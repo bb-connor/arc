@@ -10,14 +10,20 @@
 //! field on a tool call to check. `Hardened` is the same three parts with every
 //! check an operator could add written in: the policy context is taken only
 //! from receiver-held records, request-supplied attributes that collide with
-//! receiver-owned names are refused, the decision is required to be in its
-//! canonical encoding, the two keys are required to be distinct, the decision
-//! must name this receiver, and the rule that gates the action requires an
-//! approval record the receiver already holds.
+//! receiver-owned names are refused, the identifier the decision carries for
+//! itself is claimed in a second replay table, the validity window is bounded
+//! by a receiver-held constant, the decision is required to be in its canonical
+//! encoding, the two keys are required to be distinct, the decision must name
+//! this receiver, and the rule that gates the action requires an approval
+//! record the receiver already holds.
 //!
-//! Neither profile is a straw man and neither is Chio. The distance between
-//! them is the point: the same three components yield either, and nothing in
-//! the composition tells an operator which one they deployed.
+//! Both wirings are reported, and the distance between them is itself a result:
+//! the same three components yield either, and nothing in the composition tells
+//! an operator which one they deployed.
+//!
+//! A store failure is not a denial. It leaves this path as an error, so the
+//! tool never runs and no record is written: an unavailable store refuses by
+//! failing rather than by answering.
 
 use crate::receiver_state::ReceiverState;
 use crate::request::{ComposedEnvelope, PolicyDecision, AUTHORIZATION_SCHEMA};
@@ -68,24 +74,26 @@ pub const DENIAL_CODES: &[(&str, u32)] = &[
     ("authorization.malformed", 5),
     ("authorization.schema_unrecognised", 5),
     ("authorization.signature_invalid", 6),
-    ("authorization.noncanonical", 7),
-    ("signer.not_distinct", 8),
-    ("authorization.expired", 9),
-    ("authorization.verdict_deny", 10),
-    ("authorization.audience_mismatch", 11),
-    ("authorization.principal_mismatch", 12),
-    ("authorization.action_mismatch", 13),
-    ("authorization.args_digest_mismatch", 14),
-    ("agreement.unknown", 15),
-    ("agreement.party_mismatch", 16),
-    ("agreement.action_not_covered", 17),
-    ("agreement.superseded", 18),
-    ("context.request_supplied_attribute", 19),
-    ("policy.no_rule", 20),
-    ("policy.assurance_insufficient", 21),
-    ("policy.amount_over_ceiling", 22),
-    ("policy.approval_missing", 23),
-    ("store.unavailable", 24),
+    ("replay.authorization_seen", 7),
+    ("authorization.noncanonical", 8),
+    ("signer.not_distinct", 9),
+    ("authorization.expired", 10),
+    ("authorization.window_too_long", 10),
+    ("authorization.verdict_deny", 11),
+    ("authorization.audience_mismatch", 12),
+    ("authorization.principal_mismatch", 13),
+    ("authorization.action_mismatch", 14),
+    ("authorization.args_digest_mismatch", 15),
+    ("agreement.unknown", 16),
+    ("agreement.receiver_not_party", 17),
+    ("agreement.party_mismatch", 17),
+    ("agreement.action_not_covered", 18),
+    ("agreement.superseded", 19),
+    ("context.request_supplied_attribute", 20),
+    ("policy.no_rule", 21),
+    ("policy.assurance_insufficient", 22),
+    ("policy.amount_over_ceiling", 23),
+    ("policy.approval_missing", 24),
 ];
 
 /// The signed record the composed receiver writes for every decision, admit or
@@ -128,12 +136,19 @@ pub struct AdmissionOutcome {
     pub response_ready: Duration,
     /// Time to the end of the whole path, durable append included.
     pub total: Duration,
-    /// Time spent in the checks alone: signature verification, canonical
-    /// encoding, the consistency comparisons, the table lookups and the rule
-    /// evaluation, with the two durable writes excluded. This is the span in
-    /// which the two profiles differ, and it is the only one small enough for
-    /// that difference to be resolvable.
+    /// The span from the start of peer resolution to the end of rule
+    /// evaluation, less the durable replay claims that sit inside it. The
+    /// argument digest, the decision parse, the record encoding and the record
+    /// signature are outside it. This is the span in which the two profiles'
+    /// checks differ, and it is the only one small enough for that difference
+    /// to be resolvable.
     pub checks: Duration,
+    /// Time spent in the durable replay claims alone. The composed wiring makes
+    /// one, on the request identifier; the hardened wiring makes a second, on
+    /// the identifier the decision carries for itself. It is reported apart
+    /// from the checks so the cost of that second write is a measured span
+    /// rather than a difference between two whole-path medians.
+    pub durable_claims: Duration,
 }
 
 #[derive(Debug)]
@@ -163,6 +178,13 @@ impl From<StoreError> for ReceiverError {
 /// trying to decide its own admission.
 pub const RECEIVER_OWNED_ATTRIBUTES: &[&str] =
     &["assurance_level", "approval", "agreement_version"];
+
+/// Longest validity window the hardened wiring accepts, counted from the
+/// decision's own issuance timestamp to its own expiry. It is a receiver-held
+/// constant, which is what a maximum token age is in every verifier that
+/// enforces one. The composed wiring has no such bound, so the only limit on
+/// the window is the one the signer wrote into it.
+pub const MAX_AUTHORIZATION_WINDOW_MS: u64 = 300_000;
 
 pub struct ComposedReceiver<'a> {
     pub state: &'a ReceiverState,
@@ -201,11 +223,11 @@ impl ComposedReceiver<'_> {
             .map(|parsed| parsed.agreement_id.clone())
             .unwrap_or_default();
 
-        // The checks span is every comparison, signature verification and table
-        // lookup the receiver performs, less the durable claim that sits in the
-        // middle of them. It is the only span small enough for the difference
-        // between the two profiles to be resolvable against a store that
-        // fsyncs, so it is timed apart from the whole path.
+        // The checks span runs from the start of peer resolution to the end of
+        // rule evaluation, less the durable replay claims that sit inside it.
+        // It is the only span small enough for the difference between the two
+        // profiles to be resolvable against a store that fsyncs, so it is timed
+        // apart from the whole path.
         let checks_started = Instant::now();
         let mut claim_cost = Duration::ZERO;
         let verdict = self.evaluate(
@@ -275,6 +297,7 @@ impl ComposedReceiver<'_> {
             response_ready,
             total: started.elapsed(),
             checks,
+            durable_claims: claim_cost,
         })
     }
 
@@ -295,8 +318,8 @@ impl ComposedReceiver<'_> {
         decision: Option<&PolicyDecision>,
         args_digest: &str,
         now_unix_ms: u64,
-        // The durable claim's cost, which the caller subtracts from the span it
-        // timed around this call to leave the checks alone.
+        // What the durable replay claims cost, which the caller subtracts from
+        // the span it timed around this call to leave the checks alone.
         claim_cost: &mut Duration,
     ) -> Result<Option<Denial>, ReceiverError> {
         let request = &envelope.request;
@@ -328,12 +351,14 @@ impl ComposedReceiver<'_> {
 
         // Step 4. The replay table. A single-row insert on a primary key, so
         // exactly one of any set of concurrent claims wins. The insert is
-        // durable, and its cost is reported separately from the checks.
+        // durable, and its cost is reported separately from the checks. The key
+        // is the identifier the caller chose, so it makes an identifier
+        // single-use and says nothing about the authorization presented with it.
         let claim_started = Instant::now();
         let claim =
             self.store
                 .claim_request_id(&request.request_id, &request.caller, now_unix_ms)?;
-        *claim_cost = claim_started.elapsed();
+        *claim_cost += claim_started.elapsed();
         if claim == NonceClaim::Seen {
             return Ok(Some(denial("replay.request_id_seen", 4)));
         }
@@ -357,83 +382,121 @@ impl ComposedReceiver<'_> {
             return Ok(Some(denial("authorization.signature_invalid", 6)));
         }
 
-        // Step 7. Canonical encoding. Only the hardened profile requires the
+        // Step 7. The authorization's own replay table. The same single-row
+        // insert on a primary key as step 4, keyed by the identifier inside the
+        // signed bytes rather than by the one the caller chose outside them.
+        // Only the hardened profile claims it: the parts document a replay
+        // table over the request identifier, and it takes an operator to write
+        // the second one.
+        if self.profile == BaselineProfile::Hardened {
+            let claim_started = Instant::now();
+            let claim = self.store.claim_authorization(
+                decision.decision_id.as_str(),
+                &request.caller,
+                now_unix_ms,
+            )?;
+            *claim_cost += claim_started.elapsed();
+            if claim == NonceClaim::Seen {
+                return Ok(Some(denial("replay.authorization_seen", 7)));
+            }
+        }
+
+        // Step 8. Canonical encoding. Only the hardened profile requires the
         // received bytes to be the canonical encoding of what they parse to,
         // which is what would make a reordering visible.
         if self.profile == BaselineProfile::Hardened {
             let canonical = canonical_json_bytes(decision)
                 .map_err(|error| ReceiverError::Canonical(error.to_string()))?;
             if canonical.as_slice() != request.authorization_json.as_bytes() {
-                return Ok(Some(denial("authorization.noncanonical", 7)));
+                return Ok(Some(denial("authorization.noncanonical", 8)));
             }
         }
 
-        // Step 8. Distinctness of the two keys. Only the hardened profile
+        // Step 9. Distinctness of the two keys. Only the hardened profile
         // refuses one party holding both.
         if self.profile == BaselineProfile::Hardened
             && pin.channel_key.to_hex() == pin.policy_key.to_hex()
         {
-            return Ok(Some(denial("signer.not_distinct", 8)));
+            return Ok(Some(denial("signer.not_distinct", 9)));
         }
 
-        // Step 9. Validity window.
+        // Step 10. Validity window. Both profiles refuse a closed window. Only
+        // the hardened profile bounds how long a window the signer may open,
+        // against a constant the receiver holds.
         if decision.expires_at_unix_ms <= now_unix_ms {
-            return Ok(Some(denial("authorization.expired", 9)));
+            return Ok(Some(denial("authorization.expired", 10)));
+        }
+        if self.profile == BaselineProfile::Hardened
+            && decision
+                .expires_at_unix_ms
+                .saturating_sub(decision.issued_at_unix_ms)
+                > MAX_AUTHORIZATION_WINDOW_MS
+        {
+            return Ok(Some(denial("authorization.window_too_long", 10)));
         }
 
-        // Step 10. The verdict the signer reached.
+        // Step 11. The verdict the signer reached.
         if decision.verdict != "allow" {
-            return Ok(Some(denial("authorization.verdict_deny", 10)));
+            return Ok(Some(denial("authorization.verdict_deny", 11)));
         }
 
-        // Step 11. Audience. A tool call has no audience field, so only the
+        // Step 12. Audience. A tool call has no audience field, so only the
         // hardened profile carries and checks one.
         if self.profile == BaselineProfile::Hardened && decision.audience != self.state.receiver_id
         {
-            return Ok(Some(denial("authorization.audience_mismatch", 11)));
+            return Ok(Some(denial("authorization.audience_mismatch", 12)));
         }
 
-        // Steps 12 to 14. Internal consistency: the decision must be about
+        // Steps 13 to 15. Internal consistency: the decision must be about
         // this caller, this action and these arguments. The first two are
         // comparisons between fields the sender supplied; the third recomputes
         // from the request.
         if decision.principal != request.caller {
-            return Ok(Some(denial("authorization.principal_mismatch", 12)));
+            return Ok(Some(denial("authorization.principal_mismatch", 13)));
         }
         if decision.action != request.tool_name {
-            return Ok(Some(denial("authorization.action_mismatch", 13)));
+            return Ok(Some(denial("authorization.action_mismatch", 14)));
         }
         if decision.tool_args_sha256 != args_digest {
-            return Ok(Some(denial("authorization.args_digest_mismatch", 14)));
+            return Ok(Some(denial("authorization.args_digest_mismatch", 15)));
         }
 
-        // Steps 15 to 18. The agreement the decision names, resolved in the
-        // receiver's own table.
+        // Steps 16 to 19. The agreement the decision names, resolved in the
+        // receiver's own table. Resolving it means reading the participant list,
+        // so both profiles ask whether this receiver is a party to the agreement
+        // as well as whether the caller is.
         let Some(agreement) = self.state.agreement(&decision.agreement_id) else {
-            return Ok(Some(denial("agreement.unknown", 15)));
+            return Ok(Some(denial("agreement.unknown", 16)));
         };
+        if !agreement
+            .participants
+            .iter()
+            .any(|participant| participant == &self.state.receiver_id)
+        {
+            return Ok(Some(denial("agreement.receiver_not_party", 17)));
+        }
         if !agreement
             .participants
             .iter()
             .any(|participant| participant == &request.caller)
         {
-            return Ok(Some(denial("agreement.party_mismatch", 16)));
+            return Ok(Some(denial("agreement.party_mismatch", 17)));
         }
         if !agreement
             .allowed_actions
             .iter()
             .any(|action| action == &request.tool_name)
         {
-            return Ok(Some(denial("agreement.action_not_covered", 17)));
+            return Ok(Some(denial("agreement.action_not_covered", 18)));
         }
         // Only the hardened profile refuses an agreement its own record marks
         // superseded. The request carries no version, so neither profile can
-        // tell which version the sender decided under.
+        // tell which version of a live record the sender decided under.
         if self.profile == BaselineProfile::Hardened && agreement.superseded {
-            return Ok(Some(denial("agreement.superseded", 18)));
+            return Ok(Some(denial("agreement.superseded", 19)));
         }
 
-        // Step 19. The policy context. The composed wiring builds it from the
+        // Step 20. The policy context. The composed wiring builds it from the
         // incoming request, which is how a policy decision point is called.
         // The hardened wiring builds it from receiver-held records only, and
         // refuses a request that supplies an attribute the receiver owns.
@@ -445,19 +508,19 @@ impl ComposedReceiver<'_> {
             BaselineProfile::Hardened => {
                 for owned in RECEIVER_OWNED_ATTRIBUTES {
                     if request.context.contains_key(*owned) {
-                        return Ok(Some(denial("context.request_supplied_attribute", 19)));
+                        return Ok(Some(denial("context.request_supplied_attribute", 20)));
                     }
                 }
                 agreement.assurance_level.clone()
             }
         };
 
-        // Steps 20 to 23. The receiver's own rule set.
+        // Steps 21 to 24. The receiver's own rule set.
         let Some(rule) = self.state.rule_for(&request.tool_name) else {
-            return Ok(Some(denial("policy.no_rule", 20)));
+            return Ok(Some(denial("policy.no_rule", 21)));
         };
         if assurance != rule.required_assurance {
-            return Ok(Some(denial("policy.assurance_insufficient", 21)));
+            return Ok(Some(denial("policy.assurance_insufficient", 22)));
         }
         let amount = request
             .tool_args
@@ -465,7 +528,7 @@ impl ComposedReceiver<'_> {
             .and_then(Value::as_u64)
             .unwrap_or(0);
         if amount > rule.max_amount_minor || amount > agreement.max_amount_minor {
-            return Ok(Some(denial("policy.amount_over_ceiling", 22)));
+            return Ok(Some(denial("policy.amount_over_ceiling", 23)));
         }
         if rule.requires_local_approval {
             let approval_id = request
@@ -491,7 +554,7 @@ impl ComposedReceiver<'_> {
                     .unwrap_or(false),
             };
             if !satisfied {
-                return Ok(Some(denial("policy.approval_missing", 23)));
+                return Ok(Some(denial("policy.approval_missing", 24)));
             }
         }
 

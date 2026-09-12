@@ -691,12 +691,17 @@ struct CallDecision {
 ///
 /// `attributed_nanos` is the sum of the measured parts and `unattributed_nanos`
 /// the remainder of the window: the guard pipeline, the binding comparisons, the
-/// two DSSE signature verifications, canonicalization, the durable pre-dispatch
-/// admission record, and receipt construction and signing. It is reported rather
-/// than modelled. `overattributed_nanos` is the reverse remainder and must be
-/// zero within [`BUDGET_TOLERANCE_NANOS`]: a positive value means the counters
-/// picked up work from another call and the decomposition does not describe this
-/// one.
+/// two DSSE signature verifications, canonicalization, and receipt construction
+/// and signing. Those run inside the admission hook, where this example has no
+/// dependency to put a stopwatch on, so the remainder is reported whole rather
+/// than split further.
+///
+/// The parts and that remainder are the window exactly, by construction, so
+/// their sum is not a check. [`ReceiverBudget::check`] is one-sided:
+/// `overattributed_nanos` is the reverse remainder and must be zero within
+/// [`BUDGET_TOLERANCE_NANOS`], because a positive value means the counters
+/// picked up work from another call. Nothing bounds how large
+/// `unattributed_nanos` may be.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ReceiverBudget {
@@ -825,6 +830,9 @@ impl ReceiverBudget {
     }
 
     /// Refuse a decomposition whose parts cannot have come from this call.
+    ///
+    /// Only over-attribution is refused. Under-attribution is the ordinary case:
+    /// it is the share of the window that has no dependency to attribute it to.
     fn check(&self, request_id: &str) -> Result<(), BoxError> {
         if self.overattributed_nanos > BUDGET_TOLERANCE_NANOS {
             return Err(format!(
@@ -5257,6 +5265,11 @@ async fn run_race(args: &Args) -> Result<(), BoxError> {
     let before = sender.stats().await?;
     let mut rounds = Vec::new();
     let mut freshness_denials = 0_u64;
+    // Rounds thrown away whole because a racer hit a revocation-freshness denial.
+    // A discarded round is one whose latencies are not in the reported
+    // distributions, so the count is reported beside them: the distributions are
+    // conditioned on rounds that saw no freshness denial.
+    let mut discarded_rounds = 0_u64;
     let freshness_budget = repeats.saturating_mul(4).max(20);
 
     while (rounds.len() as u64) < repeats {
@@ -5303,6 +5316,7 @@ async fn run_race(args: &Args) -> Result<(), BoxError> {
         // about, so the whole round is discarded and run again.
         if freshness_in_round > 0 {
             freshness_denials = freshness_denials.saturating_add(freshness_in_round);
+            discarded_rounds = discarded_rounds.saturating_add(1);
             if freshness_denials > freshness_budget {
                 return Err(format!(
                     "the contention run absorbed {freshness_denials} revocation-freshness \
@@ -5386,12 +5400,15 @@ async fn run_race(args: &Args) -> Result<(), BoxError> {
                 "winnerLatenciesMs": winner_latencies,
                 "loserLatenciesMs": loser_latencies,
                 "freshnessDenialsAbsorbed": freshness_denials,
+                "roundsDiscarded": discarded_rounds,
+                "roundsAttempted": rounds.len() as u64 + discarded_rounds,
                 "admissionStore": after.admission_store,
             }),
         )?;
     }
     println!(
-        "continuation race: {workers} racers over {} rounds admitted exactly one each",
+        "continuation race: {workers} racers over {} rounds admitted exactly one each \
+         ({discarded_rounds} rounds discarded)",
         rounds.len()
     );
     Ok(())

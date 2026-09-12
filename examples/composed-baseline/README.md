@@ -41,13 +41,15 @@ carries no audience to check.
 
 `hardened` is the same parts with every check an operator could reasonably add
 written in: the policy context is built only from receiver-held records and a
-request that supplies an attribute the receiver owns is refused, the decision
-must be in its canonical encoding, the two pinned keys must be distinct, the
-decision must name this receiver, an agreement the receiver has retired is
-refused, and the rule that gates the action resolves its approval in the
-receiver's own table and takes nothing from the request.
+request that supplies an attribute the receiver owns is refused, the identifier
+the signed decision carries for itself is claimed in a second replay table, the
+validity window is bounded by a constant the receiver holds, the decision must
+be in its canonical encoding, the two pinned keys must be distinct, the decision
+must name this receiver, an agreement the receiver has retired is refused, and
+the rule that gates the action resolves its approval in the receiver's own table
+and takes nothing from the request.
 
-Neither is a straw man. Reporting the hardened wiring alone would credit the
+Both are reported. Reporting the hardened wiring alone would credit the
 composition with checks that no part of it requires; reporting the composed
 wiring alone would understate what a careful operator reaches. The distance
 between them is itself a result: the same three components yield either, and
@@ -55,9 +57,10 @@ nothing in the composition records which one an operator deployed.
 
 ## The admission path
 
-Twenty-three numbered steps with a closed denial vocabulary, so a denial can be
+Twenty-four numbered steps with a closed denial vocabulary, so a denial can be
 reported at a step. `src/receiver.rs` carries the path and `DENIAL_CODES` the
-vocabulary.
+vocabulary. A store failure is not in that vocabulary: it leaves the path as an
+error, so the tool never runs and no record is written.
 
 ## Running it
 

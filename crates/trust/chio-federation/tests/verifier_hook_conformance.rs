@@ -27,13 +27,23 @@
 //! receipt, the lease and the governance record; the hook resolves none of the
 //! three. The hook enforces the single-use continuation, the agreement scope,
 //! the ladder intersection and the request's own smuggling refusals; the
-//! offline verifier sees none of the four. A reader who needs one sentence: the
-//! two deciders agree on everything the envelope alone determines and diverge
-//! exactly where one of them holds state the other does not.
+//! offline verifier sees none of the four. The two also read the participants'
+//! public keys out of two different receiver-owned stores: the verifier from
+//! its pin set, the hook from the activated agreement, which is its own
+//! divergence and has its own case here.
+//!
+//! Coverage is exact and asserted mechanically rather than claimed. The corpus
+//! exercises all sixteen rejection codes `VerifierError::code` can return and
+//! nineteen of the twenty-four `chio_treaty_` codes the runtime registry
+//! defines; `the_corpus_covers_every_verifier_rejection_class` and
+//! `the_agreement_scoped_hook_codes_the_corpus_covers` name both sets and the
+//! five codes no case reaches. This is a corpus, not a proof: it establishes
+//! how the two deciders relate on these inputs and nothing about inputs it does
+//! not contain, so a check added to either decider must be added here too.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use base64::Engine as _;
 use chio_core_types::capability::{
@@ -45,15 +55,14 @@ use chio_core_types::crypto::{canonical_json_bytes, sha256_hex, Keypair};
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
 use chio_core_types::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision as ReceiptDecision,
-    decision::ToolCallAction,
-    kinds::BoundaryClass, kinds::ReceiptKind, kinds::RedactionMode, kinds::ToolOrigin,
-    kinds::TrustLevel, metadata::ActorRef,
+    decision::ToolCallAction, kinds::BoundaryClass, kinds::ReceiptKind, kinds::RedactionMode,
+    kinds::ToolOrigin, kinds::TrustLevel, metadata::ActorRef,
 };
+use chio_federation::bilateral::RejectionCode;
 use chio_federation::bilateral_dsse::{
-    pae, sign_chio_bilateral_dsse_envelope, BilateralPredicateExtensions,
-    CapabilityLeaseRef, DsseEnvelope, DsseSignature, DsseStatement, GovernanceReceiptRef,
-    HashRecord, Keyid, PolicyEvaluationSummary, PolicyVerdict, TreatyBindingRef,
-    PAYLOAD_TYPE_IN_TOTO,
+    pae, sign_chio_bilateral_dsse_envelope, BilateralPredicateExtensions, CapabilityLeaseRef,
+    DsseEnvelope, DsseSignature, DsseStatement, GovernanceReceiptRef, HashRecord, Keyid,
+    PolicyEvaluationSummary, PolicyVerdict, TreatyBindingRef, PAYLOAD_TYPE_IN_TOTO,
 };
 use chio_federation::bilateral_verifier::{
     verify_chio_bilateral_invocation, ActionClassKind, ChioBilateralVerifierConfig,
@@ -74,15 +83,17 @@ use chio_runtime_core::{
     RuntimePheromonePolicy, RuntimePheromonePolicyRule, RuntimeRequestBinding,
     RuntimeTrustedVerifierKey, RuntimeVerifierTrustBundleV4, TreatyScope,
     CHIO_BILATERAL_INVOCATION_SCHEMA, CHIO_CROSS_KERNEL_CONTINUATION_SCHEMA,
-    CHIO_GOVERNANCE_LADDER_MANIFEST_SCHEMA,
-    CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA, CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
-    CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA, CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
+    CHIO_GOVERNANCE_LADDER_MANIFEST_SCHEMA, CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA,
+    CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA, CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA,
+    CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA, CHIO_RUNTIME_FAILURE_CODES,
     CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA, CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA,
     CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA, CHIO_TREATY_SCOPE_SCHEMA,
 };
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 type BoxError = Box<dyn std::error::Error>;
+/// Mutation of the decoded statement, applied before it is re-signed.
+type StatementMutation = fn(&mut DsseStatement, &Fixture);
 /// Mutation of the receiver's runtime state, which can fail against the store.
 type HookStateMutation = fn(&mut HookState) -> Result<(), BoxError>;
 
@@ -91,16 +102,27 @@ const RECEIVER_KERNEL: &str = "kernel.vendor-b";
 const TOOL_SERVER: &str = "vendor-ledger";
 const TOOL_NAME: &str = "close_account";
 const ACTION_CLASS: &str = "workflow.destructive.vendor_call";
+const OTHER_ACTION_CLASS: &str = "workflow.destructive.other";
 const CAPABILITY_ID: &str = "cap-conformance-1";
+const OTHER_CAPABILITY_ID: &str = "cap-conformance-other";
 const LEASE_ID: &str = "lease-conformance-1";
 const GOVERNANCE_ID: &str = "gov-conformance-1";
 const ADMISSION_ID: &str = "adm-conformance-1";
 const REQUEST_ID: &str = "req-conformance-1";
 const CONTINUATION_ID: &str = "continue-conformance-1";
 const INVOCATION_ID: &str = "invoke-conformance-1";
+const LINEAGE_BUNDLE_ID: &str = "lineage-bundle-conformance-1";
 const DSSE_ID: &str = "bilateral-dsse-conformance-1";
 const VERIFIER_ID: &str = "did:chio:receiver-verifier";
 const VERIFIER_KEY_ID: &str = "verifier-key-1";
+/// Identifier no case ever stores, for the artifact-does-not-resolve cases.
+const ABSENT_ID: &str = "conformance-absent";
+
+const ORIGIN_SEED: [u8; 32] = [0x11; 32];
+const RECEIVER_SEED: [u8; 32] = [0x22; 32];
+/// The origin's key after a rotation the receiver carried into the activated
+/// agreement but not into its pin set.
+const ROTATED_ORIGIN_SEED: [u8; 32] = [0x33; 32];
 
 const ISSUED_AT_MS: u64 = 1_800_000_000_000;
 const NOW_MS: u64 = 1_800_000_001_000;
@@ -157,7 +179,7 @@ struct Case {
     name: &'static str,
     /// Applied to the decoded statement before it is re-signed, so the envelope
     /// stays cryptographically valid over the mutated bytes.
-    mutate_statement: Option<fn(&mut DsseStatement)>,
+    mutate_statement: Option<StatementMutation>,
     /// Applied to the envelope after signing, for the malformed-envelope cases.
     mutate_envelope: Option<fn(&mut DsseEnvelope)>,
     /// Applied to the receiver-owned state the offline verifier reads.
@@ -174,14 +196,12 @@ struct Case {
     divergence: &'static str,
 }
 
-// ---------------------------------------------------------------------------
-// The corpus
-// ---------------------------------------------------------------------------
-
-fn corpus() -> Vec<Case> {
-    vec![
-        Case {
-            name: "accept",
+impl Case {
+    /// A case both deciders admit. The relation and codes are narrowed by one
+    /// of the four terminal builders below.
+    fn new(name: &'static str) -> Self {
+        Self {
+            name,
             mutate_statement: None,
             mutate_envelope: None,
             mutate_verifier_state: None,
@@ -190,25 +210,82 @@ fn corpus() -> Vec<Case> {
             verifier_code: "",
             hook_code: "",
             divergence: "",
-        },
+        }
+    }
+
+    fn statement(mut self, mutate: StatementMutation) -> Self {
+        self.mutate_statement = Some(mutate);
+        self
+    }
+
+    fn envelope(mut self, mutate: fn(&mut DsseEnvelope)) -> Self {
+        self.mutate_envelope = Some(mutate);
+        self
+    }
+
+    fn verifier_state(mut self, mutate: fn(&mut VerifierState)) -> Self {
+        self.mutate_verifier_state = Some(mutate);
+        self
+    }
+
+    fn hook_state(mut self, mutate: HookStateMutation) -> Self {
+        self.mutate_hook_state = Some(mutate);
+        self
+    }
+
+    fn agree_reject(mut self, verifier_code: &'static str, hook_code: &'static str) -> Self {
+        self.relation = Relation::AgreeReject;
+        self.verifier_code = verifier_code;
+        self.hook_code = hook_code;
+        self
+    }
+
+    fn verifier_only(mut self, verifier_code: &'static str, divergence: &'static str) -> Self {
+        self.relation = Relation::VerifierOnly;
+        self.verifier_code = verifier_code;
+        self.divergence = divergence;
+        self
+    }
+
+    fn hook_only(mut self, hook_code: &'static str, divergence: &'static str) -> Self {
+        self.relation = Relation::HookOnly;
+        self.hook_code = hook_code;
+        self.divergence = divergence;
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The corpus
+// ---------------------------------------------------------------------------
+
+fn corpus() -> Vec<Case> {
+    vec![
+        Case::new("accept"),
         // -- both reject: the envelope alone decides ----------------------
-        Case {
-            name: "wrong payload type",
-            mutate_statement: None,
-            mutate_envelope: Some(|envelope| {
+        Case::new("wrong payload type")
+            .envelope(|envelope| {
                 envelope.payload_type = "application/json".to_string();
-            }),
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::AgreeReject,
-            verifier_code: "dsse.malformed",
-            hook_code: "chio_treaty_unverified_required_evidence",
-            divergence: "",
-        },
-        Case {
-            name: "payload mutated after signing",
-            mutate_statement: None,
-            mutate_envelope: Some(|envelope| {
+            })
+            .agree_reject("dsse.malformed", "chio_treaty_unverified_required_evidence"),
+        Case::new("payload is not parseable JSON")
+            .envelope(|envelope| {
+                envelope.payload = base64::engine::general_purpose::STANDARD.encode(b"{\"_type\":");
+            })
+            .agree_reject(
+                "statement.malformed",
+                "chio_treaty_unverified_required_evidence",
+            ),
+        Case::new("statement type is not in-toto Statement v1")
+            .statement(|statement, _fixture| {
+                statement.statement_type = "https://in-toto.io/Statement/v0.1".to_string();
+            })
+            .agree_reject(
+                "statement.schema_invalid",
+                "chio_treaty_unverified_required_evidence",
+            ),
+        Case::new("payload mutated after signing")
+            .envelope(|envelope| {
                 let mut decoded = base64::engine::general_purpose::STANDARD
                     .decode(envelope.payload.as_bytes())
                     .unwrap_or_default();
@@ -216,375 +293,453 @@ fn corpus() -> Vec<Case> {
                     decoded[position] = b'1';
                 }
                 envelope.payload = base64::engine::general_purpose::STANDARD.encode(&decoded);
-            }),
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::AgreeReject,
-            verifier_code: "signature.server_a_invalid",
-            hook_code: "chio_treaty_unverified_required_evidence",
-            divergence: "",
-        },
-        Case {
-            name: "one signature removed",
-            mutate_statement: None,
-            mutate_envelope: Some(|envelope| {
+            })
+            .agree_reject(
+                "signature.server_a_invalid",
+                "chio_treaty_unverified_required_evidence",
+            ),
+        // The two signature-isolation cases. Each leaves one signature valid
+        // over unmodified bytes and forges the other, which is what separates
+        // what each participant's key contributes from what the envelope as a
+        // whole contributes.
+        Case::new("only the origin's signature is forged")
+            .envelope(|envelope| {
+                if let Some(signature) = envelope.signatures.first_mut() {
+                    signature.sig = forged_signature(&signature.sig);
+                }
+            })
+            .agree_reject(
+                "signature.server_a_invalid",
+                "chio_treaty_unverified_required_evidence",
+            ),
+        Case::new("only the receiver's signature is forged")
+            .envelope(|envelope| {
+                if let Some(signature) = envelope.signatures.get_mut(1) {
+                    signature.sig = forged_signature(&signature.sig);
+                }
+            })
+            .agree_reject(
+                "signature.server_b_invalid",
+                "chio_treaty_unverified_required_evidence",
+            ),
+        Case::new("one signature removed")
+            .envelope(|envelope| {
                 envelope.signatures.truncate(1);
-            }),
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::AgreeReject,
-            verifier_code: "dsse.malformed",
-            hook_code: "chio_treaty_unverified_required_evidence",
-            divergence: "",
-        },
-        Case {
-            name: "duplicate signature keyid",
-            mutate_statement: None,
-            mutate_envelope: Some(|envelope| {
+            })
+            .agree_reject("dsse.malformed", "chio_treaty_unverified_required_evidence"),
+        Case::new("duplicate signature keyid")
+            .envelope(|envelope| {
                 if envelope.signatures.len() == 2 {
                     envelope.signatures[1].keyid = envelope.signatures[0].keyid.clone();
                 }
-            }),
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::AgreeReject,
-            verifier_code: "dsse.malformed",
-            hook_code: "chio_treaty_unverified_required_evidence",
-            divergence: "",
-        },
-        Case {
-            name: "predicate type is the compatibility profile",
-            mutate_statement: Some(|statement| {
+            })
+            .agree_reject("dsse.malformed", "chio_treaty_unverified_required_evidence"),
+        Case::new("predicate type is the compatibility profile")
+            .statement(|statement, _fixture| {
                 statement.predicate_type = "chio.bilateral-signature-slice.v1".to_string();
-            }),
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::AgreeReject,
-            verifier_code: "predicate.type_unrecognised",
-            hook_code: "chio_treaty_unverified_required_evidence",
-            divergence: "",
-        },
-        Case {
-            name: "origin kernel renamed to an unpinned identity",
-            mutate_statement: Some(|statement| {
+            })
+            .agree_reject(
+                "predicate.type_unrecognised",
+                "chio_treaty_unverified_required_evidence",
+            ),
+        Case::new("origin kernel renamed to an unpinned identity")
+            .statement(|statement, _fixture| {
                 statement.predicate.tool_server_a.kernel_id = "kernel.impostor".to_string();
                 if let Some(treaty) = statement.predicate.treaty_binding_ref.as_mut() {
                     treaty.signer_kernel_ids[0] = "kernel.impostor".to_string();
                 }
-            }),
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::AgreeReject,
-            verifier_code: "peer.unpinned_or_keyid_mismatch",
-            hook_code: "chio_treaty_dsse_binding_mismatch",
-            divergence: "",
-        },
-        Case {
-            name: "declared passport fingerprint disagrees with the pin",
-            mutate_statement: Some(|statement| {
+            })
+            .agree_reject(
+                "peer.unpinned_or_keyid_mismatch",
+                "chio_treaty_dsse_binding_mismatch",
+            ),
+        Case::new("declared passport fingerprint disagrees with the pin")
+            .statement(|statement, _fixture| {
                 statement.predicate.tool_server_a.passport_key_fingerprint =
                     Keyid(sha256_hex(b"conformance:not-the-pinned-key"));
-            }),
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::AgreeReject,
-            verifier_code: "peer.unpinned_or_keyid_mismatch",
-            hook_code: "chio_treaty_unverified_required_evidence",
-            divergence: "",
-        },
-        Case {
-            name: "the two verdicts disagree",
-            mutate_statement: Some(|statement| {
+            })
+            .agree_reject(
+                "peer.unpinned_or_keyid_mismatch",
+                "chio_treaty_unverified_required_evidence",
+            ),
+        Case::new("the two verdicts disagree")
+            .statement(|statement, _fixture| {
                 if let Some(summary) = statement.predicate.policy_evaluation_summary.as_mut() {
                     summary.server_b_verdict.verdict = "deny".to_string();
                     summary.joint_disposition = None;
                 }
-            }),
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::AgreeReject,
-            verifier_code: "policy.verdict_disagreement",
-            hook_code: "chio_treaty_unverified_required_evidence",
-            divergence: "",
-        },
-        Case {
-            name: "request hash substituted in the binding reference",
-            mutate_statement: Some(|statement| {
+            })
+            .agree_reject(
+                "policy.verdict_disagreement",
+                "chio_treaty_unverified_required_evidence",
+            ),
+        Case::new("request hash substituted in the binding reference")
+            .statement(|statement, _fixture| {
                 if let Some(treaty) = statement.predicate.treaty_binding_ref.as_mut() {
                     treaty.request_sha256 = sha256_hex(b"conformance:other-arguments");
                 }
-            }),
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::AgreeReject,
-            verifier_code: "predicate.schema_invalid",
-            hook_code: "chio_treaty_dsse_binding_mismatch",
-            divergence: "",
-        },
-        Case {
-            name: "signer order transposed in the binding reference",
-            mutate_statement: Some(|statement| {
+            })
+            .agree_reject(
+                "predicate.schema_invalid",
+                "chio_treaty_dsse_binding_mismatch",
+            ),
+        Case::new("signer order transposed in the binding reference")
+            .statement(|statement, _fixture| {
                 if let Some(treaty) = statement.predicate.treaty_binding_ref.as_mut() {
                     treaty.signer_kernel_ids.swap(0, 1);
                 }
-            }),
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::AgreeReject,
-            verifier_code: "predicate.schema_invalid",
-            hook_code: "chio_treaty_unverified_required_evidence",
-            divergence: "",
-        },
-        Case {
-            name: "lease reference substituted in the binding reference",
-            mutate_statement: Some(|statement| {
+            })
+            .agree_reject(
+                "predicate.schema_invalid",
+                "chio_treaty_unverified_required_evidence",
+            ),
+        Case::new("lease reference substituted in the binding reference")
+            .statement(|statement, _fixture| {
                 if let Some(treaty) = statement.predicate.treaty_binding_ref.as_mut() {
                     treaty.lease_refs = vec!["lease-conformance-other".to_string()];
                 }
-            }),
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::AgreeReject,
-            verifier_code: "predicate.schema_invalid",
-            hook_code: "chio_treaty_dsse_binding_mismatch",
-            divergence: "",
-        },
-        Case {
-            name: "consistency model downgraded below the class",
-            mutate_statement: Some(|statement| {
+            })
+            .agree_reject(
+                "predicate.schema_invalid",
+                "chio_treaty_dsse_binding_mismatch",
+            ),
+        // -- the field neither decider compares ---------------------------
+        Case::new("admission report digest substituted").statement(|statement, _fixture| {
+            if let Some(treaty) = statement.predicate.treaty_binding_ref.as_mut() {
+                treaty.admission_report_sha256 = sha256_hex(b"conformance:other-report");
+            }
+        }),
+        // -- the offline verifier checks what the hook does not ------------
+        Case::new("subject digest does not match the receipt body")
+            .statement(|statement, _fixture| {
+                statement.subject[0].digest.sha256 = sha256_hex(b"conformance:other-receipt-body");
+            })
+            .verifier_only(
+                "subject.digest_mismatch",
+                "the pre-dispatch hook never resolves the subject receipt and never reads the \
+                 statement's subject, so the subject binding of the conforming verifier's steps \
+                 17 to 19 has no counterpart on the dispatch path.",
+            ),
+        Case::new("subject receipt absent from the receiver's receipt store")
+            .verifier_state(|state| {
+                state.receipt_store = InMemoryReceiptStore::new();
+            })
+            .verifier_only(
+                "subject.digest_mismatch",
+                "the hook has no receipt store on this path, so a statement whose subject names \
+                 a receipt the receiver does not hold still admits.",
+            ),
+        Case::new("capability lease absent from the receiver's registry")
+            .verifier_state(|state| {
+                state.lease_registry = InMemoryLeaseRegistry::new();
+            })
+            .verifier_only(
+                "capability.lease_expired_or_unknown",
+                "the hook compares the binding's lease references against the lease identifier \
+                 its own admission bundle names; it does not resolve the lease record itself, so \
+                 expiry and issuer are not checked here.",
+            ),
+        Case::new("governance record absent from the receiver's store")
+            .verifier_state(|state| {
+                state.governance_store = InMemoryGovernanceReceiptStore::new();
+            })
+            .verifier_only(
+                "governance.receipt_required_missing",
+                "the hook compares governance references against its own admission bundle and \
+                 does not resolve the governance record or re-derive its digest.",
+            ),
+        Case::new("tool name absent from the verifier's action-class table")
+            .verifier_state(|state| {
+                state.action_class_table_is_empty = true;
+            })
+            .verifier_only(
+                "governance.unknown_action_class",
+                "the verifier's unknown-class policy is reject and its table is verifier-owned. \
+                 The hook reads the class out of the ladder intersection it computed itself, so \
+                 a table the verifier has not been given does not reach it.",
+            ),
+        Case::new("peer passport revoked at the pinned epoch")
+            .verifier_state(|state| {
+                state.revoke_origin = true;
+            })
+            .verifier_only(
+                "peer.revoked_at_epoch",
+                "revocation reaches the kernel through its revocation view rather than through \
+                 this hook; the hook resolves no revocation oracle.",
+            ),
+        Case::new("pinned peer has no ladder manifest reference")
+            .verifier_state(|state| {
+                state.drop_origin_ladder_ref = true;
+            })
+            .verifier_only(
+                "ladder.manifest_missing",
+                "the hook activates both manifests itself and stores their intersection, so it \
+                 checks the intersection rather than a per-peer manifest reference.",
+            ),
+        Case::new("pinned peer's ladder manifest reference is stale")
+            .verifier_state(|state| {
+                state.stale_origin_ladder_ref = true;
+            })
+            .verifier_only(
+                "ladder.manifest_stale",
+                "manifest freshness is measured against the verifier's pinned epoch, which the \
+                 hook does not hold; the hook bounds the same material through the validity \
+                 window of the intersection it stored.",
+            ),
+        // The divergence axis in the participants' keys themselves: the
+        // verifier reads them from its pin set, the hook from the activated
+        // agreement. One input, two receiver-owned sources, two answers.
+        Case::new("origin passport key rotated in the agreement but not in the pin set")
+            .statement(|statement, fixture| {
+                statement.predicate.tool_server_a.passport_key_fingerprint =
+                    Keyid::from_public_key(&fixture.rotated_origin_key.public_key());
+                if let Some(treaty) = statement.predicate.treaty_binding_ref.as_mut() {
+                    treaty.treaty_scope_sha256 = fixture.rotated_treaty_scope_sha256.clone();
+                }
+            })
+            .hook_state(|state| {
+                state.agreement = Agreement::RotatedOriginKey;
+                Ok(())
+            })
+            .verifier_only(
+                "peer.unpinned_or_keyid_mismatch",
+                "the two deciders resolve the participants' public keys from two different \
+                 receiver-owned stores: the conforming verifier from its pin set, the hook from \
+                 the activated agreement. A rotation carried into one and not the other is \
+                 admitted by whichever decider holds the newer key. A deployment MUST keep the \
+                 two in agreement or run both deciders.",
+            ),
+        // -- the hook checks what the offline verifier cannot --------------
+        Case::new("consistency model downgraded below the class")
+            .statement(|statement, _fixture| {
                 statement.predicate.consistency_model = "crdt-commutative".to_string();
                 if let Some(treaty) = statement.predicate.treaty_binding_ref.as_mut() {
                     treaty.consistency_model = "crdt-commutative".to_string();
                 }
-            }),
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::HookOnly,
-            verifier_code: "",
-            hook_code: "chio_treaty_dsse_binding_mismatch",
-            divergence: "the offline verifier has no ladder intersection, so it cannot know \
-                         which consistency model the action class requires; it accepts any \
-                         model the predicate and its binding reference agree on. The hook \
-                         compares both against the intersection it computed itself.",
-        },
-        // -- the field neither decider compares ---------------------------
-        Case {
-            name: "admission report digest substituted",
-            mutate_statement: Some(|statement| {
-                if let Some(treaty) = statement.predicate.treaty_binding_ref.as_mut() {
-                    treaty.admission_report_sha256 = sha256_hex(b"conformance:other-report");
-                }
-            }),
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::AgreeAdmit,
-            verifier_code: "",
-            hook_code: "",
-            divergence: "",
-        },
-        // -- the offline verifier checks what the hook does not ------------
-        Case {
-            name: "subject digest does not match the receipt body",
-            mutate_statement: Some(|statement| {
-                statement.subject[0].digest.sha256 = sha256_hex(b"conformance:other-receipt-body");
-            }),
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::VerifierOnly,
-            verifier_code: "subject.digest_mismatch",
-            hook_code: "",
-            divergence: "the pre-dispatch hook never resolves the subject receipt and never \
-                         reads the statement's subject, so the subject binding of the \
-                         conforming verifier's steps 17 to 19 has no counterpart on the \
-                         dispatch path.",
-        },
-        Case {
-            name: "subject receipt absent from the receiver's receipt store",
-            mutate_statement: None,
-            mutate_envelope: None,
-            mutate_verifier_state: Some(|state| {
-                state.receipt_store = InMemoryReceiptStore::new();
-            }),
-            mutate_hook_state: None,
-            relation: Relation::VerifierOnly,
-            verifier_code: "subject.digest_mismatch",
-            hook_code: "",
-            divergence: "the hook has no receipt store on this path, so a statement whose \
-                         subject names a receipt the receiver does not hold still admits.",
-        },
-        Case {
-            name: "capability lease absent from the receiver's registry",
-            mutate_statement: None,
-            mutate_envelope: None,
-            mutate_verifier_state: Some(|state| {
-                state.lease_registry = InMemoryLeaseRegistry::new();
-            }),
-            mutate_hook_state: None,
-            relation: Relation::VerifierOnly,
-            verifier_code: "capability.lease_expired_or_unknown",
-            hook_code: "",
-            divergence: "the hook compares the binding's lease references against the lease \
-                         identifier its own admission bundle names; it does not resolve the \
-                         lease record itself, so expiry and issuer are not checked here.",
-        },
-        Case {
-            name: "governance record absent from the receiver's store",
-            mutate_statement: None,
-            mutate_envelope: None,
-            mutate_verifier_state: Some(|state| {
-                state.governance_store = InMemoryGovernanceReceiptStore::new();
-            }),
-            mutate_hook_state: None,
-            relation: Relation::VerifierOnly,
-            verifier_code: "governance.receipt_required_missing",
-            hook_code: "",
-            divergence: "the hook compares governance references against its own admission \
-                         bundle and does not resolve the governance record or re-derive its \
-                         digest.",
-        },
-        Case {
-            name: "peer passport revoked at the pinned epoch",
-            mutate_statement: None,
-            mutate_envelope: None,
-            mutate_verifier_state: Some(|state| {
-                state.revoke_origin = true;
-            }),
-            mutate_hook_state: None,
-            relation: Relation::VerifierOnly,
-            verifier_code: "peer.revoked_at_epoch",
-            hook_code: "",
-            divergence: "revocation reaches the kernel through its revocation view rather \
-                         than through this hook; the hook resolves no revocation oracle.",
-        },
-        Case {
-            name: "pinned peer has no ladder manifest reference",
-            mutate_statement: None,
-            mutate_envelope: None,
-            mutate_verifier_state: Some(|state| {
-                state.drop_origin_ladder_ref = true;
-            }),
-            mutate_hook_state: None,
-            relation: Relation::VerifierOnly,
-            verifier_code: "ladder.manifest_missing",
-            hook_code: "",
-            divergence: "the hook activates both manifests itself and stores their \
-                         intersection, so it checks the intersection rather than a per-peer \
-                         manifest reference.",
-        },
-        Case {
-            name: "unanimous deny",
-            mutate_statement: Some(|statement| {
+            })
+            .hook_only(
+                "chio_treaty_dsse_binding_mismatch",
+                "the offline verifier has no ladder intersection, so it cannot know which \
+                 consistency model the action class requires; it accepts any model the predicate \
+                 and its binding reference agree on. The hook compares both against the \
+                 intersection it computed itself.",
+            ),
+        Case::new("unanimous deny")
+            .statement(|statement, _fixture| {
                 if let Some(summary) = statement.predicate.policy_evaluation_summary.as_mut() {
                     summary.server_a_verdict.verdict = "deny".to_string();
                     summary.server_b_verdict.verdict = "deny".to_string();
                     summary.joint_disposition = Some("deny".to_string());
                 }
-            }),
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: None,
-            relation: Relation::HookOnly,
-            verifier_code: "",
-            hook_code: "chio_treaty_policy_denied",
-            divergence: "a unanimous deny is a valid statement and the conforming verifier \
-                         returns it verified for audit and dispute review. Admission is the \
-                         stricter caller: the hook requires allow.",
-        },
-        // -- the hook checks what the offline verifier cannot --------------
-        Case {
-            name: "continuation already spent",
-            mutate_statement: None,
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: Some(|state| {
+            })
+            .hook_only(
+                "chio_treaty_policy_denied",
+                "a unanimous deny is a valid statement and the conforming verifier returns it \
+                 verified for audit and dispute review. Admission is the stricter caller: the \
+                 hook requires allow.",
+            ),
+        Case::new("agreement absent from the receiver's store")
+            .hook_state(|state| {
+                state.presented.treaty_scope_id = Some(ABSENT_ID.to_string());
+                Ok(())
+            })
+            .hook_only(
+                "chio_treaty_missing_scope",
+                "the agreement is resolved by identifier out of the receiver's own store; no \
+                 agreement record reaches the offline verifier at all.",
+            ),
+        Case::new("agreement scope digest presented does not match the store")
+            .hook_state(|state| {
+                state.presented.treaty_scope_sha256 =
+                    Some(sha256_hex(b"conformance:other-treaty-scope"));
+                Ok(())
+            })
+            .hook_only(
+                "chio_treaty_scope_hash_mismatch",
+                "the agreement is resolved by identifier out of the receiver's own store and \
+                 compared against the digest the request presented. No agreement record reaches \
+                 the offline verifier.",
+            ),
+        Case::new("action class outside the agreement's allowed classes")
+            .statement(|statement, fixture| {
+                if let Some(treaty) = statement.predicate.treaty_binding_ref.as_mut() {
+                    treaty.treaty_scope_sha256 = fixture.restricted_treaty_scope_sha256.clone();
+                }
+            })
+            .hook_state(|state| {
+                state.agreement = Agreement::RestrictedActionClasses;
+                Ok(())
+            })
+            .hook_only(
+                "chio_treaty_action_class_not_allowed",
+                "which classes the two organizations put in scope is a field of the agreement \
+                 the receiver activated. The envelope names a class; nothing in it says whether \
+                 this receiver's agreement admits that class.",
+            ),
+        Case::new("ladder intersection absent from the receiver's store")
+            .hook_state(|state| {
+                state.presented.ladder_intersection_id = Some(ABSENT_ID.to_string());
+                Ok(())
+            })
+            .hook_only(
+                "chio_treaty_missing_intersection",
+                "the intersection is computed and stored by the receiver and is never \
+                 transferred, so an offline verifier of an envelope has nothing to resolve.",
+            ),
+        Case::new("presented ladder intersection digest does not match the store")
+            .hook_state(|state| {
+                state.presented.ladder_intersection_sha256 =
+                    Some(sha256_hex(b"conformance:other-intersection"));
+                Ok(())
+            })
+            .hook_only(
+                "chio_treaty_intersection_mismatch",
+                "the intersection the request names is compared against the one the receiver \
+                 stored; the offline verifier holds no intersection to compare.",
+            ),
+        Case::new("continuation absent from the receiver's store")
+            .hook_state(|state| {
+                state.presented.continuation_id = Some(ABSENT_ID.to_string());
+                Ok(())
+            })
+            .hook_only(
+                "chio_treaty_missing_continuation",
+                "the continuation is authenticated by residency in the receiver's own store; \
+                 the statement names it only by digest.",
+            ),
+        Case::new("presented continuation digest does not match the store")
+            .hook_state(|state| {
+                state.presented.continuation_sha256 =
+                    Some(sha256_hex(b"conformance:other-continuation"));
+                Ok(())
+            })
+            .hook_only(
+                "chio_treaty_continuation_hash_mismatch",
+                "the digest the request presents is compared against the stored continuation; \
+                 the offline verifier resolves no continuation.",
+            ),
+        Case::new("continuation already spent")
+            .hook_state(|state| {
                 state
                     .store
                     .consume_treaty_continuation(CONTINUATION_ID, "adm-conformance-earlier")?;
                 Ok(())
-            }),
-            relation: Relation::HookOnly,
-            verifier_code: "",
-            hook_code: "chio_treaty_continuation_replay",
-            divergence: "single use is a property of one table in the receiver's store. \
-                         Nothing in the envelope records whether the continuation was spent, \
-                         so an offline verifier cannot decide it.",
-        },
-        Case {
-            name: "continuation outside its validity window",
-            mutate_statement: None,
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: Some(|state| {
+            })
+            .hook_only(
+                "chio_treaty_continuation_replay",
+                "single use is a property of one table in the receiver's store. Nothing in the \
+                 envelope records whether the continuation was spent, so an offline verifier \
+                 cannot decide it.",
+            ),
+        Case::new("continuation outside its validity window")
+            .hook_state(|state| {
                 state.continuation_expires_at_unix_ms = ISSUED_AT_MS + 1;
                 Ok(())
-            }),
-            relation: Relation::HookOnly,
-            verifier_code: "",
-            hook_code: "chio_treaty_continuation_stale",
-            divergence: "the continuation is a receiver-owned record the statement names \
-                         only by digest; the offline verifier never resolves it.",
-        },
-        Case {
-            name: "request smuggles a trust root",
-            mutate_statement: None,
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: Some(|state| {
+            })
+            .hook_only(
+                "chio_treaty_continuation_stale",
+                "the continuation is a receiver-owned record the statement names only by digest; \
+                 the offline verifier never resolves it.",
+            ),
+        Case::new("action class presented disagrees with the stored continuation")
+            .hook_state(|state| {
+                state.presented.action_class_id = Some(OTHER_ACTION_CLASS.to_string());
+                Ok(())
+            })
+            .hook_only(
+                "chio_treaty_continuation_mismatch",
+                "the class the request names is checked against the continuation and the \
+                 intersection the receiver stored, and the continuation is compared first. The \
+                 envelope carries the class identifier and nothing that would let an offline \
+                 verifier decide whether the receiver admits that class.",
+            ),
+        Case::new("presented lineage bundle digest does not match the store")
+            .hook_state(|state| {
+                state.presented.lineage_bundle_sha256 =
+                    Some(sha256_hex(b"conformance:other-lineage-bundle"));
+                Ok(())
+            })
+            .hook_only(
+                "chio_treaty_lineage_hash_mismatch",
+                "the lineage bundle is resolved out of the receiver's store by identifier and \
+                 its stored digest is compared against the presented one; no bundle crosses.",
+            ),
+        Case::new("lineage bundle does not bind the stored continuation")
+            .hook_state(|state| {
+                state.unbind_lineage_from_continuation = true;
+                Ok(())
+            })
+            .hook_only(
+                "chio_treaty_lineage_mismatch",
+                "the walk for a lineage statement that binds this continuation is over records \
+                 the receiver wrote; the conforming verifier never sees the bundle.",
+            ),
+        Case::new("invocation record absent from the receiver's store")
+            .hook_state(|state| {
+                state.presented.invocation_id = Some(ABSENT_ID.to_string());
+                Ok(())
+            })
+            .hook_only(
+                "chio_treaty_missing_bilateral_evidence",
+                "a class whose co-signing mode requires two signatures forces the invocation \
+                 record into its required-evidence set, and the record lives only in the \
+                 receiver's store.",
+            ),
+        Case::new("presented invocation record digest does not match the store")
+            .hook_state(|state| {
+                state.presented.invocation_sha256 =
+                    Some(sha256_hex(b"conformance:other-invocation"));
+                Ok(())
+            })
+            .hook_only(
+                "chio_treaty_bilateral_hash_mismatch",
+                "the invocation record is resolved by identifier and its stored digest compared \
+                 against the presented one; the record is never carried on the wire.",
+            ),
+        Case::new("invocation record does not bind the requested dispatch")
+            .hook_state(|state| {
+                state.unbind_invocation_from_dispatch = true;
+                Ok(())
+            })
+            .hook_only(
+                "chio_treaty_bilateral_mismatch",
+                "the record is compared against the receiver's own admission bundle, which the \
+                 conforming verifier does not hold.",
+            ),
+        Case::new("envelope reference omitted for a class that requires it")
+            .hook_state(|state| {
+                state.presented.omit_envelope = true;
+                Ok(())
+            })
+            .hook_only(
+                "chio_treaty_missing_required_evidence",
+                "which evidence classes a call must carry comes from the action class in the \
+                 intersection the receiver stored. An offline verifier handed an envelope is \
+                 never in a position to observe that one was not presented.",
+            ),
+        Case::new("request smuggles a trust root")
+            .hook_state(|state| {
                 state.smuggle_trust_root = true;
                 Ok(())
-            }),
-            relation: Relation::HookOnly,
-            verifier_code: "",
-            hook_code: "request_smuggled_trust_root",
-            divergence: "the refusal is over the request's own agreement context, which no \
-                         offline verifier of an envelope ever sees.",
-        },
-        Case {
-            name: "agreement scope digest presented does not match the store",
-            mutate_statement: None,
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: Some(|state| {
-                state.presented_treaty_scope_sha256 =
-                    Some(sha256_hex(b"conformance:other-treaty-scope"));
-                Ok(())
-            }),
-            relation: Relation::HookOnly,
-            verifier_code: "",
-            hook_code: "chio_treaty_scope_hash_mismatch",
-            divergence: "the agreement is resolved by identifier out of the receiver's own \
-                         store and compared against the digest the request presented. No \
-                         agreement record reaches the offline verifier.",
-        },
-        Case {
-            name: "action class presented disagrees with the stored continuation",
-            mutate_statement: None,
-            mutate_envelope: None,
-            mutate_verifier_state: None,
-            mutate_hook_state: Some(|state| {
-                state.presented_action_class_id = Some("workflow.destructive.other".to_string());
-                Ok(())
-            }),
-            relation: Relation::HookOnly,
-            verifier_code: "",
-            hook_code: "chio_treaty_continuation_mismatch",
-            divergence: "the class the request names is checked against the continuation and \
-                         the intersection the receiver stored, and the continuation is \
-                         compared first. The envelope carries the class identifier and \
-                         nothing that would let an offline verifier decide whether the \
-                         receiver admits that class.",
-        },
+            })
+            .hook_only(
+                "request_smuggled_trust_root",
+                "the refusal is over the request's own agreement context, which no offline \
+                 verifier of an envelope ever sees.",
+            ),
     ]
+}
+
+/// A 64-byte signature that decodes cleanly and verifies under no key, so the
+/// rejection under test is the signature check and not a shape check.
+fn forged_signature(encoded: &str) -> String {
+    let mut bytes = base64::engine::general_purpose::STANDARD
+        .decode(encoded.as_bytes())
+        .unwrap_or_else(|_| vec![0u8; 64]);
+    if let Some(first) = bytes.first_mut() {
+        *first ^= 0xff;
+    }
+    base64::engine::general_purpose::STANDARD.encode(&bytes)
 }
 
 // ---------------------------------------------------------------------------
@@ -655,8 +810,11 @@ fn the_divergence_set_is_exactly_this() {
             "subject receipt absent from the receiver's receipt store",
             "capability lease absent from the receiver's registry",
             "governance record absent from the receiver's store",
+            "tool name absent from the verifier's action-class table",
             "peer passport revoked at the pinned epoch",
             "pinned peer has no ladder manifest reference",
+            "pinned peer's ladder manifest reference is stale",
+            "origin passport key rotated in the agreement but not in the pin set",
         ]
     );
     assert_eq!(
@@ -664,12 +822,137 @@ fn the_divergence_set_is_exactly_this() {
         vec![
             "consistency model downgraded below the class",
             "unanimous deny",
+            "agreement absent from the receiver's store",
+            "agreement scope digest presented does not match the store",
+            "action class outside the agreement's allowed classes",
+            "ladder intersection absent from the receiver's store",
+            "presented ladder intersection digest does not match the store",
+            "continuation absent from the receiver's store",
+            "presented continuation digest does not match the store",
             "continuation already spent",
             "continuation outside its validity window",
-            "request smuggles a trust root",
-            "agreement scope digest presented does not match the store",
             "action class presented disagrees with the stored continuation",
+            "presented lineage bundle digest does not match the store",
+            "lineage bundle does not bind the stored continuation",
+            "invocation record absent from the receiver's store",
+            "presented invocation record digest does not match the store",
+            "invocation record does not bind the requested dispatch",
+            "envelope reference omitted for a class that requires it",
+            "request smuggles a trust root",
         ]
+    );
+}
+
+/// The sixteen codes `VerifierError::code` can return. Each is asserted to be a
+/// live member of the shared rejection-code enumeration, so a rename in the
+/// implementation cannot leave this list quietly stale.
+const CONFORMING_VERIFIER_CODES: [&str; 16] = [
+    "capability.lease_expired_or_unknown",
+    "dsse.malformed",
+    "governance.receipt_required_missing",
+    "governance.unknown_action_class",
+    "ladder.manifest_missing",
+    "ladder.manifest_stale",
+    "peer.revoked_at_epoch",
+    "peer.unpinned_or_keyid_mismatch",
+    "policy.verdict_disagreement",
+    "predicate.schema_invalid",
+    "predicate.type_unrecognised",
+    "signature.server_a_invalid",
+    "signature.server_b_invalid",
+    "statement.malformed",
+    "statement.schema_invalid",
+    "subject.digest_mismatch",
+];
+
+/// Every rejection class the conforming verifier can reach has a case.
+#[test]
+fn the_corpus_covers_every_verifier_rejection_class() {
+    let defined: BTreeSet<&str> = RejectionCode::ALL
+        .iter()
+        .map(|code| code.as_str())
+        .collect();
+    for code in CONFORMING_VERIFIER_CODES {
+        assert!(
+            defined.contains(code),
+            "{code:?} is no longer a rejection code the implementation defines"
+        );
+    }
+    let covered: BTreeSet<&str> = corpus()
+        .iter()
+        .map(|case| case.verifier_code)
+        .filter(|code| !code.is_empty())
+        .collect();
+    let expected: BTreeSet<&str> = CONFORMING_VERIFIER_CODES.into_iter().collect();
+    assert_eq!(
+        covered, expected,
+        "the corpus no longer covers exactly the conforming verifier's rejection classes"
+    );
+}
+
+/// The runtime codes scoped to agreement admission that the corpus reaches, and
+/// the ones it does not. Both halves are asserted, so coverage is a measured
+/// number rather than a claim.
+#[test]
+fn the_agreement_scoped_hook_codes_the_corpus_covers() {
+    let family: BTreeSet<&str> = CHIO_RUNTIME_FAILURE_CODES
+        .iter()
+        .copied()
+        .filter(|code| code.starts_with("chio_treaty_"))
+        .collect();
+    assert_eq!(family.len(), 24, "the agreement-scoped code family changed");
+
+    let covered: BTreeSet<&str> = corpus()
+        .iter()
+        .map(|case| case.hook_code)
+        .filter(|code| code.starts_with("chio_treaty_"))
+        .collect();
+    assert_eq!(
+        covered,
+        BTreeSet::from([
+            "chio_treaty_action_class_not_allowed",
+            "chio_treaty_bilateral_hash_mismatch",
+            "chio_treaty_bilateral_mismatch",
+            "chio_treaty_continuation_hash_mismatch",
+            "chio_treaty_continuation_mismatch",
+            "chio_treaty_continuation_replay",
+            "chio_treaty_continuation_stale",
+            "chio_treaty_dsse_binding_mismatch",
+            "chio_treaty_intersection_mismatch",
+            "chio_treaty_lineage_hash_mismatch",
+            "chio_treaty_lineage_mismatch",
+            "chio_treaty_missing_bilateral_evidence",
+            "chio_treaty_missing_continuation",
+            "chio_treaty_missing_intersection",
+            "chio_treaty_missing_required_evidence",
+            "chio_treaty_missing_scope",
+            "chio_treaty_policy_denied",
+            "chio_treaty_scope_hash_mismatch",
+            "chio_treaty_unverified_required_evidence",
+        ]),
+        "the agreement-scoped codes the corpus covers changed"
+    );
+
+    let uncovered: BTreeSet<&str> = family.difference(&covered).copied().collect();
+    assert_eq!(
+        uncovered,
+        BTreeSet::from([
+            // Overwritten by the receiver before signing, so no input reaches it.
+            "chio_treaty_admission_report_hash_mismatch",
+            // Reached only through a continuation whose origin the receiver
+            // did not mint, which this single-agreement fixture cannot build.
+            "chio_treaty_continuation_origin_mismatch",
+            // Reached only when the caller omits the intersection binding the
+            // request schema requires, which fails earlier here.
+            "chio_treaty_missing_intersection_binding",
+            // Reached only from an agreement missing a participant key, which
+            // the agreement validator rejects first.
+            "chio_treaty_missing_participant",
+            // Reached only outside the agreement's validity window, which this
+            // fixed-epoch fixture does not move.
+            "chio_treaty_stale",
+        ]),
+        "the agreement-scoped codes the corpus does not reach changed"
     );
 }
 
@@ -691,6 +974,56 @@ fn the_hook_does_not_resolve_the_subject_receipt() -> TestResult {
     assert!(
         observed.hook.is_admit(),
         "the pre-dispatch hook reads no subject and resolves no receipt, so it admits"
+    );
+    Ok(())
+}
+
+/// What the peer's signature is, measured rather than argued: the receiver
+/// authors the pre-authentication bytes, and the signature over them is
+/// determined by custody of the peer's key alone. A second holder of that key
+/// material reproduces the peer's signature byte for byte, and the envelope it
+/// builds admits on both sides. The signature therefore attributes the bytes to
+/// a key; it does not constrain any field the receiver compares, because every
+/// such field is compared against a record the receiver itself wrote.
+#[test]
+fn the_peer_signature_is_determined_by_custody_of_the_peer_key() -> TestResult {
+    let fixture = Fixture::build()?;
+    let (_, payload_bytes) = fixture.envelope.decode_statement()?;
+    let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, &payload_bytes);
+
+    let second_holder = Keypair::from_seed(&ORIGIN_SEED);
+    let reproduced = dsse_signature(&second_holder, &pae_bytes);
+    let minted = fixture
+        .envelope
+        .signatures
+        .first()
+        .ok_or("the baseline envelope carries no origin signature")?;
+    assert_eq!(
+        reproduced.keyid, minted.keyid,
+        "a second holder of the peer's key material presents the same keyid"
+    );
+    assert_eq!(
+        reproduced.sig, minted.sig,
+        "a second holder of the peer's key material reproduces the peer's signature"
+    );
+
+    let rebuilt = DsseEnvelope {
+        payload_type: fixture.envelope.payload_type.clone(),
+        payload: fixture.envelope.payload.clone(),
+        signatures: vec![
+            reproduced,
+            dsse_signature(&fixture.receiver_key, &pae_bytes),
+        ],
+    };
+    let verifier_state = VerifierState::from_fixture(&fixture)?;
+    assert!(
+        verifier_state.decide(&rebuilt).is_admit(),
+        "the conforming verifier cannot distinguish which holder of the key signed"
+    );
+    let hook_state = HookState::from_fixture(&fixture);
+    assert!(
+        hook_state.decide(&fixture, &rebuilt)?.is_admit(),
+        "the pre-dispatch hook cannot distinguish which holder of the key signed"
     );
     Ok(())
 }
@@ -737,20 +1070,23 @@ fn run_case(case: &Case) -> Result<Observed, BoxError> {
 
 /// Build the baseline envelope through the producer API, then decode, mutate
 /// and re-sign with both participant keys, so every rejection below is a
-/// comparison rather than a broken signature. Mutations that must leave the
-/// signatures broken run afterwards, on the envelope.
+/// comparison rather than a broken signature. The origin key is chosen by the
+/// fingerprint the mutated statement declares, so a case that rotates the
+/// origin's passport key is signed by the key it names. Mutations that must
+/// leave the signatures broken run afterwards, on the envelope.
 fn mutated_envelope(fixture: &Fixture, case: &Case) -> Result<DsseEnvelope, BoxError> {
     let mut envelope = fixture.envelope.clone();
     if let Some(mutate) = case.mutate_statement {
         let (mut statement, _) = envelope.decode_statement()?;
-        mutate(&mut statement);
+        mutate(&mut statement, fixture);
+        let origin_key = fixture.origin_key_for(&statement);
         let statement_bytes = statement.canonical_bytes()?;
         let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, &statement_bytes);
         envelope = DsseEnvelope {
             payload_type: PAYLOAD_TYPE_IN_TOTO.to_string(),
             payload: base64::engine::general_purpose::STANDARD.encode(&statement_bytes),
             signatures: vec![
-                dsse_signature(&fixture.origin_key, &pae_bytes),
+                dsse_signature(origin_key, &pae_bytes),
                 dsse_signature(&fixture.receiver_key, &pae_bytes),
             ],
         };
@@ -780,6 +1116,8 @@ struct VerifierState {
     governance_store: InMemoryGovernanceReceiptStore,
     revoke_origin: bool,
     drop_origin_ladder_ref: bool,
+    stale_origin_ladder_ref: bool,
+    action_class_table_is_empty: bool,
 }
 
 impl VerifierState {
@@ -807,6 +1145,8 @@ impl VerifierState {
             governance_store,
             revoke_origin: false,
             drop_origin_ladder_ref: false,
+            stale_origin_ladder_ref: false,
+            action_class_table_is_empty: false,
         })
     }
 
@@ -817,6 +1157,8 @@ impl VerifierState {
             public_key: self.origin_public_key.clone(),
             ladder_manifest_ref: if self.drop_origin_ladder_ref {
                 None
+            } else if self.stale_origin_ladder_ref {
+                Some(stale_ladder_manifest_ref("manifest-origin"))
             } else {
                 Some(ladder_manifest_ref("manifest-origin"))
             },
@@ -833,7 +1175,9 @@ impl VerifierState {
         }
 
         let mut action_classes = BTreeMap::new();
-        action_classes.insert(TOOL_NAME.to_string(), ActionClassKind::ReceiptBacked);
+        if !self.action_class_table_is_empty {
+            action_classes.insert(TOOL_NAME.to_string(), ActionClassKind::ReceiptBacked);
+        }
 
         let base = VerifierConfig {
             peer_pin_set: &pin_set,
@@ -865,6 +1209,15 @@ fn ladder_manifest_ref(manifest_id: &str) -> LadderManifestRef {
     }
 }
 
+/// Freshness is `issued <= now < expires`, so a reference that expires at the
+/// pinned instant is stale at it.
+fn stale_ladder_manifest_ref(manifest_id: &str) -> LadderManifestRef {
+    LadderManifestRef {
+        expires_at_unix_ms: NOW_MS,
+        ..ladder_manifest_ref(manifest_id)
+    }
+}
+
 fn governance_canonical_json() -> String {
     format!("{{\"receiptId\":\"{GOVERNANCE_ID}\"}}")
 }
@@ -873,36 +1226,121 @@ fn governance_canonical_json() -> String {
 // Decider two: the kernel's pre-dispatch admission hook
 // ---------------------------------------------------------------------------
 
+/// Which activated agreement the receiver holds. The hook reads the
+/// participants' public keys and the classes in scope out of this record, where
+/// the conforming verifier reads the keys out of its pin set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Agreement {
+    Baseline,
+    RotatedOriginKey,
+    RestrictedActionClasses,
+}
+
+/// What the request presents. Every field defaults to the artifact the receiver
+/// stored; an override makes the request name something else, which is how the
+/// resolve-and-compare rejections are reached.
+#[derive(Debug, Clone, Default)]
+struct Presented {
+    treaty_scope_id: Option<String>,
+    treaty_scope_sha256: Option<String>,
+    ladder_intersection_id: Option<String>,
+    ladder_intersection_sha256: Option<String>,
+    action_class_id: Option<String>,
+    continuation_id: Option<String>,
+    continuation_sha256: Option<String>,
+    lineage_bundle_id: Option<String>,
+    lineage_bundle_sha256: Option<String>,
+    invocation_id: Option<String>,
+    invocation_sha256: Option<String>,
+    omit_envelope: bool,
+}
+
 struct HookState {
     store: InMemoryRuntimeAdmissionStore,
+    agreement: Agreement,
     continuation_expires_at_unix_ms: u64,
     smuggle_trust_root: bool,
-    presented_treaty_scope_sha256: Option<String>,
-    presented_action_class_id: Option<String>,
+    unbind_lineage_from_continuation: bool,
+    unbind_invocation_from_dispatch: bool,
+    presented: Presented,
 }
 
 impl HookState {
     fn from_fixture(fixture: &Fixture) -> Self {
         Self {
             store: InMemoryRuntimeAdmissionStore::new(),
+            agreement: Agreement::Baseline,
             continuation_expires_at_unix_ms: fixture.continuation.expires_at_unix_ms,
             smuggle_trust_root: false,
-            presented_treaty_scope_sha256: None,
-            presented_action_class_id: None,
+            unbind_lineage_from_continuation: false,
+            unbind_invocation_from_dispatch: false,
+            presented: Presented::default(),
+        }
+    }
+
+    fn agreement_record(&self, fixture: &Fixture) -> (TreatyScope, String) {
+        match self.agreement {
+            Agreement::Baseline => (
+                fixture.treaty_scope.clone(),
+                fixture.treaty_scope_sha256.clone(),
+            ),
+            Agreement::RotatedOriginKey => (
+                fixture.rotated_treaty_scope.clone(),
+                fixture.rotated_treaty_scope_sha256.clone(),
+            ),
+            Agreement::RestrictedActionClasses => (
+                fixture.restricted_treaty_scope.clone(),
+                fixture.restricted_treaty_scope_sha256.clone(),
+            ),
         }
     }
 
     fn decide(&self, fixture: &Fixture, envelope: &DsseEnvelope) -> Result<Answer, BoxError> {
+        let (treaty_scope, treaty_scope_sha256) = self.agreement_record(fixture);
+
         let mut continuation = fixture.continuation.clone();
         continuation.expires_at_unix_ms = self.continuation_expires_at_unix_ms;
         let continuation_sha256 = sha256_hex(&canonical_json_bytes(&continuation)?);
         let continuation_is_baseline = continuation_sha256 == fixture.continuation_sha256;
 
+        // A continuation the case moved out of its window no longer hashes to
+        // the digest the co-signed binding names, so the hook would answer the
+        // binding mismatch first. The window check is what such a case is for,
+        // so the binding reference is realigned to the continuation the
+        // receiver actually stored.
+        let envelope = if continuation_is_baseline {
+            envelope.clone()
+        } else {
+            realign_binding_continuation(fixture, envelope, &continuation_sha256)?
+        };
+        let envelope_sha256 = sha256_hex(&canonical_json_bytes(&envelope)?);
+
+        let mut invocation = fixture.invocation.clone();
+        if !continuation_is_baseline {
+            invocation.continuation_sha256 = continuation_sha256.clone();
+        }
+        if self.unbind_invocation_from_dispatch {
+            invocation.capability_id = OTHER_CAPABILITY_ID.to_string();
+        }
+        let invocation_sha256 = bilateral_invocation_binding_sha256(&invocation)?;
+
+        let mut lineage_bundle = fixture.lineage_bundle.clone();
+        for statement in &mut lineage_bundle.statements {
+            if !continuation_is_baseline {
+                statement.continuation_sha256 = continuation_sha256.clone();
+                statement.bilateral_invocation_sha256 = invocation_sha256.clone();
+            }
+            if self.unbind_lineage_from_continuation {
+                statement.continuation_sha256 = sha256_hex(b"conformance:other-continuation");
+            }
+        }
+        let lineage_bundle_sha256 = sha256_hex(&canonical_json_bytes(&lineage_bundle)?);
+
         self.store.insert_bundle(fixture.bundle.clone())?;
         self.store.insert_treaty_runtime_artifact(
             "treaty_scope",
-            &fixture.treaty_scope.treaty_id,
-            &fixture.treaty_scope,
+            &treaty_scope.treaty_id,
+            &treaty_scope,
         )?;
         self.store.insert_treaty_runtime_artifact(
             "ladder_intersection",
@@ -916,95 +1354,76 @@ impl HookState {
         )?;
         self.store.insert_treaty_runtime_artifact(
             "receipt_lineage_bundle",
-            &fixture.lineage_bundle.bundle_id,
-            &fixture.lineage_bundle,
+            LINEAGE_BUNDLE_ID,
+            &lineage_bundle,
         )?;
         self.store.insert_treaty_runtime_artifact(
             "bilateral_invocation",
             INVOCATION_ID,
-            &fixture.invocation,
+            &invocation,
         )?;
         self.store
-            .insert_treaty_runtime_artifact("bilateral_dsse_envelope", DSSE_ID, envelope)?;
+            .insert_treaty_runtime_artifact("bilateral_dsse_envelope", DSSE_ID, &envelope)?;
 
-        let envelope_sha256 = sha256_hex(&canonical_json_bytes(envelope)?);
+        let presented = &self.presented;
         let mut context = serde_json::json!({
-            "treatyScopeId": fixture.treaty_scope.treaty_id,
-            "treatyScopeSha256": self
-                .presented_treaty_scope_sha256
+            "treatyScopeId": presented
+                .treaty_scope_id
                 .clone()
-                .unwrap_or_else(|| fixture.treaty_scope_sha256.clone()),
-            "ladderIntersectionId": fixture.ladder_intersection.intersection_id,
-            "ladderIntersectionSha256": fixture.ladder_intersection_sha256,
-            "actionClassId": self
-                .presented_action_class_id
+                .unwrap_or_else(|| treaty_scope.treaty_id.clone()),
+            "treatyScopeSha256": presented
+                .treaty_scope_sha256
+                .clone()
+                .unwrap_or(treaty_scope_sha256),
+            "ladderIntersectionId": presented
+                .ladder_intersection_id
+                .clone()
+                .unwrap_or_else(|| fixture.ladder_intersection.intersection_id.clone()),
+            "ladderIntersectionSha256": presented
+                .ladder_intersection_sha256
+                .clone()
+                .unwrap_or_else(|| fixture.ladder_intersection_sha256.clone()),
+            "actionClassId": presented
+                .action_class_id
                 .clone()
                 .unwrap_or_else(|| ACTION_CLASS.to_string()),
             "crossKernelContinuation": {
-                "id": CONTINUATION_ID,
-                "sha256": continuation_sha256,
+                "id": presented
+                    .continuation_id
+                    .clone()
+                    .unwrap_or_else(|| CONTINUATION_ID.to_string()),
+                "sha256": presented
+                    .continuation_sha256
+                    .clone()
+                    .unwrap_or(continuation_sha256),
             },
             "receiptLineageBundle": {
-                "id": fixture.lineage_bundle.bundle_id,
-                "sha256": fixture.lineage_bundle_sha256,
+                "id": presented
+                    .lineage_bundle_id
+                    .clone()
+                    .unwrap_or_else(|| LINEAGE_BUNDLE_ID.to_string()),
+                "sha256": presented
+                    .lineage_bundle_sha256
+                    .clone()
+                    .unwrap_or(lineage_bundle_sha256),
             },
             "bilateralInvocation": {
-                "id": INVOCATION_ID,
-                "sha256": fixture.invocation_sha256,
+                "id": presented
+                    .invocation_id
+                    .clone()
+                    .unwrap_or_else(|| INVOCATION_ID.to_string()),
+                "sha256": presented
+                    .invocation_sha256
+                    .clone()
+                    .unwrap_or(invocation_sha256),
             },
-            "bilateralDsse": { "id": DSSE_ID, "sha256": envelope_sha256 },
         });
+        if !presented.omit_envelope {
+            context["bilateralDsse"] =
+                serde_json::json!({ "id": DSSE_ID, "sha256": envelope_sha256 });
+        }
         if self.smuggle_trust_root {
             context["trustRoot"] = serde_json::json!("did:chio:attacker-root");
-        }
-        // A continuation the case moved out of its window no longer hashes to
-        // the digest the co-signed binding names, so the hook would answer the
-        // binding mismatch first. The window check is what this case is for, so
-        // the binding reference is realigned to the continuation the receiver
-        // actually stored.
-        let envelope = if continuation_is_baseline {
-            envelope.clone()
-        } else {
-            realign_binding_continuation(fixture, envelope, &continuation_sha256)?
-        };
-        if !continuation_is_baseline {
-            let realigned_sha256 = sha256_hex(&canonical_json_bytes(&envelope)?);
-            self.store.insert_treaty_runtime_artifact(
-                "bilateral_dsse_envelope",
-                "bilateral-dsse-conformance-realigned",
-                &envelope,
-            )?;
-            context["bilateralDsse"] = serde_json::json!({
-                "id": "bilateral-dsse-conformance-realigned",
-                "sha256": realigned_sha256,
-            });
-            let mut invocation = fixture.invocation.clone();
-            invocation.continuation_sha256 = continuation_sha256.clone();
-            let invocation_sha256 = bilateral_invocation_binding_sha256(&invocation)?;
-            self.store.insert_treaty_runtime_artifact(
-                "bilateral_invocation",
-                "invoke-conformance-realigned",
-                &invocation,
-            )?;
-            context["bilateralInvocation"] = serde_json::json!({
-                "id": "invoke-conformance-realigned",
-                "sha256": invocation_sha256,
-            });
-            let mut lineage_bundle = fixture.lineage_bundle.clone();
-            for statement in &mut lineage_bundle.statements {
-                statement.continuation_sha256 = continuation_sha256.clone();
-                statement.bilateral_invocation_sha256 = invocation_sha256.clone();
-            }
-            let lineage_bundle_sha256 = sha256_hex(&canonical_json_bytes(&lineage_bundle)?);
-            self.store.insert_treaty_runtime_artifact(
-                "receipt_lineage_bundle",
-                "lineage-bundle-conformance-realigned",
-                &lineage_bundle,
-            )?;
-            context["receiptLineageBundle"] = serde_json::json!({
-                "id": "lineage-bundle-conformance-realigned",
-                "sha256": lineage_bundle_sha256,
-            });
         }
 
         let request = treaty_request(&fixture.bundle_sha256, context)?;
@@ -1040,13 +1459,14 @@ fn realign_binding_continuation(
     if let Some(treaty) = statement.predicate.treaty_binding_ref.as_mut() {
         treaty.continuation_sha256 = continuation_sha256.to_string();
     }
+    let origin_key = fixture.origin_key_for(&statement);
     let statement_bytes = statement.canonical_bytes()?;
     let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, &statement_bytes);
     Ok(DsseEnvelope {
         payload_type: PAYLOAD_TYPE_IN_TOTO.to_string(),
         payload: base64::engine::general_purpose::STANDARD.encode(&statement_bytes),
         signatures: vec![
-            dsse_signature(&fixture.origin_key, &pae_bytes),
+            dsse_signature(origin_key, &pae_bytes),
             dsse_signature(&fixture.receiver_key, &pae_bytes),
         ],
     })
@@ -1059,16 +1479,19 @@ fn realign_binding_continuation(
 struct Fixture {
     origin_key: Keypair,
     receiver_key: Keypair,
+    rotated_origin_key: Keypair,
     treaty_scope: TreatyScope,
     treaty_scope_sha256: String,
+    rotated_treaty_scope: TreatyScope,
+    rotated_treaty_scope_sha256: String,
+    restricted_treaty_scope: TreatyScope,
+    restricted_treaty_scope_sha256: String,
     ladder_intersection: LadderIntersection,
     ladder_intersection_sha256: String,
     continuation: CrossKernelContinuation,
     continuation_sha256: String,
     lineage_bundle: ReceiptLineageBundle,
-    lineage_bundle_sha256: String,
     invocation: BilateralInvocation,
-    invocation_sha256: String,
     receipt: ChioReceipt,
     envelope: DsseEnvelope,
     bundle: RuntimeAdmissionBundle,
@@ -1077,8 +1500,9 @@ struct Fixture {
 
 impl Fixture {
     fn build() -> Result<Self, BoxError> {
-        let origin_key = Keypair::generate();
-        let receiver_key = Keypair::generate();
+        let origin_key = Keypair::from_seed(&ORIGIN_SEED);
+        let receiver_key = Keypair::from_seed(&RECEIVER_SEED);
+        let rotated_origin_key = Keypair::from_seed(&ROTATED_ORIGIN_SEED);
 
         let origin_manifest = ladder_manifest(ORIGIN_KERNEL);
         let receiver_manifest = ladder_manifest(RECEIVER_KERNEL);
@@ -1097,7 +1521,27 @@ impl Fixture {
             revocation_epoch_sha256: REVOCATION_CHECKPOINT_SHA256.to_string(),
             trust_bundle_sha256: TRUST_BUNDLE_SHA256.to_string(),
         };
+
+        // The same agreement after the origin rotated its passport key, which
+        // the receiver activated without re-pinning.
+        let rotated_treaty_scope = TreatyScope {
+            participant_public_keys: vec![
+                rotated_origin_key.public_key(),
+                receiver_key.public_key(),
+            ],
+            ..treaty_scope.clone()
+        };
+        let rotated_treaty_scope_sha256 = treaty_scope_sha256(&rotated_treaty_scope)?;
+
+        // The same agreement with this call's action class out of scope.
+        let restricted_treaty_scope = TreatyScope {
+            allowed_action_classes: vec![OTHER_ACTION_CLASS.to_string()],
+            ..treaty_scope.clone()
+        };
+        let restricted_treaty_scope_sha256 = treaty_scope_sha256(&restricted_treaty_scope)?;
+
         let treaty_scope_sha256 = treaty_scope_sha256(&treaty_scope)?;
+
         let ladder_intersection = compute_ladder_intersection(
             &treaty_scope,
             &[origin_manifest, receiver_manifest],
@@ -1160,7 +1604,7 @@ impl Fixture {
             sha256_hex(&canonical_json_bytes(&lineage_statement)?);
         let lineage_bundle = ReceiptLineageBundle {
             schema: CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA.to_string(),
-            bundle_id: "lineage-bundle-conformance-1".to_string(),
+            bundle_id: LINEAGE_BUNDLE_ID.to_string(),
             root_receipt_sha256: lineage_statement.parent_receipt_sha256.clone(),
             leaf_receipt_sha256: lineage_statement.child_receipt_sha256.clone(),
             statements: vec![lineage_statement],
@@ -1201,7 +1645,7 @@ impl Fixture {
                     ladder_intersection_sha256: ladder_intersection_sha256.clone(),
                     admission_report_sha256: sha256_hex(b"conformance:admission-report"),
                     continuation_sha256: continuation_sha256.clone(),
-                    lineage_bundle_sha256: lineage_bundle_sha256.clone(),
+                    lineage_bundle_sha256,
                     action_class_id: ACTION_CLASS.to_string(),
                     consistency_model,
                     request_sha256: request_sha256.clone(),
@@ -1210,10 +1654,7 @@ impl Fixture {
                     remote_receipt_sha256,
                     lease_refs: vec![LEASE_ID.to_string()],
                     governance_refs: vec![GOVERNANCE_ID.to_string()],
-                    signer_kernel_ids: vec![
-                        ORIGIN_KERNEL.to_string(),
-                        RECEIVER_KERNEL.to_string(),
-                    ],
+                    signer_kernel_ids: vec![ORIGIN_KERNEL.to_string(), RECEIVER_KERNEL.to_string()],
                 }),
             },
         )?;
@@ -1244,21 +1685,37 @@ impl Fixture {
         Ok(Self {
             origin_key,
             receiver_key,
+            rotated_origin_key,
             treaty_scope,
             treaty_scope_sha256,
+            rotated_treaty_scope,
+            rotated_treaty_scope_sha256,
+            restricted_treaty_scope,
+            restricted_treaty_scope_sha256,
             ladder_intersection,
             ladder_intersection_sha256,
             continuation,
             continuation_sha256,
             lineage_bundle,
-            lineage_bundle_sha256,
             invocation,
-            invocation_sha256,
             receipt,
             envelope,
             bundle,
             bundle_sha256,
         })
+    }
+
+    /// The origin key the statement declares. A case that rotates the origin's
+    /// passport key names the rotated fingerprint, and the envelope must be
+    /// signed by the key it names for the check under test to be the one the
+    /// case is about.
+    fn origin_key_for(&self, statement: &DsseStatement) -> &Keypair {
+        let rotated = Keyid::from_public_key(&self.rotated_origin_key.public_key());
+        if statement.predicate.tool_server_a.passport_key_fingerprint.0 == rotated.0 {
+            &self.rotated_origin_key
+        } else {
+            &self.origin_key
+        }
     }
 }
 
@@ -1349,7 +1806,6 @@ fn ladder_manifest(kernel_id: &str) -> GovernanceLadderManifest {
         }],
     }
 }
-
 // ---------------------------------------------------------------------------
 // The receiver's own admission configuration
 // ---------------------------------------------------------------------------

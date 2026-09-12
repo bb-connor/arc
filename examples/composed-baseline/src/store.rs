@@ -1,5 +1,6 @@
-//! The receiver's durable state: a replay table keyed by request identifier and
-//! a signed decision log.
+//! The receiver's durable state: a replay table keyed by request identifier, a
+//! second one keyed by the identifier the signed decision carries for itself,
+//! and a signed decision log.
 //!
 //! SQLite in WAL with `synchronous = FULL`, the same durability the Chio
 //! receipt store runs under, so a per-call latency or per-call byte figure
@@ -53,6 +54,11 @@ impl BaselineStore {
                  caller TEXT NOT NULL,
                  claimed_at_unix_ms INTEGER NOT NULL
              );
+             CREATE TABLE IF NOT EXISTS authorization_replay (
+                 decision_id TEXT PRIMARY KEY,
+                 caller TEXT NOT NULL,
+                 claimed_at_unix_ms INTEGER NOT NULL
+             );
              CREATE TABLE IF NOT EXISTS decision_log (
                  decision_seq INTEGER PRIMARY KEY AUTOINCREMENT,
                  request_id TEXT NOT NULL,
@@ -75,6 +81,30 @@ impl BaselineStore {
             "INSERT OR IGNORE INTO replay_table (request_id, caller, claimed_at_unix_ms)
              VALUES (?1, ?2, ?3)",
             rusqlite::params![request_id, caller, now_unix_ms as i64],
+        )?;
+        if created == 1 {
+            Ok(NonceClaim::Fresh)
+        } else {
+            Ok(NonceClaim::Seen)
+        }
+    }
+
+    /// Claim the identifier the signed decision carries for itself. The same
+    /// single-row insert on a primary key as `claim_request_id`, keyed by the
+    /// identifier inside the signed bytes rather than by the one the caller
+    /// chose outside them, which is what a `jti` table does for a bearer token.
+    /// A digest of the signed bytes would key it equivalently and needs no
+    /// field at all.
+    pub fn claim_authorization(
+        &self,
+        decision_id: &str,
+        caller: &str,
+        now_unix_ms: u64,
+    ) -> Result<NonceClaim, StoreError> {
+        let created = self.connection.execute(
+            "INSERT OR IGNORE INTO authorization_replay (decision_id, caller, claimed_at_unix_ms)
+             VALUES (?1, ?2, ?3)",
+            rusqlite::params![decision_id, caller, now_unix_ms as i64],
         )?;
         if created == 1 {
             Ok(NonceClaim::Fresh)

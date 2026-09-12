@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Two separately administered kernels, two OS processes, one cross-organization
-# tool call per measurement. Org A and Org B generate their own keys, a third
-# party signs the transport directory that binds them, and the receiver decides
-# every call on its own store.
+# Two separately keyed kernels, two OS processes, one cross-organization tool
+# call per measurement. Org A and Org B generate their own keys, a third party
+# signs the transport directory that binds them, and the receiver decides every
+# call on its own store. How many MACHINES that ran on is a separate question the
+# recorded host count answers, and on this script's default it is one.
 #
 # The run measures, in order: the admitted path with the receiver's evaluation
 # window decomposed into the parts its own dependencies timed, each denial case,
-# the same tool call with the kernel taken out of the path (the denominator), a
+# the same tool call with the kernel taken out of the path, a
 # sustained concurrent load, a race in which several calls present one single-use
 # continuation, and the two revocation flips.
 #
@@ -845,6 +846,18 @@ CSV_FIELDS = (
 # refuses per call; this is the aggregate restatement of the same rule.
 BUDGET_TOLERANCE_MS = 0.05
 
+# What is inside `unattributed` and is NOT broken out. Each of these runs inside
+# the kernel's admission hook rather than in a dependency the experiment can put
+# a stopwatch on, so the remainder is reported whole rather than split further.
+BUDGET_NOT_DECOMPOSED = [
+    "the guard pipeline around the admission hook",
+    "the binding comparisons between the request's citations and the "
+    "receiver-resolved artifacts",
+    "both DSSE signature verifications",
+    "canonicalization of the artifacts those comparisons hash",
+    "receipt construction and signing",
+]
+
 
 def percentile(ordered, quantile):
     if not ordered:
@@ -871,30 +884,36 @@ def sample_std(values):
     )
 
 
-def bootstrap_ci(values):
+def bootstrap_median_ci(values):
+    """A percentile bootstrap interval for the MEDIAN.
+
+    The median is the point estimate every macro here prints, so it is the
+    statistic the interval is taken of: an interval for the mean can sit outside
+    the median it is printed beside.
+    """
     rng = random.Random(BOOTSTRAP_SEED)
     count = len(values)
-    means = sorted(
-        math.fsum(rng.choices(values, k=count)) / count
+    medians = sorted(
+        percentile(sorted(rng.choices(values, k=count)), 0.50)
         for _ in range(BOOTSTRAP_RESAMPLES)
     )
     alpha = (1.0 - CONFIDENCE) / 2.0
-    return percentile(means, alpha), percentile(means, 1.0 - alpha)
+    return percentile(medians, alpha), percentile(medians, 1.0 - alpha)
 
 
 def summarize(values):
     if len(values) < 2:
         raise SystemExit("a summary needs at least two observations")
     ordered = sorted(values)
-    low, high = bootstrap_ci(ordered)
+    low, high = bootstrap_median_ci(ordered)
     return {
         "samples": len(ordered),
         "p50_ms": percentile(ordered, 0.50),
         "p99_ms": percentile(ordered, 0.99),
         "mean_ms": mean(ordered),
         "std_ms": sample_std(ordered),
-        "ci_low_ms": low,
-        "ci_high_ms": high,
+        "median_ci_low_ms": low,
+        "median_ci_high_ms": high,
         "min_ms": ordered[0],
         "max_ms": ordered[-1],
     }
@@ -988,6 +1007,21 @@ allow_stats = summarize(allow_latencies)
 deny_stats = summarize(deny_latencies)
 evaluate_stats = summarize(allow_evaluate)
 prepare_stats = summarize(allow_prepare)
+# One unit of work as the concurrent stage counts it: the preparation round trip
+# and the call round trip together, which is what each of its workers drives in
+# a loop. The sequential throughput it is compared against has to be one over
+# this, not one over the call alone.
+allow_end_to_end_stats = summarize(
+    [
+        float(row["prepare_ms"]) + float(row["round_trip_ms"])
+        for row in allow_rows
+    ]
+)
+sequential_throughput = (
+    1_000.0 / allow_end_to_end_stats["p50_ms"]
+    if allow_end_to_end_stats["p50_ms"]
+    else None
+)
 
 revoke = load_json(revoke_json)
 cut = load_json(cut_json)
@@ -1080,6 +1114,7 @@ def decompose(rows, what):
         "parts": parts,
         "attributed": attributed,
         "unattributed": unattributed,
+        "notDecomposed": BUDGET_NOT_DECOMPOSED,
         "operationsPerCall": counts,
         "toleranceMs": BUDGET_TOLERANCE_MS,
         # The largest amount by which the parts exceeded the window they
@@ -1200,10 +1235,14 @@ document = {
         "mediatedDispatchDelta": baseline_doc["mediatedDispatchDelta"],
         "unmediatedDispatchDelta": baseline_doc["unmediatedDispatchDelta"],
         "mediationOverheadMs": allow_stats["p50_ms"] - baseline_stats["p50_ms"],
-        "mediationOverheadRatio": (
-            allow_stats["p50_ms"] / baseline_stats["p50_ms"]
-            if baseline_stats["p50_ms"]
-            else None
+        "mediationOverheadRatioNotReported": (
+            "the ratio of the admitted call to the unmediated one is not a stable "
+            "statistic and is not reported. Its denominator is a few-millisecond "
+            "round trip dominated by a fresh QUIC handshake around a tool that "
+            "returns a constant JSON object in microseconds, so the ratio is a "
+            "mediation constant divided by a small noisy number and moves by tens "
+            "of percent between runs of the same code on the same host. The "
+            "absolute overhead is the stable quantity and is reported above"
         ),
     },
     "concurrent": {
@@ -1213,9 +1252,8 @@ document = {
         "roundTrip": load_stats,
         "wallClockMs": load_doc["wallClockMs"],
         "throughputCallsPerSecond": load_doc["throughputCallsPerSecond"],
-        "sequentialThroughputCallsPerSecond": (
-            1_000.0 / allow_stats["p50_ms"] if allow_stats["p50_ms"] else None
-        ),
+        "sequentialThroughputCallsPerSecond": sequential_throughput,
+        "sequentialEndToEnd": allow_end_to_end_stats,
         "dispatched": load_doc["dispatched"],
         "freshnessDenialsAbsorbed": load_doc["freshnessDenialsAbsorbed"],
         "budgetReported": load_doc["budgetReported"],
@@ -1229,9 +1267,12 @@ document = {
         "expectedDispatched": race_doc["expectedDispatched"],
         "replayFailureCode": race_doc["replayFailureCode"],
         "winnersByWorker": race_doc["winnersByWorker"],
+        "distinctWinners": len(race_doc["winnersByWorker"]),
         "admittedLatency": race_winner_stats,
         "replayedLatency": race_loser_stats,
         "freshnessDenialsAbsorbed": race_doc["freshnessDenialsAbsorbed"],
+        "roundsDiscarded": race_doc["roundsDiscarded"],
+        "roundsAttempted": race_doc["roundsAttempted"],
     },
     "denied": {
         "roundTrip": deny_stats,
@@ -1264,6 +1305,11 @@ document = {
             "resamples": BOOTSTRAP_RESAMPLES,
             "seed": BOOTSTRAP_SEED,
         },
+        "interval": (
+            "every interval here is a percentile bootstrap interval for the "
+            "MEDIAN, which is the point estimate reported beside it. mean_ms and "
+            "std_ms describe the sample and carry no interval of their own"
+        ),
         "hosts": (
             "derived from the roles this run started: every role left to another "
             "machine adds a host, and a run that starts all of them records one"
@@ -1288,29 +1334,36 @@ document = {
             "the co-signer's own connect and exchange timers, a stopwatch on "
             "every admission-store, receipt-store, revocation-store and durable "
             "admission-operation method, and the tool server. `unattributed` is "
-            "the remainder of the window, which is the guard pipeline, the "
-            "binding comparisons, both DSSE signature verifications, "
-            "canonicalization and receipt construction and signing. A call whose "
-            "parts sum past its window fails the run rather than being reported: "
-            "the counters are process-wide and only describe one call while it is "
-            "the only call running, which is why the concurrent stages report no "
-            "decomposition"
+            "the remainder of the window and is reported whole: `notDecomposed` "
+            "lists what is in it, all of which runs inside the admission hook "
+            "where this experiment has no dependency to time. The measured parts "
+            "and that remainder are the window exactly, by construction, so their "
+            "sum is not a check. The check is one-sided: a call whose parts sum "
+            "PAST its window fails the run, because that is what several calls "
+            "sharing one set of process-wide counters looks like. Nothing bounds "
+            "how large the remainder may be. This is also why the concurrent "
+            "stages report no decomposition"
         ),
         "unmediated": (
             "the same tool call over the same lane with the kernel taken out of "
             "the path: no capability check, no evidence resolution, no "
             "continuation, no dispatch through an admission and no receipt. It is "
-            "the denominator, so mediationOverheadMs is what mediating this call "
-            "costs rather than what admitting it costs. It counts into its own "
-            "invocation counter, and the run fails closed unless the kernel's own "
-            "dispatch counter stayed still throughout"
+            "the subtrahend, so mediationOverheadMs is what mediating this call "
+            "costs rather than what admitting it costs. The tool at the end of it "
+            "returns a constant JSON object in microseconds, so this stage bounds "
+            "the transport and the tool, not any real workload. It counts into its "
+            "own invocation counter, and the run fails closed unless the kernel's "
+            "own dispatch counter stayed still throughout"
         ),
         "concurrent": (
             "every worker drives its own calls end to end, so the receiver is "
             "evaluating `workers` admissions at once for the whole stage. "
             "Throughput is the call count over the wall clock of the stage, which "
-            "is the only way it can differ from one over the latency; the "
-            "sequential figure is given beside it for that comparison. "
+            "is the only way it can differ from one over the latency. One call "
+            "here is a preparation round trip followed by a call round trip, so "
+            "the sequential figure beside it is one over the median of those two "
+            "together (`sequentialEndToEnd`) rather than one over the call alone: "
+            "both sides count the same work. "
             "budgetContaminatedCalls counts the calls whose decomposition claimed "
             "more time than the window it decomposes, which is what several calls "
             "sharing one set of counters looks like and why no decomposition is "
@@ -1322,7 +1375,14 @@ document = {
             "bilateral invocation and DSSE envelope, then puts all of them in "
             "flight at once. Exactly one may be admitted, every other must carry "
             "the replay code, and the receiver's dispatch counter must move by "
-            "exactly one per round. Any other outcome fails the run"
+            "exactly one per round. Any other outcome fails the run. A round in "
+            "which any racer hit a revocation-freshness denial is discarded whole "
+            "and run again, so the reported latencies are conditioned on rounds "
+            "that saw no freshness denial: roundsDiscarded and roundsAttempted "
+            "record how many were dropped. distinctWinners is the number of "
+            "workers that won at least one round; the single-use property does not "
+            "depend on it, and at a small round count one worker winning every "
+            "round is an ordinary outcome that says nothing about the mechanism"
         ),
         "preflight": (
             "reachability and clock offset, measured before anything else, from "
@@ -1372,8 +1432,8 @@ macros = [
     ("PSFedAllowPFiftyMs", f"{allow_stats['p50_ms']:.3f}"),
     ("PSFedAllowPNinetyNineMs", f"{allow_stats['p99_ms']:.3f}"),
     ("PSFedAllowMeanMs", f"{allow_stats['mean_ms']:.3f}"),
-    ("PSFedAllowCiLowMs", f"{allow_stats['ci_low_ms']:.3f}"),
-    ("PSFedAllowCiHighMs", f"{allow_stats['ci_high_ms']:.3f}"),
+    ("PSFedAllowCiLowMs", f"{allow_stats['median_ci_low_ms']:.3f}"),
+    ("PSFedAllowCiHighMs", f"{allow_stats['median_ci_high_ms']:.3f}"),
     ("PSFedAllowSampleCount", str(allow_stats["samples"])),
     ("PSFedAllowAbsorbedCount", str(allow_absorbed)),
     ("PSFedAbsorbedCount", str(document["freshnessDenialsAbsorbed"]["total"])),
@@ -1382,12 +1442,12 @@ macros = [
     ("PSFedDenySampleCount", str(deny_stats["samples"])),
     ("PSFedDenyCases", str(len(deny_cases))),
     ("PSFedRevokeToDenyMs", f"{revoke_stats['p50_ms']:.3f}"),
-    ("PSFedRevokeCiLowMs", f"{revoke_stats['ci_low_ms']:.3f}"),
-    ("PSFedRevokeCiHighMs", f"{revoke_stats['ci_high_ms']:.3f}"),
+    ("PSFedRevokeCiLowMs", f"{revoke_stats['median_ci_low_ms']:.3f}"),
+    ("PSFedRevokeCiHighMs", f"{revoke_stats['median_ci_high_ms']:.3f}"),
     ("PSFedRevokeRepeats", str(revoke_stats["samples"])),
     ("PSFedCutToDenyMs", f"{cut_stats['p50_ms']:.3f}"),
-    ("PSFedCutCiLowMs", f"{cut_stats['ci_low_ms']:.3f}"),
-    ("PSFedCutCiHighMs", f"{cut_stats['ci_high_ms']:.3f}"),
+    ("PSFedCutCiLowMs", f"{cut_stats['median_ci_low_ms']:.3f}"),
+    ("PSFedCutCiHighMs", f"{cut_stats['median_ci_high_ms']:.3f}"),
     ("PSFedCutRepeats", str(cut_stats["samples"])),
     ("PSFedHosts", str(int(host_count))),
     ("PSFedTransport", "iroh QUIC, relays disabled"),
@@ -1445,19 +1505,13 @@ macros = [
     ),
     # The denominator.
     ("PSFedBaselinePFiftyMs", f"{baseline_stats['p50_ms']:.3f}"),
-    ("PSFedBaselineCiLowMs", f"{baseline_stats['ci_low_ms']:.3f}"),
-    ("PSFedBaselineCiHighMs", f"{baseline_stats['ci_high_ms']:.3f}"),
+    ("PSFedBaselineCiLowMs", f"{baseline_stats['median_ci_low_ms']:.3f}"),
+    ("PSFedBaselineCiHighMs", f"{baseline_stats['median_ci_high_ms']:.3f}"),
     ("PSFedBaselineSampleCount", str(baseline_stats["samples"])),
     ("PSFedBaselineToolMs", f"{baseline_dispatch['p50_ms']:.4f}"),
     (
         "PSFedMediationOverheadMs",
         f"{allow_stats['p50_ms'] - baseline_stats['p50_ms']:.3f}",
-    ),
-    (
-        "PSFedMediationOverheadRatio",
-        f"{allow_stats['p50_ms'] / baseline_stats['p50_ms']:.1f}"
-        if baseline_stats["p50_ms"]
-        else "0.0",
     ),
     # Concurrency and contention.
     ("PSFedLoadWorkers", str(load_doc["workers"])),
@@ -1465,8 +1519,9 @@ macros = [
     ("PSFedLoadThroughput", f"{load_doc['throughputCallsPerSecond']:.1f}"),
     (
         "PSFedSequentialThroughput",
-        f"{1_000.0 / allow_stats['p50_ms']:.1f}" if allow_stats["p50_ms"] else "0.0",
+        f"{sequential_throughput:.1f}" if sequential_throughput else "0.0",
     ),
+    ("PSFedSequentialEndToEndMs", f"{allow_end_to_end_stats['p50_ms']:.3f}"),
     ("PSFedLoadPFiftyMs", f"{load_stats['p50_ms']:.3f}"),
     ("PSFedLoadPNinetyNineMs", f"{load_stats['p99_ms']:.3f}"),
     ("PSFedLoadContaminatedCalls", str(load_doc["budgetContaminatedCalls"])),

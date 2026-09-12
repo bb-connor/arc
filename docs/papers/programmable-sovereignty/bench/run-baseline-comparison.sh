@@ -17,10 +17,11 @@ set -euo pipefail
 #
 # Two wirings of those parts run over the same code: `composed`, each part used
 # the way it documents itself, and `hardened`, the same parts with every
-# operator-authored check written in. Both are reported. Several of the four
-# properties turn on which wiring an operator happens to have, and nothing in
-# the composition records which one that is; reporting one wiring alone would
-# either flatter or straw-man the alternative.
+# operator-authored check written in. Both are reported, because several of the
+# four properties turn on which wiring an operator happens to have and nothing
+# in the composition records which one that is. One wiring alone would either
+# credit the composition with checks no part of it requires or understate what
+# a careful operator reaches.
 #
 # The Chio side of every comparison is read from the committed
 # bilateral-admission result rather than re-measured here, so the two halves
@@ -391,6 +392,41 @@ if len(distinct_fields) != SUBSTITUTION_FIELDS:
         f"not {SUBSTITUTION_FIELDS}"
     )
 
+
+def field_of(row):
+    return row["chio_field"].split(",")[0]
+
+
+def rows_of(field):
+    return [row for row in rows if field_of(row) == field]
+
+
+# A field has no carrier only when every row for it has none: the ordered signer
+# list is a second row of a field that is carried, and counting rows as fields
+# would report one carrier too few.
+not_carried_fields = sorted(
+    field
+    for field in distinct_fields
+    if all(row["basis"] == "not_carried" for row in rows_of(field))
+)
+carried_never_compared_fields = sorted(
+    field
+    for field in distinct_fields
+    if field not in not_carried_fields
+    and any(row["basis"] == "carried_never_compared" for row in rows_of(field))
+)
+noticed_fields = sorted(
+    field
+    for field in distinct_fields
+    if any(row["noticed_composed"] or row["noticed_hardened"] for row in rows_of(field))
+)
+partition = len(not_carried_fields) + len(carried_never_compared_fields) + len(noticed_fields)
+if partition != SUBSTITUTION_FIELDS:
+    raise SystemExit(
+        f"the {SUBSTITUTION_FIELDS} binding fields do not partition into noticed, "
+        f"carried-and-never-compared and not-carried: {partition} accounted for"
+    )
+
 null_case = next(
     entry
     for entry in baseline["negativeCorpus"]
@@ -488,20 +524,136 @@ hardened_ci = (
     hardened_before["checks_latency"]["ci_low_us"],
     hardened_before["checks_latency"]["ci_high_us"],
 )
-hardening_separated = composed_ci[1] < hardened_ci[0] or hardened_ci[1] < composed_ci[0]
-hardening_verdict = "separated" if hardening_separated else "indistinguishable"
+
+
+def separated(left, right):
+    """Whether two mean intervals are disjoint at this sample size."""
+    return left[1] < right[0] or right[1] < left[0]
+
+
+hardening_verdict = (
+    "separated" if separated(composed_ci, hardened_ci) else "indistinguishable"
+)
 composed_checks_us = composed_before["checks_latency"]["p50_us"]
 hardened_checks_us = hardened_before["checks_latency"]["p50_us"]
 hardening_checks_cost_us = hardened_checks_us - composed_checks_us
 checks_share = composed_checks_us / composed_before["latency"]["p50_us"]
+
+# The hardened wiring also makes a second durable replay claim, on the
+# identifier the decision carries for itself. That is a write and not a check,
+# so it is measured over its own span rather than inferred from two whole-path
+# medians.
+composed_claim_us = composed_before["claim_latency"]["p50_us"]
+hardened_claim_us = hardened_before["claim_latency"]["p50_us"]
+claim_cost_us = hardened_claim_us - composed_claim_us
+claim_verdict = (
+    "separated"
+    if separated(
+        (
+            composed_before["claim_latency"]["ci_low_us"],
+            composed_before["claim_latency"]["ci_high_us"],
+        ),
+        (
+            hardened_before["claim_latency"]["ci_low_us"],
+            hardened_before["claim_latency"]["ci_high_us"],
+        ),
+    )
+    else "indistinguishable"
+)
+
+# The whole path is the noisiest span the run reports, and the two wirings are
+# measured in two separate conditions, so the pair is quotable only when the two
+# mean intervals are disjoint. Otherwise the difference between them is host
+# noise and the macro says so rather than printing a number.
+whole_path_verdict = (
+    "separated"
+    if separated(
+        (
+            composed_before["latency"]["ci_low_us"],
+            composed_before["latency"]["ci_high_us"],
+        ),
+        (
+            hardened_before["latency"]["ci_low_us"],
+            hardened_before["latency"]["ci_high_us"],
+        ),
+    )
+    else "indistinguishable"
+)
+
+# A timing is quotable only from a run the paper could reproduce: a clean input
+# tree, a sample large enough that the median is stable, and a host that was
+# quiet by an absolute standard rather than by whatever ceiling the run was
+# allowed to raise. A run that misses any of these still writes its corpora and
+# its property verdicts, which are exact functions of the source, and refuses
+# to hand the paper a number.
+LATENCY_PINNABLE_MIN_CALLS = 1000
+LATENCY_PINNABLE_MAX_LOAD_1M = 4.0
+latency_pinnable_reasons = []
+if source_dirty == "true":
+    latency_pinnable_reasons.append("the benchmark input tree had uncommitted changes")
+if composed_before["calls"] < LATENCY_PINNABLE_MIN_CALLS:
+    latency_pinnable_reasons.append(
+        f"the run took {composed_before['calls']} calls, fewer than "
+        f"{LATENCY_PINNABLE_MIN_CALLS}"
+    )
+if environment["loadAverage1m"] > LATENCY_PINNABLE_MAX_LOAD_1M:
+    latency_pinnable_reasons.append(
+        f"the one-minute load average was {environment['loadAverage1m']}, above "
+        f"{LATENCY_PINNABLE_MAX_LOAD_1M}"
+    )
+latency_pinnable = not latency_pinnable_reasons
+
+UNPINNED = "\\textnormal{[unpinned]}"
+NOT_SEPARABLE = "\\textnormal{[not separable]}"
+
+
+def timing(value):
+    """A measured duration or a verdict over two of them, or a marker when this
+    run cannot pin one. A separability verdict is as unquotable as the
+    intervals it was taken over."""
+    return value if latency_pinnable else UNPINNED
 
 # --- counts over the corpora -------------------------------------------------
 
 negative = baseline["negativeCorpus"]
 driven = [entry for entry in negative if entry.get("composed") is not None]
 no_analogue = [entry for entry in negative if entry.get("composed") is None]
-attacks = [
-    entry for entry in driven if entry["baseline_case_id"] != "unmodified-admissible-call"
+# Only a case the corpus marks as an attack is counted as one. The null case is
+# a call that must be admitted, and an informational case is driven to record a
+# difference between the wirings that is not a security difference; counting
+# either as an attack would inflate every count taken over the attack set.
+attacks = [entry for entry in driven if entry["role"] == "attack"]
+informational = [entry for entry in driven if entry["role"] == "informational"]
+if len(driven) != len(attacks) + len(informational) + 1:
+    raise SystemExit(
+        "the driven cases do not partition into attacks, informational cases "
+        "and one null case"
+    )
+# A case excluded from the attack counts has to be a call the composition
+# admits, or the exclusion is hiding a denial that belongs in the counts.
+for entry in informational:
+    if not entry["composed"]["dispatched"]:
+        raise SystemExit(
+            f"{entry['baseline_case_id']} is recorded as informational and the "
+            "composed wiring denied it; a denied case is an attack"
+        )
+
+# Two Chio cases can collapse onto one baseline experiment, because the
+# composition has one mechanism where Chio has two. An experiment is a drive
+# against a receiver state, so the same drive against different state counts
+# twice and the same drive against the same state counts once.
+drive_ids = [entry["drive_id"] for entry in attacks]
+distinct_drives = sorted(set(drive_ids))
+collapsed_drives = [
+    {
+        "driveId": drive_id,
+        "threatIds": [entry["threat_id"] for entry in attacks if entry["drive_id"] == drive_id],
+        "caseIds": [
+            entry["baseline_case_id"] for entry in attacks if entry["drive_id"] == drive_id
+        ],
+    }
+    for drive_id in distinct_drives
+    if drive_ids.count(drive_id) > 1
 ]
 
 
@@ -608,20 +760,29 @@ document = {
         "driven": len(driven),
         "noAnalogue": len(no_analogue),
         "attacks": len(attacks),
+        "informational": len(informational),
+        "distinctDrives": len(distinct_drives),
         "composedAdmits": len(composed_admits),
         "hardenedAdmits": len(hardened_admits),
         "closedByHardening": len(hardening_closes),
         "composedAdmittedCaseIds": [entry["baseline_case_id"] for entry in composed_admits],
         "hardenedAdmittedCaseIds": [entry["baseline_case_id"] for entry in hardened_admits],
         "noAnalogueCaseIds": [entry["baseline_case_id"] for entry in no_analogue],
+        "informationalCaseIds": [entry["baseline_case_id"] for entry in informational],
+        "collapsedDrives": collapsed_drives,
         "entries": negative,
     },
     "substitutionCorpus": {
         "bindingFields": SUBSTITUTION_FIELDS,
         "rows": SUBSTITUTION_ROWS,
-        "noticedComposed": len(noticed_composed),
-        "noticedHardened": len(noticed_hardened),
-        "notCarried": len(not_carried),
+        "noticedComposedRows": len(noticed_composed),
+        "noticedHardenedRows": len(noticed_hardened),
+        "notCarriedRows": len(not_carried),
+        "notCarriedFields": len(not_carried_fields),
+        "noticedFields": len(noticed_fields),
+        "carriedNeverComparedFields": len(carried_never_compared_fields),
+        "notCarriedFieldNames": not_carried_fields,
+        "carriedNeverComparedFieldNames": carried_never_compared_fields,
         "entries": rows,
     },
     "properties": properties,
@@ -644,15 +805,28 @@ document = {
             "responseBeforeRecordP50Ms": base_response_ms,
             "orderingCostP50Ms": ordering_cost_ms,
             "hardenedAdmittedCallP50Ms": hardened_allow_ms,
-            "hardeningCostWholePathP50Ms": hardening_cost_ms,
+            "hardenedAdmittedCallVerdict": whole_path_verdict,
+            "hardeningCostWholePathP50Ms": (
+                hardening_cost_ms if whole_path_verdict == "separated" else None
+            ),
             "checksOnlyP50Us": composed_checks_us,
             "hardenedChecksOnlyP50Us": hardened_checks_us,
             "hardenedChecksOnlyMeanCiLowUs": hardened_ci[0],
             "hardenedChecksOnlyMeanCiHighUs": hardened_ci[1],
             "hardeningChecksCostP50Us": hardening_checks_cost_us,
             "hardeningCostVerdict": hardening_verdict,
+            "durableClaimsP50Us": composed_claim_us,
+            "hardenedDurableClaimsP50Us": hardened_claim_us,
+            "hardeningDurableClaimCostP50Us": claim_cost_us,
+            "hardeningDurableClaimVerdict": claim_verdict,
             "checksShareOfAdmittedCall": checks_share,
             "durableBytesPerCall": base_bytes_per_call,
+            "hardenedDurableBytesPerCall": hardened_before["durable_bytes_per_call"],
+            "hardeningStorageCostBytesPerCall": (
+                hardened_before["durable_bytes_per_call"] - base_bytes_per_call
+            ),
+            "latencyPinnable": latency_pinnable,
+            "latencyUnpinnableBecause": latency_pinnable_reasons,
             "decisionRecordBytes": composed_before["decision_record_bytes_p50"],
             "requestWireBytes": composed_before["request_wire_bytes"],
         },
@@ -667,7 +841,9 @@ document = {
         },
         "ratios": {
             "latencyChioOverAlternative": chio_allow_ms / base_allow_ms,
-            "storageChioOverAlternative": chio_storage_bytes_per_call / base_bytes_per_call,
+            "storageChioOverAlternativeUpperBound": (
+                chio_storage_bytes_per_call / base_bytes_per_call
+            ),
         },
     },
     "method": {
@@ -680,7 +856,35 @@ document = {
             "distribution is right-skewed by the durable write's tail"
         ),
         "latency": baseline["method"]["latency"],
-        "storage": baseline["method"]["storage"],
+        "storage": (
+            "the two sides are read by two procedures and the ratio is a bound, "
+            "not a measurement: the alternative's store is read after PRAGMA "
+            "wal_checkpoint(TRUNCATE) on both the before and the after reading, "
+            "so its delta is main-database growth with the write-ahead log "
+            "excluded, while the Chio figure is read from the committed "
+            "sustained-load record, which sums the database, its -wal and its "
+            "-shm without checkpointing and so carries the log's high-water mark "
+            "in its delta. The Chio side is inflated by that amount and the "
+            "alternative's is not, so the ratio is an upper bound on how much "
+            "more durable state a Chio admission leaves behind"
+        ),
+        "ratios": (
+            "the latency ratio compares two whole admission paths and attributes "
+            "nothing: no measurement here isolates the cost of any individual "
+            "property, and the two paths differ in more than the properties they "
+            "reach. It is against the local Chio path (treaty_predispatch_allow) "
+            "because the alternative is in-process, and never against the "
+            "federated figure"
+        ),
+        "pinnableTimings": (
+            "a timing is written into the macros only from a run the paper could "
+            "reproduce: a clean input tree, at least "
+            f"{LATENCY_PINNABLE_MIN_CALLS} calls, and a one-minute load average "
+            f"no higher than {LATENCY_PINNABLE_MAX_LOAD_1M}. A run that misses "
+            "any of these still writes its corpora and its property verdicts, "
+            "which are exact functions of the source, and writes [unpinned] "
+            "wherever a duration would go"
+        ),
         "chioSide": (
             "read from the committed bilateral-admission result rather than "
             "re-measured, so the two halves of the comparison cannot drift; the "
@@ -693,21 +897,36 @@ document = {
             "careful operator can reach"
         ),
         "hardeningCost": (
-            "the hardened wiring runs six checks the composed wiring does not. "
-            "Their cost is taken over the checks span alone, with the two "
-            "durable writes excluded, because against a store that fsyncs a "
-            "whole-path delta of that size is not resolvable; the verdict is "
-            "over the two mean intervals of that span"
+            "the hardened wiring runs seven checks the composed wiring does not, "
+            "and makes one more durable write: the replay claim on the "
+            "identifier the decision carries for itself. The checks are costed "
+            "over the checks span alone, because against a store that fsyncs a "
+            "whole-path delta of that size is not resolvable; the extra write is "
+            "costed over the durable-claim span, which is measured separately "
+            "for that reason. Each verdict is over the two mean intervals of its "
+            "own span, and the whole-path pair carries a verdict of its own "
+            "because the two wirings are measured in two separate conditions"
         ),
         "checksSpan": (
-            "every signature verification, canonical encoding, consistency "
-            "comparison, table lookup and rule evaluation the receiver "
-            "performs, timed around the admission path and less the durable "
-            "claim that sits in the middle of it"
+            "the span from the start of peer resolution to the end of rule "
+            "evaluation, less the durable replay claims that sit inside it. The "
+            "argument digest, the decision parse, the record encoding and the "
+            "record signature are outside it, so what is left over from an "
+            "admitted call is everything that is not the checks span, dominated "
+            "by the durable writes: two under the composed wiring, three under "
+            "the hardened one"
         ),
         "propertyVerdicts": (
             "derived from cases the run drove, not asserted: a property fails "
             "only when a driven case dispatched a call the property forbids"
+        ),
+        "attackCounts": (
+            "taken over the cases the corpus marks as attacks. The null case is "
+            "a call that must be admitted, and an informational case is driven "
+            "to record a difference between the wirings that is not a security "
+            "difference; both are reported separately and neither is counted as "
+            "an attack. Distinct drives counts the experiments behind those "
+            "cases, since two Chio cases can collapse onto one baseline drive"
         ),
     },
 }
@@ -724,42 +943,61 @@ macros = [
     ("PSBaseNegativeDriven", str(len(driven))),
     ("PSBaseNegativeNoAnalogue", str(len(no_analogue))),
     ("PSBaseNegativeAttacks", str(len(attacks))),
+    ("PSBaseNegativeInformational", str(len(informational))),
+    ("PSBaseNegativeDistinctDrives", str(len(distinct_drives))),
     ("PSBaseComposedAdmits", str(len(composed_admits))),
     ("PSBaseHardenedAdmits", str(len(hardened_admits))),
     ("PSBaseClosedByHardening", str(len(hardening_closes))),
     ("PSBaseSubstFields", str(SUBSTITUTION_FIELDS)),
     ("PSBaseSubstRows", str(SUBSTITUTION_ROWS)),
-    ("PSBaseSubstNoticedComposed", str(len(noticed_composed))),
-    ("PSBaseSubstNoticedHardened", str(len(noticed_hardened))),
-    ("PSBaseSubstNotCarried", str(len(not_carried))),
+    ("PSBaseSubstNoticedComposedRows", str(len(noticed_composed))),
+    ("PSBaseSubstNoticedHardenedRows", str(len(noticed_hardened))),
+    ("PSBaseSubstNotCarriedRows", str(len(not_carried))),
+    ("PSBaseSubstNotCarriedFields", str(len(not_carried_fields))),
+    ("PSBaseSubstNoticedFields", str(len(noticed_fields))),
+    ("PSBaseSubstCarriedNeverComparedFields", str(len(carried_never_compared_fields))),
     ("PSBasePropsHoldComposed", str(property_count("composed", "holds"))),
     ("PSBasePropsWeakComposed", str(property_count("composed", "holds_weakened"))),
     ("PSBasePropsFailComposed", str(property_count("composed", "fails"))),
     ("PSBasePropsHoldHardened", str(property_count("hardened", "holds"))),
     ("PSBasePropsWeakHardened", str(property_count("hardened", "holds_weakened"))),
     ("PSBasePropsFailHardened", str(property_count("hardened", "fails"))),
-    ("PSBaseAllowPFiftyMs", f"{base_allow_ms:.3f}"),
-    ("PSBaseAllowPNinetyNineMs", f"{composed_before['latency']['p99_us'] / 1000.0:.3f}"),
-    ("PSBaseAllowMeanMs", f"{composed_before['latency']['mean_us'] / 1000.0:.3f}"),
-    ("PSBaseAllowMeanCiLowMs", f"{composed_before['latency']['ci_low_us'] / 1000.0:.3f}"),
-    ("PSBaseAllowMeanCiHighMs", f"{composed_before['latency']['ci_high_us'] / 1000.0:.3f}"),
+    ("PSBaseAllowPFiftyMs", timing(f"{base_allow_ms:.3f}")),
+    ("PSBaseAllowPNinetyNineMs", timing(f"{composed_before['latency']['p99_us'] / 1000.0:.3f}")),
+    ("PSBaseAllowMeanMs", timing(f"{composed_before['latency']['mean_us'] / 1000.0:.3f}")),
+    ("PSBaseAllowMeanCiLowMs", timing(f"{composed_before['latency']['ci_low_us'] / 1000.0:.3f}")),
+    (
+        "PSBaseAllowMeanCiHighMs",
+        timing(f"{composed_before['latency']['ci_high_us'] / 1000.0:.3f}"),
+    ),
     ("PSBaseAllowSampleCount", str(composed_before["latency"]["samples"])),
-    ("PSBaseResponsePFiftyMs", f"{base_response_ms:.3f}"),
-    ("PSBaseOrderingCostMs", f"{ordering_cost_ms:.3f}"),
-    ("PSBaseHardenedAllowPFiftyMs", f"{hardened_allow_ms:.3f}"),
-    ("PSBaseChecksPFiftyUs", f"{composed_checks_us:.1f}"),
-    ("PSBaseHardenedChecksPFiftyUs", f"{hardened_checks_us:.1f}"),
-    ("PSBaseHardeningChecksCostUs", f"{hardening_checks_cost_us:.1f}"),
-    ("PSBaseHardeningCostVerdict", hardening_verdict),
-    ("PSBaseChecksSharePercent", f"{checks_share * 100.0:.2f}"),
+    ("PSBaseResponsePFiftyMs", timing(f"{base_response_ms:.3f}")),
+    ("PSBaseOrderingCostMs", timing(f"{ordering_cost_ms:.3f}")),
+    # The two wirings' whole paths are measured in two separate conditions, so
+    # this one is quotable only when their mean intervals are disjoint.
+    (
+        "PSBaseHardenedAllowPFiftyMs",
+        timing(f"{hardened_allow_ms:.3f}" if whole_path_verdict == "separated" else NOT_SEPARABLE),
+    ),
+    ("PSBaseHardenedAllowVerdict", timing(whole_path_verdict)),
+    ("PSBaseChecksPFiftyUs", timing(f"{composed_checks_us:.1f}")),
+    ("PSBaseHardenedChecksPFiftyUs", timing(f"{hardened_checks_us:.1f}")),
+    ("PSBaseHardeningChecksCostUs", timing(f"{hardening_checks_cost_us:.1f}")),
+    ("PSBaseHardeningCostVerdict", timing(hardening_verdict)),
+    ("PSBaseClaimPFiftyUs", timing(f"{composed_claim_us:.1f}")),
+    ("PSBaseHardenedClaimPFiftyUs", timing(f"{hardened_claim_us:.1f}")),
+    ("PSBaseHardeningClaimCostUs", timing(f"{claim_cost_us:.1f}")),
+    ("PSBaseHardeningClaimVerdict", timing(claim_verdict)),
+    ("PSBaseChecksSharePercent", timing(f"{checks_share * 100.0:.2f}")),
     ("PSBaseBytesPerCall", f"{base_bytes_per_call:.1f}"),
+    ("PSBaseHardenedBytesPerCall", f"{hardened_before['durable_bytes_per_call']:.1f}"),
     ("PSBaseRequestWireBytes", str(composed_before["request_wire_bytes"])),
     ("PSBaseChioAllowPFiftyMs", f"{chio_allow_ms:.3f}"),
     ("PSBaseChioAppendPFiftyMs", f"{chio_append_ms:.3f}"),
     ("PSBaseChioKiBPerCall", f"{chio_storage_bytes_per_call / 1024.0:.2f}"),
-    ("PSBaseLatencyRatio", f"{chio_allow_ms / base_allow_ms:.2f}"),
+    ("PSBaseLatencyRatio", timing(f"{chio_allow_ms / base_allow_ms:.2f}")),
     (
-        "PSBaseStorageRatio",
+        "PSBaseStorageRatioUpperBound",
         f"{chio_storage_bytes_per_call / base_bytes_per_call:.1f}",
     ),
 ]

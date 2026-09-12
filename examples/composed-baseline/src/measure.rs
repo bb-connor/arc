@@ -40,11 +40,17 @@ pub struct MeasurementResult {
     /// stops before the audit append, and the difference between the two
     /// profiles is the cost of putting the record before the response.
     pub response_latency: LatencySummary,
-    /// The checks alone: signature verification, canonical encoding, the
-    /// consistency comparisons, the table lookups and the rule evaluation,
-    /// with the two durable writes excluded. This is the span in which the two
-    /// profiles differ.
+    /// The checks alone: the span from the start of peer resolution to the end
+    /// of rule evaluation, less the durable replay claims inside it. The
+    /// argument digest, the decision parse, the record encoding and the record
+    /// signature are outside it. This is the span in which the two wirings'
+    /// checks differ.
     pub checks_latency: LatencySummary,
+    /// The durable replay claims alone: one insert under the composed wiring,
+    /// two under the hardened wiring. The difference between the two is the
+    /// cost of claiming the authorization's own identifier, measured rather
+    /// than inferred from two whole-path medians.
+    pub claim_latency: LatencySummary,
     pub store_bytes_before: u64,
     pub store_bytes_after: u64,
     pub durable_bytes_per_call: f64,
@@ -196,6 +202,7 @@ pub fn measure(
     let mut samples = Vec::with_capacity(calls as usize);
     let mut response_samples = Vec::with_capacity(calls as usize);
     let mut checks_samples = Vec::with_capacity(calls as usize);
+    let mut claim_samples = Vec::with_capacity(calls as usize);
     let mut record_bytes = Vec::with_capacity(calls as usize);
     let mut dispatched = 0u64;
     for envelope in envelopes.iter().skip(warmup as usize) {
@@ -214,6 +221,7 @@ pub fn measure(
         samples.push(elapsed.as_secs_f64() * 1_000_000.0);
         response_samples.push(outcome.response_ready.as_secs_f64() * 1_000_000.0);
         checks_samples.push(outcome.checks.as_secs_f64() * 1_000_000.0);
+        claim_samples.push(outcome.durable_claims.as_secs_f64() * 1_000_000.0);
         record_bytes.push(outcome.decision_record_bytes);
     }
 
@@ -241,6 +249,7 @@ pub fn measure(
         latency: summarize(&samples)?,
         response_latency: summarize(&response_samples)?,
         checks_latency: summarize(&checks_samples)?,
+        claim_latency: summarize(&claim_samples)?,
         store_bytes_before: before,
         store_bytes_after: after,
         durable_bytes_per_call: ((after.saturating_sub(before)) as f64) / (calls as f64),

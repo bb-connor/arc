@@ -222,6 +222,15 @@ this receipt's canonical body. This is the receipt this section names as the
 subject, and it is not the receipt the receiver writes for this call at the end
 of admission (D13).
 
+The subject receipt is a receipt the receiver has already signed, and this
+specification requires nothing more of it than the three equalities above. The
+shipped reference path signs one such receipt per receiver process and names it
+for every call that process serves, so its subject carries no per-call
+information: `invocation_id` and the subject digest are the same value on every
+call, and the per-call binding is carried entirely by the binding reference of
+D9. A deployment that wants the subject to identify the call MUST mint a
+distinct subject receipt per call; nothing in section 7 forces that.
+
 **D7. Invocation record.** Section 4.2. Producer: the receiver. Store: the
 receiver, under evidence kind `bilateral_invocation`. Enters before the
 request.
@@ -283,13 +292,23 @@ subject is the receiver's own receipt (D6), not the peer's. It is never carried
 on the wire: the request names it by identifier and digest, and the receiver
 resolves it out of a store the receiver itself wrote.
 
-**The outbound co-signature.** A receiver MAY, after persisting D13, ask the
-peer to co-sign a statement whose subject is D13's digest. That object is an
-after-the-fact acknowledgement: it is minted after the dispatch it describes,
-it gates nothing, no admission path resolves it, and a conforming
-implementation MUST NOT treat its presence or absence as an admission input.
-It is the inbound statement of D9 and D10, never the outbound one, that any
-property about what a receiver dispatched can quantify over.
+**The outbound co-signature.** After persisting D13, the receiver asks the peer
+to co-sign a statement whose subject is D13's digest. This is not optional in
+the shipped reference kernel: it runs on every federated request, immediately
+after the step-7 receipt is durable, and a co-sign it cannot complete fails the
+response. A federated request with no cosigner installed, an admitted peer
+snapshot that does not match the origin, and a non-deny federated receipt with
+no verified treaty material are each an error that aborts the caller's response
+path rather than shipping a receipt without the remote signature. A federated
+request denied before treaty admission ran is recorded single-signed, because
+it dispatched no cross-organization outcome to co-sign.
+
+That object is nevertheless an after-the-fact acknowledgement. It is minted
+after the dispatch it describes, no admission path resolves it, and a
+conforming implementation MUST NOT treat its presence or absence as an
+admission input. It gates the response, never the dispatch. It is the inbound
+statement of D9 and D10, never the outbound one, that any property about what a
+receiver dispatched can quantify over.
 
 ### 4.2 The Invocation Record
 
@@ -355,6 +374,15 @@ and target kernel identifiers, and parent receipt digest all bind the resolved
 continuation; the digest of that statement is what the invocation record's
 `lineage_statement_sha256` must equal. If no statement binds, the call is
 denied with `chio_treaty_lineage_mismatch`.
+
+Neither decider resolves the root or leaf receipt digest to a receipt. The hook
+compares them against the invocation record and the binding reference, and the
+conforming verifier never sees the bundle at all. What the bundle establishes
+is therefore that the receiver's own records agree on which digests this call
+chains to, and nothing about any parent receipt existing: in the reference path
+the root digest is the SHA-256 of a per-continuation label rather than of a
+receipt. A deployment that needs the parent receipt to exist MUST resolve it
+separately.
 
 The walk is the only part of admission linear in the size of an artifact rather
 than constant. It is bounded structurally rather than by a declared cap: the
@@ -944,10 +972,10 @@ The relation between them is not identity, and this subsection states it, so
 that neither an implementer nor a reader has to infer it. It is held by the
 differential corpus at
 [../crates/trust/chio-federation/tests/verifier_hook_conformance.rs](../crates/trust/chio-federation/tests/verifier_hook_conformance.rs),
-which builds one cross-organization call, projects it into both deciders, and
-asserts per input which of four relations holds. The set of divergences is
-asserted whole, so a check that moves between the two, in either direction,
-fails the corpus.
+which builds one cross-organization call per input, projects it into both
+deciders, and asserts which of four relations holds. The set of divergences the
+corpus contains is asserted whole, so a check that moves between the two, in
+either direction, on any input the corpus holds, fails it.
 
 **They agree on everything the envelope alone determines.** Media type,
 signature count, canonicalisation, predicate type, statement type, subject
@@ -957,8 +985,8 @@ field of the same envelope. On each of these an accept is an accept on both
 sides and a reject is a reject on both sides; only the code differs, because
 the two code families differ.
 
-**The conforming verifier rejects, and the hook admits, in exactly these
-cases.** Each is a resolution the hook does not perform.
+**Among the inputs the corpus covers, the conforming verifier rejects and the
+hook admits in these cases.** Each is a resolution the hook does not perform.
 
 | Case | Verifier code | Why the hook admits |
 | --- | --- | --- |
@@ -966,8 +994,11 @@ cases.** Each is a resolution the hook does not perform.
 | Subject receipt not in the receiver's receipt store | `subject.digest_mismatch` | The hook has no receipt store on this path. |
 | Capability lease not in the registry | `capability.lease_expired_or_unknown` | The hook compares `lease_refs` against the lease identifier its own admission bundle names and does not resolve the lease record, so issuer and expiry are not checked here. |
 | Governance record not in the store | `governance.receipt_required_missing` | The hook compares `governance_refs` against its own admission bundle and does not re-derive the record's digest. |
+| Tool name not in the verifier's action-class table | `governance.unknown_action_class` | The table is verifier-owned and its unknown-class policy is reject. The hook reads the class out of the ladder intersection it computed itself. |
 | Peer passport revoked at the pinned epoch | `peer.revoked_at_epoch` | Revocation reaches the kernel through its revocation view, not through this hook. |
 | Pinned peer carries no ladder manifest reference | `ladder.manifest_missing` | The hook activates both manifests itself and checks the intersection it stored, not a per-peer manifest reference. |
+| Pinned peer's ladder manifest reference is stale | `ladder.manifest_stale` | Freshness is measured against the verifier's pinned epoch, which the hook does not hold; the hook bounds the same material through the validity window of the intersection it stored. |
+| Origin's passport key rotated in the agreement but not in the pin set | `peer.unpinned_or_keyid_mismatch` | The hook verifies the envelope under the keys the **agreement** carries, so it admits under the rotated key the pin set has not received. |
 
 The first two are the consequential ones. **The receipt resolution of steps 17
 to 19 has no counterpart on the dispatch path**: the hook never resolves the
@@ -980,18 +1011,43 @@ store, to the artifact the co-signed binding reference names. A deployment that
 needs the full section 7 result on the dispatch path MUST run the conforming
 verifier in addition to the hook.
 
-**The hook rejects, and the conforming verifier admits, in exactly these
-cases.** Each is over receiver-owned runtime state that no envelope carries.
+The last row is a divergence of a different kind, and it is the one an operator
+has to act on. **The two deciders resolve the participants' public keys from
+two different receiver-owned stores.** The conforming verifier takes both from
+its pin set, at steps 6 and 7, and compares each declared fingerprint against
+the pin. The hook takes both from the activated agreement, by the position of
+the kernel identifier in the agreement's participant list, and verifies the two
+signatures under those. Both stores belong to the receiver and either can be
+ahead of the other: a rotation carried into one and not the other is admitted
+by whichever decider holds the key the envelope names, and rejected by the
+other. A deployment MUST keep its pin set and its activated agreements in
+agreement about every participant's key, or run both deciders on every call.
+
+**Among the inputs the corpus covers, the hook rejects and the conforming
+verifier admits in these cases.** Each is over receiver-owned runtime state that
+no envelope carries.
 
 | Case | Hook code | Why the verifier admits |
 | --- | --- | --- |
 | Consistency model below what the action class requires | `chio_treaty_dsse_binding_mismatch` | The verifier has no ladder intersection, so it accepts any model the predicate and its binding reference agree on. |
 | Unanimous `deny` | `chio_treaty_policy_denied` | A unanimous deny is a valid statement; the verifier returns it verified for audit and dispute review. Admission is the stricter caller. |
+| Agreement not in the store | `chio_treaty_missing_scope` | No agreement record reaches the verifier. |
+| Presented agreement digest differs from the store | `chio_treaty_scope_hash_mismatch` | No agreement record reaches the verifier. |
+| Action class outside the agreement's allowed classes | `chio_treaty_action_class_not_allowed` | Which classes are in scope is a field of the agreement the receiver activated; the envelope names a class and nothing that decides whether this receiver admits it. |
+| Ladder intersection not in the store | `chio_treaty_missing_intersection` | The intersection is computed by the receiver and never transferred. |
+| Presented intersection digest differs from the store | `chio_treaty_intersection_mismatch` | The intersection is computed by the receiver and never transferred. |
+| Continuation not in the store | `chio_treaty_missing_continuation` | The continuation is authenticated by residency in the receiver's store; the statement names it only by digest. |
+| Presented continuation digest differs from the store | `chio_treaty_continuation_hash_mismatch` | The verifier resolves no continuation. |
 | Continuation already spent | `chio_treaty_continuation_replay` | Single use is a property of one table in the receiver's store; nothing in the envelope records it. |
 | Continuation outside its window | `chio_treaty_continuation_stale` | The continuation is a receiver-owned record the statement names only by digest. |
-| Request carries a refused key name | `request_smuggled_trust_root` | The refusal is over the request's agreement context, which no envelope verifier sees. |
-| Presented agreement digest differs from the store | `chio_treaty_scope_hash_mismatch` | No agreement record reaches the verifier. |
 | Presented action class does not bind the stored continuation | `chio_treaty_continuation_mismatch` | The envelope carries the class identifier and nothing that would let an offline verifier decide whether this receiver admits it. |
+| Presented lineage bundle digest differs from the store | `chio_treaty_lineage_hash_mismatch` | No bundle crosses; the verifier never sees one. |
+| No lineage statement binds the stored continuation | `chio_treaty_lineage_mismatch` | The walk is over records the receiver wrote. |
+| Invocation record not in the store | `chio_treaty_missing_bilateral_evidence` | The record lives only in the receiver's store. |
+| Presented invocation record digest differs from the store | `chio_treaty_bilateral_hash_mismatch` | The record is never carried on the wire. |
+| Invocation record does not bind the requested dispatch | `chio_treaty_bilateral_mismatch` | The record is compared against the receiver's own admission bundle, which the verifier does not hold. |
+| Envelope reference omitted for a class that requires it | `chio_treaty_missing_required_evidence` | Which evidence classes a call must carry comes from the action class in the intersection the receiver stored. A verifier handed an envelope is never in a position to observe that one was not presented. |
+| Request carries a refused key name | `request_smuggled_trust_root` | The refusal is over the request's agreement context, which no envelope verifier sees. |
 
 **One binding field is compared by neither.** `admission_report_sha256` is
 checked for hex shape and never compared against anything: the receiver
@@ -1001,6 +1057,18 @@ receipt as though the receiver had computed it. A conforming verifier MUST NOT
 reject an envelope on this field's value, and an implementer MUST NOT enforce
 it. The corpus asserts that both deciders admit when it is substituted, so the
 field's non-normative status cannot silently change.
+
+**What the corpus does and does not establish.** It is a set of inputs, not a
+proof. Over its forty-five inputs it exercises the accept path, every one of
+the sixteen codes section 7.1 requires a conforming verifier to surface, and
+nineteen of the twenty-four `chio_treaty_` codes the runtime registry defines
+for agreement admission. Both figures are asserted mechanically against the two
+code registries, and the five runtime codes no input reaches are named in the
+corpus with the reason each is out of its range. The corpus therefore states
+how the two deciders relate on the inputs it contains, and states nothing about
+inputs it does not contain: it is not a proof that no other input diverges. A
+check added to either decider MUST be added to the corpus, and a divergence
+discovered outside it MUST be added to the tables above.
 
 ---
 

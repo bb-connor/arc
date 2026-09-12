@@ -1982,18 +1982,40 @@
       "claimClass": "bounded_model",
       "status": "proved",
       "mapsTo": ["P3"],
-      "notes": "Comparison-set completeness: every leaf is bound to a named receiver-held value, or constrained only against the statement itself, or constrained by nothing, and exactly one of the three. Totality is structural, because the classification is a match on the leaf enumeration."
+      "notes": "Comparison-set completeness over the leaves this call's statement carries: every such leaf is compared against something the receiver holds, or constrained only against the statement itself, or compared against nothing the receiver holds, and exactly one of the three. The third branch is the residual and does not claim the leaf is unconstrained, because the statement gate still enforces its declared shape."
     },
     {
-      "id": "treaty.admission_binding.accept_decomposition",
-      "leanName": "Chio.Treaty.AdmissionBinding.accept_iff_bound_fields_agree",
+      "id": "treaty.admission_binding.absent_leaves_are_refused_or_merely_optional",
+      "leanName": "Chio.Treaty.AdmissionBinding.absent_leaves_are_refused_or_merely_optional",
       "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
       "status": "proved",
       "mapsTo": ["P3"],
-      "notes": "Accept-set decomposition: the modeled receiver accepts exactly when every leaf bound to a receiver-held value carries that value, so no gate outside the comparison set can admit or deny."
+      "notes": "The leaves this call's statement does not carry split into two kinds: two the strict profile refuses outright, and four the wire type marks optional and this call omits, which another strict statement may carry."
+    },
+    {
+      "id": "treaty.admission_binding.classification_census",
+      "leanName": "Chio.Treaty.AdmissionBinding.classification_census",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The census the companion document's counts must agree with: twenty-three leaves compared for equality, two against a receiver-held domain, thirteen constrained only against the statement, eleven compared against nothing the receiver holds, two refused by the profile, four optional and omitted, forty-nine carried by this call, and fifty-three that a strict statement may carry."
+    },
+    {
+      "id": "treaty.admission_binding.accept_decomposition",
+      "leanName": "Chio.Treaty.AdmissionBinding.accept_iff_gate_and_comparisons_hold",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Accept-set decomposition in the model: the modeled receiver accepts exactly when the statement gate holds, every equality-bound leaf carries its receiver-held value, and every domain-bound leaf lies in its receiver-held set. The gate is named rather than absorbed into the comparison set, so the biconditional does not claim that leaf agreement alone admits."
     },
     {
       "id": "treaty.admission_binding.accept_implies_binding",
@@ -2004,7 +2026,18 @@
       "claimClass": "bounded_model",
       "status": "proved",
       "mapsTo": ["P3"],
-      "notes": "Admission binding over the modeled comparison set: an accepted statement carries, at every bound leaf, the value the receiver already held."
+      "notes": "Admission binding over the equality-bound leaves of the model: an accepted statement carries, at each of them, the value the receiver already held."
+    },
+    {
+      "id": "treaty.admission_binding.accept_implies_domain_membership",
+      "leanName": "Chio.Treaty.AdmissionBinding.accept_implies_domain_membership",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The weaker half of the binding claim, for the two leaves bound to a receiver-held domain rather than to a value: an accepted statement carries a value inside the domain and nothing more. The lease expiry and the lease issuer are of this kind."
     },
     {
       "id": "treaty.admission_binding.disagreement_denies",
@@ -2015,29 +2048,40 @@
       "claimClass": "bounded_model",
       "status": "proved",
       "mapsTo": ["P3"],
-      "notes": "Fail-closed contrapositive: one bound leaf that disagrees with the receiver-held value denies, whatever the rest of the statement carries."
+      "notes": "Fail-closed contrapositive: one equality-bound leaf that disagrees with the receiver-held value denies, whatever the rest of the statement carries."
     },
     {
-      "id": "treaty.admission_binding.accept_determined_by_bound_fields",
-      "leanName": "Chio.Treaty.AdmissionBinding.accept_determined_by_bound_fields",
+      "id": "treaty.admission_binding.value_outside_domain_denies",
+      "leanName": "Chio.Treaty.AdmissionBinding.value_outside_domain_denies",
       "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
       "status": "proved",
       "mapsTo": ["P3"],
-      "notes": "Acceptance in the model is a function of the bound leaves alone, which is the completeness claim in its strongest form."
+      "notes": "Fail-closed contrapositive for the domain-bound leaves: a value outside the receiver-held set denies."
     },
     {
-      "id": "treaty.admission_binding.unbound_substitution_preserves_acceptance",
-      "leanName": "Chio.Treaty.AdmissionBinding.unbound_substitution_preserves_acceptance",
+      "id": "treaty.admission_binding.accept_determined_by_gate_and_compared_leaves",
+      "leanName": "Chio.Treaty.AdmissionBinding.accept_determined_by_gate_and_compared_leaves",
       "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
       "kind": "theorem",
       "rootImported": true,
       "claimClass": "bounded_model",
       "status": "proved",
       "mapsTo": ["P3"],
-      "notes": "The residual: substituting a leaf the classification does not bind to receiver state leaves the modeled decision unchanged."
+      "notes": "Acceptance in the model is a function of the statement gate and the compared leaves alone, which is the completeness claim in its strongest form."
+    },
+    {
+      "id": "treaty.admission_binding.residual_substitution_preserves_acceptance",
+      "leanName": "Chio.Treaty.AdmissionBinding.residual_substitution_preserves_acceptance",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The residual: replacing a leaf the classification compares against nothing the receiver holds leaves the modeled decision unchanged, provided the statement gate's verdict does not move. That proviso is what each residual leaf's declared shape enforces."
     }
   ]
 }

@@ -19,12 +19,32 @@
 //! additionally assert that no verified federation material reached dispatch
 //! and that the continuation the statement named is still unconsumed.
 //!
+//! Two leaves are bounded rather than compared for equality: the lease expiry
+//! against the receiver's clock, and the lease issuer against the agreement's
+//! participant set. Both carry a second declared value outside the bound, so
+//! the corpus records the domain rather than pretending it is an equality.
+//!
+//! A leaf the receiver compares against nothing is not therefore a leaf whose
+//! value is free. Each such leaf declares the shape the wire form still
+//! requires of it, and the leaves whose shape is narrower than their JSON type
+//! carry a second declared value outside that shape, which is denied.
+//!
+//! The wire type marks six leaves optional; the strict profile refuses two of
+//! them outright and permits the other four, which this call does not carry.
+//! Those four cannot be reached by substitution, so the corpus adds each one
+//! to the doubly signed statement and records what the receiver does.
+//!
 //! Beyond the single-field cases the corpus runs every pair inside the
-//! fifteen-field binding reference, the pairs whose two members duplicate one
+//! sixteen-field binding reference, the pairs whose two members duplicate one
 //! another across the predicate (where a consistent two-field substitution
 //! could pass an internal agreement check that a one-field substitution
 //! trips), and the simultaneous substitution of every field the receiver does
 //! not compare.
+//!
+//! The same enumeration and the same classification are mechanized in
+//! `formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean`. That file is read
+//! here and the two are asserted equal leaf for leaf, so neither can drift
+//! into disagreeing with the other.
 
 mod support;
 
@@ -78,15 +98,20 @@ type BoxError = Box<dyn std::error::Error>;
 // Classification
 // ---------------------------------------------------------------------------
 
+/// The shape of a leaf the receiver compares against nothing, when the wire
+/// form requires no more of it than its JSON type. A leaf declaring this needs
+/// no probe, because there is no value of the right type outside its shape.
+const ANY_VALUE_OF_ITS_JSON_TYPE: &str = "any value of its JSON type";
+
 /// What the receiver does with one leaf of the crossing statement.
 #[derive(Clone, Copy)]
 enum Comparison {
     /// Compared for equality against the named receiver-held value.
     ReceiverState(&'static str),
-    /// Compared against the named receiver-held value as an inequality rather
-    /// than for equality, so only values outside the admissible interval are
-    /// refused.
-    ReceiverBound(&'static str),
+    /// Required to lie in the named receiver-held domain, which is not a
+    /// singleton: an admitted statement pins the leaf to the domain and not to
+    /// a value. The lease expiry and the lease issuer are of this kind.
+    ReceiverDomain(&'static str),
     /// Constrained to a fixed value or a fixed domain the receiver holds as
     /// code. A constant is not receiver state: it separates profiles, it does
     /// not bind this call.
@@ -95,12 +120,21 @@ enum Comparison {
     /// A consistent substitution of both copies passes this check, so the
     /// pair corpus below is what covers it.
     SelfConsistent(&'static str),
-    /// Not compared against anything. The note says why the receiver can
-    /// admit a call whose value here was chosen by the sender.
-    Uncompared(&'static str),
-    /// Required absent from a strict statement, so there is no value to
-    /// substitute.
-    AbsentByProfile(&'static str),
+    /// Compared against nothing the receiver holds. `shape` is what the wire
+    /// form still requires of the value, which is the domain whoever holds the
+    /// two signing keys chooses inside; `reason` says why admission reads
+    /// nothing else from it.
+    Uncompared {
+        shape: &'static str,
+        reason: &'static str,
+    },
+    /// Refused outright by the strict profile, so no strict statement carries
+    /// it and there is no value to substitute.
+    AbsentRequired(&'static str),
+    /// Marked optional by the wire type and not carried by this call. The
+    /// profile permits it, so another strict statement may carry it; the
+    /// addition corpus is what reaches it.
+    AbsentOptional(&'static str),
 }
 
 impl Comparison {
@@ -109,22 +143,38 @@ impl Comparison {
     fn against(self) -> &'static str {
         match self {
             Self::ReceiverState(value)
-            | Self::ReceiverBound(value)
+            | Self::ReceiverDomain(value)
             | Self::Shape(value)
             | Self::SelfConsistent(value)
-            | Self::Uncompared(value)
-            | Self::AbsentByProfile(value) => value,
+            | Self::AbsentRequired(value)
+            | Self::AbsentOptional(value) => value,
+            Self::Uncompared { reason, .. } => reason,
         }
     }
 
     fn kind(self) -> &'static str {
         match self {
             Self::ReceiverState(_) => "compared against receiver state",
-            Self::ReceiverBound(_) => "bounded by receiver state",
+            Self::ReceiverDomain(_) => "required to lie in a receiver-held domain",
             Self::Shape(_) => "constrained to a fixed domain",
             Self::SelfConsistent(_) => "compared with another field of the statement",
-            Self::Uncompared(_) => "not compared",
-            Self::AbsentByProfile(_) => "absent from a strict statement",
+            Self::Uncompared { .. } => "not compared",
+            Self::AbsentRequired(_) => "refused by the strict profile",
+            Self::AbsentOptional(_) => "optional, and not carried by this call",
+        }
+    }
+
+    /// The constructor the Lean model classifies the same leaf with. The
+    /// cross-check test compares the two classifications through this name.
+    fn lean_constructor(self) -> &'static str {
+        match self {
+            Self::ReceiverState(_) => "receiverState",
+            Self::ReceiverDomain(_) => "receiverDomain",
+            Self::Shape(_) => "shape",
+            Self::SelfConsistent(_) => "selfConsistent",
+            Self::Uncompared { .. } => "uncompared",
+            Self::AbsentRequired(_) => "absentRequired",
+            Self::AbsentOptional(_) => "absentOptional",
         }
     }
 }
@@ -163,6 +213,9 @@ const fn rule(path: &'static str, comparison: Comparison, substituted: Outcome) 
     }
 }
 
+/// A leaf no strict statement of this call carries, either because the profile
+/// refuses it or because the wire type marks it optional and this call omits
+/// it. Neither can be reached by substitution.
 const fn absent(path: &'static str, comparison: Comparison) -> FieldRule {
     FieldRule {
         path,
@@ -224,20 +277,21 @@ const FIELD_RULES: &[FieldRule] = &[
     ),
     rule(
         "subject/0/digest/sha256",
-        Comparison::Uncompared(
-            "the strict admission path binds the receipts through \
-             treaty_binding_ref.local_receipt_sha256 and remote_receipt_sha256, which are \
-             compared against the lineage bundle and the invocation record; the subject digest \
-             itself is compared against nothing the receiver holds",
-        ),
+        Comparison::Uncompared {
+            shape: ANY_VALUE_OF_ITS_JSON_TYPE,
+            reason: "the strict admission path binds the receipts through \
+                     treaty_binding_ref.local_receipt_sha256 and remote_receipt_sha256, which \
+                     are compared against the lineage bundle and the invocation record; the \
+                     subject digest itself is compared against nothing the receiver holds",
+        },
         Outcome::Admitted,
     ),
     // --- predicate, identity and shape ----------------------------------
     absent(
         "predicate/schema",
-        Comparison::AbsentByProfile(
+        Comparison::AbsentRequired(
             "strict predicates carry no schema discriminator; predicateType is the \
-             verifier-facing one",
+             verifier-facing one, and a statement carrying this field is refused",
         ),
     ),
     rule(
@@ -311,11 +365,12 @@ const FIELD_RULES: &[FieldRule] = &[
     ),
     rule(
         "predicate/timestamp_unix_ms",
-        Comparison::Uncompared(
-            "the presentation window is enforced by the continuation, the lease, and the \
-             agreement intervals, all of which the receiver holds; the statement's own timestamp \
-             is not read by admission",
-        ),
+        Comparison::Uncompared {
+            shape: ANY_VALUE_OF_ITS_JSON_TYPE,
+            reason: "the presentation window is enforced by the continuation, the lease, and \
+                     the agreement intervals, all of which the receiver holds; the statement's \
+                     own timestamp is not read by admission",
+        },
         Outcome::Admitted,
     ),
     rule(
@@ -333,7 +388,7 @@ const FIELD_RULES: &[FieldRule] = &[
     ),
     absent(
         "predicate/receipt_canonical_json",
-        Comparison::AbsentByProfile(
+        Comparison::AbsentRequired(
             "the embedded receipt copy belongs to the compatibility signature-slice profile and \
              is refused in strict predicates",
         ),
@@ -347,14 +402,24 @@ const FIELD_RULES: &[FieldRule] = &[
         ),
         Outcome::Denied(UNVERIFIED_EVIDENCE),
     ),
-    rule(
+    with_probe(
         "predicate/capability_lease_ref/issuer",
-        Comparison::ReceiverState("the two participant kernel ids of the resolved agreement"),
+        Comparison::ReceiverDomain(
+            "the two participant kernel ids of the resolved agreement, as a membership test \
+             rather than an equality: either participant is admitted",
+        ),
         Outcome::Denied(UNVERIFIED_EVIDENCE),
+        (
+            MutationSpec::Literal("\"kernel.vendor-b\""),
+            Outcome::Admitted,
+        ),
     ),
     with_probe(
         "predicate/capability_lease_ref/expires_at_unix_ms",
-        Comparison::ReceiverBound("the receiver's clock, as a strict lower bound"),
+        Comparison::ReceiverDomain(
+            "the instants strictly later than the receiver's clock: any of them is admitted, \
+             and no value is required",
+        ),
         Outcome::Admitted,
         (
             MutationSpec::Literal("1"),
@@ -363,11 +428,17 @@ const FIELD_RULES: &[FieldRule] = &[
     ),
     absent(
         "predicate/capability_lease_ref/scope_digest/alg",
-        Comparison::AbsentByProfile("the optional lease scope digest is not present in this call"),
+        Comparison::AbsentOptional(
+            "the lease scope digest is optional and this call omits it; the strict profile does \
+             not refuse it, so the addition corpus is what reaches it",
+        ),
     ),
     absent(
         "predicate/capability_lease_ref/scope_digest/value",
-        Comparison::AbsentByProfile("the optional lease scope digest is not present in this call"),
+        Comparison::AbsentOptional(
+            "the lease scope digest is optional and this call omits it; the strict profile does \
+             not refuse it, so the addition corpus is what reaches it",
+        ),
     ),
     // --- predicate, policy evaluation summary ---------------------------
     with_probe(
@@ -381,22 +452,37 @@ const FIELD_RULES: &[FieldRule] = &[
             Outcome::Denied(UNVERIFIED_EVIDENCE),
         ),
     ),
-    rule(
+    with_probe(
         "predicate/policy_evaluation_summary/server_a_verdict/policy_id",
-        Comparison::Uncompared(
-            "the receiver does not resolve either party's policy identity; the verdict it acts on \
-             is its own, and this field is audit content",
+        Comparison::Uncompared {
+            shape: "a non-empty string",
+            reason: "the receiver does not resolve either party's policy identity; the verdict \
+                     it acts on is its own, and this field is audit content",
+        },
+        Outcome::Admitted,
+        (
+            MutationSpec::Literal("\"\""),
+            Outcome::Denied(UNVERIFIED_EVIDENCE),
         ),
-        Outcome::Admitted,
     ),
-    rule(
+    with_probe(
         "predicate/policy_evaluation_summary/server_a_verdict/policy_version",
-        Comparison::Uncompared("audit content, as for the policy id"),
+        Comparison::Uncompared {
+            shape: "a non-empty string",
+            reason: "audit content, as for the policy id",
+        },
         Outcome::Admitted,
+        (
+            MutationSpec::Literal("\"\""),
+            Outcome::Denied(UNVERIFIED_EVIDENCE),
+        ),
     ),
     absent(
         "predicate/policy_evaluation_summary/server_a_verdict/rationale_code",
-        Comparison::AbsentByProfile("the optional rationale code is not present in this call"),
+        Comparison::AbsentOptional(
+            "the rationale code is optional and this call omits it; the strict profile does not \
+             refuse it, so the addition corpus is what reaches it",
+        ),
     ),
     with_probe(
         "predicate/policy_evaluation_summary/server_b_verdict/verdict",
@@ -407,19 +493,36 @@ const FIELD_RULES: &[FieldRule] = &[
             Outcome::Denied(UNVERIFIED_EVIDENCE),
         ),
     ),
-    rule(
+    with_probe(
         "predicate/policy_evaluation_summary/server_b_verdict/policy_id",
-        Comparison::Uncompared("audit content, as for the first signer's policy id"),
+        Comparison::Uncompared {
+            shape: "a non-empty string",
+            reason: "audit content, as for the first signer's policy id",
+        },
         Outcome::Admitted,
+        (
+            MutationSpec::Literal("\"\""),
+            Outcome::Denied(UNVERIFIED_EVIDENCE),
+        ),
     ),
-    rule(
+    with_probe(
         "predicate/policy_evaluation_summary/server_b_verdict/policy_version",
-        Comparison::Uncompared("audit content, as for the first signer's policy version"),
+        Comparison::Uncompared {
+            shape: "a non-empty string",
+            reason: "audit content, as for the first signer's policy version",
+        },
         Outcome::Admitted,
+        (
+            MutationSpec::Literal("\"\""),
+            Outcome::Denied(UNVERIFIED_EVIDENCE),
+        ),
     ),
     absent(
         "predicate/policy_evaluation_summary/server_b_verdict/rationale_code",
-        Comparison::AbsentByProfile("the optional rationale code is not present in this call"),
+        Comparison::AbsentOptional(
+            "the rationale code is optional and this call omits it; the strict profile does not \
+             refuse it, so the addition corpus is what reaches it",
+        ),
     ),
     with_probe(
         "predicate/policy_evaluation_summary/joint_disposition",
@@ -441,31 +544,37 @@ const FIELD_RULES: &[FieldRule] = &[
     ),
     rule(
         "predicate/governance_receipt_ref/kernel_id",
-        Comparison::Uncompared(
-            "the governance receipt the receiver acts on is the one its own admission bundle \
-             names; the issuing kernel recorded here is audit content",
-        ),
+        Comparison::Uncompared {
+            shape: ANY_VALUE_OF_ITS_JSON_TYPE,
+            reason: "the governance receipt the receiver acts on is the one its own admission \
+                     bundle names; the issuing kernel recorded here is audit content",
+        },
         Outcome::Admitted,
     ),
     rule(
         "predicate/governance_receipt_ref/digest/alg",
-        Comparison::Uncompared("audit content, as for the governance kernel id"),
+        Comparison::Uncompared {
+            shape: ANY_VALUE_OF_ITS_JSON_TYPE,
+            reason: "audit content, as for the governance kernel id",
+        },
         Outcome::Admitted,
     ),
     rule(
         "predicate/governance_receipt_ref/digest/value",
-        Comparison::Uncompared(
-            "the receiver resolves the governance receipt by id from its own store and never \
-             compares this digest against the record it resolved",
-        ),
+        Comparison::Uncompared {
+            shape: ANY_VALUE_OF_ITS_JSON_TYPE,
+            reason: "the receiver resolves the governance receipt by id from its own store and \
+                     never compares this digest against the record it resolved",
+        },
         Outcome::Admitted,
     ),
     rule(
         "predicate/consistency_anchor",
-        Comparison::Uncompared(
-            "the anchor is carried for the peer's own reconciliation and is not resolved during \
-             admission",
-        ),
+        Comparison::Uncompared {
+            shape: ANY_VALUE_OF_ITS_JSON_TYPE,
+            reason: "the anchor is carried for the peer's own reconciliation and is not resolved \
+                     during admission",
+        },
         Outcome::Admitted,
     ),
     // --- predicate, treaty binding reference ----------------------------
@@ -484,14 +593,21 @@ const FIELD_RULES: &[FieldRule] = &[
         Comparison::ReceiverState("the digest of the intersection the receiver resolved"),
         Outcome::Denied(BINDING_MISMATCH),
     ),
-    rule(
+    with_probe(
         "predicate/treaty_binding_ref/admission_report_sha256",
-        Comparison::Uncompared(
-            "required to be 64 lowercase hex and then overwritten with the digest of the \
-             receiver's own report before that report is signed, so no peer-supplied value \
-             reaches a locally signed receipt",
-        ),
+        Comparison::Uncompared {
+            shape: "sixty-four lowercase hex characters",
+            reason: "checked for that shape and then overwritten with the digest of the \
+                     receiver's own report before that report is signed, so no peer-supplied \
+                     value reaches a locally signed receipt",
+        },
         Outcome::Admitted,
+        (
+            MutationSpec::Literal(
+                "\"zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\"",
+            ),
+            Outcome::Denied(UNVERIFIED_EVIDENCE),
+        ),
     ),
     rule(
         "predicate/treaty_binding_ref/continuation_sha256",
@@ -569,8 +685,9 @@ const FIELD_RULES: &[FieldRule] = &[
     ),
 ];
 
-/// The fifteen fields of the binding reference, as paths. The pair corpus runs
-/// over this set.
+/// The sixteen leaves of the binding reference, as paths. The pair corpus runs
+/// over every unordered pair of this set, so the ordered signer list counts as
+/// two leaves rather than one.
 const BINDING_FIELDS: &[&str] = &[
     "predicate/treaty_binding_ref/treaty_id",
     "predicate/treaty_binding_ref/treaty_scope_sha256",
@@ -587,6 +704,7 @@ const BINDING_FIELDS: &[&str] = &[
     "predicate/treaty_binding_ref/lease_refs/0",
     "predicate/treaty_binding_ref/governance_refs/0",
     "predicate/treaty_binding_ref/signer_kernel_ids/0",
+    "predicate/treaty_binding_ref/signer_kernel_ids/1",
 ];
 
 /// Cases whose leaves duplicate one another across the statement. A
@@ -715,6 +833,98 @@ const MASKING_CASES: &[MaskingCase] = &[
     },
 ];
 
+/// A leaf the wire type marks optional and this call does not carry. The
+/// strict profile refuses two optional leaves outright, and these are the ones
+/// it permits: substitution cannot reach them, because the statement under
+/// test has no value there to replace, so the corpus adds them to the doubly
+/// signed statement instead and records what the receiver does.
+struct AdditionCase {
+    id: &'static str,
+    /// The object to insert into, the key to insert, and the JSON value, in
+    /// order.
+    insertions: &'static [(&'static str, &'static str, &'static str)],
+    /// The classified leaves the insertion adds. The corpus checks that the
+    /// statement gains exactly these.
+    leaves: &'static [&'static str],
+    expected: Outcome,
+    note: &'static str,
+}
+
+const LEASE_SCOPE_DIGEST: &str =
+    "{\"alg\":\"sha256\",\"value\":\"8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92\"}";
+
+const ADDITION_CASES: &[AdditionCase] = &[
+    AdditionCase {
+        id: "a capability lease scope digest",
+        insertions: &[(
+            "predicate/capability_lease_ref",
+            "scope_digest",
+            LEASE_SCOPE_DIGEST,
+        )],
+        leaves: &[
+            "predicate/capability_lease_ref/scope_digest/alg",
+            "predicate/capability_lease_ref/scope_digest/value",
+        ],
+        expected: Outcome::Admitted,
+        note: "the field's own contract says a registry record's scope digest must match it, \
+               but the pre-dispatch hook resolves no lease registry record, so nothing reads \
+               the value",
+    },
+    AdditionCase {
+        id: "an origin policy rationale code",
+        insertions: &[(
+            "predicate/policy_evaluation_summary/server_a_verdict",
+            "rationale_code",
+            "\"policy.added-by-the-sender\"",
+        )],
+        leaves: &["predicate/policy_evaluation_summary/server_a_verdict/rationale_code"],
+        expected: Outcome::Admitted,
+        note: "the rationale code is verifier-opaque and admission reads nothing from it",
+    },
+    AdditionCase {
+        id: "a receiving-side policy rationale code",
+        insertions: &[(
+            "predicate/policy_evaluation_summary/server_b_verdict",
+            "rationale_code",
+            "\"policy.added-by-the-sender\"",
+        )],
+        leaves: &["predicate/policy_evaluation_summary/server_b_verdict/rationale_code"],
+        expected: Outcome::Admitted,
+        note: "as for the origin rationale code, on the verdict attributed to the receiver \
+               itself",
+    },
+    AdditionCase {
+        id: "every optional leaf this call omits, at once",
+        insertions: &[
+            (
+                "predicate/capability_lease_ref",
+                "scope_digest",
+                LEASE_SCOPE_DIGEST,
+            ),
+            (
+                "predicate/policy_evaluation_summary/server_a_verdict",
+                "rationale_code",
+                "\"policy.added-by-the-sender\"",
+            ),
+            (
+                "predicate/policy_evaluation_summary/server_b_verdict",
+                "rationale_code",
+                "\"policy.added-by-the-sender\"",
+            ),
+        ],
+        leaves: &[
+            "predicate/capability_lease_ref/scope_digest/alg",
+            "predicate/capability_lease_ref/scope_digest/value",
+            "predicate/policy_evaluation_summary/server_a_verdict/rationale_code",
+            "predicate/policy_evaluation_summary/server_b_verdict/rationale_code",
+        ],
+        expected: Outcome::Admitted,
+        note: "the addition residual, alongside the substitution residual: leaves the receiver \
+               never validates can be added to a doubly signed statement as well as rewritten \
+               inside it",
+    },
+];
+
 // ---------------------------------------------------------------------------
 // Totality of the classification
 // ---------------------------------------------------------------------------
@@ -751,21 +961,41 @@ fn every_statement_leaf_is_classified() -> TestResult {
             rule.path
         );
         match (rule.comparison, rule.substituted) {
-            (Comparison::AbsentByProfile(_), Some(_)) => {
-                panic!("{} is classified absent but declares an outcome", rule.path)
+            (Comparison::AbsentRequired(_) | Comparison::AbsentOptional(_), Some(_)) => {
+                panic!(
+                    "{} is classified absent from this statement but declares a substitution \
+                     outcome",
+                    rule.path
+                )
             }
-            (Comparison::AbsentByProfile(_), None) => {}
+            (Comparison::AbsentRequired(_) | Comparison::AbsentOptional(_), None) => {}
             (_, None) => panic!("{} declares no substitution outcome", rule.path),
-            (Comparison::Uncompared(_), Some(outcome)) => assert_eq!(
-                outcome,
-                Outcome::Admitted,
-                "{} is classified uncompared, so its substitution must be admitted",
-                rule.path
-            ),
-            (Comparison::ReceiverBound(_), Some(_)) => assert!(
+            (Comparison::Uncompared { shape, .. }, Some(outcome)) => {
+                assert_eq!(
+                    outcome,
+                    Outcome::Admitted,
+                    "{} is classified uncompared, so its substitution must be admitted",
+                    rule.path
+                );
+                if shape != ANY_VALUE_OF_ITS_JSON_TYPE {
+                    let Some((_, probe_outcome)) = rule.probe else {
+                        panic!(
+                            "{} declares the shape {shape:?}, which is narrower than its JSON \
+                             type, so it needs a declared value outside that shape",
+                            rule.path
+                        )
+                    };
+                    assert!(
+                        matches!(probe_outcome, Outcome::Denied(_)),
+                        "{} declares a shape, so a value outside it must be denied",
+                        rule.path
+                    );
+                }
+            }
+            (Comparison::ReceiverDomain(_), Some(_)) => assert!(
                 rule.probe.is_some(),
-                "{} is bounded rather than compared for equality, so it needs a declared value \
-                 outside the bound",
+                "{} is required to lie in a domain rather than to equal a value, so it needs a \
+                 second declared value inside or outside that domain",
                 rule.path
             ),
             (_, Some(outcome)) => assert!(
@@ -785,9 +1015,10 @@ fn every_statement_leaf_is_classified() -> TestResult {
     Ok(())
 }
 
-/// The leaves a strict statement actually carries are exactly the classified
-/// leaves that the corpus exercises. A field the profile requires to be absent
-/// has no case; a field this call populates must have one.
+/// The leaves a strict statement of this call actually carries are exactly the
+/// classified leaves the substitution corpus exercises. A leaf the profile
+/// refuses and a leaf the wire type marks optional and this call omits have no
+/// substitution case; a leaf this call populates must have one.
 #[test]
 fn the_exercised_leaves_are_the_leaves_a_strict_statement_carries() -> TestResult {
     let fixture = treaty_fixture(Evidence::LineageAndRecord)?;
@@ -861,10 +1092,10 @@ fn single_field_substitutions_match_their_classification_without_lineage() -> Te
 // Multi-field corpus
 // ---------------------------------------------------------------------------
 
-/// All 105 pairs inside the fifteen-field binding reference. Exactly one of
-/// the fifteen is not compared, so every pair contains at least one compared
-/// field and every pair must be denied without dispatch. A pair that admitted
-/// would be one comparison masking another.
+/// All 120 pairs inside the sixteen-leaf binding reference. Exactly one of the
+/// sixteen is not compared, so every pair contains at least one compared leaf
+/// and every pair must be denied without dispatch. A pair that admitted would
+/// be one comparison masking another.
 #[test]
 fn every_pair_inside_the_binding_reference_is_rejected() -> TestResult {
     let mut pairs = 0usize;
@@ -944,6 +1175,163 @@ fn the_uncompared_leaves_substituted_together_are_still_admitted() -> TestResult
         "an admitted substitution must have consumed the continuation it named"
     );
     Ok(())
+}
+
+/// The leaves the wire type marks optional and this call omits, added to the
+/// doubly signed statement one at a time and then all at once. Substitution
+/// cannot reach them, so without this group the completeness claim would have
+/// a hole exactly where it claims totality: the corpus would record nothing
+/// about four of the fifty-five leaves. Each case also checks that the
+/// insertion adds exactly the leaves the classification says it adds.
+#[test]
+fn optional_leaves_this_call_omits_can_be_added_to_the_signed_statement() -> TestResult {
+    let fixture = treaty_fixture(Evidence::LineageAndRecord)?;
+    let baseline = rewritten_document(&fixture, &[], &[])?;
+    let baseline_leaves: std::collections::BTreeSet<String> =
+        leaf_paths(&baseline).into_iter().collect();
+
+    let classified_optional: std::collections::BTreeSet<&str> = FIELD_RULES
+        .iter()
+        .filter(|rule| matches!(rule.comparison, Comparison::AbsentOptional(_)))
+        .map(|rule| rule.path)
+        .collect();
+    let covered: std::collections::BTreeSet<&str> = ADDITION_CASES
+        .iter()
+        .flat_map(|case| case.leaves.iter().copied())
+        .collect();
+    assert_eq!(
+        covered, classified_optional,
+        "every leaf classified optional and absent must be added by some case, and no case may \
+         name a leaf that is not"
+    );
+
+    for case in ADDITION_CASES {
+        let document = rewritten_document(&fixture, &[], case.insertions)?;
+        let added: std::collections::BTreeSet<String> = leaf_paths(&document)
+            .into_iter()
+            .filter(|leaf| !baseline_leaves.contains(leaf))
+            .collect();
+        let declared: std::collections::BTreeSet<String> =
+            case.leaves.iter().map(|leaf| (*leaf).to_string()).collect();
+        assert_eq!(
+            added, declared,
+            "{} must add exactly the leaves it names",
+            case.id
+        );
+        let run = admit_with_insertions(Evidence::LineageAndRecord, &[], case.insertions)?;
+        assert_outcome(&run, case.expected, case.id, case.note);
+    }
+    Ok(())
+}
+
+/// The mechanized enumeration and the executed one are the same enumeration,
+/// checked rather than asserted. The Lean model carries the leaf paths and the
+/// classification as an inductive type and a total match; this reads that file
+/// and requires both to agree with [`FIELD_RULES`] leaf for leaf, so a leaf
+/// added on one side or reclassified on one side fails here instead of leaving
+/// the two silently disagreeing.
+#[test]
+fn the_lean_model_and_the_executed_classification_are_the_same_enumeration() -> TestResult {
+    let source = std::fs::read_to_string(lean_model_path())?;
+    let paths = lean_match_arms(&source, "def path : Field -> String := fun f =>\n")?;
+    let kinds = lean_match_arms(&source, "def classify : Field -> Comparison := fun f =>\n")?;
+
+    let path_constructors: Vec<&String> = paths.iter().map(|(name, _)| name).collect();
+    let kind_constructors: Vec<&String> = kinds.iter().map(|(name, _)| name).collect();
+    assert_eq!(
+        path_constructors, kind_constructors,
+        "the Lean model must name each leaf the wire path and the classification in the same order"
+    );
+
+    let mut lean_classification: Vec<(String, String)> = paths
+        .iter()
+        .zip(kinds.iter())
+        .map(|((_, path), (_, kind))| (path.clone(), kind.clone()))
+        .collect();
+    lean_classification.sort();
+    let mut executed_classification: Vec<(String, String)> = FIELD_RULES
+        .iter()
+        .map(|rule| {
+            (
+                rule.path.to_string(),
+                rule.comparison.lean_constructor().to_string(),
+            )
+        })
+        .collect();
+    executed_classification.sort();
+    assert_eq!(
+        lean_classification, executed_classification,
+        "the Lean classification and the executed classification must agree leaf for leaf"
+    );
+    Ok(())
+}
+
+fn lean_model_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../..")
+        .join("formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean")
+}
+
+/// The arms of one Lean match on the leaf enumeration, as pairs of constructor
+/// name and payload head. For the path function the payload head is the wire
+/// path; for the classification it is the comparison constructor.
+fn lean_match_arms(source: &str, header: &str) -> Result<Vec<(String, String)>, BoxError> {
+    let body = source
+        .split_once(header)
+        .ok_or_else(|| io::Error::other(format!("the Lean model has no {header:?}")))?
+        .1;
+    let body = match body.split_once("\n/--") {
+        Some((section, _)) => section,
+        None => body,
+    };
+    let mut arms: Vec<(String, String)> = Vec::new();
+    let mut pending: Option<String> = None;
+    for line in body.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("| .") {
+            if let Some(name) = pending.take() {
+                return Err(Box::new(io::Error::other(format!(
+                    "the Lean arm for {name} has no payload"
+                ))));
+            }
+            match rest.split_once(" => ") {
+                Some((name, payload)) => arms.push((name.to_string(), lean_payload_head(payload)?)),
+                None => {
+                    let name = rest.strip_suffix(" =>").ok_or_else(|| {
+                        io::Error::other(format!("unparsed Lean match arm: {trimmed}"))
+                    })?;
+                    pending = Some(name.to_string());
+                }
+            }
+            continue;
+        }
+        if let Some(name) = pending.take() {
+            arms.push((name, lean_payload_head(trimmed)?));
+        }
+    }
+    if let Some(name) = pending {
+        return Err(Box::new(io::Error::other(format!(
+            "the Lean arm for {name} has no payload"
+        ))));
+    }
+    Ok(arms)
+}
+
+/// The head of a Lean match arm's payload: a quoted string yields its
+/// contents, and a constructor application yields the constructor name.
+fn lean_payload_head(payload: &str) -> Result<String, BoxError> {
+    let payload = payload.trim();
+    if let Some(rest) = payload.strip_prefix('"') {
+        let text = rest.strip_suffix('"').ok_or_else(|| {
+            io::Error::other(format!("unterminated Lean string payload: {payload}"))
+        })?;
+        return Ok(text.to_string());
+    }
+    let constructor = payload
+        .strip_prefix('.')
+        .and_then(|rest| rest.split_whitespace().next())
+        .ok_or_else(|| io::Error::other(format!("unparsed Lean payload: {payload}")))?;
+    Ok(constructor.to_string())
 }
 
 /// The unsubstituted statement admits and consumes its continuation, which is
@@ -1173,6 +1561,38 @@ fn set_value_at(root: &mut Value, path: &str, replacement: Value) -> Result<(), 
     Ok(())
 }
 
+/// Insert a key the statement does not carry into the object at `path`. The
+/// key must be absent, so an insertion can only add leaves.
+fn insert_value_at(root: &mut Value, path: &str, key: &str, value: Value) -> Result<(), BoxError> {
+    let mut cursor = root;
+    for segment in path.split('/') {
+        cursor = match cursor {
+            Value::Object(map) => map
+                .get_mut(segment)
+                .ok_or_else(|| io::Error::other(format!("no object at {path}")))?,
+            Value::Array(items) => {
+                let index: usize = segment.parse()?;
+                items
+                    .get_mut(index)
+                    .ok_or_else(|| io::Error::other(format!("no object at {path}")))?
+            }
+            _ => return Err(Box::new(io::Error::other(format!("no object at {path}")))),
+        };
+    }
+    let Value::Object(map) = cursor else {
+        return Err(Box::new(io::Error::other(format!(
+            "{path} is not an object, so {key} cannot be inserted"
+        ))));
+    };
+    if map.contains_key(key) {
+        return Err(Box::new(io::Error::other(format!(
+            "{path}/{key} is already present, so inserting it would be a substitution"
+        ))));
+    }
+    map.insert(key.to_string(), value);
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Driver
 // ---------------------------------------------------------------------------
@@ -1209,8 +1629,19 @@ fn admit_with(
     evidence: Evidence,
     mutations: &[(&str, MutationSpec)],
 ) -> Result<SubstitutionRun, BoxError> {
+    admit_with_insertions(evidence, mutations, &[])
+}
+
+/// As [`admit_with`], and additionally inserts leaves the statement does not
+/// carry before it is re-signed.
+fn admit_with_insertions(
+    evidence: Evidence,
+    mutations: &[(&str, MutationSpec)],
+    insertions: &[(&str, &str, &str)],
+) -> Result<SubstitutionRun, BoxError> {
     let fixture = treaty_fixture(evidence)?;
-    let substituted_envelope = resign_with_substitutions(&fixture, mutations)?;
+    let document = rewritten_document(&fixture, mutations, insertions)?;
+    let substituted_envelope = sign_document(&fixture, document)?;
     assert_envelope_signatures_valid(&fixture, &substituted_envelope)?;
 
     let directory = tempfile::tempdir()?;
@@ -1274,14 +1705,15 @@ fn admission_context(request: &ToolCallRequest) -> RuntimeAdmissionContext<'_> {
     }
 }
 
-/// Apply the substitutions and sign the resulting statement with both
-/// participant keys. The producer API refuses many of these statements at
-/// construction time, so the statement is encoded and signed directly, which
-/// is what an adversary holding both keys would do.
-fn resign_with_substitutions(
+/// Apply the substitutions and the insertions to the statement document. The
+/// document is rewritten as JSON rather than through the producer API, which
+/// refuses many of these statements at construction time, because what an
+/// adversary holding both keys can do is encode and sign whatever it likes.
+fn rewritten_document(
     fixture: &TreatyFixture,
     mutations: &[(&str, MutationSpec)],
-) -> Result<DsseEnvelope, BoxError> {
+    insertions: &[(&str, &str, &str)],
+) -> Result<Value, BoxError> {
     let (statement, _) = fixture.envelope.decode_statement()?;
     let mut document = serde_json::to_value(&statement)?;
     for (path, spec) in mutations {
@@ -1297,6 +1729,15 @@ fn resign_with_substitutions(
         };
         set_value_at(&mut document, path, replacement)?;
     }
+    for (object, key, json) in insertions {
+        insert_value_at(&mut document, object, key, serde_json::from_str(json)?)?;
+    }
+    Ok(document)
+}
+
+/// Sign a statement document with both participant keys over its own
+/// pre-authentication bytes.
+fn sign_document(fixture: &TreatyFixture, document: Value) -> Result<DsseEnvelope, BoxError> {
     let substituted: DsseStatement = serde_json::from_value(document)?;
     let statement_bytes = substituted.canonical_bytes()?;
     let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, &statement_bytes);

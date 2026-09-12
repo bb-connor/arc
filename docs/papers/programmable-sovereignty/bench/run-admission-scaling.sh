@@ -7,10 +7,11 @@ set -euo pipefail
 # the request presents. This measures it: one kernel per depth, the real runtime
 # admission hook, a lineage bundle of that many verified statements, and two
 # timed windows per call. The first is the receiver-side lineage work alone
-# (resolve the bundle the request names from the receiver's own store, take the
-# digest the citation is compared against, walk every edge). The second is the
-# whole admitted call that contains it. Reporting both is the point: the linear
-# term is real and it is small against the constant it sits inside.
+# (resolve the bundle the request names from the receiver's own store, compare
+# the digest the store recorded for it against the one the request cites, walk
+# every edge). The second is the whole admitted call that contains it. Reporting
+# both is the point: the linear term is real and it is small against the
+# constant it sits inside.
 #
 # The depth is a property of the bundle the RECEIVER holds. A request names the
 # bundle by id and digest and cannot carry one, so this is the cost of a deep
@@ -54,8 +55,12 @@ if [[ "$SOURCE_DIRTY" == true && "${CHIO_BENCH_ALLOW_DIRTY:-0}" != "1" ]]; then
   git -C "$SOURCE" status --short -- "${INPUT_PATHS[@]}" >&2
   exit 2
 fi
+# Hashed from the worktree rather than the index, so a run taken with
+# CHIO_BENCH_ALLOW_DIRTY=1 names the code that was measured and not the last
+# staged version of it.
 BENCHMARK_INPUT_TREE_SHA256="$(
-  git -C "$SOURCE" ls-files -s -- "${INPUT_PATHS[@]}" | sha256sum | cut -d ' ' -f 1
+  cd "$SOURCE" && git ls-files -z -- "${INPUT_PATHS[@]}" \
+    | xargs -0 sha256sum | sha256sum | cut -d ' ' -f 1
 )"
 
 RESULT_DIR="${CHIO_PAPER_RESULT_DIR:-$SCRIPT_DIR/results}"
@@ -84,7 +89,7 @@ if [[ "$ITERATIONS" -lt 2 ]]; then
   echo "CHIO_SCALING_ITERATIONS must be at least 2: every reported distribution needs two observations" >&2
   exit 2
 fi
-DEPTH_COUNT="$(printf '%s' "$DEPTHS" | tr ',' '\n' | wc -l | tr -d ' ')"
+DEPTH_COUNT="$(printf '%s' "$DEPTHS" | tr ',' '\n' | grep -c .)"
 if [[ "$DEPTH_COUNT" -lt 3 ]]; then
   echo "CHIO_SCALING_DEPTHS must name at least three depths: two points are a line, not a shape" >&2
   exit 2
@@ -352,30 +357,46 @@ def sample_std(values):
     )
 
 
-def bootstrap_ci(values):
-    rng = random.Random(BOOTSTRAP_SEED)
+def bootstrap_medians(values, seed):
+    """Bootstrap replicates of the median, which is the statistic reported.
+
+    Each series gets its own stream, so replicate `i` of one depth is drawn
+    independently of replicate `i` of another and the replicates can be refitted
+    against each other to put an interval on a slope.
+    """
+    rng = random.Random(seed)
     count = len(values)
-    means = sorted(
-        math.fsum(rng.choices(values, k=count)) / count
+    return [
+        percentile(sorted(rng.choices(values, k=count)), 0.50)
         for _ in range(BOOTSTRAP_RESAMPLES)
-    )
+    ]
+
+
+def interval(replicates):
+    ordered = sorted(replicates)
     alpha = (1.0 - CONFIDENCE) / 2.0
-    return percentile(means, alpha), percentile(means, 1.0 - alpha)
+    return percentile(ordered, alpha), percentile(ordered, 1.0 - alpha)
 
 
-def summarize(values):
+def summarize(values, replicates):
+    """One distribution, with an interval for the median and nothing else.
+
+    `mean_us` and `std_us` describe the sample; the only interval reported is
+    the one for the point estimate the macros print, so no interval can sit
+    beside a number it does not bracket.
+    """
     if len(values) < 2:
         raise SystemExit("a summary needs at least two observations")
     ordered = sorted(values)
-    low, high = bootstrap_ci(ordered)
+    low, high = interval(replicates)
     return {
         "samples": len(ordered),
         "p50_us": percentile(ordered, 0.50),
         "p99_us": percentile(ordered, 0.99),
         "mean_us": mean(ordered),
         "std_us": sample_std(ordered),
-        "ci_low_us": low,
-        "ci_high_us": high,
+        "median_ci_low_us": low,
+        "median_ci_high_us": high,
         "min_us": ordered[0],
         "max_us": ordered[-1],
     }
@@ -400,6 +421,31 @@ def least_squares(xs, ys):
     return slope, intercept, r_squared
 
 
+def fit_with_interval(xs, ys, replicates_by_point):
+    """A slope and its interval, from the same replicates the points carry.
+
+    Replicate `i` of the fit takes replicate `i` of every point, so the interval
+    is the spread of the slope under the sampling noise in the points rather
+    than a residual of a six-point line.
+    """
+    slope, intercept, r_squared = least_squares(xs, ys)
+    slopes = []
+    for index in range(BOOTSTRAP_RESAMPLES):
+        replicate_slope, _, _ = least_squares(
+            xs, [reps[index] for reps in replicates_by_point]
+        )
+        slopes.append(replicate_slope)
+    low, high = interval(slopes)
+    return {
+        "slope": slope,
+        "intercept": intercept,
+        "rSquared": r_squared,
+        "slopeCiLow": low,
+        "slopeCiHigh": high,
+        "slopeIntervalStraddlesZero": low <= 0.0 <= high,
+    }
+
+
 manifest_path = samples_dir / "admission_scaling_depths.csv"
 if not manifest_path.exists():
     raise SystemExit(f"the sweep wrote no manifest at {manifest_path}")
@@ -410,7 +456,9 @@ if len(manifest) < 3:
 
 rows = []
 depths = []
-for entry in manifest:
+lineage_replicates = []
+call_replicates = []
+for series, entry in enumerate(manifest):
     depth = int(entry["depth"])
     path = samples_dir / entry["samples_file"]
     with path.open(encoding="utf-8", newline="") as handle:
@@ -431,30 +479,35 @@ for entry in manifest:
                 "lineage_elapsed_ns": row["lineage_elapsed_ns"],
             }
         )
-    call = summarize(call_us)
-    lineage = summarize(lineage_us)
+    # Two independent streams per depth, so no two series share resample indices.
+    lineage_reps = bootstrap_medians(lineage_us, BOOTSTRAP_SEED * 1000 + series * 2)
+    call_reps = bootstrap_medians(call_us, BOOTSTRAP_SEED * 1000 + series * 2 + 1)
+    lineage_replicates.append(lineage_reps)
+    call_replicates.append(call_reps)
+    call = summarize(call_us, call_reps)
+    lineage = summarize(lineage_us, lineage_reps)
     depths.append(
         {
             "depth": depth,
             "lineageBundleBytes": int(entry["lineage_bundle_bytes"]),
             "lineageWalk": lineage,
             "admittedCall": call,
-            # What the linear term is worth inside the constant it sits in.
-            "lineageShareOfCall": lineage["p50_us"] / call["p50_us"],
+            # What the linear term is worth inside the in-process call this
+            # fixture makes. That call carries no durable admission-operation
+            # store, so the share is against a far smaller denominator than a
+            # federated receiver's window.
+            "lineageShareOfInProcessCall": lineage["p50_us"] / call["p50_us"],
         }
     )
 
 xs = [entry["depth"] for entry in depths]
-slope_us, intercept_us, r_squared = least_squares(
-    xs, [entry["lineageWalk"]["p50_us"] for entry in depths]
+lineage_p50s = [entry["lineageWalk"]["p50_us"] for entry in depths]
+call_p50s = [entry["admittedCall"]["p50_us"] for entry in depths]
+lineage_fit = fit_with_interval(xs, lineage_p50s, lineage_replicates)
+byte_fit = fit_with_interval(
+    [entry["lineageBundleBytes"] for entry in depths], lineage_p50s, lineage_replicates
 )
-byte_slope, byte_intercept, byte_r_squared = least_squares(
-    [entry["lineageBundleBytes"] for entry in depths],
-    [entry["lineageWalk"]["p50_us"] for entry in depths],
-)
-call_slope, call_intercept, call_r_squared = least_squares(
-    xs, [entry["admittedCall"]["p50_us"] for entry in depths]
-)
+call_fit = fit_with_interval(xs, call_p50s, call_replicates)
 
 with pathlib.Path(samples_csv).open("w", encoding="utf-8", newline="") as handle:
     writer = csv.DictWriter(
@@ -484,15 +537,24 @@ document = {
     "warmupPerDepth": int(warmup),
     "depths": depths,
     "fit": {
-        "lineageWalkPerStatementUs": slope_us,
-        "lineageWalkInterceptUs": intercept_us,
-        "lineageWalkRSquared": r_squared,
-        "lineageWalkPerByteUs": byte_slope,
-        "lineageWalkPerByteInterceptUs": byte_intercept,
-        "lineageWalkPerByteRSquared": byte_r_squared,
-        "admittedCallPerStatementUs": call_slope,
-        "admittedCallInterceptUs": call_intercept,
-        "admittedCallRSquared": call_r_squared,
+        "lineageWalkPerStatementUs": lineage_fit["slope"],
+        "lineageWalkPerStatementCiLowUs": lineage_fit["slopeCiLow"],
+        "lineageWalkPerStatementCiHighUs": lineage_fit["slopeCiHigh"],
+        "lineageWalkInterceptUs": lineage_fit["intercept"],
+        "lineageWalkRSquared": lineage_fit["rSquared"],
+        "lineageWalkPerByteUs": byte_fit["slope"],
+        "lineageWalkPerByteCiLowUs": byte_fit["slopeCiLow"],
+        "lineageWalkPerByteCiHighUs": byte_fit["slopeCiHigh"],
+        "lineageWalkPerByteInterceptUs": byte_fit["intercept"],
+        "lineageWalkPerByteRSquared": byte_fit["rSquared"],
+        "admittedCallPerStatementUs": call_fit["slope"],
+        "admittedCallPerStatementCiLowUs": call_fit["slopeCiLow"],
+        "admittedCallPerStatementCiHighUs": call_fit["slopeCiHigh"],
+        "admittedCallInterceptUs": call_fit["intercept"],
+        "admittedCallRSquared": call_fit["rSquared"],
+        "admittedCallSlopeIntervalStraddlesZero": call_fit[
+            "slopeIntervalStraddlesZero"
+        ],
     },
     "range": {
         "shallowestDepth": shallowest["depth"],
@@ -501,18 +563,30 @@ document = {
         / shallowest["lineageWalk"]["p50_us"],
         "admittedCallGrowth": deepest["admittedCall"]["p50_us"]
         / shallowest["admittedCall"]["p50_us"],
-        "lineageShareAtShallowest": shallowest["lineageShareOfCall"],
-        "lineageShareAtDeepest": deepest["lineageShareOfCall"],
+        "lineageShareOfInProcessCallAtShallowest": shallowest[
+            "lineageShareOfInProcessCall"
+        ],
+        "lineageShareOfInProcessCallAtDeepest": deepest["lineageShareOfInProcessCall"],
     },
     "method": {
         "percentile": "linear interpolation between order statistics",
         "confidence": CONFIDENCE,
         "bootstrap": {"resamples": BOOTSTRAP_RESAMPLES, "seed": BOOTSTRAP_SEED},
+        "interval": (
+            "every interval here is a percentile bootstrap interval for the MEDIAN, "
+            "which is the point estimate reported beside it. A slope's interval "
+            "refits the line once per bootstrap replicate, taking replicate i of "
+            "every depth, so it is the spread of the slope under the sampling noise "
+            "in the points rather than a residual of a six-point line"
+        ),
         "lineageWalk": (
             "resolve the lineage bundle the request names from the receiver's own "
-            "store, take the canonical digest the request's citation is compared "
-            "against, walk and validate every edge, and find the statement that "
-            "binds the continuation and the bilateral invocation. Timed on its own, "
+            "store, compare the digest the store recorded when it accepted the "
+            "bundle against the one the request cites, walk and validate every "
+            "edge, and find the statement that binds the continuation and the "
+            "bilateral invocation. The comparison is the string compare the hook "
+            "makes, not a fresh canonicalize-and-hash: the hook never recomputes "
+            "the bundle digest, so neither does this window. Timed on its own, "
             "immediately before the call that repeats it inside the hook"
         ),
         "admittedCall": (
@@ -522,10 +596,25 @@ document = {
             "dispatch, the signed receipt in SQLite and the in-process co-signature"
         ),
         "fit": (
-            "ordinary least squares of each depth's median against the depth. The "
-            "lineage walk is the term Section 6 identifies as linear; the admitted "
-            "call's own fit is reported beside it so the reader can see how little "
-            "of the constant it moves"
+            "ordinary least squares of each depth's median against the depth, with "
+            "a bootstrap interval on the slope. The lineage walk is the term "
+            "Section 6 identifies as linear"
+        ),
+        "admittedCallFit": (
+            "the admitted call's fit against depth is recorded with its own "
+            "interval and coefficient of determination, and no per-statement macro "
+            "is emitted for it. Over this depth range the fit does not resolve a "
+            "slope: the interval covers zero, so a per-statement admission cost is "
+            "not a quantity this sweep measured. The reportable quantity for the "
+            "admitted call is range.admittedCallGrowth, the total growth of its "
+            "median from the shallowest depth to the deepest"
+        ),
+        "shareOfInProcessCall": (
+            "the lineage share is taken against THIS fixture's in-process admitted "
+            "call, which installs no durable admission-operation store. A federated "
+            "receiver's admitted window is roughly an order of magnitude larger, so "
+            "the same walk is a correspondingly smaller share of it. The two shares "
+            "are not interchangeable"
         ),
         "whatDepthIs": (
             "verified statements in the lineage bundle the RECEIVER holds. A request "
@@ -550,19 +639,41 @@ macros = [
     ("PSScalingIterations", str(int(iterations))),
     ("PSScalingLineageMinUs", f"{shallowest['lineageWalk']['p50_us']:.3f}"),
     ("PSScalingLineageMaxUs", f"{deepest['lineageWalk']['p50_us']:.3f}"),
-    ("PSScalingLineageMinCiLowUs", f"{shallowest['lineageWalk']['ci_low_us']:.3f}"),
-    ("PSScalingLineageMinCiHighUs", f"{shallowest['lineageWalk']['ci_high_us']:.3f}"),
-    ("PSScalingLineageMaxCiLowUs", f"{deepest['lineageWalk']['ci_low_us']:.3f}"),
-    ("PSScalingLineageMaxCiHighUs", f"{deepest['lineageWalk']['ci_high_us']:.3f}"),
-    ("PSScalingPerStatementUs", f"{slope_us:.3f}"),
-    ("PSScalingInterceptUs", f"{intercept_us:.3f}"),
-    ("PSScalingRSquared", f"{r_squared:.4f}"),
-    ("PSScalingPerByteNs", f"{byte_slope * 1000.0:.3f}"),
+    (
+        "PSScalingLineageMinCiLowUs",
+        f"{shallowest['lineageWalk']['median_ci_low_us']:.3f}",
+    ),
+    (
+        "PSScalingLineageMinCiHighUs",
+        f"{shallowest['lineageWalk']['median_ci_high_us']:.3f}",
+    ),
+    ("PSScalingLineageMaxCiLowUs", f"{deepest['lineageWalk']['median_ci_low_us']:.3f}"),
+    (
+        "PSScalingLineageMaxCiHighUs",
+        f"{deepest['lineageWalk']['median_ci_high_us']:.3f}",
+    ),
+    ("PSScalingPerStatementUs", f"{lineage_fit['slope']:.3f}"),
+    ("PSScalingPerStatementCiLowUs", f"{lineage_fit['slopeCiLow']:.3f}"),
+    ("PSScalingPerStatementCiHighUs", f"{lineage_fit['slopeCiHigh']:.3f}"),
+    ("PSScalingInterceptUs", f"{lineage_fit['intercept']:.3f}"),
+    ("PSScalingRSquared", f"{lineage_fit['rSquared']:.4f}"),
+    ("PSScalingPerByteNs", f"{byte_fit['slope'] * 1000.0:.3f}"),
+    ("PSScalingPerByteCiLowNs", f"{byte_fit['slopeCiLow'] * 1000.0:.3f}"),
+    ("PSScalingPerByteCiHighNs", f"{byte_fit['slopeCiHigh'] * 1000.0:.3f}"),
     ("PSScalingCallMinUs", f"{shallowest['admittedCall']['p50_us']:.3f}"),
     ("PSScalingCallMaxUs", f"{deepest['admittedCall']['p50_us']:.3f}"),
-    ("PSScalingCallPerStatementUs", f"{call_slope:.3f}"),
-    ("PSScalingShareAtMinDepth", f"{shallowest['lineageShareOfCall'] * 100.0:.2f}"),
-    ("PSScalingShareAtMaxDepth", f"{deepest['lineageShareOfCall'] * 100.0:.2f}"),
+    # No per-statement macro for the admitted call: over this range its slope
+    # interval covers zero, so the growth across the whole range is what there
+    # is to report.
+    ("PSScalingCallGrowth", f"{document['range']['admittedCallGrowth']:.2f}"),
+    (
+        "PSScalingShareAtMinDepthInProcess",
+        f"{shallowest['lineageShareOfInProcessCall'] * 100.0:.2f}",
+    ),
+    (
+        "PSScalingShareAtMaxDepthInProcess",
+        f"{deepest['lineageShareOfInProcessCall'] * 100.0:.2f}",
+    ),
     ("PSScalingMaxBundleBytes", str(deepest["lineageBundleBytes"])),
 ]
 pathlib.Path(inline_out).write_text(

@@ -281,7 +281,7 @@ fn rows() -> Vec<Row> {
             chio_field: "continuation_sha256",
             baseline_carrier: Some("request.request_id"),
             basis: NoticeBasis::CarriedNeverCompared,
-            note: "The nearest carrier is the replay table's key, and it is tested for absence, never for equality with anything the receiver minted. Substituting it yields an identifier the table has not seen, so the substituted call is admitted and dispatches. The replay table makes an identifier single-use; it does not make an authorization single-use.",
+            note: "The nearest carrier is the replay table's key, and it is tested for absence, never for equality with anything the receiver minted. Substituting it yields an identifier no table has seen, under either wiring and whichever identifier the wiring claims, so the substituted call is admitted and dispatches. A replay table makes an identifier single-use; it never makes an identifier one the receiver chose.",
             drive: Some(sub_request_id),
             consistent: None,
         },

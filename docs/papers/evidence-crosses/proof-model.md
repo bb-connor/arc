@@ -14,8 +14,10 @@ Three things carry the argument and each is a different kind of object.
    implementation rather than against prose.
 2. The **completeness of the comparison set** (Section 4) is discharged inside
    the proof, by an enumeration of every leaf the crossing object can carry
-   together with a classification that is total by construction. The
-   enumeration is mechanized in Lean
+   together with a classification that is total by construction. It is a
+   classification of what the receiver compares each leaf against, not a claim
+   that the leaves it does not compare are unconstrained. The enumeration is
+   mechanized in Lean
    (`formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean`) and executed in Rust
    (`crates/kernel/chio-runtime-core/tests/runtime_treaty_predicate_substitution.rs`).
 3. The **reductions** (Section 6) construct the reducing adversary and account
@@ -40,28 +42,57 @@ the paper's current text, and what the paper must say instead.
 
 ### 1.2 Receipts
 
-A receipt body `b` is a JSON object over the fields of Table 1 of the paper.
-A receipt is
+Three preimages of one receipt occur in this protocol, and they are nested
+rather than equal. Name them.
+
+- `b_id`, the **identity projection**: the receipt's fields minus `id`, minus
+  the signature, and minus the BBS signature
+  (`crates/core/chio-core-types/src/receipt/body.rs`, `ChioReceiptIdInput`).
+- `b_subj`, which is `b_id` together with `id`, and is what `receipt.body()`
+  serializes (same file, `ChioReceipt::body`).
+- `r`, which is `b_subj` together with the signature, the optional BBS
+  signature, and the optional algorithm tag: the receipt as it travels.
+
+The quantities the protocol carries are then
 
 ```
-r = (b, id, sig)      id = H(J(b))      sig = Sig(sk, J({body: b, id: id}))
+id  = H(J(b_id))
+sig = Sig(sk, J({id: id, body: b_id, bbs_signature?}))
 ```
 
-Three digests of the same receipt occur in the protocol and they are distinct
-byte strings: `id` is the identity, `D(b)` is what the statement's subject
-carries, and `D(r)` is the whole-object digest that the binding reference's
-`remote_receipt_sha256` carries. Section 8 records that the paper's Section 3
-is ambiguous about which fields `b` excludes; the model here takes `id` and
-`sig` to be excluded and treats the exclusion set as fixed.
+and three digests appear on the wire, one per preimage:
+
+- `id = D(b_id)`, the receipt identifier;
+- `D(b_subj)`, which is what a statement's subject digest carries and what the
+  conforming verifier recomputes (`bilateral_verifier/cosign.rs`, and
+  `receipt_body_digest_hex` in `bilateral_dsse/verify.rs`);
+- `D(r)`, which is what the binding reference's `remote_receipt_sha256` carries
+  (`receipt_canonical_digest_hex`).
+
+They are distinct because their preimages are distinct: `b_subj` contains `id`
+and `b_id` does not, and `r` contains the signature and `b_subj` does not. In
+particular `D(b_subj)` is not `id`, which is the confusion a reader of the
+paper's Table 1 can fall into and which Section 8 item 11 asks the paper to
+close.
+
+Two further facts about the signing preimage matter later. It is neither
+`J(b_subj)` nor `J(r)`: it is the canonical encoding of a three-field object
+carrying the identifier, the identity projection, and the optional BBS
+signature (`receipt/signing.rs`, `ChioReceiptSigningBody`). And `bbs_signature`
+sits inside that preimage while sitting outside `b_id`, so it is covered by the
+receipt signature and not by the receipt identifier: two receipts differing
+only there share an `id`, and differ in `sig` and in `D(r)`.
 
 ### 1.3 Statements
 
 A statement is an in-toto Statement v1 whose predicate type is
 `chio.bilateral-cosign-invocation.v1`. Write a statement as a finite map from
 leaf paths to values, `S : F -> V`, where `F` is the finite set of leaf paths
-that the wire type admits. `F` is enumerated in Section 4; it has 55 elements,
-of which 49 occur in a strict statement and 6 are required absent by the strict
-profile.
+that the wire type admits. `F` is enumerated in Section 4; it has 55 elements.
+The strict profile refuses two of them outright, so 53 may occur in a strict
+statement. The statement studied here carries 49; the other four are leaves the
+wire type marks optional and this call omits, and Section 4.3 records what the
+receiver does when they are added.
 
 An envelope is `E = (t, p, [(kid_1, s_1), (kid_2, s_2)])` with `p = J(S)`
 base64-encoded. The two signatures cover `PAE(t, J(S))`.
@@ -132,16 +163,35 @@ model that is made precise as possession of `sk_Q`, full control of the
 network, full control of every request field, and the ability to present any
 artifact it has ever seen. It does not hold `sk_R` and cannot write to `Σ`.
 
-One point deserves to be stated rather than left implicit. The two signatures
-on an inbound statement are one from `Q` and one from `R` itself: the strict
-verifier resolves `tool_server_b` to the receiving kernel and requires its
-`passport_key_fingerprint` to equal `kid(pk_R)`
-(`bilateral_dsse/verify.rs`, and `verified_treaty.rs` requires
-`participant_kernel_ids[1] = local_kernel_id`). The adversary therefore cannot
-produce a valid inbound envelope on its own. What it can do is ask `R` to
-co-sign, which is the co-signing oracle below. The consequence is Section 6.3:
-the second signature is a statement about what `R` has seen, not about what `Q`
-is entitled to.
+One point deserves to be stated rather than left implicit, and the obvious
+argument for it is not the argument that works. The two signatures on an
+inbound statement are one from `Q` and one from `R` itself. The comparison that
+looks like it establishes this does not: the hook passes
+`statement.predicate.tool_server_b.kernel_id` as both the statement's second
+participant and as `local_kernel_id`
+(`admission_hook/treaty_evidence.rs`, `verified_federation_treaty_material`),
+so `verified_treaty.rs`'s `participant_kernel_ids[1] = local_kernel_id` is a
+comparison of a value with itself on this path. What does establish it is a
+chain of three links, all of them receiver-held.
+
+1. The request binding is built from the live request together with the
+   receiver's own `local_kernel_id`, so `binding.host_kernel_id` is the
+   receiver by construction.
+2. Stage C3 requires `continuation.target_kernel_id = binding.host_kernel_id`
+   and requires both of the continuation's kernels to be participants of the
+   agreement `R` resolved. The receiver is therefore one of the two
+   participants.
+3. Stage M1 pins `tool_server_a` to the request's federated origin, which is
+   the other participant, and the agreement fixes exactly two. Hence
+   `tool_server_b` is the receiver.
+
+The second signature is then verified under the public key the agreement pins
+for that participant. That is a statement about which key `R`'s own activated
+agreement names for `R`, not about `R` comparing its live signing key against
+the statement. The adversary cannot produce a valid inbound envelope on its
+own. What it can do is ask `R` to co-sign, which is the co-signing oracle
+below. The consequence is Section 6.3: the second signature is a statement
+about what `R` has seen, not about what `Q` is entitled to.
 
 ### 2.3 Oracle interface
 
@@ -176,9 +226,13 @@ the tool runs.
 ## 3. The accept predicate
 
 `Accept(q, E, Σ)` is the conjunction of the following, in the order the
-implementation evaluates them. Each line names the function it is read from.
-Failure at any line denies with the code given; the hook maps every
-envelope-layer failure to `chio_treaty_unverified_required_evidence`.
+implementation evaluates them: 47 numbered conjuncts across nine stages. Each
+line names the function it is read from. Failure at any line denies with the
+code given; the hook maps every envelope-layer failure to
+`chio_treaty_unverified_required_evidence`. Stage L is the one an account of
+the statement's binding is likely to omit, because it reads no leaf of the
+statement, and omitting it is what makes the ordering claim below come out
+wrong.
 
 **Stage R, request extraction** (`treaty_ref_from_request`)
 
@@ -191,7 +245,12 @@ envelope-layer failure to `chio_treaty_unverified_required_evidence`.
 **Stage S, store resolution** (`verify_treaty_reference_from_store`)
 
 - S1. `K[admissionId]` exists.
-- S2. `A[scopeId]` exists and `D(A[scopeId]) = scopeDigest`.
+- S2. `A[scopeId]` exists and the digest the receiver recorded beside it when
+  it stored it equals `scopeDigest`. This is a stored column, not a
+  recomputation; that the column matches the artifact is premise P7. The
+  recomputation happens later, at D4, which compares the statement's
+  `treaty_scope_sha256` against `treaty_scope_sha256(A[scopeId])` computed on
+  the spot (`admission_hook/dsse.rs`).
 - S3. `A[scopeId].trust_bundle_sha256 = K[admissionId].trust_bundle_sha256`.
 - S4. `I[intersectionId]` exists and `D(I[intersectionId]) = intersectionDigest`.
 - S5. Each present evidence reference resolves and its stored digest equals the
@@ -273,9 +332,13 @@ envelope-layer failure to `chio_treaty_unverified_required_evidence`.
 
 **Stage M, verified material** (`VerifiedFederationTreatyMaterial::verify`)
 
-- M1. The request carries a federated origin, the statement's two kernel
-  identifiers are that origin and the receiving kernel in that order, and they
-  differ; their public keys differ.
+- M1. The request carries a federated origin, and the first of the two kernel
+  identifiers handed to this stage equals it. The second is compared against
+  `local_kernel_id`, which on this path the hook supplies from the statement's
+  own `tool_server_b` (Section 2.2), so that conjunct does not by itself bind
+  the receiver; the predicate's two identity blocks must then equal the two
+  identifiers, the two must differ, and their public keys, resolved from the
+  agreement, must differ.
 - M2. Strict envelope verification runs again on the same envelope and the same
   two keys.
 - M3. `tool_name` equals the request's tool name.
@@ -298,12 +361,55 @@ envelope-layer failure to `chio_treaty_unverified_required_evidence`.
 - K1. `consume(continuationId, admissionId)` inserts a row and reports one
   affected row. Zero rows denies with `chio_treaty_continuation_replay`.
 
-The position of K1 is load-bearing and is stated here because the paper does
-not state it: **consumption runs strictly after every check in stages R through
-M**. A statement that fails any comparison returns before K1 and therefore
-cannot burn a continuation. The executed corpus asserts this for all 220 cases:
-every denial leaves the unsubstituted statement admissible afterwards, and
-every admission makes it a replay.
+**Stage L, local admission report**
+(`admission.rs`, `evaluate_runtime_admission_tracked`)
+
+This stage runs **after** K1, and it can deny. It is the part of the decision
+that does not read the statement at all, which is why it is easy to leave out
+of an account of the statement's binding and why leaving it out makes the
+ordering claim false.
+
+- L1. The admission profile carries the supported schema and
+  `profile.issued_at <= clock < profile.expires_at`.
+- L2. `K[admissionId]` resolves and carries the supported bundle schema.
+- L3. If a signed runtime trust input is present it names the profile's
+  verifier, validates against the trusted verifier keys, and its floor entry
+  records against the receiver's own chain; if trusted verifier keys are
+  configured and no trust input is present, the report rejects.
+- L4. `K[admissionId].binding.host_kernel_id = profile.local_kernel_id`.
+- L5. `K[admissionId].binding` equals the binding rebuilt from the live
+  request, field for field: request identifier, capability, server, tool,
+  canonical argument hash, origin and host kernel identifiers
+  (`admission.rs`, `bundle.binding != input.request`). This is the conjunct
+  that makes the tool name and the argument hash receiver-held quantities
+  rather than request-held ones, and it is what stages M3 and M4 lean on.
+- L6. Where a pheromone policy is configured, its decision is neither deny nor
+  escalate.
+- L7. If the bundle is destructive it names a lease and a governance receipt,
+  and the destructive lease reserves.
+
+On a deny at any of L1 through L7 the hook releases what it reserved, including
+the continuation K1 took (`admission_hook.rs`, `release_reservations`). A
+release that fails is not retried, and the denial carries
+`reservation_release_failed`, which is an ambiguous state rather than a clean
+one.
+
+The position of K1 is load-bearing and the paper does not state it. The precise
+statement is: **consumption runs strictly after every statement-level
+comparison and after both signature verifications (stages R through M), and
+before the local admission report (stage L)**. Two consequences follow, and
+only the first is the good one.
+
+- A statement that fails any comparison returns before K1 and therefore cannot
+  burn a continuation. Garbage cannot deny service to a legitimate call. The
+  executed corpus asserts this for all 245 cases: every denial leaves the
+  unsubstituted statement admissible afterwards, and every admission makes it
+  a replay.
+- A valid statement on a request that then fails the local admission report
+  does consume, and depends on the compensating release above. Where that
+  release fails the continuation's state is ambiguous, and the decision records
+  it as such rather than resolving it. The corpus cannot see this, because its
+  fixture passes stage L on every case.
 
 ## 4. The comparison set, enumerated
 
@@ -314,43 +420,66 @@ set is a consequence of the enumeration rather than of the corpus.
 
 ### 4.1 The enumeration
 
-`F` is derived from the wire type, not from a hand list. In Rust it is obtained
-by serializing a maximally populated statement built with exhaustive struct
+`F` is derived from the Rust wire type, not from a hand list and not from a
+schema. The repository has no machine-readable schema for the strict predicate:
+the only in-tree schema for this predicate family,
+`spec/schemas/chio-wire/v1/federation/bilateral-signature-slice.schema.json`,
+describes the compatibility profile, enumerates 37 leaves, and carries neither
+`tool_args_hash` nor `treaty_binding_ref`. Nothing in this document is
+schema-generated, and the paper should not say it is.
+
+What the enumeration is generated from is the type. In Rust it is obtained by
+serializing a maximally populated statement built with exhaustive struct
 literals and walking it to its scalar leaves, so a field added to the predicate
 stops the corpus compiling. In Lean it is the constructor list of an inductive
 type, and the classification is a match on that type, so a field added there
-stops the classification elaborating until it is classified.
+stops the classification elaborating until it is classified. The two are not
+merely asserted to be the same enumeration: the Rust corpus reads the Lean
+module, parses its path and classification matches, and requires them to equal
+its own table leaf for leaf, so a leaf added or reclassified on one side fails
+the corpus rather than leaving the two silently disagreeing.
 
-`|F| = 55`. The classification assigns each leaf exactly one of six kinds:
+`|F| = 55`. The classification assigns each leaf exactly one of seven kinds:
 
 | Kind | Count | Meaning |
 | --- | --- | --- |
-| `receiverState` | 24 | compared for equality against a named receiver-held value |
-| `receiverBound` | 1 | compared against a receiver-held value as an inequality |
+| `receiverState` | 23 | compared for equality against a named receiver-held value |
+| `receiverDomain` | 2 | required to lie in a named receiver-held set that is not a singleton |
 | `selfConsistent` | 7 | compared only against another leaf of the same statement |
 | `shape` | 6 | constrained to a constant or a fixed domain the receiver holds as code |
-| `uncompared` | 11 | not compared at all |
-| `absentByProfile` | 6 | required absent from a strict statement |
+| `uncompared` | 11 | compared against nothing the receiver holds |
+| `absentRequired` | 2 | refused outright by the strict profile |
+| `absentOptional` | 4 | marked optional by the wire type, and not carried by this call |
 
-The 49 leaves a strict statement carries are the first five rows. Write
-`Bound = receiverState ∪ receiverBound` (25 leaves) and
-`Free = uncompared` (11 leaves).
+The 49 leaves this call's statement carries are the first five rows; adding the
+four optional leaves gives the 53 a strict statement may carry. Write
+`BoundEq = receiverState` (23 leaves), `BoundDom = receiverDomain` (2 leaves),
+`Bound = BoundEq ∪ BoundDom` (25 leaves), and `Free = uncompared` (11 leaves).
+The split between `BoundEq` and `BoundDom` is load-bearing and Section 4.2 says
+why. These counts are mechanized as
+`Chio.Treaty.AdmissionBinding.classification_census`.
 
 ### 4.2 The bound leaves and what they are compared against
+
+Two kinds of binding live here and conflating them overstates the claim. A
+leaf in `BoundEq` must **equal** a value the receiver holds, so an accepted
+statement pins it exactly. A leaf in `BoundDom` must lie **inside** a set the
+receiver holds, and the set is not a singleton, so an accepted statement pins
+it only to the set. There are two of the second kind, and no statement of the
+binding property may quantify over them as if they were equalities.
 
 Receiver-state leaves, with the value each must equal:
 
 | Leaf | Receiver-held value |
 | --- | --- |
-| `predicate/tool_server_a/kernel_id` | the origin kernel identifier of the request |
-| `predicate/tool_server_a/passport_key_fingerprint` | `kid` of the pinned origin key |
-| `predicate/tool_server_b/kernel_id` | the receiving kernel's own identifier |
-| `predicate/tool_server_b/passport_key_fingerprint` | `kid` of the pinned local key |
+| `predicate/tool_server_a/kernel_id` | the origin kernel identifier of the request (M1), and the agreement's participant set |
+| `predicate/tool_server_a/passport_key_fingerprint` | `kid` of the key the resolved agreement pins for that participant |
+| `predicate/tool_server_b/kernel_id` | the agreement's participant set; that this participant is the receiver follows from C3 and M1, not from a direct comparison (Section 2.2) |
+| `predicate/tool_server_b/passport_key_fingerprint` | `kid` of the key the resolved agreement pins for that participant |
 | `predicate/tool_name` | the tool name of the request |
 | `predicate/co_sign` | the co-signing mode of the resolved action class |
 | `predicate/consistency_model` | the consistency model of the resolved action class |
 | `predicate/tool_args_hash/value` | the canonical argument hash of the request |
-| `predicate/capability_lease_ref/issuer` | one of the agreement's two participants |
 | `predicate/treaty_binding_ref/treaty_id` | the resolved agreement's identifier |
 | `predicate/treaty_binding_ref/treaty_scope_sha256` | `D` of the resolved agreement |
 | `predicate/treaty_binding_ref/ladder_intersection_sha256` | `D` of the resolved intersection |
@@ -367,9 +496,21 @@ Receiver-state leaves, with the value each must equal:
 | `predicate/treaty_binding_ref/signer_kernel_ids/0` | the agreement's participant set, and the record's order |
 | `predicate/treaty_binding_ref/signer_kernel_ids/1` | the agreement's participant set, and the record's order |
 
-The single `receiverBound` leaf is
-`predicate/capability_lease_ref/expires_at_unix_ms`, compared against `clock`
-as a strict lower bound.
+The two `receiverDomain` leaves, with the set each must lie in:
+
+| Leaf | Receiver-held set |
+| --- | --- |
+| `predicate/capability_lease_ref/expires_at_unix_ms` | the instants strictly later than `clock` (`verified_treaty.rs` denies on `expires_at_unix_ms <= now`) |
+| `predicate/capability_lease_ref/issuer` | the agreement's two participant kernel identifiers, as a membership test (`verified_treaty.rs`, `participant_kernel_ids.contains`) |
+
+Both are exercised in both directions. Substituting the lease expiry with a
+later instant is admitted and substituting it with an instant in the past is
+denied; substituting the issuer with the other participant is admitted and
+substituting it with a third identifier is denied. An accepted statement
+therefore says of these two leaves only that they fell inside the set, and
+`accept_implies_domain_membership` is the form the mechanized claim takes for
+them. Reading them as equalities would assert something impossible in the first
+case, since a lease expiry equal to the receiver's clock is expired.
 
 Four of the receiver-state leaves are compared only when the admission resolves
 the artifact they name: `lineage_bundle_sha256` when a lineage bundle resolved,
@@ -381,86 +522,158 @@ admission. The conditionality of `lineage_bundle_sha256` is real and is
 exercised: under an action class that resolves no lineage bundle, substituting
 it is admitted.
 
-### 4.3 The free leaves, and why each is free
+### 4.3 The residual: leaves the receiver compares against nothing
 
-Eleven leaves are compared against nothing. This is the residual of the
-comparison set and the honest statement of what an adversary who can obtain
-both signatures may choose.
+Eleven leaves are compared against nothing the receiver holds. That is not the
+same as unconstrained. Each carries a declared shape that the statement-level
+gate still enforces, and the residual an adversary who can obtain both
+signatures actually chooses is the shape, not the type. The shape column is
+therefore part of the claim, not decoration.
 
-| Leaf | Why it is not compared |
-| --- | --- |
-| `subject/0/digest/sha256` | the receipts are bound through `local_receipt_sha256` and `remote_receipt_sha256`; the admission path never compares the subject digest |
-| `predicate/timestamp_unix_ms` | the presentation window comes from the lease, the governance record, and the continuation, all receiver-held |
-| `predicate/policy_evaluation_summary/server_a_verdict/policy_id` | the receiver resolves neither party's policy identity |
-| `predicate/policy_evaluation_summary/server_a_verdict/policy_version` | as above |
-| `predicate/policy_evaluation_summary/server_b_verdict/policy_id` | as above |
-| `predicate/policy_evaluation_summary/server_b_verdict/policy_version` | as above |
-| `predicate/governance_receipt_ref/kernel_id` | the governance record the receiver acts on is the one its own bundle names |
-| `predicate/governance_receipt_ref/digest/alg` | the governance digest is never resolved during admission |
-| `predicate/governance_receipt_ref/digest/value` | as above |
-| `predicate/consistency_anchor` | the anchor is carried for the peer's own reconciliation |
-| `predicate/treaty_binding_ref/admission_report_sha256` | checked only for hex shape, then overwritten with the digest of the receiver's own report before signing |
+| Leaf | Declared shape | Why it is not compared |
+| --- | --- | --- |
+| `subject/0/digest/sha256` | any JSON string | the receipts are bound through `local_receipt_sha256` and `remote_receipt_sha256`; the admission path never compares the subject digest |
+| `predicate/timestamp_unix_ms` | any unsigned integer | the presentation window comes from the lease, the governance record, and the continuation, all receiver-held |
+| `predicate/policy_evaluation_summary/server_a_verdict/policy_id` | a non-empty string | the receiver resolves neither party's policy identity |
+| `predicate/policy_evaluation_summary/server_a_verdict/policy_version` | a non-empty string | as above |
+| `predicate/policy_evaluation_summary/server_b_verdict/policy_id` | a non-empty string | as above |
+| `predicate/policy_evaluation_summary/server_b_verdict/policy_version` | a non-empty string | as above |
+| `predicate/governance_receipt_ref/kernel_id` | any JSON string | the governance record the receiver acts on is the one its own bundle names |
+| `predicate/governance_receipt_ref/digest/alg` | any JSON string | the governance digest is never resolved during admission |
+| `predicate/governance_receipt_ref/digest/value` | any JSON string | as above |
+| `predicate/consistency_anchor` | any JSON string | the anchor is carried for the peer's own reconciliation |
+| `predicate/treaty_binding_ref/admission_report_sha256` | 64 lowercase hex characters | checked for that shape and then overwritten with the digest of the receiver's own report before signing |
 
-Only the last of these is discussed in the paper. The other ten are new to this
-document and two of them change what the paper may claim (Section 8).
+Every shape narrower than the leaf's JSON type is exercised in both directions:
+a value inside it is admitted, and a declared value outside it is denied. The
+empty policy identity and the non-hexadecimal admission report digest are the
+two that bite, and they are the reason Corollary 3 below is stated over shapes
+rather than over arbitrary replacements.
+
+One further leaf belongs in this accounting although the classification places
+it elsewhere. `predicate/cross_org_visibility` is classified `shape` because it
+is confined to four declared labels, but inside those four the receiver
+compares it against nothing: substituting `federated` for the fixture's value
+is admitted. Its residual is a four-value domain rather than a string space,
+which is why it is not in the table above, but an adversary chooses it too.
+
+Finally, the residual has an additive half. The four leaves the wire type marks
+optional and this call omits are `capability_lease_ref/scope_digest/alg`,
+`capability_lease_ref/scope_digest/value`, and the two
+`policy_evaluation_summary/*/rationale_code` fields. The strict predicate
+validator refuses only `predicate/schema` and
+`predicate/receipt_canonical_json` (`bilateral_dsse/verify.rs`,
+`validate_chio_predicate`); these four it permits and never reads. Adding each
+of them to a doubly signed statement, and adding all four at once, is admitted.
+The scope digest is worth naming separately, because its own contract says that
+when it is present a lease registry record's scope digest must match it, and
+the pre-dispatch hook resolves no lease registry record, so the requirement is
+documented and unenforced. The residual an adversary chooses is therefore the
+eleven leaves' shapes, the visibility label's four values, and the presence and
+content of four leaves nothing validates.
 
 ### 4.4 Lemma 1 (comparison-set completeness)
 
-**Lemma 1.** For every `f ∈ F`, exactly one of the following holds: `f` is
-bound to a named receiver-held value; `f` is constrained only against the
-statement itself or against a constant; `f` is constrained by nothing. The
-classification is total.
+**Lemma 1.** For every `f ∈ F` that a strict statement of this call carries,
+exactly one of the following holds: `f` is compared against something the
+receiver holds, either for equality or for membership in a receiver-held set;
+`f` is constrained only against the statement itself or against a constant;
+`f` is compared against nothing the receiver holds. For every `f ∈ F` the
+statement does not carry, exactly one of the following holds: the strict
+profile refuses `f`; the wire type marks `f` optional and this call omits it.
+The classification is total.
 
 *Proof.* Totality is structural. In the Lean development the classification is
 a function `classify : Field -> Comparison` defined by a match on an inductive
 type whose constructors are exactly `F`, so it is total by exhaustiveness
-checking; the trichotomy is then decided by case analysis over the 55
-constructors
-(`Chio.Treaty.AdmissionBinding.classification_trichotomy`, which depends on no
-axioms). In the Rust corpus the same enumeration is derived from the wire type
+checking; the trichotomy over the carried leaves and the dichotomy over the
+absent ones are then decided by case analysis over the 55 constructors
+(`Chio.Treaty.AdmissionBinding.classification_trichotomy` and
+`absent_leaves_are_refused_or_merely_optional`, neither of which depends on any
+axiom). In the Rust corpus the same enumeration is derived from the wire type
 by serializing an exhaustively constructed value, and the classification is
-asserted equal to that leaf set in both directions. QED
+asserted equal to that leaf set in both directions; the Lean enumeration and
+the Rust one are asserted equal to each other by the same corpus. QED
 
-**Lemma 2 (accept-set decomposition).** `Accept` is the conjunction over `F` of
-the per-leaf comparisons the classification names, and no other gate reads a
-leaf of `S`. Hence `Accept(q, E, Σ) = true` if and only if every leaf in
-`Bound` equals the receiver-held value it names.
+Read the third branch as it is stated. It says the receiver compares the leaf
+against nothing, not that nothing constrains the leaf. Section 4.3 gives the
+shape that does.
 
-*Proof.* The "if and only if" is proved in Lean over the modelled accept
-predicate
-(`Chio.Treaty.AdmissionBinding.accept_iff_bound_fields_agree`), from which
-`accept_implies_binding` and `disagreement_denies` follow. That the shipped
-receiver realizes this predicate is not proved; it is checked, leaf by leaf, by
-the executed corpus of Section 5. That split is deliberate: Lemma 2 is a
-theorem about the model, and the corpus is the evidence that the model is the
-right one. QED
+**Lemma 2 (accept-set decomposition).** For the shipped predicate of Section 3:
+if `Accept(q, E, Σ)` holds then every leaf in `BoundEq` equals the
+receiver-held value it names and every leaf in `BoundDom` lies in the
+receiver-held set it names. The converse does not hold for the shipped
+predicate, and this document does not claim it: D9 requires both signatures to
+verify, S1 through S5 require the named artifacts to resolve from `Σ`, C2
+requires the continuation to be live, K1 requires it unconsumed, and stage L
+must accept, and none of those is a leaf comparison.
 
-**Corollary 3 (residual).** Substituting any leaf in `Free` leaves the decision
-unchanged (`unbound_substitution_preserves_acceptance`). The corpus exhibits
-this concretely: substituting at once every leaf whose single substitution is
-admitted, which is the eleven free leaves plus the lease expiry moved further
-into the future, still admits and dispatches.
+The biconditional does hold in the Lean model, where signatures, store
+resolution and the local admission report are abstracted away and the statement
+gate is named explicitly:
+`accept = statementGate ∧ ⋀_{f ∈ F} comparison(f)`, so
+`accept` is true exactly when the gate holds and every bound leaf agrees
+(`Chio.Treaty.AdmissionBinding.accept_iff_gate_and_comparisons_hold`).
+
+*Proof.* The forward direction over the shipped predicate is by inspection of
+Section 3: each conjunct listed there under D4 through D11, M1 through M7 and
+C3 is exactly one of the comparisons the classification names, so `Accept`
+implies each of them. This is the only direction Theorem 1 clause (i) uses. The
+model's biconditional is proved in Lean, from which `accept_implies_binding`,
+`accept_implies_domain_membership`, `disagreement_denies` and
+`value_outside_domain_denies` follow. That the shipped receiver realizes the
+modelled predicate is not proved; it is checked, leaf by leaf, by the executed
+corpus of Section 5. That split is deliberate: the biconditional is a theorem
+about the model, and the corpus is the evidence that the model is the right
+one. QED
+
+**Corollary 3 (residual).** Substituting any leaf in `Free` with a value of its
+declared shape leaves the decision unchanged. In the model this is
+`residual_substitution_preserves_acceptance`, whose hypothesis is exactly that
+the statement gate's verdict does not move; the gate is where the declared
+shape lives. The qualification is not a formality: a non-hexadecimal
+`admission_report_sha256` and an empty `policy_id` are both denied, and a
+statement of this corollary quantifying over arbitrary replacements would be
+false of the shipped receiver.
+
+The corpus exhibits the corollary concretely in three ways: substituting at
+once every leaf whose single substitution is admitted, which is the eleven free
+leaves plus the lease expiry moved further into the future, still admits and
+dispatches; adding all four optional leaves at once still admits; and each
+declared value outside a leaf's shape is denied.
 
 ## 5. The executed corpus
 
 `crates/kernel/chio-runtime-core/tests/runtime_treaty_predicate_substitution.rs`
-runs 220 admission decisions against one complete, admissible fixture. Each
-case substitutes one or more leaves with a well-formed value of the same JSON
-type generated from the value it replaces, re-signs the statement with both
-participant keys over its own pre-authentication bytes, asserts both signatures
-verify over the substituted bytes, and drives the pre-dispatch hook. Every
-denial additionally asserts that no verified material reached dispatch and that
-the continuation the statement named is still unconsumed; every admission
-asserts the opposite.
+runs 245 cases against one complete, admissible fixture, which is 490 admission
+decisions because each case also re-drives the unsubstituted bundle against the
+same store. Each case substitutes one or more leaves with a well-formed value
+of the same JSON type generated from the value it replaces, or with a value the
+classification declares, or adds a leaf the statement does not carry; it then
+re-signs the statement with both participant keys over its own
+pre-authentication bytes, asserts both signatures verify over the rewritten
+bytes, and drives the pre-dispatch hook. Every denial additionally asserts that
+no verified material reached dispatch and that the continuation the statement
+named is still unconsumed; every admission asserts the opposite.
 
 | Group | Cases | What it establishes |
 | --- | --- | --- |
-| Single leaf, lineage and record resolved | 49 generated plus 6 declared probes | each leaf's classification, including six leaves where one value cannot separate a domain constraint from a comparison |
+| Single leaf, lineage and record resolved | 49 generated plus 12 declared probes | each leaf's classification, including the twelve leaves where one value cannot separate a domain constraint, a shape, or a bound from a comparison |
 | Single leaf, no lineage bundle | 49 | the conditional comparisons, and that only `lineage_bundle_sha256` differs |
-| Every pair inside the binding reference | 105 | no comparison masks another: all 105 pairs are denied without dispatch |
+| Every pair inside the binding reference | 120 | no comparison masks another: all 120 pairs over the reference's 16 leaves are denied without dispatch |
 | Duplicated leaves rewritten consistently | 8 | the statement's internal agreement checks do not stand in for a comparison against receiver state |
+| Optional leaves added to the signed statement | 4 | the additive half of the residual, for the four leaves substitution cannot reach |
 | Every admitted leaf at once | 1 | the residual of Corollary 3, twelve leaves in one statement |
 | Control | 2 | the unsubstituted statement admits under both evidence profiles |
+
+The twelve declared probes are the cases where the generated value would not
+separate two hypotheses. Two of them sit outside a receiver-held domain (a
+lease expiry in the past, denied) or inside it at a second point (the other
+participant as lease issuer, admitted), which is what distinguishes a domain
+from an equality. Five sit outside a leaf's declared shape (a non-hexadecimal
+admission report digest, and each of the four empty policy identities and
+versions, all denied), which is what distinguishes a shape from no constraint
+at all. The remainder pin a second value inside a fixed domain.
 
 The duplicated-leaf group is the one that a single-fault corpus cannot reach.
 Six of its eight cases rewrite both copies of a value that appears twice
@@ -468,6 +681,11 @@ Six of its eight cases rewrite both copies of a value that appears twice
 identifier, and each signer identifier), so the internal cross-check passes and
 only a comparison against receiver state can deny. All six deny. The remaining
 two admit, and both are reported in Section 8.
+
+The addition group is the one a substitution corpus cannot reach at all: a leaf
+the fixture omits has no value to replace. All four additions are admitted, so
+the corpus records what the classification says about them rather than
+inferring it from silence.
 
 The corpus also fails closed on drift: the classification must equal the leaf
 set of the wire type exactly, in both directions, so a field added to the
@@ -485,20 +703,27 @@ queries.
 Game AB(A):
   (sk_R, pk_R) <- KeyGen; (sk_Q, pk_Q) <- KeyGen
   Σ <- Setup(pin {Q: pk_Q}, activate agreement T over {Q, R})
-  A runs with O_peerSign, O_coSign, O_deliver, O_admit, O_tick
+  A runs with O_peerSign, O_coSign, O_deliver, O_admit, O_tick, and halts
+  with a witness w which is either bot or a pair (f, x').
   A wins if some O_admit(q, E) returned allow and, writing S for the
   statement in E,
-    (i)  some leaf f in Bound has S(f) != val_Σ(f, q), or
-    (ii) some digest-valued leaf f in Bound has S(f) = D(x) for an object x
-         that is not the object the receiver resolved for f, or
+    (i)  some leaf f in BoundEq has S(f) != val_Σ(f, q), or some leaf f in
+         BoundDom has S(f) outside the receiver-held set dom_Σ(f, q), or
+    (ii) w = (f, x') with f a digest-valued leaf in BoundEq, x' an object A
+         obtained from O_deliver or produced itself, x' != x_f where x_f is
+         the object the receiver resolved for f, and S(f) = D(x'), or
     (iii) PAE(t, J(S)) was never signed under pk_R, or
     (iv) the continuation named by S had already been consumed when the
          admission began.
 Adv_AB(A) = Pr[A wins].
 ```
 
-Clause (i) is field agreement, (ii) is artifact identity, (iii) is statement
-authenticity, (iv) is freshness of the continuation.
+Clause (i) is leaf agreement, and it is stated over the two bound kinds
+separately because they are different claims: equality for `BoundEq`,
+membership for `BoundDom`. Clause (ii) is artifact identity, and it requires
+`A` to **exhibit** the colliding object rather than to have intended one; that
+is what makes the reduction below a construction. Clause (iii) is statement
+authenticity, and (iv) is freshness of the continuation.
 
 **Theorem 1.** For every such `A`,
 
@@ -512,24 +737,37 @@ ASSUME-SQLITE-ATOMICITY fails.
 
 *Proof.* By clauses.
 
-**(i) Field agreement.** Unconditional. By Lemma 2, `Accept` holds only if
-every leaf in `Bound` equals the receiver-held value it names, so clause (i)
-has probability zero. This step needs no assumption and no reduction; what it
-needs is Lemma 1, which is why the completeness of the comparison set is
-discharged inside the proof rather than by a table.
+**(i) Leaf agreement.** Unconditional. By Lemma 2's forward direction,
+`Accept` holds only if every leaf in `BoundEq` equals the receiver-held value
+it names and every leaf in `BoundDom` lies in the receiver-held set it names,
+so clause (i) has probability zero. This step needs no assumption and no
+reduction; what it needs is Lemma 1, which is why the completeness of the
+comparison set is discharged inside the proof rather than by a table. It says
+nothing about the two `BoundDom` leaves beyond membership, and the game's
+clause (i) is stated so that it cannot be read as saying more.
 
 **(ii) Artifact identity.** Construct `B_h`, a collision finder for SHA-256.
 `B_h` runs `A`, simulating every oracle honestly (it holds both key pairs it
-generated and the whole of `Σ`). When `A` wins by clause (ii) on a leaf `f`,
-`B_h` holds the receiver-resolved object `x` and the object `x'` that `A`
-intended `S(f)` to denote, with `D(x) = S(f) = D(x')` and `x != x'`. If
-`J(x) != J(x')` then `(J(x), J(x'))` is a SHA-256 collision and `B_h` outputs
-it. If `J(x) = J(x')` with `x != x'` then the canonical encoder is not
-injective on that pair, and `B_e` outputs it; ASSUME-CANONICAL-JSON is the
-premise that this cannot happen inside its stated domain, and premise P1 in
+generated and the whole of `Σ`), and records every object `A` offers through
+`O_deliver`. When `A` halts with a witness `w = (f, x')` and wins by clause
+(ii), `B_h` reads `x'` from the witness and takes `x = x_f`, the object its own
+simulated `Σ` resolved for `f`, so both objects are in `B_h`'s hands rather
+than in `A`'s intent. Acceptance gives `S(f) = D(x)`, because `f` is in
+`BoundEq` and the receiver-held value it names is the digest of the object the
+receiver resolved; the win condition gives `S(f) = D(x')` and `x != x'`. Hence
+`D(x) = D(x')` with `x != x'`.
+If `J(x) != J(x')` then `(J(x), J(x'))` is a SHA-256 collision and
+`B_h` outputs it. If `J(x) = J(x')` with `x != x'` then the canonical encoder
+is not injective on that pair, and `B_e` outputs it; ASSUME-CANONICAL-JSON is
+the premise that this cannot happen inside its stated domain, and premise P1 in
 Section 7 is the part of that domain the implementation does not enforce.
 `B_h` and `B_e` succeed exactly when `A` wins by clause (ii), so that clause
 contributes `Adv_CR(B_h) + Adv_INJ(B_e)`.
+
+Requiring the witness is what makes this a reduction rather than a gesture. An
+adversary that merely believed `S(f)` denoted some other object, without being
+able to produce it, would leave `B_h` with nothing to output, and the `Adv_CR`
+term would be unearned.
 
 **(iii) Statement authenticity.** Construct `B_sig`, an EUF-CMA adversary.
 `B_sig` receives a challenge public key `pk*` and a signing oracle. It flips a
@@ -566,7 +804,11 @@ Summing the four clauses gives the bound. QED
 **What Theorem 1 does not say.** It does not say that the statement's subject
 is the digest of a receipt the receiver holds. The admission path does not
 compare the subject digest; see Section 8. It does not say anything about
-leaves in `Free`. It does not say the peer authorized anything.
+leaves in `Free`, nor about the four optional leaves an adversary may add. For
+the two leaves in `BoundDom` it says only that they fell inside a receiver-held
+set. It does not say the peer authorized anything. And it is a statement about
+stages R through M and K: a request that clears all of them can still be denied
+at stage L, after the continuation has been consumed.
 
 ### 6.2 Game RL (receiver locality)
 
@@ -583,9 +825,13 @@ Game RL(A):
 *Proof.* Structural, and stronger than the paper's argument. `ref` reads a
 fixed finite set of names from the `chioTreaty` object and ignores every other
 key (`treaty_ref_from_request`). Store resolution is a sequence of total
-lookups keyed by the identifiers in `ref(q)` against `Σ`, followed by digest
-equality against `Σ`'s own content. Hence the resolved artifacts are a function
-of `(Σ, ref(q))` alone, and `ref(q0) = ref(q1)` gives the same artifacts. The
+lookups keyed by the identifiers in `ref(q)` together with the admission
+identifier the request carries in `chioAdmission`, which is the key for S1,
+against `Σ`, followed by digest equality against `Σ`'s own content. The game
+fixes both, which is why it requires the two requests to carry the same
+`chioAdmission` sub-object as well as the same `ref`. Hence the resolved
+artifacts are a function of `(Σ, ref(q), admissionId(q))` alone, and the two
+requests give the same artifacts. The
 eleven refused names are therefore not what makes locality true; they make a
 request that attempts to carry trust fail loudly rather than be silently
 ignored, which is a different and weaker claim than the paper makes. QED
@@ -635,20 +881,27 @@ Game SU(A):
 **Theorem 4.** `Adv_SU(A) <= Adv_ATOM`, under premise P5 (one store, one
 coordinator).
 
-*Proof.* Stage K1 runs after every other gate and before the decision is
-returned. It inserts a row keyed by the continuation identifier and denies on
-zero affected rows. Release deletes only a row keyed by both the continuation
-identifier and the admission identifier that took it, and runs only when a
-later pre-dispatch step denies, so no admission frees another's row and no
-post-dispatch path frees one. Two allows with the same identifier therefore
-require two successful creating inserts on one primary key. QED
+*Proof.* Stage K1 inserts a row keyed by the continuation identifier and
+denies on zero affected rows. Release deletes only a row keyed by both the
+continuation identifier and the admission identifier that took it, and runs
+only when a later pre-dispatch step denies, so no admission frees another's row
+and no post-dispatch path frees one. Two allows with the same identifier
+therefore require two successful creating inserts on one primary key. Note that
+this argument does not need K1 to be last: it needs the insert to be on a
+primary key and the release to be keyed by the taker. QED
 
-The ordering of K1 also answers a question the paper leaves open: because
+The ordering of K1 answers a different question, and only half of it. Because
 consumption runs after all of stages R through M, a statement that fails any
 comparison cannot burn a continuation, so an adversary cannot deny service to a
-legitimate call by presenting garbage that names its continuation. What it can
-do is guess or learn a continuation identifier and present a **fully valid**
-statement for it, which is premise P2.
+legitimate call by presenting garbage that names its continuation. Because
+consumption runs before stage L, a valid statement on a request that then fails
+the local admission report does burn one, and gets it back only through the
+compensating release; where that release fails the continuation is left in a
+state the decision records as ambiguous. Two further gaps stay open: an
+adversary may guess or learn a continuation identifier and present a **fully
+valid** statement for it, which is premise P2, and an adversary that can drive
+a request to a stage L denial repeatedly is exercising the compensating release
+repeatedly.
 
 ### 6.5 Game AUD (audience binding)
 
@@ -664,17 +917,31 @@ the same identifier and the same canonical content, resolved the same
 intersection, hold the same continuation unconsumed, and hold the same
 invocation record.
 
-*Proof.* Each conjunct is a bound leaf compared against `Σ_R'`'s own state:
-`tool_server_b/kernel_id` and its fingerprint against `Σ_R'`'s own identity and
-pin, `treaty_id` and `treaty_scope_sha256` against the agreement `Σ_R'`
-resolved, `ladder_intersection_sha256` against the intersection, and
+*Proof.* Each conjunct is a bound leaf compared against `Σ_R'`'s own state,
+with one link that has to be drawn carefully. `treaty_id` and
+`treaty_scope_sha256` are compared against the agreement `Σ_R'` resolved,
+`ladder_intersection_sha256` against the intersection, and
 `continuation_sha256` against the continuation. Any difference contradicts
-Lemma 2. The case the paper's argument does not cover is a single receiver
-holding several agreements over the same pair of kernels: that case is covered
-here, because `treaty_id` and `treaty_scope_sha256` are both bound, and the
-agreement is resolved from the request's identifier and then digest-checked
-against `Σ`, so two agreements over the same pair are separated whenever their
-canonical content differs. QED
+Lemma 2's forward direction.
+
+The identity of the receiver enters by the chain of Section 2.2 rather than by
+a direct comparison of `tool_server_b` against `Σ_R'`'s own identity. Stage C3
+forces the continuation's target to be `Σ_R'`'s own `host_kernel_id` and forces
+both of its kernels to be participants of the agreement `Σ_R'` resolved; stage
+M1 pins `tool_server_a` to the request's federated origin; the agreement fixes
+exactly two participants. So `Σ_R'` admits only if it is itself the second
+participant of the agreement it resolved, and the second signature verifies
+under the key **that agreement** pins for that participant. Audience binding is
+therefore a consequence of agreement activation at `Σ_R'`, not of `Σ_R'`
+comparing its live key against the statement, and a deployment that activates
+an agreement naming a key it does not hold weakens this theorem accordingly.
+
+The case the paper's argument does not cover is a single receiver holding
+several agreements over the same pair of kernels: that case is covered here,
+because `treaty_id` and `treaty_scope_sha256` are both bound, and the agreement
+is resolved from the request's identifier and then digest-checked against `Σ`,
+so two agreements over the same pair are separated whenever their canonical
+content differs. QED
 
 ### 6.6 Cross-protocol separation
 
@@ -682,17 +949,43 @@ A lemma the paper needs and does not state. The receiving kernel signs receipts
 with the same Ed25519 key it co-signs statements with: the signature-slice
 profile requires the embedded receipt's `kernel_key` to equal Org B's passport
 key, and the strict path resolves the second signer to the receiving kernel.
+A first-byte argument separating receipts from DSSE is not enough on its own,
+because that key signs at least three preimage families and two of them are
+JSON objects.
 
-**Lemma 6.** No receipt-signing preimage is a DSSE pre-authentication preimage.
+The three families this document traced are:
 
-*Proof.* A receipt signature covers `J({body: ..., id: ...})`, which is the
-canonical encoding of a JSON object and therefore begins with the byte `{`. A
-DSSE pre-authentication encoding begins with the literal `DSSEv1`. The two
-languages are disjoint in their first byte, so no string is both. QED
+- **RSIGN**, the receipt signing preimage, `J({id, body, bbs_signature?})`
+  (`receipt/signing.rs`, `ChioReceiptSigningBody`);
+- **COSIGN**, the dual-signed receipt body,
+  `J({schema, receiptCanonicalJson, orgAKernelId, orgBKernelId})`
+  (`bilateral.rs`, `CoSigningBody`);
+- **PAE**, the DSSE pre-authentication encoding of a statement.
 
-Lemma 6 is what rules out reinterpreting one signed object as the other. It is
-a property of the encodings, not a domain separation tag, and the paper should
-say so rather than leave the question open.
+**Lemma 6.** No byte string is a preimage of two of RSIGN, COSIGN and PAE.
+
+*Proof.* Two steps, and each is a property of the encodings rather than of a
+domain separation tag.
+
+PAE against the other two: a canonical JSON object encoding begins with the
+byte `{`, and a DSSE pre-authentication encoding begins with the literal
+`DSSEv1`. The languages are disjoint in their first byte.
+
+RSIGN against COSIGN: both are canonical encodings of JSON objects, so if their
+byte strings were equal their key sets would be equal, because RFC 8785 emits
+every member key of the object in codepoint order and emits no key the object
+does not have. RSIGN's key set is `{id, body}` or
+`{bbs_signature, id, body}`; COSIGN's is
+`{schema, receiptCanonicalJson, orgAKernelId, orgBKernelId}`. The two are
+disjoint, so the key sets differ, so the byte strings differ. Concretely they
+diverge at the first key: RSIGN's first key in codepoint order is
+`bbs_signature` or `body`, and COSIGN's is `orgAKernelId`. QED
+
+Lemma 6 is what rules out reinterpreting one signed object as another. It
+covers the three families this document traced; premise P10 records that the
+full set of preimage families a kernel passport key signs across the workspace
+was not enumerated here, and that the lemma's method, not its instance list, is
+what a deployment must re-run when a fourth family is added.
 
 ## 7. Premises
 
@@ -736,8 +1029,15 @@ deployment.
 - **P8 (sole reader of the context object).** Theorem 2 assumes no other
   component reads the `chioTreaty` object during admission.
 - **P9 (clock tolerance).** ASSUME-OS-CLOCK is parameterized by an operator
-  tolerance that is never instantiated. Stages C2, A1 and M6 are windows
+  tolerance that is never instantiated. Stages C2, A1, L1 and M6 are windows
   evaluated against that clock.
+- **P10 (signing-preimage families).** Lemma 6 separates the three preimage
+  families this document traced. The complete set of families signed under one
+  kernel passport key was not enumerated: the workspace has many callers of the
+  canonical signing API, most of them under other keys. A deployment that adds
+  a fourth family signed under the passport key must re-run Lemma 6's argument
+  for it, which for a JSON-object family means exhibiting a required key the
+  other families do not have.
 
 ## 8. Where this model is weaker than the paper's current text
 
@@ -756,8 +1056,21 @@ the paper says. Each is stated as the correction the paper should make.
    verifier does resolve the receipt and compare the subject digest at its
    steps 17 to 19, but the paper itself says the hook is what decides a live
    call. The property must either drop that clause for the hook, or the hook
-   must compare the subject digest. The latter is a one-line change and is the
-   better fix.
+   must compare the subject digest.
+
+   The second option is not a one-line change and should not be offered as
+   one. `RuntimeAdmissionStore` (`chio-runtime-core/src/store/traits.rs`) has
+   no receipt lookup at all, and the binding reference cannot stand in for one:
+   `local_receipt_sha256` is `D(r)`, a digest of the whole canonical receipt,
+   while the subject digest is `D(b_subj)`, over `receipt.body()`. They are
+   digests of different preimages and comparing one against the other is not a
+   check, it is a type error in disguise. Closing the gap means giving the
+   admission hook a receipt-by-identifier capability, which widens a store
+   trait that was made narrow on purpose. The honest choice is between paying
+   that cost and dropping the subject clause from the property for the hook,
+   saying instead that the receipt binding is carried by
+   `local_receipt_sha256` and `remote_receipt_sha256` through the lineage
+   bundle and the invocation record.
 2. **The invocation identity is not bound to the receiver's record either.**
    In the hook, the predicate's `invocation_id` is checked only against the
    subject name, which is derived from it. Rewriting both consistently is
@@ -766,7 +1079,7 @@ the paper says. Each is stated as the correction the paper should make.
    archived statement is then an audit record whose own identifier the receiver
    never checked.
 
-   Findings 1 and 2 have one cause, and naming it is the useful form of both.
+   Items 1 and 2 have one cause, and naming it is the useful form of both.
    The conforming verifier does what the property describes: it resolves the
    receipt by invocation identifier from its own receipt store, checks that
    receipt's signature and kernel key, and then compares the subject name and
@@ -775,22 +1088,34 @@ the paper says. Each is stated as the correction the paper should make.
    invocation identifier at all. That single missing step is the whole of the
    divergence between the two decision families on this point, and it is what
    the paper's admission binding property assumes has happened.
-3. **Ten leaves outside `admission_report_sha256` are also uncompared.** The
-   paper names one uncompared field. There are eleven. The nine that are not
-   the admission report digest or the subject digest are the two policy
-   identities, the two policy versions, the governance kernel identifier, the
-   governance digest and its algorithm, the consistency anchor, and the
-   statement timestamp. None is used in the decision; all are doubly signed and
-   archived. The paper should enumerate them and say what an auditor may
-   conclude from them, which is: nothing, unless the auditor independently
-   trusts both signers.
+3. **Ten leaves outside `admission_report_sha256` are also uncompared, and
+   four more can be added.** The paper names one uncompared field. There are
+   eleven. The nine that are not the admission report digest or the subject
+   digest are the two policy identities, the two policy versions, the
+   governance kernel identifier, the governance digest and its algorithm, the
+   consistency anchor, and the statement timestamp. None is used in the
+   decision; all are doubly signed and archived. Beyond them, four leaves the
+   wire type marks optional are permitted, never validated, and never read: the
+   two halves of the lease scope digest and the two policy rationale codes.
+   Adding them to a doubly signed statement is admitted. The paper should
+   enumerate all of these with their declared shapes and say what an auditor
+   may conclude from them, which is: nothing, unless the auditor independently
+   trusts both signers. It should also say that
+   `capability_lease_ref.scope_digest` carries a normative requirement of its
+   own, that a lease registry record's scope digest must match it, which no
+   pre-dispatch check enforces because the hook resolves no registry record.
 4. **The completeness claim's scope.** The corpus previously covered fifteen
-   fields of one sub-object, one at a time. The predicate carries 49 leaves that
-   a strict statement populates. The paper should say 49 and cite the
-   enumeration, not 15 and cite a table. The binding-reference corpus the paper
-   cites is now 22 cases rather than 20, so the derived case-count macro moves
-   with it; its own arithmetic is 16 substitutions, two of the new kind, three
-   conditional cases, and one control.
+   fields of one sub-object, one at a time. The predicate type carries 55
+   leaves; the strict profile refuses two, so 53 may occur in a strict
+   statement, and the statement under study carries 49. The paper should say 49
+   carried out of 53 possible and cite the enumeration, not 15 and cite a
+   table, and it should say the enumeration is derived from the Rust wire type
+   rather than from a schema, because the only in-tree schema for this
+   predicate family covers the compatibility profile and enumerates 37 leaves.
+   The binding-reference corpus the paper cites is now 22 cases rather than 20,
+   so the derived case-count macro moves with it; its own arithmetic is 16
+   substitutions, two of the new kind, three conditional cases, and one
+   control.
 5. **Receiver locality is stronger than the paper's argument and weaker than
    its statement.** The denylist of eleven names does not establish
    independence from request content. What establishes it is that extraction
@@ -806,15 +1131,28 @@ the paper says. Each is stated as the correction the paper should make.
    authorization input. The rejection code named for signer independence should
    be renamed after what it checks, which is key distinctness.
 7. **The position of consume.** The paper does not state where continuation
-   consumption sits. It sits after every comparison and after both signature
-   verifications. That is the good ordering and it should be stated, because it
-   is what rules out burning a legitimate continuation with a statement that
-   would later fail.
+   consumption sits. The statement it should make is the one the code supports
+   and no more: consumption runs after every statement-level comparison and
+   after both signature verifications, and before the local admission report.
+   The first half is what rules out burning a legitimate continuation with a
+   statement that would later fail a comparison, and it should be stated. The
+   second half is the part that must not be omitted: a valid statement on a
+   request that fails the local admission report does consume, and gets the
+   continuation back only through a compensating release, whose failure the
+   decision records as ambiguous rather than resolving. Saying "consumption
+   runs after every other gate" is false.
 8. **Cross-protocol separation.** The receipt signature and the DSSE signature
    can be made under the same key, and the profile in fact requires the
-   receipt's kernel key to equal the second signer's passport key. Separation
-   rests on Lemma 6, a disjointness of encodings, not on a domain separation
-   tag. The paper should state the lemma.
+   receipt's kernel key to equal the second signer's passport key. That key
+   signs at least three preimage families, not two: the receipt signing body,
+   the dual-signed `CoSigningBody`, and the DSSE pre-authentication encoding.
+   A first-byte argument separates the DSSE family from the other two and says
+   nothing about the pair a reader asks about next. Separation rests on
+   Lemma 6, which adds the RFC 8785 argument that two canonical JSON objects
+   with equal encodings have equal key sets, and these two have disjoint
+   required keys. The paper should state the lemma in that form, and should
+   carry premise P10, which is that the full set of families under this key was
+   not enumerated.
 9. **The conditional comparisons and the action class.** Four comparisons run
    only when the admission resolves the artifact they bind, and the action
    class is named in the request. The downgrade this invites is closed, but not
@@ -828,27 +1166,59 @@ the paper says. Each is stated as the correction the paper should make.
     of the modelled accept predicate and of the field classification. It does
     not prove that the shipped Rust hook realizes that predicate. The corpus is
     what links them, leaf by leaf, on one configuration. The paper should state
-    the split in those words.
+    the split in those words. It may also say that the mechanized enumeration
+    and the executed one are checked against each other rather than asserted
+    to be the same, because the corpus reads the Lean module and compares both
+    the leaf paths and the classification.
+11. **Receipt identity has three preimages and the paper's Table 1 names one.**
+    The identifier is `D(b_id)` over a projection that excludes `id`, the
+    signature and the BBS signature; the subject digest is `D(b_subj)` over
+    `receipt.body()`, which includes `id`; the binding reference's
+    `remote_receipt_sha256` is `D(r)` over the whole receipt. The signature
+    covers none of those three: it covers a three-field object carrying the
+    identifier, the identity projection, and the optional BBS signature. The
+    paper should give the three preimages names and say which digest each wire
+    field carries, because two of its own claims (the subject clause of
+    admission binding, and the receipt binding through the binding reference)
+    are about different preimages and read as though they were about the same
+    one. It should also say that `bbs_signature` is covered by the receipt
+    signature and not by the receipt identifier.
+12. **The two bound leaves that are not equalities.** The lease expiry is
+    compared as a strict lower bound against the receiver's clock and the lease
+    issuer as membership in the agreement's two participants. A binding claim
+    quantified over "every compared leaf equals the receiver-held value" is
+    false of both, and impossible for the first, since an expiry equal to the
+    receiver's clock is expired. The paper should state the binding property
+    over the equality-bound leaves and state the membership property separately
+    for these two.
 
 ## 9. Artifact index
 
 | Object | Where |
 | --- | --- |
-| Field enumeration and classification, mechanized | `formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean` |
+| Leaf enumeration and classification, mechanized | `formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean` |
 | Comparison-set completeness theorem | `Chio.Treaty.AdmissionBinding.classification_trichotomy` |
-| Accept-set decomposition | `Chio.Treaty.AdmissionBinding.accept_iff_bound_fields_agree` |
-| Admission binding, field agreement | `Chio.Treaty.AdmissionBinding.accept_implies_binding` |
-| Fail-closed contrapositive | `Chio.Treaty.AdmissionBinding.disagreement_denies` |
-| Acceptance depends only on bound leaves | `Chio.Treaty.AdmissionBinding.accept_determined_by_bound_fields` |
-| The residual | `Chio.Treaty.AdmissionBinding.unbound_substitution_preserves_acceptance` |
-| Exhaustive substitution corpus, 220 cases | `crates/kernel/chio-runtime-core/tests/runtime_treaty_predicate_substitution.rs` |
+| The two kinds of absence | `Chio.Treaty.AdmissionBinding.absent_leaves_are_refused_or_merely_optional` |
+| The counts of Section 4.1 | `Chio.Treaty.AdmissionBinding.classification_census` |
+| Accept-set decomposition | `Chio.Treaty.AdmissionBinding.accept_iff_gate_and_comparisons_hold` |
+| Admission binding, equality-bound leaves | `Chio.Treaty.AdmissionBinding.accept_implies_binding` |
+| Admission binding, domain-bound leaves | `Chio.Treaty.AdmissionBinding.accept_implies_domain_membership` |
+| Fail-closed contrapositive, equality | `Chio.Treaty.AdmissionBinding.disagreement_denies` |
+| Fail-closed contrapositive, domain | `Chio.Treaty.AdmissionBinding.value_outside_domain_denies` |
+| Acceptance depends only on the gate and the compared leaves | `Chio.Treaty.AdmissionBinding.accept_determined_by_gate_and_compared_leaves` |
+| The residual | `Chio.Treaty.AdmissionBinding.residual_substitution_preserves_acceptance` |
+| Exhaustive substitution and addition corpus, 245 cases | `crates/kernel/chio-runtime-core/tests/runtime_treaty_predicate_substitution.rs` |
+| Agreement of the mechanized and executed enumerations | same file, `the_lean_model_and_the_executed_classification_are_the_same_enumeration` |
 | Binding-reference corpus, 22 cases | `crates/kernel/chio-runtime-core/tests/runtime_treaty_binding_substitution.rs` |
 | Accept predicate, stages R and S and C and G | `crates/kernel/chio-runtime-core/src/admission_hook/treaty_ref.rs`, `treaty_evidence.rs` |
 | Accept predicate, stage D | `crates/kernel/chio-runtime-core/src/admission_hook/dsse.rs`, `crates/trust/chio-federation/src/bilateral_dsse/verify.rs` |
 | Accept predicate, stage A | `crates/kernel/chio-runtime-core/src/treaty.rs`, `evaluate_cross_boundary_admission` |
 | Accept predicate, stage M | `crates/kernel/chio-kernel/src/kernel/verified_treaty.rs` |
 | Accept predicate, stage K | `crates/kernel/chio-runtime-core/src/admission_hook.rs`, `evaluate` |
+| Accept predicate, stage L | `crates/kernel/chio-runtime-core/src/admission.rs`, `evaluate_runtime_admission_tracked` |
 
 None of the Lean theorems above depends on the collision-resistance axiom or on
-any other project axiom: each depends only on `propext` and `Quot.sound`, which
-is to say they sit below the cryptographic layer, where they belong.
+any other project axiom: each depends on at most `propext` and `Quot.sound`,
+and the five decided by case analysis or computation over the enumeration
+depend on no axiom at all. They sit below the cryptographic layer, where they
+belong.

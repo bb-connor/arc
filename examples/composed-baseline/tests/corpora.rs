@@ -2,8 +2,9 @@
 
 use chio_composed_baseline::harness::Runner;
 use chio_composed_baseline::negative;
+use chio_composed_baseline::negative::CaseRole;
 use chio_composed_baseline::properties;
-use chio_composed_baseline::receiver::{BaselineProfile, DurabilityMode};
+use chio_composed_baseline::receiver::{BaselineProfile, DurabilityMode, DENIAL_CODES};
 use chio_composed_baseline::scenario::Keys;
 use chio_composed_baseline::substitution;
 
@@ -79,12 +80,11 @@ fn the_null_case_is_admitted_under_both_wirings() -> TestResult {
     Ok(())
 }
 
-/// Three attacks survive the hardened wiring, and they are the three the
+/// Two attacks survive the hardened wiring, and they are the two the
 /// composition cannot reach by operator effort: a field it carries and never
-/// compares, a validity window only the signer bounds, and an authorization
-/// that is reusable because the replay table is keyed by a value the caller
-/// chooses. If a change makes one of these deny, the comparison's central
-/// result has moved and the paper's text must move with it.
+/// compares, and an agreement version it has no field to carry. If a change
+/// makes either deny, or adds a third survivor, the comparison's central result
+/// has moved and the paper's text must move with it.
 #[test]
 fn hardening_does_not_close_the_structural_gaps() -> TestResult {
     let dir = work_dir("structural")?;
@@ -104,7 +104,7 @@ fn hardening_does_not_close_the_structural_gaps() -> TestResult {
     let results = negative::run(&composed, &hardened)?;
     let mut surviving: Vec<&str> = results
         .iter()
-        .filter(|result| result.baseline_case_id != "unmodified-admissible-call")
+        .filter(|result| result.role == CaseRole::Attack)
         .filter(|result| {
             result
                 .hardened
@@ -117,16 +117,73 @@ fn hardening_does_not_close_the_structural_gaps() -> TestResult {
     assert_eq!(
         surviving,
         vec![
-            "authorization-replay-under-fresh-identifier",
-            "signer-minted-decade-window",
-            "unbound-resource-field",
+            "agreement-version-advanced-in-flight",
+            "unbound-resource-field"
         ]
     );
     Ok(())
 }
 
-/// Ten of the sixteen substitution rows have no carrier at all, and the five
-/// the composition does notice are noticed identically under both wirings.
+/// Every denial either corpus produces is in the receiver's declared
+/// vocabulary, at the step the vocabulary gives it. The path is numbered, so a
+/// step that moves without the vocabulary moving with it is a defect.
+#[test]
+fn every_denial_is_in_the_declared_vocabulary() -> TestResult {
+    let dir = work_dir("vocabulary")?;
+    let keys = Keys::fixed();
+    let composed = Runner::new(
+        &keys,
+        BaselineProfile::Composed,
+        DurabilityMode::BeforeDispatch,
+        &dir,
+    );
+    let hardened = Runner::new(
+        &keys,
+        BaselineProfile::Hardened,
+        DurabilityMode::BeforeDispatch,
+        &dir,
+    );
+    let mut observed: Vec<(String, u32)> = Vec::new();
+    for result in negative::run(&composed, &hardened)? {
+        for seen in [result.composed.as_ref(), result.hardened.as_ref()]
+            .into_iter()
+            .flatten()
+        {
+            if let (Some(code), Some(step)) = (seen.denial_code.as_ref(), seen.denial_step) {
+                observed.push((code.clone(), step));
+            }
+        }
+    }
+    for row in substitution::run(&composed, &hardened)? {
+        for seen in [
+            row.composed.as_ref(),
+            row.hardened.as_ref(),
+            row.consistent_composed.as_ref(),
+            row.consistent_hardened.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if let (Some(code), Some(step)) = (seen.denial_code.as_ref(), seen.denial_step) {
+                observed.push((code.clone(), step));
+            }
+        }
+    }
+    assert!(!observed.is_empty(), "neither corpus produced a denial");
+    for (code, step) in observed {
+        assert!(
+            DENIAL_CODES
+                .iter()
+                .any(|(known, known_step)| *known == code && *known_step == step),
+            "{code} at step {step} is not in the declared vocabulary"
+        );
+    }
+    Ok(())
+}
+
+/// Ten of the sixteen substitution rows have no carrier at all, covering nine
+/// of the fifteen binding fields, and the five rows the composition does notice
+/// are noticed identically under both wirings.
 #[test]
 fn the_substitution_corpus_covers_the_fifteen_binding_fields() -> TestResult {
     let dir = work_dir("substitution")?;
@@ -177,10 +234,9 @@ fn the_substitution_corpus_covers_the_fifteen_binding_fields() -> TestResult {
     Ok(())
 }
 
-/// Admission binding fails under both wirings and single use holds only in a
-/// weakened form under both, so neither is reachable by hardening. Receiver
-/// locality and audience binding are reachable, and are the two the hardened
-/// wiring holds.
+/// Admission binding is the one property no wiring of these parts reaches.
+/// Audience binding holds under both wirings; receiver locality and single use
+/// are reached by hardening and not by the composed wiring.
 #[test]
 fn the_property_verdicts_are_what_the_paper_reports() -> TestResult {
     let dir = work_dir("properties")?;
@@ -226,9 +282,9 @@ fn the_property_verdicts_are_what_the_paper_reports() -> TestResult {
             (
                 "single use",
                 "HoldsWeakened".to_string(),
-                "HoldsWeakened".to_string()
+                "Holds".to_string()
             ),
-            ("audience binding", "Fails".to_string(), "Holds".to_string()),
+            ("audience binding", "Holds".to_string(), "Holds".to_string()),
         ]
     );
     Ok(())

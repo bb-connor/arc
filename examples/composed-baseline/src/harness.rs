@@ -26,6 +26,27 @@ pub enum StateVariant {
     /// A different vendor that pinned the same counterparty keys and
     /// provisioned the same agreement identifier.
     SecondReceiver,
+    /// The vendor's own record for the live agreement has moved to a later
+    /// version. Nothing else about the record changes: it is not retired, the
+    /// participants, actions and ceilings are the ones the decision was issued
+    /// under, and the only altered fact is the version the receiver now holds.
+    AgreementVersionAdvanced,
+}
+
+impl StateVariant {
+    /// Stable name for the receiver state a case runs against, so that two
+    /// cases running the same drive against different state are recorded as
+    /// two experiments and two cases running it against the same state are
+    /// recorded as one.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            StateVariant::Default => "default",
+            StateVariant::CollapsedKeys => "collapsed_keys",
+            StateVariant::DowngradedAssurance => "downgraded_assurance",
+            StateVariant::SecondReceiver => "second_receiver",
+            StateVariant::AgreementVersionAdvanced => "agreement_version_advanced",
+        }
+    }
 }
 
 /// What one drive observed.
@@ -80,6 +101,11 @@ impl<'a> Runner<'a> {
             StateVariant::DowngradedAssurance => {
                 if let Some(agreement) = state.agreements.get_mut(scenario::AGREEMENT) {
                     agreement.assurance_level = "self_asserted".to_string();
+                }
+            }
+            StateVariant::AgreementVersionAdvanced => {
+                if let Some(agreement) = state.agreements.get_mut(scenario::AGREEMENT) {
+                    agreement.version += 1;
                 }
             }
             StateVariant::SecondReceiver => {

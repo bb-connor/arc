@@ -6,8 +6,8 @@
 //! of one. Statement zero is the edge that binds the continuation and the
 //! bilateral invocation, so the two scans that look for it terminate at the
 //! first statement whatever the depth; what grows with depth is the chain walk
-//! that validates every edge, the per-statement digests it takes, and the
-//! canonical hash of the bundle the receiver resolves from its own store.
+//! that validates every edge and the deserialization of the bundle the receiver
+//! resolves from its own store.
 //!
 //! The depth is a property of the bundle the RECEIVER holds. A request names the
 //! bundle by id and digest and cannot supply one, so this measures the cost of a
@@ -361,30 +361,37 @@ impl AdmissionScalingFixture {
 
     /// The receiver-side lineage work for one call, without the rest of
     /// admission: resolve the bundle the request names from the receiver's own
-    /// store, take the digest the request's citation is compared against, walk
-    /// every edge, and find the statement that binds the continuation and the
-    /// invocation. This is the term that is linear in depth; everything else on
-    /// the admitted path is a constant.
+    /// store, compare the digest the store recorded when it accepted the bundle
+    /// against the one the request cites, walk every edge, and find the
+    /// statement that binds the continuation and the invocation. This is the
+    /// term that is linear in depth; everything else on the admitted path is a
+    /// constant.
     ///
-    /// It runs the same functions the pre-dispatch hook runs, in the same order.
-    pub fn verify_lineage_once(&self, bundle_id: &str) -> Result<String, BoxError> {
+    /// It does what the pre-dispatch hook does and no more. In particular the
+    /// digest comparison is the string compare the hook makes against a digest
+    /// the store took once at registration, not a fresh canonicalize-and-hash of
+    /// the bundle: the hook never recomputes it, so neither does this.
+    pub fn verify_lineage_once(
+        &self,
+        bundle_id: &str,
+        cited_sha256: &str,
+    ) -> Result<String, BoxError> {
         let record = RuntimeAdmissionStore::treaty_runtime_artifact(
             &self.store,
             "receipt_lineage_bundle",
             bundle_id,
         )?
         .ok_or("the receiver does not hold the named lineage bundle")?;
+        if record.artifact_sha256 != cited_sha256 {
+            return Err("the stored lineage bundle is not the one the request cites".into());
+        }
         let bundle: ReceiptLineageBundle = serde_json::from_value(record.raw_json)?;
-        let bundle_sha256 = sha256_hex(&canonical_json_bytes(&bundle)?);
         if !verify_receipt_lineage_bundle(&bundle)? {
             return Err("the lineage bundle did not verify".into());
         }
         for statement in &bundle.statements {
             if statement.parent_receipt_sha256 == bundle.root_receipt_sha256 {
-                return Ok(format!(
-                    "{bundle_sha256}:{}",
-                    receipt_lineage_statement_sha256(statement)?
-                ));
+                return Ok(receipt_lineage_statement_sha256(statement)?);
             }
         }
         Err("the lineage bundle has no edge leaving its root".into())

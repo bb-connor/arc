@@ -10,9 +10,10 @@
 //!
 //! Two windows are timed per call. The first is the receiver-side lineage work
 //! on its own: resolving the bundle the request names from the receiver's own
-//! store, taking the digest the citation is compared against, and walking every
-//! edge. The second is the whole admitted call that includes it. The first is
-//! where the linear term lives; the second says how much of an admission it is.
+//! store, comparing the digest the store recorded for it against the one the
+//! request cites, and walking every edge. The second is the whole admitted call
+//! that includes it. The first is where the linear term lives; the second says
+//! how much of an admission it is.
 //!
 //! Each timed invocation is written out individually rather than summarized
 //! here: the distribution, its percentiles and its intervals are the reader's to
@@ -167,12 +168,13 @@ fn measure_depth(depth: usize, warmup: usize, iterations: usize) -> Result<Depth
     let mut lineage_nanos = Vec::with_capacity(iterations);
     for index in 0..warmup + iterations {
         let request = fixture.prepare_request()?;
-        let bundle_id = lineage_bundle_id(&request)?;
+        let (bundle_id, bundle_sha256) = lineage_bundle_citation(&request)?;
 
         // The lineage work on its own, before the call that includes it: the
-        // resolution, the digest and the walk, with nothing else in the window.
+        // resolution, the digest comparison and the walk, with nothing else in
+        // the window.
         let started = Instant::now();
-        let binding = fixture.verify_lineage_once(&bundle_id)?;
+        let binding = fixture.verify_lineage_once(&bundle_id, &bundle_sha256)?;
         let lineage_elapsed = started.elapsed();
         if binding.is_empty() {
             return Err(format!("depth {depth} produced no lineage binding").into());
@@ -213,14 +215,22 @@ fn measure_depth(depth: usize, warmup: usize, iterations: usize) -> Result<Depth
 /// The lineage bundle id the request cites. Read back out of the request rather
 /// than recomputed, so the isolated measurement resolves the same object the
 /// call that follows it resolves.
-fn lineage_bundle_id(request: &chio_kernel::ToolCallRequest) -> Result<String, BoxError> {
-    request
+fn lineage_bundle_citation(
+    request: &chio_kernel::ToolCallRequest,
+) -> Result<(String, String), BoxError> {
+    let citation = request
         .governed_intent
         .as_ref()
         .and_then(|intent| intent.context.as_ref())
-        .and_then(|context| context["chioTreaty"]["receiptLineageBundle"]["id"].as_str())
-        .map(str::to_string)
-        .ok_or_else(|| "the prepared request cites no lineage bundle".into())
+        .map(|context| &context["chioTreaty"]["receiptLineageBundle"])
+        .ok_or("the prepared request carries no governed intent")?;
+    let id = citation["id"]
+        .as_str()
+        .ok_or("the prepared request cites no lineage bundle")?;
+    let sha256 = citation["sha256"]
+        .as_str()
+        .ok_or("the prepared request cites a lineage bundle without a digest")?;
+    Ok((id.to_string(), sha256.to_string()))
 }
 
 fn write_samples(directory: &Path, results: &[DepthResult]) -> Result<(), BoxError> {
