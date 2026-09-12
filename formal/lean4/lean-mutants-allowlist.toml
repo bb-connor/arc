@@ -74,3 +74,7 @@ path = "formal/lean4/Chio/Chio/Json/Value.lean"
 [[definition]]
 name = "CanonicalInteger"
 path = "formal/lean4/Chio/Chio/Json/Value.lean"
+
+[[definition]]
+name = "fieldAgrees"
+path = "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean"

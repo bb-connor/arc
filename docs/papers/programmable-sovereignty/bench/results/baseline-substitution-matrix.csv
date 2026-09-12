@@ -1,0 +1,17 @@
+chio_field,baseline_carrier,basis,noticed_composed,noticed_hardened,composed_code,consistent_composed_code
+treaty_id,policy_decision.agreement_id,resolution,True,True,agreement.unknown,
+treaty_scope_sha256,,not_carried,False,False,,
+ladder_intersection_sha256,,not_carried,False,False,,
+admission_report_sha256,,not_carried,False,False,,
+continuation_sha256,request.request_id,carried_never_compared,False,False,,
+lineage_bundle_sha256,,not_carried,False,False,,
+action_class_id,policy_decision.action against request.tool_name,internal_consistency,True,True,authorization.action_mismatch,agreement.action_not_covered
+consistency_model,,not_carried,False,False,,
+request_sha256,policy_decision.tool_args_sha256,recomputation,True,True,authorization.args_digest_mismatch,
+outcome_sha256,,not_carried,False,False,,
+local_receipt_sha256,,not_carried,False,False,,
+remote_receipt_sha256,,not_carried,False,False,,
+lease_refs,,not_carried,False,False,,
+governance_refs,tool_args.approval_id,resolution,True,True,policy.approval_missing,
+"signer_kernel_ids, as a set",policy_decision.principal against request.caller,internal_consistency,True,True,authorization.principal_mismatch,peer.unpinned
+"signer_kernel_ids, in order",,not_carried,False,False,,

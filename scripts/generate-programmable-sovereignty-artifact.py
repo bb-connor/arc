@@ -236,6 +236,14 @@ BEHAVIORAL_TESTS = [
         ),
         "claimClass": "runtime_enforced",
     },
+    {
+        "id": "PS-T13",
+        "command": (
+            "cargo test -p chio-runtime-core "
+            "--test runtime_treaty_predicate_substitution"
+        ),
+        "claimClass": "runtime_enforced",
+    },
 ]
 
 BENCHMARKS = [

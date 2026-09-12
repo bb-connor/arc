@@ -6,18 +6,43 @@ set -euo pipefail
 # party signs the transport directory that binds them, and the receiver decides
 # every call on its own store.
 #
+# The run measures, in order: the admitted path with the receiver's evaluation
+# window decomposed into the parts its own dependencies timed, each denial case,
+# the same tool call with the kernel taken out of the path (the denominator), a
+# sustained concurrent load, a race in which several calls present one single-use
+# continuation, and the two revocation flips.
+#
 # One machine is the default: this script starts the origin, the receiver and the
 # driver here and records one host. A genuine two-host run is two invocations,
 # one per machine, with disjoint CHIO_FED_ROLES and a CHIO_FED_STATE_DIR both
 # machines can read; the recorded host count comes from the roles a run actually
 # started, never from the host names it was handed.
 #
-#   host A:  CHIO_FED_ROLES=origin \
-#            CHIO_FED_ORIGIN_HOST=10.0.0.1 CHIO_FED_RECEIVER_HOST=10.0.0.2 \
-#            CHIO_FED_STATE_DIR=/srv/chio-federated-pair ./run-federated-pair.sh
-#   host B:  CHIO_FED_ROLES=receiver,driver \
-#            CHIO_FED_ORIGIN_HOST=10.0.0.1 CHIO_FED_RECEIVER_HOST=10.0.0.2 \
-#            CHIO_FED_STATE_DIR=/srv/chio-federated-pair ./run-federated-pair.sh
+# These are the two commands, one per machine, in full. Run host A first: it
+# generates the shared material and publishes the handshake the receiver pins.
+#
+#   host A (10.0.0.1), Org A only:
+#     CHIO_FED_ROLES=origin \
+#     CHIO_FED_ORIGIN_HOST=10.0.0.1 CHIO_FED_RECEIVER_HOST=10.0.0.2 \
+#     CHIO_FED_STATE_DIR=/srv/chio-federated-pair \
+#     ./run-federated-pair.sh
+#
+#   host B (10.0.0.2), Org B and the driver:
+#     CHIO_FED_ROLES=receiver,driver \
+#     CHIO_FED_ORIGIN_HOST=10.0.0.1 CHIO_FED_RECEIVER_HOST=10.0.0.2 \
+#     CHIO_FED_SENDER_HOST=10.0.0.2 \
+#     CHIO_FED_STATE_DIR=/srv/chio-federated-pair \
+#     ./run-federated-pair.sh
+#
+# Each invocation refuses a role whose host is not an address of the machine it
+# is running on, and refuses to leave a role to another machine whose address IS
+# one of its own, so the recorded host count cannot describe a deployment that
+# did not happen. Before it measures anything, a run with a role elsewhere probes
+# that host for reachability and clock offset and refuses if the two clocks
+# disagree by more than CHIO_FED_MAX_CLOCK_OFFSET_MS: the receiving kernel reads
+# its clock in whole seconds and holds its revocation snapshot to a sub-second
+# freshness bound, so a larger offset does not degrade the measurement, it
+# changes which calls are admitted.
 #
 # The state directory carries the generated keys, the signed directory, the
 # treaty, the origin handshake, the readiness marker and the revoke/cut control
@@ -62,6 +87,17 @@ WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/chio-federated-pair-bench.XXXXXX")"
 
 ALLOW_CALLS="${CHIO_FED_ALLOW_CALLS:-100}"
 DENY_CALLS="${CHIO_FED_DENY_CALLS:-20}"
+BASELINE_CALLS="${CHIO_FED_BASELINE_CALLS:-100}"
+LOAD_WORKERS="${CHIO_FED_LOAD_WORKERS:-8}"
+LOAD_CALLS="${CHIO_FED_LOAD_CALLS:-10}"
+RACE_WORKERS="${CHIO_FED_RACE_WORKERS:-8}"
+RACE_REPEATS="${CHIO_FED_RACE_REPEATS:-20}"
+PREFLIGHT_SAMPLES="${CHIO_FED_PREFLIGHT_SAMPLES:-16}"
+MAX_CLOCK_OFFSET_MS="${CHIO_FED_MAX_CLOCK_OFFSET_MS:-250}"
+# Where the receiver keeps the treaty evidence and the consumed continuations.
+# sqlite is the default because the single-use property the race tests rests on
+# a primary-key insert; memory measures a different mechanism under the same name.
+ADMISSION_STORE="${CHIO_FED_ADMISSION_STORE:-sqlite}"
 TICK_MS="${CHIO_FED_TICK_MS:-250}"
 READY_TIMEOUT_SECS="${CHIO_FED_READY_TIMEOUT_SECS:-60}"
 FLIP_TIMEOUT_MS="${CHIO_FED_FLIP_TIMEOUT_MS:-30000}"
@@ -94,7 +130,7 @@ DENY_SCENARIOS=(
   unknown_ladder_intersection
 )
 
-case "$ALLOW_CALLS:$DENY_CALLS:$TICK_MS:$READY_TIMEOUT_SECS:$FLIP_TIMEOUT_MS:$REVOKE_REPEATS:$CUT_REPEATS:$STAGE_TIMEOUT_SECS" in
+case "$ALLOW_CALLS:$DENY_CALLS:$TICK_MS:$READY_TIMEOUT_SECS:$FLIP_TIMEOUT_MS:$REVOKE_REPEATS:$CUT_REPEATS:$STAGE_TIMEOUT_SECS:$BASELINE_CALLS:$LOAD_WORKERS:$LOAD_CALLS:$RACE_WORKERS:$RACE_REPEATS:$PREFLIGHT_SAMPLES:$MAX_CLOCK_OFFSET_MS" in
   *[!0-9:]*)
     echo "call counts, repeats and timeouts must be nonnegative integers" >&2
     exit 2
@@ -112,6 +148,33 @@ if [[ "$STAGE_TIMEOUT_SECS" -lt 1 ]]; then
   echo "CHIO_FED_STAGE_TIMEOUT_SECS must be at least one second" >&2
   exit 2
 fi
+if [[ "$BASELINE_CALLS" -lt 2 ]]; then
+  echo "CHIO_FED_BASELINE_CALLS must be at least 2: the denominator is a distribution too" >&2
+  exit 2
+fi
+if [[ "$LOAD_WORKERS" -lt 2 || "$RACE_WORKERS" -lt 2 ]]; then
+  echo "CHIO_FED_LOAD_WORKERS and CHIO_FED_RACE_WORKERS must be at least 2: one worker is not concurrency" >&2
+  exit 2
+fi
+if [[ "$LOAD_CALLS" -lt 1 ]]; then
+  echo "CHIO_FED_LOAD_CALLS must be at least 1" >&2
+  exit 2
+fi
+if [[ "$RACE_REPEATS" -lt 2 ]]; then
+  echo "CHIO_FED_RACE_REPEATS must be at least 2: one round is not a distribution" >&2
+  exit 2
+fi
+if [[ "$PREFLIGHT_SAMPLES" -lt 1 ]]; then
+  echo "CHIO_FED_PREFLIGHT_SAMPLES must be at least 1" >&2
+  exit 2
+fi
+case "$ADMISSION_STORE" in
+  sqlite | memory) ;;
+  *)
+    echo "CHIO_FED_ADMISSION_STORE must be sqlite or memory, got $ADMISSION_STORE" >&2
+    exit 2
+    ;;
+esac
 if [[ ! "$MAX_LOAD" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
   echo "CHIO_BENCH_MAX_LOAD must be a nonnegative decimal number: $MAX_LOAD" >&2
   exit 2
@@ -239,6 +302,9 @@ RESULT_DIR="$(cd "$RESULT_DIR" && pwd -P)"
 RESULT_JSON="$RESULT_DIR/federated-pair.json"
 ALLOW_CSV="$RESULT_DIR/federated-pair-allow-samples.csv"
 DENY_CSV="$RESULT_DIR/federated-pair-deny-samples.csv"
+BASELINE_CSV="$RESULT_DIR/federated-pair-baseline-samples.csv"
+LOAD_CSV="$RESULT_DIR/federated-pair-load-samples.csv"
+RACE_CSV="$RESULT_DIR/federated-pair-race-samples.csv"
 INLINE="$RESULT_DIR/federated-pair-inline.tex"
 ENVIRONMENT="$RESULT_DIR/federated-pair-environment-$ROLE_SLUG.txt"
 ENVIRONMENT_JSON="$RESULT_DIR/federated-pair-environment-$ROLE_SLUG.json"
@@ -395,6 +461,13 @@ fi
   printf 'epoch_tick_ms=%s\n' "$TICK_MS"
   printf 'allow_calls=%s\n' "$ALLOW_CALLS"
   printf 'deny_calls_per_case=%s\n' "$DENY_CALLS"
+  printf 'baseline_calls=%s\n' "$BASELINE_CALLS"
+  printf 'load_workers=%s\n' "$LOAD_WORKERS"
+  printf 'load_calls_per_worker=%s\n' "$LOAD_CALLS"
+  printf 'race_workers=%s\n' "$RACE_WORKERS"
+  printf 'race_repeats=%s\n' "$RACE_REPEATS"
+  printf 'admission_store=%s\n' "$ADMISSION_STORE"
+  printf 'max_clock_offset_ms=%s\n' "$MAX_CLOCK_OFFSET_MS"
   printf 'deny_cases=%s\n' "${#DENY_SCENARIOS[@]}"
   printf 'revoke_repeats=%s\n' "$REVOKE_REPEATS"
   printf 'cut_repeats=%s\n' "$CUT_REPEATS"
@@ -563,6 +636,7 @@ if has_role receiver; then
     --peer "$ORIGIN_KERNEL=$ORIGIN_HOST:$ORIGIN_PORT" \
     --handshake "$HANDSHAKE" \
     --store-dir "$RECEIVER_STORE" \
+    --admission-store "$ADMISSION_STORE" \
     --ready-out "$READY" \
     --ready-timeout-secs "$READY_TIMEOUT_SECS" > "$RECEIVER_LOG" 2>&1 &
   RECEIVER_PID=$!
@@ -582,6 +656,33 @@ SEND_FLAGS=(
   --bind "$SENDER_HOST:$SENDER_PORT"
   --peer "$RECEIVER_KERNEL=$RECEIVER_HOST:$RECEIVER_PORT"
 )
+
+# ---- Preflight -------------------------------------------------------------
+
+# Reachability and clock agreement, before anything is measured. Every role this
+# invocation did not start is probed; on a single-host run that is nothing to
+# probe from another machine, and the local roles are probed anyway so the result
+# records a reading rather than an assumption.
+PREFLIGHT_TARGETS=()
+if ! has_role origin; then
+  PREFLIGHT_TARGETS+=(--target "$ORIGIN_KERNEL")
+fi
+if ! has_role receiver; then
+  PREFLIGHT_TARGETS+=(--target "$RECEIVER_KERNEL")
+fi
+if [[ "${#PREFLIGHT_TARGETS[@]}" -eq 0 ]]; then
+  PREFLIGHT_TARGETS=(--target "$ORIGIN_KERNEL" --target "$RECEIVER_KERNEL")
+  PREFLIGHT_SCOPE="local roles on this host"
+else
+  PREFLIGHT_SCOPE="every role this host did not start"
+fi
+
+PREFLIGHT_JSON="$WORK_DIR/preflight.json"
+run_pair preflight "${SEND_FLAGS[@]}" \
+  --peer "$ORIGIN_KERNEL=$ORIGIN_HOST:$ORIGIN_PORT" \
+  "${PREFLIGHT_TARGETS[@]}" \
+  --samples "$PREFLIGHT_SAMPLES" --max-offset-ms "$MAX_CLOCK_OFFSET_MS" \
+  --out "$PREFLIGHT_JSON"
 
 # ---- Measurements ----------------------------------------------------------
 
@@ -603,6 +704,24 @@ for scenario in "${DENY_SCENARIOS[@]}"; do
   DENY_SUMMARY_FILES+=("$summary")
 done
 
+BASELINE_SAMPLES="$WORK_DIR/baseline-samples.csv"
+BASELINE_SUMMARY="$WORK_DIR/baseline-summary.json"
+run_pair baseline "${SEND_FLAGS[@]}" \
+  --calls "$BASELINE_CALLS" \
+  --csv "$BASELINE_SAMPLES" --out "$BASELINE_SUMMARY"
+
+LOAD_SAMPLES="$WORK_DIR/load-samples.csv"
+LOAD_SUMMARY="$WORK_DIR/load-summary.json"
+run_pair load "${SEND_FLAGS[@]}" \
+  --workers "$LOAD_WORKERS" --calls "$LOAD_CALLS" \
+  --csv "$LOAD_SAMPLES" --out "$LOAD_SUMMARY"
+
+RACE_SAMPLES="$WORK_DIR/race-samples.csv"
+RACE_SUMMARY="$WORK_DIR/race-summary.json"
+run_pair race "${SEND_FLAGS[@]}" \
+  --workers "$RACE_WORKERS" --repeats "$RACE_REPEATS" \
+  --csv "$RACE_SAMPLES" --out "$RACE_SUMMARY"
+
 REVOKE_JSON="$WORK_DIR/revoke.json"
 run_pair revoke "${SEND_FLAGS[@]}" \
   --control "$CONTROL" --timeout-ms "$FLIP_TIMEOUT_MS" \
@@ -621,6 +740,10 @@ python3 - \
   "$SOURCE_COMMIT" "$SOURCE_DIRTY" "$HOST_COUNT" "$HOST_TOPOLOGY" "$TICK_MS" \
   "$ROLE_LABEL" "$LOCAL_PROCESSES" "$EPOCH_RATE" "$RESULT_DIR" \
   "$BENCHMARK_INPUT_TREE_SHA256" \
+  "$BASELINE_CSV" "$LOAD_CSV" "$RACE_CSV" \
+  "$BASELINE_SAMPLES" "$BASELINE_SUMMARY" "$LOAD_SAMPLES" "$LOAD_SUMMARY" \
+  "$RACE_SAMPLES" "$RACE_SUMMARY" "$PREFLIGHT_JSON" "$PREFLIGHT_SCOPE" \
+  "$ADMISSION_STORE" \
   "${DENY_SAMPLE_FILES[@]}" -- "${DENY_SUMMARY_FILES[@]}" <<'PY'
 import csv
 import json
@@ -653,23 +776,74 @@ CONFIDENCE = 0.95
     epoch_rate_path,
     result_dir,
     benchmark_input_tree_sha256,
-) = sys.argv[1:20]
-rest = sys.argv[20:]
+    baseline_csv_out,
+    load_csv_out,
+    race_csv_out,
+    baseline_samples,
+    baseline_summary,
+    load_samples,
+    load_summary,
+    race_samples,
+    race_summary,
+    preflight_json,
+    preflight_scope,
+    admission_store,
+) = sys.argv[1:32]
+rest = sys.argv[32:]
 split = rest.index("--")
 deny_sample_files = rest[:split]
 deny_summary_files = rest[split + 1 :]
 
-CSV_FIELDS = [
-    "scenario",
-    "sequence",
-    "request_id",
-    "round_trip_ms",
-    "evaluate_ms",
-    "prepare_ms",
-    "verdict",
-    "failure_code",
-    "cosign_connections",
+# The parts of the receiver's evaluation window, each measured at the dependency
+# that did the work. Order is the order they appear in the samples file.
+BUDGET_PARTS = [
+    ("cosign_connect_ms", "cosignConnect"),
+    ("cosign_exchange_ms", "cosignExchange"),
+    ("store_resolve_ms", "evidenceResolution"),
+    ("continuation_ms", "continuationConsume"),
+    ("lease_ms", "leaseConsume"),
+    ("trust_floor_ms", "trustFloor"),
+    ("dispatch_ms", "dispatch"),
+    ("receipt_append_ms", "durableReceiptAppend"),
+    ("receipt_other_ms", "receiptStoreOther"),
+    ("revocation_ms", "revocationStore"),
+    ("admission_durable_ms", "durableAdmissionOperations"),
+    ("tool_outcome_durable_ms", "durableToolOutcome"),
 ]
+BUDGET_OP_COUNTS = [
+    "cosign_hops",
+    "store_resolve_ops",
+    "continuation_ops",
+    "lease_ops",
+    "trust_floor_ops",
+    "dispatch_ops",
+    "receipt_append_ops",
+    "receipt_other_ops",
+    "revocation_ops",
+    "admission_durable_ops",
+    "tool_outcome_durable_ops",
+]
+
+CSV_FIELDS = (
+    [
+        "scenario",
+        "sequence",
+        "request_id",
+        "round_trip_ms",
+        "evaluate_ms",
+        "prepare_ms",
+        "verdict",
+        "failure_code",
+        "cosign_connections",
+    ]
+    + [field for field, _ in BUDGET_PARTS]
+    + BUDGET_OP_COUNTS
+    + ["attributed_ms", "unattributed_ms"]
+)
+
+# The receiver's own fail-closed bound on the decomposition, in milliseconds. It
+# refuses per call; this is the aggregate restatement of the same rule.
+BUDGET_TOLERANCE_MS = 0.05
 
 
 def percentile(ordered, quantile):
@@ -836,16 +1010,154 @@ revoke_absorbed = int(revoke["freshnessDenialsAbsorbed"])
 cut_absorbed = int(cut["freshnessDenialsAbsorbed"])
 
 
-def write_csv(path, rows):
+def write_csv(path, rows, fieldnames=None):
+    fieldnames = fieldnames or CSV_FIELDS
     with pathlib.Path(path).open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         for row in rows:
-            writer.writerow({field: row[field] for field in CSV_FIELDS})
+            writer.writerow({field: row[field] for field in fieldnames})
 
 
 write_csv(allow_csv_out, allow_rows)
 write_csv(deny_csv_out, deny_rows)
+
+
+def decompose(rows, what):
+    """The evaluation window of these calls, attributed to its parts.
+
+    Each part is summarized across the calls the same way the whole window is,
+    so a share can be read with its interval rather than off one median. The run
+    fails closed if the attributed total ever exceeds the window it decomposes:
+    that means the receiver's counters picked up work from another call, and the
+    decomposition does not describe these calls.
+    """
+    whole = summarize([float(row["evaluate_ms"]) for row in rows])
+    parts = {}
+    for field, name in BUDGET_PARTS:
+        stats = summarize([float(row[field]) for row in rows])
+        stats["shareOfWindow"] = (
+            stats["p50_ms"] / whole["p50_ms"] if whole["p50_ms"] else 0.0
+        )
+        parts[name] = stats
+    attributed = summarize([float(row["attributed_ms"]) for row in rows])
+    unattributed = summarize([float(row["unattributed_ms"]) for row in rows])
+    over = max(float(row["attributed_ms"]) - float(row["evaluate_ms"]) for row in rows)
+    if over > BUDGET_TOLERANCE_MS:
+        raise SystemExit(
+            f"{what} attributed {over:.6f} ms more than its evaluation window on at "
+            f"least one call, beyond the {BUDGET_TOLERANCE_MS} ms tolerance"
+        )
+    # How many times each dependency was called. These are not constant per
+    # call (the durable admission store does more work on some paths than
+    # others), so they are reported as a range rather than asserted to be one
+    # number. The one count that IS an invariant is the dispatch, and it is
+    # checked against the verdict below.
+    counts = {}
+    for field in BUDGET_OP_COUNTS:
+        observed = sorted(int(row[field]) for row in rows)
+        counts[field] = {
+            "min": observed[0],
+            "median": observed[len(observed) // 2],
+            "max": observed[-1],
+        }
+    dispatches = {int(row["dispatch_ops"]) for row in rows}
+    verdicts = {row["verdict"] for row in rows}
+    expected_dispatch = {1} if verdicts == {"allow"} else {0}
+    if dispatches != expected_dispatch:
+        raise SystemExit(
+            f"{what} dispatched {sorted(dispatches)} times per call, expected "
+            f"{sorted(expected_dispatch)}"
+        )
+    attributed["shareOfWindow"] = (
+        attributed["p50_ms"] / whole["p50_ms"] if whole["p50_ms"] else 0.0
+    )
+    unattributed["shareOfWindow"] = (
+        unattributed["p50_ms"] / whole["p50_ms"] if whole["p50_ms"] else 0.0
+    )
+    return {
+        "window": whole,
+        "parts": parts,
+        "attributed": attributed,
+        "unattributed": unattributed,
+        "operationsPerCall": counts,
+        "toleranceMs": BUDGET_TOLERANCE_MS,
+        # The largest amount by which the parts exceeded the window they
+        # decompose, over all these calls. Negative is the ordinary case: some
+        # of the window has no dependency to attribute it to. Positive past the
+        # tolerance is the failure above.
+        "worstAttributedMinusWindowMs": over,
+    }
+
+
+allow_budget = decompose(allow_rows, "the admitted path")
+deny_budgets = {}
+for samples_path, summary_path in zip(deny_sample_files, deny_summary_files):
+    summary = load_json(summary_path)
+    deny_budgets[summary["scenario"]] = decompose(
+        load_rows(samples_path), f"denial case {summary['scenario']}"
+    )
+
+baseline_rows = load_rows(baseline_samples)
+if not baseline_rows:
+    raise SystemExit("the baseline produced no samples")
+for row in baseline_rows:
+    if row["verdict"] != "allow":
+        raise SystemExit("an unmediated call did not return a result")
+write_csv(baseline_csv_out, baseline_rows)
+baseline_doc = load_json(baseline_summary)
+if int(baseline_doc["mediatedDispatchDelta"]) != 0:
+    raise SystemExit("the unmediated run moved the kernel's dispatch counter")
+baseline_stats = summarize([float(row["round_trip_ms"]) for row in baseline_rows])
+baseline_dispatch = summarize([float(row["dispatch_ms"]) for row in baseline_rows])
+
+load_sample_rows = load_rows(load_samples)
+if not load_sample_rows:
+    raise SystemExit("the concurrent run produced no samples")
+write_csv(
+    load_csv_out,
+    load_sample_rows,
+    [
+        "worker",
+        "sequence",
+        "request_id",
+        "round_trip_ms",
+        "evaluate_ms",
+        "verdict",
+        "failure_code",
+    ],
+)
+load_doc = load_json(load_summary)
+if int(load_doc["dispatched"]) != int(load_doc["calls"]):
+    raise SystemExit("the concurrent run did not dispatch once per admitted call")
+load_stats = summarize([float(row["round_trip_ms"]) for row in load_sample_rows])
+
+race_rows = load_rows(race_samples)
+if not race_rows:
+    raise SystemExit("the contention run produced no samples")
+write_csv(race_csv_out, race_rows, ["round", "worker", "outcome", "round_trip_ms"])
+race_doc = load_json(race_summary)
+if int(race_doc["dispatched"]) != int(race_doc["expectedDispatched"]):
+    raise SystemExit(
+        "the contention run dispatched "
+        f"{race_doc['dispatched']} times over {race_doc['rounds']} rounds"
+    )
+admitted_per_round = {}
+for row in race_rows:
+    admitted_per_round.setdefault(row["round"], 0)
+    if row["outcome"] == "admitted":
+        admitted_per_round[row["round"]] += 1
+if set(admitted_per_round.values()) != {1}:
+    raise SystemExit(
+        "a contention round admitted more or fewer than one call: "
+        f"{sorted(set(admitted_per_round.values()))}"
+    )
+race_winner_stats = summarize([float(ms) for ms in race_doc["winnerLatenciesMs"]])
+race_loser_stats = summarize([float(ms) for ms in race_doc["loserLatenciesMs"]])
+
+preflight = load_json(preflight_json)
+if not preflight["admitted"]:
+    raise SystemExit(f"preflight refused the run: {preflight['refusals']}")
 
 document = {
     "schema": "chio.programmable-sovereignty.federated-pair-results.v1",
@@ -864,18 +1176,67 @@ document = {
         "epochTickMs": int(tick_ms),
         "achievedEpochRate": epoch_rate,
         "cosignConnectionsPerAdmittedCall": cosign_connections,
+        "admissionStore": admission_store,
+        "preflight": {
+            "scope": preflight_scope,
+            "maxOffsetMs": preflight["maxOffsetMs"],
+            "samplesPerTarget": preflight["samplesPerTarget"],
+            "readings": preflight["readings"],
+        },
     },
     "admitted": {
         "roundTrip": allow_stats,
         "receiverEvaluate": evaluate_stats,
         "evidencePreparation": prepare_stats,
+        "receiverBudget": allow_budget,
         "dispatched": allow_summary_doc["dispatched"],
         "calls": allow_summary_doc["calls"],
         "freshnessDenialsAbsorbed": allow_absorbed,
     },
+    "unmediated": {
+        "roundTrip": baseline_stats,
+        "toolInvocation": baseline_dispatch,
+        "calls": baseline_doc["calls"],
+        "mediatedDispatchDelta": baseline_doc["mediatedDispatchDelta"],
+        "unmediatedDispatchDelta": baseline_doc["unmediatedDispatchDelta"],
+        "mediationOverheadMs": allow_stats["p50_ms"] - baseline_stats["p50_ms"],
+        "mediationOverheadRatio": (
+            allow_stats["p50_ms"] / baseline_stats["p50_ms"]
+            if baseline_stats["p50_ms"]
+            else None
+        ),
+    },
+    "concurrent": {
+        "workers": load_doc["workers"],
+        "callsPerWorker": load_doc["callsPerWorker"],
+        "calls": load_doc["calls"],
+        "roundTrip": load_stats,
+        "wallClockMs": load_doc["wallClockMs"],
+        "throughputCallsPerSecond": load_doc["throughputCallsPerSecond"],
+        "sequentialThroughputCallsPerSecond": (
+            1_000.0 / allow_stats["p50_ms"] if allow_stats["p50_ms"] else None
+        ),
+        "dispatched": load_doc["dispatched"],
+        "freshnessDenialsAbsorbed": load_doc["freshnessDenialsAbsorbed"],
+        "budgetReported": load_doc["budgetReported"],
+        "budgetContaminatedCalls": load_doc["budgetContaminatedCalls"],
+    },
+    "continuationRace": {
+        "workers": race_doc["workers"],
+        "rounds": race_doc["rounds"],
+        "admittedPerRound": 1,
+        "dispatched": race_doc["dispatched"],
+        "expectedDispatched": race_doc["expectedDispatched"],
+        "replayFailureCode": race_doc["replayFailureCode"],
+        "winnersByWorker": race_doc["winnersByWorker"],
+        "admittedLatency": race_winner_stats,
+        "replayedLatency": race_loser_stats,
+        "freshnessDenialsAbsorbed": race_doc["freshnessDenialsAbsorbed"],
+    },
     "denied": {
         "roundTrip": deny_stats,
         "cases": deny_cases,
+        "receiverBudgets": deny_budgets,
         "freshnessDenialsAbsorbed": deny_absorbed_total,
     },
     "revocation": {
@@ -920,6 +1281,56 @@ document = {
             "pooled across the denial cases, which refuse at different depths of "
             "the admission hook; each case's own distribution is under "
             "denied.cases[name].roundTrip"
+        ),
+        "receiverBudget": (
+            "the receiver's evaluation window attributed to its parts, each "
+            "measured at the dependency that did the work rather than modelled: "
+            "the co-signer's own connect and exchange timers, a stopwatch on "
+            "every admission-store, receipt-store, revocation-store and durable "
+            "admission-operation method, and the tool server. `unattributed` is "
+            "the remainder of the window, which is the guard pipeline, the "
+            "binding comparisons, both DSSE signature verifications, "
+            "canonicalization and receipt construction and signing. A call whose "
+            "parts sum past its window fails the run rather than being reported: "
+            "the counters are process-wide and only describe one call while it is "
+            "the only call running, which is why the concurrent stages report no "
+            "decomposition"
+        ),
+        "unmediated": (
+            "the same tool call over the same lane with the kernel taken out of "
+            "the path: no capability check, no evidence resolution, no "
+            "continuation, no dispatch through an admission and no receipt. It is "
+            "the denominator, so mediationOverheadMs is what mediating this call "
+            "costs rather than what admitting it costs. It counts into its own "
+            "invocation counter, and the run fails closed unless the kernel's own "
+            "dispatch counter stayed still throughout"
+        ),
+        "concurrent": (
+            "every worker drives its own calls end to end, so the receiver is "
+            "evaluating `workers` admissions at once for the whole stage. "
+            "Throughput is the call count over the wall clock of the stage, which "
+            "is the only way it can differ from one over the latency; the "
+            "sequential figure is given beside it for that comparison. "
+            "budgetContaminatedCalls counts the calls whose decomposition claimed "
+            "more time than the window it decomposes, which is what several calls "
+            "sharing one set of counters looks like and why no decomposition is "
+            "reported for this stage"
+        ),
+        "continuationRace": (
+            "each round mints one single-use continuation and `workers` calls that "
+            "name it, each with its own admission bundle, lease, lineage bundle, "
+            "bilateral invocation and DSSE envelope, then puts all of them in "
+            "flight at once. Exactly one may be admitted, every other must carry "
+            "the replay code, and the receiver's dispatch counter must move by "
+            "exactly one per round. Any other outcome fails the run"
+        ),
+        "preflight": (
+            "reachability and clock offset, measured before anything else, from "
+            "the three-timestamp estimate over the clock lane: the local clock "
+            "before the request, the peer's clock in the reply, the local clock "
+            "after. The reading is taken from the fastest exchange, whose half "
+            "round trip bounds the error. A run whose hosts disagree by more than "
+            "maxOffsetMs refuses to measure"
         ),
         "cosignConnections": (
             "measured, not assumed: the receiver reports the QUIC connections its "
@@ -981,6 +1392,101 @@ macros = [
     ("PSFedHosts", str(int(host_count))),
     ("PSFedTransport", "iroh QUIC, relays disabled"),
     ("PSFedCosignConnections", str(cosign_connections)),
+    ("PSFedAdmissionStore", admission_store),
+    # The decomposition of the admitted evaluation window.
+    ("PSFedBudgetWindowMs", f"{allow_budget['window']['p50_ms']:.3f}"),
+    (
+        "PSFedBudgetCosignConnectMs",
+        f"{allow_budget['parts']['cosignConnect']['p50_ms']:.3f}",
+    ),
+    (
+        "PSFedBudgetCosignExchangeMs",
+        f"{allow_budget['parts']['cosignExchange']['p50_ms']:.3f}",
+    ),
+    (
+        "PSFedBudgetResolutionMs",
+        f"{allow_budget['parts']['evidenceResolution']['p50_ms']:.3f}",
+    ),
+    (
+        "PSFedBudgetResolutionLookups",
+        str(allow_budget["operationsPerCall"]["store_resolve_ops"]["median"]),
+    ),
+    (
+        "PSFedBudgetContinuationMs",
+        f"{allow_budget['parts']['continuationConsume']['p50_ms']:.3f}",
+    ),
+    ("PSFedBudgetLeaseMs", f"{allow_budget['parts']['leaseConsume']['p50_ms']:.3f}"),
+    ("PSFedBudgetDispatchMs", f"{allow_budget['parts']['dispatch']['p50_ms']:.4f}"),
+    (
+        "PSFedBudgetReceiptAppendMs",
+        f"{allow_budget['parts']['durableReceiptAppend']['p50_ms']:.3f}",
+    ),
+    (
+        "PSFedBudgetAdmissionDurableMs",
+        f"{allow_budget['parts']['durableAdmissionOperations']['p50_ms']:.3f}",
+    ),
+    (
+        "PSFedBudgetAdmissionDurableOps",
+        str(allow_budget["operationsPerCall"]["admission_durable_ops"]["median"]),
+    ),
+    (
+        "PSFedBudgetToolOutcomeMs",
+        f"{allow_budget['parts']['durableToolOutcome']['p50_ms']:.3f}",
+    ),
+    ("PSFedBudgetAttributedMs", f"{allow_budget['attributed']['p50_ms']:.3f}"),
+    (
+        "PSFedBudgetAttributedPercent",
+        f"{allow_budget['attributed']['shareOfWindow'] * 100.0:.1f}",
+    ),
+    ("PSFedBudgetUnattributedMs", f"{allow_budget['unattributed']['p50_ms']:.3f}"),
+    (
+        "PSFedBudgetUnattributedPercent",
+        f"{allow_budget['unattributed']['shareOfWindow'] * 100.0:.1f}",
+    ),
+    # The denominator.
+    ("PSFedBaselinePFiftyMs", f"{baseline_stats['p50_ms']:.3f}"),
+    ("PSFedBaselineCiLowMs", f"{baseline_stats['ci_low_ms']:.3f}"),
+    ("PSFedBaselineCiHighMs", f"{baseline_stats['ci_high_ms']:.3f}"),
+    ("PSFedBaselineSampleCount", str(baseline_stats["samples"])),
+    ("PSFedBaselineToolMs", f"{baseline_dispatch['p50_ms']:.4f}"),
+    (
+        "PSFedMediationOverheadMs",
+        f"{allow_stats['p50_ms'] - baseline_stats['p50_ms']:.3f}",
+    ),
+    (
+        "PSFedMediationOverheadRatio",
+        f"{allow_stats['p50_ms'] / baseline_stats['p50_ms']:.1f}"
+        if baseline_stats["p50_ms"]
+        else "0.0",
+    ),
+    # Concurrency and contention.
+    ("PSFedLoadWorkers", str(load_doc["workers"])),
+    ("PSFedLoadCalls", str(load_doc["calls"])),
+    ("PSFedLoadThroughput", f"{load_doc['throughputCallsPerSecond']:.1f}"),
+    (
+        "PSFedSequentialThroughput",
+        f"{1_000.0 / allow_stats['p50_ms']:.1f}" if allow_stats["p50_ms"] else "0.0",
+    ),
+    ("PSFedLoadPFiftyMs", f"{load_stats['p50_ms']:.3f}"),
+    ("PSFedLoadPNinetyNineMs", f"{load_stats['p99_ms']:.3f}"),
+    ("PSFedLoadContaminatedCalls", str(load_doc["budgetContaminatedCalls"])),
+    ("PSFedRaceWorkers", str(race_doc["workers"])),
+    ("PSFedRaceRounds", str(race_doc["rounds"])),
+    ("PSFedRaceDispatched", str(race_doc["dispatched"])),
+    ("PSFedRaceDistinctWinners", str(len(race_doc["winnersByWorker"]))),
+    ("PSFedRaceReplayCode", race_doc["replayFailureCode"].replace("_", r"\_")),
+    ("PSFedRaceAdmittedPFiftyMs", f"{race_winner_stats['p50_ms']:.3f}"),
+    ("PSFedRaceReplayedPFiftyMs", f"{race_loser_stats['p50_ms']:.3f}"),
+    # Two-host readiness.
+    ("PSFedClockOffsetBoundMs", str(preflight["maxOffsetMs"])),
+    (
+        "PSFedClockOffsetMaxMs",
+        str(max((abs(int(r["offsetMs"])) for r in preflight["readings"]), default=0)),
+    ),
+    (
+        "PSFedClockUncertaintyMaxMs",
+        str(max((int(r["uncertaintyMs"]) for r in preflight["readings"]), default=0)),
+    ),
 ]
 pathlib.Path(inline_out).write_text(
     "".join(f"\\newcommand{{\\{name}}}{{{value}}}\n" for name, value in macros),

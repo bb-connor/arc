@@ -63,6 +63,15 @@ tokio = { workspace = true }
 chio-kernel = { workspace = true }
 chio-runtime-core = { workspace = true }
 chio-store-sqlite = { workspace = true }
+# The example decomposes the receiver's admission window by wrapping the two
+# stores the kernel writes through. Forwarding the `ReceiptStore` surface names
+# two types the kernel does not re-export: `chio_core::canonical::CanonicalBytes`
+# and `chio_settle::SettlementStoreBinding`. Example-only, like the four above.
+chio-core = { workspace = true }
+chio-settle = { workspace = true }
+# Forwarding the `RuntimeAdmissionStore` surface names `SwarmAuthorityBundle`,
+# which chio-runtime-core does not re-export. Already in that crate's own tree.
+chio-swarm-authority = { workspace = true }
 # lane c tests build + sign real `PheromoneDeposit`s (sign_deposit / PheromoneDepositBody)
 # to exercise the self-signed origin-verification path. Production code reaches the
 # deposit through `chio_federation`'s re-exported field types and needs no direct dep.

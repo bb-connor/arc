@@ -59,6 +59,11 @@
       "claimClass": "runtime_enforced",
       "command": "cargo test -p chio-runtime-core --test runtime_treaty_binding_substitution",
       "id": "PS-T12"
+    },
+    {
+      "claimClass": "runtime_enforced",
+      "command": "cargo test -p chio-runtime-core --test runtime_treaty_predicate_substitution",
+      "id": "PS-T13"
     }
   ],
   "benchmarks": [
@@ -516,7 +521,7 @@
     },
     {
       "path": "scripts/generate-programmable-sovereignty-artifact.py",
-      "sha256": "c1acf277f0df7fb6ebf8d5778b76ac7cef4def037812a200fd6e09d015b16b46"
+      "sha256": "6fe9f33a4edf0d11cb70b6942c0889b162c7d24e512d787a86c8bfbe2e865cfb"
     },
     {
       "path": "docs/papers/programmable-sovereignty/supplementary/README.md",

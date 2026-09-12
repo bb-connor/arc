@@ -36,16 +36,47 @@
 //! * `receiver` runs Org B: a `ChioKernel` behind the runtime admission hook,
 //!   with the iroh co-signers and the revocation bridge installed, plus the
 //!   experiment-only tool-call ALPN.
-//! * `send --scenario S --calls N` drives calls and records round-trip latency.
+//! * `send --scenario S --calls N` drives calls and records round-trip latency
+//!   together with the receiver's decomposition of each evaluation window.
+//! * `baseline --calls N` makes the same tool call with the kernel out of the
+//!   path, over the same lane, so admission has a denominator.
+//! * `load --workers N --calls M` holds N admissions in flight at once and
+//!   reports throughput against the wall clock rather than one over the latency.
+//! * `race --workers N [--repeats R]` puts N calls that present the SAME
+//!   single-use continuation in flight at once and asserts that exactly one is
+//!   admitted, that the rest carry the replay code, and that the receiver
+//!   dispatched exactly once.
+//! * `preflight --target ID` probes reachability and the clock offset between
+//!   this host and another and refuses a split run whose clocks disagree by more
+//!   than the bound.
 //! * `revoke --capability-id ID [--repeats N]` advances Org A's epoch with a
 //!   revoked capability and measures calls until the receiver's first denial.
 //! * `cut [--repeats N]` stops Org A's ticker and measures time to the first
 //!   freshness denial. Both report every repeat, because each observation costs
 //!   one control-file poll period and one call of polling resolution.
 //!
+//! ## What the receiver measures about itself
+//!
+//! The receiver's evaluation window is not reported as one number. Each
+//! dependency the kernel calls keeps its own cumulative stopwatch: the co-signer
+//! separates the QUIC handshake of a co-sign hop from the exchange that follows
+//! it, the admission store times every resolution, continuation, lease and trust
+//! floor operation, the tool server times its own invocation, and the durable
+//! receipt store times every append. A call reads all of them before and after
+//! `evaluate_tool_call`, and the differences are that call's parts. The
+//! remainder of the window, reported rather than modelled, is the work that has
+//! no such dependency: guards, the binding comparisons, the two DSSE signature
+//! verifications, canonicalization, the durable pre-dispatch record and receipt
+//! signing. The counters are process-wide, so a run that has more than one call
+//! in flight does not report a decomposition, and a sequential run that ever
+//! attributes more than the window it decomposes stops rather than report it.
+//!
 //! The tool-call ALPN is EXPERIMENT-ONLY: no shipped Chio lane carries a
 //! `ToolCallRequest`, so the request hop is not a claim about the deployed
-//! protocol. It is bound the way the shipped lanes are all the same: the
+//! protocol. The unmediated baseline and the clock probe ride the same
+//! experiment-only ground and are not Chio interfaces either: the baseline
+//! exists to be the denominator of the mediated call, and nothing in the shipped
+//! crates reaches it. It is bound the way the shipped lanes are all the same: the
 //! authenticated endpoint is re-resolved through the verified directory and must
 //! be the treaty role entitled to send that frame, and every peer-dependent await
 //! on it is bounded. The co-sign hops and the revocation lane are the shipped
@@ -196,9 +227,14 @@ use chio_runtime_core::CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA;
 use chio_runtime_core::CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA;
 use chio_runtime_core::CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA;
 use chio_runtime_core::CHIO_TREATY_SCOPE_SCHEMA;
+use chio_runtime_core::{
+    ChioRuntimeError, RuntimeAdmissionStore, RuntimeTrustFloorEntry,
+    SqliteRuntimeOrchestrationStore, TreatyRuntimeArtifactRecord,
+};
 use chio_store_sqlite::SqliteAuthorityStore;
 use chio_store_sqlite::SqliteReceiptStore;
 use chio_store_sqlite::SqliteRevocationStore;
+use chio_swarm_authority::SwarmAuthorityBundle;
 use iroh::endpoint::presets;
 use iroh::endpoint::Connection;
 use iroh::endpoint::RecvStream;
@@ -220,6 +256,12 @@ type BoxError = Box<dyn Error + Send + Sync>;
 /// No shipped Chio lane does this; it exists so the request hop can be measured.
 const ALPN_EXPERIMENT: &[u8] = b"chio/experiment/federated-tool-call/1";
 
+/// Experiment-only ALPN carrying nothing but a reading of the answering host's
+/// clock. Both long-lived roles mount it so a run split across two machines can
+/// be refused before it measures anything when the two clocks disagree by more
+/// than the run's bound.
+const ALPN_CLOCK: &[u8] = b"chio/experiment/federated-pair-clock/1";
+
 const SECRETS_SCHEMA: &str = "chio.experiment.federated-pair-secrets.v1";
 const PUBLIC_SCHEMA: &str = "chio.experiment.federated-pair-public.v1";
 const TREATY_SCHEMA: &str = "chio.experiment.federated-pair-treaty.v1";
@@ -227,6 +269,25 @@ const TRUST_SCHEMA: &str = "chio.experiment.federated-pair-directory-trust.v1";
 const CONTROL_SCHEMA: &str = "chio.experiment.federated-pair-control.v1";
 const REVOKED_SUBJECTS_SCHEMA: &str = "chio.experiment.federated-pair-revoked-subjects.v1";
 const EPOCH_RATE_SCHEMA: &str = "chio.experiment.federated-pair-epoch-rate.v1";
+const CLOCK_SCHEMA: &str = "chio.experiment.federated-pair-clock.v1";
+
+/// The most concurrent calls one driver may have in flight against the receiver.
+/// It is the experiment lane's per-peer accept cap as well, so a driver that asks
+/// for more is refused by the driver rather than shed by the limiter, which would
+/// measure the limiter instead of the kernel.
+const MAX_CONCURRENT_CALLS: u64 = 64;
+
+/// How far apart two hosts' clocks may be before a split run refuses to measure.
+/// The receiving kernel reads its clock in whole seconds and holds its revocation
+/// snapshot to a sub-second freshness bound, so an offset of this size already
+/// changes which calls are admitted.
+const DEFAULT_MAX_CLOCK_OFFSET_MS: u64 = 250;
+
+/// How much of an admitted call's evaluation window may go unaccounted for in
+/// the other direction: the attributed parts are measured independently of the
+/// whole, so an attributed total that EXCEEDS the whole means the parts are not
+/// describing this call and the run must not report the decomposition.
+const BUDGET_TOLERANCE_NANOS: u64 = 50_000;
 
 /// Frame cap for the experiment lane. A prepared treaty bundle with an embedded
 /// DSSE envelope is tens of kilobytes; the cap is a fail-closed bound.
@@ -510,9 +571,25 @@ enum ExperimentRequest {
     /// Mint the per-call treaty evidence in the receiver's own store and report
     /// the identifiers and digests the request must cite. `sequence` is `None`
     /// when the sender lets the receiver number the call.
-    Prepare { sequence: Option<u64> },
+    ///
+    /// `continuation_sequence` numbers the single-use continuation separately
+    /// from the call. Leaving it `None` gives every call its own continuation,
+    /// which is what an ordinary run wants; setting it to a sequence already
+    /// prepared mints a second call that names the SAME continuation, which is
+    /// what the contention run needs to make several calls race for one.
+    Prepare {
+        sequence: Option<u64>,
+        #[serde(default)]
+        continuation_sequence: Option<u64>,
+    },
     /// Evaluate one tool call. The sender authored every byte of `request`.
     Call { request: Box<ToolCallRequest> },
+    /// Invoke the same tool with the kernel taken out of the path: no capability
+    /// check, no admission, no receipt. It is the denominator the admitted call
+    /// is measured against and exists for no other purpose; it is reachable only
+    /// over this experiment-only ALPN, from the one peer the treaty names as the
+    /// driver, and it is not a Chio interface.
+    DirectCall { request: Box<ToolCallRequest> },
     /// Report the receiver's dispatch and call counters.
     Stats,
     /// Install Org A's signed revoked-subject set for an epoch.
@@ -524,10 +601,27 @@ enum ExperimentRequest {
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum ExperimentReply {
     Prepared(Box<PreparedCall>),
-    Decision(CallDecision),
+    Decision(Box<CallDecision>),
     Stats(ReceiverStats),
     Accepted,
     Refused { detail: String },
+}
+
+/// What a clock probe asks for and what it gets back. The reply carries the
+/// answering kernel's identity so a probe cannot be satisfied by whichever host
+/// happens to answer the address.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ClockProbe {
+    schema: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ClockReply {
+    schema: String,
+    kernel_id: String,
+    unix_ms: u64,
 }
 
 /// The evidence the receiver holds for one call, named so the sender can cite it.
@@ -543,6 +637,9 @@ struct PreparedCall {
     ladder_intersection_id: String,
     ladder_intersection_sha256: String,
     action_class_id: String,
+    /// The sequence the continuation was minted under. Equal to `sequence` for an
+    /// ordinary call; shared by every call of one contention round.
+    continuation_sequence: u64,
     continuation_id: String,
     continuation_sha256: String,
     lineage_bundle_id: String,
@@ -579,6 +676,167 @@ struct CallDecision {
     revocation_epoch: u64,
     /// Co-sign connections the receiver had opened to Org A once it had answered.
     cosign_connections: u64,
+    /// Where the evaluation window went, measured at the dependencies the kernel
+    /// called rather than inferred from the protocol.
+    budget: ReceiverBudget,
+}
+
+/// One admitted or denied call's evaluation window, decomposed.
+///
+/// Every field but `evaluate_nanos` is a before/after difference of a counter
+/// kept by a real dependency of the kernel: the co-signer's own connect and
+/// exchange timers, the admission store's per-method stopwatch, the tool server,
+/// and the durable receipt store. Nothing is a model of the protocol, and
+/// nothing is sampled.
+///
+/// `attributed_nanos` is the sum of the measured parts and `unattributed_nanos`
+/// the remainder of the window: the guard pipeline, the binding comparisons, the
+/// two DSSE signature verifications, canonicalization, the durable pre-dispatch
+/// admission record, and receipt construction and signing. It is reported rather
+/// than modelled. `overattributed_nanos` is the reverse remainder and must be
+/// zero within [`BUDGET_TOLERANCE_NANOS`]: a positive value means the counters
+/// picked up work from another call and the decomposition does not describe this
+/// one.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ReceiverBudget {
+    evaluate_nanos: u64,
+    cosign_connect_nanos: u64,
+    cosign_exchange_nanos: u64,
+    cosign_hops: u64,
+    store_resolve_nanos: u64,
+    store_resolve_ops: u64,
+    continuation_nanos: u64,
+    continuation_ops: u64,
+    lease_nanos: u64,
+    lease_ops: u64,
+    trust_floor_nanos: u64,
+    trust_floor_ops: u64,
+    dispatch_nanos: u64,
+    dispatch_ops: u64,
+    receipt_append_nanos: u64,
+    receipt_append_ops: u64,
+    receipt_other_nanos: u64,
+    receipt_other_ops: u64,
+    revocation_nanos: u64,
+    revocation_ops: u64,
+    admission_durable_nanos: u64,
+    admission_durable_ops: u64,
+    tool_outcome_durable_nanos: u64,
+    tool_outcome_durable_ops: u64,
+    attributed_nanos: u64,
+    unattributed_nanos: u64,
+    overattributed_nanos: u64,
+}
+
+/// The co-signer's three counters, read at one instant.
+#[derive(Debug, Clone, Copy, Default)]
+struct CoSignSnapshot {
+    connect_nanos: u64,
+    exchange_nanos: u64,
+    hops: u64,
+}
+
+impl ReceiverBudget {
+    /// The window between two readings of every counter.
+    fn between(
+        evaluate: Duration,
+        ledger: (LedgerSnapshot, LedgerSnapshot),
+        cosign: (CoSignSnapshot, CoSignSnapshot),
+    ) -> Self {
+        let (before, after) = ledger;
+        let (cosign_before, cosign_after) = cosign;
+        let evaluate_nanos = as_nanos(evaluate);
+        let mut budget = Self {
+            evaluate_nanos,
+            cosign_connect_nanos: cosign_after
+                .connect_nanos
+                .saturating_sub(cosign_before.connect_nanos),
+            cosign_exchange_nanos: cosign_after
+                .exchange_nanos
+                .saturating_sub(cosign_before.exchange_nanos),
+            cosign_hops: cosign_after.hops.saturating_sub(cosign_before.hops),
+            store_resolve_nanos: after
+                .store_resolve_nanos
+                .saturating_sub(before.store_resolve_nanos),
+            store_resolve_ops: after
+                .store_resolve_ops
+                .saturating_sub(before.store_resolve_ops),
+            continuation_nanos: after
+                .continuation_nanos
+                .saturating_sub(before.continuation_nanos),
+            continuation_ops: after
+                .continuation_ops
+                .saturating_sub(before.continuation_ops),
+            lease_nanos: after.lease_nanos.saturating_sub(before.lease_nanos),
+            lease_ops: after.lease_ops.saturating_sub(before.lease_ops),
+            trust_floor_nanos: after
+                .trust_floor_nanos
+                .saturating_sub(before.trust_floor_nanos),
+            trust_floor_ops: after.trust_floor_ops.saturating_sub(before.trust_floor_ops),
+            dispatch_nanos: after.dispatch_nanos.saturating_sub(before.dispatch_nanos),
+            dispatch_ops: after.dispatch_ops.saturating_sub(before.dispatch_ops),
+            receipt_append_nanos: after
+                .receipt_append_nanos
+                .saturating_sub(before.receipt_append_nanos),
+            receipt_append_ops: after
+                .receipt_append_ops
+                .saturating_sub(before.receipt_append_ops),
+            receipt_other_nanos: after
+                .receipt_other_nanos
+                .saturating_sub(before.receipt_other_nanos),
+            receipt_other_ops: after
+                .receipt_other_ops
+                .saturating_sub(before.receipt_other_ops),
+            revocation_nanos: after
+                .revocation_nanos
+                .saturating_sub(before.revocation_nanos),
+            revocation_ops: after.revocation_ops.saturating_sub(before.revocation_ops),
+            admission_durable_nanos: after
+                .admission_durable_nanos
+                .saturating_sub(before.admission_durable_nanos),
+            admission_durable_ops: after
+                .admission_durable_ops
+                .saturating_sub(before.admission_durable_ops),
+            tool_outcome_durable_nanos: after
+                .tool_outcome_durable_nanos
+                .saturating_sub(before.tool_outcome_durable_nanos),
+            tool_outcome_durable_ops: after
+                .tool_outcome_durable_ops
+                .saturating_sub(before.tool_outcome_durable_ops),
+            ..Self::default()
+        };
+        budget.attributed_nanos = budget
+            .cosign_connect_nanos
+            .saturating_add(budget.cosign_exchange_nanos)
+            .saturating_add(budget.store_resolve_nanos)
+            .saturating_add(budget.continuation_nanos)
+            .saturating_add(budget.lease_nanos)
+            .saturating_add(budget.trust_floor_nanos)
+            .saturating_add(budget.dispatch_nanos)
+            .saturating_add(budget.receipt_append_nanos)
+            .saturating_add(budget.receipt_other_nanos)
+            .saturating_add(budget.revocation_nanos)
+            .saturating_add(budget.admission_durable_nanos)
+            .saturating_add(budget.tool_outcome_durable_nanos);
+        budget.unattributed_nanos = evaluate_nanos.saturating_sub(budget.attributed_nanos);
+        budget.overattributed_nanos = budget.attributed_nanos.saturating_sub(evaluate_nanos);
+        budget
+    }
+
+    /// Refuse a decomposition whose parts cannot have come from this call.
+    fn check(&self, request_id: &str) -> Result<(), BoxError> {
+        if self.overattributed_nanos > BUDGET_TOLERANCE_NANOS {
+            return Err(format!(
+                "call {request_id} attributed {} ns of an evaluation window of {} ns, \
+                 which exceeds the {BUDGET_TOLERANCE_NANOS} ns tolerance; the receiver's \
+                 counters were not describing this call alone",
+                self.attributed_nanos, self.evaluate_nanos
+            )
+            .into());
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -586,6 +844,11 @@ struct CallDecision {
 struct ReceiverStats {
     calls: u64,
     dispatches: u64,
+    /// Tool invocations made with the kernel out of the path, counted apart from
+    /// `dispatches` so a baseline run never moves the mediated counter.
+    baseline_dispatches: u64,
+    /// Which store holds the treaty evidence and the consumed continuations.
+    admission_store: String,
     revocation_epoch: u64,
     /// QUIC connections the receiver's kernel has opened to Org A to co-sign,
     /// read from the co-signer itself rather than assumed from the protocol.
@@ -663,6 +926,13 @@ fn experiment_limits() -> AcceptLimitConfig {
         // as soon as it has the reply, so the teardown grace window is short: a
         // lingering handler holds one of the lane's per-peer permits.
         linger_timeout: Duration::from_secs(5),
+        // The concurrency stages present many calls at once from the one driver
+        // peer. The shipped default admits 16 per peer, which would shed the rest
+        // and measure the limiter instead of the kernel.
+        max_in_flight_per_peer: usize::try_from(MAX_CONCURRENT_CALLS).unwrap_or(usize::MAX),
+        // A call waiting behind others for a permit must wait, not be shed: the
+        // run counts every call it sent.
+        shed_wait: Duration::from_secs(30),
         ..AcceptLimitConfig::default()
     }
 }
@@ -1335,7 +1605,21 @@ async fn run_origin(args: &Args) -> Result<(), BoxError> {
         )
         .accept(
             ALPN_BILATERAL_RECEIPT_COSIGN,
-            BilateralReceiptCoSignHandler::new(gate, origin_id.clone(), passport.clone(), pinned),
+            BilateralReceiptCoSignHandler::new(
+                gate.clone(),
+                origin_id.clone(),
+                passport.clone(),
+                pinned,
+            ),
+        )
+        .accept(
+            ALPN_CLOCK,
+            ClockHandler {
+                gate,
+                kernel_id: origin_id.clone(),
+                peers: BTreeSet::from([receiver_id.clone(), treaty.sender_kernel_id.clone()]),
+                limiter: AcceptLimiter::new(experiment_limits()),
+            },
         )
         .spawn();
 
@@ -1578,6 +1862,1475 @@ impl EpochClock {
 // receiver (Org B)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Receiver-side latency decomposition
+// ---------------------------------------------------------------------------
+
+/// Cumulative time the receiver's own stores and tool server have spent serving
+/// the kernel, in nanoseconds, counted from the moment the process started.
+///
+/// Nothing here is sampled. Each decorator below wraps a real dependency the
+/// kernel calls and adds the wall clock it observed; a caller reads the whole
+/// ledger before an operation and again after it, and the difference is that
+/// operation's share. The counters are process-wide, so a difference describes
+/// one operation only while that operation is the only one running: the
+/// sequential drivers take budgets, the concurrent ones do not.
+#[derive(Debug, Default)]
+struct PhaseLedger {
+    store_resolve_nanos: AtomicU64,
+    store_resolve_ops: AtomicU64,
+    continuation_nanos: AtomicU64,
+    continuation_ops: AtomicU64,
+    lease_nanos: AtomicU64,
+    lease_ops: AtomicU64,
+    trust_floor_nanos: AtomicU64,
+    trust_floor_ops: AtomicU64,
+    dispatch_nanos: AtomicU64,
+    dispatch_ops: AtomicU64,
+    receipt_append_nanos: AtomicU64,
+    receipt_append_ops: AtomicU64,
+    receipt_other_nanos: AtomicU64,
+    receipt_other_ops: AtomicU64,
+    revocation_nanos: AtomicU64,
+    revocation_ops: AtomicU64,
+    admission_durable_nanos: AtomicU64,
+    admission_durable_ops: AtomicU64,
+    tool_outcome_durable_nanos: AtomicU64,
+    tool_outcome_durable_ops: AtomicU64,
+}
+
+/// One read of every counter in [`PhaseLedger`].
+#[derive(Debug, Clone, Copy, Default)]
+struct LedgerSnapshot {
+    store_resolve_nanos: u64,
+    store_resolve_ops: u64,
+    continuation_nanos: u64,
+    continuation_ops: u64,
+    lease_nanos: u64,
+    lease_ops: u64,
+    trust_floor_nanos: u64,
+    trust_floor_ops: u64,
+    dispatch_nanos: u64,
+    dispatch_ops: u64,
+    receipt_append_nanos: u64,
+    receipt_append_ops: u64,
+    receipt_other_nanos: u64,
+    receipt_other_ops: u64,
+    revocation_nanos: u64,
+    revocation_ops: u64,
+    admission_durable_nanos: u64,
+    admission_durable_ops: u64,
+    tool_outcome_durable_nanos: u64,
+    tool_outcome_durable_ops: u64,
+}
+
+fn as_nanos(elapsed: Duration) -> u64 {
+    u64::try_from(elapsed.as_nanos()).unwrap_or(u64::MAX)
+}
+
+impl PhaseLedger {
+    fn record(counter: &AtomicU64, ops: &AtomicU64, elapsed: Duration) {
+        counter.fetch_add(as_nanos(elapsed), Ordering::SeqCst);
+        ops.fetch_add(1, Ordering::SeqCst);
+    }
+
+    /// Resolving one named object against a receiver-owned store: the admission
+    /// bundle and the six treaty artifacts the request cites by id and digest.
+    fn record_store_resolve(&self, elapsed: Duration) {
+        Self::record(&self.store_resolve_nanos, &self.store_resolve_ops, elapsed);
+    }
+
+    /// Consuming or releasing the single-use cross-kernel continuation.
+    fn record_continuation(&self, elapsed: Duration) {
+        Self::record(&self.continuation_nanos, &self.continuation_ops, elapsed);
+    }
+
+    /// Consuming or releasing the destructive lease the admission bundle names.
+    fn record_lease(&self, elapsed: Duration) {
+        Self::record(&self.lease_nanos, &self.lease_ops, elapsed);
+    }
+
+    /// Reading or advancing the monotone runtime trust floor.
+    fn record_trust_floor(&self, elapsed: Duration) {
+        Self::record(&self.trust_floor_nanos, &self.trust_floor_ops, elapsed);
+    }
+
+    /// The tool server invocation itself, after the kernel has committed to it.
+    fn record_dispatch(&self, elapsed: Duration) {
+        Self::record(&self.dispatch_nanos, &self.dispatch_ops, elapsed);
+    }
+
+    /// One durable receipt append, including the commit round trip.
+    fn record_receipt_append(&self, elapsed: Duration) {
+        Self::record(
+            &self.receipt_append_nanos,
+            &self.receipt_append_ops,
+            elapsed,
+        );
+    }
+
+    /// Everything else the receipt store serves during an admission: capability
+    /// snapshots and delegation chains, session anchors, request and receipt
+    /// lineage rows, point lookups and checkpoint work.
+    fn record_receipt_other(&self, elapsed: Duration) {
+        Self::record(&self.receipt_other_nanos, &self.receipt_other_ops, elapsed);
+    }
+
+    /// One revocation-store read or write on the capability chain.
+    fn record_revocation(&self, elapsed: Duration) {
+        Self::record(&self.revocation_nanos, &self.revocation_ops, elapsed);
+    }
+
+    /// One durable admission-operation store call: the fenced pre-dispatch
+    /// record, the budget hold, the dispatch commit, the terminal projection.
+    fn record_admission_durable(&self, elapsed: Duration) {
+        Self::record(
+            &self.admission_durable_nanos,
+            &self.admission_durable_ops,
+            elapsed,
+        );
+    }
+
+    /// One durable record of what the tool returned.
+    fn record_tool_outcome_durable(&self, elapsed: Duration) {
+        Self::record(
+            &self.tool_outcome_durable_nanos,
+            &self.tool_outcome_durable_ops,
+            elapsed,
+        );
+    }
+
+    fn snapshot(&self) -> LedgerSnapshot {
+        LedgerSnapshot {
+            store_resolve_nanos: self.store_resolve_nanos.load(Ordering::SeqCst),
+            store_resolve_ops: self.store_resolve_ops.load(Ordering::SeqCst),
+            continuation_nanos: self.continuation_nanos.load(Ordering::SeqCst),
+            continuation_ops: self.continuation_ops.load(Ordering::SeqCst),
+            lease_nanos: self.lease_nanos.load(Ordering::SeqCst),
+            lease_ops: self.lease_ops.load(Ordering::SeqCst),
+            trust_floor_nanos: self.trust_floor_nanos.load(Ordering::SeqCst),
+            trust_floor_ops: self.trust_floor_ops.load(Ordering::SeqCst),
+            dispatch_nanos: self.dispatch_nanos.load(Ordering::SeqCst),
+            dispatch_ops: self.dispatch_ops.load(Ordering::SeqCst),
+            receipt_append_nanos: self.receipt_append_nanos.load(Ordering::SeqCst),
+            receipt_append_ops: self.receipt_append_ops.load(Ordering::SeqCst),
+            receipt_other_nanos: self.receipt_other_nanos.load(Ordering::SeqCst),
+            receipt_other_ops: self.receipt_other_ops.load(Ordering::SeqCst),
+            revocation_nanos: self.revocation_nanos.load(Ordering::SeqCst),
+            revocation_ops: self.revocation_ops.load(Ordering::SeqCst),
+            admission_durable_nanos: self.admission_durable_nanos.load(Ordering::SeqCst),
+            admission_durable_ops: self.admission_durable_ops.load(Ordering::SeqCst),
+            tool_outcome_durable_nanos: self.tool_outcome_durable_nanos.load(Ordering::SeqCst),
+            tool_outcome_durable_ops: self.tool_outcome_durable_ops.load(Ordering::SeqCst),
+        }
+    }
+}
+
+/// Where the receiver keeps the treaty evidence a request may cite.
+///
+/// `sqlite` is the default because the single-use property the experiment tests
+/// rests on a primary-key insert: an in-memory set would test a different
+/// mechanism. `memory` stays available so a run can separate the cost of the
+/// durable store from the cost of the decision.
+enum AdmissionBackend {
+    Memory(InMemoryRuntimeAdmissionStore),
+    Sqlite(SqliteRuntimeOrchestrationStore),
+}
+
+impl AdmissionBackend {
+    fn label(&self) -> &'static str {
+        match self {
+            Self::Memory(_) => "memory",
+            Self::Sqlite(_) => "sqlite",
+        }
+    }
+
+    fn insert_bundle(&self, bundle: RuntimeAdmissionBundle) -> Result<(), ChioRuntimeError> {
+        match self {
+            Self::Memory(store) => store.insert_bundle(bundle),
+            Self::Sqlite(store) => store.insert_bundle(bundle),
+        }
+    }
+
+    fn insert_treaty_runtime_artifact<T: Serialize>(
+        &self,
+        evidence_kind: &str,
+        evidence_id: &str,
+        artifact: &T,
+    ) -> Result<(), ChioRuntimeError> {
+        match self {
+            Self::Memory(store) => {
+                store.insert_treaty_runtime_artifact(evidence_kind, evidence_id, artifact)
+            }
+            Self::Sqlite(store) => {
+                store.insert_treaty_runtime_artifact(evidence_kind, evidence_id, artifact)
+            }
+        }
+    }
+
+    fn as_store(&self) -> &dyn RuntimeAdmissionStore {
+        match self {
+            Self::Memory(store) => store,
+            Self::Sqlite(store) => store,
+        }
+    }
+}
+
+/// The receiver's admission store with a stopwatch on every method the kernel
+/// calls. The decisions are the backend's; only the clock is added here.
+#[derive(Clone)]
+struct TimingAdmissionStore {
+    backend: Arc<AdmissionBackend>,
+    ledger: Arc<PhaseLedger>,
+}
+
+impl TimingAdmissionStore {
+    fn new(backend: Arc<AdmissionBackend>, ledger: Arc<PhaseLedger>) -> Self {
+        Self { backend, ledger }
+    }
+
+    fn insert_bundle(&self, bundle: RuntimeAdmissionBundle) -> Result<(), ChioRuntimeError> {
+        self.backend.insert_bundle(bundle)
+    }
+
+    fn insert_treaty_runtime_artifact<T: Serialize>(
+        &self,
+        evidence_kind: &str,
+        evidence_id: &str,
+        artifact: &T,
+    ) -> Result<(), ChioRuntimeError> {
+        self.backend
+            .insert_treaty_runtime_artifact(evidence_kind, evidence_id, artifact)
+    }
+
+    fn timed<T>(
+        &self,
+        record: impl Fn(&PhaseLedger, Duration),
+        call: impl FnOnce(&dyn RuntimeAdmissionStore) -> T,
+    ) -> T {
+        let started = Instant::now();
+        let outcome = call(self.backend.as_store());
+        record(self.ledger.as_ref(), started.elapsed());
+        outcome
+    }
+}
+
+impl RuntimeAdmissionStore for TimingAdmissionStore {
+    fn bundle(
+        &self,
+        admission_id: &str,
+    ) -> Result<Option<RuntimeAdmissionBundle>, ChioRuntimeError> {
+        self.timed(PhaseLedger::record_store_resolve, |store| {
+            store.bundle(admission_id)
+        })
+    }
+
+    fn treaty_runtime_artifact(
+        &self,
+        evidence_kind: &str,
+        evidence_id: &str,
+    ) -> Result<Option<TreatyRuntimeArtifactRecord>, ChioRuntimeError> {
+        self.timed(PhaseLedger::record_store_resolve, |store| {
+            store.treaty_runtime_artifact(evidence_kind, evidence_id)
+        })
+    }
+
+    fn swarm_authority_bundle(
+        &self,
+        task_graph_id: &str,
+    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+        self.timed(PhaseLedger::record_store_resolve, |store| {
+            store.swarm_authority_bundle(task_graph_id)
+        })
+    }
+
+    fn consume_destructive_lease(
+        &self,
+        lease_id: &str,
+        admission_id: &str,
+    ) -> Result<(), ChioRuntimeError> {
+        self.timed(PhaseLedger::record_lease, |store| {
+            store.consume_destructive_lease(lease_id, admission_id)
+        })
+    }
+
+    fn release_destructive_lease(
+        &self,
+        lease_id: &str,
+        admission_id: &str,
+    ) -> Result<(), ChioRuntimeError> {
+        self.timed(PhaseLedger::record_lease, |store| {
+            store.release_destructive_lease(lease_id, admission_id)
+        })
+    }
+
+    fn consume_treaty_continuation(
+        &self,
+        continuation_id: &str,
+        admission_id: &str,
+    ) -> Result<(), ChioRuntimeError> {
+        self.timed(PhaseLedger::record_continuation, |store| {
+            store.consume_treaty_continuation(continuation_id, admission_id)
+        })
+    }
+
+    fn release_treaty_continuation(
+        &self,
+        continuation_id: &str,
+        admission_id: &str,
+    ) -> Result<(), ChioRuntimeError> {
+        self.timed(PhaseLedger::record_continuation, |store| {
+            store.release_treaty_continuation(continuation_id, admission_id)
+        })
+    }
+
+    fn consume_swarm_continuation(
+        &self,
+        continuation_id: &str,
+        admission_id: &str,
+    ) -> Result<(), ChioRuntimeError> {
+        self.timed(PhaseLedger::record_continuation, |store| {
+            store.consume_swarm_continuation(continuation_id, admission_id)
+        })
+    }
+
+    fn release_swarm_continuation(
+        &self,
+        continuation_id: &str,
+        admission_id: &str,
+    ) -> Result<(), ChioRuntimeError> {
+        self.timed(PhaseLedger::record_continuation, |store| {
+            store.release_swarm_continuation(continuation_id, admission_id)
+        })
+    }
+
+    fn runtime_trust_floor(
+        &self,
+        verifier_id: &str,
+        key_id: &str,
+    ) -> Result<Option<RuntimeTrustFloorEntry>, ChioRuntimeError> {
+        self.timed(PhaseLedger::record_trust_floor, |store| {
+            store.runtime_trust_floor(verifier_id, key_id)
+        })
+    }
+
+    fn record_runtime_trust_floor(
+        &self,
+        entry: RuntimeTrustFloorEntry,
+    ) -> Result<(), ChioRuntimeError> {
+        self.timed(PhaseLedger::record_trust_floor, |store| {
+            store.record_runtime_trust_floor(entry)
+        })
+    }
+}
+
+/// The receiver's durable receipt store with a stopwatch on every append. Every
+/// other method forwards unchanged, so the kernel sees the SQLite store's own
+/// capabilities rather than a reduced trait default.
+struct TimingReceiptStore {
+    inner: SqliteReceiptStore,
+    ledger: Arc<PhaseLedger>,
+}
+
+/// The trait the wrapper forwards through. `SqliteReceiptStore` has inherent
+/// methods that share names with the trait's, so every forward names the trait
+/// explicitly rather than letting method resolution choose.
+use chio_kernel::receipt_store::ReceiptStore as Forwarded;
+/// Every method below forwards to the SQLite store through the trait rather
+/// than through its inherent surface, so the kernel sees exactly the store it
+/// would have seen without the wrapper. The appends are timed apart from the
+/// rest: the receipt the caller waits on is one line of the budget, and the
+/// capability snapshots, lineage rows and point lookups the same store serves
+/// during admission are another.
+impl chio_kernel::receipt_store::ReceiptStore for TimingReceiptStore {
+    fn append_chio_receipt(
+        &self,
+        receipt: &ChioReceipt,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::append_chio_receipt(&self.inner, receipt);
+        self.ledger.record_receipt_append(started.elapsed());
+        outcome
+    }
+    fn durable_sink_id(&self) -> Option<&str> {
+        Forwarded::durable_sink_id(&self.inner)
+    }
+    fn settlement_store_binding(&self) -> Option<chio_settle::SettlementStoreBinding> {
+        Forwarded::settlement_store_binding(&self.inner)
+    }
+    fn atomic_receipt_projection(&self) -> chio_kernel::receipt_store::AtomicReceiptProjection {
+        Forwarded::atomic_receipt_projection(&self.inner)
+    }
+    fn supports_atomic_receipt_projection_with_timeout(&self) -> bool {
+        Forwarded::supports_atomic_receipt_projection_with_timeout(&self.inner)
+    }
+    fn append_chio_receipt_with_pending_observation(
+        &self,
+        receipt: &ChioReceipt,
+        pending: &chio_kernel::receipt_store::PendingSettlementObservation,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome =
+            Forwarded::append_chio_receipt_with_pending_observation(&self.inner, receipt, pending);
+        self.ledger.record_receipt_append(started.elapsed());
+        outcome
+    }
+    fn append_chio_receipt_with_pending_observation_and_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        pending: &chio_kernel::receipt_store::PendingSettlementObservation,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::append_chio_receipt_with_pending_observation_and_timeout(
+            &self.inner,
+            receipt,
+            pending,
+            budget,
+        );
+        self.ledger.record_receipt_append(started.elapsed());
+        outcome
+    }
+    fn load_chio_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<ChioReceipt>, chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::load_chio_receipt(&self.inner, receipt_id);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn load_retained_chio_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<ChioReceipt>, chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::load_retained_chio_receipt(&self.inner, receipt_id);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn load_retained_chio_receipt_commitment(
+        &self,
+        receipt_id: &str,
+    ) -> Result<
+        Option<chio_kernel::receipt_store::RetainedReceiptCommitment>,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = Forwarded::load_retained_chio_receipt_commitment(&self.inner, receipt_id);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn load_child_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<
+        Option<chio_core::receipt::lineage::ChildRequestReceipt>,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = Forwarded::load_child_receipt(&self.inner, receipt_id);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn append_chio_receipt_canonical(
+        &self,
+        receipt: &ChioReceipt,
+        canonical: &chio_core::canonical::CanonicalBytes,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::append_chio_receipt_canonical(&self.inner, receipt, canonical);
+        self.ledger.record_receipt_append(started.elapsed());
+        outcome
+    }
+    fn append_chio_receipt_returning_seq(
+        &self,
+        receipt: &ChioReceipt,
+    ) -> Result<Option<u64>, chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::append_chio_receipt_returning_seq(&self.inner, receipt);
+        self.ledger.record_receipt_append(started.elapsed());
+        outcome
+    }
+    fn append_chio_receipt_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::append_chio_receipt_with_timeout(&self.inner, receipt, budget);
+        self.ledger.record_receipt_append(started.elapsed());
+        outcome
+    }
+    fn writer_liveness(
+        &self,
+        stall_threshold: std::time::Duration,
+    ) -> chio_kernel::ReceiptWriterLiveness {
+        let started = Instant::now();
+        let outcome = Forwarded::writer_liveness(&self.inner, stall_threshold);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn append_chio_receipt_consuming_authorization(
+        &self,
+        receipt: &ChioReceipt,
+        consumption: &chio_kernel::receipt_store::AuthorizationReceiptConsumption,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::append_chio_receipt_consuming_authorization(
+            &self.inner,
+            receipt,
+            consumption,
+        );
+        self.ledger.record_receipt_append(started.elapsed());
+        outcome
+    }
+    fn receipts_canonical_bytes_range(
+        &self,
+        start_seq: u64,
+        end_seq: u64,
+    ) -> Result<Vec<(u64, Vec<u8>)>, chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::receipts_canonical_bytes_range(&self.inner, start_seq, end_seq);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn flush_receipt_writes(
+        &self,
+    ) -> Result<
+        chio_kernel::receipt_store::ReceiptFlushReport,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = Forwarded::flush_receipt_writes(&self.inner);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn flush_receipt_writes_with_timeout(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<
+        chio_kernel::receipt_store::ReceiptFlushReport,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = Forwarded::flush_receipt_writes_with_timeout(&self.inner, timeout);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn receipt_store_health(
+        &self,
+    ) -> Result<
+        chio_kernel::receipt_store::ReceiptStoreHealthReport,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = Forwarded::receipt_store_health(&self.inner);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn writer_serving_closed(&self) -> bool {
+        Forwarded::writer_serving_closed(&self.inner)
+    }
+    fn latest_committed_entry_seq(
+        &self,
+    ) -> Result<u64, chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::latest_committed_entry_seq(&self.inner);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn latest_checkpointed_entry_seq(
+        &self,
+    ) -> Result<u64, chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::latest_checkpointed_entry_seq(&self.inner);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn next_checkpoint_range(
+        &self,
+        max_batch: u64,
+    ) -> Result<
+        Option<chio_kernel::receipt_store::ReceiptCheckpointRange>,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = Forwarded::next_checkpoint_range(&self.inner, max_batch);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn receipt_checkpoint_status(
+        &self,
+        max_batch: Option<u64>,
+    ) -> Result<
+        chio_kernel::receipt_store::ReceiptCheckpointStatusReport,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = Forwarded::receipt_checkpoint_status(&self.inner, max_batch);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn store_checkpoint(
+        &self,
+        checkpoint: &chio_kernel::KernelCheckpoint,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::store_checkpoint(&self.inner, checkpoint);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn create_next_receipt_checkpoint(
+        &self,
+        max_batch: u64,
+        keypair: &Keypair,
+    ) -> Result<
+        chio_kernel::receipt_store::ReceiptCheckpointCreateReport,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = Forwarded::create_next_receipt_checkpoint(&self.inner, max_batch, keypair);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn load_checkpoint_by_seq(
+        &self,
+        checkpoint_seq: u64,
+    ) -> Result<Option<chio_kernel::KernelCheckpoint>, chio_kernel::receipt_store::ReceiptStoreError>
+    {
+        let started = Instant::now();
+        let outcome = Forwarded::load_checkpoint_by_seq(&self.inner, checkpoint_seq);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn load_latest_checkpoint(
+        &self,
+    ) -> Result<Option<chio_kernel::KernelCheckpoint>, chio_kernel::receipt_store::ReceiptStoreError>
+    {
+        let started = Instant::now();
+        let outcome = Forwarded::load_latest_checkpoint(&self.inner);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn supports_kernel_signed_checkpoints(&self) -> bool {
+        Forwarded::supports_kernel_signed_checkpoints(&self.inner)
+    }
+    fn enable_background_checkpoints(
+        &self,
+        keypair: Keypair,
+        max_batch: u64,
+    ) -> Result<bool, chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::enable_background_checkpoints(&self.inner, keypair, max_batch);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn supports_retention(&self) -> bool {
+        Forwarded::supports_retention(&self.inner)
+    }
+    fn rotate_receipts(
+        &self,
+        config: &chio_kernel::receipt_store::RetentionConfig,
+    ) -> Result<u64, chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::rotate_receipts(&self.inner, config);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn record_retention_rotation_outcome(&self, failure: Option<&str>) {
+        let started = Instant::now();
+        Forwarded::record_retention_rotation_outcome(&self.inner, failure);
+        self.ledger.record_receipt_other(started.elapsed());
+    }
+    fn record_capability_snapshot(
+        &self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome =
+            Forwarded::record_capability_snapshot(&self.inner, token, parent_capability_id);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn record_capability_snapshot_with_timeout(
+        &self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+        budget: std::time::Duration,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::record_capability_snapshot_with_timeout(
+            &self.inner,
+            token,
+            parent_capability_id,
+            budget,
+        );
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn get_capability_snapshot(
+        &self,
+        capability_id: &str,
+    ) -> Result<
+        Option<chio_kernel::CapabilitySnapshot>,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = Forwarded::get_capability_snapshot(&self.inner, capability_id);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn get_capability_delegation_chain(
+        &self,
+        capability_id: &str,
+    ) -> Result<Vec<chio_kernel::CapabilitySnapshot>, chio_kernel::receipt_store::ReceiptStoreError>
+    {
+        let started = Instant::now();
+        let outcome = Forwarded::get_capability_delegation_chain(&self.inner, capability_id);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn record_session_anchor(
+        &self,
+        session_id: &str,
+        anchor_id: &str,
+        auth_context_fingerprint: &str,
+        issued_at: u64,
+        supersedes_anchor_id: Option<&str>,
+        anchor_json: &serde_json::Value,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::record_session_anchor(
+            &self.inner,
+            session_id,
+            anchor_id,
+            auth_context_fingerprint,
+            issued_at,
+            supersedes_anchor_id,
+            anchor_json,
+        );
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn record_request_lineage(
+        &self,
+        session_id: &str,
+        request_id: &str,
+        parent_request_id: Option<&str>,
+        session_anchor_id: Option<&str>,
+        recorded_at: u64,
+        request_fingerprint: Option<&str>,
+        lineage_json: &serde_json::Value,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::record_request_lineage(
+            &self.inner,
+            session_id,
+            request_id,
+            parent_request_id,
+            session_anchor_id,
+            recorded_at,
+            request_fingerprint,
+            lineage_json,
+        );
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn record_receipt_lineage_statement(
+        &self,
+        child_receipt_id: &str,
+        request_id: Option<&str>,
+        session_id: Option<&str>,
+        session_anchor_id: Option<&str>,
+        parent_request_id: Option<&str>,
+        parent_receipt_id: Option<&str>,
+        chain_id: Option<&str>,
+        recorded_at: u64,
+        statement_json: &serde_json::Value,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::record_receipt_lineage_statement(
+            &self.inner,
+            child_receipt_id,
+            request_id,
+            session_id,
+            session_anchor_id,
+            parent_request_id,
+            parent_receipt_id,
+            chain_id,
+            recorded_at,
+            statement_json,
+        );
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn get_receipt_lineage_verification(
+        &self,
+        receipt_id: &str,
+    ) -> Result<
+        Option<chio_kernel::receipt_store::ReceiptLineageVerification>,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = Forwarded::get_receipt_lineage_verification(&self.inner, receipt_id);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn get_retained_receipt_lineage_verification(
+        &self,
+        receipt_id: &str,
+    ) -> Result<
+        Option<chio_kernel::receipt_store::ReceiptLineageVerification>,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = Forwarded::get_retained_receipt_lineage_verification(&self.inner, receipt_id);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn list_receipt_lineage_statement_links(
+        &self,
+        receipt_id: &str,
+    ) -> Result<
+        Vec<chio_kernel::receipt_store::ReceiptLineageStatementLink>,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = Forwarded::list_receipt_lineage_statement_links(&self.inner, receipt_id);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn load_receipt_lineage_statement(
+        &self,
+        receipt_id: &str,
+    ) -> Result<
+        Option<chio_core::receipt::lineage::ReceiptLineageStatement>,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = Forwarded::load_receipt_lineage_statement(&self.inner, receipt_id);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn load_retained_receipt_lineage_statement(
+        &self,
+        receipt_id: &str,
+    ) -> Result<
+        Option<chio_core::receipt::lineage::ReceiptLineageStatement>,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = Forwarded::load_retained_receipt_lineage_statement(&self.inner, receipt_id);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn as_any_mut(&self) -> Option<&dyn std::any::Any> {
+        Forwarded::as_any_mut(&self.inner)
+    }
+    fn resolve_credit_bond(
+        &self,
+        bond_id: &str,
+    ) -> Result<Option<chio_kernel::CreditBondRow>, chio_kernel::receipt_store::ReceiptStoreError>
+    {
+        let started = Instant::now();
+        let outcome = Forwarded::resolve_credit_bond(&self.inner, bond_id);
+        self.ledger.record_receipt_other(started.elapsed());
+        outcome
+    }
+    fn append_child_receipt(
+        &self,
+        receipt: &chio_core::receipt::lineage::ChildRequestReceipt,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::append_child_receipt(&self.inner, receipt);
+        self.ledger.record_receipt_append(started.elapsed());
+        outcome
+    }
+    fn append_child_receipt_returning_seq(
+        &self,
+        receipt: &chio_core::receipt::lineage::ChildRequestReceipt,
+    ) -> Result<Option<u64>, chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::append_child_receipt_returning_seq(&self.inner, receipt);
+        self.ledger.record_receipt_append(started.elapsed());
+        outcome
+    }
+    fn append_child_receipt_with_timeout(
+        &self,
+        receipt: &chio_core::receipt::lineage::ChildRequestReceipt,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = Forwarded::append_child_receipt_with_timeout(&self.inner, receipt, budget);
+        self.ledger.record_receipt_append(started.elapsed());
+        outcome
+    }
+}
+impl TimingReceiptStore {
+    fn new(inner: SqliteReceiptStore, ledger: Arc<PhaseLedger>) -> Self {
+        Self { inner, ledger }
+    }
+}
+
+/// The receiver's durable admission-operation store with a stopwatch on every
+/// method. This is the store the kernel opens the fenced pre-dispatch record in,
+/// takes the budget hold through, and commits the terminal projection to, so it
+/// is where an admission's durability cost lives.
+struct TimingAuthorityStore {
+    inner: chio_store_sqlite::admission_operation_store::SqliteAdmissionOperationStore,
+    ledger: Arc<PhaseLedger>,
+}
+
+/// The durable record of what the tool returned, on the same clock.
+struct TimingToolOutcomeStore {
+    inner: chio_store_sqlite::tool_outcome_store::SqliteToolOutcomeStore,
+    ledger: Arc<PhaseLedger>,
+}
+
+impl chio_kernel::receipt_store::ReceiptStore for TimingAuthorityStore {
+    fn append_chio_receipt(
+        &self,
+        receipt: &ChioReceipt,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome =
+            chio_kernel::receipt_store::ReceiptStore::append_chio_receipt(&self.inner, receipt);
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn admission_projection_capabilities(
+        &self,
+    ) -> chio_kernel::admission_operation::AdmissionProjectionCapabilities {
+        let started = Instant::now();
+        let outcome = chio_kernel::receipt_store::ReceiptStore::admission_projection_capabilities(
+            &self.inner,
+        );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn commit_admission_projection(
+        &self,
+        projection: &chio_kernel::admission_operation::AdmissionTerminalProjection,
+    ) -> Result<
+        chio_kernel::admission_operation::AdmissionTerminal,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = chio_kernel::receipt_store::ReceiptStore::commit_admission_projection(
+            &self.inner,
+            projection,
+        );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn load_chio_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<ChioReceipt>, chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome =
+            chio_kernel::receipt_store::ReceiptStore::load_chio_receipt(&self.inner, receipt_id);
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn append_child_receipt(
+        &self,
+        receipt: &chio_core::receipt::lineage::ChildRequestReceipt,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome =
+            chio_kernel::receipt_store::ReceiptStore::append_child_receipt(&self.inner, receipt);
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+}
+
+impl chio_kernel::admission_operation::AdmissionOperationStore for TimingAuthorityStore {
+    fn begin(
+        &self,
+        operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+        fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::admission_operation::AdmissionBeginResult,
+        chio_kernel::admission_operation::AdmissionOperationStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = chio_kernel::admission_operation::AdmissionOperationStore::begin(
+            &self.inner,
+            operation,
+            fence,
+            trusted_now_unix_ms,
+        );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn load_by_operation_id(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+    ) -> Result<
+        Option<chio_kernel::admission_operation::AdmissionOperationV1>,
+        chio_kernel::admission_operation::AdmissionOperationStoreError,
+    > {
+        let started = Instant::now();
+        let outcome =
+            chio_kernel::admission_operation::AdmissionOperationStore::load_by_operation_id(
+                &self.inner,
+                operation_id,
+            );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn load_by_replay_key(
+        &self,
+        replay_key: &chio_kernel::admission_operation::AdmissionReplayKey,
+    ) -> Result<
+        Option<chio_kernel::admission_operation::AdmissionOperationV1>,
+        chio_kernel::admission_operation::AdmissionOperationStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = chio_kernel::admission_operation::AdmissionOperationStore::load_by_replay_key(
+            &self.inner,
+            replay_key,
+        );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn compare_and_swap(
+        &self,
+        command: &chio_kernel::admission_operation::AdmissionOperationCommand,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::admission_operation::AdmissionCommandResult,
+        chio_kernel::admission_operation::AdmissionOperationStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = chio_kernel::admission_operation::AdmissionOperationStore::compare_and_swap(
+            &self.inner,
+            command,
+            trusted_now_unix_ms,
+        );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn claim_recovery_untrusted(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+        expected_version: u64,
+        claimant_id: &chio_kernel::admission_operation::AdmissionIdentifier,
+        trusted_now_unix_ms: u64,
+        expires_at_unix_ms: u64,
+        fence: &chio_kernel::admission_operation::StoreMutationFence,
+    ) -> Result<
+        chio_kernel::admission_operation::UntrustedAdmissionRecoveryClaim,
+        chio_kernel::admission_operation::AdmissionOperationStoreError,
+    > {
+        let started = Instant::now();
+        let outcome =
+            chio_kernel::admission_operation::AdmissionOperationStore::claim_recovery_untrusted(
+                &self.inner,
+                operation_id,
+                expected_version,
+                claimant_id,
+                trusted_now_unix_ms,
+                expires_at_unix_ms,
+                fence,
+            );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn revalidate_recovery_claim(
+        &self,
+        operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+        claim: &chio_kernel::admission_operation::UntrustedAdmissionRecoveryClaim,
+        trusted_now_unix_ms: u64,
+        current_store_fence: &chio_kernel::admission_operation::StoreMutationFence,
+    ) -> Result<(), chio_kernel::admission_operation::AdmissionOperationStoreError> {
+        let started = Instant::now();
+        let outcome =
+            chio_kernel::admission_operation::AdmissionOperationStore::revalidate_recovery_claim(
+                &self.inner,
+                operation,
+                claim,
+                trusted_now_unix_ms,
+                current_store_fence,
+            );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn list_recoverable(
+        &self,
+        not_after_unix_ms: u64,
+        limit: usize,
+    ) -> Result<
+        Vec<chio_kernel::admission_operation::AdmissionOperationV1>,
+        chio_kernel::admission_operation::AdmissionOperationStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = chio_kernel::admission_operation::AdmissionOperationStore::list_recoverable(
+            &self.inner,
+            not_after_unix_ms,
+            limit,
+        );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn load_terminal_replay(
+        &self,
+        replay_key: &chio_kernel::admission_operation::AdmissionReplayKey,
+    ) -> Result<
+        Option<chio_kernel::admission_operation::AdmissionTerminalReplay>,
+        chio_kernel::admission_operation::AdmissionOperationStoreError,
+    > {
+        let started = Instant::now();
+        let outcome =
+            chio_kernel::admission_operation::AdmissionOperationStore::load_terminal_replay(
+                &self.inner,
+                replay_key,
+            );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+}
+
+impl chio_kernel::admission_operation::QualifiedAdmissionOperationStore for TimingAuthorityStore {}
+
+impl chio_kernel::QualifiedAdmissionProjectionStore for TimingAuthorityStore {
+    fn load_payment_journal(
+        &self,
+        operation_id: &str,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+    ) -> Result<
+        Option<chio_kernel::payment::PaymentJournalRecord>,
+        chio_kernel::AdmissionPaymentJournalError,
+    > {
+        let started = Instant::now();
+        let outcome = chio_kernel::QualifiedAdmissionProjectionStore::load_payment_journal(
+            &self.inner,
+            operation_id,
+            active_fence,
+        );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn advance_payment_journal(
+        &self,
+        advance: chio_kernel::AdmissionPaymentJournalAdvance<'_>,
+    ) -> Result<chio_kernel::payment::PaymentJournalRecord, chio_kernel::AdmissionPaymentJournalError>
+    {
+        let started = Instant::now();
+        let outcome = chio_kernel::QualifiedAdmissionProjectionStore::advance_payment_journal(
+            &self.inner,
+            advance,
+        );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn begin_payment_settlement(
+        &self,
+        begin: chio_kernel::AdmissionPaymentSettlementBegin<'_>,
+    ) -> Result<chio_kernel::AdmissionPaymentSettlement, chio_kernel::AdmissionPaymentJournalError>
+    {
+        let started = Instant::now();
+        let outcome = chio_kernel::QualifiedAdmissionProjectionStore::begin_payment_settlement(
+            &self.inner,
+            begin,
+        );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn authorize_budget_and_commit_admission(
+        &self,
+        operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+        recovery_lease: &chio_kernel::admission_operation::AdmissionRecoveryLease,
+        request: chio_kernel::budget_store::BudgetAuthorizeHoldRequest,
+        payment_journal: Option<chio_kernel::payment::PaymentJournalRecord>,
+        credit_exposure: Option<chio_kernel::CreditExposureReservationRequest>,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetAuthorization,
+        chio_kernel::AdmissionBudgetAuthorizationError,
+    > {
+        let started = Instant::now();
+        let outcome =
+            chio_kernel::QualifiedAdmissionProjectionStore::authorize_budget_and_commit_admission(
+                &self.inner,
+                operation,
+                recovery_lease,
+                request,
+                payment_journal,
+                credit_exposure,
+                active_fence,
+                trusted_now_unix_ms,
+            );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn capture_invocation_and_commit_dispatch(
+        &self,
+        operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+        recovery_lease: &chio_kernel::admission_operation::AdmissionRecoveryLease,
+        request: chio_kernel::budget_store::BudgetCaptureInvocationRequest,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetCapture,
+        chio_kernel::admission_operation::AdmissionCaptureError,
+    > {
+        let started = Instant::now();
+        let outcome =
+            chio_kernel::QualifiedAdmissionProjectionStore::capture_invocation_and_commit_dispatch(
+                &self.inner,
+                operation,
+                recovery_lease,
+                request,
+                active_fence,
+                trusted_now_unix_ms,
+            );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn reserve_threshold_approval_and_commit_admission(
+        &self,
+        command: &chio_kernel::admission_operation::AdmissionOperationCommand,
+        reservation: &chio_kernel::ThresholdApprovalReplayReservationV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::admission_operation::AdmissionCommandResult,
+        chio_kernel::admission_operation::AdmissionOperationStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = chio_kernel::QualifiedAdmissionProjectionStore::reserve_threshold_approval_and_commit_admission(&self.inner, command, reservation, trusted_now_unix_ms);
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+    fn list_admission_receipts_after(
+        &self,
+        after_receipt_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<chio_core::receipt::body::ChioReceipt>, chio_kernel::ReceiptStoreError> {
+        let started = Instant::now();
+        let outcome = chio_kernel::QualifiedAdmissionProjectionStore::list_admission_receipts_after(
+            &self.inner,
+            after_receipt_id,
+            limit,
+        );
+        self.ledger.record_admission_durable(started.elapsed());
+        outcome
+    }
+}
+
+impl chio_kernel::tool_outcome::ToolOutcomeStore for TimingToolOutcomeStore {
+    fn record_tool_returned(
+        &self,
+        operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+        recovery_lease: &chio_kernel::admission_operation::AdmissionRecoveryLease,
+        blob: &chio_kernel::tool_outcome::CanonicalInvocationBlobV1,
+        record: &chio_kernel::tool_outcome::ToolOutcomeRecordV1,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::tool_outcome::ToolOutcomeInsertResultV1,
+        chio_kernel::tool_outcome::ToolOutcomeStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = chio_kernel::tool_outcome::ToolOutcomeStore::record_tool_returned(
+            &self.inner,
+            operation,
+            recovery_lease,
+            blob,
+            record,
+            active_fence,
+            trusted_now_unix_ms,
+        );
+        self.ledger.record_tool_outcome_durable(started.elapsed());
+        outcome
+    }
+    fn lookup_by_operation(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+    ) -> Result<
+        Option<chio_kernel::tool_outcome::ToolOutcomeRecordV1>,
+        chio_kernel::tool_outcome::ToolOutcomeStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = chio_kernel::tool_outcome::ToolOutcomeStore::lookup_by_operation(
+            &self.inner,
+            operation_id,
+        );
+        self.ledger.record_tool_outcome_durable(started.elapsed());
+        outcome
+    }
+    fn load_raw_invocation_by_operation(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+    ) -> Result<
+        Option<chio_kernel::tool_outcome::RawInvocationOutcomeV1>,
+        chio_kernel::tool_outcome::ToolOutcomeStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = chio_kernel::tool_outcome::ToolOutcomeStore::load_raw_invocation_by_operation(
+            &self.inner,
+            operation_id,
+        );
+        self.ledger.record_tool_outcome_durable(started.elapsed());
+        outcome
+    }
+    fn lookup_post_return_evaluation(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+    ) -> Result<
+        Option<chio_kernel::tool_outcome::PostReturnEvaluationRecordV1>,
+        chio_kernel::tool_outcome::ToolOutcomeStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = chio_kernel::tool_outcome::ToolOutcomeStore::lookup_post_return_evaluation(
+            &self.inner,
+            operation_id,
+        );
+        self.ledger.record_tool_outcome_durable(started.elapsed());
+        outcome
+    }
+    fn begin_post_return_evaluation(
+        &self,
+        recovery_lease: &chio_kernel::admission_operation::AdmissionRecoveryLease,
+        record: &chio_kernel::tool_outcome::PostReturnEvaluationRecordV1,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::tool_outcome::PostReturnEvaluationRecordV1,
+        chio_kernel::tool_outcome::ToolOutcomeStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = chio_kernel::tool_outcome::ToolOutcomeStore::begin_post_return_evaluation(
+            &self.inner,
+            recovery_lease,
+            record,
+            active_fence,
+            trusted_now_unix_ms,
+        );
+        self.ledger.record_tool_outcome_durable(started.elapsed());
+        outcome
+    }
+    fn stage_post_return_evaluation(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+        expected_version: u64,
+        recovery_lease: &chio_kernel::admission_operation::AdmissionRecoveryLease,
+        next: &chio_kernel::tool_outcome::PostReturnEvaluationRecordV1,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::tool_outcome::PostReturnEvaluationRecordV1,
+        chio_kernel::tool_outcome::ToolOutcomeStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = chio_kernel::tool_outcome::ToolOutcomeStore::stage_post_return_evaluation(
+            &self.inner,
+            operation_id,
+            expected_version,
+            recovery_lease,
+            next,
+            active_fence,
+            trusted_now_unix_ms,
+        );
+        self.ledger.record_tool_outcome_durable(started.elapsed());
+        outcome
+    }
+    fn finalize_post_return(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+        expected_evaluation_version: u64,
+        recovery_lease: &chio_kernel::admission_operation::AdmissionRecoveryLease,
+        terminal_evaluation: &chio_kernel::tool_outcome::PostReturnEvaluationRecordV1,
+        expected_outcome_version: u64,
+        terminal_outcome: &chio_kernel::tool_outcome::ToolOutcomeRecordV1,
+        resolved_output: Option<&chio_kernel::tool_outcome::CanonicalResolvedOutputBlobV1>,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        (
+            chio_kernel::tool_outcome::PostReturnEvaluationRecordV1,
+            chio_kernel::tool_outcome::ToolOutcomeRecordV1,
+        ),
+        chio_kernel::tool_outcome::ToolOutcomeStoreError,
+    > {
+        let started = Instant::now();
+        let outcome = chio_kernel::tool_outcome::ToolOutcomeStore::finalize_post_return(
+            &self.inner,
+            operation_id,
+            expected_evaluation_version,
+            recovery_lease,
+            terminal_evaluation,
+            expected_outcome_version,
+            terminal_outcome,
+            resolved_output,
+            active_fence,
+            trusted_now_unix_ms,
+        );
+        self.ledger.record_tool_outcome_durable(started.elapsed());
+        outcome
+    }
+    fn load_resolved_output_by_operation(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+    ) -> Result<
+        Option<chio_kernel::tool_outcome::CanonicalResolvedOutputBlobV1>,
+        chio_kernel::tool_outcome::ToolOutcomeStoreError,
+    > {
+        let started = Instant::now();
+        let outcome =
+            chio_kernel::tool_outcome::ToolOutcomeStore::load_resolved_output_by_operation(
+                &self.inner,
+                operation_id,
+            );
+        self.ledger.record_tool_outcome_durable(started.elapsed());
+        outcome
+    }
+}
+
+impl chio_kernel::tool_outcome::QualifiedToolOutcomeStore for TimingToolOutcomeStore {}
+
+/// The receiver's durable revocation store with a stopwatch on every lookup.
+/// The kernel consults it once per capability in the delegation chain.
+struct TimingRevocationStore {
+    inner: SqliteRevocationStore,
+    ledger: Arc<PhaseLedger>,
+}
+
+impl chio_kernel::RevocationStore for TimingRevocationStore {
+    fn is_revoked(&self, capability_id: &str) -> Result<bool, chio_kernel::RevocationStoreError> {
+        let started = Instant::now();
+        let outcome = chio_kernel::RevocationStore::is_revoked(&self.inner, capability_id);
+        self.ledger.record_revocation(started.elapsed());
+        outcome
+    }
+
+    fn revoke(&self, capability_id: &str) -> Result<bool, chio_kernel::RevocationStoreError> {
+        let started = Instant::now();
+        let outcome = chio_kernel::RevocationStore::revoke(&self.inner, capability_id);
+        self.ledger.record_revocation(started.elapsed());
+        outcome
+    }
+
+    fn observe_revocation(
+        &self,
+        capability_id: &str,
+    ) -> Result<chio_kernel::RevocationObservation, chio_kernel::RevocationStoreError> {
+        let started = Instant::now();
+        let outcome = chio_kernel::RevocationStore::observe_revocation(&self.inner, capability_id);
+        self.ledger.record_revocation(started.elapsed());
+        outcome
+    }
+
+    fn is_ephemeral(&self) -> bool {
+        chio_kernel::RevocationStore::is_ephemeral(&self.inner)
+    }
+}
+
 /// The tool the admitted call reaches. Its counter is the fail-closed gate every
 /// denial scenario asserts: a denied call must never move it.
 #[derive(Debug)]
@@ -1585,6 +3338,7 @@ struct CountingToolServer {
     server_id: String,
     tool_name: String,
     invocations: Arc<AtomicU64>,
+    ledger: Arc<PhaseLedger>,
 }
 
 #[async_trait::async_trait]
@@ -1603,8 +3357,11 @@ impl ToolServerConnection for CountingToolServer {
         arguments: serde_json::Value,
         _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError> {
+        let started = Instant::now();
         self.invocations.fetch_add(1, Ordering::SeqCst);
-        Ok(serde_json::json!({ "tool": tool_name, "arguments": arguments }))
+        let output = serde_json::json!({ "tool": tool_name, "arguments": arguments });
+        self.ledger.record_dispatch(started.elapsed());
+        Ok(output)
     }
 }
 
@@ -1662,7 +3419,13 @@ struct PreparedArtifacts {
 /// it holds. Nothing here is reachable from Org A's process.
 struct Receiver {
     kernel: Arc<ChioKernel>,
-    store: InMemoryRuntimeAdmissionStore,
+    store: TimingAdmissionStore,
+    ledger: Arc<PhaseLedger>,
+    /// The same tool server the kernel dispatches to, reachable without it. Only
+    /// the baseline stage uses it, and it counts into its own counter.
+    unmediated_server: CountingToolServer,
+    baseline_invocations: Arc<AtomicU64>,
+    admission_store: &'static str,
     treaty: TreatyDocument,
     base_receipt: ChioReceipt,
     remote_receipt_sha256: String,
@@ -1696,18 +3459,35 @@ impl Receiver {
         ReceiverStats {
             calls: self.calls.load(Ordering::SeqCst),
             dispatches: self.invocations.load(Ordering::SeqCst),
+            baseline_dispatches: self.baseline_invocations.load(Ordering::SeqCst),
+            admission_store: self.admission_store.to_string(),
             revocation_epoch: self.view.current_epoch(),
             cosign_connections: self.cosigner.connections_opened(),
+        }
+    }
+
+    fn cosign_snapshot(&self) -> CoSignSnapshot {
+        CoSignSnapshot {
+            connect_nanos: self.cosigner.connect_nanos(),
+            exchange_nanos: self.cosigner.exchange_nanos(),
+            hops: self.cosigner.connections_opened(),
         }
     }
 
     /// Mint the per-call evidence and obtain Org A's DSSE signature across the
     /// network. Untimed relative to the admission decision: this is the treaty
     /// paperwork, not the syscall.
-    fn prepare(&self, sequence: Option<u64>) -> Result<PreparedArtifacts, BoxError> {
+    fn prepare(
+        &self,
+        sequence: Option<u64>,
+        continuation_sequence: Option<u64>,
+    ) -> Result<PreparedArtifacts, BoxError> {
         let started = Instant::now();
         let cosign_connections_before = self.cosigner.connections_opened();
         let sequence = sequence.unwrap_or_else(|| self.sequence.fetch_add(1, Ordering::SeqCst));
+        // The continuation is numbered separately so several calls can be minted
+        // against one of them. Every other artifact stays keyed to the call.
+        let continuation_sequence = continuation_sequence.unwrap_or(sequence);
         let treaty = &self.treaty;
         let request_id = format!("req-federated-pair-{sequence}");
         let admission_id = format!("adm-federated-pair-{sequence}");
@@ -1740,19 +3520,19 @@ impl Receiver {
 
         let continuation = CrossKernelContinuation {
             schema: CHIO_CROSS_KERNEL_CONTINUATION_SCHEMA.to_string(),
-            continuation_id: format!("continue-federated-pair-{sequence}"),
+            continuation_id: format!("continue-federated-pair-{continuation_sequence}"),
             source_kernel_id: treaty.origin_kernel_id.clone(),
             target_kernel_id: treaty.receiver_kernel_id.clone(),
             parent_receipt_sha256: sha256_hex(
-                format!("federated-pair:parent-receipt:{sequence}").as_bytes(),
+                format!("federated-pair:parent-receipt:{continuation_sequence}").as_bytes(),
             ),
             parent_session_anchor_sha256: sha256_hex(
-                format!("federated-pair:session-anchor:{sequence}").as_bytes(),
+                format!("federated-pair:session-anchor:{continuation_sequence}").as_bytes(),
             ),
             capability_id: treaty.capability_id.clone(),
             action_class_id: treaty.action_class_id.clone(),
             audience_tool: format!("{}.{}", treaty.server_id, treaty.tool_name),
-            nonce: format!("nonce-federated-pair-{sequence}"),
+            nonce: format!("nonce-federated-pair-{continuation_sequence}"),
             issued_at_unix_ms: treaty.issued_at_unix_ms,
             expires_at_unix_ms: treaty.expires_at_unix_ms,
         };
@@ -1843,6 +3623,7 @@ impl Receiver {
                 ladder_intersection_id: self.intersection_id.clone(),
                 ladder_intersection_sha256: self.intersection_sha256.clone(),
                 action_class_id: treaty.action_class_id.clone(),
+                continuation_sequence,
                 continuation_id: continuation.continuation_id,
                 continuation_sha256,
                 lineage_bundle_id: lineage.bundle_id,
@@ -1937,11 +3718,25 @@ impl Receiver {
     }
 
     /// The measured operation: one receiver-owned admission decision.
+    ///
+    /// The window is bracketed by a reading of every counter the receiver's own
+    /// dependencies keep, so the decision's cost can be attributed to its parts
+    /// instead of reported as one number. Those counters are process-wide: the
+    /// attribution describes this call only while it is the only call running,
+    /// which the budget's own consistency check enforces.
     async fn call(&self, request: &ToolCallRequest) -> CallDecision {
         self.calls.fetch_add(1, Ordering::SeqCst);
+        let ledger_before = self.ledger.snapshot();
+        let cosign_before = self.cosign_snapshot();
         let started = Instant::now();
         let outcome = self.kernel.evaluate_tool_call(request).await;
-        let evaluate_micros = u64::try_from(started.elapsed().as_micros()).unwrap_or(u64::MAX);
+        let elapsed = started.elapsed();
+        let budget = ReceiverBudget::between(
+            elapsed,
+            (ledger_before, self.ledger.snapshot()),
+            (cosign_before, self.cosign_snapshot()),
+        );
+        let evaluate_micros = u64::try_from(elapsed.as_micros()).unwrap_or(u64::MAX);
         let (verdict, failure_code, receipt_id) = match outcome {
             Ok(response) => {
                 let verdict = match response.verdict {
@@ -1972,6 +3767,46 @@ impl Receiver {
             dispatches: self.invocations.load(Ordering::SeqCst),
             revocation_epoch: self.view.current_epoch(),
             cosign_connections: self.cosigner.connections_opened(),
+            budget,
+        }
+    }
+
+    /// The same tool, invoked with the kernel taken out of the path.
+    ///
+    /// This is the denominator: the transport, the frame, the tool server and
+    /// nothing else. No capability is checked, no evidence is resolved, no
+    /// continuation is consumed, nothing is dispatched through an admission, and
+    /// no receipt is written, so the difference between this and `call` is what
+    /// mediating the call costs. It counts into its own invocation counter, so
+    /// the admitted run's dispatch assertions are unaffected.
+    async fn direct_call(&self, request: &ToolCallRequest) -> CallDecision {
+        let ledger_before = self.ledger.snapshot();
+        let cosign_before = self.cosign_snapshot();
+        let started = Instant::now();
+        let outcome = self
+            .unmediated_server
+            .invoke(&request.tool_name, request.arguments.clone(), None)
+            .await;
+        let elapsed = started.elapsed();
+        let budget = ReceiverBudget::between(
+            elapsed,
+            (ledger_before, self.ledger.snapshot()),
+            (cosign_before, self.cosign_snapshot()),
+        );
+        let (verdict, failure_code) = match outcome {
+            Ok(_) => ("allow".to_string(), String::new()),
+            Err(error) => ("deny".to_string(), error.to_string()),
+        };
+        CallDecision {
+            request_id: request.request_id.clone(),
+            verdict,
+            failure_code,
+            receipt_id: String::new(),
+            evaluate_micros: u64::try_from(elapsed.as_micros()).unwrap_or(u64::MAX),
+            dispatches: self.baseline_invocations.load(Ordering::SeqCst),
+            revocation_epoch: self.view.current_epoch(),
+            cosign_connections: self.cosigner.connections_opened(),
+            budget,
         }
     }
 
@@ -2070,15 +3905,32 @@ impl ExperimentHandler {
                         treaty.origin_kernel_id
                     ));
                 }
-                ExperimentReply::Decision(self.receiver.call(&request).await)
+                ExperimentReply::Decision(Box::new(self.receiver.call(&request).await))
             }
-            ExperimentRequest::Prepare { sequence } => {
+            ExperimentRequest::DirectCall { request } => {
+                if let Err(detail) =
+                    Self::require_peer(peer, &treaty.sender_kernel_id, "an unmediated tool call")
+                {
+                    return refused(detail);
+                }
+                if request.server_id != treaty.server_id || request.tool_name != treaty.tool_name {
+                    return refused(format!(
+                        "the baseline serves only {}.{}",
+                        treaty.server_id, treaty.tool_name
+                    ));
+                }
+                ExperimentReply::Decision(Box::new(self.receiver.direct_call(&request).await))
+            }
+            ExperimentRequest::Prepare {
+                sequence,
+                continuation_sequence,
+            } => {
                 if let Err(detail) =
                     Self::require_peer(peer, &treaty.sender_kernel_id, "a preparation request")
                 {
                     return refused(detail);
                 }
-                match self.receiver.prepare(sequence) {
+                match self.receiver.prepare(sequence, continuation_sequence) {
                     Ok(artifacts) => ExperimentReply::Prepared(Box::new(artifacts.prepared)),
                     Err(error) => refused(error.to_string()),
                 }
@@ -2162,6 +4014,151 @@ impl ProtocolHandler for ExperimentHandler {
     }
 }
 
+/// The clock lane. It answers one question, with the answering kernel's own
+/// identity attached: what time does this host think it is?
+///
+/// It carries no trust and decides nothing. It exists so a run split across two
+/// machines can refuse to measure before it starts when the two clocks disagree
+/// by more than the run's bound, which would otherwise show up as revocation
+/// freshness denials attributed to the treaty.
+struct ClockHandler {
+    gate: DirectoryGate,
+    kernel_id: String,
+    peers: BTreeSet<String>,
+    limiter: AcceptLimiter,
+}
+
+impl std::fmt::Debug for ClockHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClockHandler")
+            .field("kernel_id", &self.kernel_id)
+            .finish_non_exhaustive()
+    }
+}
+
+impl ClockHandler {
+    async fn serve(&self, connection: &Connection) -> Result<(), BoxError> {
+        let remote = connection.remote_id();
+        let peer = self.gate.resolve(&remote);
+        let (mut send, mut recv) = self
+            .limiter
+            .bounded(AcceptPhase::AcceptStream, connection.accept_bi())
+            .await??;
+        let frame = self
+            .limiter
+            .bounded(AcceptPhase::ReadFrame, read_frame(&mut recv))
+            .await??;
+        let probe: ClockProbe = serde_json::from_slice(&frame)?;
+        // Same discipline as every other lane: the authenticated endpoint must
+        // still resolve through the verified directory to a party this role
+        // exchanges frames with, and the frame must carry the expected schema.
+        let reply = match peer {
+            Some(peer) if self.peers.contains(&peer) && probe.schema == CLOCK_SCHEMA => {
+                Some(ClockReply {
+                    schema: CLOCK_SCHEMA.to_string(),
+                    kernel_id: self.kernel_id.clone(),
+                    unix_ms: now_unix_ms()?,
+                })
+            }
+            _ => None,
+        };
+        let Some(reply) = reply else {
+            return Err("a clock probe arrived from an endpoint this role does not serve".into());
+        };
+        self.limiter
+            .bounded(
+                AcceptPhase::WriteResponse,
+                write_frame(&mut send, &serde_json::to_vec(&reply)?),
+            )
+            .await??;
+        send.finish()?;
+        Ok(())
+    }
+}
+
+impl ProtocolHandler for ClockHandler {
+    async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
+        let _permit = match self.limiter.admit_peer(&connection.remote_id()).await {
+            Ok(permit) => permit,
+            Err(error) => {
+                connection.close(error.close_code().into(), error.code().as_bytes());
+                return Err(AcceptError::from_err(error));
+            }
+        };
+        match self.serve(&connection).await {
+            Ok(()) => {
+                self.limiter.linger(&connection).await;
+                Ok(())
+            }
+            Err(error) => {
+                connection.close(VarInt::from_u32(1), b"clock");
+                Err(AcceptError::from_err(std::io::Error::other(
+                    error.to_string(),
+                )))
+            }
+        }
+    }
+}
+
+/// One clock probe against a peer that mounts [`ALPN_CLOCK`].
+///
+/// The reading is the usual three-timestamp estimate: the local clock before the
+/// request, the peer's clock in the reply, the local clock after. The offset is
+/// the peer's reading minus the midpoint of the two local ones, and half the
+/// round trip bounds the error in that estimate.
+async fn probe_clock(
+    endpoint: &Endpoint,
+    peer: EndpointAddr,
+    expect_kernel_id: &str,
+) -> Result<(i64, u64), BoxError> {
+    let connection = client_bounded(
+        AcceptPhase::AcceptStream,
+        endpoint.connect(peer, ALPN_CLOCK),
+    )
+    .await?
+    .map_err(|error| format!("the clock lane did not connect: {error}"))?;
+    let result = probe_clock_inner(&connection, expect_kernel_id).await;
+    connection.close(VarInt::from_u32(CLOSE_OK), b"done");
+    result
+}
+
+async fn probe_clock_inner(
+    connection: &Connection,
+    expect_kernel_id: &str,
+) -> Result<(i64, u64), BoxError> {
+    let (mut send, mut recv) = client_bounded(AcceptPhase::AcceptStream, connection.open_bi())
+        .await?
+        .map_err(|error| format!("the clock lane did not open a stream: {error}"))?;
+    let probe = ClockProbe {
+        schema: CLOCK_SCHEMA.to_string(),
+    };
+    let before = now_unix_ms()?;
+    client_bounded(
+        AcceptPhase::WriteResponse,
+        write_frame(&mut send, &serde_json::to_vec(&probe)?),
+    )
+    .await??;
+    send.finish()?;
+    let frame = client_bounded(AcceptPhase::ReadFrame, read_frame(&mut recv)).await??;
+    let after = now_unix_ms()?;
+    let reply: ClockReply = serde_json::from_slice(&frame)?;
+    if reply.schema != CLOCK_SCHEMA {
+        return Err(format!("a clock reply carried schema {}", reply.schema).into());
+    }
+    if reply.kernel_id != expect_kernel_id {
+        return Err(format!(
+            "the clock reply came from {}, not from {expect_kernel_id}",
+            reply.kernel_id
+        )
+        .into());
+    }
+    let round_trip = after.saturating_sub(before);
+    let midpoint = before.saturating_add(round_trip / 2);
+    let offset_ms = i64::try_from(reply.unix_ms).unwrap_or(i64::MAX)
+        - i64::try_from(midpoint).unwrap_or(i64::MAX);
+    Ok((offset_ms, round_trip))
+}
+
 /// Stand up Org B and serve until the process is stopped.
 async fn run_receiver(args: &Args) -> Result<(), BoxError> {
     let loaded = load_role(args)?;
@@ -2211,7 +4208,23 @@ async fn run_receiver(args: &Args) -> Result<(), BoxError> {
         .with_trusted_peer(origin_id.clone(), origin_passport.clone());
     let peer = exchange.accept_envelope(&handshake, &origin_id, now_secs)?;
 
-    let store = InMemoryRuntimeAdmissionStore::new();
+    // The single-use property this experiment races rests on a primary-key
+    // insert, so the durable store is the default: an in-memory set would be a
+    // different mechanism under the same name. `memory` stays available so a run
+    // can separate the store's cost from the decision's.
+    let ledger = Arc::new(PhaseLedger::default());
+    let admission_store = args.optional("admission-store").unwrap_or("sqlite");
+    let backend = match admission_store {
+        "sqlite" => AdmissionBackend::Sqlite(SqliteRuntimeOrchestrationStore::open(
+            store_dir.join("runtime-admission.sqlite3"),
+        )?),
+        "memory" => AdmissionBackend::Memory(InMemoryRuntimeAdmissionStore::new()),
+        other => {
+            return Err(format!("--admission-store expects sqlite or memory, got {other}").into())
+        }
+    };
+    let admission_store = backend.label();
+    let store = TimingAdmissionStore::new(Arc::new(backend), Arc::clone(&ledger));
     let intersection: LadderIntersection = compute_ladder_intersection(
         &treaty.treaty_scope,
         &treaty.ladder_manifests,
@@ -2260,22 +4273,31 @@ async fn run_receiver(args: &Args) -> Result<(), BoxError> {
     .with_federation_peers(vec![peer]);
     kernel.set_federation_local_kernel_id(&receiver_id);
     kernel.set_federation_cosigner(Arc::clone(&cosigner) as Arc<_>);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(
-        store_dir.join("kernel-receipts.sqlite3"),
-    )?))?;
+    kernel.set_receipt_store(Box::new(TimingReceiptStore::new(
+        SqliteReceiptStore::open(store_dir.join("kernel-receipts.sqlite3"))?,
+        Arc::clone(&ledger),
+    )))?;
     kernel.set_durable_admission_store(
-        Arc::new(authority.admission_operation_store()),
-        Arc::new(authority.tool_outcome_store()),
+        Arc::new(TimingAuthorityStore {
+            inner: authority.admission_operation_store(),
+            ledger: Arc::clone(&ledger),
+        }),
+        Arc::new(TimingToolOutcomeStore {
+            inner: authority.tool_outcome_store(),
+            ledger: Arc::clone(&ledger),
+        }),
         authority.mutation_fence(),
     )?;
     kernel.reconcile_durable_admission_receipt_projections()?;
-    kernel.set_revocation_store(Box::new(SqliteRevocationStore::open(
-        store_dir.join("kernel-revocations.sqlite3"),
-    )?));
+    kernel.set_revocation_store(Box::new(TimingRevocationStore {
+        inner: SqliteRevocationStore::open(store_dir.join("kernel-revocations.sqlite3"))?,
+        ledger: Arc::clone(&ledger),
+    }));
     kernel.register_tool_server(Box::new(CountingToolServer {
         server_id: treaty.server_id.clone(),
         tool_name: treaty.tool_name.clone(),
         invocations: Arc::clone(&invocations),
+        ledger: Arc::clone(&ledger),
     }));
     kernel.set_runtime_admission_hook(Arc::new(
         ChioRuntimeAdmissionHook::new(treaty.admission_profile.clone(), store.clone())
@@ -2292,9 +4314,19 @@ async fn run_receiver(args: &Args) -> Result<(), BoxError> {
     kernel.set_revocation_view(Arc::clone(&view));
 
     let base_receipt = base_receipt(&treaty, &local_keypair)?;
+    let baseline_invocations = Arc::new(AtomicU64::new(0));
     let receiver = Arc::new(Receiver {
         kernel: Arc::new(kernel),
         store,
+        unmediated_server: CountingToolServer {
+            server_id: treaty.server_id.clone(),
+            tool_name: treaty.tool_name.clone(),
+            invocations: Arc::clone(&baseline_invocations),
+            ledger: Arc::clone(&ledger),
+        },
+        baseline_invocations,
+        admission_store,
+        ledger,
         remote_receipt_sha256: sha256_hex(&canonical_json_bytes(&base_receipt)?),
         request_sha256: tool_args_sha256(&treaty.arguments)?,
         scope_sha256,
@@ -2331,7 +4363,19 @@ async fn run_receiver(args: &Args) -> Result<(), BoxError> {
             ALPN_EXPERIMENT,
             ExperimentHandler {
                 receiver: Arc::clone(&receiver),
+                gate: gate.clone(),
+                limiter: AcceptLimiter::new(experiment_limits()),
+            },
+        )
+        .accept(
+            ALPN_CLOCK,
+            ClockHandler {
                 gate,
+                kernel_id: receiver_id.clone(),
+                peers: BTreeSet::from([
+                    receiver.treaty.origin_kernel_id.clone(),
+                    receiver.treaty.sender_kernel_id.clone(),
+                ]),
                 limiter: AcceptLimiter::new(experiment_limits()),
             },
         )
@@ -2498,6 +4542,11 @@ enum DenialKind {
     Admission,
 }
 
+/// What the receiver answers a call whose continuation another call already
+/// consumed. Named here so the contention run asserts the code rather than
+/// accepting any denial as proof of single use.
+const CONTINUATION_REPLAY_CODE: &str = "chio_treaty_continuation_replay";
+
 fn classify(failure_code: &str) -> DenialKind {
     if failure_code.contains("revocation view snapshot") {
         DenialKind::Freshness
@@ -2535,8 +4584,21 @@ impl Sender {
     }
 
     async fn prepare(&self) -> Result<PreparedCall, BoxError> {
+        self.prepare_sharing(None).await
+    }
+
+    /// Mint one call's evidence. `continuation_sequence` names a continuation an
+    /// earlier preparation already minted, which is how several calls come to
+    /// present the same single-use identifier.
+    async fn prepare_sharing(
+        &self,
+        continuation_sequence: Option<u64>,
+    ) -> Result<PreparedCall, BoxError> {
         match self
-            .exchange(&ExperimentRequest::Prepare { sequence: None })
+            .exchange(&ExperimentRequest::Prepare {
+                sequence: None,
+                continuation_sequence,
+            })
             .await?
         {
             ExperimentReply::Prepared(prepared) => Ok(*prepared),
@@ -2566,11 +4628,28 @@ impl Sender {
             .await?;
         let round_trip_ms = started.elapsed().as_secs_f64() * 1_000.0;
         match reply {
-            ExperimentReply::Decision(decision) => Ok((decision, round_trip_ms)),
+            ExperimentReply::Decision(decision) => Ok((*decision, round_trip_ms)),
             ExperimentReply::Refused { detail } => {
                 Err(format!("the receiver refused the call: {detail}").into())
             }
             other => Err(format!("unexpected reply to call: {other:?}").into()),
+        }
+    }
+
+    /// The same request, dispatched by the receiver with the kernel out of the
+    /// path. Same lane, same frame size, same tool: only the mediation is absent.
+    async fn direct_call(&self, request: ToolCallRequest) -> Result<CallDecision, BoxError> {
+        match self
+            .exchange(&ExperimentRequest::DirectCall {
+                request: Box::new(request),
+            })
+            .await?
+        {
+            ExperimentReply::Decision(decision) => Ok(*decision),
+            ExperimentReply::Refused { detail } => {
+                Err(format!("the receiver refused the unmediated call: {detail}").into())
+            }
+            other => Err(format!("unexpected reply to an unmediated call: {other:?}").into()),
         }
     }
 
@@ -2779,6 +4858,11 @@ async fn run_send(args: &Args) -> Result<(), BoxError> {
             )
             .into());
         }
+        // This driver sends one call at a time, so the receiver's counters
+        // describe this call alone. A decomposition that claims more time than
+        // the window it decomposes is not describing this call, and the run stops
+        // rather than report it.
+        sample.decision.budget.check(&sample.decision.request_id)?;
         samples.push(sample);
     }
     let after = sender.stats().await?;
@@ -2815,12 +4899,13 @@ async fn run_send(args: &Args) -> Result<(), BoxError> {
     };
 
     if let Some(path) = args.optional("csv") {
-        let mut csv = String::from(
-            "scenario,sequence,request_id,round_trip_ms,evaluate_ms,prepare_ms,verdict,failure_code,cosign_connections\n",
+        let mut csv = format!(
+            "scenario,sequence,request_id,round_trip_ms,evaluate_ms,prepare_ms,verdict,\
+             failure_code,cosign_connections,{BUDGET_CSV_FIELDS}\n"
         );
         for sample in &samples {
             csv.push_str(&format!(
-                "{},{},{},{:.6},{:.6},{:.6},{},{},{}\n",
+                "{},{},{},{:.6},{:.6},{:.6},{},{},{},{}\n",
                 scenario.name,
                 sample.sequence,
                 sample.decision.request_id,
@@ -2830,6 +4915,7 @@ async fn run_send(args: &Args) -> Result<(), BoxError> {
                 sample.decision.verdict,
                 sample.decision.failure_code,
                 sample.cosign_connections,
+                budget_csv_row(&sample.decision.budget),
             ));
         }
         fs::write(path, csv)?;
@@ -2852,6 +4938,8 @@ async fn run_send(args: &Args) -> Result<(), BoxError> {
                 "cosignConnectionsPerCall": cosign_connections_per_call,
                 "cosignConnectionsBefore": before.cosign_connections,
                 "cosignConnectionsAfter": after.cosign_connections,
+                "admissionStore": after.admission_store,
+                "budgetToleranceNanos": BUDGET_TOLERANCE_NANOS,
             }),
         )?;
     }
@@ -2859,6 +4947,560 @@ async fn run_send(args: &Args) -> Result<(), BoxError> {
         "scenario {} completed {calls} calls; receiver dispatched {dispatched}",
         scenario.name
     );
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// baseline, load, race, preflight
+// ---------------------------------------------------------------------------
+
+/// The per-call decomposition columns, in the order [`budget_csv_row`] writes
+/// them. Held in one place so the samples file and the aggregator cannot drift.
+const BUDGET_CSV_FIELDS: &str = "cosign_connect_ms,cosign_exchange_ms,cosign_hops,\
+store_resolve_ms,store_resolve_ops,continuation_ms,continuation_ops,lease_ms,lease_ops,\
+trust_floor_ms,trust_floor_ops,dispatch_ms,dispatch_ops,receipt_append_ms,receipt_append_ops,\
+receipt_other_ms,receipt_other_ops,revocation_ms,revocation_ops,admission_durable_ms,\
+admission_durable_ops,tool_outcome_durable_ms,tool_outcome_durable_ops,attributed_ms,\
+unattributed_ms";
+
+fn millis(nanos: u64) -> f64 {
+    nanos as f64 / 1_000_000.0
+}
+
+fn budget_csv_row(budget: &ReceiverBudget) -> String {
+    format!(
+        "{:.6},{:.6},{},{:.6},{},{:.6},{},{:.6},{},{:.6},{},{:.6},{},{:.6},{},{:.6},{},{:.6},{},\
+         {:.6},{},{:.6},{},{:.6},{:.6}",
+        millis(budget.cosign_connect_nanos),
+        millis(budget.cosign_exchange_nanos),
+        budget.cosign_hops,
+        millis(budget.store_resolve_nanos),
+        budget.store_resolve_ops,
+        millis(budget.continuation_nanos),
+        budget.continuation_ops,
+        millis(budget.lease_nanos),
+        budget.lease_ops,
+        millis(budget.trust_floor_nanos),
+        budget.trust_floor_ops,
+        millis(budget.dispatch_nanos),
+        budget.dispatch_ops,
+        millis(budget.receipt_append_nanos),
+        budget.receipt_append_ops,
+        millis(budget.receipt_other_nanos),
+        budget.receipt_other_ops,
+        millis(budget.revocation_nanos),
+        budget.revocation_ops,
+        millis(budget.admission_durable_nanos),
+        budget.admission_durable_ops,
+        millis(budget.tool_outcome_durable_nanos),
+        budget.tool_outcome_durable_ops,
+        millis(budget.attributed_nanos),
+        millis(budget.unattributed_nanos),
+    )
+}
+
+/// The unmediated denominator: the same tool, over the same lane, with no kernel
+/// in the path. Reported so the paper can state what mediation costs rather than
+/// only what admission costs.
+async fn run_baseline(args: &Args) -> Result<(), BoxError> {
+    let calls = args.count("calls", 30)?;
+    if calls < 2 {
+        return Err("--calls must be at least two: a single call is not a distribution".into());
+    }
+    let sender = Sender::connect(args).await?;
+    let before = sender.stats().await?;
+
+    let mut samples = Vec::new();
+    while samples.len() < calls as usize {
+        let prepared = sender.prepare().await?;
+        let request = sender.build_request(&prepared, scenario_named("allow")?);
+        let started = Instant::now();
+        let decision = sender.direct_call(request).await?;
+        let round_trip_ms = started.elapsed().as_secs_f64() * 1_000.0;
+        if decision.verdict != "allow" {
+            return Err(
+                format!("the unmediated tool call failed: {}", decision.failure_code).into(),
+            );
+        }
+        decision.budget.check(&decision.request_id)?;
+        samples.push((prepared.sequence, round_trip_ms, decision));
+    }
+    let after = sender.stats().await?;
+
+    // The point of the baseline is that the kernel is not in the path, so the
+    // mediated dispatch counter must not have moved at all.
+    let mediated = after.dispatches.saturating_sub(before.dispatches);
+    if mediated != 0 {
+        return Err(format!(
+            "the unmediated run moved the kernel's dispatch counter by {mediated}"
+        )
+        .into());
+    }
+    let unmediated = after
+        .baseline_dispatches
+        .saturating_sub(before.baseline_dispatches);
+    if unmediated != calls {
+        return Err(format!(
+            "the unmediated run invoked the tool {unmediated} times, expected {calls}"
+        )
+        .into());
+    }
+
+    if let Some(path) = args.optional("csv") {
+        let mut csv = format!(
+            "scenario,sequence,request_id,round_trip_ms,evaluate_ms,prepare_ms,verdict,\
+             failure_code,cosign_connections,{BUDGET_CSV_FIELDS}\n"
+        );
+        for (sequence, round_trip_ms, decision) in &samples {
+            csv.push_str(&format!(
+                "baseline,{sequence},{},{round_trip_ms:.6},{:.6},0.000000,{},{},0,{}\n",
+                decision.request_id,
+                decision.evaluate_micros as f64 / 1_000.0,
+                decision.verdict,
+                decision.failure_code,
+                budget_csv_row(&decision.budget),
+            ));
+        }
+        fs::write(path, csv)?;
+    }
+    if let Some(path) = args.optional("out") {
+        write_json(
+            Path::new(path),
+            &serde_json::json!({
+                "scenario": "baseline",
+                "calls": calls,
+                "mediatedDispatchDelta": mediated,
+                "unmediatedDispatchDelta": unmediated,
+                "admissionStore": after.admission_store,
+            }),
+        )?;
+    }
+    println!("baseline completed {calls} calls with the kernel out of the path");
+    Ok(())
+}
+
+/// One completed call of a concurrent run.
+struct ConcurrentSample {
+    worker: u64,
+    sequence: u64,
+    round_trip_ms: f64,
+    decision: CallDecision,
+}
+
+fn worker_count(args: &Args) -> Result<u64, BoxError> {
+    let workers = args.count("workers", 8)?;
+    if workers < 2 {
+        return Err("--workers must be at least two: one worker is not concurrency".into());
+    }
+    if workers > MAX_CONCURRENT_CALLS {
+        return Err(format!(
+            "--workers is {workers}, above the experiment lane's per-peer accept cap of \
+             {MAX_CONCURRENT_CALLS}; a larger run would measure the limiter shedding calls"
+        )
+        .into());
+    }
+    Ok(workers)
+}
+
+/// Sustained concurrent admitted calls.
+///
+/// Each worker drives its own calls end to end, so the receiver is evaluating
+/// `--workers` admissions at once for the whole run. Throughput here is measured
+/// against the wall clock of the whole run rather than derived from a latency,
+/// which is the only way it can differ from one over the latency.
+async fn run_load(args: &Args) -> Result<(), BoxError> {
+    let workers = worker_count(args)?;
+    let calls_per_worker = args.count("calls", 10)?;
+    if calls_per_worker == 0 {
+        return Err("--calls must be at least one".into());
+    }
+    let total = workers.saturating_mul(calls_per_worker);
+    let sender = Arc::new(Sender::connect(args).await?);
+    let before = sender.stats().await?;
+    let freshness = Arc::new(AtomicU64::new(0));
+    // Calls whose decomposition claims more time than the window it decomposes.
+    // Under concurrency the receiver's counters serve several calls at once, so
+    // this is expected to be nonzero: it is the reason no decomposition is
+    // reported here, recorded rather than assumed.
+    let contaminated = Arc::new(AtomicU64::new(0));
+    let budget = total.saturating_mul(4).max(20);
+
+    let started = Instant::now();
+    let mut tasks = Vec::new();
+    for worker in 0..workers {
+        let sender = Arc::clone(&sender);
+        let freshness = Arc::clone(&freshness);
+        let contaminated = Arc::clone(&contaminated);
+        tasks.push(tokio::spawn(async move {
+            let mut mine = Vec::new();
+            while (mine.len() as u64) < calls_per_worker {
+                let sample = sender.drive_once(scenario_named("allow")?).await?;
+                if sample.decision.verdict == "deny"
+                    && classify(&sample.decision.failure_code) == DenialKind::Freshness
+                {
+                    if freshness.fetch_add(1, Ordering::SeqCst) >= budget {
+                        return Err::<Vec<ConcurrentSample>, BoxError>(
+                            format!(
+                                "the concurrent run absorbed more than {budget} \
+                                 revocation-freshness denials"
+                            )
+                            .into(),
+                        );
+                    }
+                    continue;
+                }
+                if sample.decision.verdict != "allow" {
+                    return Err(format!(
+                        "a concurrent call was denied: {}",
+                        sample.decision.failure_code
+                    )
+                    .into());
+                }
+                if sample
+                    .decision
+                    .budget
+                    .check(&sample.decision.request_id)
+                    .is_err()
+                {
+                    contaminated.fetch_add(1, Ordering::SeqCst);
+                }
+                mine.push(ConcurrentSample {
+                    worker,
+                    sequence: sample.sequence,
+                    round_trip_ms: sample.round_trip_ms,
+                    decision: sample.decision,
+                });
+            }
+            Ok(mine)
+        }));
+    }
+    let mut samples = Vec::new();
+    for task in tasks {
+        samples.extend(task.await??);
+    }
+    let wall_clock_ms = started.elapsed().as_secs_f64() * 1_000.0;
+    let after = sender.stats().await?;
+
+    let dispatched = after.dispatches.saturating_sub(before.dispatches);
+    if dispatched != total {
+        return Err(format!(
+            "the concurrent run dispatched {dispatched} times for {total} admitted calls"
+        )
+        .into());
+    }
+    samples.sort_by_key(|sample| sample.sequence);
+
+    if let Some(path) = args.optional("csv") {
+        let mut csv = String::from(
+            "worker,sequence,request_id,round_trip_ms,evaluate_ms,verdict,failure_code\n",
+        );
+        for sample in &samples {
+            csv.push_str(&format!(
+                "{},{},{},{:.6},{:.6},{},{}\n",
+                sample.worker,
+                sample.sequence,
+                sample.decision.request_id,
+                sample.round_trip_ms,
+                sample.decision.evaluate_micros as f64 / 1_000.0,
+                sample.decision.verdict,
+                sample.decision.failure_code,
+            ));
+        }
+        fs::write(path, csv)?;
+    }
+    if let Some(path) = args.optional("out") {
+        write_json(
+            Path::new(path),
+            &serde_json::json!({
+                "workers": workers,
+                "callsPerWorker": calls_per_worker,
+                "calls": total,
+                "wallClockMs": wall_clock_ms,
+                "throughputCallsPerSecond": total as f64 / (wall_clock_ms / 1_000.0),
+                "dispatched": dispatched,
+                "freshnessDenialsAbsorbed": freshness.load(Ordering::SeqCst),
+                "admissionStore": after.admission_store,
+                // The decomposition is not reported here: the receiver's counters
+                // are process-wide, so with several calls in flight a per-call
+                // difference would attribute another call's work to this one.
+                "budgetReported": false,
+                "budgetContaminatedCalls": contaminated.load(Ordering::SeqCst),
+            }),
+        )?;
+    }
+    println!(
+        "concurrent load completed {total} admitted calls at {workers} in flight in {wall_clock_ms:.1} ms"
+    );
+    Ok(())
+}
+
+/// One round of the continuation race.
+struct RaceRound {
+    admitted: Vec<u64>,
+    denied: BTreeMap<u64, String>,
+    latencies: Vec<(u64, f64)>,
+}
+
+/// N calls presenting the SAME single-use continuation, all in flight at once.
+///
+/// Each racer carries its own admission bundle, lease, lineage bundle, bilateral
+/// invocation and DSSE envelope; the one thing they share is the continuation
+/// identifier. Exactly one may be admitted, and the receiver's dispatch counter
+/// must move by exactly one per round.
+async fn run_race(args: &Args) -> Result<(), BoxError> {
+    let workers = worker_count(args)?;
+    let repeats = args.count("repeats", 10)?;
+    if repeats < 2 {
+        return Err("--repeats must be at least two: one round is not a distribution".into());
+    }
+    let sender = Arc::new(Sender::connect(args).await?);
+    let before = sender.stats().await?;
+    let mut rounds = Vec::new();
+    let mut freshness_denials = 0_u64;
+    let freshness_budget = repeats.saturating_mul(4).max(20);
+
+    while (rounds.len() as u64) < repeats {
+        // One continuation, and one prepared call per racer that names it.
+        let first = sender.prepare().await?;
+        let shared = first.continuation_sequence;
+        let mut prepared = vec![first];
+        while (prepared.len() as u64) < workers {
+            prepared.push(sender.prepare_sharing(Some(shared)).await?);
+        }
+
+        let mut tasks = Vec::new();
+        for (worker, prepared) in prepared.into_iter().enumerate() {
+            let sender = Arc::clone(&sender);
+            let worker = worker as u64;
+            tasks.push(tokio::spawn(async move {
+                let request = sender.build_request(&prepared, scenario_named("allow")?);
+                let started = Instant::now();
+                let (decision, round_trip_ms) = sender.call(request).await?;
+                let _ = started;
+                Ok::<_, BoxError>((worker, decision, round_trip_ms))
+            }));
+        }
+        let mut round = RaceRound {
+            admitted: Vec::new(),
+            denied: BTreeMap::new(),
+            latencies: Vec::new(),
+        };
+        let mut freshness_in_round = 0_u64;
+        for task in tasks {
+            let (worker, decision, round_trip_ms) = task.await??;
+            round.latencies.push((worker, round_trip_ms));
+            if decision.verdict == "allow" {
+                round.admitted.push(worker);
+            } else {
+                if classify(&decision.failure_code) == DenialKind::Freshness {
+                    freshness_in_round = freshness_in_round.saturating_add(1);
+                }
+                round.denied.insert(worker, decision.failure_code);
+            }
+        }
+        // A revocation-freshness denial is the clock rather than the continuation:
+        // it would take a racer out of the race for a reason the round is not
+        // about, so the whole round is discarded and run again.
+        if freshness_in_round > 0 {
+            freshness_denials = freshness_denials.saturating_add(freshness_in_round);
+            if freshness_denials > freshness_budget {
+                return Err(format!(
+                    "the contention run absorbed {freshness_denials} revocation-freshness \
+                     denials, which is more than it allows"
+                )
+                .into());
+            }
+            continue;
+        }
+        if round.admitted.len() != 1 {
+            return Err(format!(
+                "{} of {workers} calls presenting one continuation were admitted; \
+                 exactly one may be",
+                round.admitted.len()
+            )
+            .into());
+        }
+        for (worker, failure_code) in &round.denied {
+            if failure_code != CONTINUATION_REPLAY_CODE {
+                return Err(format!(
+                    "racer {worker} lost the continuation race with failure code \
+                     {failure_code}, not {CONTINUATION_REPLAY_CODE}"
+                )
+                .into());
+            }
+        }
+        rounds.push(round);
+    }
+    let after = sender.stats().await?;
+
+    let dispatched = after.dispatches.saturating_sub(before.dispatches);
+    if dispatched != repeats {
+        return Err(format!(
+            "{workers} racers over {repeats} rounds dispatched {dispatched} times; \
+             exactly one dispatch per round is the whole property"
+        )
+        .into());
+    }
+
+    let mut winners: BTreeMap<u64, u64> = BTreeMap::new();
+    let mut winner_latencies = Vec::new();
+    let mut loser_latencies = Vec::new();
+    for round in &rounds {
+        let Some(winner) = round.admitted.first().copied() else {
+            return Err("a recorded round has no winner".into());
+        };
+        *winners.entry(winner).or_default() += 1;
+        for (worker, latency) in &round.latencies {
+            if *worker == winner {
+                winner_latencies.push(*latency);
+            } else {
+                loser_latencies.push(*latency);
+            }
+        }
+    }
+
+    if let Some(path) = args.optional("csv") {
+        let mut csv = String::from("round,worker,outcome,round_trip_ms\n");
+        for (index, round) in rounds.iter().enumerate() {
+            for (worker, latency) in &round.latencies {
+                let outcome = if round.admitted.contains(worker) {
+                    "admitted"
+                } else {
+                    "replayed"
+                };
+                csv.push_str(&format!("{index},{worker},{outcome},{latency:.6}\n"));
+            }
+        }
+        fs::write(path, csv)?;
+    }
+    if let Some(path) = args.optional("out") {
+        write_json(
+            Path::new(path),
+            &serde_json::json!({
+                "workers": workers,
+                "rounds": rounds.len(),
+                "dispatched": dispatched,
+                "expectedDispatched": repeats,
+                "replayFailureCode": CONTINUATION_REPLAY_CODE,
+                "winnersByWorker": winners,
+                "winnerLatenciesMs": winner_latencies,
+                "loserLatenciesMs": loser_latencies,
+                "freshnessDenialsAbsorbed": freshness_denials,
+                "admissionStore": after.admission_store,
+            }),
+        )?;
+    }
+    println!(
+        "continuation race: {workers} racers over {} rounds admitted exactly one each",
+        rounds.len()
+    );
+    Ok(())
+}
+
+/// What one probed host's clock looked like from here.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ClockReading {
+    kernel_id: String,
+    address: String,
+    samples: u64,
+    offset_ms: i64,
+    /// Half the round trip of the sample the offset was read from: the estimate
+    /// cannot be tighter than this.
+    uncertainty_ms: u64,
+    min_round_trip_ms: u64,
+}
+
+/// Refuse to measure a split run whose two hosts disagree about the time.
+///
+/// Reachability and clock agreement are the two things a one-host run never has
+/// to establish and a two-host run always does. The receiving kernel reads its
+/// clock in whole seconds and holds its revocation snapshot to a sub-second
+/// freshness bound, so a clock offset above the bound does not degrade the
+/// measurement, it changes which calls are admitted.
+async fn run_preflight(args: &Args) -> Result<(), BoxError> {
+    let loaded = load_role(args)?;
+    let peers = peer_map(args)?;
+    let targets = args.values("target");
+    if targets.is_empty() {
+        return Err("--target names the kernel id of a host to probe; give at least one".into());
+    }
+    let samples = args.count("samples", 8)?;
+    if samples == 0 {
+        return Err("--samples must be at least one".into());
+    }
+    let max_offset_ms = args.count("max-offset-ms", DEFAULT_MAX_CLOCK_OFFSET_MS)?;
+    let endpoint = bind_endpoint(args, &loaded.secrets.transport_seed_hex, None).await?;
+
+    let mut readings = Vec::new();
+    let mut refusals = Vec::new();
+    for target in targets {
+        let address = peer_address(&loaded.directory, &peers, target)?;
+        let mut best: Option<(i64, u64)> = None;
+        for _ in 0..samples {
+            // A probe that cannot connect is a reachability failure, which is the
+            // first thing preflight is for.
+            let (offset_ms, round_trip) = probe_clock(&endpoint, address.clone(), target)
+                .await
+                .map_err(|error| format!("{target} did not answer a clock probe: {error}"))?;
+            // The tightest estimate is the one from the fastest exchange: the
+            // error in the midpoint is bounded by half the round trip.
+            if best.is_none_or(|(_, best_round_trip)| round_trip < best_round_trip) {
+                best = Some((offset_ms, round_trip));
+            }
+        }
+        let Some((offset_ms, round_trip)) = best else {
+            return Err(format!("no clock probe of {target} completed").into());
+        };
+        let uncertainty_ms = round_trip / 2;
+        readings.push(ClockReading {
+            kernel_id: target.clone(),
+            address: address
+                .ip_addrs()
+                .map(|socket| socket.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+            samples,
+            offset_ms,
+            uncertainty_ms,
+            min_round_trip_ms: round_trip,
+        });
+        if offset_ms.unsigned_abs() > max_offset_ms {
+            refusals.push(format!(
+                "{target}'s clock is {offset_ms} ms from this host's, beyond the \
+                 {max_offset_ms} ms bound"
+            ));
+        }
+        if uncertainty_ms > max_offset_ms {
+            refusals.push(format!(
+                "the path to {target} has a {round_trip} ms round trip, so a \
+                 {max_offset_ms} ms offset bound cannot be established over it"
+            ));
+        }
+    }
+
+    if let Some(path) = args.optional("out") {
+        write_json(
+            Path::new(path),
+            &serde_json::json!({
+                "schema": "chio.experiment.federated-pair-preflight.v1",
+                "maxOffsetMs": max_offset_ms,
+                "samplesPerTarget": samples,
+                "readings": readings,
+                "refusals": refusals,
+                "admitted": refusals.is_empty(),
+            }),
+        )?;
+    }
+    if !refusals.is_empty() {
+        return Err(refusals.join("; ").into());
+    }
+    for reading in &readings {
+        println!(
+            "preflight: {} answered {} probes, clock offset {} ms (+/- {} ms)",
+            reading.kernel_id, reading.samples, reading.offset_ms, reading.uncertainty_ms
+        );
+    }
     Ok(())
 }
 
@@ -3172,9 +5814,15 @@ usage: federated_call_pair <subcommand> [--flag value ...]
   receiver  --dir DIR --directory FILE --trust FILE --treaty FILE
             --bind HOST:PORT --peer ORIGIN=HOST:PORT
             --handshake FILE --store-dir DIR --ready-out FILE
+            [--admission-store sqlite|memory]
   send      --dir DIR --directory FILE --trust FILE --treaty FILE
             --bind HOST:PORT --peer RECEIVER=HOST:PORT
             --scenario NAME --calls N [--csv FILE] [--out FILE]
+  baseline  (send flags) --calls N [--csv FILE] [--out FILE]
+  load      (send flags) --workers N --calls N [--csv FILE] [--out FILE]
+  race      (send flags) --workers N [--repeats N] [--csv FILE] [--out FILE]
+  preflight (send flags) --target KERNEL_ID [--target KERNEL_ID]
+            [--samples N] [--max-offset-ms N] [--out FILE]
   revoke    (send flags) --control FILE [--capability-id ID] [--repeats N]
             [--out FILE]
   cut       (send flags) --control FILE [--repeats N] [--out FILE]
@@ -3211,6 +5859,10 @@ fn main() -> Result<(), BoxError> {
             "origin" => run_origin(&args).await,
             "receiver" => run_receiver(&args).await,
             "send" => run_send(&args).await,
+            "baseline" => run_baseline(&args).await,
+            "load" => run_load(&args).await,
+            "race" => run_race(&args).await,
+            "preflight" => run_preflight(&args).await,
             "revoke" => run_revoke(&args).await,
             "cut" => run_cut(&args).await,
             other => Err(format!("unknown subcommand {other}\n{USAGE}").into()),

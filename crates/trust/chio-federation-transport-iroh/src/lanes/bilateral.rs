@@ -468,6 +468,17 @@ pub struct IrohBilateralCoSigner {
     /// hops a workload actually cost instead of inferring the number from the
     /// protocol.
     connections: Arc<AtomicU64>,
+    /// Cumulative nanoseconds this co-signer has spent inside
+    /// [`Endpoint::connect`] for Org A, across both profiles and shared by every
+    /// clone. Read through [`IrohBilateralCoSigner::connect_nanos`]. Paired with
+    /// `exchange_nanos` it splits a co-sign hop into the QUIC handshake and the
+    /// request/reply that follows it, so a caller can attribute the hop's share
+    /// of a latency budget to connection setup rather than infer it.
+    connect_nanos: Arc<AtomicU64>,
+    /// Cumulative nanoseconds spent in the request/reply exchange on an already
+    /// established connection: stream open, request write, reply read and decode.
+    /// Excludes the connect above and the connection close that follows.
+    exchange_nanos: Arc<AtomicU64>,
 }
 
 impl core::fmt::Debug for IrohBilateralCoSigner {
@@ -489,6 +500,8 @@ impl IrohBilateralCoSigner {
             address_book,
             limits: AcceptLimitConfig::default(),
             connections: Arc::new(AtomicU64::new(0)),
+            connect_nanos: Arc::new(AtomicU64::new(0)),
+            exchange_nanos: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -499,6 +512,43 @@ impl IrohBilateralCoSigner {
     #[must_use]
     pub fn connections_opened(&self) -> u64 {
         self.connections.load(Ordering::SeqCst)
+    }
+
+    /// Cumulative nanoseconds spent establishing QUIC connections to Org A,
+    /// across both profiles and every clone. Monotone and saturating.
+    ///
+    /// A co-sign hop is a connect followed by one request/reply exchange. This
+    /// counter holds the first half and [`Self::exchange_nanos`] the second, so
+    /// the cost of a hop can be split between the handshake and the round trip
+    /// instead of being reported as one opaque number.
+    #[must_use]
+    pub fn connect_nanos(&self) -> u64 {
+        self.connect_nanos.load(Ordering::SeqCst)
+    }
+
+    /// Cumulative nanoseconds spent in the request/reply exchange on an already
+    /// established connection, across both profiles and every clone. Monotone
+    /// and saturating. See [`Self::connect_nanos`].
+    #[must_use]
+    pub fn exchange_nanos(&self) -> u64 {
+        self.exchange_nanos.load(Ordering::SeqCst)
+    }
+
+    /// Count one opened connection and the time its handshake took.
+    fn record_connect(&self, elapsed: core::time::Duration) {
+        self.connections.fetch_add(1, Ordering::SeqCst);
+        self.connect_nanos.fetch_add(
+            u64::try_from(elapsed.as_nanos()).unwrap_or(u64::MAX),
+            Ordering::SeqCst,
+        );
+    }
+
+    /// Record the time one request/reply exchange took on an open connection.
+    fn record_exchange(&self, elapsed: core::time::Duration) {
+        self.exchange_nanos.fetch_add(
+            u64::try_from(elapsed.as_nanos()).unwrap_or(u64::MAX),
+            Ordering::SeqCst,
+        );
     }
 
     /// Override the default client-side slowloris bounds (per-phase timeouts on
@@ -527,6 +577,7 @@ impl IrohBilateralCoSigner {
             .address_of(&request.org_a_kernel_id)
             .ok_or_else(|| BilateralCoSigningError::UnknownPeer(request.org_a_kernel_id.clone()))?;
 
+        let dialed = std::time::Instant::now();
         let connection = client_bounded(
             &self.limits,
             AcceptPhase::AcceptStream,
@@ -534,9 +585,11 @@ impl IrohBilateralCoSigner {
         )
         .await?
         .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
-        self.connections.fetch_add(1, Ordering::SeqCst);
+        self.record_connect(dialed.elapsed());
 
+        let exchanged = std::time::Instant::now();
         let result = self.exchange(&connection, request).await;
+        self.record_exchange(exchanged.elapsed());
         connection.close(VarInt::from_u32(CLOSE_OK), b"done");
         result
     }
@@ -570,6 +623,7 @@ impl IrohBilateralCoSigner {
             .address_of(&request.org_a_kernel_id)
             .ok_or_else(|| BilateralCoSigningError::UnknownPeer(request.org_a_kernel_id.clone()))?;
 
+        let dialed = std::time::Instant::now();
         let connection = client_bounded(
             &self.limits,
             AcceptPhase::AcceptStream,
@@ -577,11 +631,13 @@ impl IrohBilateralCoSigner {
         )
         .await?
         .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
-        self.connections.fetch_add(1, Ordering::SeqCst);
+        self.record_connect(dialed.elapsed());
 
+        let exchanged = std::time::Instant::now();
         let result = self
             .receipt_exchange(&connection, request, body_bytes)
             .await;
+        self.record_exchange(exchanged.elapsed());
         connection.close(VarInt::from_u32(CLOSE_OK), b"done");
         result
     }
@@ -2415,5 +2471,54 @@ mod tests {
             .await
             .is_err());
         assert_eq!(cosigner.connections_opened(), 2);
+    }
+
+    #[tokio::test]
+    async fn hop_timers_split_the_handshake_from_the_exchange() {
+        let org_a = Peer::new(ORIGIN_KERNEL, 40, 13);
+        let org_b = Peer::new(TOOL_HOST_KERNEL, 41, 14);
+        let gate = DirectoryGate::new(verified_directory(&[&org_a, &org_b]));
+
+        let (addr, _router) = spawn_org_a(&org_a, gate, pinned_org_b(&org_b)).await;
+        let cosigner = spawn_org_b(&org_b, ORIGIN_KERNEL, addr).await;
+        assert_eq!(cosigner.connect_nanos(), 0);
+        assert_eq!(cosigner.exchange_nanos(), 0);
+
+        // Both halves are cumulative across hops and shared by every clone, which
+        // is what lets a caller take a before/after difference around one
+        // operation and read it as that operation's share.
+        let pae_bytes = b"DSSEv1 opaque bilateral pae preimage".to_vec();
+        let mut connect = 0_u64;
+        let mut exchange = 0_u64;
+        for hop in 1..=2_u64 {
+            cosigner
+                .request_dsse_cosignature_over_iroh(&org_b_request(
+                    &org_b,
+                    ORIGIN_KERNEL,
+                    &pae_bytes,
+                ))
+                .await
+                .expect("the dsse hop completes");
+            assert_eq!(cosigner.connections_opened(), hop);
+            let next_connect = cosigner.clone().connect_nanos();
+            let next_exchange = cosigner.clone().exchange_nanos();
+            assert!(next_connect > connect, "hop {hop} dialed in no time at all");
+            assert!(
+                next_exchange > exchange,
+                "hop {hop} exchanged in no time at all"
+            );
+            connect = next_connect;
+            exchange = next_exchange;
+        }
+
+        // A refusal that never dials moves neither half.
+        let mut wrong_schema = org_b_receipt_request(&org_b, ORIGIN_KERNEL);
+        wrong_schema.schema = BILATERAL_DSSE_COSIGNING_SCHEMA.to_string();
+        assert!(cosigner
+            .request_cosignature_over_iroh(&wrong_schema)
+            .await
+            .is_err());
+        assert_eq!(cosigner.connect_nanos(), connect);
+        assert_eq!(cosigner.exchange_nanos(), exchange);
     }
 }

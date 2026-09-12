@@ -55,6 +55,13 @@ dudect-bencher = { version = "0.7", optional = true }
 # the verifier-side surface so that crate is pulled in here as a dev
 # dependency only.
 chio-kernel-core = { workspace = true }
+# Integration test crates/trust/chio-federation/tests/verifier_hook_conformance.rs
+# drives the specification's numbered conforming verifier and the kernel's
+# pre-dispatch admission hook over one shared corpus, so it needs the kernel
+# hook and the runtime store that backs it. Dev-only, so the published
+# dependency graph is unchanged.
+chio-kernel = { workspace = true }
+chio-runtime-core = { workspace = true }
 chio-spec-validate = { workspace = true }
 criterion = { workspace = true }
 rand_chacha = { workspace = true }

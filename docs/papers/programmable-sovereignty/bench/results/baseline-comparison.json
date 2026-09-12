@@ -1,0 +1,990 @@
+{
+  "alternative": {
+    "denialCodes": [
+      {
+        "code": "peer.unpinned",
+        "step": 1
+      },
+      {
+        "code": "peer.signature_missing",
+        "step": 2
+      },
+      {
+        "code": "peer.signature_invalid",
+        "step": 2
+      },
+      {
+        "code": "request.schema_invalid",
+        "step": 3
+      },
+      {
+        "code": "replay.request_id_seen",
+        "step": 4
+      },
+      {
+        "code": "authorization.malformed",
+        "step": 5
+      },
+      {
+        "code": "authorization.schema_unrecognised",
+        "step": 5
+      },
+      {
+        "code": "authorization.signature_invalid",
+        "step": 6
+      },
+      {
+        "code": "authorization.noncanonical",
+        "step": 7
+      },
+      {
+        "code": "signer.not_distinct",
+        "step": 8
+      },
+      {
+        "code": "authorization.expired",
+        "step": 9
+      },
+      {
+        "code": "authorization.verdict_deny",
+        "step": 10
+      },
+      {
+        "code": "authorization.audience_mismatch",
+        "step": 11
+      },
+      {
+        "code": "authorization.principal_mismatch",
+        "step": 12
+      },
+      {
+        "code": "authorization.action_mismatch",
+        "step": 13
+      },
+      {
+        "code": "authorization.args_digest_mismatch",
+        "step": 14
+      },
+      {
+        "code": "agreement.unknown",
+        "step": 15
+      },
+      {
+        "code": "agreement.party_mismatch",
+        "step": 16
+      },
+      {
+        "code": "agreement.action_not_covered",
+        "step": 17
+      },
+      {
+        "code": "agreement.superseded",
+        "step": 18
+      },
+      {
+        "code": "context.request_supplied_attribute",
+        "step": 19
+      },
+      {
+        "code": "policy.no_rule",
+        "step": 20
+      },
+      {
+        "code": "policy.assurance_insufficient",
+        "step": 21
+      },
+      {
+        "code": "policy.amount_over_ceiling",
+        "step": 22
+      },
+      {
+        "code": "policy.approval_missing",
+        "step": 23
+      },
+      {
+        "code": "store.unavailable",
+        "step": 24
+      }
+    ],
+    "parts": [
+      "tool-call server",
+      "peer identity authenticated by a key pinned out of band",
+      "policy engine evaluating a local rule set and signing its decision",
+      "receiver-side replay table keyed by a request identifier"
+    ],
+    "profiles": {
+      "composed": "each part wired the way it documents itself",
+      "hardened": "the same parts with every operator-authored check written in"
+    },
+    "signatures": "Ed25519 and RFC 8785 canonical JSON, from the same Chio crate the receiver under comparison uses",
+    "store": "SQLite, WAL, synchronous = FULL"
+  },
+  "benchmarkInputTreeSha256": "506810c24cf9f68d43413ca93f704744e6cdb8a0ae33dc430f90212a34432bcc",
+  "commit": "86fbc03cb2e00d95742a7ae16a29f1cfbc281e49",
+  "cost": {
+    "alternative": {
+      "admittedCallMeanCiHighMs": 6.869005055512516,
+      "admittedCallMeanCiLowMs": 6.509655797512501,
+      "admittedCallMeanMs": 6.668011119000003,
+      "admittedCallP50Ms": 6.013351000000001,
+      "admittedCallP99Ms": 13.70962221,
+      "checksOnlyP50Us": 382.322,
+      "checksShareOfAdmittedCall": 0.06357885977385987,
+      "decisionRecordBytes": 616,
+      "durableBytesPerCall": 763.904,
+      "hardenedAdmittedCallP50Ms": 5.981931,
+      "hardenedChecksOnlyMeanCiHighUs": 433.7032618000002,
+      "hardenedChecksOnlyMeanCiLowUs": 414.9656645875004,
+      "hardenedChecksOnlyP50Us": 394.422,
+      "hardeningChecksCostP50Us": 12.100000000000023,
+      "hardeningCostVerdict": "indistinguishable",
+      "hardeningCostWholePathP50Ms": -0.03142000000000067,
+      "orderingCostP50Ms": 3.125656000000001,
+      "requestWireBytes": 932,
+      "responseBeforeRecordP50Ms": 2.887695,
+      "samples": 2000
+    },
+    "chio": {
+      "admittedCallP50Ms": 13.863188000000001,
+      "crossBoundaryDecisionP50Us": 20.68814475051975,
+      "durableBytesPerCall": 11861.195596951737,
+      "envelopeVerifyP50Us": 339.12711184210525,
+      "receiptAppendP50Ms": 4.681643,
+      "source": "results/bilateral-admission.json",
+      "sustainedCalls": 3543
+    },
+    "ratios": {
+      "latencyChioOverAlternative": 2.3054014309159734,
+      "storageChioOverAlternative": 15.527076173120886
+    }
+  },
+  "environment": {
+    "cargo": "1.94.1",
+    "commit": "86fbc03cb2e00d95742a7ae16a29f1cfbc281e49",
+    "cores": 12,
+    "cpuModel": "Neoverse-N1",
+    "loadAverage1m": 7.63,
+    "memoryGiB": 46.94236373901367,
+    "os": "Linux 6.17.0-1020-oracle aarch64",
+    "rustc": "1.94.1",
+    "toolchainPin": "1.94.1",
+    "worktreeDirty": true
+  },
+  "method": {
+    "bootstrap": {
+      "resamples": 10000,
+      "seed": 1
+    },
+    "checksSpan": "every signature verification, canonical encoding, consistency comparison, table lookup and rule evaluation the receiver performs, timed around the admission path and less the durable claim that sits in the middle of it",
+    "chioSide": "read from the committed bilateral-admission result rather than re-measured, so the two halves of the comparison cannot drift; the run refuses if that file is absent or its own counters disagree",
+    "confidence": 0.95,
+    "hardeningCost": "the hardened wiring runs six checks the composed wiring does not. Their cost is taken over the checks span alone, with the two durable writes excluded, because against a store that fsyncs a whole-path delta of that size is not resolvable; the verdict is over the two mean intervals of that span",
+    "interval": "the bootstrap interval is over the mean, so it brackets the mean and not the median; the two are reported separately and the distribution is right-skewed by the durable write's tail",
+    "latency": "the receiver's whole admission path in one process, from the arrival of a sealed request to the return of a decision, including the durable append",
+    "percentile": "linear interpolation between order statistics",
+    "profiles": "both wirings are reported. Reporting the hardened wiring alone would credit the composition with checks no part of it requires; reporting the composed wiring alone would understate what a careful operator can reach",
+    "propertyVerdicts": "derived from cases the run drove, not asserted: a property fails only when a driven case dispatched a call the property forbids",
+    "storage": "growth of the SQLite store, checkpointed before and after, divided by the calls measured"
+  },
+  "negativeCorpus": {
+    "attacks": 22,
+    "cases": 26,
+    "chioThreatIds": 20,
+    "closedByHardening": 7,
+    "composedAdmits": 10,
+    "composedAdmittedCaseIds": [
+      "wrong-live-agreement",
+      "superseded-agreement",
+      "unbound-resource-field",
+      "one-party-holds-both-keys",
+      "reordered-encoding",
+      "signer-minted-decade-window",
+      "authorization-replay-under-fresh-identifier",
+      "request-supplied-assurance-attribute",
+      "request-supplied-approval-object",
+      "cross-receiver-presentation"
+    ],
+    "driven": 23,
+    "entries": [
+      {
+        "analogue": "direct",
+        "attack": "the signed decision names an agreement identifier the receiver does not hold",
+        "baseline_case_id": "unknown-agreement",
+        "chio_case_id": "wrong-treaty",
+        "chio_expected_code": "chio_treaty_scope_hash_mismatch",
+        "composed": {
+          "admitted": false,
+          "denial_code": "agreement.unknown",
+          "denial_step": 15,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "agreement.unknown",
+          "denial_step": 15,
+          "dispatched": false
+        },
+        "note": "The composed receiver resolves the identifier in its own table, so an identifier it never provisioned denies. This is the one place the composition already practices receiver-side resolution.",
+        "threat_id": "PS-TH-01"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the signed decision names a different agreement the receiver does hold with the same counterparty, with a higher ceiling",
+        "baseline_case_id": "wrong-live-agreement",
+        "chio_case_id": "wrong-treaty",
+        "chio_expected_code": "chio_treaty_scope_hash_mismatch",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "policy.approval_missing",
+          "denial_step": 23,
+          "dispatched": false
+        },
+        "note": "Nothing in the composition ties this call to the agreement under which it was authorized: the identifier is a field of the decision and any identifier that resolves and covers the caller and the action passes. The hardened profile denies only incidentally, because the approval record it resolves names the other agreement.",
+        "threat_id": "PS-TH-01"
+      },
+      {
+        "analogue": "partial",
+        "attack": "the signed decision names an agreement version the receiver has retired",
+        "baseline_case_id": "superseded-agreement",
+        "chio_case_id": "stale-treaty",
+        "chio_expected_code": "chio_treaty_stale",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "agreement.superseded",
+          "denial_step": 18,
+          "dispatched": false
+        },
+        "note": "The composed request carries no agreement version, so neither profile can tell which version the signer decided under; the hardened profile denies only because the receiver's record for that identifier is itself marked retired. A decision issued under version 1 and presented against a live version 2 record is indistinguishable from one issued under version 2.",
+        "threat_id": "PS-TH-02"
+      },
+      {
+        "analogue": "none",
+        "attack": "none: the composition has no object standing for the bound two organizations jointly accept",
+        "baseline_case_id": "no-jointly-computed-bound",
+        "chio_case_id": "forged-intersection",
+        "chio_expected_code": "chio_treaty_intersection_mismatch",
+        "note": "The Chio case forges a digest of an intersection both kernels computed. The composed parts have a rule set on each side and no object representing their meet, so there is no digest to forge and no comparison to defeat. The nearest reachable attack is the claimed-attribute case under PS-TH-16.",
+        "threat_id": "PS-TH-03"
+      },
+      {
+        "analogue": "partial",
+        "attack": "the call names an approval record the receiver does not hold",
+        "baseline_case_id": "reference-to-unheld-record",
+        "chio_case_id": "missing-lineage",
+        "chio_expected_code": "chio_treaty_missing_required_evidence",
+        "composed": {
+          "admitted": false,
+          "denial_code": "policy.approval_missing",
+          "denial_step": 23,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "policy.approval_missing",
+          "denial_step": 23,
+          "dispatched": false
+        },
+        "note": "The composed receiver can be given a rule requiring a locally-resolved approval, and then an unresolvable reference denies; this is the same drive the governance case runs, because the composition has one mechanism where Chio has two. What has no analogue is the part that matters: the approval is a static record provisioned out of band and reusable without limit, not evidence that this call rests on a specific prior call the receiver itself recorded.",
+        "threat_id": "PS-TH-04"
+      },
+      {
+        "analogue": "partial",
+        "attack": "the signed decision names a resource unrelated to the arguments of the call",
+        "baseline_case_id": "unbound-resource-field",
+        "chio_case_id": "receipt-mismatch",
+        "chio_expected_code": "predicate.schema_invalid",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "hardened": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "note": "The composition carries no digest of a receipt the receiver holds, so the Chio attack has no target. The reachable analogue is the decision's own resource field, which the composed receiver carries into its audit record and never compares against anything. It is the composition's counterpart of a carried-but-uncompared field.",
+        "threat_id": "PS-TH-05"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the arguments sent differ from the arguments the decision covers",
+        "baseline_case_id": "args-digest-mismatch",
+        "chio_case_id": "request-hash-mismatch",
+        "chio_expected_code": "predicate.schema_invalid",
+        "composed": {
+          "admitted": false,
+          "denial_code": "authorization.args_digest_mismatch",
+          "denial_step": 14,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "authorization.args_digest_mismatch",
+          "denial_step": 14,
+          "dispatched": false
+        },
+        "note": "The receiver recomputes the digest over the canonical encoding of the arguments it received and compares it with the digest the decision carries. This is a recomputation from the request, not a resolution against receiver state, and it holds in both profiles.",
+        "threat_id": "PS-TH-06"
+      },
+      {
+        "analogue": "none",
+        "attack": "none: the composition has no outcome digest, because it has no receipt of the prior call to bind one to",
+        "baseline_case_id": "no-outcome-object",
+        "chio_case_id": "outcome-hash-mismatch",
+        "chio_expected_code": "predicate.schema_invalid",
+        "note": "A signed policy decision describes an intended action. It has no field for what a prior call returned, so there is nothing for a substituted outcome digest to contradict.",
+        "threat_id": "PS-TH-07"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the request arrives without the peer signature",
+        "baseline_case_id": "missing-peer-signature",
+        "chio_case_id": "missing-signature",
+        "chio_expected_code": "dsse.malformed",
+        "composed": {
+          "admitted": false,
+          "denial_code": "peer.signature_missing",
+          "denial_step": 2,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "peer.signature_missing",
+          "denial_step": 2,
+          "dispatched": false
+        },
+        "note": "Channel authentication is the composition's strongest part and it holds: an unsigned request never reaches the replay table.",
+        "threat_id": "PS-TH-08"
+      },
+      {
+        "analogue": "none",
+        "attack": "none: the composition carries one signature per role, so there is no set of signatures inside one envelope to populate with a duplicate key identifier",
+        "baseline_case_id": "no-signature-set",
+        "chio_case_id": "duplicate-signature-keyid",
+        "chio_expected_code": "dsse.malformed",
+        "note": "The attack exists in Chio because the envelope carries a signature array that a verifier iterates. The composed request carries a channel signature and a detached decision signature, each verified against one pinned key, so a duplicate has nowhere to sit.",
+        "threat_id": "PS-TH-09"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the counterparty's channel key and its policy-engine key are the same key, pinned for both roles",
+        "baseline_case_id": "one-party-holds-both-keys",
+        "chio_case_id": "repeated-signer-key",
+        "chio_expected_code": "signer.independence_required",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "signer.not_distinct",
+          "denial_step": 8,
+          "dispatched": false
+        },
+        "note": "Nothing in the composed wiring compares the two pinned keys, so one party signing both halves passes. The check is distinctness, not independence, in either system: two different keys held by one operator pass both.",
+        "threat_id": "PS-TH-10"
+      },
+      {
+        "analogue": "direct",
+        "attack": "a different document the same policy key signed for another purpose is presented as the decision",
+        "baseline_case_id": "type-confusion",
+        "chio_case_id": "wrong-predicate-type",
+        "chio_expected_code": "predicate.type_unrecognised",
+        "composed": {
+          "admitted": false,
+          "denial_code": "authorization.malformed",
+          "denial_step": 5,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "authorization.malformed",
+          "denial_step": 5,
+          "dispatched": false
+        },
+        "note": "Domain separation by a schema tag and a strict parse that refuses unknown fields. This holds in both profiles and costs nothing.",
+        "threat_id": "PS-TH-11"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the transmitted decision bytes carry the action key twice, honest value first and the attacker's last, with the signature over exactly those bytes",
+        "baseline_case_id": "duplicate-key-in-signed-bytes",
+        "chio_case_id": "noncanonical-payload",
+        "chio_expected_code": "statement.malformed",
+        "composed": {
+          "admitted": false,
+          "denial_code": "authorization.malformed",
+          "denial_step": 5,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "authorization.malformed",
+          "denial_step": 5,
+          "dispatched": false
+        },
+        "note": "A strict parse rejects the duplicate before any profile-specific check, so the composition holds here without needing a canonicalization comparison.",
+        "threat_id": "PS-TH-12"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the decision is transmitted in a semantically identical but non-canonical encoding",
+        "baseline_case_id": "reordered-encoding",
+        "chio_case_id": "noncanonical-payload",
+        "chio_expected_code": "statement.malformed",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "authorization.noncanonical",
+          "denial_step": 7,
+          "dispatched": false
+        },
+        "note": "Admitting this is not a defect: the parsed content is the same and the signature covers the bytes received. The case is recorded because it is the one place the two profiles differ for a reason that is not a security difference.",
+        "threat_id": "PS-TH-12"
+      },
+      {
+        "analogue": "partial",
+        "attack": "the signed decision's validity window has closed",
+        "baseline_case_id": "expired-authorization",
+        "chio_case_id": "stale-lease",
+        "chio_expected_code": "capability.lease_expired_or_unknown",
+        "composed": {
+          "admitted": false,
+          "denial_code": "authorization.expired",
+          "denial_step": 9,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "authorization.expired",
+          "denial_step": 9,
+          "dispatched": false
+        },
+        "note": "The expiry holds. What does not translate is that the window is a timestamp the signer chose rather than a reference the receiver resolves: see the long-window case, where the same signer mints a decade.",
+        "threat_id": "PS-TH-13"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the signed decision declares a ten-year validity window",
+        "baseline_case_id": "signer-minted-decade-window",
+        "chio_case_id": "stale-lease",
+        "chio_expected_code": "capability.lease_expired_or_unknown",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "hardened": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "note": "The receiver has no lease record to resolve, so the only bound on the window is the one the signer wrote. A Chio lease reference resolves in the receiver's own registry and carries the receiver's expiry, which a signer cannot extend.",
+        "threat_id": "PS-TH-13"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the call names an approval identifier the receiver does not hold, and presents nothing else",
+        "baseline_case_id": "approval-reference-unresolvable",
+        "chio_case_id": "missing-governance-receipt",
+        "chio_expected_code": "governance.receipt_required_missing",
+        "composed": {
+          "admitted": false,
+          "denial_code": "policy.approval_missing",
+          "denial_step": 23,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "policy.approval_missing",
+          "denial_step": 23,
+          "dispatched": false
+        },
+        "note": "The rule requiring an approval is operator-authored: the composition supplies the place to write it, not the requirement. With it written, an unresolvable reference denies in both profiles.",
+        "threat_id": "PS-TH-14"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the identical request is presented twice",
+        "baseline_case_id": "request-id-replay",
+        "chio_case_id": "replayed-continuation",
+        "chio_expected_code": "chio_treaty_continuation_replay",
+        "composed": {
+          "admitted": false,
+          "denial_code": "replay.request_id_seen",
+          "denial_step": 4,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "replay.request_id_seen",
+          "denial_step": 4,
+          "dispatched": false
+        },
+        "note": "The replay table holds: a single-row insert on a primary key admits the first presentation and denies the second.",
+        "threat_id": "PS-TH-15"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the same signed decision is presented again under a request identifier the caller picked freshly",
+        "baseline_case_id": "authorization-replay-under-fresh-identifier",
+        "chio_case_id": "replayed-continuation",
+        "chio_expected_code": "chio_treaty_continuation_replay",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "hardened": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "note": "The replay table is keyed by a value the caller chooses, so it makes an identifier single-use and leaves the authorization multi-use. A Chio continuation is minted by the receiver and named by the statement, so the second presentation resolves a row that is already consumed.",
+        "threat_id": "PS-TH-15"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the request's policy context carries the assurance level the receiver's own record assigns, and the rule that gates the action reads it",
+        "baseline_case_id": "request-supplied-assurance-attribute",
+        "chio_case_id": "request-smuggled-trust-root",
+        "chio_expected_code": "request_smuggled_trust_root",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "context.request_supplied_attribute",
+          "denial_step": 19,
+          "dispatched": false
+        },
+        "note": "This is the composition's receiver-locality failure and it is not a bug in any part: passing the incoming request as the policy context is how every policy decision point is called. The hardened profile refuses any context attribute whose name the receiver owns, which is a denylist of exactly the kind the Chio receiver uses.",
+        "threat_id": "PS-TH-16"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the request presents the approval record inline instead of naming one the receiver holds",
+        "baseline_case_id": "request-supplied-approval-object",
+        "chio_case_id": "dynamic-trust-smuggling",
+        "chio_expected_code": "request_smuggled_dynamic_trust",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "context.request_supplied_attribute",
+          "denial_step": 19,
+          "dispatched": false
+        },
+        "note": "Presenting a claim rather than naming one is the ordinary way a claim travels, so the composed wiring accepts it. The hardened wiring refuses the request-supplied attribute at the context step, before it reaches the rule that would have resolved the identifier, so the denial code is the same one the assurance case produces.",
+        "threat_id": "PS-TH-17"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the decision carries a schema tag the receiver does not recognise",
+        "baseline_case_id": "wrong-schema-tag",
+        "chio_case_id": "schema-mismatch",
+        "chio_expected_code": "dsse.malformed",
+        "composed": {
+          "admitted": false,
+          "denial_code": "authorization.schema_unrecognised",
+          "denial_step": 5,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "authorization.schema_unrecognised",
+          "denial_step": 5,
+          "dispatched": false
+        },
+        "note": "Holds in both profiles.",
+        "threat_id": "PS-TH-18"
+      },
+      {
+        "analogue": "partial",
+        "attack": "the signed decision's verdict is deny and the call is sent anyway",
+        "baseline_case_id": "signer-denied-receiver-would-allow",
+        "chio_case_id": "policy-disagreement",
+        "chio_expected_code": "policy.verdict_disagreement",
+        "composed": {
+          "admitted": false,
+          "denial_code": "authorization.verdict_deny",
+          "denial_step": 10,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "authorization.verdict_deny",
+          "denial_step": 10,
+          "dispatched": false
+        },
+        "note": "The composed receiver refuses a decision that does not say allow, which covers the disagreement the Chio case tests. It is weaker in one respect: there is one signed verdict rather than two, so a receiver cannot tell a counterparty that never evaluated from one that evaluated and allowed.",
+        "threat_id": "PS-TH-19"
+      },
+      {
+        "analogue": "direct",
+        "attack": "a validly signed deny is presented as authorization",
+        "baseline_case_id": "signed-deny-presented",
+        "chio_case_id": "signed-unanimous-deny",
+        "chio_expected_code": "chio_treaty_policy_denied",
+        "composed": {
+          "admitted": false,
+          "denial_code": "authorization.verdict_deny",
+          "denial_step": 10,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "authorization.verdict_deny",
+          "denial_step": 10,
+          "dispatched": false
+        },
+        "note": "The same drive as PS-TH-19: with one signed verdict the two Chio cases collapse into one baseline case, and it holds.",
+        "threat_id": "PS-TH-20"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the admissible call is presented unchanged to a second receiver that pinned the same counterparty keys and provisioned the same agreement identifier",
+        "baseline_case_id": "cross-receiver-presentation",
+        "chio_case_id": "audience-binding",
+        "chio_expected_code": "n/a",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "authorization.audience_mismatch",
+          "denial_step": 11,
+          "dispatched": false
+        },
+        "note": "Not in the twenty-case corpus; it is the drive for the fourth property. A tool call has no audience field, so the composed wiring admits. The hardened wiring carries an audience in the decision and checks it.",
+        "threat_id": "PS-EXTRA-01"
+      },
+      {
+        "analogue": "direct",
+        "attack": "nothing is modified",
+        "baseline_case_id": "unmodified-admissible-call",
+        "chio_case_id": "null-case",
+        "chio_expected_code": "n/a",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "hardened": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "note": "The null case. Without it the corpus could be denying everything for an unrelated reason.",
+        "threat_id": "PS-EXTRA-02"
+      }
+    ],
+    "hardenedAdmits": 3,
+    "hardenedAdmittedCaseIds": [
+      "unbound-resource-field",
+      "signer-minted-decade-window",
+      "authorization-replay-under-fresh-identifier"
+    ],
+    "noAnalogue": 3,
+    "noAnalogueCaseIds": [
+      "no-jointly-computed-bound",
+      "no-outcome-object",
+      "no-signature-set"
+    ]
+  },
+  "profile": "release",
+  "properties": [
+    {
+      "composed": "fails",
+      "hardened": "fails",
+      "note": "This is the property the composition cannot reach by hardening, and the reason is structural rather than a missing check: ten of the sixteen substitution rows have no carrier in the composed request at all, so for those facts there is nothing to compare. The hardened profile does deny the wrong-live-agreement case, but incidentally, because the approval record it resolves names the other agreement; move the approval and the denial goes away.",
+      "property": "admission binding",
+      "statement": "if the receiver dispatches, every binding field of the presented evidence equals the value the receiver computed for this request from its own state, and the continuation it names was unconsumed",
+      "step": "no step. The fields the composed receiver does check resolve identifiers in its own tables (steps 1, 15 and 23) or recompute a digest from the request (step 14); none is a comparison against a value the receiver computed for this call before it arrived, and no step resolves a single-use object the receiver minted for it",
+      "weakened_to": "the request is bound to its own arguments, to a caller the receiver pinned, to an agreement identifier and an approval identifier that resolve in the receiver's own tables; nothing binds it to the authorization under which it was issued, and nothing makes that authorization single-use",
+      "witnesses": [
+        "authorization-replay-under-fresh-identifier",
+        "wrong-live-agreement",
+        "superseded-agreement",
+        "signer-minted-decade-window"
+      ]
+    },
+    {
+      "composed": "fails",
+      "hardened": "holds",
+      "note": "This is the sharpest result of the comparison and it is not a defect in any component. Handing the incoming request to the policy engine as its evaluation context is the documented way to call a policy decision point, and it is what makes the decision a function of the request. The hardened profile refuses any context attribute whose name the receiver owns, which is a name denylist of exactly the kind Chio uses, and it then holds. The same three components yield either outcome and nothing in the composition records which one an operator deployed.",
+      "property": "receiver locality",
+      "statement": "the roots, pins, agreements, tables and registries used to decide a request are a function of the receiver's state before the request arrived, and are independent of the request's content",
+      "step": "step 19, where the policy context is assembled",
+      "witnesses": [
+        "request-supplied-assurance-attribute",
+        "request-supplied-approval-object"
+      ]
+    },
+    {
+      "composed": "holds_weakened",
+      "hardened": "holds_weakened",
+      "note": "The mechanism is identical to Chio's and the difference is whose value it is keyed by. Chio's continuation is minted by the receiver before the request and named by the statement, so the second presentation resolves a row already consumed. The composed table is keyed by a value the caller chooses, so the caller picks a new one. Both profiles behave the same way here, because the difference is in the protocol and not in how carefully the parts were wired.",
+      "property": "single use",
+      "statement": "for a continuation identifier c, at most one admission ever reaches dispatch with c bound to it",
+      "step": "step 4, the replay table's single-row insert on a primary key",
+      "weakened_to": "at most one dispatch per request identifier, where the identifier is chosen by the caller; the authorization itself is reusable until it expires",
+      "witnesses": [
+        "request-id-replay",
+        "authorization-replay-under-fresh-identifier"
+      ]
+    },
+    {
+      "composed": "fails",
+      "hardened": "holds",
+      "note": "A tool call has no audience field, so the composed wiring has nothing to check and a second receiver that pinned the same counterparty and provisioned the same agreement identifier admits the same call. Adding an audience to the signed decision closes it, and is the cheapest of the four repairs. Note that the composed receiver never asks whether it is itself a party to the agreement it resolved; checking the participant list would close the same hole.",
+      "property": "audience binding",
+      "statement": "a statement accepted by receiver R is not accepted by a different receiver R' unless R' separately pinned the same two keys, activated the same agreement, and holds the same receipt",
+      "step": "step 11, which only the hardened profile runs",
+      "witnesses": [
+        "cross-receiver-presentation"
+      ]
+    }
+  ],
+  "propertySummary": {
+    "composed": {
+      "fails": 3,
+      "holds": 0,
+      "holdsWeakened": 1
+    },
+    "hardened": {
+      "fails": 1,
+      "holds": 2,
+      "holdsWeakened": 1
+    }
+  },
+  "schema": "chio.programmable-sovereignty.baseline-comparison.v1",
+  "substitutionCorpus": {
+    "bindingFields": 15,
+    "entries": [
+      {
+        "baseline_carrier": "policy_decision.agreement_id",
+        "basis": "resolution",
+        "chio_field": "treaty_id",
+        "composed": {
+          "admitted": false,
+          "denial_code": "agreement.unknown",
+          "denial_step": 15,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "agreement.unknown",
+          "denial_step": 15,
+          "dispatched": false
+        },
+        "note": "The one field the composition already resolves against receiver-held state. A substituted identifier the receiver never provisioned denies; a substituted identifier that names a different live agreement with the same counterparty does not, which is the wrong-live-agreement case of the negative corpus.",
+        "noticed_composed": true,
+        "noticed_hardened": true
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "treaty_scope_sha256",
+        "note": "The receiver holds an agreement record with a scope. The composed request pins no digest of it, so a sender and a receiver disagreeing about the content of the agreement they are operating under produces no observable event.",
+        "noticed_composed": false,
+        "noticed_hardened": false
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "ladder_intersection_sha256",
+        "note": "No object stands for the bound two organizations jointly accept, so there is no digest to substitute.",
+        "noticed_composed": false,
+        "noticed_hardened": false
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "admission_report_sha256",
+        "note": "The one row where the two systems agree in outcome and differ in why. Chio carries this field and never compares it. The composition does not carry it at all. Neither notices a substitution, and in neither case does anything rest on it.",
+        "noticed_composed": false,
+        "noticed_hardened": false
+      },
+      {
+        "baseline_carrier": "request.request_id",
+        "basis": "carried_never_compared",
+        "chio_field": "continuation_sha256",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "hardened": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "note": "The nearest carrier is the replay table's key, and it is tested for absence, never for equality with anything the receiver minted. Substituting it yields an identifier the table has not seen, so the substituted call is admitted and dispatches. The replay table makes an identifier single-use; it does not make an authorization single-use.",
+        "noticed_composed": false,
+        "noticed_hardened": false
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "lineage_bundle_sha256",
+        "note": "The composition has no record of the chain of prior calls this one continues, so there is no bundle digest to substitute.",
+        "noticed_composed": false,
+        "noticed_hardened": false
+      },
+      {
+        "baseline_carrier": "policy_decision.action against request.tool_name",
+        "basis": "internal_consistency",
+        "chio_field": "action_class_id",
+        "composed": {
+          "admitted": false,
+          "denial_code": "authorization.action_mismatch",
+          "denial_step": 13,
+          "dispatched": false
+        },
+        "consistent_composed": {
+          "admitted": false,
+          "denial_code": "agreement.action_not_covered",
+          "denial_step": 17,
+          "dispatched": false
+        },
+        "consistent_hardened": {
+          "admitted": false,
+          "denial_code": "agreement.action_not_covered",
+          "denial_step": 17,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "authorization.action_mismatch",
+          "denial_step": 13,
+          "dispatched": false
+        },
+        "note": "Substituting the decision's action alone is caught, but the comparison is between two fields the sender supplied. The consistent substitution, which moves both, is then decided by the receiver's own agreement record and rule table, so the composition does hold this field, by resolution rather than by the consistency check that fires first.",
+        "noticed_composed": true,
+        "noticed_hardened": true
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "consistency_model",
+        "note": "The composition names no consistency model for cross-organization state, so there is nothing to substitute.",
+        "noticed_composed": false,
+        "noticed_hardened": false
+      },
+      {
+        "baseline_carrier": "policy_decision.tool_args_sha256",
+        "basis": "recomputation",
+        "chio_field": "request_sha256",
+        "composed": {
+          "admitted": false,
+          "denial_code": "authorization.args_digest_mismatch",
+          "denial_step": 14,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "authorization.args_digest_mismatch",
+          "denial_step": 14,
+          "dispatched": false
+        },
+        "note": "The receiver canonicalizes the arguments it received and compares. This binds the decision to the arguments and holds in both profiles. It is the composition's strongest binding and the only one that does not depend on an operator writing a rule.",
+        "noticed_composed": true,
+        "noticed_hardened": true
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "outcome_sha256",
+        "note": "A policy decision describes an intended action and carries nothing about what a prior call returned.",
+        "noticed_composed": false,
+        "noticed_hardened": false
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "local_receipt_sha256",
+        "note": "The composition's audit record is written after the decision and is never named by a later request, so no receipt digest crosses the boundary and none can be substituted.",
+        "noticed_composed": false,
+        "noticed_hardened": false
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "remote_receipt_sha256",
+        "note": "The counterparty's audit record is not visible to the receiver at all, so there is nothing for the request to point at.",
+        "noticed_composed": false,
+        "noticed_hardened": false
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "lease_refs",
+        "note": "The validity window is a pair of timestamps the signer chose, not a reference the receiver resolves. There is no lease identifier to substitute, and correspondingly no receiver-side bound on the window: see the decade-window case of the negative corpus.",
+        "noticed_composed": false,
+        "noticed_hardened": false
+      },
+      {
+        "baseline_carrier": "tool_args.approval_id",
+        "basis": "resolution",
+        "chio_field": "governance_refs",
+        "composed": {
+          "admitted": false,
+          "denial_code": "policy.approval_missing",
+          "denial_step": 23,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "policy.approval_missing",
+          "denial_step": 23,
+          "dispatched": false
+        },
+        "note": "Held, on the condition that an operator wrote the rule requiring the approval. The composition supplies the place to write that rule and does not require it, and the composed profile is additionally satisfied by an approval the request presents rather than one it names.",
+        "noticed_composed": true,
+        "noticed_hardened": true
+      },
+      {
+        "baseline_carrier": "policy_decision.principal against request.caller",
+        "basis": "internal_consistency",
+        "chio_field": "signer_kernel_ids, as a set",
+        "composed": {
+          "admitted": false,
+          "denial_code": "authorization.principal_mismatch",
+          "denial_step": 12,
+          "dispatched": false
+        },
+        "consistent_composed": {
+          "admitted": false,
+          "denial_code": "peer.unpinned",
+          "denial_step": 1,
+          "dispatched": false
+        },
+        "consistent_hardened": {
+          "admitted": false,
+          "denial_code": "peer.unpinned",
+          "denial_step": 1,
+          "dispatched": false
+        },
+        "hardened": {
+          "admitted": false,
+          "denial_code": "authorization.principal_mismatch",
+          "denial_step": 12,
+          "dispatched": false
+        },
+        "note": "Substituting the decision's principal alone is caught by the consistency check. The consistent substitution, which moves the caller too, is caught by the pin table, so the composition holds this field by resolution. Channel authentication is the part of the composition that works.",
+        "noticed_composed": true,
+        "noticed_hardened": true
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "signer_kernel_ids, in order",
+        "note": "One signature per role and no ordered signer list, so there is no order to reverse.",
+        "noticed_composed": false,
+        "noticed_hardened": false
+      }
+    ],
+    "notCarried": 10,
+    "noticedComposed": 5,
+    "noticedHardened": 5,
+    "rows": 16
+  },
+  "worktreeDirty": true
+}

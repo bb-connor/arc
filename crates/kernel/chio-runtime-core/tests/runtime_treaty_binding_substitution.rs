@@ -15,7 +15,12 @@
 //! conditions are driven twice: once against an action class that resolves the
 //! lineage bundle and the invocation record, and once against a class that
 //! resolves only the record. One field is never compared, and its case asserts
-//! admission instead of a code.
+//! admission instead of a code; two further cases pin what the receiver does
+//! still require of that field, and that it cannot mask a compared one.
+//!
+//! The corpus over every field of the predicate, including the fields outside
+//! this binding reference and every pair inside it, is
+//! `runtime_treaty_predicate_substitution.rs`.
 
 mod support;
 
@@ -295,6 +300,34 @@ fn receipt_digests_are_compared_through_the_forced_invocation_record() -> TestRe
         binding.remote_receipt_sha256 = substituted_digest(&binding.remote_receipt_sha256);
     })?;
     assert_rejected_without_dispatch(&remote, BINDING_MISMATCH);
+    Ok(())
+}
+
+/// The one field the receiver never compares is still required to be 64
+/// lowercase hex characters, and that requirement is the whole of what the
+/// receiver checks about it. A value outside that shape is refused by strict
+/// envelope verification before the binding comparisons are reached.
+#[test]
+fn substituting_admission_report_digest_with_a_non_hex_value_is_rejected() -> TestResult {
+    let run = substitute_and_admit(|binding| {
+        binding.admission_report_sha256 = "z".repeat(64);
+    })?;
+    assert_rejected_without_dispatch(&run, UNVERIFIED_EVIDENCE);
+    Ok(())
+}
+
+/// Two fields substituted at once. The uncompared field cannot mask a compared
+/// one: the pair is rejected with the compared field's code, and nothing
+/// dispatches. The exhaustive pair corpus lives in
+/// `runtime_treaty_predicate_substitution.rs`; this case is here because it is
+/// the pair that the one-field-at-a-time reading of this file would miss.
+#[test]
+fn substituting_the_uncompared_field_alongside_a_compared_one_is_rejected() -> TestResult {
+    let run = substitute_and_admit(|binding| {
+        binding.admission_report_sha256 = substituted_digest(&binding.admission_report_sha256);
+        binding.continuation_sha256 = substituted_digest(&binding.continuation_sha256);
+    })?;
+    assert_rejected_without_dispatch(&run, BINDING_MISMATCH);
     Ok(())
 }
 

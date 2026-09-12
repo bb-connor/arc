@@ -58,7 +58,9 @@ it is not a build-provenance gap. It is the gap between two parties
 **signing the same canonical body** (a statistical accident) and two
 parties **independently committing to the same canonical action under
 their separate policies** (a verifiable, mechanically-checkable joint
-intent). The existing chio primitive is
+intent). That is the vocabulary this predicate makes expressible;
+section 4.4 states exactly which part of it the shipped co-signing
+protocol enforces and which part a deployment must add for itself. The existing chio primitive is
 [../crates/trust/chio-federation/src/bilateral.rs](../crates/trust/chio-federation/src/bilateral.rs).
 The composition unit is the workflow receipt
 ([../crates/platform/chio-workflow/src/lib.rs](../crates/platform/chio-workflow/src/lib.rs)),
@@ -109,7 +111,7 @@ nonce is not bound to the verifier context.
 
 ---
 
-## 4. Subject Definition
+## 4. Subject Definition and Normative Data Flow
 
 The in-toto Statement v1 envelope binds a predicate to one or more
 ResourceDescriptor subjects. For bilateral co-signed invocations, the
@@ -145,6 +147,269 @@ needing to dereference any external pointer. This mirrors the chio
 internal pattern in
 [../crates/trust/chio-federation/src/bilateral.rs](../crates/trust/chio-federation/src/bilateral.rs)
 where both kernels sign over the canonical bytes of `CoSigningBody`.
+
+### 4.1 Normative Data Flow
+
+This subsection traces one complete cross-organization call, one numbered step
+per object, naming who produces it, which store holds it, and the moment it
+enters the receiving kernel's state. It is normative: an implementation that
+orders these objects differently is not conforming.
+
+**Roles.** Org A is the **origin**: the organization whose agent authored the
+call. Org B is the **receiver**: the organization whose kernel admits and
+dispatches the tool. In the predicate, `tool_server_a` is always Org A and
+`tool_server_b` is always Org B. The receiver is therefore the second party
+throughout, which is what section 7 step 17 means when it requires the resolved
+receipt's kernel key to be the pinned `tool_server_b` key: the subject of an
+inbound statement is a receipt the receiver itself signed.
+
+**Keys.** Each kernel holds two key roles. The **kernel signing key** signs
+`ChioReceipt` bodies; its public half is the receipt's `kernel_key`. The
+**passport key** signs DSSE pre-authentication bytes; its SHA-256 is both the
+envelope `keyid` and the predicate's `passport_key_fingerprint`. For Org B the
+two MUST be the same key, because step 17 compares the resolved receipt's
+`kernel_key` against the pinned `tool_server_b` passport key and rejects any
+difference with `peer.unpinned_or_keyid_mismatch`. For Org A this
+specification relates the two in no way, because no Org A receipt is resolved
+on this path.
+
+**D1. Pins (out of band, before any call).** Each organization records the
+other's kernel identifier, passport public key, and rotation deadline.
+Producer: the two operators. Store: each kernel's own pin set. Enters the
+receiver's state at pinning time, before any agreement exists.
+
+**D2. Agreement (activation).** A `chio.federation.treaty-scope.v1` record
+naming exactly two kernel identifiers, their passport public keys, the digest
+of each side's ladder manifest, the action classes in scope, a validity window,
+a revocation epoch digest, and a trust bundle digest. Producer: the two
+organizations jointly, out of band. Store: each side activates its **own** copy
+under evidence kind `treaty_scope`. Enters the receiver's state at activation,
+before any call.
+
+**D3. Ladder intersection.** Producer: the receiver, which intersects the two
+activated manifests itself, per action class. Store: the receiver, under
+evidence kind `ladder_intersection`. Enters at activation. The intersection is
+never transferred; each side computes its own.
+
+**D4. Admission bundle.** The receiver's record of the call it is about to
+admit: an admission identifier, the request binding (request identifier,
+capability identifier, server identifier, tool name, argument digest, origin
+kernel identifier, host kernel identifier), the workflow and grant identifiers,
+the step index, the destructive flag, the lease identifier, the governance
+receipt identifier, and the trust bundle and verification context digests.
+Producer: the receiver. Store: the receiver. Enters before the hook runs; the
+request carries only the admission identifier and the bundle digest.
+
+**D5. Continuation.** A `chio.federation.cross-kernel-continuation.v1` record
+binding the parent receipt digest, the parent session anchor digest, the
+capability, the action class, the audience tool, a nonce, the two kernel
+identifiers, and a validity window. It carries **no signature**. Producer: the
+receiver, on behalf of the source kernel the record names. Store: the receiver,
+under evidence kind `cross_kernel_continuation`. Enters before the request.
+
+An implementation MAY mint the continuation in the origin kernel and transfer
+it. A receiver MUST NOT accept a continuation that is not already resident in
+its own store at the identifier and digest the request presents, and a
+continuation is therefore authenticated by residency and digest rather than by
+a signature. The shipped reference path mints it in the receiver.
+
+**D6. Subject receipt.** A `ChioReceipt` signed by the receiver's kernel key,
+whose `id` equals the predicate's `invocation_id`, whose `tool_name` equals the
+predicate's, and whose action parameter hash equals `tool_args_hash.value`.
+Producer: the receiver. Store: the receiver's receipt store. Enters **before**
+the statement exists, because the statement's subject digest is the SHA-256 of
+this receipt's canonical body. This is the receipt this section names as the
+subject, and it is not the receipt the receiver writes for this call at the end
+of admission (D13).
+
+**D7. Invocation record.** Section 4.2. Producer: the receiver. Store: the
+receiver, under evidence kind `bilateral_invocation`. Enters before the
+request.
+
+**D8. Lineage bundle.** Section 4.3. Producer: the receiver. Store: the
+receiver, under evidence kind `receipt_lineage_bundle`. Enters before the
+request.
+
+**D9. Statement, first signature.** The receiver builds the in-toto Statement:
+the single subject of D6, the predicate of section 5, and the treaty binding
+reference whose fields commit to D2, D3, D5, D6, D7, D8 and the request digest.
+It canonicalises the Statement (RFC 8785), computes the DSSE pre-authentication
+encoding, and signs those bytes with its own passport key.
+
+**D10. Co-signature.** The receiver sends the origin the tuple (origin kernel
+identifier, receiver kernel identifier, pre-authentication bytes, receiver
+signature). The origin MUST check that the transport-authenticated peer
+resolves, through its own verified directory, to the declared receiver kernel
+identifier, and MUST verify the receiver's signature over those exact bytes
+before signing. It then returns its own signature over the same bytes. The
+origin signs the bytes it was handed and does not re-derive or parse them. The
+receiver verifies the origin's signature and assembles the two-signature
+envelope. Store: the receiver, under evidence kind `bilateral_dsse_envelope`.
+Enters before the request. See section 4.4 for what this second signature
+establishes and what it does not.
+
+**D11. Request.** The origin's agent sends the tool call. Its agreement context
+carries identifiers and digests only: the agreement identifier and digest, the
+intersection identifier and digest, the action class identifier, and for each
+of the continuation, the lineage bundle, the invocation record and the envelope
+an identifier and a digest. Nothing else about the agreement crosses. A context
+carrying any of the eleven refused key names is denied before anything is
+resolved, with `request_smuggled_trust_root` or
+`request_smuggled_dynamic_trust`.
+
+**D12. Pre-dispatch hook.** The receiver resolves each named artifact out of
+its own store by evidence kind and identifier, denies any whose stored digest
+differs from the presented one, checks the continuation binds this request and
+is inside its window, checks the lineage bundle binds the continuation, checks
+the invocation record binds the agreement, intersection, continuation, class,
+capability, request digest and lineage statement, verifies the envelope's two
+signatures against the public keys the **agreement** carries, and compares the
+binding reference against its own admission bundle and its own resolved
+artifacts. It then consumes the continuation: an `INSERT OR IGNORE` into one table keyed
+by the continuation identifier, where an insert that changed no row is the
+replay denial `chio_treaty_continuation_replay`. A later pre-dispatch denial
+releases that row, scoped to the admission that took it, so a rejected call
+does not burn a continuation the origin will retry. Once dispatch commits, the
+row stays.
+
+**D13. The receiver's receipt for this call.** Built from the admitted inputs
+after output checks, rechecked against them, signed with the receiver's kernel
+key, and persisted before the caller sees a result. Producer: the receiver.
+Store: the receiver. It is a different object from D6 and no admission path
+resolves it.
+
+**What the pre-dispatch hook verifies** is the statement of D9 and D10. Its
+subject is the receiver's own receipt (D6), not the peer's. It is never carried
+on the wire: the request names it by identifier and digest, and the receiver
+resolves it out of a store the receiver itself wrote.
+
+**The outbound co-signature.** A receiver MAY, after persisting D13, ask the
+peer to co-sign a statement whose subject is D13's digest. That object is an
+after-the-fact acknowledgement: it is minted after the dispatch it describes,
+it gates nothing, no admission path resolves it, and a conforming
+implementation MUST NOT treat its presence or absence as an admission input.
+It is the inbound statement of D9 and D10, never the outbound one, that any
+property about what a receiver dispatched can quantify over.
+
+### 4.2 The Invocation Record
+
+The **invocation record** is the receiver-owned object the pre-dispatch hook
+resolves by identifier and against which it compares the binding reference's
+`consistency_model`, `outcome_sha256`, `local_receipt_sha256`,
+`remote_receipt_sha256` and signer order. It is distinct from the subject
+receipt that section 7 steps 17 to 19 resolve: the record is what the receiver
+stores about the invocation, the receipt is what the receiver signed about it.
+The record's type is `chio.federation.bilateral-invocation.v1` and its fields
+are:
+
+| Field | Meaning |
+| --- | --- |
+| `schema` | `chio.federation.bilateral-invocation.v1`. |
+| `invocation_id` | Identifier under which the receiver stores the record. |
+| `treaty_id` | The agreement (D2) this call runs under. |
+| `ladder_intersection_sha256` | Digest of the intersection (D3) the receiver computed. |
+| `continuation_sha256` | Digest of the continuation (D5). |
+| `lineage_statement_sha256` | Digest of the one lineage statement (D8) that binds this call. |
+| `action_class_id` | The action class in the intersection. |
+| `consistency_model` | The class's consistency model. |
+| `capability_id` | The capability the call exercises. |
+| `request_sha256` | Digest of the canonical tool arguments. |
+| `outcome_sha256` | The subject receipt's `content_hash`. |
+| `local_receipt_sha256` | The parent receipt the continuation names, which is the lineage bundle's root. |
+| `remote_receipt_sha256` | The subject receipt (D6), which is the lineage bundle's leaf. |
+| `signer_kernel_ids` | Exactly the two agreement participants, in agreement order. |
+
+Producer: the receiver. Store: the receiver, under evidence kind
+`bilateral_invocation`. It enters the receiver's store at D7, before the
+request.
+
+The record's digest is taken over the canonical JSON of every field above
+**except** `lineage_statement_sha256`. The exclusion is deliberate and not an
+omission: the lineage statement carries the record's digest, so covering the
+statement's digest in the record's would be circular. The excluded field is
+bound instead through the bundle: the hook accepts the record only when some
+statement in the resolved lineage bundle carries this record's digest **and**
+itself hashes to the value `lineage_statement_sha256` names. A verifier MUST
+perform that mutual check; a verifier that resolves the record without it has
+left one field unbound.
+
+An action class whose co-signing mode requires two signatures forces the
+invocation record into its required-evidence set, so for such a class the record
+is mandatory. There is no first-contact case: a call cannot name an invocation
+record the receiver has not already minted, and a request naming one that does
+not resolve is denied with `chio_treaty_missing_bilateral_evidence` before any
+signature is checked.
+
+### 4.3 The Lineage Bundle
+
+The **lineage bundle** is the receiver-owned record chaining this call to the
+receipts behind it. Its type is
+`chio.federation.receipt-lineage-bundle.v1`, and it carries a bundle
+identifier, a root receipt digest, a leaf receipt digest, and a non-empty list
+of lineage statements. Each statement carries a statement identifier, a parent
+receipt digest, a child receipt digest, the continuation digest, the invocation
+record digest, an evidence class, and the source and target kernel identifiers.
+
+The receiver walks the statements for the one whose continuation digest, source
+and target kernel identifiers, and parent receipt digest all bind the resolved
+continuation; the digest of that statement is what the invocation record's
+`lineage_statement_sha256` must equal. If no statement binds, the call is
+denied with `chio_treaty_lineage_mismatch`.
+
+The walk is the only part of admission linear in the size of an artifact rather
+than constant. It is bounded structurally rather than by a declared cap: the
+bundle must already be resident in the receiver's own store at the digest the
+request presents, so its size is whatever the receiver itself wrote, and a
+request cannot enlarge it. A receiver SHOULD nevertheless cap the statement
+count it will accept into that store, because a bundle it writes once is walked
+on every call that names it.
+
+### 4.4 What the Second Signature Establishes
+
+Section 2 describes the gap this predicate fills as two parties independently
+committing to the same canonical action under their separate policies. That is
+the vocabulary the predicate makes expressible. What the co-signing protocol of
+D9 and D10 establishes is narrower, and this subsection states it exactly,
+because a verifier that assumes more than this is assuming something no shipped
+check enforces.
+
+The receiver authors the bytes and the peer signs them. It follows that:
+
+1. **Against an adversary holding the peer's passport key, the second signature
+   constrains nothing about what the receiver dispatches.** Every field the
+   receiver compares at D12 is compared against a record the receiver itself
+   wrote. Removing the peer's signature from an otherwise identical envelope
+   changes no receiver-side comparison except the envelope signature check,
+   which the adversary can satisfy. What the design delivers against a
+   compromised peer is attribution, not prevention.
+
+2. **The signature is a liveness and consent gate.** The peer must be reachable
+   and willing at D10. A peer that declines to co-sign leaves the receiver with
+   no statement to resolve, and a class that requires bilateral evidence then
+   denies. This is a stop the peer can exercise without waiting for revocation
+   to propagate.
+
+3. **The signature is a durable non-repudiable record** that the peer's
+   passport key endorsed these exact pre-authentication bytes, which the
+   receiver persists. Conditional on the peer's key custody, the peer cannot
+   later deny the endorsement.
+
+4. **Under key compromise, (3) degrades from prevention to evidence.** The
+   adversary must exercise the key, and the exercised signature is persisted by
+   the receiver over bytes that name the agreement, the class, the capability,
+   the request digest and the continuation. That converts a silent abuse into
+   one that names a key and a moment, which is what makes detection and
+   revocation actionable. It does not stop the call.
+
+5. **The signature is not evidence that the peer evaluated its own policy.**
+   The predicate's `policy_evaluation_summary.server_a_verdict` is written by
+   the receiver and signed by the peer over bytes the peer does not parse. The
+   co-signing protocol transfers pre-authentication bytes and a signature and
+   defines no payload parse on the responder. A verifier MUST NOT read
+   `server_a_verdict` as evidence of an independent evaluation by Org A. A
+   deployment that wants that property MUST specify a responder profile in
+   which Org A decodes the Statement and evaluates the named policy before
+   signing; no such profile is specified here.
 
 ---
 
@@ -657,6 +922,85 @@ leaves the host: `VerifierFailure::from_error` reduces every failure to
 its code, the stage that owns it, and the fixed phrase
 `WITHHELD_FAILURE_DETAIL`, and the rendered diagnostic stays with the
 local error.
+
+### 7.3 Conformance Relation With the Pre-Dispatch Hook
+
+Two implementations answer whether a cross-organization call may proceed, in
+two disjoint code families.
+
+- The **conforming verifier** of this section,
+  `verify_chio_bilateral_invocation`, answers offline from verifier-owned
+  state: a pin set, a receipt store, a lease registry, a governance receipt
+  store, a revocation oracle, an action-class table, and a pinned epoch. It
+  returns the dotted codes of section 7.1. It is normative for what an envelope
+  means, and it is the implementation a second implementer conforms to.
+- The **pre-dispatch hook** answers inline during admission, from the
+  receiving kernel's own runtime store, and it is the implementation that
+  decides a live call. It answers from the kernel's runtime failure-code set
+  and maps every envelope-layer failure to
+  `chio_treaty_unverified_required_evidence`.
+
+The relation between them is not identity, and this subsection states it, so
+that neither an implementer nor a reader has to infer it. It is held by the
+differential corpus at
+[../crates/trust/chio-federation/tests/verifier_hook_conformance.rs](../crates/trust/chio-federation/tests/verifier_hook_conformance.rs),
+which builds one cross-organization call, projects it into both deciders, and
+asserts per input which of four relations holds. The set of divergences is
+asserted whole, so a check that moves between the two, in either direction,
+fails the corpus.
+
+**They agree on everything the envelope alone determines.** Media type,
+signature count, canonicalisation, predicate type, statement type, subject
+count, declared fingerprints against pinned keys, verdict well-formedness and
+agreement, and every binding-reference field that is compared against another
+field of the same envelope. On each of these an accept is an accept on both
+sides and a reject is a reject on both sides; only the code differs, because
+the two code families differ.
+
+**The conforming verifier rejects, and the hook admits, in exactly these
+cases.** Each is a resolution the hook does not perform.
+
+| Case | Verifier code | Why the hook admits |
+| --- | --- | --- |
+| Subject digest does not match the receipt body | `subject.digest_mismatch` | The hook reads no subject and resolves no receipt. |
+| Subject receipt not in the receiver's receipt store | `subject.digest_mismatch` | The hook has no receipt store on this path. |
+| Capability lease not in the registry | `capability.lease_expired_or_unknown` | The hook compares `lease_refs` against the lease identifier its own admission bundle names and does not resolve the lease record, so issuer and expiry are not checked here. |
+| Governance record not in the store | `governance.receipt_required_missing` | The hook compares `governance_refs` against its own admission bundle and does not re-derive the record's digest. |
+| Peer passport revoked at the pinned epoch | `peer.revoked_at_epoch` | Revocation reaches the kernel through its revocation view, not through this hook. |
+| Pinned peer carries no ladder manifest reference | `ladder.manifest_missing` | The hook activates both manifests itself and checks the intersection it stored, not a per-peer manifest reference. |
+
+The first two are the consequential ones. **The receipt resolution of steps 17
+to 19 has no counterpart on the dispatch path**: the hook never resolves the
+subject receipt and never reads the statement's subject. A property of the form
+"the subject of the admitted statement is the digest of a receipt the receiver
+resolved from its own store" is therefore a property of the conforming
+verifier, not of the hook. What the hook establishes instead is that every
+identifier and digest the request presented resolved, in the receiver's own
+store, to the artifact the co-signed binding reference names. A deployment that
+needs the full section 7 result on the dispatch path MUST run the conforming
+verifier in addition to the hook.
+
+**The hook rejects, and the conforming verifier admits, in exactly these
+cases.** Each is over receiver-owned runtime state that no envelope carries.
+
+| Case | Hook code | Why the verifier admits |
+| --- | --- | --- |
+| Consistency model below what the action class requires | `chio_treaty_dsse_binding_mismatch` | The verifier has no ladder intersection, so it accepts any model the predicate and its binding reference agree on. |
+| Unanimous `deny` | `chio_treaty_policy_denied` | A unanimous deny is a valid statement; the verifier returns it verified for audit and dispute review. Admission is the stricter caller. |
+| Continuation already spent | `chio_treaty_continuation_replay` | Single use is a property of one table in the receiver's store; nothing in the envelope records it. |
+| Continuation outside its window | `chio_treaty_continuation_stale` | The continuation is a receiver-owned record the statement names only by digest. |
+| Request carries a refused key name | `request_smuggled_trust_root` | The refusal is over the request's agreement context, which no envelope verifier sees. |
+| Presented agreement digest differs from the store | `chio_treaty_scope_hash_mismatch` | No agreement record reaches the verifier. |
+| Presented action class does not bind the stored continuation | `chio_treaty_continuation_mismatch` | The envelope carries the class identifier and nothing that would let an offline verifier decide whether this receiver admits it. |
+
+**One binding field is compared by neither.** `admission_report_sha256` is
+checked for hex shape and never compared against anything: the receiver
+recomputes the digest of its own report and overwrites the field before
+signing, because a peer-supplied hash must not sit inside a locally signed
+receipt as though the receiver had computed it. A conforming verifier MUST NOT
+reject an envelope on this field's value, and an implementer MUST NOT enforce
+it. The corpus asserts that both deciders admit when it is substituted, so the
+field's non-normative status cannot silently change.
 
 ---
 

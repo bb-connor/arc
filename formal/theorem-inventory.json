@@ -1939,6 +1939,105 @@
       "status": "proved",
       "mapsTo": ["P10"],
       "notes": "A local retracted observation cannot be cleared by a contradictory non-inclusion proof in the bounded decision model."
+    },
+    {
+      "id": "treaty.admission_binding.fields_enumerated",
+      "leanName": "Chio.Treaty.AdmissionBinding.mem_allFields",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Every leaf of the bilateral statement wire type appears in the enumeration the classification quantifies over."
+    },
+    {
+      "id": "treaty.admission_binding.fields_enumerated_once",
+      "leanName": "Chio.Treaty.AdmissionBinding.allFields_nodup",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The leaf enumeration lists each leaf of the bilateral statement exactly once."
+    },
+    {
+      "id": "treaty.admission_binding.field_count",
+      "leanName": "Chio.Treaty.AdmissionBinding.allFields_length",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The bilateral statement carries fifty-five leaves in the enumerated model, which is the cardinality the substitution corpus exercises."
+    },
+    {
+      "id": "treaty.admission_binding.classification_trichotomy",
+      "leanName": "Chio.Treaty.AdmissionBinding.classification_trichotomy",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Comparison-set completeness: every leaf is bound to a named receiver-held value, or constrained only against the statement itself, or constrained by nothing, and exactly one of the three. Totality is structural, because the classification is a match on the leaf enumeration."
+    },
+    {
+      "id": "treaty.admission_binding.accept_decomposition",
+      "leanName": "Chio.Treaty.AdmissionBinding.accept_iff_bound_fields_agree",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Accept-set decomposition: the modeled receiver accepts exactly when every leaf bound to a receiver-held value carries that value, so no gate outside the comparison set can admit or deny."
+    },
+    {
+      "id": "treaty.admission_binding.accept_implies_binding",
+      "leanName": "Chio.Treaty.AdmissionBinding.accept_implies_binding",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Admission binding over the modeled comparison set: an accepted statement carries, at every bound leaf, the value the receiver already held."
+    },
+    {
+      "id": "treaty.admission_binding.disagreement_denies",
+      "leanName": "Chio.Treaty.AdmissionBinding.disagreement_denies",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Fail-closed contrapositive: one bound leaf that disagrees with the receiver-held value denies, whatever the rest of the statement carries."
+    },
+    {
+      "id": "treaty.admission_binding.accept_determined_by_bound_fields",
+      "leanName": "Chio.Treaty.AdmissionBinding.accept_determined_by_bound_fields",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Acceptance in the model is a function of the bound leaves alone, which is the completeness claim in its strongest form."
+    },
+    {
+      "id": "treaty.admission_binding.unbound_substitution_preserves_acceptance",
+      "leanName": "Chio.Treaty.AdmissionBinding.unbound_substitution_preserves_acceptance",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The residual: substituting a leaf the classification does not bind to receiver state leaves the modeled decision unchanged."
     }
   ]
 }

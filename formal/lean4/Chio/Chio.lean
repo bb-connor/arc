@@ -38,3 +38,4 @@ import Chio.Treaty.IntersectionLegacy
 import Chio.Treaty.BridgeEquivalence
 import Chio.Treaty.BilateralAccept
 import Chio.Treaty.PredicateShape
+import Chio.Treaty.AdmissionBinding
