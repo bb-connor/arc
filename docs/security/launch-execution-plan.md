@@ -551,8 +551,11 @@ None is evidence of a property merely because the surrounding suite is green.
 
 The original dependency order is retained below. M0's maps and the first successful
 ordinary/nested native in-process lifecycle are now implemented. The current M1
-frontier is complete participant binding, required nonce/declassification profiles
-and the remaining combined-egress deadline and confinement qualification work.
+frontier is the required nonce/declassification/flow-use profiles and confinement
+qualification. Frozen participant references are bound. Native strict-nonce
+preflight now has separate operation-owned taint custody; it does not satisfy the
+dispatch join or authorize capture. The next nonce slice must bind actual issued
+material through fresh dispatch preparation, capture and ordinary/nested release.
 
 1. Complete M0's support/requirement and review-slice maps, preserving the stopped
    capture checkpoint without rerunning its completed tests.

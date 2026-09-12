@@ -1,6 +1,7 @@
 //! Fold separate native journal families in their anchored global order.
 //! Each family retains its own sequence and hash chain, including join-v1 bytes.
 use super::super::egress;
+use super::super::nonce_preflight;
 use super::super::output;
 use super::*;
 use std::collections::BTreeSet;
@@ -9,6 +10,7 @@ pub(in crate::admission_operation_store::security_participant_state) enum Event 
     Join(Box<Record>),
     Egress(Box<egress::Record>),
     Output(Box<output::Record>),
+    NoncePreflight(Box<nonce_preflight::Record>),
 }
 
 impl Event {
@@ -19,6 +21,7 @@ impl Event {
             Self::Join(record) => record.changes.as_slice(),
             Self::Egress(record) => record.changes.as_slice(),
             Self::Output(record) => record.changes.as_slice(),
+            Self::NoncePreflight(record) => record.changes.as_slice(),
         }
     }
     pub(in crate::admission_operation_store::security_participant_state) fn totals(
@@ -28,6 +31,7 @@ impl Event {
             Self::Join(record) => (record.current_rows, record.current_bytes),
             Self::Egress(record) => (record.current_rows, record.current_bytes),
             Self::Output(record) => (record.current_rows, record.current_bytes),
+            Self::NoncePreflight(record) => (record.current_rows, record.current_bytes),
         }
     }
 }
@@ -55,6 +59,15 @@ pub(in crate::admission_operation_store::security_participant_state) fn validate
             .checked_add(extra_bytes)
             .ok_or_else(|| invalid("native journal byte overflow"))?;
     }
+    if nonce_preflight::exists(connection)? {
+        let (extra_count,extra_bytes): (i64,i64) = connection.query_row("SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_nonce_preflight_events WHERE security_authority_id = ?1", [authority], |row| Ok((row.get(0)?,row.get(1)?))).map_err(sqlite_error)?;
+        count = count
+            .checked_add(extra_count)
+            .ok_or_else(|| invalid("native journal count overflow"))?;
+        bytes = bytes
+            .checked_add(extra_bytes)
+            .ok_or_else(|| invalid("native journal byte overflow"))?;
+    }
     if !(0..=65_536).contains(&count) || !(0..=67_108_864).contains(&bytes) {
         return Err(invalid("combined native journal exceeds bounds"));
     }
@@ -68,7 +81,7 @@ pub(in crate::admission_operation_store::security_participant_state) fn latest_t
     let authority = initialization.authority.as_str();
     let last: Option<(String,i64)> = connection.query_row("SELECT projection_kind, projection_sequence FROM authority_global_commits
         WHERE projection_key = ?1 AND ((projection_kind = 'security_participant_state' AND projection_sequence > 1)
-           OR projection_kind IN ('security_participant_egress','security_participant_output')) ORDER BY commit_sequence DESC LIMIT 1", [authority], |row| Ok((row.get(0)?,row.get(1)?))).optional().map_err(sqlite_error)?;
+           OR projection_kind IN ('security_participant_egress','security_participant_output','security_participant_nonce_preflight')) ORDER BY commit_sequence DESC LIMIT 1", [authority], |row| Ok((row.get(0)?,row.get(1)?))).optional().map_err(sqlite_error)?;
     let Some((kind, sequence)) = last else {
         let (rows,bytes): (i64,i64) = connection.query_row("SELECT COUNT(*), COALESCE(SUM(length(canonical_row)),0) FROM security_participant_migration_rows WHERE security_authority_id = ?1", [authority], |row| Ok((row.get(0)?,row.get(1)?))).map_err(sqlite_error)?;
         return Ok((
@@ -91,6 +104,11 @@ pub(in crate::admission_operation_store::security_participant_state) fn latest_t
         "security_participant_output" => {
             let record = output::load(connection, authority, sequence)?
                 .ok_or_else(|| invalid("latest native output is absent"))?;
+            Ok((record.current_rows, record.current_bytes))
+        }
+        "security_participant_nonce_preflight" => {
+            let record = nonce_preflight::load(connection, authority, sequence)?
+                .ok_or_else(|| invalid("latest native nonce_preflight is absent"))?;
             Ok((record.current_rows, record.current_bytes))
         }
         _ => Err(invalid("unknown native journal family")),
@@ -116,6 +134,13 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
     } else {
         0
     };
+    let nonce_preflight_head = if nonce_preflight::exists(connection)? {
+        nonce_preflight::head(connection, authority)?
+    } else {
+        0
+    };
+    let mut nonce_preflight_sequence = 0;
+    let mut nonce_preflight_previous = initialization.digest.clone();
     let mut output_sequence = 0;
     let mut output_previous = initialization.digest.clone();
     let mut egress_sequence = 0;
@@ -125,14 +150,19 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
     let mut initialized = false;
     let mut joined = BTreeSet::new();
     let mut statement = connection.prepare("SELECT projection_kind, projection_sequence FROM authority_global_commits WHERE projection_key = ?1
-        AND projection_kind IN ('security_participant_state','security_participant_egress','security_participant_output') ORDER BY commit_sequence").map_err(sqlite_error)?;
+        AND projection_kind IN ('security_participant_state','security_participant_egress','security_participant_output','security_participant_nonce_preflight') ORDER BY commit_sequence").map_err(sqlite_error)?;
     let mut rows = statement.query([authority]).map_err(sqlite_error)?;
     while let Some(row) = rows.next().map_err(sqlite_error)? {
         let kind: String = row.get(0).map_err(sqlite_error)?;
         let sequence =
             u64::try_from(row.get::<_, i64>(1).map_err(sqlite_error)?).map_err(invalid)?;
         if kind == "security_participant_state" && sequence == 1 {
-            if initialized || join_sequence != 1 || egress_sequence != 0 || output_sequence != 0 {
+            if initialized
+                || join_sequence != 1
+                || egress_sequence != 0
+                || output_sequence != 0
+                || nonce_preflight_sequence != 0
+            {
                 return Err(invalid(
                     "native initialization is not the first global event",
                 ));
@@ -205,6 +235,25 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
                 observed_at = record.observed_at;
                 Event::Output(Box::new(record))
             }
+            "security_participant_nonce_preflight" => {
+                let record = nonce_preflight::load(connection, authority, sequence)?
+                    .ok_or_else(|| invalid("native global nonce_preflight is absent"))?;
+                if sequence != nonce_preflight_sequence + 1
+                    || record.initialization != initialization.digest
+                    || record.previous != nonce_preflight_previous
+                    || record.lease.fence.store_uuid != initialization.fence.store_uuid
+                    || record.observed_at < observed_at
+                    || joined.contains(record.intent.operation_id())
+                {
+                    return Err(invalid(
+                        "native nonce preflight family is out of global order or follows a dispatch join",
+                    ));
+                }
+                nonce_preflight_sequence = sequence;
+                nonce_preflight_previous = record.digest()?;
+                observed_at = record.observed_at;
+                Event::NoncePreflight(Box::new(record))
+            }
             _ => return Err(invalid("unknown native journal family")),
         };
         apply(&event)?;
@@ -213,6 +262,7 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
         || join_sequence != join_head
         || egress_sequence != egress_head
         || output_sequence != output_head
+        || nonce_preflight_sequence != nonce_preflight_head
     {
         return Err(invalid(
             "native journal events lack complete global coverage",

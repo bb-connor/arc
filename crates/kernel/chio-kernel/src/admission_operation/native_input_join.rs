@@ -8,6 +8,12 @@ use chio_security_types::ports::{FlowJoinRequest, FlowStateKey, FlowStateSnapsho
 use chio_security_types::InformationLabel;
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone, Copy)]
+pub(super) enum InputJoinPhase {
+    Dispatch,
+    NoncePreflight,
+}
+
 /// Data only. The operation, selected authority and actual lease must still be
 /// checked by the writer. The input label includes classification and the
 /// operator floor, not a caller's estimate of inherited native state.
@@ -34,7 +40,16 @@ impl NativeSecurityInputJoinRequestV1 {
         key: FlowStateKey,
         input_label: InformationLabel,
     ) -> Result<Self, AdmissionOperationStoreError> {
-        let transition_id = transition_id(&operation_id, &key, &input_label)?;
+        Self::for_phase(operation_id, key, input_label, InputJoinPhase::Dispatch)
+    }
+
+    pub(super) fn for_phase(
+        operation_id: AdmissionOperationId,
+        key: FlowStateKey,
+        input_label: InformationLabel,
+        phase: InputJoinPhase,
+    ) -> Result<Self, AdmissionOperationStoreError> {
+        let transition_id = transition_id(&operation_id, &key, &input_label, phase)?;
         Ok(Self {
             operation_id,
             key,
@@ -60,8 +75,16 @@ impl NativeSecurityInputJoinRequestV1 {
         &self,
         operation: &AdmissionOperationId,
     ) -> Result<(), AdmissionOperationStoreError> {
+        self.validate_phase(operation, InputJoinPhase::Dispatch)
+    }
+
+    pub(super) fn validate_phase(
+        &self,
+        operation: &AdmissionOperationId,
+        phase: InputJoinPhase,
+    ) -> Result<(), AdmissionOperationStoreError> {
         if &self.operation_id != operation
-            || self.transition_id != transition_id(operation, &self.key, &self.input_label)?
+            || self.transition_id != transition_id(operation, &self.key, &self.input_label, phase)?
         {
             return Err(invalid("native input join intent binding differs"));
         }
@@ -77,7 +100,17 @@ impl NativeSecurityInputJoinRequestV1 {
         command: &FlowJoinRequest,
         snapshot: &FlowStateSnapshot,
     ) -> Result<(), AdmissionOperationStoreError> {
-        self.validate(operation)?;
+        self.validate_phase_resolution(operation, command, snapshot, InputJoinPhase::Dispatch)
+    }
+
+    pub(super) fn validate_phase_resolution(
+        &self,
+        operation: &AdmissionOperationId,
+        command: &FlowJoinRequest,
+        snapshot: &FlowStateSnapshot,
+        phase: InputJoinPhase,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.validate_phase(operation, phase)?;
         let source = &command.principal_join;
         if command.key != self.key
             || command.transition_id != self.transition_id
@@ -131,10 +164,21 @@ fn transition_id(
     operation: &AdmissionOperationId,
     key: &FlowStateKey,
     input: &InformationLabel,
+    phase: InputJoinPhase,
 ) -> Result<RecordId, AdmissionOperationStoreError> {
-    let mut bytes = b"chio.native-security-input-join-request.v1\0".to_vec();
+    let (domain, prefix): (&[u8], &str) = match phase {
+        InputJoinPhase::Dispatch => (
+            b"chio.native-security-input-join-request.v1\0",
+            "native-input",
+        ),
+        InputJoinPhase::NoncePreflight => (
+            b"chio.native-security-nonce-preflight-join-request.v1\0",
+            "native-nonce-preflight",
+        ),
+    };
+    let mut bytes = domain.to_vec();
     bytes.extend(canonical_json_bytes(&(operation, key, input)).map_err(invalid)?);
-    RecordId::new(format!("native-input:{}", sha256_hex(&bytes))).map_err(invalid)
+    RecordId::new(format!("{prefix}:{}", sha256_hex(&bytes))).map_err(invalid)
 }
 
 fn invalid(error: impl std::fmt::Display) -> AdmissionOperationStoreError {

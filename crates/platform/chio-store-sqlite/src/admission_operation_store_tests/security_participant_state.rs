@@ -4,6 +4,8 @@ use std::cell::Cell;
 
 #[path = "security_participant_state/dispatch_ledger.rs"]
 mod dispatch_ledger;
+#[path = "security_participant_state/nonce_preflight.rs"]
+mod nonce_preflight;
 #[path = "security_participant_state/output.rs"]
 mod output;
 
@@ -24,6 +26,8 @@ mod migration;
 #[cfg(unix)]
 #[path = "security_participant_state/mutations.rs"]
 mod mutations;
+#[cfg(unix)]
+pub(super) use mutations::prepare_issuance_fixture;
 #[cfg(unix)]
 #[path = "security_participant_state/observation.rs"]
 mod observation;

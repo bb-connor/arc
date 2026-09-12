@@ -80,6 +80,55 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         self.join_security_participant_input(operation, lease, &initialized, context, command, now)
     }
 
+    fn join_native_security_nonce_preflight(
+        &self,
+        operation: &AdmissionOperationV1,
+        lease: &AdmissionRecoveryLease,
+        binding: &chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1,
+        context: &chio_kernel::SecurityInvocationContext,
+        command: &chio_kernel::admission_operation::NativeSecurityNoncePreflightJoinRequestV1,
+        now: u64,
+    ) -> Result<
+        chio_kernel::admission_operation::NativeSecurityNoncePreflightJoinRecordV1,
+        AdmissionOperationStoreError,
+    > {
+        let initialized = self
+            .load_security_participant_state(
+                binding.security_authority_id(),
+                lease.store_fence(),
+                now,
+            )?
+            .ok_or_else(|| invariant("selected native initialization is absent"))?;
+        if initialized.admission_binding()? != *binding {
+            return Err(invariant("selected native initialization binding differs"));
+        }
+        // The physical writer rechecks these bytes and the original lease in
+        // its own transaction. The preceding selection read grants no custody.
+        self.join_security_participant_nonce_preflight(
+            operation,
+            lease,
+            &initialized,
+            context,
+            command,
+            now,
+        )
+    }
+
+    fn load_native_security_nonce_preflight_join(
+        &self,
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        Option<(
+            AdmissionOperationV1,
+            Option<chio_kernel::admission_operation::NativeSecurityNoncePreflightJoinRecordV1>,
+        )>,
+        AdmissionOperationStoreError,
+    > {
+        self.load_native_nonce_preflight_join_record(operation_id, fence, now)
+    }
+
     fn join_native_security_output(
         &self,
         operation: &AdmissionOperationV1,

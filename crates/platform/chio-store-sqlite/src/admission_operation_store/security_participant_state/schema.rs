@@ -176,7 +176,7 @@ pub(super) fn recorded_version(
         28 => Ok(28),
         // Admission v30 adds the egress journal and v31 adds the independent
         // dispatch ledger. Neither changes the v29 native row catalog/digest.
-        29..=32 => Ok(29),
+        29..=33 => Ok(29),
         _ => Err(invalid("native security schema version is unsupported")),
     }
 }

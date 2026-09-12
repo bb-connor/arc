@@ -4,6 +4,63 @@ use chio_security_types::{Compartment, PrincipalId};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+#[test]
+fn nonce_preflight_intent_cannot_be_reinterpreted_as_dispatch_input() -> TestResult {
+    use crate::admission_operation::NativeSecurityNoncePreflightJoinRequestV1;
+    let dispatch = input()?;
+    let preflight = NativeSecurityNoncePreflightJoinRequestV1::new(
+        dispatch.operation_id().clone(),
+        dispatch.key().clone(),
+        dispatch.input_label().clone(),
+    )?;
+    preflight.validate(dispatch.operation_id())?;
+    assert_ne!(preflight.transition_id(), dispatch.transition_id());
+    let decoded: NativeSecurityInputJoinRequestV1 =
+        serde_json::from_slice(&canonical_json_bytes(&preflight)?)?;
+    assert!(decoded.validate(dispatch.operation_id()).is_err());
+    let decoded: NativeSecurityNoncePreflightJoinRequestV1 =
+        serde_json::from_slice(&canonical_json_bytes(&dispatch)?)?;
+    assert!(decoded.validate(dispatch.operation_id()).is_err());
+    // Keep the existing dispatch domain and canonical preimage exactly intact.
+    let mut bytes = b"chio.native-security-input-join-request.v1\0".to_vec();
+    bytes.extend(canonical_json_bytes(&(
+        dispatch.operation_id(),
+        dispatch.key(),
+        dispatch.input_label(),
+    ))?);
+    assert_eq!(
+        dispatch.transition_id().as_str(),
+        format!("native-input:{}", sha256_hex(&bytes))
+    );
+    Ok(())
+}
+
+#[test]
+fn nonce_preflight_resolution_requires_its_exact_intent_and_full_source() -> TestResult {
+    use crate::admission_operation::NativeSecurityNoncePreflightJoinRequestV1;
+    let dispatch = input()?;
+    let preflight = NativeSecurityNoncePreflightJoinRequestV1::new(
+        dispatch.operation_id().clone(),
+        dispatch.key().clone(),
+        label()?,
+    )?;
+    let (mut command, mut snapshot) = resolution(&dispatch)?;
+    assert!(preflight
+        .validate_resolution(dispatch.operation_id(), &command, &snapshot)
+        .is_err());
+    command.transition_id = preflight.transition_id().clone();
+    preflight.validate_resolution(dispatch.operation_id(), &command, &snapshot)?;
+    snapshot.session_label = InformationLabel::bottom();
+    assert!(preflight
+        .validate_resolution(dispatch.operation_id(), &command, &snapshot)
+        .is_err());
+    let mut changed = serde_json::to_value(&preflight)?;
+    changed["key"]["principal_id"] = "another-principal".into();
+    let decoded: NativeSecurityNoncePreflightJoinRequestV1 = serde_json::from_value(changed)?;
+    assert!(decoded.validate(dispatch.operation_id()).is_err());
+    Ok(())
+}
+
 fn input() -> TestResult<NativeSecurityInputJoinRequestV1> {
     Ok(NativeSecurityInputJoinRequestV1::new(
         AdmissionOperationId::from_persisted(sha256_hex(b"original-operation"))?,

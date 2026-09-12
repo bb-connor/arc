@@ -53,7 +53,9 @@ mod recovery;
 mod runtime_acquisition;
 #[path = "admission_coordinator/runtime_participant.rs"]
 mod runtime_participant;
-pub use native_acquisition::NativeSecurityFlowJoinAuthority;
+pub use native_acquisition::{
+    NativeSecurityFlowJoinAuthority, NativeSecurityNoncePreflightJoinAuthority,
+};
 #[cfg(feature = "admission-test-support")]
 pub(crate) use native_egress::NativeCaptureCheckpointInput;
 #[cfg(feature = "admission-test-support")]

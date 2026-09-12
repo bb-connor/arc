@@ -14,7 +14,8 @@ use super::scoped_sql::ScopedMutation;
 use super::{encode_retained_security_values, retained_security_columns, sqlite_error};
 use super::{NativeEgressCommand, NativeEgressResult};
 use crate::admission_operation_store::{
-    NativeEgressAuthority, NativeFlowJoinAuthority, NativeOutputJoinAuthority,
+    NativeEgressAuthority, NativeFlowJoinAuthority, NativeNoncePreflightJoinAuthority,
+    NativeOutputJoinAuthority,
 };
 use chio_security_types::ports::{FlowJoinRequest, FlowStateSnapshot, PortError, PortResult};
 
@@ -181,6 +182,7 @@ pub(super) struct NativeFlowOwner<'connection> {
 enum JoinAuthorization {
     Input(NativeFlowJoinAuthority),
     Output(NativeOutputJoinAuthority),
+    NoncePreflight(NativeNoncePreflightJoinAuthority),
 }
 
 impl JoinAuthorization {
@@ -188,12 +190,14 @@ impl JoinAuthorization {
         match self {
             Self::Input(owner) => owner.authority(),
             Self::Output(owner) => owner.authority(),
+            Self::NoncePreflight(owner) => owner.authority(),
         }
     }
     fn request(&self) -> &FlowJoinRequest {
         match self {
             Self::Input(owner) => owner.request(),
             Self::Output(owner) => owner.request(),
+            Self::NoncePreflight(owner) => owner.request(),
         }
     }
 }
@@ -247,6 +251,20 @@ pub(crate) fn join_native_output<'connection>(
     Vec<NativeRowChange>,
 )> {
     join_native(transaction, JoinAuthorization::Output(authorization))
+}
+
+pub(crate) fn join_native_nonce_preflight<'connection>(
+    transaction: Transaction<'connection>,
+    authorization: NativeNoncePreflightJoinAuthority,
+) -> PortResult<(
+    Transaction<'connection>,
+    FlowStateSnapshot,
+    Vec<NativeRowChange>,
+)> {
+    join_native(
+        transaction,
+        JoinAuthorization::NoncePreflight(authorization),
+    )
 }
 
 fn join_native<'connection>(

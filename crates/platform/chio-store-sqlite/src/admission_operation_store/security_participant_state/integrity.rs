@@ -84,6 +84,7 @@ pub(in crate::admission_operation_store) fn verify_coverage(
     }
     super::egress::verify_coverage(connection, &records)?;
     super::output::verify_coverage(connection, &records)?;
+    super::nonce_preflight::verify_coverage(connection, &records)?;
     Ok(())
 }
 

@@ -18,6 +18,7 @@ mod native_egress;
 mod native_flow_join;
 mod native_flow_observation;
 mod native_input_join;
+mod native_nonce_preflight;
 mod native_output_join;
 mod native_security_binding;
 mod nonce_preflight;
@@ -48,6 +49,9 @@ pub use native_egress::{
 pub use native_flow_join::NativeSecurityFlowJoinRecordV1;
 pub use native_flow_observation::NativeSecurityFlowObservationV1;
 pub use native_input_join::{NativeSecurityInputJoinRecordV1, NativeSecurityInputJoinRequestV1};
+pub use native_nonce_preflight::{
+    NativeSecurityNoncePreflightJoinRecordV1, NativeSecurityNoncePreflightJoinRequestV1,
+};
 pub use native_output_join::{NativeSecurityOutputJoinRecordV1, NativeSecurityOutputJoinRequestV1};
 pub use native_security_binding::NativeSecurityAuthorityBindingV1;
 pub use nonce_preflight::{

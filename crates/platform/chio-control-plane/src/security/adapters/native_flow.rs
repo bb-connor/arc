@@ -88,6 +88,29 @@ impl std::fmt::Debug for NativeFlowCustody {
 }
 
 impl NativeFlowResolver {
+    fn classify_admission_input(
+        &self,
+        context: &chio_kernel::NativeSecurityAdmissionContext<'_>,
+        binding: &NativeSecurityAuthorityBindingV1,
+    ) -> Result<InformationLabel, KernelError> {
+        policy_call(|| {
+            if binding != &self.binding {
+                return Err(NativeFlowError::AuthorityMismatch);
+            }
+            if context.request.declassification_grant.is_some() {
+                return Err(NativeFlowError::UnsupportedDeclassification);
+            }
+            self.policy()
+                .classified_input_label(&FlowPreInvocationInput {
+                    security_context: context.security_context.as_v1(),
+                    request: context.request,
+                })
+                .map_err(NativeFlowError::from)
+        })
+        .and_then(|result| result)
+        .map_err(|error| KernelError::GuardDenied(error.to_string()))
+    }
+
     pub fn new(
         binding: NativeSecurityAuthorityBindingV1,
         manifests: Arc<VerifiedManifestRegistry>,
@@ -227,22 +250,17 @@ impl chio_kernel::SecurityPreDispatchHook for NativeFlowResolver {
         context: &chio_kernel::NativeSecurityAdmissionContext<'_>,
         authority: &chio_kernel::NativeSecurityFlowJoinAuthority<'_>,
     ) -> Result<(), KernelError> {
-        let input_label = policy_call(|| {
-            if authority.binding() != &self.binding {
-                return Err(NativeFlowError::AuthorityMismatch);
-            }
-            if context.request.declassification_grant.is_some() {
-                return Err(NativeFlowError::UnsupportedDeclassification);
-            }
-            self.policy()
-                .classified_input_label(&FlowPreInvocationInput {
-                    security_context: context.security_context.as_v1(),
-                    request: context.request,
-                })
-                .map_err(NativeFlowError::from)
-        })
-        .and_then(|result| result)
-        .map_err(|error| KernelError::GuardDenied(error.to_string()))?;
+        let input_label = self.classify_admission_input(context, authority.binding())?;
+        authority.join_input(input_label)?;
+        Ok(())
+    }
+
+    fn prepare_native_nonce_preflight(
+        &self,
+        context: &chio_kernel::NativeSecurityAdmissionContext<'_>,
+        authority: &chio_kernel::NativeSecurityNoncePreflightJoinAuthority<'_>,
+    ) -> Result<(), KernelError> {
+        let input_label = self.classify_admission_input(context, authority.binding())?;
         authority.join_input(input_label)?;
         Ok(())
     }

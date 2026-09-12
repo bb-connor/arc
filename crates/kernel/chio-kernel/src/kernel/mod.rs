@@ -102,7 +102,8 @@ pub use admission_coordinator::NativeSecurityEgressCheckpointHook;
 pub use admission_coordinator::NativeSecurityOutputJoinAuthority;
 pub use admission_coordinator::{
     AcquiredNativeSecurityEgress, DurableFinalizationCutpoint, NativeSecurityFlowJoinAuthority,
-    PreparedNativeSecurityEgress, RuntimeParticipantClaimAuthority,
+    NativeSecurityNoncePreflightJoinAuthority, PreparedNativeSecurityEgress,
+    RuntimeParticipantClaimAuthority,
 };
 #[cfg(feature = "admission-test-support")]
 pub use admission_coordinator::{CallerExecutionCheckpoint, CallerExecutionCheckpointHook};
@@ -430,6 +431,18 @@ pub trait SecurityPreDispatchHook: Send + Sync {
     ) -> Result<(), KernelError> {
         Err(KernelError::DurableAdmission(
             "native security admission preparation is unsupported".into(),
+        ))
+    }
+
+    /// Separate strict-nonce preflight custody. Dispatch-only hooks fail closed;
+    /// a preflight journal never satisfies the dispatch input-join contract.
+    fn prepare_native_nonce_preflight(
+        &self,
+        _context: &NativeSecurityAdmissionContext<'_>,
+        _authority: &NativeSecurityNoncePreflightJoinAuthority<'_>,
+    ) -> Result<(), KernelError> {
+        Err(KernelError::DurableAdmission(
+            "native security nonce preflight preparation is unsupported".into(),
         ))
     }
 

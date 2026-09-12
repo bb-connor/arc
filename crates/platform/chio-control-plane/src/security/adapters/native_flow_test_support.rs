@@ -29,6 +29,13 @@ mod lifecycle {
     ));
 }
 
+mod nonce {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_flow_nonce_tests.rs"
+    ));
+}
+
 pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 pub(super) fn now_ms() -> PortResult<u64> {

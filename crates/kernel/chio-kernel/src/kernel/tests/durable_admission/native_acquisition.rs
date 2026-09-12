@@ -552,8 +552,8 @@ fn native_dispatch_retains_original_requirement_when_live_selection_is_absent(
                 );
                 assert_eq!(
                     probe.reads.load(Ordering::SeqCst),
-                    0,
-                    "original selection is sufficient"
+                    u64::from(has_hook),
+                    "live selection is checked without weakening the original native requirement"
                 );
                 assert_eq!(probe.callbacks.load(Ordering::SeqCst), 0);
                 assert_eq!(calls.load(Ordering::SeqCst), 0);

@@ -87,10 +87,12 @@ pub(crate) use security_participant_state::dispatch_ledger::{
     NativeCaptureBinding, VerifiedNativeCapture,
 };
 pub(crate) use security_participant_state::egress::projection_reference as security_participant_egress_projection_reference;
+pub(crate) use security_participant_state::nonce_preflight::projection_reference as security_participant_nonce_preflight_projection_reference;
 pub(crate) use security_participant_state::output::projection_reference as security_participant_output_projection_reference;
 pub(crate) use security_participant_state::projection_reference as security_participant_state_projection_reference;
 pub(crate) use security_participant_state::{
-    NativeEgressAuthority, NativeFlowJoinAuthority, NativeOutputJoinAuthority,
+    NativeEgressAuthority, NativeFlowJoinAuthority, NativeNoncePreflightJoinAuthority,
+    NativeOutputJoinAuthority,
 };
 pub use security_participant_state::{
     SecurityParticipantEgressHistory, SecurityParticipantFlowJoinHistory,
@@ -165,7 +167,7 @@ pub use security_participant_migration::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 32;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 33;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",

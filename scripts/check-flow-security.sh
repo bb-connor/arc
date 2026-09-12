@@ -264,6 +264,12 @@ run_exact_target --label "native compiled catalog identity" --allow-filtered --e
   -- cargo test -p chio-store-sqlite --lib admission_operation_store::security_participant_state::schema::tests::
 
 run_exact_target --label "native flow custody" --allow-filtered --expected \
+  admission_operation_store::tests::security_participant_state::nonce_preflight::missing_current_nonce_preflight_catalog_is_not_repaired \
+  admission_operation_store::tests::security_participant_state::nonce_preflight::v32_nonce_preflight_journal_upgrade_rejects_partial_future_catalog_without_repair \
+  admission_operation_store::tests::security_participant_state::nonce_preflight::v32_upgrade_adds_empty_nonce_preflight_journal_without_rewriting_native_history \
+  admission_operation_store::tests::security_participant_state::mutations::nonce_preflight::preflight_is_anchored_once_and_never_satisfies_dispatch_input_custody \
+  admission_operation_store::tests::security_participant_state::mutations::nonce_preflight::preflight_rejects_wrong_phase_lease_identity_and_observation_before_writing \
+  admission_operation_store::tests::security_participant_state::mutations::nonce_preflight::preflight_cutpoints_preserve_only_committed_monotone_history_on_reopen \
   admission_operation_store::tests::security_participant_state::output::missing_current_output_catalog_is_not_repaired \
   admission_operation_store::tests::security_participant_state::output::v31_output_journal_upgrade_rejects_partial_future_catalog_without_repair \
   admission_operation_store::tests::security_participant_state::output::v31_upgrade_adds_empty_output_journal_without_rewriting_native_history \
@@ -480,6 +486,8 @@ run_exact_target --label "native dispatch attachment contracts" --allow-filtered
   -- cargo test -p chio-kernel --lib admission_operation::capture::tests::native_dispatch_attachment_
 
 run_exact_target --label "native post-join policy" --allow-filtered --expected \
+  security::adapters::tests::native_flow::support::nonce::native_nonce_preflight_issues_without_dispatch_or_legacy_nonce_custody \
+  security::adapters::tests::native_flow::support::nonce::native_nonce_preflight_callback_faults_deny_issuance_but_preserve_committed_taint \
   security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_invokes_once_and_replays_the_released_receipt \
   security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_requires_one_successful_live_handoff \
   security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_rejects_real_expiry_after_capture \
@@ -750,10 +758,23 @@ run_exact_target --label "security schema vectors" --expected \
   -- cargo test -p chio-conformance --test vectors_schema_pair
 
 run_exact_target --label "native input intent contracts" --allow-filtered --expected \
+  admission_operation::native_input_join::tests::nonce_preflight_intent_cannot_be_reinterpreted_as_dispatch_input \
+  admission_operation::native_input_join::tests::nonce_preflight_resolution_requires_its_exact_intent_and_full_source \
   admission_operation::native_input_join::tests::decoded_input_intent_rejects_unknown_fields_and_recomputed_binding_mismatch \
   admission_operation::native_input_join::tests::input_resolution_cannot_discard_the_classified_input_label \
   admission_operation::native_input_join::tests::input_resolution_requires_complete_propagation_exact_keys_and_safe_generation \
   admission_operation::native_input_join::tests::input_transition_binds_operation_each_identity_and_classified_label \
   -- cargo test -p chio-kernel --lib admission_operation::native_input_join::tests::
+
+run_exact_target --label "native global journal migration" --allow-filtered --expected \
+  serving_owner::global_commit_chain::schema_tests::ignored_check_cannot_smuggle_future_projection_into_a_supported_predecessor \
+  serving_owner::global_commit_chain::schema_tests::nonhistorical_runtime_kind_without_status_is_not_an_upgrade_predecessor \
+  serving_owner::global_commit_chain::schema_tests::supported_previous_global_schemas_preserve_history_when_adding_replay_kinds \
+  serving_owner::global_commit_chain::schema_tests::unexpected_trigger_on_previous_global_schema_is_not_repaired \
+  -- cargo test -p chio-store-sqlite --lib serving_owner::global_commit_chain::schema_tests::
+
+run_exact_target --label "native nonce issuance custody" --allow-filtered --expected \
+  admission_operation_store::tests::execution_nonce::native_preflight::native_issuance_requires_preflight_taint_before_budget_preflight \
+  -- cargo test -p chio-store-sqlite --lib admission_operation_store::tests::execution_nonce::native_preflight::
 
 echo "Flow security gate passed"

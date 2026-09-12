@@ -42,7 +42,9 @@ pub(in crate::admission_operation_store::security_participant_state) fn verify_r
         && super::super::egress::head(connection, authority)? != 0;
     let output = super::super::output::exists(connection)?
         && super::super::output::head(connection, authority)? != 0;
-    if head == 1 && !egress && !output {
+    let nonce_preflight = super::super::nonce_preflight::exists(connection)?
+        && super::super::nonce_preflight::head(connection, authority)? != 0;
+    if head == 1 && !egress && !output && !nonce_preflight {
         return super::super::storage::verify_rows(connection, source);
     }
     let mut inventory = Inventory::new();

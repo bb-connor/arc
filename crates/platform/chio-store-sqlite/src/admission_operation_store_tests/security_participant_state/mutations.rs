@@ -18,6 +18,9 @@ mod history_integrity;
 mod input;
 #[path = "mutations/monotonicity.rs"]
 mod monotonicity;
+#[path = "mutations/nonce_preflight.rs"]
+mod nonce_preflight;
+pub(in crate::admission_operation_store::tests) use nonce_preflight::prepare_issuance_fixture;
 #[path = "mutations/shared.rs"]
 mod shared;
 
@@ -108,9 +111,25 @@ fn setup_selected_at(
     AdmissionRecoveryLease,
     AdmissionRecoveryLease,
 )> {
+    setup_selected_phase(fixture, name, context, decision_at, selected, false)
+}
+
+fn setup_selected_phase(
+    fixture: &Fixture,
+    name: &str,
+    context: &SecurityInvocationContext,
+    decision_at: u64,
+    selected: Option<chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1>,
+    nonce_preflight: bool,
+) -> TestResult<(
+    AdmissionOperationV1,
+    AdmissionRecoveryLease,
+    AdmissionRecoveryLease,
+)> {
     let requirements = AdmissionParticipantRequirements {
         broker_attempt: true,
         budget_capture: true,
+        execution_nonce: nonce_preflight,
         ..AdmissionParticipantRequirements::NONE
     };
     let (unbound, original) = super::super::retained_request::original_with_requirements(
@@ -180,6 +199,9 @@ fn setup_selected_at(
     )?;
     let lease = claim(fixture, &operation, name, decision_at);
     let stale_lease = lease.clone();
+    if nonce_preflight {
+        return Ok((operation, lease, stale_lease));
+    }
     let operation = fixture
         .store
         .compare_and_swap(

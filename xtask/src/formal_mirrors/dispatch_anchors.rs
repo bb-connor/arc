@@ -737,6 +737,79 @@ const NATIVE_CAPTURE_SOURCES: &[RequiredSource] = &[
     },
 ];
 
+// Preflight phase and physical journal are source-drift anchors only, not
+// new proofs of nonce execution, SQLite isolation or crash safety.
+const NATIVE_NONCE_PREFLIGHT_SOURCES: &[RequiredSource] = &[
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/issuance.rs",
+        symbols: &["require_preflight_for_issuance"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/execution_nonce/issuance.rs",
+        symbols: &["SqliteAdmissionOperationStore::issue_nonce"],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/admission_operation/native_input_join.rs",
+        symbols: &["InputJoinPhase","NativeSecurityInputJoinRequestV1::for_phase","NativeSecurityInputJoinRequestV1::validate_phase","NativeSecurityInputJoinRequestV1::validate_phase_resolution"],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/admission_operation/native_nonce_preflight.rs",
+        symbols: &["NativeSecurityNoncePreflightJoinRequestV1","NativeSecurityNoncePreflightJoinRecordV1","NativeSecurityNoncePreflightJoinRequestV1::new","NativeSecurityNoncePreflightJoinRequestV1::validate","NativeSecurityNoncePreflightJoinRequestV1::validate_resolution","NativeSecurityNoncePreflightJoinRecordV1::validate"],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition.rs",
+        symbols: &["NativeSecurityFlowJoinAuthority::finish_with"],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition/nonce_preflight.rs",
+        symbols: &["NativeSecurityNoncePreflightJoinAuthority","NativeSecurityNoncePreflightJoinAuthority::finish","NativeSecurityNoncePreflightJoinAuthority::join_input","ChioKernel::run_native_nonce_preflight_preparation"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs",
+        symbols: &["NativeFlowResolver::classify_admission_input","NativeFlowResolver::prepare_native_nonce_preflight"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs",
+        symbols: &["SqliteAdmissionOperationStore::join_native_security_nonce_preflight","SqliteAdmissionOperationStore::load_native_security_nonce_preflight_join"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/security_state/native_mutation.rs",
+        symbols: &["join_native_nonce_preflight","JoinAuthorization"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight.rs",
+        symbols: &["NativeNoncePreflightJoinAuthority","projection_reference","checkpoint"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/contract.rs",
+        symbols: &["require_original"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/write.rs",
+        symbols: &["SqliteAdmissionOperationStore::join_security_participant_nonce_preflight","SqliteAdmissionOperationStore::load_native_nonce_preflight_join_record","footprint"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs",
+        symbols: &["FORMAT","Record","Record::bytes","Record::digest","Record::evidence","Record::validate","Record::insert","head","load","load_operation"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/schema.rs",
+        symbols: &["sql","exists","catalog","verify_catalog"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/integrity.rs",
+        symbols: &["verify_coverage"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/rows.rs",
+        symbols: &["verify_rows","apply_image"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v33.rs",
+        symbols: &["verify_pre_migration_schema"],
+    },
+];
+
 const NATIVE_INPUT_SOURCES: &[RequiredSource] = &[
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition.rs",
@@ -1058,6 +1131,10 @@ const REQUIRED_COVERAGE: &[(&str, &[RequiredSource])] = &[
     (
         "formal/apalache/PostAdmissionDropGuard.tla",
         NATIVE_INPUT_SOURCES,
+    ),
+    (
+        "formal/apalache/PostAdmissionDropGuard.tla",
+        NATIVE_NONCE_PREFLIGHT_SOURCES,
     ),
     (
         "formal/apalache/PostAdmissionDropGuard.tla",

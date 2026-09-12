@@ -11,6 +11,9 @@ use std::cell::{Cell, RefCell};
 
 #[path = "native_acquisition/input.rs"]
 mod input;
+#[path = "native_acquisition/nonce_preflight.rs"]
+mod nonce_preflight;
+pub use nonce_preflight::NativeSecurityNoncePreflightJoinAuthority;
 
 /// A kernel-created, non-cloneable, non-serializable handle. Its lifetime is
 /// bounded by one admission callback and it cannot authorize external effects.
@@ -188,6 +191,20 @@ impl NativeSecurityFlowJoinAuthority<'_> {
     }
 
     fn finish(self, result: Result<(), KernelError>) -> Result<(), KernelError> {
+        self.finish_with(result, |owner, runtime, now| {
+            owner.read_history(runtime, now)
+        })
+    }
+
+    fn finish_with(
+        self,
+        result: Result<(), KernelError>,
+        read: impl FnOnce(
+            &Self,
+            &DurableAdmissionRuntime,
+            u64,
+        ) -> Result<NativeSecurityFlowJoinRecordV1, KernelError>,
+    ) -> Result<(), KernelError> {
         result?;
         if self.failed.get() {
             return Err(invalid("native preparation suppressed a failed join"));
@@ -201,7 +218,7 @@ impl NativeSecurityFlowJoinAuthority<'_> {
         let runtime = self.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
         let now = runtime.refresh_trusted_time(self.requested_now);
-        if self.read_history(runtime, now)? != confirmed {
+        if read(&self, runtime, now)? != confirmed {
             return Err(invalid("native history changed before verifier completion"));
         }
         Ok(())

@@ -5,7 +5,9 @@ use super::*;
 
 pub(super) mod dispatch_ledger;
 pub(super) mod egress;
+pub(super) mod nonce_preflight;
 pub(super) mod output;
+pub(crate) use nonce_preflight::NativeNoncePreflightJoinAuthority;
 pub(crate) use output::NativeOutputJoinAuthority;
 mod history;
 pub(crate) use egress::NativeEgressAuthority;

@@ -13,6 +13,7 @@ pub(super) fn migrate_previous_global_commit_schema(
     let mut unsupported = Vec::new();
     let mut matched = false;
     for kind in [
+        "security_participant_nonce_preflight",
         "security_participant_output",
         "native_dispatch_ledger",
         "security_participant_egress",

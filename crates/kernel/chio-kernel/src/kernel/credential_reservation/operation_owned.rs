@@ -44,12 +44,26 @@ impl ChioKernel {
         } else {
             None
         };
-        if let Err(error) = self.run_native_admission_preparation(
-            request,
-            security_context,
-            admission.as_deref(),
-            now_unix_ms,
-        ) {
+        let native_preparation = if admission.as_deref().is_some_and(|operation| {
+            operation.requires_execution_nonce()
+                && operation.operation.state()
+                    == crate::admission_operation::AdmissionOperationState::Prepared
+        }) {
+            self.run_native_nonce_preflight_preparation(
+                request,
+                security_context,
+                admission.as_deref(),
+                now_unix_ms,
+            )
+        } else {
+            self.run_native_admission_preparation(
+                request,
+                security_context,
+                admission.as_deref(),
+                now_unix_ms,
+            )
+        };
+        if let Err(error) = native_preparation {
             return RuntimeAdmissionDecision::deny(error.to_string(), None);
         }
         let decision = self.run_runtime_admission_hook(

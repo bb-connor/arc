@@ -41,7 +41,9 @@ fn history_bytes(connection: &Connection) -> Result<Vec<u8>, Box<dyn std::error:
 
 #[test]
 fn supported_previous_global_schemas_preserve_history_when_adding_replay_kinds() -> TestResult {
-    let without_output = GLOBAL_COMMIT_SCHEMA.replace(", 'security_participant_output'", "");
+    let without_preflight =
+        GLOBAL_COMMIT_SCHEMA.replace(", 'security_participant_nonce_preflight'", "");
+    let without_output = without_preflight.replace(", 'security_participant_output'", "");
     let without_dispatch = without_output.replace(", 'native_dispatch_ledger'", "");
     let without_egress = without_dispatch.replace(", 'security_participant_egress'", "");
     let without_native = without_egress.replace(", 'security_participant_state'", "");
@@ -52,6 +54,7 @@ fn supported_previous_global_schemas_preserve_history_when_adding_replay_kinds()
     let without_status = without_runtime.replace(", 'finding_status'", "");
     let without_challenge = without_status.replace(", 'finding_challenge'", "");
     for schema in [
+        without_preflight,
         without_output,
         without_dispatch,
         without_egress,
@@ -85,6 +88,7 @@ fn nonhistorical_runtime_kind_without_status_is_not_an_upgrade_predecessor() -> 
     let connection = Connection::open_in_memory()?;
     connection.execute_batch(
         &GLOBAL_COMMIT_SCHEMA
+            .replace(", 'security_participant_nonce_preflight'", "")
             .replace(", 'security_participant_output'", "")
             .replace(", 'native_dispatch_ledger'", "")
             .replace(", 'security_participant_egress'", "")
@@ -111,6 +115,7 @@ fn unexpected_trigger_on_previous_global_schema_is_not_repaired() -> TestResult 
     let connection = Connection::open_in_memory()?;
     connection.execute_batch(
         &GLOBAL_COMMIT_SCHEMA
+            .replace(", 'security_participant_nonce_preflight'", "")
             .replace(", 'security_participant_output'", "")
             .replace(", 'native_dispatch_ledger'", "")
             .replace(", 'security_participant_egress'", "")
@@ -137,6 +142,7 @@ fn unexpected_trigger_on_previous_global_schema_is_not_repaired() -> TestResult 
 fn ignored_check_cannot_smuggle_future_projection_into_a_supported_predecessor() -> TestResult {
     let mut schema = GLOBAL_COMMIT_SCHEMA.to_owned();
     for kind in [
+        "security_participant_nonce_preflight",
         "security_participant_output",
         "native_dispatch_ledger",
         "security_participant_egress",

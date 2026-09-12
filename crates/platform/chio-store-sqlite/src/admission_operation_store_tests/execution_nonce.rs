@@ -14,6 +14,9 @@ mod domain;
 mod issuance;
 #[path = "execution_nonce/lifecycle.rs"]
 mod lifecycle;
+#[cfg(unix)]
+#[path = "execution_nonce/native_preflight.rs"]
+mod native_preflight;
 #[path = "execution_nonce/preflight.rs"]
 mod preflight;
 

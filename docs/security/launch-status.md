@@ -1,6 +1,6 @@
 # Security launch: current execution status
 
-Updated 2026-09-11. This is the short working index for the accepted
+Updated 2026-09-12. This is the short working index for the accepted
 [execution plan](launch-execution-plan.md), not another qualification campaign.
 Candidate: `/tmp/arc-security-launch`, `security/launch-integration`, base HEAD
 `8b9f9243905dfa61acac82d83438684940777fe3`. The accumulated 722-path checkpoint
@@ -14,7 +14,7 @@ This is not merge or release approval.
 | Milestone | State / missing acceptance | Next action / blocker | Evidence |
 | --- | --- | --- | --- |
 | M0 | Consolidated for implementation | Keep this index current; no independent cleanup campaign | Requirement and review maps below |
-| M1 | In progress; native execution and frozen participant-reference binding connected | Complete remaining participant custody and required use/declassification/nonce profiles; qualify actual confinement | [Frozen participant references](#frozen-dispatch-participant-reference-checkpoint) |
+| M1 | In progress; native execution, frozen participant references and nonce preflight connected | Complete nonce dispatch/capture/release and required use/declassification custody; qualify actual confinement | [Native nonce preflight](#native-nonce-preflight-custody-checkpoint) |
 | M2 | Process qualification pending; in-process native lifecycle reachable | Process cutpoints and recovery against M1 | Existing reply-fault coverage is partial evidence only |
 | M3 | Missing authenticated caller start and durable delivery | Preserve lost-report counterexample until real handshake fixes it | [Caller design](../superpowers/specs/2026-09-07-caller-dispatch-commitment-design.md) |
 | M4 | Consumer qualification incomplete | Inventory positive supported paths and required startup denials after M1-M3 | [Original requirement ledger](launch-plan.md#requirement-ledger) |
@@ -95,7 +95,7 @@ admission coordinator and fenced authoritative store, not a decoded receipt.
 | Nested `evaluate_tool_call_operation_with_nested_flow_client*` | Same participants, plus nested/session binding | Same original-operation owners; nested return finalization | Opt-in native sync/async local and egress in-process paths pass; complete profiles pending |
 | Nonce-required ordinary/nested | Operation-owned nonce and authenticated delivery identity | Durable nonce plus admission owner; uncertain outcomes retain accounting | Native nonce composition missing |
 | Governed ordinary/nested | Exact request-bound approval quorum and replay custody | Exact fenced claim disposition; expiry checked before capture | Combined native in-process ordinary/nested local and egress invocation passes; complete profiles and confinement pending |
-| Native-flow security-context entrypoints | Original native binding, full-source join, policy, egress/use custody and live capture authority | Private original owner and current output policy, not historical capture | Host opt-in required; default and test checkpoint stay closed; nonce/declassification unsupported |
+| Native-flow security-context entrypoints | Original native binding, full-source join, policy, egress/use custody and live capture authority | Private original owner and current output policy, not historical capture | Host opt-in required; default and test checkpoint stay closed; nonce preflight is separate from still-unsupported nonce dispatch and declassification |
 | Brokered invocation | Broker attempt, delegated parent/family quotas, witnessed identity and confined connector | Broker and admission original-operation reconciliation | Integrated enterprise topology unqualified; no direct fallback permitted |
 | Caller `reserve_caller_execution_blocking` / `reconcile_caller_execution_blocking` | Nonce/caller identity and complete authenticated start/delivery contract | Executor durable claim plus original admission owner | Start handshake missing; credential/security profiles explicitly denied; lost-report counterexample open |
 
@@ -709,6 +709,69 @@ native dispatch ledger; external caller claim custody and authenticated start
 are still incomplete. This does not enable native nonce/declassification/use
 profiles, qualify a confined process or complete M1. No merge, publication,
 populated-store migration, hosted qualification dispatch or activation is included.
+
+### Native nonce preflight custody checkpoint
+
+The public strict-nonce preflight regression reproduced denial at the
+dispatch-only preparation boundary. A nonce request is still `Prepared`, while
+the existing native input journal correctly requires `BrokerAttemptRegistered`.
+That dispatch contract and its historical transition digests are unchanged.
+
+Preflight now has a distinct typed intent, callback and affine writer. It shares
+the full-source label resolver and closed monotone row policy, not dispatch
+authority. Its physical transaction requires the original strict-nonce request,
+selected native initialization, exact current operation, recovery lease and flow
+observation. One immutable preflight join is allowed per operation; independent
+readback, callback error containment and the single-attempt latch remain required.
+Committed taint survives subsequent denial and lost acknowledgements.
+
+Admission schema v33 adds a separate preflight journal. Its canonical records,
+digest domain and sequence are independent of input and output journals. Anchored
+global ordering includes its row changes without treating them as dispatch joins.
+The combined history bounds are unchanged. Migration rejects partial future
+catalogs and preserves prior history; no populated operator store was migrated.
+
+The physical issuer also independently requires the exact earlier preflight
+record and its global anchor in the current fenced transaction, after verifying
+the original signed nonce and cleaned budget preflight. The regression first
+reproduced issuance without native taint, then passed with the writer check. This
+is an operation-custody composition boundary, not a claim that an untrusted agent
+possesses an issuer key or store fence. Non-native issuance and historical record
+decoding retain their existing contracts.
+
+Local behavioral verification passes:
+
+- 93 exact native-store custody tests, including v33 migration and recovery,
+  and four exact global-journal migration tests.
+- 67 exact native runtime policy tests, including combined credentials, ordinary
+  and nested execution, output custody and two public nonce preflight cases.
+- Six exact intent contracts and 11 exact kernel preparation tests. A stale
+  dispatch-probe assertion now expects the existing live-selection read; denial,
+  zero legacy callbacks, zero tool calls and unchanged admission remain asserted.
+- After adding the physical issuer check: its new exact regression, all 15
+  existing issuance tests and the two public nonce consumers pass again. The
+  full 93/67 suites preceded this final issuer-only change.
+
+The behavioral counterexamples are
+`/tmp/chio-native-nonce-preflight-red-behavior.log` and
+`/tmp/chio-native-preflight-issuance-red-behavior.log`. Production library checks
+for kernel, store and control plane pass, as does strict all-target Clippy for
+those packages and `xtask`. All 23 formal-source tests pass; the fresh checker
+matches 217 source anchors and generated coverage remains 58 rows/168 artifacts.
+All 205 prior anchor relationships/symbols and non-mirror proof claims are
+preserved. These are source-drift checks, not new proofs of SQLite or nonce
+execution safety.
+
+Workspace and explicit-source formatting, the 65-inventory flow wiring contract,
+security CI static/mutation checks and patch hygiene pass. All 63 prior flow
+inventories retain their names and commands. The root Cargo.lock is unchanged.
+The repository's AST-only graph refresh follows these final source edits. These
+local checks do not constitute passing exact-head hosted qualification.
+
+This is pre-issuance taint custody, not completed native nonce execution. Binding
+the issued nonce through fresh dispatch preparation, atomic capture and ordinary/
+nested output release remains next. Declassification/use custody and actual
+confinement remain open; M1 and launch qualification are not complete.
 
 ## Retained evidence and external prerequisites
 

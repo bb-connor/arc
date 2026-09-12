@@ -2,7 +2,7 @@
 use super::*;
 use chio_kernel::admission_operation::NativeSecurityInputJoinRequestV1;
 
-fn label() -> TestResult<InformationLabel> {
+pub(super) fn label() -> TestResult<InformationLabel> {
     Ok(InformationLabel::try_known(
         Default::default(),
         std::collections::BTreeSet::from([chio_security_types::Compartment::new(

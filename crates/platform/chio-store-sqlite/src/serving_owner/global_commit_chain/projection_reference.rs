@@ -14,6 +14,11 @@ pub(super) fn projection_reference_digest(
                 connection, key, sequence,
             )
         }
+        "security_participant_nonce_preflight" => {
+            crate::admission_operation_store::security_participant_nonce_preflight_projection_reference(
+                connection, key, sequence,
+            )
+        }
         "security_participant_output" => {
             crate::admission_operation_store::security_participant_output_projection_reference(
                 connection, key, sequence,

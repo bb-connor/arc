@@ -16,6 +16,7 @@ mod migration_v29;
 mod migration_v30;
 mod migration_v31;
 mod migration_v32;
+mod migration_v33;
 
 #[cfg(test)]
 pub(crate) fn pre_dpop_claim_schema_fixture() -> String {
@@ -114,7 +115,10 @@ fn migrate_schema(
     if on_disk < 31 {
         migration_v31::verify_pre_migration_schema(&transaction, on_disk)?;
     }
-    migration_v32::verify_pre_migration_schema(&transaction, on_disk)?;
+    if on_disk < 32 {
+        migration_v32::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    migration_v33::verify_pre_migration_schema(&transaction, on_disk)?;
     if on_disk < 18 && table_exists(&transaction, "admission_operations")? {
         // The legacy report-after-effect contract could refund an executed
         // caller as pre-dispatch compensation. A refunded terminal is not
@@ -208,6 +212,9 @@ fn migrate_schema(
         .map_err(sqlite_error)?;
     transaction
         .execute_batch(super::security_participant_state::output::sql())
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(super::security_participant_state::nonce_preflight::sql())
         .map_err(sqlite_error)?;
     crate::stamp_schema_version(
         &transaction,
@@ -550,6 +557,7 @@ pub(crate) fn verify_admission_operation_invariants(
     super::security_participant_migration::verify_all(connection)?;
     super::security_participant_state::egress::verify_catalog(connection)?;
     super::security_participant_state::output::verify_catalog(connection)?;
+    super::security_participant_state::nonce_preflight::verify_catalog(connection)?;
     super::security_participant_state::dispatch_ledger::verify_all(connection)?;
     super::security_participant_state::verify_all(connection).map(|_| ())
 }
@@ -644,6 +652,11 @@ fn verify_admission_operation_schema(
     if version >= 32 {
         expected
             .execute_batch(super::security_participant_state::output::sql())
+            .map_err(sqlite_error)?;
+    }
+    if version >= 33 {
+        expected
+            .execute_batch(super::security_participant_state::nonce_preflight::sql())
             .map_err(sqlite_error)?;
     }
     if admission_operation_schema_catalog(connection)?
@@ -920,6 +933,8 @@ fn admission_operation_schema_catalog(
                OR lower(tbl_name) GLOB 'security_participant_state*'
                OR lower(name) GLOB 'security_participant_egress*'
                OR lower(tbl_name) GLOB 'security_participant_egress*'
+               OR lower(name) GLOB 'security_participant_nonce_preflight*'
+               OR lower(tbl_name) GLOB 'security_participant_nonce_preflight*'
                OR lower(name) GLOB 'security_participant_output*'
                OR lower(tbl_name) GLOB 'security_participant_output*'
                OR lower(name) GLOB 'admission_operation_native_dispatch*'

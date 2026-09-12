@@ -119,6 +119,42 @@ pub trait AdmissionOperationStore: Send + Sync {
         ))
     }
 
+    /// Join strict nonce preflight input under its Prepared operation and lease.
+    /// The dedicated history cannot substitute for dispatch preparation or a
+    /// fresh flow observation. It must not fall back to the dispatch join port.
+    fn join_native_security_nonce_preflight(
+        &self,
+        _operation: &AdmissionOperationV1,
+        _lease: &AdmissionRecoveryLease,
+        _binding: &NativeSecurityAuthorityBindingV1,
+        _context: &crate::SecurityInvocationContext,
+        _command: &NativeSecurityNoncePreflightJoinRequestV1,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<NativeSecurityNoncePreflightJoinRecordV1, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "operation-owned native nonce preflight is unsupported".into(),
+        ))
+    }
+
+    /// Independently read exact nonce preflight history under the serving fence.
+    /// Successful readback never authorizes another join or a tool effect.
+    fn load_native_security_nonce_preflight_join(
+        &self,
+        _operation_id: &AdmissionOperationId,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<(
+            AdmissionOperationV1,
+            Option<NativeSecurityNoncePreflightJoinRecordV1>,
+        )>,
+        AdmissionOperationStoreError,
+    > {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "native nonce preflight history is unsupported".into(),
+        ))
+    }
+
     /// Join classified post-guard output under the original finalization lease.
     /// Implementations must bind the intent to the physical resolved outcome,
     /// evaluation and native capture. This neither publishes output nor releases

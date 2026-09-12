@@ -87,6 +87,11 @@ impl SqliteAdmissionOperationStore {
             &stored.operation,
             None,
         )?;
+        super::super::security_participant_state::nonce_preflight::require_preflight_for_issuance(
+            &transaction,
+            &stored.operation,
+            &original,
+        )?;
         let retained = verify(&transaction, &stored.operation)?;
         let result = stored.operation.apply_command(command, now)?;
         let AdmissionCommandResult::Applied(updated) = result else {
