@@ -7,6 +7,10 @@ use crate::kernel::delivery_contract;
 #[path = "return_context/caller.rs"]
 mod caller;
 
+#[path = "return_context/participants.rs"]
+mod participants;
+use participants::FrozenDispatchParticipants;
+
 /// A local freeze rejection proves that no dispatch commit was attempted.
 /// Errors from the store path do not provide that evidence and retain custody.
 #[derive(Debug, thiserror::Error)]
@@ -36,6 +40,9 @@ pub(crate) struct DurableToolReturnContext {
     pub(super) federation_context: Option<FrozenFederationContext>,
     pub(super) receipt_signing_identity:
         Option<crate::tool_outcome::FrozenReceiptSigningIdentityV1>,
+    // Legacy caller frames stay explicitly unbound. New live contexts always
+    // retain the original selection, including absent participants.
+    participants: Option<Box<FrozenDispatchParticipants>>,
 }
 
 pub(crate) struct DurableToolReturnContextInput<'a> {
@@ -95,7 +102,27 @@ impl DurableToolReturnContext {
                 "frozen return context lost its selected grant".into(),
             ));
         }
+        if let Some(participants) = self.participants.as_ref() {
+            participants.validate(&admission.operation)?;
+        }
         Ok(())
+    }
+
+    pub(super) fn bind_native_dispatch(
+        &mut self,
+        digest: &AdmissionDigest,
+    ) -> Result<(), KernelError> {
+        if !self.security_release_required {
+            return Err(KernelError::DurableAdmission(
+                "native dispatch binding requires the original security release context".into(),
+            ));
+        }
+        self.participants
+            .as_mut()
+            .ok_or_else(|| {
+                KernelError::DurableAdmission("native dispatch lost frozen participants".into())
+            })?
+            .bind_native_dispatch(digest)
     }
 }
 
@@ -109,6 +136,7 @@ impl ChioKernel {
     ) -> Result<DurableToolReturnContext, DurableDispatchCommitError> {
         input.trusted_now_unix_ms = current_unix_timestamp_ms().max(input.trusted_now_unix_ms);
         let now = input.trusted_now_unix_ms;
+        let request = input.request;
         let context = self
             .freeze_durable_tool_return_context(admission, input)
             .map_err(DurableDispatchCommitError::RejectedBeforeCommit)?;
@@ -135,6 +163,9 @@ impl ChioKernel {
             self.commit_durable_dispatch(admission, now)
                 .map_err(DurableDispatchCommitError::CommitUnconfirmed)?;
         }
+        context
+            .validate_binding(admission, request)
+            .map_err(DurableDispatchCommitError::CommitUnconfirmed)?;
         if let Some(expected) = caller_context.as_ref() {
             self.restore_caller_return_context(admission, expected, now)
                 .map_err(DurableDispatchCommitError::CommitUnconfirmed)
@@ -214,6 +245,9 @@ impl ChioKernel {
                 trusted_now_unix_ms,
             )?,
             receipt_signing_identity: Some(self.freeze_receipt_signing_identity()?),
+            participants: Some(Box::new(FrozenDispatchParticipants::from_operation(
+                &admission.operation,
+            )?)),
         };
         context.validate_binding(admission, request)?;
         Ok(context)

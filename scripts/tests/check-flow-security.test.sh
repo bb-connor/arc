@@ -84,6 +84,8 @@ def parse(source: str) -> dict[str, tuple[bool, list[str], list[str]]]:
 
 
 expected_counts = {
+    "frozen dispatch participant context": 27,
+    "durable caller participant persistence": 3,
     "native compiled catalog identity": 2,
     "native post-join policy": 65,
     "public nested credential custody": 5,
@@ -185,6 +187,13 @@ required_adapter_commands = {
     "Cohere canonical stream": "chio-cohere-tools-adapter",
 }
 required_native_commands = {
+    "frozen dispatch participant context": [
+        "cargo", "test", "-p", "chio-kernel", "--lib", "return_context::",
+    ],
+    "durable caller participant persistence": [
+        "cargo", "test", "-p", "chio-store-sqlite", "--test",
+        "execution_nonce_caller_execution", "dispatch_context::",
+    ],
     "frozen durable receipt signing": [
         "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::return_context::signing::",
     ],

@@ -6,6 +6,54 @@ mod signing;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+pub(super) fn substitute_captured_participant(
+    operation: AdmissionOperationV1,
+) -> Result<AdmissionOperationV1, AdmissionCaptureError> {
+    let map = |error: serde_json::Error| AdmissionCaptureError::Invariant(error.to_string());
+    let mut persisted = operation.to_persisted();
+    let mut attachments = operation.attachments().to_vec();
+    attachments.push(AdmissionAttachment::GovernedApprovalLedgerDigest(
+        crate::admission_operation::AdmissionDigest::try_new("substituted_ledger", "a".repeat(64))
+            .map_err(AdmissionCaptureError::Operation)?,
+    ));
+    persisted.attachments =
+        serde_json::from_value(serde_json::to_value(attachments).map_err(map)?).map_err(map)?;
+    AdmissionOperationV1::from_persisted(persisted).map_err(AdmissionCaptureError::Operation)
+}
+
+#[test]
+fn changed_capture_participant_denies_before_tool_effect_and_retains_accounting() -> TestResult {
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture("changed-capture-participant");
+    store
+        .substitute_capture_participant
+        .store(true, Ordering::SeqCst);
+    if let Ok(response) = kernel.evaluate_tool_call_blocking(&request) {
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert!(response.output.is_none());
+    }
+    assert!(!store.substitute_capture_participant.load(Ordering::SeqCst));
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    let operation = store.operation();
+    assert!(operation.dispatch_commit().is_some());
+    assert!(operation.governed_approval_ledger_digest().is_none());
+    assert!(store
+        .state
+        .lock()
+        .map_err(|_| "test lock")?
+        .raw_outcome
+        .is_none());
+    let usage = store
+        .budget
+        .get_usage(&request.capability.id, 0)?
+        .ok_or("captured usage")?;
+    assert_eq!(
+        usage.invocation_count, 1,
+        "unconfirmed capture cannot be refunded"
+    );
+    Ok(())
+}
+
 fn ordinary_return_context_has_no_caller_artifact_limit(nested: bool) -> TestResult {
     let (kernel, mut request, store, invocations) =
         durable_admission_fixture("ordinary-frozen-return-context");

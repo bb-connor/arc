@@ -65,7 +65,17 @@ fn caller_report_retains_typed_private_context_with_capture_and_exact_restart_re
         assert!(completed.receipt.verify_signature()?);
         let frame = load(&runtime, &execution)?;
         let payload: serde_json::Value = serde_json::from_slice(frame.kernel_context_json())?;
-        assert_eq!(payload["schema"], "chio.kernel-caller-return-context.v2");
+        assert_eq!(payload["schema"], "chio.kernel-caller-return-context.v3");
+        let participants = payload["participants"]
+            .as_object()
+            .ok_or("frozen participants")?;
+        assert_eq!(participants.len(), 18);
+        let framed: serde_json::Value = serde_json::from_slice(frame.canonical_bytes())?;
+        for field in ["provider_attempt", "budget_hold_id", "execution_nonce_id"] {
+            assert_eq!(participants[field], framed[field]);
+        }
+        assert!(participants["execution_nonce_issuance_digest"].is_string());
+        assert!(participants["execution_nonce_preflight_digest"].is_string());
         assert_eq!(
             payload["receipt_signing_identity"]["public_key"],
             serde_json::to_value(&completed.receipt.kernel_key)?

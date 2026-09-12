@@ -75,7 +75,7 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
                 "native capture preparation belongs to another live evaluation",
             ));
         }
-        let frozen = self
+        let mut frozen = self
             .return_input
             .take()
             .map(|input| {
@@ -94,6 +94,9 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
                 )
             })
             .transpose()?;
+        if let Some(context) = frozen.as_mut() {
+            context.bind_native_dispatch(&ledger.record_digest)?;
+        }
         // From this point, a callback failure or lost acknowledgement cannot
         // justify refunding quota or releasing one-shot credential custody.
         self.attempted = true;

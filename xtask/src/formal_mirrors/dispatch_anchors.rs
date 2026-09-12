@@ -406,6 +406,9 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "ChioKernel::restore_caller_return_context",
             "ChioKernel::decode_caller_return_context",
             "ChioKernel::decode_caller_return_payload",
+            "SCHEMA",
+            "SIGNING_SCHEMA",
+            "LEGACY_SCHEMA",
         ],
     },
     RequiredSource {
@@ -425,6 +428,18 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "DurableDispatchCommitError",
             "ChioKernel::freeze_and_commit_durable_dispatch",
             "ChioKernel::freeze_durable_tool_return_context",
+            "DurableToolReturnContext",
+            "DurableToolReturnContext::validate_binding",
+            "DurableToolReturnContext::bind_native_dispatch",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/participants.rs",
+        symbols: &[
+            "FrozenDispatchParticipants",
+            "FrozenDispatchParticipants::from_operation",
+            "FrozenDispatchParticipants::validate",
+            "FrozenDispatchParticipants::bind_native_dispatch",
         ],
     },
     RequiredSource {

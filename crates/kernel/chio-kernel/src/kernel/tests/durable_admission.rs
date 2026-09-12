@@ -14,10 +14,10 @@ use crate::tool_outcome::{
     ToolOutcomeStoreError,
 };
 
-#[path = "durable_admission/delivery_revalidation.rs"]
-mod delivery_revalidation;
 #[path = "durable_admission/authority_profile.rs"]
 mod authority_profile;
+#[path = "durable_admission/delivery_revalidation.rs"]
+mod delivery_revalidation;
 #[path = "durable_admission/dispatch_commit_failure.rs"]
 mod dispatch_commit_failure;
 #[path = "durable_admission/dpop_acquisition.rs"]
@@ -30,10 +30,10 @@ mod governed_acquisition;
 mod monetary;
 #[path = "durable_admission/native_acquisition.rs"]
 mod native_acquisition;
-#[path = "durable_admission/native_egress.rs"]
-mod native_egress;
 #[path = "durable_admission/native_dispatch_ledger.rs"]
 mod native_dispatch_ledger;
+#[path = "durable_admission/native_egress.rs"]
+mod native_egress;
 #[path = "durable_admission/operation_store.rs"]
 mod operation_store;
 #[path = "durable_admission/receipt_projection.rs"]
@@ -216,6 +216,7 @@ struct TestAdmissionOperationStore {
     fail_next_payment_settlement_intent: std::sync::atomic::AtomicBool,
     fail_next_budget_authorization: std::sync::atomic::AtomicBool,
     panic_capture_boundary: std::sync::atomic::AtomicU8,
+    substitute_capture_participant: std::sync::atomic::AtomicBool,
     budget: std::sync::Arc<crate::budget_store::InMemoryBudgetStore>,
     state: std::sync::Mutex<TestAdmissionState>,
 }
@@ -239,6 +240,7 @@ impl TestAdmissionOperationStore {
             fail_next_payment_settlement_intent: std::sync::atomic::AtomicBool::new(false),
             fail_next_budget_authorization: std::sync::atomic::AtomicBool::new(false),
             panic_capture_boundary: std::sync::atomic::AtomicU8::new(0),
+            substitute_capture_participant: std::sync::atomic::AtomicBool::new(false),
             budget: std::sync::Arc::new(crate::budget_store::InMemoryBudgetStore::new()),
             state: std::sync::Mutex::new(TestAdmissionState::default()),
         }
@@ -913,6 +915,14 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
             panic_boundary, 2,
             "injected panic after dispatch commitment"
         );
+        let operation = if self
+            .substitute_capture_participant
+            .swap(false, Ordering::SeqCst)
+        {
+            return_context::substitute_captured_participant(operation)?
+        } else {
+            operation
+        };
         Ok(crate::receipt_store::AdmissionBudgetCapture {
             decision,
             operation,

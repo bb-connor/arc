@@ -14,7 +14,7 @@ This is not merge or release approval.
 | Milestone | State / missing acceptance | Next action / blocker | Evidence |
 | --- | --- | --- | --- |
 | M0 | Consolidated for implementation | Keep this index current; no independent cleanup campaign | Requirement and review maps below |
-| M1 | In progress; ordinary/nested combined-credential native execution and signed replay connected | Complete participant references and required use/declassification/nonce profiles; qualify actual confinement | [Native catalog deadline repair](#native-compiled-catalog-deadline-checkpoint) |
+| M1 | In progress; native execution and frozen participant-reference binding connected | Complete remaining participant custody and required use/declassification/nonce profiles; qualify actual confinement | [Frozen participant references](#frozen-dispatch-participant-reference-checkpoint) |
 | M2 | Process qualification pending; in-process native lifecycle reachable | Process cutpoints and recovery against M1 | Existing reply-fault coverage is partial evidence only |
 | M3 | Missing authenticated caller start and durable delivery | Preserve lost-report counterexample until real handshake fixes it | [Caller design](../superpowers/specs/2026-09-07-caller-dispatch-commitment-design.md) |
 | M4 | Consumer qualification incomplete | Inventory positive supported paths and required startup denials after M1-M3 | [Original requirement ledger](launch-plan.md#requirement-ledger) |
@@ -94,7 +94,7 @@ admission coordinator and fenced authoritative store, not a decoded receipt.
 | Ordinary `evaluate_tool_call*` | Installed runtime, credentials and selected security lifecycle | Coordinator/store; output guards and current security release | Opt-in non-nonce/non-declassifying native in-process invocation and replay pass; complete profiles pending |
 | Nested `evaluate_tool_call_operation_with_nested_flow_client*` | Same participants, plus nested/session binding | Same original-operation owners; nested return finalization | Opt-in native sync/async local and egress in-process paths pass; complete profiles pending |
 | Nonce-required ordinary/nested | Operation-owned nonce and authenticated delivery identity | Durable nonce plus admission owner; uncertain outcomes retain accounting | Native nonce composition missing |
-| Governed ordinary/nested | Exact request-bound approval quorum and replay custody | Exact fenced claim disposition; expiry checked before capture | Combined non-egress ordinary invocation passes; combined nested/egress execution not qualified |
+| Governed ordinary/nested | Exact request-bound approval quorum and replay custody | Exact fenced claim disposition; expiry checked before capture | Combined native in-process ordinary/nested local and egress invocation passes; complete profiles and confinement pending |
 | Native-flow security-context entrypoints | Original native binding, full-source join, policy, egress/use custody and live capture authority | Private original owner and current output policy, not historical capture | Host opt-in required; default and test checkpoint stay closed; nonce/declassification unsupported |
 | Brokered invocation | Broker attempt, delegated parent/family quotas, witnessed identity and confined connector | Broker and admission original-operation reconciliation | Integrated enterprise topology unqualified; no direct fallback permitted |
 | Caller `reserve_caller_execution_blocking` / `reconcile_caller_execution_blocking` | Nonce/caller identity and complete authenticated start/delivery contract | Executor durable claim plus original admission owner | Start handshake missing; credential/security profiles explicitly denied; lost-report counterexample open |
@@ -132,7 +132,8 @@ checks below are retained evidence, not fresh exact-commit hosted qualification.
 ## Current M1 checkpoint
 
 The entries below retain checkpoint-by-checkpoint evidence. The latest integration
-is the [native captured lifecycle](#native-captured-lifecycle-checkpoint); earlier
+is the [frozen participant-reference binding](#frozen-dispatch-participant-reference-checkpoint)
+over the [native captured lifecycle](#native-captured-lifecycle-checkpoint); earlier
 statements about a closed connector describe their own source checkpoint.
 
 The native capture path now carries bounded validity from the configured runtime
@@ -655,6 +656,59 @@ qualification. Full frozen participant references and native
 nonce/declassification/use profiles remain open; M1 is not complete. No manual
 hosted qualification, populated-store migration, merge, publication or
 operational activation is included.
+
+### Frozen dispatch participant reference checkpoint
+
+Two model regressions reproduced acceptance of a substituted nonce-issuance
+reference by the live return context and caller decoder. The operation and
+request still matched. These are binding counterexamples using individually
+valid model operations, not evidence of bypassing the physical store's custody.
+
+The shared kernel context now retains a bounded, typed snapshot of all 18
+immutable participant references, including explicit absence. It covers
+provider/budget, threshold and supplemental authorization, nonce issuance and
+preflight, payment/channel/credit, runtime, governed approval and DPoP bindings.
+Proposal content is hashed rather than retained. The enclosing caller-frame
+digest and later tool-outcome attachment are deliberately excluded. An
+exhaustive attachment match requires future additions to make a retention
+decision. Native capture binds the exact prepared dispatch ledger before its
+physical commit; independent capture readback and the live owner remain required.
+
+New private caller frames use v3 and require both signing identity and participant
+snapshot. Legacy v1/v2 preserve their prior canonical bytes and explicitly absent
+snapshots. Unknown, missing, substituted or schema-smuggled fields reject;
+legacy data cannot be reissued as complete v3 context using current references.
+The shared post-capture check rejects a changed reply before tool invocation,
+without refunding captured accounting. Return recording checks the same frozen
+selection. No private key, reusable proof signature or protected proposal input
+is added to the snapshot.
+
+Final exact inventories pass: 27 frozen-context tests, three real SQLite caller
+persistence/restart tests and all 65 native-policy tests, with zero failures or
+ignored tests. The context group includes both reproduced regressions and the
+capture-reply test. Native coverage retains combined runtime/approval/DPoP
+ordinary and public nested sync/async execution, local and egress, as well as
+accounting faults, corruption, actual output preparation and final release.
+Evidence is `/tmp/chio-participant-snapshot-exact-gates.log`; the two original
+model failures are retained in `/tmp/chio-participant-snapshot-red-tests.log`.
+Strict all-target Clippy passes for kernel, SQLite, control plane and xtask;
+production-library checks pass for the three runtime packages. All 23 selected
+formal-mirror checker tests pass. All 205 source entries match, preserving every
+prior entry, symbol and claim; generated coverage remains 58 rows / 168 artifacts.
+These are source-drift checks, not new proofs. Workspace and explicit
+include-reachable formatting, the 63-inventory flow contract, security CI
+contract, file hygiene and whitespace checks pass. The root lockfile is unchanged.
+Quality and static logs are `/tmp/chio-participant-snapshot-quality.log` and
+`/tmp/chio-participant-snapshot-static-final.log`. The final AST-only graph
+refresh passes (`/tmp/chio-participant-snapshot-graph.log`); HTML visualization
+remains skipped at the unchanged repository-size limit.
+
+Participant-ledger roots identify authority/operation history, not necessarily
+one claim episode. Exact native claim references remain bound through the
+native dispatch ledger; external caller claim custody and authenticated start
+are still incomplete. This does not enable native nonce/declassification/use
+profiles, qualify a confined process or complete M1. No merge, publication,
+populated-store migration, hosted qualification dispatch or activation is included.
 
 ## Retained evidence and external prerequisites
 

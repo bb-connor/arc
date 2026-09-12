@@ -245,6 +245,14 @@ This does not complete the participant snapshot, required nonce/declassification
 variants or confined-process qualification. Those remain required M1 work;
 captured historical records cannot reconstruct a lost live owner.
 
+The [participant-reference checkpoint](launch-status.md#frozen-dispatch-participant-reference-checkpoint)
+now freezes every pre-dispatch participant reference, including explicit absence,
+and binds the native preparation ledger before capture. New private caller v3
+frames retain that same selection; legacy frames remain explicitly unbound.
+Participant history roots are not fresh claim authority. Required native
+nonce/declassification/use custody and confined-process qualification remain
+open, as does the external caller's authenticated claim/start contract in M3.
+
 ## M2. Qualify native failure and recovery
 
 Build one named cutpoint matrix against real stores and child processes. Reuse

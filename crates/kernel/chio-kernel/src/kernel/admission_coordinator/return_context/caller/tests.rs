@@ -13,6 +13,9 @@ struct Fixture {
 mod fixture;
 use fixture::fixture;
 
+#[path = "tests/participants.rs"]
+mod participants;
+
 #[test]
 fn caller_return_codec_keeps_frozen_facts_without_credentials_or_return_observations() -> TestResult
 {
@@ -144,6 +147,10 @@ fn caller_return_codec_keeps_legacy_identity_absence_explicit() -> TestResult {
         "current frames require a frozen identity"
     );
     payload["schema"] = serde_json::json!(LEGACY_SCHEMA);
+    payload
+        .as_object_mut()
+        .ok_or("caller object")?
+        .remove("participants");
     let legacy = fixture.kernel.decode_caller_return_payload(
         &fixture.admission,
         &canonical_json_bytes(&payload)?,

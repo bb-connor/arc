@@ -1384,12 +1384,13 @@ unsupported; this does not activate the native lifecycle.
 
 ### Remaining integration sequence
 
-The current caller-report path now produces `chio.kernel-caller-return-context.v2`
+The current caller-report path now produces `chio.kernel-caller-return-context.v3`
 before capture. The bounded private payload binds operation/request identity,
 selected grant, original material digest, frozen receipt and purchase/recovery
 metadata, pre-invocation guard evidence, stream limits, signing identity,
-security identity data, original federation evidence and the runtime ledger
-root. It excludes reusable request credentials and post-return observations.
+security identity data, original federation evidence and the original immutable
+participant-reference selection. It excludes reusable request credentials and
+post-return observations.
 The dedicated store port captures quota, commits the nonce and retains this
 frame atomically. The kernel then reloads the exact bytes under its fence and
 uses the typed decoder before accepting the report as a tool return. Missing or
@@ -1397,6 +1398,25 @@ changed readback is an unconfirmed commitment, not permission to compensate.
 Store callback panics are contained so recovery can still inspect whether the
 operation committed. Participant validation during decode runs outside the
 mutation sequencer after exact physical readback.
+
+V3 requires a typed participant snapshot alongside the v2 signing selection.
+Every current participant reference has an explicit value or absence, including
+budget/provider identity, threshold and supplemental authorization, nonce
+issuance/preflight, payment and channel bindings, credit exposure, and runtime,
+approval and DPoP ledger roots. Signed proposal content is represented by a
+digest, not copied into this snapshot. The enclosing caller-frame digest is
+excluded to avoid recursion; the later tool outcome is not an admission fact.
+New attachment kinds require an explicit retention decision in an exhaustive
+match. The same reference comparison runs after capture before a tool effect and
+before recording its return. An unconfirmed capture retains accounting.
+
+Native live contexts additionally bind the exact prepared native dispatch
+ledger before physical capture; that ledger retains the selected claim episodes
+and flow/egress evidence. A ledger root alone is not an exact claim episode or
+live authority. Complete external caller claim custody and authenticated start
+remain separate requirements. Legacy caller v1/v2 bytes stay readable with
+explicitly absent participant snapshots. They cannot carry the new snapshot or
+be reissued as complete v3 context by filling it from current state.
 
 V2 retains the public receipt key and cryptographic floor selected before
 dispatch, separately from the classical kernel identity. New raw returns retain

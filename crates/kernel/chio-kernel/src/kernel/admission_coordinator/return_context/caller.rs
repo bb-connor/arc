@@ -7,7 +7,8 @@ use crate::admission_operation::AdmissionCallerDispatchContextV1;
 use serde::{Deserialize, Serialize};
 
 const LEGACY_SCHEMA: &str = "chio.kernel-caller-return-context.v1";
-const SCHEMA: &str = "chio.kernel-caller-return-context.v2";
+const SIGNING_SCHEMA: &str = "chio.kernel-caller-return-context.v2";
+const SCHEMA: &str = "chio.kernel-caller-return-context.v3";
 
 #[cfg(test)]
 #[path = "caller/tests.rs"]
@@ -34,6 +35,8 @@ struct CallerReturnWire {
     runtime_participant_ledger_digest: Option<AdmissionDigest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     receipt_signing_identity: Option<crate::tool_outcome::FrozenReceiptSigningIdentityV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    participants: Option<Box<FrozenDispatchParticipants>>,
 }
 
 impl ChioKernel {
@@ -63,6 +66,7 @@ impl ChioKernel {
             schema: SCHEMA.into(),
             kernel_public_key: self.config.keypair.public_key(),
             receipt_signing_identity: context.receipt_signing_identity.clone(),
+            participants: context.participants.clone(),
             frozen_at_unix_ms: now,
             operation_id: context.operation_id.clone(),
             request_binding_hash: context.request_binding_hash.clone(),
@@ -173,9 +177,15 @@ impl ChioKernel {
                 "caller return component is not exact typed canonical JSON",
             ));
         }
-        let schema_valid = match (wire.schema.as_str(), wire.receipt_signing_identity.as_ref()) {
-            (SCHEMA, Some(identity)) => identity.validate().is_ok(),
-            (LEGACY_SCHEMA, None) => true,
+        let schema_valid = match (
+            wire.schema.as_str(),
+            wire.receipt_signing_identity.as_ref(),
+            wire.participants.as_ref(),
+        ) {
+            (SCHEMA, Some(identity), Some(_)) | (SIGNING_SCHEMA, Some(identity), None) => {
+                identity.validate().is_ok()
+            }
+            (LEGACY_SCHEMA, None, None) => true,
             _ => false,
         };
         if !schema_valid
@@ -242,6 +252,7 @@ impl ChioKernel {
             security_release_required: false,
             federation_context,
             receipt_signing_identity: wire.receipt_signing_identity,
+            participants: wire.participants,
         };
         context.validate_binding(admission, request)?;
         Ok(context)
