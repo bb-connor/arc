@@ -84,6 +84,7 @@ def parse(source: str) -> dict[str, tuple[bool, list[str], list[str]]]:
 
 
 expected_counts = {
+    "native compiled catalog identity": 2,
     "native post-join policy": 65,
     "public nested credential custody": 5,
     "native capture accounting deltas": 2,
@@ -242,6 +243,10 @@ required_native_commands = {
     "native flow custody": [
         "cargo", "test", "-p", "chio-store-sqlite", "--lib",
         "admission_operation_store::tests::security_participant_state::",
+    ],
+    "native compiled catalog identity": [
+        "cargo", "test", "-p", "chio-store-sqlite", "--lib",
+        "admission_operation_store::security_participant_state::schema::tests::",
     ],
     "original security authority selection": [
         "cargo", "test", "-p", "chio-kernel", "--lib",

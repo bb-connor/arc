@@ -14,7 +14,7 @@ This is not merge or release approval.
 | Milestone | State / missing acceptance | Next action / blocker | Evidence |
 | --- | --- | --- | --- |
 | M0 | Consolidated for implementation | Keep this index current; no independent cleanup campaign | Requirement and review maps below |
-| M1 | In progress; opt-in native capture-to-live-owner, actual in-process tool output and signed replay connected | Complete participant references and required use/declassification/nonce profiles; qualify actual confinement | [Native captured lifecycle](#native-captured-lifecycle-checkpoint) |
+| M1 | In progress; ordinary/nested combined-credential native execution and signed replay connected | Complete participant references and required use/declassification/nonce profiles; qualify actual confinement | [Native catalog deadline repair](#native-compiled-catalog-deadline-checkpoint) |
 | M2 | Process qualification pending; in-process native lifecycle reachable | Process cutpoints and recovery against M1 | Existing reply-fault coverage is partial evidence only |
 | M3 | Missing authenticated caller start and durable delivery | Preserve lost-report counterexample until real handshake fixes it | [Caller design](../superpowers/specs/2026-09-07-caller-dispatch-commitment-design.md) |
 | M4 | Consumer qualification incomplete | Inventory positive supported paths and required startup denials after M1-M3 | [Original requirement ledger](launch-plan.md#requirement-ledger) |
@@ -43,10 +43,10 @@ the normative plans retain their detailed acceptance requirements.
 | 5 Durable SQLite and remote authority semantics | Partial local; crash/recovery qualification pending | M2 |
 | 6 Admission ordering and signed terminal projection | Partial local; opt-in native execution passes, required profiles and caller handshake missing | M1, M3 |
 | 7 Policy-owned threshold requirements | Carried; composed action acceptance pending | M7 |
-| 8 Bounded approval verification | Partial local; combined non-egress native invocation passes, complete profiles pending | M1 |
+| 8 Bounded approval verification | Partial local; combined ordinary/nested local and egress invocation passes, complete profiles pending | M1 |
 | 9 Durable replay and collection | Partial local; composed recovery and response pending | M2, M7 |
 | 10 Federation threshold compatibility | Carried; final native authorization coupling pending | M1 |
-| 11 Existing bounded runtime evidence | Partial local; validity binds capture and live handoff, combined non-egress invocation passes | M1 |
+| 11 Existing bounded runtime evidence | Partial local; validity binds capture and live handoff, combined ordinary/nested local and egress invocation passes | M1 |
 | 12 Authoritative schemas and four-language generation | Carried; final changed-wire parity pending | M4 |
 | 13 Adapter preservation | Partial local; complete consumer inventory pending | M4 |
 | 14 Cross-implementation conformance | Carried; exact-candidate execution pending | M10 |
@@ -605,6 +605,56 @@ The final AST-only graph refresh passed
 (`/tmp/chio-native-owner-graph-post-review.log`). HTML visualization remains
 skipped at the unchanged repository-size limit. No merge, publication, populated
 store migration, hosted qualification dispatch or operational activation occurred.
+
+### Native compiled-catalog deadline checkpoint
+
+Expanded production-path acceptance reproduced combined-egress refusal at the
+live handoff, after physical capture. Diagnostic sampling found repeated
+canonicalization and hashing of the immutable compiled native catalog during
+egress history verification. This consumed the original policy window. The
+kernel correctly denied the expired handoff before invoking the tool.
+
+The store now memoizes only the two compiled catalog digests, independently for
+v28 and v29. Their domain separator and canonical bytes are unchanged. Live
+SQLite catalogs, rows, authority bindings, observations and verification results
+are not cached. Unsupported versions and initialization errors remain
+fail-closed. No policy, credential or lease deadline changed. The exploratory
+claim-read refactor and all diagnostic probes were removed.
+
+Four focused tests pass with none ignored: ordinary and public nested capture,
+and ordinary plus nested sync/async execution. Every case covers local and
+egress policy with nonempty runtime, governed approval and DPoP custody together.
+Execution asserts actual output, independently verified receipts, retained
+participant histories, committed egress where required, native output joins and
+durable release checkpoints. Ordinary retry returns the exact original receipt
+without a second invocation. The existing basic nested cases remain covered.
+
+The complete declared inventories pass: 2 compiled-catalog identity tests, 87
+native custody/recovery tests and 65 native-policy tests, all with zero failures
+or ignored tests (`/tmp/chio-native-catalog-exact-gates.log`). This final 65-test
+run includes the four focused cases and supersedes the preceding 62-pass/2-fail
+result as current local policy evidence. Counts overlap and are not additive.
+The catalog tests require unchanged historical digests and fresh rejection of
+modified live schemas even after the compiled cache is warm.
+
+Production-library checks pass for SQLite and control plane. Strict all-target
+Clippy passes for SQLite, control plane and xtask; workspace and explicit
+include-reachable formatting pass. All 23 selected formal-mirror tests pass,
+with 204 matching source entries and generated coverage unchanged at 58 rows /
+168 artifacts (`/tmp/chio-native-catalog-quality.log`). Every prior source entry,
+symbol and claim is retained; only the existing catalog anchor adds the digest,
+compiled-catalog and live-verification functions. No new proof claim is made.
+The 61-inventory flow contract, security CI contract, file hygiene and whitespace
+checks pass. The root lockfile is unchanged
+(`/tmp/chio-native-catalog-static.log`). Final AST graph refresh passes
+(`/tmp/chio-native-catalog-graph.log`); HTML visualization remains skipped at the
+unchanged repository-size limit.
+
+These remain in-process registered-tool tests, not confined-process or launch
+qualification. Full frozen participant references and native
+nonce/declassification/use profiles remain open; M1 is not complete. No manual
+hosted qualification, populated-store migration, merge, publication or
+operational activation is included.
 
 ## Retained evidence and external prerequisites
 

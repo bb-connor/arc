@@ -182,7 +182,26 @@ pub(super) fn recorded_version(
 }
 
 pub(super) fn digest_version(version: i32) -> Result<String, AdmissionOperationStoreError> {
-    let mut bytes = b"chio.security-participant-state.catalog.v1\0".to_vec();
-    bytes.extend(canonical_json_bytes(&expected(version)?).map_err(invalid)?);
-    Ok(sha256_hex(&bytes))
+    // Only compiled catalog bytes are memoized. Live SQLite catalogs, rows,
+    // authority bindings and their verification results are never cached here.
+    static CURRENT: OnceLock<Result<String, String>> = OnceLock::new();
+    static PREDECESSOR: OnceLock<Result<String, String>> = OnceLock::new();
+    let cache = match version {
+        28 => &PREDECESSOR,
+        29 => &CURRENT,
+        _ => return Err(invalid("native security catalog version is unsupported")),
+    };
+    cache
+        .get_or_init(|| {
+            let catalog = expected(version).map_err(|error| error.to_string())?;
+            let mut bytes = b"chio.security-participant-state.catalog.v1\0".to_vec();
+            bytes.extend(canonical_json_bytes(&catalog).map_err(|error| error.to_string())?);
+            Ok(sha256_hex(&bytes))
+        })
+        .as_ref()
+        .cloned()
+        .map_err(invalid)
 }
+
+#[cfg(test)]
+mod tests;

@@ -8,6 +8,7 @@ use chio_kernel::admission_operation::governed_approval_claim::{
     GovernedApprovalAuthorityBindingV1, GovernedApprovalClaimDisposition,
 };
 use chio_kernel::admission_operation::runtime_participant::RuntimeParticipantDisposition;
+use chio_kernel::admission_operation::AdmissionOperationId;
 
 mod runtime_fixture {
     include!(concat!(
@@ -32,24 +33,53 @@ mod expiry {
 
 #[test]
 fn native_captured_lifecycle_executes_with_original_runtime_approval_and_dpop() -> TestResult {
-    let mut fixture = Fixture::combined_native_credentials()?;
-    fixture.kernel.set_security_pre_dispatch_hook(Arc::new(
-        NativeFlowResolver::new(
-            fixture.binding.clone(),
-            super::super::super::registry(false, InformationLabel::bottom())?,
-            Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(Clock::default()),
-            flow_config(),
-        )?
-        .with_captured_lifecycle(),
-    ));
-    let response = fixture
-        .kernel
-        .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
-    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-    assert!(response.output.is_some());
-    assert!(response.receipt.verify_signature()?);
-    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    for egress in [false, true] {
+        let mut fixture = Fixture::combined_native_credentials()?;
+        fixture.kernel.set_security_pre_dispatch_hook(Arc::new(
+            NativeFlowResolver::new(
+                fixture.binding.clone(),
+                super::super::super::registry(egress, InformationLabel::bottom())?,
+                Arc::new(CountingEmptyClassifier::new()),
+                Arc::new(Clock::default()),
+                flow_config(),
+            )?
+            .with_captured_lifecycle(),
+        ));
+        let response = fixture
+            .kernel
+            .evaluate_tool_call_blocking_with_security_context(
+                &fixture.request,
+                &fixture.context,
+            )?;
+        assert_eq!(
+            response.verdict,
+            Verdict::Allow,
+            "egress={egress}: {:?}",
+            response.reason
+        );
+        assert!(
+            matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
+        );
+        assert!(response.receipt.verify_signature()?);
+        assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+        let replay = fixture
+            .kernel
+            .evaluate_tool_call_blocking_with_security_context(
+                &fixture.request,
+                &fixture.context,
+            )?;
+        assert_eq!(
+            chio_core::canonical_json_bytes(&replay.receipt)?,
+            chio_core::canonical_json_bytes(&response.receipt)?
+        );
+        assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+        assert_combined_completion(&fixture, egress)?;
+    }
+    Ok(())
+}
+
+fn assert_combined_completion(fixture: &Fixture, egress: bool) -> TestResult {
+    use chio_kernel::tool_outcome::ToolOutcomeStore;
     let store = fixture.authority.admission_operation_store();
     let fence = fixture.authority.mutation_fence();
     let (operation, _) = store
@@ -64,6 +94,25 @@ fn native_captured_lifecycle_executes_with_original_runtime_approval_and_dpop() 
     assert!(operation.governed_approval_ledger_digest().is_some());
     assert!(operation.dpop_replay_ledger_digest().is_some());
     assert!(operation.native_dispatch_ledger_digest().is_some());
+    assert_combined_participant_history(fixture, operation.binding().operation_id())?;
+    assert_eq!(
+        store
+            .load_native_security_egress(operation.binding().operation_id(), &fence, now_ms()?)?
+            .ok_or("original egress operation")?
+            .1
+            .map(|history| history.commitment.is_some()),
+        egress.then_some(true)
+    );
+    assert!(store
+        .load_native_security_output_join(operation.binding().operation_id(), &fence, now_ms()?)?
+        .ok_or("original output operation")?
+        .1
+        .is_some());
+    assert!(fixture
+        .authority
+        .tool_outcome_store()
+        .lookup_security_release(operation.binding().operation_id())?
+        .is_some());
     Ok(())
 }
 
@@ -152,16 +201,28 @@ fn assert_combined_capture(
     fixture: Fixture,
     ledger: &chio_kernel::admission_operation::NativeSecurityDispatchLedgerRecordV1,
 ) -> TestResult {
+    assert_combined_participant_history(&fixture, &ledger.operation_id)?;
+    assert_eq!(
+        fixture.reopen_dispatch_ledger(&ledger.operation_id, |_| Ok(()))?,
+        *ledger
+    );
+    Ok(())
+}
+
+fn assert_combined_participant_history(
+    fixture: &Fixture,
+    operation_id: &AdmissionOperationId,
+) -> TestResult {
     let store = fixture.authority.admission_operation_store();
     let fence = fixture.authority.mutation_fence();
     let (_, runtime) = store
-        .load_runtime_participant_history(&ledger.operation_id, &fence, now_ms()?)?
+        .load_runtime_participant_history(operation_id, &fence, now_ms()?)?
         .ok_or("runtime history")?;
     let (_, approval) = store
-        .load_governed_approval_claim_history(&ledger.operation_id, &fence, now_ms()?)?
+        .load_governed_approval_claim_history(operation_id, &fence, now_ms()?)?
         .ok_or("approval history")?;
     let (_, dpop) = store
-        .load_dpop_replay_claim_history(&ledger.operation_id, &fence, now_ms()?)?
+        .load_dpop_replay_claim_history(operation_id, &fence, now_ms()?)?
         .ok_or("DPoP history")?;
     assert_eq!((runtime.len(), approval.len(), dpop.len()), (1, 1, 1));
     assert_eq!(runtime[0].intent.resources().len(), 1);
@@ -177,11 +238,6 @@ fn assert_combined_capture(
     assert_eq!(runtime[0].intent.grant_index(), 0);
     assert_eq!(approval[0].intent.grant_index(), 0);
     assert_eq!(dpop[0].intent.grant_index(), 0);
-    drop(store);
-    assert_eq!(
-        fixture.reopen_dispatch_ledger(&ledger.operation_id, |_| Ok(()))?,
-        *ledger
-    );
     Ok(())
 }
 

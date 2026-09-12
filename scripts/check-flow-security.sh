@@ -258,6 +258,11 @@ run_exact_target --label "durable flow state" --expected \
   verified_event_correlation_is_durable_and_advisory_events_remain_segregated \
   -- cargo test -p chio-store-sqlite --test security_state
 
+run_exact_target --label "native compiled catalog identity" --allow-filtered --expected \
+  admission_operation_store::security_participant_state::schema::tests::compiled_catalog_digest_preserves_each_version_and_rejects_unsupported_versions \
+  admission_operation_store::security_participant_state::schema::tests::cached_compiled_digest_never_replaces_live_catalog_verification \
+  -- cargo test -p chio-store-sqlite --lib admission_operation_store::security_participant_state::schema::tests::
+
 run_exact_target --label "native flow custody" --allow-filtered --expected \
   admission_operation_store::tests::security_participant_state::output::missing_current_output_catalog_is_not_repaired \
   admission_operation_store::tests::security_participant_state::output::v31_output_journal_upgrade_rejects_partial_future_catalog_without_repair \

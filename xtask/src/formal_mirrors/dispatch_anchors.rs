@@ -981,7 +981,7 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/schema.rs",
-        symbols: &["recorded_version"],
+        symbols: &["recorded_version", "digest_version", "expected", "verify_version"],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",

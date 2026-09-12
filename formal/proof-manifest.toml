@@ -3104,10 +3104,13 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/schema.rs"
-rust_symbols = ["recorded_version"]
-normalized_sha256 = "0d0841f0389499095c63f17fb9a6b93f73bc864786c49e2c28c8319dd348710f"
+rust_symbols = ["recorded_version", "digest_version", "expected", "verify_version"]
+normalized_sha256 = "aff98d227b806b246f4abfd4b59e4c163f37052d7e38af151de084f819360534"
 symbol_sha256 = [
   { symbol = "recorded_version", sha256 = "7e22753bd25898bce07b744a2906346917ceff2be474747ce6ceefdcb447b846" },
+  { symbol = "digest_version", sha256 = "7c870a429ee25a6915150d2fc96ddecf7fade1a327d91a8b1b6c21c52240e6d0" },
+  { symbol = "expected", sha256 = "8d0bba92e02cdf38e31e65bf91585b85a95fc1759ab5b7c6194082a05515b886" },
+  { symbol = "verify_version", sha256 = "5f57ebc4e2f4bb9253efdd59a285f66510f338253a22e4ed1cf290f78186a993" },
 ]
 
 [[mirror]]
