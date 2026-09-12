@@ -82,7 +82,7 @@ impl fmt::Debug for AcquiredNativeSecurityEgress<'_> {
 }
 
 impl ChioKernel {
-    /// Prepare custody for an already admitted, non-nonce in-kernel operation
+    /// Prepare custody for an already admitted in-kernel operation
     /// in `CapturePending`. The identifier selects history, not authority: the
     /// kernel checks original material, configured selections and trusted identity.
     /// A new fenced observation supplies the post-join generation. The original
@@ -166,10 +166,6 @@ impl ChioKernel {
         if operation.binding().kind() != AdmissionOperationKind::ToolDispatch
             || operation.state() != AdmissionOperationState::CapturePending
             || operation.dispatch_commit().is_some()
-            || operation
-                .binding()
-                .participant_requirements()
-                .execution_nonce
             || operation.provider_attempt().is_none_or(|attempt| {
                 attempt.transport_id
                     != DispatchTransport::KernelToolServer.transport_id(&request.server_id)
@@ -177,9 +173,7 @@ impl ChioKernel {
             || original.authority_profile().is_none()
             || self.security_pre_dispatch_policy != SecurityPreDispatchPolicy::Enforce
         {
-            return Err(invalid(
-                "native egress requires original non-nonce capture custody",
-            ));
+            return Err(invalid("native egress requires original capture custody"));
         }
         let selected = self
             .native_security_authority_binding()?
@@ -403,6 +397,13 @@ impl AcquiredNativeSecurityEgress<'_> {
     }
 
     fn commit_current(&self) -> Result<NativeSecurityEgressHistoryV1, KernelError> {
+        self.commit_current_with_declassification(None)
+    }
+
+    fn commit_current_with_declassification(
+        &self,
+        consumption: Option<&chio_security_types::ports::DeclassificationConsumptionEvidenceCommit>,
+    ) -> Result<NativeSecurityEgressHistoryV1, KernelError> {
         let prepared = &self.prepared;
         let runtime = prepared.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
@@ -431,10 +432,15 @@ impl AcquiredNativeSecurityEgress<'_> {
             .kernel
             .claim_admission_recovery(&prepared.operation, now)?;
         let input = prepared.command_context(&lease, now);
-        let acknowledged = store_call(|| {
-            runtime
+        let acknowledged = store_call(|| match consumption {
+            Some(consumption) => runtime.store.commit_native_security_declassified_egress(
+                &input,
+                &command,
+                consumption,
+            ),
+            None => runtime
                 .store
-                .commit_native_security_egress(&input, &command)
+                .commit_native_security_egress(&input, &command),
         });
         let history = prepared.read_history(runtime, now);
         let committed = acknowledged?;
@@ -448,6 +454,7 @@ impl AcquiredNativeSecurityEgress<'_> {
             || history.acquisition != self.history.acquisition
             || evidence.acquisition_digest != self.history.acquisition.event_digest
             || evidence.event_digest == evidence.acquisition_digest
+            || evidence.declassification.as_ref() != consumption
         {
             return Err(invalid(
                 "native egress commitment differs from acquired command history",

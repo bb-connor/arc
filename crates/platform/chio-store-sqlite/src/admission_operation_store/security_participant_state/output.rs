@@ -6,6 +6,7 @@ use chio_kernel::admission_operation::{
 use chio_security_types::ports::{BoundedVec, FlowJoinRequest, FlowStateSnapshot};
 
 mod contract;
+mod declassification;
 #[cfg(feature = "admission-test-support")]
 mod faults;
 #[cfg(feature = "admission-test-support")]
@@ -22,11 +23,12 @@ const PROJECTION: &str = "security_participant_output";
 const MUTATION: &str = "join_security_participant_output";
 
 /// Minted only after validating finalization custody inside the writer's
-/// transaction. It enables the same closed monotone row policy as an input
-/// join, but never the input journal or its pre-dispatch admission contract.
+/// transaction. It enables the closed monotone row policy and, when selected,
+/// the original use outcome. It cannot mutate the input journal or admit work.
 pub(crate) struct NativeOutputJoinAuthority {
     authority: AdmissionIdentifier,
     request: FlowJoinRequest,
+    declassification: Option<Box<crate::security_state::NativeDeclassificationOutcome>>,
 }
 
 impl NativeOutputJoinAuthority {
@@ -35,6 +37,11 @@ impl NativeOutputJoinAuthority {
     }
     pub(crate) fn request(&self) -> &FlowJoinRequest {
         &self.request
+    }
+    pub(crate) fn declassification(
+        &self,
+    ) -> Option<&crate::security_state::NativeDeclassificationOutcome> {
+        self.declassification.as_deref()
     }
 }
 

@@ -7,6 +7,16 @@ use super::{
 use crate::{SecurityInvocationContext, ToolCallRequest};
 use chio_security_types::ports::{CommittedEgressFence, EgressFence};
 
+/// Historical signed-artifact binding without a reusable signature. Decoding
+/// this data does not establish issuer trust, one-shot use, or dispatch authority.
+#[derive(Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeSecurityDeclassificationGrantV1 {
+    pub body: chio_security_types::DeclassificationGrantBody,
+    pub authority_key: chio_core::PublicKey,
+    pub artifact_hash: chio_security_types::ports::Digest32,
+}
+
 /// Borrowed inputs to one store command. Constructing this value grants no
 /// custody: the store must verify the actual operation, original selection,
 /// current recovery lease, live request and independently initialized authority.
@@ -49,6 +59,9 @@ pub struct NativeSecurityEgressCommitmentV1 {
     pub commitment: CommittedEgressFence,
     pub event_digest: AdmissionDigest,
     pub acquisition_digest: AdmissionDigest,
+    /// Exact retained consumption, not a fresh one-shot permit or reusable grant.
+    pub declassification:
+        Option<chio_security_types::ports::DeclassificationConsumptionEvidenceCommit>,
 }
 
 impl std::fmt::Debug for NativeSecurityEgressCommitmentV1 {

@@ -31,17 +31,13 @@ fn require_operation(operation: &AdmissionOperationV1) -> Result<(), AdmissionOp
     if operation.state() != AdmissionOperationState::CapturePending
         || operation.binding().kind() != AdmissionOperationKind::ToolDispatch
         || operation.dispatch_commit().is_some()
-        || operation
-            .binding()
-            .participant_requirements()
-            .execution_nonce
         || operation.budget_hold_id().is_none()
         || operation
             .provider_attempt()
             .is_none_or(|attempt| attempt.is_caller_report())
     {
         return Err(invalid(
-            "native dispatch preparation requires non-nonce kernel capture custody",
+            "native dispatch preparation requires kernel capture custody",
         ));
     }
     Ok(())

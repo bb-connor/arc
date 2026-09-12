@@ -20,10 +20,57 @@ impl<'a> PreparedNativeSecurityEgress<'a> {
         ),
         KernelError,
     > {
+        self.retain_for_capture_inner(egress_expires_at_unix_ms, grant_index, policy_json, None)
+    }
+
+    /// Retain a verified declassifying policy through one operation-owned use.
+    /// An acknowledgement is checked against exact readback; it never permits a
+    /// second use or substitutes for final native capture credential checks.
+    pub fn retain_for_declassified_capture(
+        self,
+        egress_expires_at_unix_ms: u64,
+        grant_index: usize,
+        policy_json: &[u8],
+        consumption: &chio_security_types::ports::DeclassificationConsumptionEvidenceCommit,
+    ) -> Result<
+        (
+            Self,
+            Option<NativeSecurityEgressHistoryV1>,
+            NativeSecurityDispatchLedgerRecordV1,
+        ),
+        KernelError,
+    > {
+        self.retain_for_capture_inner(
+            Some(egress_expires_at_unix_ms),
+            grant_index,
+            policy_json,
+            Some(consumption),
+        )
+    }
+
+    fn retain_for_capture_inner(
+        self,
+        egress_expires_at_unix_ms: Option<u64>,
+        grant_index: usize,
+        policy_json: &[u8],
+        consumption: Option<&chio_security_types::ports::DeclassificationConsumptionEvidenceCommit>,
+    ) -> Result<
+        (
+            Self,
+            Option<NativeSecurityEgressHistoryV1>,
+            NativeSecurityDispatchLedgerRecordV1,
+        ),
+        KernelError,
+    > {
         self.validate_ledger_input(grant_index, policy_json)?;
+        if consumption.is_some() != self.request.declassification_grant.is_some()
+            || (consumption.is_some() && egress_expires_at_unix_ms.is_none())
+        {
+            return Err(invalid("native capture declassification selection differs"));
+        }
         let (prepared, history) = if let Some(expires) = egress_expires_at_unix_ms {
             let acquired = self.acquire(expires)?;
-            let history = acquired.commit_current()?;
+            let history = acquired.commit_current_with_declassification(consumption)?;
             (acquired.prepared, Some(history))
         } else {
             (self, None)

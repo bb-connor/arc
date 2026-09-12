@@ -43,8 +43,8 @@ pub use native_dispatch_ledger::{
     NativeSecurityDispatchLedgerContext, NativeSecurityDispatchLedgerRecordV1,
 };
 pub use native_egress::{
-    NativeSecurityEgressAcquisitionV1, NativeSecurityEgressCommitmentV1,
-    NativeSecurityEgressContext, NativeSecurityEgressHistoryV1,
+    NativeSecurityDeclassificationGrantV1, NativeSecurityEgressAcquisitionV1,
+    NativeSecurityEgressCommitmentV1, NativeSecurityEgressContext, NativeSecurityEgressHistoryV1,
 };
 pub use native_flow_join::NativeSecurityFlowJoinRecordV1;
 pub use native_flow_observation::NativeSecurityFlowObservationV1;
@@ -708,6 +708,9 @@ impl AdmissionOperationV1 {
             return Err(AdmissionOperationError::ProviderAttemptBindingMismatch);
         }
         if let Some(attempt) = self.provider_attempt() {
+            if self.native_dispatch_ledger_digest().is_some() && attempt.is_caller_report() {
+                return Err(AdmissionOperationError::ProviderAttemptBindingMismatch);
+            }
             attempt
                 .validate()
                 .map_err(|_| AdmissionOperationError::ProviderAttemptBindingMismatch)?;

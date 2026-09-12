@@ -325,12 +325,12 @@ fn preparation_case(mode: PreparationMode, nonce_enabled: bool) -> TestResult {
         "{mode:?}"
     );
     if nonce_enabled {
-        assert!(
-            response
-                .reason
-                .as_deref()
-                .is_some_and(|reason| reason.contains("original pre-budget authority")),
-            "{response:?}"
+        assert_eq!(
+            response.reason.as_deref(),
+            Some(
+                "durable admission failed: native security nonce preflight preparation is unsupported"
+            ),
+            "dispatch preparation cannot supply the missing nonce preflight authority"
         );
         assert!(response.execution_nonce.is_none());
         assert_eq!(count_rows(&fixture, "budget_authorization_holds")?, 0);

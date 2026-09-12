@@ -2,6 +2,13 @@
 use super::*;
 use chio_kernel::execution_nonce::{ExecutionNonceConfig, ExecutionNonceStore};
 
+pub(super) mod execution {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_flow_nonce_execution_tests.rs"
+    ));
+}
+
 struct NoLegacyNonce(Arc<AtomicUsize>);
 
 impl ExecutionNonceStore for NoLegacyNonce {

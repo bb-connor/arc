@@ -88,6 +88,13 @@ fn permits_native_table(plan: &CapturePlan, table: &str) -> bool {
         "security_participant_state_session_memberships" => "security_session_memberships",
         "security_participant_state_transitions" => "security_transitions",
         "security_participant_state_egress_fences" => "security_egress_fences",
+        "security_participant_state_declassification_uses" => "security_declassification_uses",
+        "security_participant_state_declassification_evidence_identity" => {
+            "security_declassification_evidence_identity"
+        }
+        "security_participant_state_declassification_receipt_outbox" => {
+            "security_declassification_receipt_outbox"
+        }
         _ => return false,
     };
     plan.permits_table(source)

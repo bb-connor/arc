@@ -3,7 +3,7 @@
 use super::*;
 
 impl ScopedMutation<'_> {
-    pub(super) fn commit_declassification_consumption_evidence(
+    pub(in crate::security_state) fn commit_declassification_consumption_evidence(
         &self,
         request: &DeclassificationConsumptionEvidenceCommit,
         read_time: impl FnOnce() -> PortResult<u64>,
@@ -116,7 +116,7 @@ impl ScopedMutation<'_> {
         }
     }
 
-    pub(super) fn commit_declassification_outcome_evidence(
+    pub(in crate::security_state) fn commit_declassification_outcome_evidence(
         &self,
         request: &DeclassificationOutcomeEvidenceCommit,
     ) -> PortResult<()> {

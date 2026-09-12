@@ -4,8 +4,8 @@ use crate::admission_operation::{
     dpop_claim::DpopReplayClaimReferenceV1,
     governed_approval_claim::GovernedApprovalClaimReferenceV1,
     runtime_participant::{RuntimeDispatchValidity, RuntimeParticipantClaimHistoryV1},
-    AdmissionOperationState, AdmissionOperationStoreError, AdmissionOperationV1,
-    RetainedToolAdmissionRequestV1,
+    AdmissionExecutionNonceReservationV1, AdmissionOperationState, AdmissionOperationStoreError,
+    AdmissionOperationV1, RetainedToolAdmissionRequestV1,
 };
 
 /// A non-serializable borrow of the original kernel reservation and immutable
@@ -19,6 +19,7 @@ pub struct VerifiedNativeDispatchCredentials<'a> {
     original: &'a RetainedToolAdmissionRequestV1,
     grant_index: usize,
     runtime: Option<(RuntimeParticipantClaimHistoryV1, RuntimeDispatchValidity)>,
+    execution_nonce: Option<&'a AdmissionExecutionNonceReservationV1>,
     valid_until_unix_ms: u64,
 }
 
@@ -62,6 +63,12 @@ impl VerifiedNativeDispatchCredentials<'_> {
     pub fn dpop(&self) -> Option<&DpopReplayClaimReferenceV1> {
         self.reservation.owned_dpop.as_ref()
     }
+
+    /// Exact issuance borrowed from this admission, not a replay-store marker.
+    /// The physical capture must independently verify its owned reservation.
+    pub fn execution_nonce(&self) -> Option<&AdmissionExecutionNonceReservationV1> {
+        self.execution_nonce
+    }
 }
 
 impl DispatchCredentialReservation<'_> {
@@ -82,10 +89,11 @@ impl DispatchCredentialReservation<'_> {
         let selection = profile.selection();
         if original.native_security_authority_binding().is_none()
             || admission.operation().state() != AdmissionOperationState::CapturePending
-            || admission.requires_execution_nonce()
-            || request.execution_nonce.is_some()
-            || request.declassification_grant.is_some()
-            || self.execution_nonce_present
+            || self.execution_nonce_id.is_some()
+            || !matches!(
+                self.legacy_execution_nonce,
+                LegacyExecutionNonce::NotPresented
+            )
             || self.dpop_key.is_some()
             || self.approval_key.is_some()
             || (selection.runtime_hook_installed && selection.runtime.is_none())
@@ -96,6 +104,7 @@ impl DispatchCredentialReservation<'_> {
                 "native capture requires complete operation-owned custody",
             ));
         }
+        let execution_nonce = self.verify_native_execution_nonce(admission, request, original)?;
         let dpop_required = original.matching_grants_require_dpop();
         if self.kernel.is_emergency_stopped() {
             return Err(invalid("native capture denied by emergency stop"));
@@ -124,7 +133,7 @@ impl DispatchCredentialReservation<'_> {
                 &request.capability,
                 dpop_required,
                 current_unix_timestamp(),
-                false,
+                admission.requires_execution_nonce(),
             )?
             .refresh()?;
         prepared.validate_origin(self.kernel, original)?;
@@ -189,6 +198,32 @@ impl DispatchCredentialReservation<'_> {
         if let Some((_, validity)) = &runtime {
             valid_until = valid_until.min(validity.valid_until_unix_ms());
         }
+        if let Some(nonce) = execution_nonce {
+            valid_until = valid_until.min(
+                u64::try_from(nonce.signed_nonce().expires_at())
+                    .ok()
+                    .and_then(|seconds| seconds.checked_mul(1000))
+                    .ok_or_else(|| invalid("native execution nonce deadline overflow"))?,
+            );
+        }
+        if let Some(grant) = &request.declassification_grant {
+            // Issuer trust and flow policy are checked by the live native
+            // resolver. The physical capture additionally requires its exact
+            // operation-owned use and matching policy, never this signature alone.
+            if !grant
+                .verify_signature()
+                .map_err(|error| invalid(&error.to_string()))?
+            {
+                return Err(invalid("native declassification signature is invalid"));
+            }
+            valid_until = valid_until.min(
+                grant
+                    .body()
+                    .expires_at_unix_seconds()
+                    .checked_mul(1000)
+                    .ok_or_else(|| invalid("native declassification deadline overflow"))?,
+            );
+        }
         Ok(VerifiedNativeDispatchCredentials {
             reservation: self,
             request,
@@ -196,8 +231,55 @@ impl DispatchCredentialReservation<'_> {
             original,
             grant_index,
             runtime,
+            execution_nonce,
             valid_until_unix_ms: valid_until,
         })
+    }
+
+    fn verify_native_execution_nonce<'a>(
+        &self,
+        admission: &'a DurableToolAdmission,
+        request: &ToolCallRequest,
+        original: &RetainedToolAdmissionRequestV1,
+    ) -> Result<Option<&'a AdmissionExecutionNonceReservationV1>, KernelError> {
+        let required = admission.requires_execution_nonce();
+        let issued = admission.issued_execution_nonce();
+        if self.execution_nonce_present != required
+            || request.execution_nonce.is_some() != required
+            || issued.is_some() != required
+        {
+            return Err(invalid(
+                "native execution nonce lacks its original reservation",
+            ));
+        }
+        let Some(issued) = issued else {
+            return Ok(None);
+        };
+        if Some(issued.signed_nonce()) != request.execution_nonce.as_ref()
+            || admission.operation().execution_nonce_id() != Some(issued.nonce_id())
+            || admission
+                .operation()
+                .execution_nonce_issuance_digest()
+                .is_none()
+        {
+            return Err(invalid(
+                "native execution nonce differs from original issuance",
+            ));
+        }
+        issued
+            .require_operation_bound_profile()
+            .map_err(|error| invalid(&error.to_string()))?;
+        // Recheck against the configured issuer and current time. A historical
+        // reservation check alone cannot extend the native dispatch horizon.
+        AdmissionExecutionNonceReservationV1::from_canonical_bytes(
+            issued.canonical_bytes(),
+            admission.operation(),
+            original,
+            &self.kernel.config.keypair.public_key(),
+            current_unix_timestamp_ms(),
+        )
+        .map_err(|error| invalid(&error.to_string()))?;
+        Ok(Some(issued))
     }
 }
 

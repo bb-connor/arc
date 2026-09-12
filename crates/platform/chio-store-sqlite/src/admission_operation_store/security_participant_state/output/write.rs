@@ -80,9 +80,20 @@ impl SqliteAdmissionOperationStore {
         let before = footprint(&tx)?;
         let observed_at = observed_time(&tx, decision_at)?;
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, decision_at)?;
+        let declassification =
+            declassification::expected(&tx, operation, observed_at.max(decision_at))?;
+        if let Some(outcome) = &declassification {
+            crate::security_state::verify_native_pending_declassification(
+                &tx,
+                actual.authority.as_str(),
+                &outcome.consumption,
+            )
+            .map_err(invalid)?;
+        }
         let authorization = NativeOutputJoinAuthority {
             authority: actual.authority.clone(),
             request: request.clone(),
+            declassification: declassification.clone().map(Box::new),
         };
         let (tx, result, changes) =
             crate::security_state::join_native_output(tx, authorization).map_err(invalid)?;
@@ -113,7 +124,7 @@ impl SqliteAdmissionOperationStore {
             }
         }
         let record = Record {
-            schema: Record::format(),
+            schema: Record::format(declassification.is_some()),
             authority: actual.authority.clone(),
             sequence: output_head
                 .checked_add(1)
@@ -130,6 +141,7 @@ impl SqliteAdmissionOperationStore {
             changes: BoundedVec::new(changes).map_err(invalid)?,
             current_rows,
             current_bytes,
+            declassification,
         };
         record.validate(&tx)?;
         record.insert(&tx)?;

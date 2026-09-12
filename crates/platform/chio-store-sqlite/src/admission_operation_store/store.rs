@@ -217,6 +217,16 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         self.commit_native_egress_from_port(context, command)
     }
 
+    fn commit_native_security_declassified_egress(
+        &self,
+        context: &chio_kernel::admission_operation::NativeSecurityEgressContext<'_>,
+        command: &chio_security_types::ports::EgressFenceCommit,
+        consumption: &chio_security_types::ports::DeclassificationConsumptionEvidenceCommit,
+    ) -> Result<chio_security_types::ports::CommittedEgressFence, AdmissionOperationStoreError>
+    {
+        self.commit_declassified_egress_from_port(context, command, consumption)
+    }
+
     fn load_native_security_egress(
         &self,
         operation: &AdmissionOperationId,

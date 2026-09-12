@@ -212,6 +212,17 @@ run_exact_target --label "security kernel adapters" --expected \
   post_output_match_blocks_delivery_after_server_execution \
   public_entrypoint_propagates_authoritative_context_pre_and_post \
   request_lifecycle_linearizes_release_after_post_invocation_block \
+  security_callbacks::caller_reservation_rejects_live_security_hook_before_acquiring_it \
+  security_callbacks::final_release_panic_requires_recovery_without_releasing_output \
+  security_callbacks::outcome_cleanup_during_unwind_does_not_double_panic \
+  security_callbacks::outcome_record_panic_requires_recovery_without_releasing_output \
+  security_callbacks::post_effect_callback_errors_cannot_advertise_retryable_guard_denial \
+  security_callbacks::pre_dispatch_acquisition_panic_is_a_signed_denial \
+  security_callbacks::pre_dispatch_commit_panic_is_a_signed_denial \
+  security_callbacks::pre_dispatch_outcome_requires_exact_request_and_commitment \
+  security_callbacks::pre_dispatch_rejection_does_not_call_a_panicking_diagnostic \
+  security_callbacks::recording_and_disposal_panics_are_contained_separately \
+  security_callbacks::rejected_dispatch_contains_lifecycle_disposal_panic \
   synthetic_and_missing_context_block_under_enforcement \
   trait_conformance_compiles_against_kernel_hooks \
   tripwire_content_digest_separates_identity_and_replays_exactly \
@@ -483,9 +494,23 @@ run_exact_target --label "native dispatch attachment contracts" --allow-filtered
   admission_operation::capture::tests::native_dispatch_attachment_commits_with_dispatch_and_cannot_be_replaced \
   admission_operation::capture::tests::native_dispatch_attachment_has_exact_acquisition_and_retention_phases \
   admission_operation::capture::tests::native_dispatch_attachment_rejects_every_unsupported_participant_profile \
+  admission_operation::capture::tests::native_dispatch_attachment_with_nonce_never_accepts_caller_custody \
   -- cargo test -p chio-kernel --lib admission_operation::capture::tests::native_dispatch_attachment_
 
 run_exact_target --label "native post-join policy" --allow-filtered --expected \
+  security::adapters::tests::native_flow::support::nonce::execution::native_nonce_executes_once_and_replays_its_receipt_for_local_and_egress \
+  security::adapters::tests::native_flow::support::nonce::execution::native_nonce_mutations_and_missing_credentials_never_reach_the_connector \
+  security::adapters::tests::native_flow::support::nonce::execution::native_nonce_omission_cannot_reopen_an_issued_preflight_or_dispatch \
+  security::adapters::tests::native_flow::support::nonce::execution::expiry::native_nonce_expiry_at_final_commit_rolls_back_capture_without_reversing_taint \
+  security::adapters::tests::native_flow::support::nonce::execution::expiry::native_nonce_completed_receipt_replay_survives_expiry_without_new_authority \
+  security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_nonce_supports_public_nested_sync_and_async_dispatch \
+  security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_declassification_supports_public_nested_sync_and_async_with_all_credentials \
+  security::adapters::tests::native_flow::support::declassification::native_declassification_executes_once_without_lowering_inherited_state \
+  security::adapters::tests::native_flow::support::declassification::matrix::native_declassification_composes_nonce_runtime_approval_and_dpop_sync_and_async \
+  security::adapters::tests::native_flow::support::declassification::rejection::native_declassification_rejects_missing_and_substituted_signed_claims \
+  security::adapters::tests::native_flow::support::declassification::rejection::native_declassification_refuses_unselected_lifecycle_without_activation \
+  security::adapters::tests::native_flow::support::declassification::faults::native_declassification_expiry_at_final_commit_retains_consumption_without_capture \
+  security::adapters::tests::native_flow::support::declassification::faults::native_declassification_output_fault_rolls_back_outcome_without_refunding_use \
   security::adapters::tests::native_flow::support::nonce::native_nonce_preflight_issues_without_dispatch_or_legacy_nonce_custody \
   security::adapters::tests::native_flow::support::nonce::native_nonce_preflight_callback_faults_deny_issuance_but_preserve_committed_taint \
   security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_invokes_once_and_replays_the_released_receipt \
@@ -505,7 +530,7 @@ run_exact_target --label "native post-join policy" --allow-filtered --expected \
   security::adapters::tests::native_flow::support::capture::output::native_output_journal_propagates_taint_once_without_releasing_or_rewriting_input \
   security::adapters::tests::native_flow::support::capture::output::native_output_journal_rejects_stale_lease_generation_and_substituted_artifacts \
   security::adapters::tests::native_flow::support::capture::combined_credentials::nested::public_nested_native_capture_retains_runtime_approval_and_dpop_for_local_and_egress \
-  security::adapters::tests::native_flow::support::capture::combined_credentials::nested::public_nested_declassification_proof_reaches_native_unsupported_profile_denial \
+  security::adapters::tests::native_flow::support::capture::combined_credentials::nested::public_nested_declassification_proof_reaches_native_untrusted_issuer_denial \
   security::adapters::tests::native_flow::support::capture::combined_credentials::native_capture_preserves_nonempty_runtime_approval_and_dpop_in_one_operation \
   security::adapters::tests::native_flow::support::capture::combined_credentials::expiry::runtime_expiry_after_native_verification_rolls_back_physical_capture \
   security::adapters::tests::native_flow::support::capture::combined_credentials::native_combined_credentials_deny_missing_proof_or_changed_approved_intent_before_capture \
@@ -527,7 +552,7 @@ run_exact_target --label "native post-join policy" --allow-filtered --expected \
   security::adapters::tests::native_flow::input::native_input_classifier_panic_denies_without_taint_or_budget \
   security::adapters::tests::native_flow::input::native_input_classifier_substitution_denies_without_taint_or_budget \
   security::adapters::tests::native_flow::input::native_input_classifies_before_budget_and_rechecks_after_the_single_join \
-  security::adapters::tests::native_flow::input::native_input_declassification_denies_before_classification_or_join \
+  security::adapters::tests::native_flow::input::native_input_untrusted_declassification_denies_before_classification_or_join \
   security::adapters::tests::native_flow::input::native_input_inherits_global_lineage_before_the_exact_epoch_exists \
   security::adapters::tests::native_flow::input::native_input_inherits_principal_epoch_from_another_lineage \
   security::adapters::tests::native_flow::input::native_input_local_policy_does_not_acquire_egress_custody \
@@ -544,7 +569,7 @@ run_exact_target --label "native post-join policy" --allow-filtered --expected \
   security::adapters::tests::native_flow::native_policy_rejects_classifier_payload_substitution \
   security::adapters::tests::native_flow::native_policy_rejects_classifier_taint_not_in_original_join \
   security::adapters::tests::native_flow::native_policy_rejects_clock_failure_before_egress_acquisition \
-  security::adapters::tests::native_flow::native_policy_rejects_declassification_before_classification \
+  security::adapters::tests::native_flow::native_policy_rejects_untrusted_declassification_before_classification \
   security::adapters::tests::native_flow::native_policy_rejects_future_clock_before_preparation \
   security::adapters::tests::native_flow::native_policy_rejects_legacy_evidence_configuration \
   security::adapters::tests::native_flow::native_policy_rejects_other_initialized_authority_before_classification \
@@ -554,6 +579,14 @@ run_exact_target --label "native post-join policy" --allow-filtered --expected \
   security::adapters::tests::native_flow::native_policy_requires_admitted_manifest_before_classification \
   security::adapters::tests::native_flow::native_policy_requires_taint_propagation_in_each_recorded_label \
   -- cargo test -p chio-control-plane --lib security::adapters::tests::native_flow::
+
+run_exact_target --label "native declassification row semantics" --allow-filtered --expected \
+  security_state::declassification::tests::equivalence::native_declassification_row_commands_match_shared_semantics_and_reject_substitution \
+  -- cargo test -p chio-store-sqlite --lib native_declassification_row_commands_match_shared_semantics_and_reject_substitution
+
+run_exact_target --label "native declassification issuer window" --allow-filtered --expected \
+  security_state::declassification::tests::equivalence::native_declassification_egress_observation_enforces_both_issuer_time_bounds \
+  -- cargo test -p chio-store-sqlite --lib native_declassification_egress_observation_enforces_both_issuer_time_bounds
 
 run_exact_target --label "native capture accounting deltas" --allow-filtered --expected \
   budget_store::composite::native_capture::tests::native_capture_quota_delta_requires_exact_bounded_unique_accounting \
@@ -641,6 +674,22 @@ run_exact_target --label "durable caller participant persistence" --allow-filter
   dispatch_context::caller_context_capture_rejects_out_of_band_schema_changes \
   dispatch_context::caller_context_survives_interruption_after_capture_before_report_recording \
   -- cargo test -p chio-store-sqlite --test execution_nonce_caller_execution dispatch_context::
+
+run_exact_target --label "frozen federation context" --allow-filtered --expected \
+  kernel::tests::federation_context::evidence::retained_federation_context_recovery_uses_original_pin_time \
+  kernel::tests::federation_context::evidence::retained_federation_context_rejects_a_changed_local_identity \
+  kernel::tests::federation_context::evidence::retained_treaty_evidence_rejects_unknown_fields \
+  kernel::tests::federation_context::evidence::retained_treaty_evidence_reverification_checks_original_signatures_and_keys \
+  kernel::tests::federation_context::nested_retained_federation_context_rejection_compensates_before_dispatch \
+  kernel::tests::federation_context::recovery_isolation::concurrent_recovery_keeps_distinct_treaty_reports_for_the_same_request_id \
+  kernel::tests::federation_context::retained_federation_context_does_not_bypass_public_replay_revocation \
+  kernel::tests::federation_context::retained_federation_context_finalizing_recovery_survives_owner_rotation \
+  kernel::tests::federation_context::retained_federation_context_is_private_and_cannot_be_removed_by_schema_downgrade \
+  kernel::tests::federation_context::retained_federation_context_recovers_without_live_peer_or_new_runtime_admission \
+  kernel::tests::federation_context::retained_federation_context_rejects_wrong_treaty_pin_before_dispatch \
+  kernel::tests::federation_context::retained_federation_context_tampering_fails_the_committed_outcome_binding \
+  kernel::tests::federation_context::security_release_requirement_and_federation_survive_either_codec_order \
+  -- cargo test -p chio-kernel --lib kernel::tests::federation_context::
 
 run_exact_target --label "frozen durable receipt signing" --allow-filtered --expected \
   kernel::tests::return_context::signing::callbacks::signer_can_reenter_without_holding_the_mutation_sequencer \

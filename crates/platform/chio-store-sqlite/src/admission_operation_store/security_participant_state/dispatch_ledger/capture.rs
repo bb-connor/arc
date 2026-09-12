@@ -25,6 +25,7 @@ pub(crate) struct VerifiedNativeCapture<'tx> {
     lease_expires_at: u64,
     capability_expires_at_secs: u64,
     runtime_valid_until_unix_ms: Option<u64>,
+    nonce_valid_until_unix_ms: Option<u64>,
     approval_credential: Option<GovernedApprovalCredentialV1>,
     dpop_credential: Option<DpopReplayCredentialV1>,
 }
@@ -88,6 +89,28 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         if value != record.policy {
             return Err(invalid("native capture changed its live policy evidence"));
         }
+        policy.validate_live_declassification(custody.request)?;
+        policy.validate_owned_declassification(tx, operation, &value)?;
+        if policy.inputs.declassification.is_some() {
+            let committed = super::super::egress::load_operation(
+                tx,
+                operation.binding().operation_id(),
+                "committed",
+            )?
+            .ok_or_else(|| invalid("native capture lost declassification custody"))?;
+            let crate::security_state::NativeEgressCommand::CommitDeclassified {
+                consumption, ..
+            } = committed.command
+            else {
+                return Err(invalid("native capture lost declassification consumption"));
+            };
+            crate::security_state::verify_native_pending_declassification(
+                tx,
+                custody.binding.security_authority_id().as_str(),
+                &consumption,
+            )
+            .map_err(invalid)?;
+        }
         policy.validate_current(tx, now).map_err(|error| {
             invalid(format!(
                 "native capture policy at transaction entry: {error}"
@@ -111,6 +134,36 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         }
         governed_approval_claim::verify_fresh_approval_tx(tx, operation, now)?;
         dpop_claim::verify_fresh_dpop_tx(tx, operation, now)?;
+        let nonce =
+            crate::admission_operation_store::execution_nonce::verify_reservation(tx, operation)?;
+        if nonce.as_ref().map(|value| value.canonical_bytes())
+            != input
+                .credentials
+                .execution_nonce()
+                .map(|value| value.canonical_bytes())
+            || nonce.is_some()
+                != operation
+                    .binding()
+                    .participant_requirements()
+                    .execution_nonce
+        {
+            return Err(invalid(
+                "native capture nonce differs from its physical reservation",
+            ));
+        }
+        let nonce_valid_until_unix_ms = nonce
+            .as_ref()
+            .map(|value| {
+                value.require_operation_bound_profile()?;
+                u64::try_from(value.signed_nonce().expires_at())
+                    .ok()
+                    .and_then(|seconds| seconds.checked_mul(1000))
+                    .filter(|until| now < *until)
+                    .ok_or_else(|| {
+                        invalid("native capture execution nonce expired or exceeds bounds")
+                    })
+            })
+            .transpose()?;
         let runtime_valid_until_unix_ms = input
             .credentials
             .runtime_validity()
@@ -128,6 +181,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
             lease_expires_at: custody.lease.untrusted_claim().expires_at_unix_ms(),
             capability_expires_at_secs: capability.expires_at,
             runtime_valid_until_unix_ms,
+            nonce_valid_until_unix_ms,
             approval_credential: approval.map(|claim| claim.intent.credential().clone()),
             dpop_credential: dpop.map(|claim| claim.intent.credential().clone()),
         })
@@ -190,8 +244,16 @@ impl<'tx> VerifiedNativeCapture<'tx> {
             ))
         })?;
         #[cfg(feature = "admission-test-support")]
-        let delayed =
-            expiry_test_support::wait_after_verification(tx, self.runtime_valid_until_unix_ms)?;
+        let delayed = expiry_test_support::wait_after_verification(
+            tx,
+            self.runtime_valid_until_unix_ms,
+            self.nonce_valid_until_unix_ms,
+            self.policy
+                .inputs
+                .declassification
+                .as_ref()
+                .and_then(|grant| grant.body.expires_at_unix_seconds().checked_mul(1000)),
+        )?;
         // State verification can outlive its initial clock sample. The claims
         // above and the captured credentials name the same immutable episodes
         // in this write transaction. Sample again after state verification,
@@ -223,6 +285,14 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         {
             return Err(invalid(
                 "native capture runtime evidence expired before commit",
+            ));
+        }
+        if self
+            .nonce_valid_until_unix_ms
+            .is_some_and(|until| now >= until)
+        {
+            return Err(invalid(
+                "native capture execution nonce expired before commit",
             ));
         }
         if let Some(credential) = &self.approval_credential {

@@ -1111,7 +1111,75 @@ const NATIVE_OUTPUT_PREPARATION_SOURCES: &[RequiredSource] = &[
     },
 ];
 
+// Consumption and outcome remain closed commands under original affine owners.
+const NATIVE_USE_SOURCES: &[RequiredSource] = &[
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/credential_reservation/native_dispatch.rs",
+        symbols: &["VerifiedNativeDispatchCredentials::execution_nonce", "DispatchCredentialReservation::verify_native_execution_nonce"],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/ledger.rs",
+        symbols: &["PreparedNativeSecurityEgress::retain_for_declassified_capture", "PreparedNativeSecurityEgress::retain_for_capture_inner"],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress.rs",
+        symbols: &["AcquiredNativeSecurityEgress::commit_current_with_declassification"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs",
+        symbols: &["NativeFlowResolver::validate_declassification_issuer"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-control-plane/src/security/adapters/native_flow/declassification.rs",
+        symbols: &["prepare_consumption", "confirm_consumption"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/security_state/native_egress.rs",
+        symbols: &["NativeEgressCommand", "NativeEgressCommand::declassified", "NativeEgressCommand::permits_table", "NativeEgressCommand::expected_changes", "NativeEgressCommand::validate_changes"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/security_state/native_declassification.rs",
+        symbols: &["TABLES", "consumption_changes", "NativeDeclassificationOutcome", "NativeDeclassificationOutcome::released", "NativeDeclassificationOutcome::changes", "NativeDeclassificationOutcome::validate_change", "NativeDeclassificationOutcome::validate_changes"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/security_state/declassification.rs",
+        symbols: &["verify_native_pending_declassification"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/security_state/native_mutation.rs",
+        symbols: &["CapturePlan", "CapturePlan::max_changes"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/write.rs",
+        symbols: &["SqliteAdmissionOperationStore::commit_declassified_egress_from_port"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/contract.rs",
+        symbols: &["validate_declassification_binding"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs",
+        symbols: &["Record::format"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs",
+        symbols: &["DECLASSIFIED_POLICY_SCHEMA", "Policy::validate_live_declassification", "Policy::validate_owned_declassification"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/declassification.rs",
+        symbols: &["expected"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs",
+        symbols: &["Record::format"],
+    },
+];
+
 const REQUIRED_COVERAGE: &[(&str, &[RequiredSource])] = &[
+    (
+        "formal/apalache/PostAdmissionDropGuard.tla",
+        NATIVE_USE_SOURCES,
+    ),
     (
         "formal/apalache/PostAdmissionDropGuard.tla",
         NATIVE_LIFECYCLE_SOURCES,

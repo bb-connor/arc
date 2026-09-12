@@ -4,12 +4,15 @@ mod deadline_tests;
 mod declassification;
 mod flow_state;
 mod issuance_freeze;
+mod native_declassification;
 mod native_egress;
+pub(crate) use native_declassification::NativeDeclassificationOutcome;
 mod native_mutation;
 mod participant_source;
 mod scoped_sql;
 mod transaction;
 pub(crate) use declassification::verify_native_declassification_state;
+pub(crate) use declassification::verify_native_pending_declassification;
 use flow_state::load_flow_snapshot;
 pub(crate) use flow_state::{
     observe_native_flow_state, resolve_native_input_join, resolve_native_label_join,

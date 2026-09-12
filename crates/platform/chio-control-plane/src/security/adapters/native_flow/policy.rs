@@ -8,6 +8,7 @@ use std::io::Write;
 
 const MAX_POLICY_BYTES: usize = 256 * 1024;
 const SCHEMA: &str = "chio.native-flow-dispatch-policy.v1";
+const DECLASSIFIED_SCHEMA: &str = "chio.native-flow-dispatch-policy.v2";
 
 /// Canonical historical policy inputs and decision. No reusable credentials or
 /// argument payload are retained. This is neither a durable ledger attachment
@@ -77,6 +78,9 @@ impl PreparedInputs {
             tool_name: &'a RecordId,
             prepared_at_unix_ms: u64,
             valid_until_unix_ms: u64,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            declassification:
+                Option<chio_kernel::admission_operation::NativeSecurityDeclassificationGrantV1>,
         }
         let request = &resolved.request;
         let manifest = resolver
@@ -90,42 +94,62 @@ impl PreparedInputs {
             .bridge
             .manifest_digest()
             .ok_or(FlowDenial::InvalidManifest)?;
-        let inputs = Inputs {
-            operation_id: custody.operation_id(),
-            operation_version: custody.operation_version(),
-            retained_request_digest: custody.retained_request_digest()?,
-            live_request_digest: flow_dispatch::live_request_digest(custody.request())?,
-            kernel_policy_hash: custody.kernel_policy_hash(),
-            native_authority: custody.observation().binding(),
-            observation: &request.state,
-            observed_at_unix_ms: custody.observation().observed_at_unix_ms(),
-            stored_context_generation: custody.observation().stored_context_generation(),
-            classification: resolved.classification.evidence(),
-            category_bindings: resolver.config.category_labels.bindings(),
-            classified_label: resolved.classification.label(),
-            operator_input_floor: &request.operator_input_floor,
-            admitted_security: resolved.admitted_security,
-            bridge: &resolved.bridge,
-            manifest_attestation: ManifestAttestation {
-                manifest_digest,
-                signer_key: &manifest.signer_key,
-                signature: &manifest.signature,
-            },
-            runtime_egress: request.runtime_egress,
-            manifest: &request.manifest,
-            policy_clearances: request.policy_clearances.as_slice(),
-            transition_id: &request.transition_id,
-            destination_id: &request.destination_id,
-            tool_name: &request.tool_name,
-            prepared_at_unix_ms: request.now_unix_ms,
-            valid_until_unix_ms: request.fence_expires_at_unix_ms,
-        };
+        let inputs =
+            Inputs {
+                operation_id: custody.operation_id(),
+                operation_version: custody.operation_version(),
+                retained_request_digest: custody.retained_request_digest()?,
+                live_request_digest: flow_dispatch::live_request_digest(custody.request())?,
+                kernel_policy_hash: custody.kernel_policy_hash(),
+                native_authority: custody.observation().binding(),
+                observation: &request.state,
+                observed_at_unix_ms: custody.observation().observed_at_unix_ms(),
+                stored_context_generation: custody.observation().stored_context_generation(),
+                classification: resolved.classification.evidence(),
+                category_bindings: resolver.config.category_labels.bindings(),
+                classified_label: resolved.classification.label(),
+                operator_input_floor: &request.operator_input_floor,
+                admitted_security: resolved.admitted_security,
+                bridge: &resolved.bridge,
+                manifest_attestation: ManifestAttestation {
+                    manifest_digest,
+                    signer_key: &manifest.signer_key,
+                    signature: &manifest.signature,
+                },
+                runtime_egress: request.runtime_egress,
+                manifest: &request.manifest,
+                policy_clearances: request.policy_clearances.as_slice(),
+                transition_id: &request.transition_id,
+                destination_id: &request.destination_id,
+                tool_name: &request.tool_name,
+                prepared_at_unix_ms: request.now_unix_ms,
+                valid_until_unix_ms: request.fence_expires_at_unix_ms,
+                declassification: custody
+                    .request()
+                    .declassification_grant
+                    .as_ref()
+                    .map(|signed| {
+                        let verified = request
+                            .declassification
+                            .as_ref()
+                            .ok_or(NativeFlowError::PolicyEvidence)?;
+                        if verified.authority_key() != signed.authority_key() {
+                            return Err(NativeFlowError::PolicyEvidence);
+                        }
+                        Ok(chio_kernel::admission_operation::NativeSecurityDeclassificationGrantV1 {
+                    body: signed.body().clone(),
+                    authority_key: verified.authority_key().clone(),
+                    artifact_hash: declassification_grant_hash(signed)?,
+                })
+                    })
+                    .transpose()?,
+            };
         Ok(Self(bounded_value(&inputs)?))
     }
 
     pub(super) fn finish(
         self,
-        admission: &FlowAdmission,
+        prepared: &chio_flow::PreparedFlowAdmission,
     ) -> Result<NativeFlowPolicyEvidence, NativeFlowError> {
         #[derive(Serialize)]
         struct Decision<'a> {
@@ -143,13 +167,20 @@ impl PreparedInputs {
             inputs: &'a serde_json::Value,
             decision: Decision<'a>,
         }
+        let admission = prepared.admission();
+        let declassification = prepared.declassification().is_some();
         if admission.declassification.is_some()
+            || (declassification && !admission.effective_egress)
             || admission.effective_egress != admission.egress_fence_plan.is_some()
         {
             return Err(NativeFlowError::PolicyEvidence);
         }
         let canonical = canonical_bounded(&Record {
-            schema: SCHEMA,
+            schema: if declassification {
+                DECLASSIFIED_SCHEMA
+            } else {
+                SCHEMA
+            },
             inputs: &self.0,
             decision: Decision {
                 request_hash: admission.request_hash,
@@ -161,7 +192,7 @@ impl PreparedInputs {
                     .egress_fence_plan
                     .as_ref()
                     .map(|plan| plan.expires_at_unix_ms),
-                declassification: false,
+                declassification,
             },
         })?;
         Ok(NativeFlowPolicyEvidence {

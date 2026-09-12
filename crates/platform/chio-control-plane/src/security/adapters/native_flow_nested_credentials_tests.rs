@@ -109,6 +109,130 @@ fn bind_session(fixture: &mut Fixture) -> TestResult<(OperationContext, ToolCall
 }
 
 #[test]
+fn native_declassification_supports_public_nested_sync_and_async_with_all_credentials() -> TestResult
+{
+    use super::super::super::{declassification, nonce::execution as nonce_execution};
+    for combined in [false, true] {
+        for nonce in [false, true] {
+            for asynchronous in [false, true] {
+                let (mut fixture, _) = declassification::profile(combined, 300)?;
+                let legacy = if nonce {
+                    let legacy = nonce_execution::install_nonce(&mut fixture, 120);
+                    nonce_execution::issue(&mut fixture)?;
+                    Some(legacy)
+                } else {
+                    None
+                };
+                let (context, operation) = bind_session(&mut fixture)?;
+                let mut client = NoChildRequests;
+                let proofs = NestedToolCallProofs {
+                    dpop_proof: fixture.request.dpop_proof.clone(),
+                    declassification_grant: fixture.request.declassification_grant.clone(),
+                };
+                let response = if asynchronous {
+                    tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
+                        fixture.kernel.evaluate_tool_call_operation_with_nested_flow_client_and_proofs_async(
+                            &context, &operation, &mut client, proofs,
+                        ),
+                    )?
+                } else {
+                    fixture
+                        .kernel
+                        .evaluate_tool_call_operation_with_nested_flow_client_and_proofs(
+                            &context,
+                            &operation,
+                            &mut client,
+                            proofs,
+                        )?
+                };
+                assert_eq!(
+                    response.verdict,
+                    Verdict::Allow,
+                    "combined={combined} nonce={nonce} async={asynchronous}: {:?}",
+                    response.reason
+                );
+                assert!(
+                    matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
+                );
+                assert!(response.receipt.verify_signature()?);
+                declassification::assert_completed(&fixture, combined, nonce)?;
+                if let Some(legacy) = legacy {
+                    assert_eq!(legacy.load(Ordering::SeqCst), 0);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn native_nonce_supports_public_nested_sync_and_async_dispatch() -> TestResult {
+    use super::super::super::nonce::execution as nonce_execution;
+    for combined in [false, true] {
+        for asynchronous in [false, true] {
+            for egress in [false, true] {
+                let mut fixture = if combined {
+                    Fixture::combined_native_credentials()?
+                } else {
+                    Fixture::new(std::array::from_fn(|_| InformationLabel::bottom()))?
+                };
+                let legacy = nonce_execution::configure(&mut fixture, egress)?;
+                let original_id = nonce_execution::issue(&mut fixture)?;
+                let (context, operation) = bind_session(&mut fixture)?;
+                let mut client = NoChildRequests;
+                let proofs = NestedToolCallProofs {
+                    dpop_proof: fixture.request.dpop_proof.clone(),
+                    declassification_grant: None,
+                };
+                let response = if asynchronous {
+                    tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
+                        fixture.kernel.evaluate_tool_call_operation_with_nested_flow_client_and_proofs_async(
+                            &context, &operation, &mut client, proofs,
+                        ),
+                    )?
+                } else {
+                    fixture
+                        .kernel
+                        .evaluate_tool_call_operation_with_nested_flow_client_and_proofs(
+                            &context,
+                            &operation,
+                            &mut client,
+                            proofs,
+                        )?
+                };
+                assert_eq!(
+                    response.verdict,
+                    Verdict::Allow,
+                    "combined={combined} async={asynchronous} egress={egress}: {:?}",
+                    response.reason
+                );
+                assert!(
+                    matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
+                );
+                assert!(response.receipt.verify_signature()?);
+                assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+                assert_eq!(legacy.load(Ordering::SeqCst), 0);
+                let store = fixture.authority.admission_operation_store();
+                let (completed, _) = store
+                    .load_retained_tool_request(
+                        &original_id,
+                        &fixture.authority.mutation_fence(),
+                        now_ms()?,
+                    )?
+                    .ok_or("original completed nonce operation")?;
+                assert_eq!(completed.state(), AdmissionOperationState::Completed);
+                assert!(completed.execution_nonce_id().is_some());
+                assert!(completed.native_dispatch_ledger_digest().is_some());
+                if combined {
+                    assert_combined_completion(&fixture, egress)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn public_nested_native_capture_retains_runtime_approval_and_dpop_for_local_and_egress(
 ) -> TestResult {
     for async_native in [false, true] {
@@ -216,7 +340,7 @@ fn native_captured_lifecycle_supports_public_nested_sync_and_async_dispatch() ->
 }
 
 #[test]
-fn public_nested_declassification_proof_reaches_native_unsupported_profile_denial() -> TestResult {
+fn public_nested_declassification_proof_reaches_native_untrusted_issuer_denial() -> TestResult {
     for async_native in [false, true] {
         let mut fixture = Fixture::new(std::array::from_fn(|_| InformationLabel::bottom()))?;
         let (context, operation) = bind_session(&mut fixture)?;
@@ -268,10 +392,9 @@ fn public_nested_declassification_proof_reaches_native_unsupported_profile_denia
         };
         assert_eq!(response.verdict, Verdict::Deny);
         assert!(
-            response
-                .reason
-                .as_deref()
-                .is_some_and(|reason| reason.contains("declassification is unsupported")),
+            response.reason.as_deref().is_some_and(
+                |reason| reason.contains("declassification authority is not currently trusted")
+            ),
             "{:?}",
             response.reason
         );

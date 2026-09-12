@@ -355,7 +355,7 @@ fn native_policy_contains_classifier_panic_without_egress_writes() -> TestResult
 }
 
 #[test]
-fn native_policy_rejects_declassification_before_classification() -> TestResult {
+fn native_policy_rejects_untrusted_declassification_before_classification() -> TestResult {
     let mut fixture = public_fixture()?;
     let authority = Keypair::from_seed(&[31; 32]);
     fixture.request.declassification_grant = declassifying_flow_request(
@@ -373,7 +373,9 @@ fn native_policy_rejects_declassification_before_classification() -> TestResult 
     )?);
     assert!(matches!(
         fixture.run(resolver, || {})?,
-        Err(NativeFlowError::UnsupportedDeclassification)
+        Err(NativeFlowError::Policy(
+            FlowDenial::DeclassificationUntrustedAuthority
+        ))
     ));
     assert_eq!(classifier.calls.load(Ordering::SeqCst), 0);
     Ok(())

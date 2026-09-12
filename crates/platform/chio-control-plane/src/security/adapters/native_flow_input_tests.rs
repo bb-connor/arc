@@ -234,7 +234,7 @@ fn native_input_classifier_panic_denies_without_taint_or_budget() -> TestResult 
 }
 
 #[test]
-fn native_input_declassification_denies_before_classification_or_join() -> TestResult {
+fn native_input_untrusted_declassification_denies_before_classification_or_join() -> TestResult {
     let mut fixture = public_fixture()?;
     fixture.request.declassification_grant = declassifying_flow_request(
         &Keypair::from_seed(&[31; 32]),
@@ -249,7 +249,10 @@ fn native_input_declassification_denies_before_classification_or_join() -> TestR
         Arc::new(Clock::default()),
         flow_config(),
     )?);
-    fixture.deny_native(resolver, "declassification is unsupported")?;
+    fixture.deny_native(
+        resolver,
+        "declassification authority is not currently trusted",
+    )?;
     assert_eq!(classifier.calls.load(Ordering::SeqCst), 0);
     Ok(())
 }

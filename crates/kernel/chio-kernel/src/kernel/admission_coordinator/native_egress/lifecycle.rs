@@ -220,9 +220,10 @@ pub(super) fn policy_deadline(bytes: &[u8]) -> Result<u64, KernelError> {
     }
     let value: serde_json::Value =
         serde_json::from_slice(bytes).map_err(|_| invalid("native lifecycle policy is invalid"))?;
-    if value.get("schema").and_then(serde_json::Value::as_str)
-        != Some("chio.native-flow-dispatch-policy.v1")
-    {
+    if !matches!(
+        value.get("schema").and_then(serde_json::Value::as_str),
+        Some("chio.native-flow-dispatch-policy.v1" | "chio.native-flow-dispatch-policy.v2")
+    ) {
         return Err(invalid("native lifecycle policy schema is unsupported"));
     }
     value

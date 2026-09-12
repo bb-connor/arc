@@ -6,15 +6,17 @@ Candidate: `/tmp/arc-security-launch`, `security/launch-integration`, base HEAD
 `8b9f9243905dfa61acac82d83438684940777fe3`. The accumulated 722-path checkpoint
 was committed and pushed as `7e54c14a60` to
 [draft PR #1117](https://github.com/bb-connor/arc/pull/1117) under the user's
-2026-09-11 authorization. Follow-up implementation continues on the same branch.
-This is not merge or release approval.
+2026-09-11 authorization. The commit containing this status update closes M1's
+implementation and local acceptance; earlier hashes below identify historical
+checkpoints, not the current candidate. Work continues on the same branch with
+M2 next. This is not merge or release approval.
 
 ## Milestone control
 
 | Milestone | State / missing acceptance | Next action / blocker | Evidence |
 | --- | --- | --- | --- |
 | M0 | Consolidated for implementation | Keep this index current; no independent cleanup campaign | Requirement and review maps below |
-| M1 | In progress; native execution, frozen participant references and nonce preflight connected | Complete nonce dispatch/capture/release and required use/declassification custody; qualify actual confinement | [Native nonce preflight](#native-nonce-preflight-custody-checkpoint) |
+| M1 | Complete: implementation and local acceptance | Proceed to M2; confinement qualification explicitly deferred by the user | [Acceptance closeout](#m1-local-acceptance-closeout), [qualification deferral](#m1-confined-process-qualification-deferral) |
 | M2 | Process qualification pending; in-process native lifecycle reachable | Process cutpoints and recovery against M1 | Existing reply-fault coverage is partial evidence only |
 | M3 | Missing authenticated caller start and durable delivery | Preserve lost-report counterexample until real handshake fixes it | [Caller design](../superpowers/specs/2026-09-07-caller-dispatch-commitment-design.md) |
 | M4 | Consumer qualification incomplete | Inventory positive supported paths and required startup denials after M1-M3 | [Original requirement ledger](launch-plan.md#requirement-ledger) |
@@ -25,6 +27,25 @@ This is not merge or release approval.
 | M9 | Entry packages unpublished and external consumer unqualified | Package dependency closure and clean install after M4-M8 | Three intended entrypoints remain `publish = false` |
 | M10 | Not release qualified | Local gates, audits, authorized exact-candidate hosted and publication steps | Candidate lacks passing exact-head hosted qualification |
 | M11 | Not started | Authorized observed pilot and signed promotion stages | [Numeric operator contract](active-defense-rollout.md) |
+
+## M1 confined-process qualification deferral
+
+On 2026-09-12 the user approved using GitHub Actions for M1's Linux x86_64
+confined-process tests, or recording a deferral if that is not currently possible.
+This workspace runs Linux/aarch64. The repository has Ubuntu x86_64 execution
+lanes, but its existing [isolated-capture controller](https://github.com/bb-connor/arc/actions/runs/34693733714)
+for candidate `d4a7c718376ee277b554717ea9db08c9d4c1715d` failed
+`Authorize exact source and controller context`; its dispatch step was skipped.
+The capture workflow requires a controller-issued authenticated dispatch context.
+A manually invented context or weakened source authorization is not a substitute.
+
+Confined-process qualification is therefore explicitly deferred, not passed.
+Continue the full M1 implementation and local acceptance without blocking on this
+runner. Revisit qualification using an authorized exact-candidate Actions run
+before claims of confined execution or production readiness. The M2 process
+failure/recovery and M6 integrated enterprise gates remain open. No repository
+authorization variables, pinned workflow definitions or release gates were changed
+to implement this decision.
 
 ## Complete original-requirement routing
 
@@ -39,14 +60,14 @@ the normative plans retain their detailed acceptance requirements.
 | 1 Characterization | Carried; final affected regressions pending | M10 |
 | 2 Signed aggregate root | Carried; bound swarm acceptance pending | M5 |
 | 3 Capability negotiation | Carried; consumer parity pending | M4 |
-| 4 Composite holds and mutation | Partial local; complete native composition pending | M1 |
+| 4 Composite holds and mutation | Native composition locally verified | M1 |
 | 5 Durable SQLite and remote authority semantics | Partial local; crash/recovery qualification pending | M2 |
-| 6 Admission ordering and signed terminal projection | Partial local; opt-in native execution passes, required profiles and caller handshake missing | M1, M3 |
+| 6 Admission ordering and signed terminal projection | Native profiles locally verified; caller handshake missing | M1, M3 |
 | 7 Policy-owned threshold requirements | Carried; composed action acceptance pending | M7 |
-| 8 Bounded approval verification | Partial local; combined ordinary/nested local and egress invocation passes, complete profiles pending | M1 |
+| 8 Bounded approval verification | Complete native credential composition locally verified | M1 |
 | 9 Durable replay and collection | Partial local; composed recovery and response pending | M2, M7 |
-| 10 Federation threshold compatibility | Carried; final native authorization coupling pending | M1 |
-| 11 Existing bounded runtime evidence | Partial local; validity binds capture and live handoff, combined ordinary/nested local and egress invocation passes | M1 |
+| 10 Federation threshold compatibility | Shared authorization and frozen native return context locally verified | M1 |
+| 11 Existing bounded runtime evidence | Signed validity bounds, physical capture and combined native invocation locally verified | M1 |
 | 12 Authoritative schemas and four-language generation | Carried; final changed-wire parity pending | M4 |
 | 13 Adapter preservation | Partial local; complete consumer inventory pending | M4 |
 | 14 Cross-implementation conformance | Carried; exact-candidate execution pending | M10 |
@@ -59,7 +80,7 @@ the normative plans retain their detailed acceptance requirements.
 | 1 Portable labels and lattice | Carried; exact-candidate portable gate pending | M10 |
 | 2 Authenticated manifests and bridges | Partial local; constructor/consumer parity pending | M4 |
 | 3 Durable security stores | Partial local; native recovery and retention pending | M2, M8 |
-| 4 Flow and one-shot declassification | Partial local; native custody/release missing | M1 |
+| 4 Flow and one-shot declassification | Native consumption, output outcome and release locally verified | M1 |
 | 5 Kernel adapter composition | Partial local; complete positive profiles pending | M4 |
 | 6 Deception and tripwires | Carried; integrated pre-effect/raw-output acceptance pending | M7 |
 | 7 Temporal correlation | Carried; authenticated bounded replay acceptance pending | M7 |
@@ -91,11 +112,11 @@ admission coordinator and fenced authoritative store, not a decoded receipt.
 
 | Profile / public entrypoint | Mandatory authority beyond capability, guards and budget | Recovery / release policy | Current limitation |
 | --- | --- | --- | --- |
-| Ordinary `evaluate_tool_call*` | Installed runtime, credentials and selected security lifecycle | Coordinator/store; output guards and current security release | Opt-in non-nonce/non-declassifying native in-process invocation and replay pass; complete profiles pending |
-| Nested `evaluate_tool_call_operation_with_nested_flow_client*` | Same participants, plus nested/session binding | Same original-operation owners; nested return finalization | Opt-in native sync/async local and egress in-process paths pass; complete profiles pending |
-| Nonce-required ordinary/nested | Operation-owned nonce and authenticated delivery identity | Durable nonce plus admission owner; uncertain outcomes retain accounting | Native nonce composition missing |
-| Governed ordinary/nested | Exact request-bound approval quorum and replay custody | Exact fenced claim disposition; expiry checked before capture | Combined native in-process ordinary/nested local and egress invocation passes; complete profiles and confinement pending |
-| Native-flow security-context entrypoints | Original native binding, full-source join, policy, egress/use custody and live capture authority | Private original owner and current output policy, not historical capture | Host opt-in required; default and test checkpoint stay closed; nonce preflight is separate from still-unsupported nonce dispatch and declassification |
+| Ordinary `evaluate_tool_call*` | Installed runtime, credentials and selected security lifecycle | Coordinator/store; output guards and current security release | In-process local/egress and required credential/use profiles pass; confinement deferred |
+| Nested `evaluate_tool_call_operation_with_nested_flow_client*` | Same participants, plus nested/session binding | Same original-operation owners; nested return finalization | Explicit proof-bearing sync/async profiles pass; confinement deferred |
+| Nonce-required ordinary/nested | Operation-owned nonce and authenticated delivery identity | Durable nonce plus admission owner; uncertain outcomes retain accounting | Native preflight, dispatch and replay pass; caller-report transport remains unsupported |
+| Governed ordinary/nested | Exact request-bound approval quorum and replay custody | Exact fenced claim disposition; expiry checked before capture | Combined runtime/approval/DPoP with nonce and declassification pass; confinement deferred |
+| Native-flow security-context entrypoints | Original native binding, full-source join, policy, egress/use custody and live capture authority | Private original owner and current output policy, not historical capture | Host opt-in and prior source lifecycle selection required; default and diagnostic checkpoint stay closed; confinement deferred |
 | Brokered invocation | Broker attempt, delegated parent/family quotas, witnessed identity and confined connector | Broker and admission original-operation reconciliation | Integrated enterprise topology unqualified; no direct fallback permitted |
 | Caller `reserve_caller_execution_blocking` / `reconcile_caller_execution_blocking` | Nonce/caller identity and complete authenticated start/delivery contract | Executor durable claim plus original admission owner | Start handshake missing; credential/security profiles explicitly denied; lost-report counterexample open |
 
@@ -129,12 +150,128 @@ consumers are coupled. Keeping them together preserves the locally checked tree;
 subsequent milestones can be reviewed as incremental commits. The prior local
 checks below are retained evidence, not fresh exact-commit hosted qualification.
 
+## Native nonce and declassification composition
+
+The native lifecycle now supports operation-owned execution nonce and signed
+declassification custody through the original ordinary/nested capture path.
+The real connector, frozen return context, output evaluation and signed receipt
+path remain shared with the previously supported native credential profiles.
+Current-source local acceptance passes as recorded in the closeout below. The
+earlier checkpoint evidence remains historical, not fresh hosted qualification.
+
+- Nonce capture requires the original signed reservation and issuance digest,
+  exact live request and original requirement, current issuer and expiry. The
+  physical transaction independently checks the reservation and final deadline.
+  It cannot fall back to a legacy nonce store or caller-report transport.
+- A trusted, correctly bound declassification grant remains unconsumed during
+  input classification and policy preparation. Its complete source includes
+  inherited principal, lineage and session state. Consumption and its evidence
+  commit atomically with the original egress fence before capture. Expiry or
+  later failure cannot refund the one-shot use or undo committed input taint.
+- Original output finalization commits the use outcome and output taint in one
+  transaction. `Released` describes the request's connector use, not guarded
+  output delivery or publication of the active-defense receipt outbox. Lost
+  owners and uncertain effects still require original-operation recovery.
+- Grant-use uniqueness is scoped to the selected authoritative security domain.
+  This is not distributed one-shot enforcement across independent stores sharing
+  an issuer. That deployment must designate one authoritative use store.
+- Native egress and output journals use explicit v2 records for declassification;
+  ordinary v1 record bytes and the schema-33 catalog remain unchanged. No new
+  generic writer or schema upgrade is introduced. Imported declassification
+  lifecycle selection must already permit live dispatch. Invocation never seals,
+  reconciles or activates an unselected imported lifecycle.
+
+The acceptance inventory includes real sync/async ordinary and nested execution
+with nonce, with the combined runtime/approval/DPoP profile, and with both. It also
+checks grant substitution, missing proof, second use with quota still available,
+receipt replay, final-commit expiry, monotone state and atomic output failure.
+The existing deny-only checkpoint is used to observe the exact expiry failure,
+never to establish successful connector execution.
+
+### M1 requirement-to-acceptance map
+
+The numbers below match all eight requirements in the accepted M1 plan. Named
+inventories are maintained in `scripts/check-flow-security.sh`; all named M1
+inventories pass locally. Shared-path checks establish ordering and
+retained-context behavior, not a qualified multi-host federation deployment.
+
+| M1 requirement | Implementation boundary | Acceptance evidence |
+| --- | --- | --- |
+| 1 Original complete credentials | Original profile and live reservation; actual capability, delegation, revocation, runtime, approval and DPoP | Combined ordinary/nested profiles, missing/substituted proofs, original authority selection and participant snapshots |
+| 2 Physical commit deadlines | Transaction-bound witness and independent final trusted-time check | Runtime signed freshness, runtime/nonce/declassification expiry, policy clock bounds and stale-owner rejection |
+| 3 Pre-effect authorization | Shared ordinary/nested authorization and final capture helper; original composite hold | Dispatch rejection payment custody, frozen participant context, federation context and physical hold ownership |
+| 4 Frozen return context | Exact original participant references, admitted evidence, grant, limits and signing identity | Frozen dispatch context, durable caller persistence and frozen receipt signing inventories |
+| 5 Native one-shot use | Original nonce reservation; atomic egress consumption and output outcome | Nonce execution/replay, declassification credential matrices, signed-claim substitution, issuer time bounds and exact row semantics |
+| 6 Real connector | Opt-in production captured lifecycle and shared ordinary/nested handoff | Sync/async local and egress invocation, one connector effect, expected output, verified signed receipt and exact completed replay |
+| 7 Guarded output and release | Raw-output tripwire before redaction, final flow policy and original live release owner | Security kernel callbacks, actual output/chunks, output journal failures, current revocation/stop and durable release recovery |
+| 8 Explicit activation | Immutable source selection, selected imported lifecycle and supported original backend | Native authority admission, runtime non-upgrade, catalog identity, migration refusal and unselected declassification lifecycle denial |
+
+Confinement is the sole user-approved M1 qualification deferral. Process
+failure/restart campaigns, the external caller handshake, complete adapter/SDK
+parity, broker topology and operational active-defense outbox publication retain
+their own M2-M8 acceptance gates. They are not silently included in local M1
+success claims.
+
+## M1 local acceptance closeout
+
+M1's implementation and local acceptance are complete for the explicitly selected
+SQLite-backed in-process profile. Actual ordinary and public nested sync/async
+calls execute through the production captured lifecycle, return expected guarded
+output and independently verifiable signed receipts, and replay the original
+receipt without another effect. Required nonce, declassification and combined
+runtime/approval/DPoP variants pass. Default and diagnostic activation remain
+closed. Confinement is deferred by the decision above; M2 is next.
+
+Current-source evidence:
+
+- All 37 named M1 inventories pass: 472 test executions, with overlapping filters
+  counted separately. This includes all 80 native control-plane tests, all 93
+  native-store custody tests, 25 durable release tests and 13 federation tests.
+  The source commands live in the flow gate, which now declares 68 inventories
+  across the wider roadmap. This does not claim that the entire flow gate ran.
+- `/tmp/chio-m1-cohesive-acceptance-final.log` retains the first 12 passing
+  inventories. Its subsequent native-authority group exposed a stale unsupported
+  nonce-preflight message assertion. The corrected group and all remaining 24
+  inventories pass in `/tmp/chio-m1-cohesive-acceptance-remainder.log`.
+  All no-authority, no-hold and no-effect assertions remain enforced.
+- `/tmp/chio-m1-federation-qualified.log` records the added 13-test exact group.
+  Two older fixtures assumed the pre-signing outcome schema. Tests now retain
+  legacy decoder rejection, verify missing original federation context against
+  the committed outcome during recovery, and exercise both legacy and
+  frozen-signing codec order with explicit security-release disposition. No
+  production decoder was weakened to accommodate the fixtures.
+- Additional nonce regressions pass: 18 kernel tests, 82 SQLite tests and all 17
+  public lifecycle tests. Logs are `/tmp/chio-m1-nonce-kernel-regressions.log`,
+  `/tmp/chio-m1-nonce-store-regressions.log` and
+  `/tmp/chio-m1-nonce-public-lifecycle.log`. Counts overlap other inventories.
+- Production-library checks pass for kernel, SQLite and control plane. Strict
+  all-target Clippy passes for those packages and xtask. Logs are
+  `/tmp/chio-m1-production-libraries.log` and `/tmp/chio-m1-clippy-final.log`.
+- All 21 formal-source checker tests pass, and all 221 source entries match.
+  Every prior relationship and covered symbol is preserved; proof claims are
+  unchanged. Generated coverage remains 58 rows and 168 artifacts. Logs are
+  `/tmp/chio-m1-formal-mirrors-tests.log`, `/tmp/chio-m1-formal-mirrors-check.log`
+  and `/tmp/chio-m1-proof-coverage.log`. Source hashes are not new formal proofs.
+- Workspace and explicit include-reachable formatting, the 68-inventory flow
+  contract, exact-inventory runner/verifier self-tests, security CI contract and
+  its mutation tests, file hygiene and patch checks pass. The final AST-only graph
+  refresh is recorded in `/tmp/chio-m1-graph-final.log`; HTML remains skipped at
+  the unchanged size limit. Production deadlines, activation defaults, the root
+  lockfile and workflow pins are unchanged.
+
+The production source stayed unchanged during the final acceptance run and
+follow-up regression fixes; the latter changed test fixtures and gate coverage.
+Changed Rust sources were fingerprinted through final verification. These are
+local debug correctness checks, not a portable hosted artifact bundle,
+throughput/latency qualification, a full-workspace release gate or authorization
+to migrate populated operator stores, merge, publish or activate production.
+
 ## Current M1 checkpoint
 
-The entries below retain checkpoint-by-checkpoint evidence. The latest integration
-is the [frozen participant-reference binding](#frozen-dispatch-participant-reference-checkpoint)
-over the [native captured lifecycle](#native-captured-lifecycle-checkpoint); earlier
-statements about a closed connector describe their own source checkpoint.
+The entries below retain historical checkpoint-by-checkpoint evidence. Current
+composition is tracked [above](#native-nonce-and-declassification-composition).
+Earlier statements about unsupported profiles describe their own source
+checkpoint, not the latest working tree.
 
 The native capture path now carries bounded validity from the configured runtime
 verifier into the physical transaction and checks it again before commit. The

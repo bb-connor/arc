@@ -3,6 +3,7 @@ use super::*;
 use chio_kernel::admission_operation::PersistedAdmissionOperationV1;
 
 const FORMAT: &str = "chio.native-security-egress.v1";
+const DECLASSIFIED_FORMAT: &str = "chio.native-security-egress.v2";
 const MAX_RECORD: usize = 16 * 1024 * 1024;
 
 #[derive(Serialize, Deserialize)]
@@ -22,21 +23,29 @@ pub(in crate::admission_operation_store::security_participant_state) struct Reco
     pub acquisition_digest: Option<AdmissionDigest>,
     pub observed_at: u64,
     pub decision_at: u64,
-    pub changes: BoundedVec<crate::security_state::NativeRowChange, 1>,
+    pub changes: BoundedVec<crate::security_state::NativeRowChange, 4>,
     pub current_rows: u64,
     pub current_bytes: u64,
 }
 
 impl Record {
-    pub(in crate::admission_operation_store::security_participant_state) fn format() -> String {
-        FORMAT.into()
+    pub(in crate::admission_operation_store::security_participant_state) fn format(
+        command: &NativeEgressCommand,
+    ) -> String {
+        if matches!(command, NativeEgressCommand::CommitDeclassified { .. }) {
+            DECLASSIFIED_FORMAT.into()
+        } else {
+            FORMAT.into()
+        }
     }
     pub(in crate::admission_operation_store::security_participant_state) fn mutation(
         &self,
     ) -> &'static str {
         match self.command {
             NativeEgressCommand::Acquire(_) => "acquire_security_participant_egress",
-            NativeEgressCommand::Commit(_) => "commit_security_participant_egress",
+            NativeEgressCommand::Commit(_) | NativeEgressCommand::CommitDeclassified { .. } => {
+                "commit_security_participant_egress"
+            }
         }
     }
     pub(in crate::admission_operation_store::security_participant_state) fn bytes(
@@ -64,21 +73,22 @@ impl Record {
             super::super::records::load_metadata(connection, self.authority.as_str())?
                 .ok_or_else(|| invalid("native egress initialization is absent"))?;
         let fence = self.command.fence().map_err(invalid)?;
-        contract::require_original(
+        let original = contract::require_original(
             connection,
             &operation,
             &self.context,
             &initialized.admission_binding()?,
             &fence,
         )?;
-        if self.schema != FORMAT
+        contract::validate_declassification_binding(&original, &self.command)?;
+        if self.schema != Self::format(&self.command)
             || self.initialization != initialized.digest
             || self.lease.fence.store_uuid != initialized.fence.store_uuid
             || !(1..=9_007_199_254_740_991).contains(&self.sequence)
             || self.current_rows > 65_536
             || self.current_bytes > 67_108_864
             || self.result != self.command.expected_result().map_err(invalid)?
-            || self.changes.len() != 1
+            || self.changes.len() != self.command.expected_changes()
         {
             return Err(invalid("native egress command history is inconsistent"));
         }
@@ -92,9 +102,9 @@ impl Record {
             self.observed_at,
             self.decision_at,
         )?;
-        for change in self.changes.as_slice() {
-            self.command.validate_change(change).map_err(invalid)?;
-        }
+        self.command
+            .validate_changes(self.changes.as_slice())
+            .map_err(invalid)?;
         match &self.command {
             NativeEgressCommand::Acquire(_) => {
                 if self.acquisition_digest.is_some() {
@@ -103,7 +113,7 @@ impl Record {
                     ));
                 }
             }
-            NativeEgressCommand::Commit(_) => {
+            NativeEgressCommand::Commit(_) | NativeEgressCommand::CommitDeclassified { .. } => {
                 let acquired =
                     load_operation(connection, operation.binding().operation_id(), "acquired")?
                         .ok_or_else(|| invalid("native egress commit has no owned acquisition"))?;

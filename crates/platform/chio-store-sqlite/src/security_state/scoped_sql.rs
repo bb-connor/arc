@@ -1,8 +1,8 @@
 //! Data scoping, not admission authority. No raw-SQL or connection escape hatch.
 //!
-//! Native inspection cannot construct a writer. Native monotone joins require
-//! the affine admission-owned transaction and its bounded row-change capture.
-//! Other production mutations still require the legacy transaction owner.
+//! Native inspection cannot construct a writer. Native joins, egress and use
+//! transitions require their affine admission-owned transaction and exact
+//! bounded row-change capture. Other mutations retain the legacy owner.
 
 use super::*;
 use rusqlite::{params_from_iter, Row, Statement, ToSql};

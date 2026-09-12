@@ -64,10 +64,14 @@ struct Capture {
     changes: Mutex<Changes>,
 }
 
-// Closed command families. Serialized command data cannot mint either affine
+// Closed command families. Serialized command data cannot mint an affine
 // owner; each owner is created only by the corresponding admission transaction.
 enum CapturePlan {
     Join(FlowJoinRequest),
+    Output {
+        request: FlowJoinRequest,
+        declassification: Box<super::NativeDeclassificationOutcome>,
+    },
     Egress(NativeEgressCommand),
 }
 
@@ -75,13 +79,27 @@ impl CapturePlan {
     fn permits_table(&self, table: &str) -> bool {
         match self {
             Self::Join(_) => is_native_flow_join_table(table),
-            Self::Egress(_) => table == "security_egress_fences",
+            Self::Output { .. } => {
+                is_native_flow_join_table(table)
+                    || super::native_declassification::TABLES.contains(&table)
+            }
+            Self::Egress(command) => command.permits_table(table),
         }
     }
 
     fn validate(&self, change: &NativeRowChange) -> PortResult<()> {
         match self {
             Self::Join(request) => change.validate_flow_join(request),
+            Self::Output {
+                request,
+                declassification,
+            } => {
+                if is_native_flow_join_table(&change.table) {
+                    change.validate_flow_join(request)
+                } else {
+                    declassification.validate_change(change)
+                }
+            }
             Self::Egress(command) => command.validate_change(change),
         }
     }
@@ -89,7 +107,8 @@ impl CapturePlan {
     fn max_changes(&self) -> usize {
         match self {
             Self::Join(_) => MAX_CHANGES,
-            Self::Egress(_) => 1,
+            Self::Output { .. } => MAX_CHANGES,
+            Self::Egress(command) => command.expected_changes(),
         }
     }
 }
@@ -113,8 +132,8 @@ impl Capture {
             return Err(denied());
         }
         let table: String = context.get(0)?;
-        // Each owner selects its closed row policy; a join never gains egress
-        // authority, and neither command family can spend declassification.
+        // Each owner selects its closed row policy. Ordinary joins cannot
+        // acquire egress or use custody; declassification has exact row commands.
         if !self.plan.permits_table(&table) {
             return Err(denied());
         }
@@ -285,7 +304,20 @@ fn join_native<'connection>(
     }
     let capture = Arc::new(Capture {
         authority: authorization.authority().to_owned(),
-        plan: CapturePlan::Join(authorization.request().clone()),
+        plan: match &authorization {
+            JoinAuthorization::Output(output) if output.declassification().is_some() => {
+                CapturePlan::Output {
+                    request: output.request().clone(),
+                    declassification: Box::new(
+                        output
+                            .declassification()
+                            .ok_or_else(PortError::invalid_data)?
+                            .clone(),
+                    ),
+                }
+            }
+            _ => CapturePlan::Join(authorization.request().clone()),
+        },
         enabled: AtomicBool::new(true),
         changes: Mutex::new(Changes::default()),
     });
@@ -298,6 +330,12 @@ fn join_native<'connection>(
     install_capture(&owner.transaction, &owner.capture)?;
     let sql_scope = sql_scope::SqlMutationScope::install(&owner.transaction, &owner.capture)?;
     let result = ScopedMutation::native(&owner).join(owner.authorization.request())?;
+    if let JoinAuthorization::Output(output) = &owner.authorization {
+        if let Some(declassification) = output.declassification() {
+            ScopedMutation::native(&owner)
+                .commit_declassification_outcome_evidence(&declassification.outcome)?;
+        }
+    }
     super::flow_state::verify_native_join_snapshot(
         owner.transaction(),
         owner.authority(),
@@ -311,6 +349,11 @@ fn join_native<'connection>(
             .map_err(|_| PortError::integrity_failure())?
             .rows,
     );
+    if let JoinAuthorization::Output(output) = &owner.authorization {
+        if let Some(declassification) = output.declassification() {
+            declassification.validate_changes(&rows)?;
+        }
+    }
     sql_scope.finish()?;
     drop(disable);
     Ok((owner.transaction, result, rows))
@@ -387,6 +430,22 @@ pub(crate) fn mutate_native_egress<'connection>(
         NativeEgressCommand::Commit(commitment) => NativeEgressResult::Committed(
             scoped.commit_egress_fence(commitment, || Ok(trusted_now))?,
         ),
+        NativeEgressCommand::CommitDeclassified {
+            commitment,
+            consumption,
+            ..
+        } => {
+            let consumed = scoped
+                .commit_declassification_consumption_evidence(consumption, || Ok(trusted_now))?;
+            // A retry acknowledgement, even for identical arguments, is not
+            // fresh authority to join a different operation's fence commitment.
+            if consumed != chio_security_types::ports::DeclassificationConsume::Consumed {
+                return Err(PortError::conflict());
+            }
+            NativeEgressResult::Committed(
+                scoped.commit_egress_fence(commitment, || Ok(trusted_now))?,
+            )
+        }
     };
     super::flow_state::verify_native_egress_result(
         owner.transaction(),
@@ -401,7 +460,8 @@ pub(crate) fn mutate_native_egress<'connection>(
             .map_err(|_| PortError::integrity_failure())?
             .rows,
     );
-    if rows.len() != 1 || result != owner.authorization.command().expected_result()? {
+    owner.authorization.command().validate_changes(&rows)?;
+    if result != owner.authorization.command().expected_result()? {
         return Err(PortError::integrity_failure());
     }
     sql_scope.finish()?;

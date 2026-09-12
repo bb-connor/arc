@@ -13,10 +13,6 @@ pub(super) fn require_original(
         || operation.binding().kind() != AdmissionOperationKind::ToolDispatch
         || operation.native_dispatch_ledger_digest().is_none()
         || operation
-            .binding()
-            .participant_requirements()
-            .execution_nonce
-        || operation
             .provider_attempt()
             .is_none_or(|attempt| attempt.is_caller_report())
     {

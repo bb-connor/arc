@@ -4,6 +4,7 @@ use super::*;
 use chio_security_types::ports::{Digest32, FlowJoinRequest, FlowStateSnapshot};
 
 const POLICY_SCHEMA: &str = "chio.native-flow-dispatch-policy.v1";
+const DECLASSIFIED_POLICY_SCHEMA: &str = "chio.native-flow-dispatch-policy.v2";
 const MAX_POLICY_BYTES: usize = 256 * 1024;
 
 #[derive(Deserialize)]
@@ -26,6 +27,8 @@ pub(super) struct Inputs {
     stored_context_generation: Option<u64>,
     prepared_at_unix_ms: u64,
     pub valid_until_unix_ms: u64,
+    pub declassification:
+        Option<chio_kernel::admission_operation::NativeSecurityDeclassificationGrantV1>,
 }
 
 #[derive(Deserialize)]
@@ -59,7 +62,16 @@ pub(super) fn decode(
         return Err(invalid("native dispatch policy is not canonical JSON"));
     }
     let policy: Policy = serde_json::from_slice(bytes).map_err(invalid)?;
-    if policy.schema != POLICY_SCHEMA || policy.decision.declassification {
+    let declassified = policy.inputs.declassification.is_some();
+    if policy.schema
+        != if declassified {
+            DECLASSIFIED_POLICY_SCHEMA
+        } else {
+            POLICY_SCHEMA
+        }
+        || policy.decision.declassification != declassified
+        || (declassified && !policy.decision.effective_egress)
+    {
         return Err(invalid(
             "native dispatch policy schema or declassification is unsupported",
         ));
@@ -107,6 +119,31 @@ impl Policy {
             return Err(invalid(
                 "native dispatch policy exceeds recorded input taint",
             ));
+        }
+        if let Some(grant) = &input.declassification {
+            let request = original.request_for_revalidation();
+            let body = &grant.body;
+            let source = state
+                .principal_label
+                .join_restrictions(&state.lineage_label)
+                .and_then(|label| label.join_restrictions(&state.session_label))
+                .map_err(invalid)?;
+            if body.capability_id().as_str() != request.capability.id
+                || body.agent_id().as_str() != request.agent_id
+                || body.destination_id().as_str() != request.server_id
+                || body.tool_name().as_str() != request.tool_name
+                || body.tenant_id() != &state.key.tenant_id
+                || body.subject_id() != &state.key.principal_id
+                || body.session_id() != &state.key.session_id
+                || body.request_hash() != self.decision.request_hash
+                || body.source_label_hash().as_bytes()
+                    != chio_core::hashing::sha256(&canonical_json_bytes(&source).map_err(invalid)?)
+                        .as_bytes()
+            {
+                return Err(invalid(
+                    "native declassification policy differs from original source and request",
+                ));
+            }
         }
         for time in [
             input.observed_at_unix_ms,
@@ -159,6 +196,89 @@ impl Policy {
         if now < self.inputs.prepared_at_unix_ms || now >= self.inputs.valid_until_unix_ms {
             return Err(invalid("native dispatch policy is stale or expired"));
         }
+        if let Some(grant) = &self.inputs.declassification {
+            if now / 1000 < grant.body.issued_at_unix_seconds()
+                || now / 1000 >= grant.body.expires_at_unix_seconds()
+            {
+                return Err(invalid(
+                    "native declassification grant is not currently valid",
+                ));
+            }
+        }
         Ok(())
+    }
+
+    pub(super) fn validate_live_declassification(
+        &self,
+        request: &chio_kernel::ToolCallRequest,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        match (
+            &self.inputs.declassification,
+            &request.declassification_grant,
+        ) {
+            (None, None) => Ok(()),
+            (Some(expected), Some(signed))
+                if &expected.body == signed.body()
+                    && &expected.authority_key == signed.authority_key()
+                    && expected.artifact_hash.as_bytes()
+                        == chio_core::hashing::sha256(
+                            &canonical_json_bytes(signed).map_err(invalid)?,
+                        )
+                        .as_bytes()
+                    && signed.verify_signature().map_err(invalid)? =>
+            {
+                Ok(())
+            }
+            _ => Err(invalid(
+                "native declassification differs from the live signed grant",
+            )),
+        }
+    }
+
+    pub(super) fn validate_owned_declassification(
+        &self,
+        connection: &Connection,
+        operation: &AdmissionOperationV1,
+        value: &serde_json::Value,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        let committed = super::super::egress::load_operation(
+            connection,
+            operation.binding().operation_id(),
+            "committed",
+        )?;
+        let owned = committed.as_ref().and_then(|record| match &record.command {
+            crate::security_state::NativeEgressCommand::CommitDeclassified {
+                grant,
+                consumption,
+                ..
+            } => Some((grant.as_ref(), consumption.as_ref())),
+            _ => None,
+        });
+        match (&self.inputs.declassification, owned) {
+            (None, None) => Ok(()),
+            (Some(expected), Some((actual, consumption))) if expected == actual => {
+                let receipt: chio_core::receipt::security::ActiveDefenseReceiptBody =
+                    serde_json::from_slice(consumption.receipt.canonical_body.as_bytes())
+                        .map_err(invalid)?;
+                let chio_core::receipt::security::ActiveDefenseReceiptBody::DeclassificationConsumption(body) = receipt else {
+                    return Err(invalid("native use is not consumption evidence"));
+                };
+                if body.policy.policy_version.as_str() != "native-flow-dispatch-policy-v2"
+                    || body.policy.policy_hash.as_bytes()
+                        != chio_core::hashing::sha256(
+                            &canonical_json_bytes(value).map_err(invalid)?,
+                        )
+                        .as_bytes()
+                {
+                    return Err(invalid(
+                        "native consumption does not bind this exact dispatch policy",
+                    ));
+                }
+                Ok(())
+            }
+            _ => Err(invalid(
+                "native dispatch lacks its original declassification consumption",
+            )),
+        }
     }
 }

@@ -33,8 +33,7 @@ fn native_dispatch_attachment_rejects_every_unsupported_participant_profile() {
                         attachment_supported(kind, requirements, &attachment),
                         kind == AdmissionOperationKind::ToolDispatch
                             && broker_attempt
-                            && budget_capture
-                            && !execution_nonce,
+                            && budget_capture,
                         "kind={kind:?}, requirements={requirements:?}"
                     );
                 }
@@ -156,6 +155,50 @@ fn native_dispatch_attachment_commits_with_dispatch_and_cannot_be_replaced(
     Ok(())
 }
 
+#[test]
+fn native_dispatch_attachment_with_nonce_never_accepts_caller_custody(
+) -> Result<(), AdmissionOperationError> {
+    for caller in [false, true] {
+        let mut operation = capture_pending_operation_with_nonce(true);
+        if caller {
+            for attachment in &mut operation.attachments.0 {
+                if let AdmissionAttachment::BrokerAttempt(attempt) = attachment {
+                    attempt.transport_id = "caller-report:server".into();
+                }
+            }
+        }
+        operation.validate()?;
+        let command = AdmissionOperationCommand::new(
+            operation.binding.operation_id.clone(),
+            operation.version,
+            recovery_lease(&operation),
+            vec![AdmissionAttachment::NativeDispatchLedgerDigest(digest(
+                "native_dispatch_ledger_digest",
+                COMMIT_DIGEST,
+            ))],
+            Some(AdmissionOperationState::DispatchCommitted),
+            None,
+            None,
+        )?;
+        let result = operation.apply_command(&command, 1_000);
+        if caller {
+            assert!(matches!(
+                result,
+                Err(AdmissionOperationError::ProviderAttemptBindingMismatch)
+            ));
+        } else {
+            let captured = result?.into_operation();
+            assert!(captured.execution_nonce_id().is_some());
+            assert!(captured.native_dispatch_ledger_digest().is_some());
+            assert_eq!(
+                AdmissionOperationV1::from_persisted(captured.to_persisted())?,
+                captured
+            );
+        }
+    }
+    Ok(())
+}
+
 fn identifier(field: &'static str, value: &str) -> AdmissionIdentifier {
     AdmissionIdentifier::try_new(field, value).expect("test identifier must be valid")
 }
@@ -250,6 +293,10 @@ fn recovery_lease(operation: &AdmissionOperationV1) -> AdmissionRecoveryLease {
 }
 
 fn capture_pending_operation() -> AdmissionOperationV1 {
+    capture_pending_operation_with_nonce(false)
+}
+
+fn capture_pending_operation_with_nonce(execution_nonce: bool) -> AdmissionOperationV1 {
     let namespace = AuthenticatedRequestNamespace::from_authentication_context(
         identifier("coordinator_authority_id", "https://coordinator.example"),
         "tenant-1",
@@ -266,6 +313,7 @@ fn capture_pending_operation() -> AdmissionOperationV1 {
             AdmissionParticipantRequirements {
                 broker_attempt: true,
                 budget_capture: true,
+                execution_nonce,
                 ..AdmissionParticipantRequirements::NONE
             },
         )
@@ -295,6 +343,11 @@ fn capture_pending_operation() -> AdmissionOperationV1 {
             vec![AdmissionAttachment::BudgetHoldId(identifier(
                 "budget_hold_id",
                 "hold-1",
+            ))]
+        } else if state == AdmissionOperationState::ReadyToDispatch && execution_nonce {
+            vec![AdmissionAttachment::ExecutionNonceId(identifier(
+                "execution_nonce_id",
+                "nonce-1",
             ))]
         } else {
             Vec::new()

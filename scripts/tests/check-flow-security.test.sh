@@ -84,10 +84,13 @@ def parse(source: str) -> dict[str, tuple[bool, list[str], list[str]]]:
 
 
 expected_counts = {
+    "frozen federation context": 13,
     "frozen dispatch participant context": 27,
     "durable caller participant persistence": 3,
     "native compiled catalog identity": 2,
-    "native post-join policy": 67,
+    "native post-join policy": 80,
+    "native declassification row semantics": 1,
+    "native declassification issuer window": 1,
     "public nested credential custody": 5,
     "native capture accounting deltas": 2,
     "native runtime validity contract": 1,
@@ -107,12 +110,12 @@ expected_counts = {
     "security session-throttle types": 3,
     "flow lattice and enforcement engine": 46,
     "strict manifest v2": 23,
-    "security kernel adapters": 23,
+    "security kernel adapters": 34,
     "durable flow state": 33,
     "native flow custody": 93,
     "native dispatch participant snapshots": 3,
     "native dispatch ledger callbacks": 3,
-    "native dispatch attachment contracts": 3,
+    "native dispatch attachment contracts": 4,
     "native flow observation contracts": 3,
     "original security authority selection": 22,
     "original operation authority profile": 7,
@@ -189,6 +192,9 @@ required_adapter_commands = {
     "Cohere canonical stream": "chio-cohere-tools-adapter",
 }
 required_native_commands = {
+    "frozen federation context": [
+        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::federation_context::",
+    ],
     "frozen dispatch participant context": [
         "cargo", "test", "-p", "chio-kernel", "--lib", "return_context::",
     ],
@@ -240,6 +246,14 @@ required_native_commands = {
     "native post-join policy": [
         "cargo", "test", "-p", "chio-control-plane", "--lib",
         "security::adapters::tests::native_flow::",
+    ],
+    "native declassification row semantics": [
+        "cargo", "test", "-p", "chio-store-sqlite", "--lib",
+        "native_declassification_row_commands_match_shared_semantics_and_reject_substitution",
+    ],
+    "native declassification issuer window": [
+        "cargo", "test", "-p", "chio-store-sqlite", "--lib",
+        "native_declassification_egress_observation_enforces_both_issuer_time_bounds",
     ],
     "native policy clock bounds": [
         "cargo", "test", "-p", "chio-control-plane", "--lib",

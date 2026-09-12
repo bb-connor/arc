@@ -36,6 +36,13 @@ mod nonce {
     ));
 }
 
+mod declassification {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_flow_declassification_tests.rs"
+    ));
+}
+
 pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 pub(super) fn now_ms() -> PortResult<u64> {
@@ -106,6 +113,26 @@ impl Fixture {
         extra_dpop_grant: bool,
         governed: bool,
     ) -> TestResult<Self> {
+        Self::new_selected_profile(labels, seed, extra_dpop_grant, governed, false)
+    }
+
+    fn new_with_declassification_profile() -> TestResult<Self> {
+        Self::new_selected_profile(
+            std::array::from_fn(|_| InformationLabel::bottom()),
+            |_| Ok(None),
+            false,
+            false,
+            true,
+        )
+    }
+
+    fn new_selected_profile(
+        labels: [InformationLabel; 3],
+        seed: impl FnOnce(&FlowStateKey) -> TestResult<Option<FlowJoinRequest>>,
+        extra_dpop_grant: bool,
+        governed: bool,
+        declassification: bool,
+    ) -> TestResult<Self> {
         let directory = tempdir()?;
         let locks = directory.path().join("locks");
         std::fs::create_dir(&locks)?;
@@ -163,7 +190,7 @@ impl Fixture {
             } else {
                 Vec::new()
             },
-            max_invocations: Some(1),
+            max_invocations: Some(if declassification { 2 } else { 1 }),
             max_cost_per_invocation: None,
             max_total_cost: None,
             dpop_required: None,
@@ -193,6 +220,11 @@ impl Fixture {
 
         let source_path = directory.path().join("source.db");
         let source_store = SqliteSecurityStateStore::open(&source_path)?;
+        if declassification {
+            // Explicitly select this lifecycle before retirement and native
+            // initialization. Native dispatch never rewrites imported status.
+            source_store.seal_declassification_live_dispatch()?;
+        }
         if let Some(seed) = seed(&super::super::super::flow_key(context.as_v1()))? {
             let snapshot = source_store.join(&seed)?;
             if seed.key == super::super::super::flow_key(context.as_v1()) {

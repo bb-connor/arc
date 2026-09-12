@@ -172,6 +172,7 @@ impl TestEgress {
                 commitment: commitment.clone(),
                 event_digest: digest(b"committed")?,
                 acquisition_digest: history.acquisition.event_digest.clone(),
+                declassification: None,
             });
         }
         if matches!(fault, Fault::ChangedObservation) {

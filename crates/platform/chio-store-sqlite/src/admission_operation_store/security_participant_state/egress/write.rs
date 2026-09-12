@@ -57,6 +57,46 @@ impl SqliteAdmissionOperationStore {
         }
     }
 
+    pub(in crate::admission_operation_store) fn commit_declassified_egress_from_port(
+        &self,
+        context: &chio_kernel::admission_operation::NativeSecurityEgressContext<'_>,
+        commitment: &EgressFenceCommit,
+        consumption: &chio_security_types::ports::DeclassificationConsumptionEvidenceCommit,
+    ) -> Result<CommittedEgressFence, AdmissionOperationStoreError> {
+        let initialized = self
+            .load_security_participant_state(
+                context.binding.security_authority_id(),
+                context.lease.store_fence(),
+                context.trusted_now_unix_ms,
+            )?
+            .ok_or_else(|| invalid("native declassification initialization is absent"))?;
+        if initialized.admission_binding()? != *context.binding {
+            return Err(invalid("native declassification initialization differs"));
+        }
+        let signed = context
+            .request
+            .declassification_grant
+            .as_ref()
+            .ok_or_else(|| invalid("native declassification signed grant is absent"))?;
+        let command =
+            NativeEgressCommand::declassified(commitment.clone(), consumption.clone(), signed)
+                .map_err(invalid)?;
+        match self.mutate_security_participant_egress(
+            context.operation,
+            context.lease,
+            &initialized,
+            context.security_context,
+            context.request,
+            command,
+            context.trusted_now_unix_ms,
+        )? {
+            NativeEgressResult::Committed(result) => Ok(result),
+            NativeEgressResult::Acquired(_) => {
+                Err(invalid("native declassification returned acquisition"))
+            }
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn mutate_security_participant_egress(
         &self,
@@ -90,6 +130,14 @@ impl SqliteAdmissionOperationStore {
             &fence,
         )?;
         original.validate_request_material(request)?;
+        contract::validate_declassification_binding(&original, &command)?;
+        if matches!(command, NativeEgressCommand::Commit(_))
+            && request.declassification_grant.is_some()
+        {
+            return Err(invalid(
+                "native declassification cannot use ordinary egress custody",
+            ));
+        }
         let live_request_hash = contract::live_request_hash(request)?;
         if let Some(existing) =
             load_operation(&tx, operation.binding().operation_id(), command.phase())?
@@ -115,7 +163,7 @@ impl SqliteAdmissionOperationStore {
                 }
                 None
             }
-            NativeEgressCommand::Commit(_) => {
+            NativeEgressCommand::Commit(_) | NativeEgressCommand::CommitDeclassified { .. } => {
                 let acquired = load_operation(&tx, operation.binding().operation_id(), "acquired")?
                     .ok_or_else(|| invalid("native egress commit requires owned acquisition"))?;
                 if acquired.authority != actual.authority
@@ -144,6 +192,28 @@ impl SqliteAdmissionOperationStore {
             super::super::history::ordered::latest_totals(&tx, &actual)?;
         let before = footprint(&tx)?;
         let observed_at = super::super::observed_time(&tx, decision_at)?;
+        if let NativeEgressCommand::CommitDeclassified { grant, .. } = &command {
+            let (snapshot, generation) = crate::security_state::observe_native_flow_state(
+                &tx,
+                actual.authority.as_str(),
+                &fence.key,
+            )
+            .map_err(invalid)?;
+            let snapshot =
+                snapshot.ok_or_else(|| invalid("native declassification state is absent"))?;
+            let source = snapshot
+                .principal_label
+                .join_restrictions(&snapshot.lineage_label)
+                .and_then(|label| label.join_restrictions(&snapshot.session_label))
+                .map_err(invalid)?;
+            let source_hash =
+                chio_core::hashing::sha256(&canonical_json_bytes(&source).map_err(invalid)?);
+            if generation != Some(fence.context_generation)
+                || source_hash.as_bytes() != grant.body.source_label_hash().as_bytes()
+            {
+                return Err(invalid("native declassification source changed"));
+            }
+        }
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, decision_at)?;
         let authority = NativeEgressAuthority {
             authority: actual.authority.clone(),
@@ -182,7 +252,7 @@ impl SqliteAdmissionOperationStore {
             }
         }
         let record = Record {
-            schema: Record::format(),
+            schema: Record::format(&command),
             authority: actual.authority.clone(),
             sequence: egress_head
                 .checked_add(1)
@@ -244,6 +314,12 @@ impl SqliteAdmissionOperationStore {
             ));
         }
         super::super::cutpoint(14)?;
+        let commit_at = super::super::observed_time(&tx, observed_at.max(decision_at))?;
+        record
+            .command
+            .validate_observation(commit_at)
+            .map_err(invalid)?;
+        verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, commit_at)?;
         self.commit_write(tx)?;
         if let Err(error) = super::super::cutpoint(15) {
             return Err(map_owner_error(

@@ -10,6 +10,7 @@ use chio_kernel::{KernelError, PreparedNativeSecurityEgress};
 
 const MAX_CANONICAL_TIME: u64 = (1_u64 << 53) - 1;
 
+mod declassification;
 mod output;
 mod policy;
 pub use policy::NativeFlowPolicyEvidence;
@@ -20,7 +21,7 @@ pub enum NativeFlowError {
     AuthorityMismatch,
     #[error("legacy evidence stores cannot configure native flow authority")]
     LegacyEvidenceConfigured,
-    #[error("operation-owned native declassification is unsupported")]
+    #[error("native declassification is unsupported outside the captured lifecycle")]
     UnsupportedDeclassification,
     #[error("native flow classification exceeds the already recorded input taint")]
     UnrecordedInputTaint,
@@ -55,7 +56,7 @@ pub struct NativeFlowResolver {
 pub struct PreparedNativeFlowDispatch<'a> {
     resolver: &'a NativeFlowResolver,
     custody: PreparedNativeSecurityEgress<'a>,
-    admission: FlowAdmission,
+    admission: chio_flow::PreparedFlowAdmission,
     policy_evidence: NativeFlowPolicyEvidence,
     prepared_at: u64,
     valid_until: u64,
@@ -97,9 +98,7 @@ impl NativeFlowResolver {
             if binding != &self.binding {
                 return Err(NativeFlowError::AuthorityMismatch);
             }
-            if context.request.declassification_grant.is_some() {
-                return Err(NativeFlowError::UnsupportedDeclassification);
-            }
+            self.validate_declassification_issuer(context.request)?;
             self.policy()
                 .classified_input_label(&FlowPreInvocationInput {
                     security_context: context.security_context.as_v1(),
@@ -131,7 +130,7 @@ impl NativeFlowResolver {
         })
     }
 
-    /// Opt into the kernel-owned non-nonce, non-declassification lifecycle.
+    /// Opt into the kernel-owned capture, output and receipt lifecycle.
     /// Unsupported credential profiles and stores still deny; this never
     /// enables a legacy fallback or qualifies an operating-system sandbox.
     #[must_use]
@@ -150,9 +149,7 @@ impl NativeFlowResolver {
         if custody.observation().binding() != &self.binding {
             return Err(NativeFlowError::AuthorityMismatch);
         }
-        if custody.request().declassification_grant.is_some() {
-            return Err(NativeFlowError::UnsupportedDeclassification);
-        }
+        self.validate_declassification_issuer(custody.request())?;
         let state = custody
             .observation()
             .snapshot()
@@ -175,11 +172,11 @@ impl NativeFlowResolver {
             return Err(NativeFlowError::ClockChanged);
         }
         let policy_inputs = policy::PreparedInputs::capture(self, &custody, &resolved)?;
-        let admission = prepare_pre_invocation(resolved.request)?.into_admission()?;
+        let admission = prepare_pre_invocation(resolved.request)?;
         // Legacy preparation would now apply this transition. Native admission
         // has already joined exactly once. Classification drift or insufficient
         // propagation must deny, not silently discard a required taint write.
-        let taint = &admission.taint_transition;
+        let taint = &admission.admission().taint_transition;
         if taint.key != state.key
             || !taint.principal_join.flows_to(&state.principal_label)
             || !taint.lineage_join.flows_to(&state.lineage_label)
@@ -212,6 +209,29 @@ impl NativeFlowResolver {
             clock: self.clock.as_ref(),
             config: &self.config,
         }
+    }
+
+    fn validate_declassification_issuer(
+        &self,
+        request: &chio_kernel::ToolCallRequest,
+    ) -> Result<(), NativeFlowError> {
+        if let Some(grant) = &request.declassification_grant {
+            if self
+                .config
+                .trusted_declassification_authorities
+                .get(grant.body().authority_key_id())
+                != Some(grant.authority_key())
+            {
+                return Err(FlowDenial::DeclassificationUntrustedAuthority.into());
+            }
+            if !grant
+                .verify_signature()
+                .map_err(|_| FlowDenial::DeclassificationBindingMismatch)?
+            {
+                return Err(FlowDenial::DeclassificationBindingMismatch.into());
+            }
+        }
+        Ok(())
     }
 }
 
@@ -310,13 +330,35 @@ impl PreparedNativeFlowDispatch<'_> {
         let observation = self.custody.observation().clone();
         let live_request_digest =
             super::flow_dispatch::live_request_digest(self.custody.request())?;
-        let (prepared, egress, ledger) = self.custody.retain_for_capture(
-            self.admission
-                .egress_fence_plan
-                .as_ref()
-                .map(|plan| plan.expires_at_unix_ms),
-            authority.grant_index()?,
-            self.policy_evidence.canonical_bytes(),
+        let consumption = declassification::prepare_consumption(
+            &self.custody,
+            &self.admission,
+            &self.policy_evidence,
+            sampled,
+        )?;
+        let deadline = self
+            .admission
+            .admission()
+            .egress_fence_plan
+            .as_ref()
+            .map(|plan| plan.expires_at_unix_ms);
+        let (prepared, egress, ledger) = match consumption.as_ref() {
+            Some(consumption) => self.custody.retain_for_declassified_capture(
+                deadline.ok_or(NativeFlowError::PolicyEvidence)?,
+                authority.grant_index()?,
+                self.policy_evidence.canonical_bytes(),
+                consumption,
+            )?,
+            None => self.custody.retain_for_capture(
+                deadline,
+                authority.grant_index()?,
+                self.policy_evidence.canonical_bytes(),
+            )?,
+        };
+        let admission = declassification::confirm_consumption(
+            self.admission,
+            consumption.as_ref(),
+            egress.as_ref(),
         )?;
         // Resolver policy, manifests and evidence remain borrowed through the
         // store call. No decoded NativeFlowCustody can manufacture this path.
@@ -326,7 +368,7 @@ impl PreparedNativeFlowDispatch<'_> {
             operation_id,
             observation,
             live_request_digest,
-            admission: self.admission,
+            admission,
             policy_evidence: self.policy_evidence,
             egress,
             dispatch_ledger: Some(ledger),
@@ -337,7 +379,7 @@ impl PreparedNativeFlowDispatch<'_> {
     /// Verified policy data. Its taint transition is already covered by the
     /// native observation, not a command to perform another join.
     pub fn admission(&self) -> &FlowAdmission {
-        &self.admission
+        self.admission.admission()
     }
 
     /// Exact policy material from this preparation, not a serialized permit.
@@ -370,40 +412,43 @@ impl PreparedNativeFlowDispatch<'_> {
             .map_err(|_| NativeFlowError::ClockChanged)?;
         let validated_at = self.custody.validate_current()?;
         require_time(self.prepared_at, now, validated_at, self.valid_until)?;
+        // Declassifying preparation may be inspected, but only the capture
+        // lifecycle can confirm its durable one-shot consumption.
+        if self.admission.declassification().is_some() {
+            return Err(NativeFlowError::UnsupportedDeclassification);
+        }
+        let admission = self.admission.into_admission()?;
         let operation_id = self.custody.operation_id().clone();
         let observation = self.custody.observation().clone();
         let live_request_digest =
             super::flow_dispatch::live_request_digest(self.custody.request())?;
-        let (egress, dispatch_ledger) =
-            match (self.admission.egress_fence_plan.as_ref(), grant_index) {
-                (Some(plan), Some(grant)) => {
-                    let (history, ledger) = self.custody.acquire_and_commit_with_dispatch_ledger(
-                        plan.expires_at_unix_ms,
-                        grant,
-                        self.policy_evidence.canonical_bytes(),
-                    )?;
-                    (Some(history), Some(ledger))
-                }
-                (None, Some(grant)) => {
-                    (
-                        None,
-                        Some(self.custody.retain_dispatch_ledger(
-                            grant,
-                            self.policy_evidence.canonical_bytes(),
-                        )?),
-                    )
-                }
-                (Some(plan), None) => (
-                    Some(self.custody.acquire(plan.expires_at_unix_ms)?.commit()?),
-                    None,
+        let (egress, dispatch_ledger) = match (admission.egress_fence_plan.as_ref(), grant_index) {
+            (Some(plan), Some(grant)) => {
+                let (history, ledger) = self.custody.acquire_and_commit_with_dispatch_ledger(
+                    plan.expires_at_unix_ms,
+                    grant,
+                    self.policy_evidence.canonical_bytes(),
+                )?;
+                (Some(history), Some(ledger))
+            }
+            (None, Some(grant)) => (
+                None,
+                Some(
+                    self.custody
+                        .retain_dispatch_ledger(grant, self.policy_evidence.canonical_bytes())?,
                 ),
-                (None, None) => (None, None),
-            };
+            ),
+            (Some(plan), None) => (
+                Some(self.custody.acquire(plan.expires_at_unix_ms)?.commit()?),
+                None,
+            ),
+            (None, None) => (None, None),
+        };
         Ok(NativeFlowCustody {
             operation_id,
             observation,
             live_request_digest,
-            admission: self.admission,
+            admission,
             policy_evidence: self.policy_evidence,
             egress,
             dispatch_ledger,

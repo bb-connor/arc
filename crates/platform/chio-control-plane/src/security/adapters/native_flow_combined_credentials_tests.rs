@@ -173,12 +173,23 @@ impl Fixture {
         Ok(())
     }
 
-    fn combined_native_credentials() -> TestResult<Self> {
-        let mut fixture = Self::new_with_credential_profile(
+    pub(in crate::security::adapters::tests::native_flow::support) fn combined_native_credentials(
+    ) -> TestResult<Self> {
+        Self::combined_native_profile(false)
+    }
+
+    pub(in crate::security::adapters::tests::native_flow::support) fn combined_native_declassification_credentials(
+    ) -> TestResult<Self> {
+        Self::combined_native_profile(true)
+    }
+
+    fn combined_native_profile(declassification: bool) -> TestResult<Self> {
+        let mut fixture = Self::new_selected_profile(
             std::array::from_fn(|_| InformationLabel::bottom()),
             |_| Ok(None),
             true,
             true,
+            declassification,
         )?;
         runtime_fixture::install(&mut fixture)?;
         fixture.configure_native_capture_approval()?;
@@ -215,7 +226,7 @@ fn assert_combined_participant_history(
 ) -> TestResult {
     let store = fixture.authority.admission_operation_store();
     let fence = fixture.authority.mutation_fence();
-    let (_, runtime) = store
+    let (operation, runtime) = store
         .load_runtime_participant_history(operation_id, &fence, now_ms()?)?
         .ok_or("runtime history")?;
     let (_, approval) = store
@@ -224,20 +235,39 @@ fn assert_combined_participant_history(
     let (_, dpop) = store
         .load_dpop_replay_claim_history(operation_id, &fence, now_ms()?)?
         .ok_or("DPoP history")?;
-    assert_eq!((runtime.len(), approval.len(), dpop.len()), (1, 1, 1));
-    assert_eq!(runtime[0].intent.resources().len(), 1);
+    let preflight = usize::from(operation.execution_nonce_issuance_digest().is_some());
+    let expected = preflight + 1;
     assert_eq!(
-        runtime[0].disposition,
+        (runtime.len(), approval.len(), dpop.len()),
+        (expected, expected, expected)
+    );
+    if preflight == 1 {
+        assert_eq!(
+            runtime[0].disposition,
+            RuntimeParticipantDisposition::ReleasedBeforeDispatch
+        );
+        assert_eq!(
+            approval[0].disposition,
+            GovernedApprovalClaimDisposition::ReleasedBeforeDispatch
+        );
+        assert_eq!(
+            dpop[0].disposition,
+            chio_kernel::admission_operation::dpop_claim::DpopReplayClaimDisposition::ReleasedBeforeDispatch
+        );
+    }
+    assert_eq!(runtime[preflight].intent.resources().len(), 1);
+    assert_eq!(
+        runtime[preflight].disposition,
         RuntimeParticipantDisposition::RetainedAfterDispatchCommit
     );
     assert_eq!(
-        approval[0].disposition,
+        approval[preflight].disposition,
         GovernedApprovalClaimDisposition::RetainedAfterDispatchCommit
     );
-    assert_eq!(dpop[0].disposition, chio_kernel::admission_operation::dpop_claim::DpopReplayClaimDisposition::RetainedAfterDispatchCommit);
-    assert_eq!(runtime[0].intent.grant_index(), 0);
-    assert_eq!(approval[0].intent.grant_index(), 0);
-    assert_eq!(dpop[0].intent.grant_index(), 0);
+    assert_eq!(dpop[preflight].disposition, chio_kernel::admission_operation::dpop_claim::DpopReplayClaimDisposition::RetainedAfterDispatchCommit);
+    assert_eq!(runtime[preflight].intent.grant_index(), 0);
+    assert_eq!(approval[preflight].intent.grant_index(), 0);
+    assert_eq!(dpop[preflight].intent.grant_index(), 0);
     Ok(())
 }
 

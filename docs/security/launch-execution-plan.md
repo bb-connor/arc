@@ -1,10 +1,13 @@
 # Security roadmap: outcome-based execution plan
 
-Status: accepted for local execution on 2026-09-10. M0 is consolidated and M1 is
-in progress. See [current execution status](launch-status.md). On 2026-09-11 the
+Status: accepted for local execution on 2026-09-10. M0 is consolidated. M1's
+implementation and local acceptance are complete under the explicit confinement
+qualification deferral below. M2 is next. See [current execution status](launch-status.md).
+On 2026-09-11 the
 user authorized committing, pushing and maintaining the accumulated work as a PR,
-then continuing implementation. Separate authority is still required for manual
-hosted qualification jobs, operator migrations, deployment activation, workflow
+then continuing implementation. The 2026-09-12 M1 runner decision is recorded
+below. Separate authority is still required for other manual hosted qualification
+jobs, operator migrations, deployment activation, workflow
 repins, publication, merge or promotion.
 
 ## 1. Objective and scope
@@ -229,6 +232,23 @@ hook is not needed to make the successful path reachable.
 
 Stop when the supported lifecycle and named invariants pass. Further internal
 factorization requires a concrete correctness or maintainability reason.
+
+2026-09-12 execution decision: the user approved GitHub Actions for the required
+Linux x86_64 confined-process acceptance, or explicit deferral if it cannot run
+under the current configuration. The existing isolated-capture controller fails
+authorization before dispatch, so confinement qualification is deferred as
+described in the [status decision](launch-status.md#m1-confined-process-qualification-deferral).
+This exception permits completing M1's implementation and local acceptance; it
+does not qualify confinement, close M2/M6, or authorize a production/release claim.
+All other M1 implementation and acceptance requirements remain in scope.
+
+Local closeout: all eight M1 requirements now have passing implementation and
+in-process acceptance evidence, including the complete ordinary/nested nonce,
+declassification and combined-credential profiles. The
+[M1 acceptance closeout](launch-status.md#m1-local-acceptance-closeout) records
+the exact inventories, corrected regression fixtures and final quality gates.
+Stop expanding M1 unless a new demonstrated failure affects its contract. The
+next implementation milestone is M2, not further M1 factorization or fault variants.
 
 M1 checkpoint: the frozen receipt-signing subtask now connects pre-dispatch
 selection, private raw return/caller persistence, identity-bound portable signing

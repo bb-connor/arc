@@ -124,7 +124,6 @@ pub(super) fn attachment_supported(
         }
         AdmissionAttachment::NativeDispatchLedgerDigest(_) => {
             kind == AdmissionOperationKind::ToolDispatch
-                && !requirements.execution_nonce
                 && requirements.budget_capture
                 && requirements.broker_attempt
         }

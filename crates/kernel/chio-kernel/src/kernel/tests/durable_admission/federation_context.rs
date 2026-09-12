@@ -147,7 +147,7 @@ fn retained_federation_context_is_private_and_cannot_be_removed_by_schema_downgr
 {
     let fixture = completed_fixture("retained-federation-private")?;
     let state = fixture.store.state.lock().map_err(|_| "test lock")?;
-    let raw = state.raw_outcome.as_ref().ok_or("missing raw")?;
+    let raw = state.raw_outcome.as_ref().ok_or("missing raw")?.clone();
     let retained: serde_json::Value =
         serde_json::from_str(raw.federation_context_json().ok_or("missing context")?)?;
     assert_eq!(retained["schema"], "chio.frozen-federation-admission.v1");
@@ -168,12 +168,35 @@ fn retained_federation_context_is_private_and_cannot_be_removed_by_schema_downgr
         assert!(!debug.contains("request_canonical_json"));
         assert!(!debug.contains("output"));
     }
-    let mut missing = raw.to_persisted();
-    missing.federation_context_json = None;
-    assert!(RawInvocationOutcomeV1::from_persisted(missing).is_err());
+    drop(state);
+    // The legacy federation-specific schema requires this field structurally.
+    let mut legacy = raw.to_persisted();
+    legacy.schema =
+        crate::tool_outcome::RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA.into();
+    legacy.receipt_signing_identity = None;
+    assert!(RawInvocationOutcomeV1::from_persisted(legacy.clone()).is_ok());
+    legacy.federation_context_json = None;
+    assert!(RawInvocationOutcomeV1::from_persisted(legacy).is_err());
     let mut downgraded = raw.to_persisted();
     downgraded.schema = crate::tool_outcome::RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA.into();
     assert!(RawInvocationOutcomeV1::from_persisted(downgraded).is_err());
+
+    // The signing schema also represents non-federated outcomes. Its optional
+    // field is data, not authority: removing original context must fail against
+    // the operation's exact committed blob before recovery or co-signing.
+    let mut missing = raw.to_persisted();
+    missing.federation_context_json = None;
+    fixture
+        .store
+        .state
+        .lock()
+        .map_err(|_| "test lock")?
+        .raw_outcome = Some(RawInvocationOutcomeV1::from_persisted(missing)?);
+    let (kernel, admissions) = recovered_kernel(&fixture)?;
+    assert!(recover(&kernel, &fixture.request)
+        .is_err_and(|error| error.to_string().contains("outcome.raw_invocation_blob")));
+    assert_eq!(admissions.load(Ordering::SeqCst), 0);
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     Ok(())
 }
 
@@ -182,26 +205,56 @@ fn security_release_requirement_and_federation_survive_either_codec_order() -> T
     let fixture = completed_fixture("federation-release-schema")?;
     let state = fixture.store.state.lock().map_err(|_| "test lock")?;
     let original = state.raw_outcome.as_ref().ok_or("raw outcome")?;
-    let federation = original.federation_context_json().ok_or("federation")?.to_owned();
+    let federation = original
+        .federation_context_json()
+        .ok_or("federation")?
+        .to_owned();
     let mut persisted = original.to_persisted();
-    persisted.security_invocation_context = Some(SecurityInvocationContext::v1(SecurityInvocationContextV1::new(
-        chio_security_types::ports::TenantId::new("codec-tenant")?,
-        chio_security_types::ports::SessionId::new("codec-session")?,
-        chio_security_types::PrincipalId::new(fixture.request.agent_id.clone())?,
-        chio_security_types::ports::IsolationEpochId::new("codec-epoch")?,
-        chio_security_types::ports::LineageId::new(fixture.request.capability.id.clone())?, 1,
-    )));
-    // This fixture exercises encoding, not acquisition of a live release owner.
-    let raw = RawInvocationOutcomeV1::from_persisted(persisted)?;
-    for required in [false, true] {
-        let release_first = raw.clone().with_security_release_requirement(required)?.with_federation_context_json(Some(federation.clone()))?;
-        let federation_first = raw.clone().with_federation_context_json(Some(federation.clone()))?.with_security_release_requirement(required)?;
-        let blob = release_first.canonical_blob()?;
-        assert_eq!(blob.bytes(), federation_first.canonical_blob()?.bytes());
-        let decoded = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())?;
-        assert_eq!(decoded.requires_security_release()?, required);
-        assert_eq!(decoded.federation_context_json(), Some(federation.as_str()));
-        assert_eq!(decoded.to_persisted().schema, crate::tool_outcome::RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA);
+    persisted.security_invocation_context = Some(SecurityInvocationContext::v1(
+        SecurityInvocationContextV1::new(
+            chio_security_types::ports::TenantId::new("codec-tenant")?,
+            chio_security_types::ports::SessionId::new("codec-session")?,
+            chio_security_types::PrincipalId::new(fixture.request.agent_id.clone())?,
+            chio_security_types::ports::IsolationEpochId::new("codec-epoch")?,
+            chio_security_types::ports::LineageId::new(fixture.request.capability.id.clone())?,
+            1,
+        ),
+    ));
+    // Exercise both legacy and frozen-signing codecs, not live release custody.
+    for signed in [false, true] {
+        let mut candidate = persisted.clone();
+        let expected_schema = if signed {
+            // A signing-aware outcome requires an explicit release disposition
+            // whenever it contains security context, including a false value.
+            candidate.security_release_required = Some(false);
+            crate::tool_outcome::RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA
+        } else {
+            candidate.receipt_signing_identity = None;
+            candidate.schema =
+                crate::tool_outcome::RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA.into();
+            crate::tool_outcome::RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA
+        };
+        let raw = RawInvocationOutcomeV1::from_persisted(candidate)?;
+        for required in [false, true] {
+            let release_first = raw
+                .clone()
+                .with_security_release_requirement(required)?
+                .with_federation_context_json(Some(federation.clone()))?;
+            let federation_first = raw
+                .clone()
+                .with_federation_context_json(Some(federation.clone()))?
+                .with_security_release_requirement(required)?;
+            let blob = release_first.canonical_blob()?;
+            assert_eq!(blob.bytes(), federation_first.canonical_blob()?.bytes());
+            let decoded = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())?;
+            assert_eq!(decoded.requires_security_release()?, required);
+            assert_eq!(decoded.federation_context_json(), Some(federation.as_str()));
+            assert_eq!(
+                decoded.receipt_signing_identity(),
+                raw.receipt_signing_identity()
+            );
+            assert_eq!(decoded.to_persisted().schema, expected_schema);
+        }
     }
     Ok(())
 }

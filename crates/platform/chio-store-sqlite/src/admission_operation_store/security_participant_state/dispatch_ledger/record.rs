@@ -78,6 +78,7 @@ impl Record {
             &self.live_request_digest,
         )?;
         policy.validate_at(self.observed_at.max(self.decision_at))?;
+        policy.validate_owned_declassification(tx, &operation, &self.policy)?;
         if self.observed_at < policy.inputs.observed_at_unix_ms
             || self.observed_at.max(self.decision_at) >= policy.inputs.valid_until_unix_ms
         {

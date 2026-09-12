@@ -256,6 +256,21 @@ pub trait AdmissionOperationStore: Send + Sync {
         ))
     }
 
+    /// Consume one signed declassification grant and commit its original egress
+    /// fence in the same transaction. Implementations must retain the exact use
+    /// and evidence rows, reject reuse, and never compensate consumed authority.
+    fn commit_native_security_declassified_egress(
+        &self,
+        _context: &NativeSecurityEgressContext<'_>,
+        _command: &chio_security_types::ports::EgressFenceCommit,
+        _consumption: &chio_security_types::ports::DeclassificationConsumptionEvidenceCommit,
+    ) -> Result<chio_security_types::ports::CommittedEgressFence, AdmissionOperationStoreError>
+    {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "operation-owned native declassification is unsupported".into(),
+        ))
+    }
+
     /// Current operation and both historical egress phases in one verified
     /// snapshot. An absent operation differs from a present operation without
     /// custody. Reading expired history cannot reacquire or renew authority.

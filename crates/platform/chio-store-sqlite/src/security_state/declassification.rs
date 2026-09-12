@@ -1,5 +1,6 @@
 //! Shared declassification semantics over a fixed security data scope.
-//! Native inspection is not activation, and production mutations remain legacy.
+//! Native inspection is not activation. Native writes require original egress
+//! or output authority and reuse the same one-shot use and receipt-pair rules.
 
 use super::scoped_sql::{declassification as sql, ScopedMutation, ScopedReader};
 use super::*;
@@ -76,6 +77,55 @@ pub(crate) fn verify_native_declassification_state(
     let reader = ScopedReader::native(connection, authority);
     lifecycle::verify(reader)?;
     integrity::verify(reader)
+}
+
+/// Fresh capture requires the actual pending use and its exact retained
+/// evidence. Historical journal presence alone is not consumption custody.
+pub(crate) fn verify_native_pending_declassification(
+    connection: &Connection,
+    authority: &str,
+    expected: &DeclassificationConsumptionEvidenceCommit,
+) -> PortResult<()> {
+    let reader = ScopedReader::native(connection, authority);
+    let consumption = &expected.consumption;
+    let query = DeclassificationUseQuery {
+        tenant_id: consumption.tenant_id.clone(),
+        grant_id: consumption.grant_id.clone(),
+    };
+    let actual = records::load_use(reader, &query)?.ok_or_else(PortError::integrity_failure)?;
+    let evidence_query = DeclassificationEvidenceQuery {
+        tenant_id: query.tenant_id.clone(),
+        grant_id: query.grant_id.clone(),
+        phase: DeclassificationEvidencePhase::Consumption,
+    };
+    let evidence = records::load_evidence(reader, &evidence_query)?
+        .ok_or_else(PortError::integrity_failure)?;
+    if actual.request_hash != consumption.request_hash
+        || actual.consumed_at_unix_ms != consumption.consumed_at_unix_ms
+        || actual.grant_expires_at_unix_ms != consumption.grant_expires_at_unix_ms
+        || actual.consumption_binding != expected.transition_binding
+        || actual.state != DeclassificationUseState::ConsumedPendingDispatch
+        || evidence.receipt != expected.receipt
+        || evidence.transition_binding != expected.transition_binding
+        || records::load_evidence(
+            reader,
+            &DeclassificationEvidenceQuery {
+                phase: DeclassificationEvidencePhase::Outcome,
+                ..evidence_query
+            },
+        )?
+        .is_some()
+        || reader
+            .query_row(
+                sql::HAS_TOMBSTONE,
+                params![query.tenant_id.as_str(), query.grant_id.as_str()],
+                |row| row.get::<_, bool>(0),
+            )
+            .map_err(sqlite_error)?
+    {
+        return Err(PortError::integrity_failure());
+    }
+    records::verify_identity(reader, &evidence)
 }
 
 #[cfg(test)]

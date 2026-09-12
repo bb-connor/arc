@@ -15,13 +15,9 @@ pub(super) fn require_original(
     if operation.binding().kind() != AdmissionOperationKind::ToolDispatch
         || operation.state() != AdmissionOperationState::CapturePending
         || operation.dispatch_commit().is_some()
-        || operation
-            .binding()
-            .participant_requirements()
-            .execution_nonce
     {
         return Err(invalid(
-            "native egress requires pre-dispatch capture custody, not nonce authority",
+            "native egress requires pre-dispatch capture custody",
         ));
     }
     let original =
@@ -72,4 +68,23 @@ pub(in crate::admission_operation_store::security_participant_state) fn live_req
         "native_live_request_hash",
         sha256_hex(&bytes),
     )?)
+}
+
+pub(super) fn validate_declassification_binding(
+    original: &RetainedToolAdmissionRequestV1,
+    command: &NativeEgressCommand,
+) -> Result<(), AdmissionOperationStoreError> {
+    if let NativeEgressCommand::CommitDeclassified { grant, .. } = command {
+        let request = original.request_for_revalidation();
+        if grant.body.capability_id().as_str() != request.capability.id
+            || grant.body.agent_id().as_str() != request.agent_id
+            || grant.body.destination_id().as_str() != request.server_id
+            || grant.body.tool_name().as_str() != request.tool_name
+        {
+            return Err(invalid(
+                "native declassification differs from original request",
+            ));
+        }
+    }
+    Ok(())
 }

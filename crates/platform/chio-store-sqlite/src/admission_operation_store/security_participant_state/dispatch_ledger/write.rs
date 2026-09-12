@@ -28,7 +28,6 @@ impl SqliteAdmissionOperationStore {
         original.validate_native_security_authority(custody.binding)?;
         if original.authority_profile().is_none()
             || policy.inputs.native_authority != *custody.binding
-            || custody.request.declassification_grant.is_some()
         {
             return Err(invalid(
                 "native dispatch ledger lacks its supported original authority profile",
@@ -49,6 +48,8 @@ impl SqliteAdmissionOperationStore {
             custody.security_context,
             &live_request_digest,
         )?;
+        policy.validate_live_declassification(custody.request)?;
+        policy.validate_owned_declassification(&tx, operation, &policy_value)?;
         let grant_index = u32::try_from(input.grant_index).map_err(invalid)?;
         let grant = original
             .retained_matching_grant(input.grant_index)

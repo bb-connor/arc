@@ -69,6 +69,12 @@ pub(in crate::admission_operation_store::security_participant_state) fn load_his
                 commitment,
                 event_digest,
                 acquisition_digest: predecessor,
+                declassification: match record.command {
+                    NativeEgressCommand::CommitDeclassified { consumption, .. } => {
+                        Some(*consumption)
+                    }
+                    NativeEgressCommand::Acquire(_) | NativeEgressCommand::Commit(_) => None,
+                },
             })
         })
         .transpose()?;

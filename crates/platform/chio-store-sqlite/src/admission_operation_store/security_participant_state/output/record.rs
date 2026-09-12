@@ -5,6 +5,7 @@ use chio_kernel::admission_operation::{
 };
 
 const FORMAT: &str = "chio.native-security-output-join.v1";
+const DECLASSIFIED_FORMAT: &str = "chio.native-security-output-join.v2";
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -24,11 +25,17 @@ pub(in crate::admission_operation_store::security_participant_state) struct Reco
     pub changes: BoundedVec<crate::security_state::NativeRowChange, 4096>,
     pub current_rows: u64,
     pub current_bytes: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declassification: Option<crate::security_state::NativeDeclassificationOutcome>,
 }
 
 impl Record {
-    pub(super) fn format() -> String {
-        FORMAT.into()
+    pub(super) fn format(declassification: bool) -> String {
+        if declassification {
+            DECLASSIFIED_FORMAT.into()
+        } else {
+            FORMAT.into()
+        }
     }
     pub(super) fn bytes(&self) -> Result<Vec<u8>, AdmissionOperationStoreError> {
         let bytes = canonical_json_bytes(self).map_err(invalid)?;
@@ -73,7 +80,7 @@ impl Record {
         contract::require_original(connection, &operation, &initialized, &self.intent, false)?;
         self.intent
             .validate_resolution(&self.request, &self.result)?;
-        if self.schema != FORMAT
+        if self.schema != Self::format(self.declassification.is_some())
             || self.initialization != initialized.digest
             || self.lease.fence.store_uuid != initialized.fence.store_uuid
             || !(1..=9_007_199_254_740_991).contains(&self.sequence)
@@ -83,6 +90,17 @@ impl Record {
         {
             return Err(invalid("native output history is inconsistent"));
         }
+        if self.declassification
+            != declassification::expected(
+                connection,
+                &operation,
+                self.observed_at.max(self.decision_at),
+            )?
+        {
+            return Err(invalid(
+                "native output changed original declassification disposition",
+            ));
+        }
         AdmissionDigest::try_new("native_output_previous", &self.previous)?;
         self.lease.validate_operation(
             connection,
@@ -91,7 +109,20 @@ impl Record {
             self.decision_at,
         )?;
         for change in self.changes.as_slice() {
-            change.validate_flow_join(&self.request).map_err(invalid)?;
+            if crate::security_state::is_native_flow_join_table(&change.table) {
+                change.validate_flow_join(&self.request).map_err(invalid)?;
+            } else if let Some(outcome) = &self.declassification {
+                outcome.validate_change(change).map_err(invalid)?;
+            } else {
+                return Err(invalid(
+                    "ordinary native output cannot mutate declassification",
+                ));
+            }
+        }
+        if let Some(outcome) = &self.declassification {
+            outcome
+                .validate_changes(self.changes.as_slice())
+                .map_err(invalid)?;
         }
         Ok(())
     }
