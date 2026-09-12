@@ -544,7 +544,12 @@ RECEIVER_DIR="$STATE_DIR/org-b"
 SENDER_DIR="$STATE_DIR/org-a-agent"
 ISSUER_DIR="$STATE_DIR/issuer"
 SHARED_DIR="$STATE_DIR/shared"
-RECEIVER_STORE="$STATE_DIR/receiver-stores"
+# The receiver's durable stores must sit on storage local to the machine that
+# runs the receiver, never on the shared state directory when that directory is
+# a network mount: SQLite's durability and its file-identity guard both assume a
+# local filesystem. A split run whose state directory is shared over a network
+# points this at a local path on the receiver's own machine.
+RECEIVER_STORE="${CHIO_FED_RECEIVER_STORE_DIR:-$STATE_DIR/receiver-stores}"
 mkdir -p "$ORIGIN_DIR" "$RECEIVER_DIR" "$SENDER_DIR" "$ISSUER_DIR" "$SHARED_DIR" "$RECEIVER_STORE"
 
 : > "$DRIVER_LOG"
