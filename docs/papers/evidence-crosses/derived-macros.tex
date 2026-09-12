@@ -24,6 +24,16 @@
 \newcommand{\PSThreatVerifierCaseCount}{12}         % treaty-runtime-negative-corpus.json, cases on the verifier alone
 \newcommand{\PSSubstitutionCaseCount}{22}           % tests/runtime_treaty_binding_substitution.rs, test cases
 \newcommand{\PSSubstitutionEvidenceId}{PS-T12}      % artifact-manifest.json, the behavioral test that runs the substitution corpus
+\newcommand{\PSLeafCount}{55}                       % AdmissionBinding.lean, classification_census
+\newcommand{\PSLeafRefusedCount}{2}                 % same theorem, refusedByProfile
+\newcommand{\PSLeafPossibleCount}{53}               % same theorem, not refusedByProfile
+\newcommand{\PSLeafCarriedCount}{49}                % same theorem, carried
+\newcommand{\PSLeafEqualityCount}{23}               % same theorem, comparedForEquality
+\newcommand{\PSLeafDomainCount}{2}                  % same theorem, comparedWithinDomain
+\newcommand{\PSLeafStatementOnlyCount}{13}          % same theorem, statementOnly
+\newcommand{\PSLeafUncomparedCount}{11}             % same theorem, receiverUncompared
+\newcommand{\PSLeafOptionalCount}{4}                % same theorem, optionalAndAbsent
+\newcommand{\PSPredicateCaseCount}{245}             % tests/runtime_treaty_predicate_substitution.rs, cases driven through the hook
 \newcommand{\PSRunCommit}{041aa18374}               % federated-pair.json, commit
 \newcommand{\PSEpochTickMs}{250}                    % federated-pair.json, topology.epochTickMs
 \newcommand{\PSFreshnessMs}{500}                    % federated-pair.json, freshness window named in every cut denial

@@ -23,6 +23,7 @@ REPO = PAPER.parent.parent.parent
 RESULTS = PAPER.parent / "programmable-sovereignty" / "bench" / "results"
 MANIFEST = PAPER.parent / "programmable-sovereignty" / "supplementary" / "artifact-manifest.json"
 SUBSTITUTION_TEST = "runtime_treaty_binding_substitution"
+PREDICATE_TEST = "runtime_treaty_predicate_substitution"
 OUT = PAPER / "derived-macros.tex"
 
 
@@ -216,6 +217,90 @@ def main() -> int:
         "PSSubstitutionEvidenceId",
         behavioral[0]["id"],
         "artifact-manifest.json, the behavioral test that runs the substitution corpus",
+    )
+
+    # --- Leaf census and the predicate corpus ----------------------------
+    # The census is the Lean theorem's own statement, read from the file the
+    # executed corpus checks itself against, so the paper cannot print a count
+    # the mechanization does not carry.
+    census_source = read("formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean")
+    census_block = census_source.split("theorem classification_census :", 1)[1].split(
+        ":= by", 1
+    )[0]
+    conjuncts = {
+        expr.strip(): int(count)
+        for expr, count in re.findall(
+            r"fun f => (.+?)\)\)\.length = (\d+)", census_block
+        )
+    }
+
+    def census(expr: str) -> int:
+        if expr not in conjuncts:
+            raise SystemExit(f"classification_census has no conjunct for {expr!r}")
+        return conjuncts[expr]
+
+    leaf_equality = census("(comparedForEquality (classify f)).isSome")
+    leaf_domain = census("(comparedWithinDomain (classify f)).isSome")
+    leaf_statement_only = census("statementOnly (classify f)")
+    leaf_uncompared = census("receiverUncompared (classify f)")
+    leaf_refused = census("refusedByProfile (classify f)")
+    leaf_optional = census("optionalAndAbsent (classify f)")
+    leaf_carried = census("carried (classify f)")
+    leaf_possible = census("!refusedByProfile (classify f)")
+
+    predicate = read(
+        f"crates/kernel/chio-runtime-core/tests/{PREDICATE_TEST}.rs"
+    )
+
+    def const_block(name: str) -> str:
+        return predicate.split(f"const {name}", 1)[1].split(" = &[", 1)[1].split(
+            "\n];", 1
+        )[0]
+
+    rules = const_block("FIELD_RULES: &[FieldRule]")
+    leaf_total = len(
+        re.findall(r"\n    (?:rule|absent|with_probe|conditional)\(", rules)
+    )
+    exercised = len(re.findall(r"\n    (?:rule|with_probe|conditional)\(", rules))
+    probes = len(re.findall(r"\n    with_probe\(", rules))
+    if (
+        leaf_equality + leaf_domain + leaf_statement_only + leaf_uncompared
+        != leaf_carried
+        or leaf_carried + leaf_optional != leaf_possible
+        or leaf_possible + leaf_refused != leaf_total
+        or exercised != leaf_carried
+    ):
+        raise SystemExit(
+            "the Lean census and the executed enumeration do not reconcile"
+        )
+
+    binding_leaves = const_block("BINDING_FIELDS: &[&str]").count('"') // 2
+    pairs = binding_leaves * (binding_leaves - 1) // 2
+    masking = const_block("MASKING_CASES: &[MaskingCase]").count("MaskingCase {")
+    additions = const_block("ADDITION_CASES: &[AdditionCase]").count("AdditionCase {")
+
+    def driven(function: str) -> int:
+        body = predicate.split(f"fn {function}() -> TestResult {{", 1)[1].split(
+            "\n}\n", 1
+        )[0]
+        return len(re.findall(r"admit_with(?:_insertions)?\(", body))
+
+    combined = driven("the_uncompared_leaves_substituted_together_are_still_admitted")
+    controls = driven("the_unsubstituted_statement_is_admitted_and_consumes_its_continuation")
+
+    add("PSLeafCount", leaf_total, "AdmissionBinding.lean, classification_census")
+    add("PSLeafRefusedCount", leaf_refused, "same theorem, refusedByProfile")
+    add("PSLeafPossibleCount", leaf_possible, "same theorem, not refusedByProfile")
+    add("PSLeafCarriedCount", leaf_carried, "same theorem, carried")
+    add("PSLeafEqualityCount", leaf_equality, "same theorem, comparedForEquality")
+    add("PSLeafDomainCount", leaf_domain, "same theorem, comparedWithinDomain")
+    add("PSLeafStatementOnlyCount", leaf_statement_only, "same theorem, statementOnly")
+    add("PSLeafUncomparedCount", leaf_uncompared, "same theorem, receiverUncompared")
+    add("PSLeafOptionalCount", leaf_optional, "same theorem, optionalAndAbsent")
+    add(
+        "PSPredicateCaseCount",
+        exercised + probes + exercised + pairs + masking + additions + combined + controls,
+        f"tests/{PREDICATE_TEST}.rs, cases driven through the hook",
     )
 
     # --- Retained cross-process run --------------------------------------

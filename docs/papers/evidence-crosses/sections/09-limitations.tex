@@ -3,49 +3,49 @@
 The cross-organization run of Section~\ref{sec:eval} put the two kernels in
 separate processes on one host, not on two separately administered machines.
 That removes the shared address space, store, and key material, which are what
-the claim is about; it leaves the shared operating system and clock source. Two
-machines would remove those and change the latencies. The rule does not
-depend on that experiment; the strength of the demonstration does.
+the claim is about; the shared operating system and clock source remain, and
+removing them changes the latencies. The rule does not depend on that
+experiment; the strength of the demonstration does.
 
-Section~\ref{sec:eval}'s alternative is one construction judged on one corpus;
-only the missing carrier is a fact about the request format rather than the
-wiring.
+Section~\ref{sec:eval}'s alternative is one construction of those parts on one
+corpus, and its request schema is ours, so what it measures is what an operator
+must add, not a bound on what the parts reach.
 Continuation consumption is at-most-once, so a crash between consume and
 dispatch loses the call rather than repeating it: right for a refund, an
 avoidable retry for an idempotent read. The chain closes in the kernel for one
-hop, since the next continuation in a longer chain is minted outside it.
+hop: the next continuation in a longer chain is minted outside it.
 Denial paths below the verifier still return a rendered detail alongside the
-code; separating them is unfinished. Receipts are batched into
+code; separating them is unfinished. Receipts batch into
 Merkle checkpoints in the RFC 6962 shape \cite{rfc6962} with offline inclusion
 proofs, and that is the whole claim: local audit evidence with verifiable
-inclusion, not a public append-only log, and with no anti-equivocation
-mechanism, so a kernel signing two contradictory checkpoints is detectable only
+inclusion, not a public append-only log, with no anti-equivocation, so a
+kernel signing two contradictory checkpoints is detectable only
 by someone holding both.
 
 \paragraph{Related work.}
 Capability discipline without ambient authority is the tradition this protocol
 sits in \cite{saltzer1975,watson2010capsicum}, saying exactly where a proof
 stops is seL4's discipline \cite{sel4}, and attenuable credentials are old and
-good: the trust-management line \cite{spki,keynote}, macaroons
+good: trust management \cite{spki,keynote}, macaroons
 \cite{macaroons}, and the modern token families \cite{ucan,biscuit}, which carry
 caveats without a kernel, a decision record, or a price. Kerberos
-\cite{kerberos} crossed the boundary by transferring authority, workload
-identity by exchanging trust bundles and minting a local credential for a
-foreign workload \cite{spiffe}, and token exchange by converting one issuer's
-token into another's \cite{rfc8693}. All three move authority across the
-boundary, which is the step this protocol declines to take. Interchain light
-clients \cite{ibc} solve pinned keys plus a monotone clock for chains rather
-than tool calls, and policy engines decide from a request they are handed
+\cite{kerberos} crosses the boundary by transferring authority, workload
+identity by minting a local credential for a foreign workload \cite{spiffe},
+and token exchange by converting one issuer's token into another's
+\cite{rfc8693}: all three move authority, which is the step this protocol
+declines to take. Interchain light
+clients \cite{ibc} solve pinned keys plus a monotone clock for chains, not tool
+calls, and policy engines decide from a request they are handed
 \cite{cedar}. The envelope shapes we reuse \cite{dsse,intoto},
 transparent registration \cite{scitt}, and certificate transparency
 \cite{rfc6962} answer how an artifact was built, who may register a statement,
-and how to publish verifiable records. What none of them defines is the object
-that is at once the authorization decision, the audit record, the accounting
-entry, and the evidence another organization's kernel verifies against state it
-alone holds.
+and how to publish verifiable records. None of them defines the object that is
+at once the authorization decision, the audit record, the accounting entry, and
+the evidence another organization's kernel verifies against state it alone
+holds.
 
 \paragraph{What we believe.}
 The rule is smaller than the system that implements it, and we think it is the
-part that lasts. The receiver has to decide, from facts only it holds, and the
-record of that decision has to outlive the connection and be checkable by
-someone who trusts neither side.
+part that lasts. The receiver decides from facts only it holds; which names must
+cross follows from that decision rather than preceding it, and the record has to
+outlive the connection and be checkable by someone who trusts neither side.

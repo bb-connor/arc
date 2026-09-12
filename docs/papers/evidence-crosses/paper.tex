@@ -97,11 +97,11 @@ receiver already holds; resolving it before dispatch is where the security
 property lives. The outbound one the receiver mints over its own new receipt
 once that receipt is durable, and the peer signs those bytes unparsed; it gates
 the response, never the dispatch. Neither is a bearer credential: a statement
-names only what the receiver stores. Hardened with every check a
-competent operator would write, a composition of a pinned peer identity, a
-signing policy engine, and a replay table reaches receiver locality, single use,
-and audience binding, but not admission binding: most of what the receiver binds
-has no carrier there. The contribution is the carrier, not the check.
+names only what the receiver stores. Which names must cross is settled by what
+the receiver decides, so the carrier is co-designed with the decision rather
+than bolted onto an existing request. We enumerate them, mechanize the
+classification, and measure what a composition of a pinned peer identity, a
+signing policy engine, and a replay table must add to reach each property.
 \end{abstract}
 
 \input{sections/01-rule.tex}

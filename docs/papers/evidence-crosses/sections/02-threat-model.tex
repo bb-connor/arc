@@ -2,21 +2,19 @@
 \label{sec:threat}
 
 The kernel sits between an agent and the tool servers whose transport it owns:
-child processes on their standard streams, HTTP tools it fronts, sidecars it
-proxies. It does not confine the agent, whose model, orchestrator, prompt, and
-libraries are untrusted; one that opens its own socket reaches whatever that
-socket reaches.
+child processes, fronted HTTP tools, proxied sidecars. It does not confine the
+agent, whose model, orchestrator, prompt, and libraries are untrusted; one that
+opens its own socket reaches whatever that socket reaches.
 
-The adversary is given everything outside the receiving kernel. It controls
-every request field this paper names; it controls the peer kernel and can make
-it sign anything with the peer's key; it controls the network and may drop,
-delay, reorder, duplicate, and replay; and it may present any receipt,
-statement, lease, or governance record it has observed, in any combination. It
-does not hold the receiving kernel's signing key and cannot write to its stores.
-The question is what it can cause a receiving kernel to dispatch.
+The adversary is given everything outside the receiving kernel: every field
+this paper names, the peer kernel and its signing key, the network, where
+it may drop, reorder, and replay, and any receipt, statement, lease, or
+governance record it has observed. It holds neither the receiving kernel's
+signing key nor write access to its stores. The question is what it can cause a
+receiver to dispatch.
 
 The trusted base is the receiving kernel's process, its signing key, and its
-stores; everything outside is verified or assumed. The assumptions appear once,
+stores; everything outside is verified or assumed; the assumptions appear once,
 in Table~\ref{tab:assumptions}.
 
 \scriptsize
@@ -44,9 +42,11 @@ ASSUME-GOSSIP-FAIRNESS-PARTITION-BOUND & Revocation liveness only: recurring del
 \end{longtable}
 \normalsize
 
-One assumption is deliberately absent: that the two signing keys on a co-signed
-statement belong to different organizations. One operator holding both satisfies
-every check here; key independence is a deployment property the protocol carries
-no evidence of. Nor does the peer's countersignature constrain this adversary:
-the receiver authors an outbound statement's bytes and the peer signs them
-unparsed, so it buys a record a non-adversarial peer cannot disown.
+Two assumptions are deliberately absent. The first is that the two signing keys
+on a co-signed statement belong to different organizations: one operator holding
+both satisfies every check here. The second is domain separation: one passport
+key signs three preimage families, the receipt signing body, the co-signing
+body, and a statement's pre-authentication encoding, so ASSUME-ED25519 is an
+assumption about a key with that reuse. A pinned peer obtains this kernel's
+signature over any bytes that rebuild as one of the last two, so a
+countersignature fixes a record's shape and parties, not its truth.

@@ -92,8 +92,8 @@ identifiers and digests and nothing else. The statement the hook verifies (D9,
 D10) has as its subject a receipt the \emph{receiver} signed (D6), not the
 peer's, and that is a different receipt from the one the receiver writes for
 this call at step 7 (D13). The dashed return is the outbound co-signature: the
-reference kernel mints it on every federated request and fails the response if
-it cannot, but it is minted after the dispatch it describes and no admission
-path resolves it.}
+reference kernel mints it on every federated request that produced verified
+treaty material and fails the response if it cannot, but it is minted after the
+dispatch it describes and no admission path resolves it.}
 \label{fig:sequence}
 \end{figure}

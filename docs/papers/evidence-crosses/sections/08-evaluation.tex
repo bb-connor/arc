@@ -1,26 +1,28 @@
 \section{Evaluation}
 \label{sec:eval}
 
-Everything below ran on one machine: \PSHostCores{} \PSHostCpuModel{} cores,
+Local measurements ran on one machine: \PSHostCores{} \PSHostCpuModel{} cores,
 \PSHostMemoryGiB{} GiB, \PSHostOs{}, compiler \PSRustcVersion{} at the pinned
-toolchain. Percentiles interpolate between order statistics; every interval is a
-percentile bootstrap interval for the median beside it.
+toolchain. Percentiles interpolate between order statistics; each interval
+below is a percentile bootstrap interval for its median.
 
 \paragraph{Two kernels in separate processes.}
-Two kernels were brought up as separate operating-system processes, each with
-its own keys, stores, issuers, agreements, leases, and receipt log, with a third
-process driving calls over \PSFedTransport{}; the topology record reports
-\PSFedHosts{} host. The co-signing and revocation hops are the shipped lanes
-unchanged; the request hop uses a transport defined for this experiment, since
-no shipped lane carries a tool call. Admitted calls:
-\PSFedAllowSampleCount{} calls, p50 \PSFedAllowPFiftyMs{} ms, p99
-\PSFedAllowPNinetyNineMs{} ms at the driver, each costing
-\PSFedCosignConnections{} co-signing connections, counted by the receiver. Of
-that round trip the receiver's evaluation window is
-\PSFedReceiverEvalPFiftyMs{} ms at the median and the driver's evidence
-preparation \PSFedEvidencePrepPFiftyMs{} ms.
+Two kernels ran as separate operating-system processes, each with its own keys,
+stores, agreements, and receipt log, with a third process driving calls over
+\PSFedTransport{}; the topology record reports a host count of \PSFedHosts{}.
+The co-signing and revocation hops are the shipped lanes unchanged; the request
+hop uses a transport defined for this experiment, since no shipped lane carries
+a tool call. Admitted calls: \PSFedAllowSampleCount{}
+calls, p50 \PSFedAllowPFiftyMs{} ms, interval \PSFedAllowCiLowMs{} to
+\PSFedAllowCiHighMs{} ms, p99 \PSFedAllowPNinetyNineMs{} ms at the driver, each
+costing \PSFedCosignConnections{} co-signing connections, counted by the
+receiver. The round trip is the receiver's decision plus the co-signing hops it
+makes back to the origin after dispatching; its evaluation window,
+\PSFedReceiverEvalPFiftyMs{} ms at the median, contains those hops. Minting the
+per-call evidence costs the receiver \PSFedEvidencePrepPFiftyMs{} ms more,
+outside it.
 
-Denied calls: \PSFedDenyCases{} scenarios driven over the wire,
+Denied calls: \PSFedDenyCases{} scenarios over the wire,
 \PSFedDenySampleCount{} calls, p50 \PSFedDenyPFiftyMs{} ms, p99
 \PSFedDenyPNinetyNineMs{} ms. They return \code{chio_treaty_missing_scope},
 \code{chio_treaty_scope_hash_mismatch},
@@ -29,15 +31,9 @@ Denied calls: \PSFedDenyCases{} scenarios driven over the wire,
 \code{chio_treaty_missing_required_evidence},
 \code{request_smuggled_trust_root}, and
 \code{request_smuggled_dynamic_trust}. In every one the receiver's dispatch
-counter was zero: no call reached a tool.
-
-Across the run \PSFedAbsorbedCount{} further calls were denied because the
-receiver's snapshot had aged past its \PSFreshnessMs{} ms freshness window while
-the origin publishes every \PSEpochTickMs{} ms: \PSFedAllowAbsorbedCount{} of
-the \PSFedAllowAttemptCount{} admitted attempts, \PSFedDenyAbsorbedCount{} in
-the denial experiment, \PSFedRevokeAbsorbedCount{} in the revocation
-experiment. That is the safety rule of Section~\ref{sec:security} firing on the
-clock, not on a revocation; they were retried and excluded.
+counter stayed zero. \PSFedAbsorbedCount{} calls were retried and excluded, denied because the receiver's snapshot had aged past its
+\PSFreshnessMs{} ms freshness window against an origin publishing every
+\PSEpochTickMs{} ms.
 
 Revoking at the origin and measuring to the receiver's first denial took
 \PSFedRevokeToDenyMs{} ms at the median over \PSFedRevokeRepeats{} repeats,
@@ -46,12 +42,13 @@ interval \PSFedRevokeCiLowMs{} to \PSFedRevokeCiHighMs{} ms, a median of
 snapshot leaves the freshness window and then denies, \PSFedCutToDenyMs{} ms at
 the median over \PSFedCutRepeats{} repeats, interval \PSFedCutCiLowMs{} to
 \PSFedCutCiHighMs{} ms, a median of \PSFedCutCallsMedian{} calls, counting a
-denial only once it persists for three further calls. The partitioned receiver
-stops rather than falling back to its last good answer. On
+denial only once it persists for three further calls. On
 \PSFedRevokeAmbiguousReleases{} of \PSFedRevokeDenialRecords{} revoke records
 and \PSFedCutAmbiguousReleases{} of \PSFedCutDenialRecords{} cut records the
-pre-dispatch release could not be confirmed and was recorded as ambiguous, the
-path Section~\ref{sec:admission} names; no call dispatched.
+denial also reports an unconfirmed pre-dispatch cleanup: the budget unwind
+rather than the continuation release Section~\ref{sec:admission} orders,
+reporting a budget hold it cannot find, an invariant violation we do not
+explain. No call dispatched.
 
 \paragraph{What admission costs locally.}
 \begin{table}[!tb]
@@ -83,24 +80,23 @@ receiver's decision over already resolved evidence, where the comparisons of
 Table~\ref{tab:subst} run. Durability dominates, which is the price of
 Section~\ref{sec:admission}'s ordering. The refusal row is a lower bound: its
 fixture refuses on a unanimous deny verdict, an early exit reaching neither
-those comparisons nor the signature checks. Held at saturation for
-\PSSustainedSeconds{} s the same path admitted \PSSustainedCalls{} calls at
-\PSSustainedCallsPerSecond{} calls per second with \PSSustainedDenials{}
-denials and
+those comparisons nor the signature checks. Driven back to back for
+\PSSustainedSeconds{} s with one call outstanding, the same path admitted
+\PSSustainedCalls{} calls with \PSSustainedDenials{} denials and
 \fpeval{round(\PSSustainedReceiptStoreGrowthKiB/1024,1)}\,MiB of receipt-store
-growth.
+growth: one call's cost repeated, not a capacity.
 
-The negative corpus is \PSThreatCaseCount{} in-process cases, each asserting its
-expected code: \PSThreatDispatchCaseCount{} through the dispatch-capable hook
-with the tool-invocation counter asserted zero, \PSThreatVerifierCaseCount{}
-against the verifier directly, alongside \PSBilateralReplayCases{} bilateral and
+The negative corpus is \PSThreatCaseCount{} in-process cases, each asserting a
+refused decision and its expected code: \PSThreatDispatchCaseCount{} through the
+dispatch-capable hook, \PSThreatVerifierCaseCount{} against the verifier
+directly, alongside \PSBilateralReplayCases{} bilateral and
 \PSGenericReplayCases{} generic replay cases.
 
 \paragraph{What a composition of existing parts reaches.}
 \begin{table}[!tb]
 \centering
 \small
-\caption{A receiver composed from \PSBaseParts{} parts an operator already has, driven through the corpora of this paper under two wirings. The parts are a tool-call server, a peer identity pinned out of band, a policy engine that evaluates a local rule set and signs its decision, and a receiver-side replay table. \emph{Composed} wires each part the way it documents itself; \emph{hardened} adds every check a competent operator would write, among them a denylist over the context names the receiver owns and a replay table keyed by the identifier inside the signed bytes rather than one the caller picks. No part requires either check, and nothing in the composition records which one an operator wrote. Admissions are over the \PSBaseNegativeAttacks{} attacks the corpus drives, as \PSBaseNegativeDistinctDrives{} distinct experiments. Chio's own record is at most \PSBaseStorageRatioUpperBound{} times heavier per call, a bound rather than a measurement, since the two stores are read by two procedures.}
+\caption{A receiver composed from \PSBaseParts{} parts an operator already has, driven under two wirings against the threat table of this paper, case by case where the composition has an analogue. The parts are a tool-call server, a peer identity pinned out of band, a policy engine that evaluates a local rule set and signs its decision, and a receiver-side replay table. \emph{Composed} wires each part the way it documents itself; \emph{hardened} adds checks no part requires and nothing in the composition records, among them a denylist over the context names the receiver owns and a replay table keyed by the identifier inside the signed bytes rather than one the caller picks. It is the wiring we wrote, not a bound on the wiring an operator could write. Admissions are over the \PSBaseNegativeAttacks{} attacks the corpus drives, as \PSBaseNegativeDistinctDrives{} distinct experiments. Chio's own record is at most \PSBaseStorageRatioUpperBound{} times heavier per call, a bound rather than a measurement, since the two stores are read by two procedures, and its side is read from the run above rather than re-measured here.}
 \label{tab:baseline}
 \begin{tabular}{@{}lll@{}}
 \toprule
@@ -117,31 +113,29 @@ Durable bytes per call & \PSBaseBytesPerCall{} & \PSBaseHardenedBytesPerCall{} \
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:baseline} is the comparison, and hardening is decisive: it closes
+Table~\ref{tab:baseline} prices what an operator adds. Hardening closes
 \PSBaseClosedByHardening{} attacks and carries \PSBasePropsHoldHardened{} of the
-four properties.
-What no wiring reaches is admission binding, and the reason is a missing carrier
-rather than a missing check: \PSBaseSubstNotCarriedRows{} of the
-\PSBaseSubstRows{} substitution rows, covering
-\PSBaseSubstNotCarriedFields{} of the \PSBaseSubstFields{} binding fields, have
-no carrier in the composed request at all, so there is nothing to compare. The
-witness is an unmodified admissible call presented against a receiver whose own
-record for that agreement has advanced a version: the receiver holds a version,
-the request pins none, and no check compares a fact the request cannot carry.
-Hardening is not free either: the last row prices the second durable write it
-makes.
+four properties. Attacks divide by what closes them: a check over fields the
+request carries, or a field it does not have. Only the second is about the
+format: \PSBaseSubstNotCarriedRows{} of the \PSBaseSubstRows{} substitution rows
+have no carrier at all, one of them the report digest Chio never compares
+either. The residual witness, an unmodified admissible call against a receiver
+whose record for that agreement has advanced a version, is closed by a version
+field; the leaf enumeration of Section~\ref{sec:formal} counts the rest, so the
+carrier is settled by the decision, not added to it. Hardening is not free:
+the last row prices the second durable write it makes.
 
 \paragraph{Verification by someone who was not there.}
-The \PSProofPackageKiB{} KiB evidence package for the refund workflow verifies with
-no access to either kernel, every receipt, statement, lease, and governance
-record, in \fpeval{round(\PSBuyerVerifyPFiftyUs/1000,1)}\,ms at the median over
-\PSBuyerVerifySampleCount{} runs. A frozen corpus of \PSVectorCaseCount{}
-receipt cases holds \PSVectorLanguages{} independent implementations to the same
-canonical body bytes and verdict.
+The \PSProofPackageKiB{} KiB evidence package for the refund workflow verifies
+every receipt, statement, lease, and governance record in it with no kernel
+access, in \fpeval{round(\PSBuyerVerifyPFiftyUs/1000,1)}\,ms at the median over
+\PSBuyerVerifySampleCount{} runs. A frozen corpus of
+\PSVectorCaseCount{} receipt cases holds \PSVectorLanguages{} independent
+implementations to the same canonical body bytes and verdict.
 
 \paragraph{Reproduction.}
-Each run writes its commit, environment, raw samples, and the macro file this
-paper compiles from, so a printed number and a retained one cannot drift. The
-comparison writes a duration only from a run on a clean input tree and an
-unloaded host, and otherwise records that it did not: its corpora and verdicts
-are above, its timings are not.
+Each run writes per-host commit and environment records, raw samples, and the
+macro file this paper compiles from, so a printed number and a retained one
+cannot drift. The comparison writes a duration only from a run on a clean input
+tree and an unloaded host, and otherwise records that it did not: its corpora
+and verdicts are above, its timings are not.
