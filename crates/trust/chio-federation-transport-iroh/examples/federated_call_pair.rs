@@ -5270,7 +5270,13 @@ async fn run_race(args: &Args) -> Result<(), BoxError> {
     // distributions, so the count is reported beside them: the distributions are
     // conditioned on rounds that saw no freshness denial.
     let mut discarded_rounds = 0_u64;
-    let freshness_budget = repeats.saturating_mul(4).max(20);
+    // The budget is in ROUNDS, not in denials. A round is discarded whole, and
+    // it costs one denial per racer, so a budget counted in denials tightens as
+    // the contention widens and says nothing about how much of the experiment
+    // was wasted. What the guard is for is a clock configuration too tight for
+    // the link: more rounds thrown away than kept means the freshness window and
+    // the publication period do not fit the path the run is measuring.
+    let discard_budget = repeats.max(10);
 
     while (rounds.len() as u64) < repeats {
         // One continuation, and one prepared call per racer that names it.
@@ -5337,10 +5343,13 @@ async fn run_race(args: &Args) -> Result<(), BoxError> {
             }
             freshness_denials = freshness_denials.saturating_add(freshness_in_round);
             discarded_rounds = discarded_rounds.saturating_add(1);
-            if freshness_denials > freshness_budget {
+            if discarded_rounds > discard_budget {
                 return Err(format!(
-                    "the contention run absorbed {freshness_denials} revocation-freshness \
-                     denials, which is more than it allows"
+                    "the contention run discarded {discarded_rounds} rounds to \
+                     revocation-freshness denials against {} kept, absorbing \
+                     {freshness_denials} denials across {workers} racers; the \
+                     freshness window and the publication period do not fit this link",
+                    rounds.len()
                 )
                 .into());
             }
