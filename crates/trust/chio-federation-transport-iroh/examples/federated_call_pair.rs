@@ -5281,6 +5281,12 @@ async fn run_race(args: &Args) -> Result<(), BoxError> {
             prepared.push(sender.prepare_sharing(Some(shared)).await?);
         }
 
+        // The dispatch counter is read around each round rather than around the
+        // whole run. A round the freshness rule discards still dispatched for
+        // whichever racer won it, so a delta taken across the run counts those
+        // dispatches while the round itself is not kept, and the two disagree by
+        // exactly the number of rounds discarded.
+        let round_before = sender.stats().await?;
         let mut tasks = Vec::new();
         for (worker, prepared) in prepared.into_iter().enumerate() {
             let sender = Arc::clone(&sender);
@@ -5311,10 +5317,24 @@ async fn run_race(args: &Args) -> Result<(), BoxError> {
                 round.denied.insert(worker, decision.failure_code);
             }
         }
+        let round_dispatched = sender
+            .stats()
+            .await?
+            .dispatches
+            .saturating_sub(round_before.dispatches);
+
         // A revocation-freshness denial is the clock rather than the continuation:
         // it would take a racer out of the race for a reason the round is not
-        // about, so the whole round is discarded and run again.
+        // about, so the whole round is discarded and run again. The single-use
+        // property still holds over a discarded round: the clock can deny the
+        // racer that would have won, never admit a second one.
         if freshness_in_round > 0 {
+            if round_dispatched > 1 {
+                return Err(format!(
+                    "a discarded round dispatched {round_dispatched} times; one                      continuation admits at most once whether or not the round counts"
+                )
+                .into());
+            }
             freshness_denials = freshness_denials.saturating_add(freshness_in_round);
             discarded_rounds = discarded_rounds.saturating_add(1);
             if freshness_denials > freshness_budget {
@@ -5334,6 +5354,12 @@ async fn run_race(args: &Args) -> Result<(), BoxError> {
             )
             .into());
         }
+        if round_dispatched != 1 {
+            return Err(format!(
+                "a round of {workers} racers on one continuation dispatched                  {round_dispatched} times; exactly one dispatch per round is the                  whole property"
+            )
+            .into());
+        }
         for (worker, failure_code) in &round.denied {
             if failure_code != CONTINUATION_REPLAY_CODE {
                 return Err(format!(
@@ -5347,11 +5373,16 @@ async fn run_race(args: &Args) -> Result<(), BoxError> {
     }
     let after = sender.stats().await?;
 
+    // Every round is asserted above to have dispatched exactly once when it is
+    // kept and at most once when it is discarded, so the run's own total may
+    // only sit between the rounds kept and the rounds attempted.
     let dispatched = after.dispatches.saturating_sub(before.dispatches);
-    if dispatched != repeats {
+    let attempted = repeats.saturating_add(discarded_rounds);
+    if dispatched < repeats || dispatched > attempted {
         return Err(format!(
-            "{workers} racers over {repeats} rounds dispatched {dispatched} times; \
-             exactly one dispatch per round is the whole property"
+            "{workers} racers over {repeats} kept rounds and {discarded_rounds} \
+             discarded dispatched {dispatched} times, which is outside \
+             {repeats} to {attempted}"
         )
         .into());
     }
