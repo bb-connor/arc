@@ -36,7 +36,12 @@ if [[ ! -d "$SOURCE/crates" || ! -f "$SOURCE/Cargo.toml" ]]; then
 fi
 SOURCE="$(cd "$SOURCE" && pwd -P)"
 SOURCE_COMMIT="$(git -C "$SOURCE" rev-parse HEAD)"
-if [[ -n "$(git -C "$SOURCE" status --short)" ]]; then
+GENERATOR="$SOURCE/scripts/generate-programmable-sovereignty-artifact.py"
+INPUT_PATHS=()
+while IFS= read -r input_path; do
+  INPUT_PATHS+=("$input_path")
+done < <(python3 "$GENERATOR" --benchmark-input-paths PS-B04)
+if [[ -n "$(git -C "$SOURCE" status --short -- "${INPUT_PATHS[@]}")" ]]; then
   SOURCE_DIRTY=true
 else
   SOURCE_DIRTY=false

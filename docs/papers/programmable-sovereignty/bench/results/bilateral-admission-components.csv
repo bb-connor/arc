@@ -1,11 +1,11 @@
 component,kind,samples,p50_us,p99_us,max_us,mean_us,std_us,ci_low_us,ci_high_us,note
-treaty_predispatch_deny,per_invocation,400,7422.817,18364.426,90378.729,9220.763,8144.831,8516.953,10102.511,"full kernel path; real hook, SQLite denial receipt, tool uninvoked"
-treaty_predispatch_allow,per_invocation,200,14139.570,26937.408,144355.196,16371.669,12856.250,14963.251,18368.300,"full kernel path; real hook, SQLite receipt, one real tool dispatch"
-receipt_append_sqlite,per_invocation,600,4782.504,12562.726,22666.992,5666.542,2052.983,5503.937,5838.530,SQLite receipt store
-receipt_sign,batch_mean,100,228.009,,230.588,228.061,0.523,227.963,228.165,Ed25519 over the evaluated receipt shape
-receipt_verify,batch_mean,100,338.225,,349.322,338.294,2.312,337.850,338.756,Ed25519 over the evaluated receipt shape
-strict_bilateral_dsse_verify,batch_mean,100,339.265,,362.682,339.632,2.525,339.259,340.206,"two signatures, embedded receipt, treaty bindings"
-cross_boundary_admission_allow,batch_mean,100,20.652,,21.314,20.672,0.114,20.652,20.696,receiver treaty scope and verified evidence
-buyer_proof_package_verify,batch_mean,100,49700.006,,50322.369,49713.392,97.560,49695.519,49733.981,offline three-vendor receiver verification
-producer_without_buyer_review,workflow,100,1835866.432,1904660.910,1915780.803,1837957.970,22417.522,1833721.959,1842414.364,release binaries; process and schema-validation costs included
-complete_buyer_workflow,workflow,100,2096521.633,2146402.262,2306656.687,2096823.322,32470.769,2090913.831,2103544.288,release binaries; process and schema-validation costs included
+treaty_predispatch_deny,per_invocation,400,7072.715,18645.520,89077.718,8749.492,8000.010,8060.678,9620.419,"full kernel path; real hook, SQLite denial receipt, tool uninvoked"
+treaty_predispatch_allow,per_invocation,200,13863.188,26175.890,137963.158,16080.889,12420.640,14715.385,18010.110,"full kernel path; real hook, SQLite receipt, one real tool dispatch"
+receipt_append_sqlite,per_invocation,500,4681.643,13566.644,23447.915,5554.817,2172.159,5365.278,5752.154,SQLite receipt store
+receipt_sign,batch_mean,100,229.340,,270.205,229.932,4.206,229.377,230.888,Ed25519 over the evaluated receipt shape
+receipt_verify,batch_mean,100,337.470,,344.582,337.586,1.868,337.225,337.955,Ed25519 over the evaluated receipt shape
+strict_bilateral_dsse_verify,batch_mean,100,339.127,,350.904,339.291,1.552,339.032,339.618,two signatures over the canonical statement; schema and self-consistency checks
+cross_boundary_admission_allow,batch_mean,100,20.688,,21.207,20.701,0.076,20.687,20.716,receiver treaty scope and verified evidence
+buyer_proof_package_verify,batch_mean,100,49703.524,,51598.253,49724.725,199.315,49696.672,49769.631,offline three-vendor receiver verification
+producer_without_buyer_review,workflow,100,1820939.032,2033854.108,2053981.977,1824923.797,40037.674,1817759.190,1833514.083,release binaries; process and schema-validation costs included
+complete_buyer_workflow,workflow,100,2088886.394,2141920.826,2182975.417,2092307.391,25740.373,2087402.131,2097369.157,release binaries; process and schema-validation costs included

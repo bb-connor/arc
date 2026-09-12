@@ -34,6 +34,7 @@ LEDGER_END = "<!-- END GENERATED MEASUREMENTS -->"
 RESULT_PREFIX = PAPER_PREFIX + "bench/results/"
 BILATERAL_SCRIPT = PAPER_PREFIX + "bench/run-bilateral-admission.sh"
 REPLAY_SCRIPT = PAPER_PREFIX + "bench/run-replay-corpus.sh"
+FEDERATED_SCRIPT = PAPER_PREFIX + "bench/run-federated-pair.sh"
 BILATERAL_SUMMARY = RESULT_PREFIX + "bilateral-admission.json"
 BILATERAL_INLINE = RESULT_PREFIX + "bilateral-admission-inline.tex"
 BILATERAL_ENVIRONMENT = RESULT_PREFIX + "bilateral-admission-environment.json"
@@ -275,6 +276,19 @@ BENCHMARKS = [
         "script": BILATERAL_SCRIPT,
         "results": [SUSTAINED_SUMMARY],
         "summary": SUSTAINED_SUMMARY,
+    },
+    {
+        "id": "PS-B04",
+        "script": FEDERATED_SCRIPT,
+        "results": [
+            RESULT_PREFIX + "federated-pair.json",
+            RESULT_PREFIX + "federated-pair-inline.tex",
+            RESULT_PREFIX + "federated-pair-allow-samples.csv",
+            RESULT_PREFIX + "federated-pair-deny-samples.csv",
+            RESULT_PREFIX + "federated-pair-environment.json",
+            RESULT_PREFIX + "federated-pair-environment.txt",
+        ],
+        "summary": RESULT_PREFIX + "federated-pair.json",
     },
 ]
 
