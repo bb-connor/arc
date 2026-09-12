@@ -565,3 +565,99 @@ once and a discarded round at most once, since the clock can deny the racer that
 would have won but can never admit a second. That is a stronger assertion than
 the one it replaces, and it is the kind of defect that only a second machine
 surfaces.
+
+## Phase 7: what a second review found
+
+The revised paper was put to eight independent readers: the six venues that had
+rejected the first draft, each asked to check the condition it had itself set,
+plus two critics, one judging the paper against the founding documents of a
+field and one whose only task was to prove a sentence false against the code.
+They scored it 3.17 of 5, up from 2.42, with one accept.
+
+Every reviewer confirmed the condition it had set was met. What they found
+instead was overstatement, and one of the findings was a vulnerability.
+
+### A signing oracle, and receipt forgery
+
+The cross-organization co-signing endpoint signed whatever bytes a caller
+supplied. It verified that the requester was a directory-bound, pinned peer and
+that the requester had signed those same bytes, and then returned this kernel's
+signature over them. Its own comment said the bytes were opaque.
+
+In the shipped deployment the co-signing key is also the receipt-signing key.
+An admitted peer could therefore ask for a signature over the canonical signing
+preimage of a receipt it invented and receive a receipt that passes ordinary
+verification: content-addressed correctly, naming the victim kernel as its
+signer under that kernel's own directory-bound passport key, asserting whatever
+decision, capability, tool, policy hash or content hash it chose. One admitted
+peer could forge the other organization's audit record at will. Both profiles
+of the lane were oracles, and the envelope profile did not check even its own
+framing prefix.
+
+This was confirmed by construction before it was fixed. An adversary test
+played the pinned peer, obtained the signature, assembled the receipt, and
+asserted that it verified. It did.
+
+The separation between the three preimage families this key signs is
+structural. Structural separation answers whether the families collide with
+each other. It is not a check, and it does nothing against a caller who asks
+for bytes from the family it wants.
+
+The reasoning error underneath is worth stating. The security argument reduced
+to unforgeability while reading participation by a kernel as that kernel's
+signature over bytes the requester chose. An adversary holding such an
+interface needs no forgery. Unforgeability describes an adversary that receives
+chosen-message signatures; it never licensed an honest signer to hand them out.
+
+The endpoint now applies the discipline the paper states as recompute and
+refuse: it parses the bytes as the preimage its profile expects, rebuilds that
+preimage from the parsed content, and refuses unless the rebuild matches byte
+for byte. The envelope profile additionally requires the statement to name this
+kernel, with this kernel's fingerprint, as the party asked to sign. No wire
+format changed. Seven existing tests had to change because their fixtures were
+the vulnerability: they fed opaque bytes to the lane and asserted a signature
+came back.
+
+### A co-signing mode that forced nothing
+
+Only the literal co-signing mode `bilateral_required` forced the invocation
+record into an action class's required-evidence set. The mode named for exactly
+this case, `bilateral_if_cross_org`, forced nothing, so a class configured with
+it admitted a cross-boundary call with no statement resolved and no
+continuation consumed. The specification already required otherwise, so the
+code and the specification disagreed and the paper had inherited the code's
+behaviour while stating the specification's.
+
+### The central claim was falsified by measurement
+
+The paper claimed a composition of existing parts could not reach admission
+binding, because the facts a receiver binds have no carrier in the composed
+request. A reviewer added one check of a kind the composed path already
+performs and cut its surviving attacks from two to one, then added one integer
+field and one comparison and took it to zero.
+
+The objection is decisive. The composed alternative's request schema is a file
+in this repository. An impossibility resting on our own schema is not an
+impossibility, and the claim is withdrawn.
+
+What replaces it is larger and was already proved but never printed: which
+names must cross is settled by what the receiver decides, so the carrier is
+co-designed with the decision rather than bolted onto a request shaped before
+it. The evidence is the enumeration, 55 leaves of which 25 are bound, mechanized
+and cross-checked against the executed corpus. Adding one field to a baseline
+closes one leaf of twenty-five.
+
+### Claims withdrawn because the code does not support them
+
+Four were found independently by four or five readers, which makes them
+certain rather than arguable.
+
+| Claim | What the code does |
+| --- | --- |
+| Eleven key names are refused wherever they appear | Refused as top-level keys of one object; a nested occurrence is ignored |
+| An unconfirmed release is the continuation path | Those records are budget-unwind failures from a different path |
+| Every denial leaves the dispatch counter at zero | That corpus drives the hook with no kernel and no counter |
+| The outbound co-signature is minted on every federated request | A request denied before treaty admission mints none and does not fail |
+| The path was held at saturation | The load generator is a serial loop with one call outstanding |
+| Every interval is a bootstrap interval for the median beside it | No interval was printed beside any median |
+| The presentation window intersects lease and governance intervals | The deciding component resolves neither |
