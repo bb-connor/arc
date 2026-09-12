@@ -26,9 +26,9 @@ aspirational; remaining boundaries are catalogued separately in
   timeout without an invariant or tool error and is not counted as a proof.
 - Mirror validation covers 57 registered mirrors over 171 bindings, including
   seven Lean module hashes and seven TLA+ module hashes. The proof manifest
-  contains 38 root imports, 14 gates, 12 model modules, 43 Rust symbols, and 15
+  contains 39 root imports, 14 gates, 12 model modules, 43 Rust symbols, and 15
   shell-bound checks.
-- Lean contains 170 catalogued declarations, one cryptographic axiom, sixteen
+- Lean contains 182 catalogued declarations, one cryptographic axiom, sixteen
   registered assumptions, and no placeholders.
 - Concurrency evidence includes all ten Loom models under three preemptions
   (229.86 seconds) and 10,000 deterministic schedules (63.24 seconds).
@@ -76,8 +76,8 @@ what may be claimed publicly.
 - Toolchain: `leanprover/lean4:v4.28.0`, lake, the vendored Aeneas support
   library, and an exact Mathlib dependency closure recorded in
   `lake-manifest.json`.
-- 38 root-imported modules (all imported by `Chio.lean`; "root-imported" is a
-  release-evidence precondition), 170 catalogued theorems, exactly one
+- 39 root-imported modules (all imported by `Chio.lean`; "root-imported" is a
+  release-evidence precondition), 182 catalogued theorems, exactly one
   axiom, zero `sorry` (enforced by `scripts/check-formal-proofs.sh`: lake
   build plus a sorry scan plus manifest cross-ref sanity).
 - Core models: `Core/Capability.lean`, `Core/Scope.lean`, `Core/Receipt.lean`
@@ -333,7 +333,7 @@ differential-test joins, theorem status, and model-only Kani scope remain
 explicit there.
 
 - `formal/proof-manifest.toml` (schema `chio.proof-manifest.v1`) is the hub:
-  `root_modules` (38 Lean files), `gate_commands` (15 commands), 12
+  `root_modules` (39 Lean files), `gate_commands` (15 commands), 12
   `covered_rust_modules`, 41 `covered_rust_symbols`, 14 `shell_entrypoints`,
   the P1-P10 `property_matrix` with per-property evidence-lane tags,
   `rust_refinement_lanes`, `allowed_axioms` (exactly one),
@@ -343,7 +343,7 @@ explicit there.
   are labeled as transliterations or abstraction anchors; TLA+ entries are
   abstraction anchors. `cargo xtask check formal-mirrors` enforces those hashes
   in required PR CI.
-- `formal/theorem-inventory.json` (170 theorem entries plus a separate
+- `formal/theorem-inventory.json` (182 theorem entries plus a separate
   assumptions block): per-theorem id, Lean name,
   file, kind, `rootImported` flag, claim class, `mapsTo` property ids.
 - `formal/MAPPING.md`: the cross-reference table from required model safety

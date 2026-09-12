@@ -48,7 +48,7 @@ runs (200 min/month headroom for everything else). Enforcement:
   lower value) in the workflow env. Do not raise the cap above 1,800
   without re-opening the locked decision.
 
-Sizing intent (steady state, 27-target inventory):
+Sizing intent (steady state, 29-target inventory):
 
 | Lane              | Cadence             | Per-run cost         | 30-day cost (est.) |
 |-------------------|---------------------|----------------------|--------------------|
@@ -94,7 +94,7 @@ Notes:
 
 ## Target inventory
 
-The standalone fuzz workspace defines 27 binaries. `fuzz/Cargo.toml` is the
+The standalone fuzz workspace defines 29 binaries. `fuzz/Cargo.toml` is the
 binary inventory, `fuzz/target-map.toml` owns source and corpus routing, and
 `fuzz/owners.toml` maps every target to its regression-test owner. The smoke
 inventory tests require those names to match the scheduled matrix in
@@ -107,12 +107,12 @@ missing, dangling, duplicated, or modified entries. The fuzz workspace's
 checked-in `Cargo.lock` is authoritative for corpus smoke, and CI invokes
 `cargo test --locked` so dependency resolution cannot drift during replay.
 
-The eval-receipt, federation trust-establishment, and underwriting targets
-expose shared in-process entries from `chio_fuzz::entries`. Their libFuzzer
-binaries are thin adapters over the same functions replayed by
-`fuzz/tests/smoke.rs`. Typed `arbitrary` targets retain their binary adapters;
-the inventory and seed-floor tests still enforce corpus and ownership coverage
-for them.
+The eval-receipt, federation trust-establishment, bilateral DSSE verify,
+finding-worker protocol, and underwriting targets expose shared in-process
+entries from `chio_fuzz::entries`. Their libFuzzer binaries are thin adapters
+over the same functions replayed by `fuzz/tests/smoke.rs`. Typed `arbitrary`
+targets retain their binary adapters; the inventory and seed-floor tests still
+enforce corpus and ownership coverage for them.
 
 ## ClusterFuzzLite bridge
 
@@ -123,10 +123,10 @@ window and remains the documented permanent fallback after acceptance lands:
 - `.github/workflows/cflite_pr.yml` -- changed-target sampling per
   `fuzz/target-map.toml`. Default per-target wall budget is 60s (1-6 targets
   per PR after the glob match). Opt-in `fuzz: full` PR label promotes the
-  run to a full-corpus sweep across all 27 targets at 120s each
+  run to a full-corpus sweep across all 29 targets at 120s each
   (release-cut PRs and trust-boundary edits).
 - `.github/workflows/cflite_batch.yml` -- sampled nightly cron at
-  `17 2 * * *` UTC. Rotates one target per night across the 27-target
+  `17 2 * * *` UTC. Rotates one target per night across the 29-target
   inventory, 30 minutes per run. The `cflite_cron`
   workflow that the source-doc earlier described is intentionally absent;
   the weekly-soak Tier-A plan was dropped along with Tier A, and OSS-Fuzz
@@ -146,7 +146,7 @@ The CFLite builder image lives under `.clusterfuzzlite/`:
   with the rustls/openssl build deps plus `zip`. Mirrors the OSS-Fuzz
   scaffold under `fuzz/oss-fuzz/` so the in-tree CFLite image and the
   OSS-Fuzz image stay behaviourally identical.
-- `.clusterfuzzlite/build.sh` -- enumerates all 27 fuzz targets and
+- `.clusterfuzzlite/build.sh` -- enumerates all 29 fuzz targets and
   runs `cargo +nightly fuzz build <target> --release --sanitizer
   "$SANITIZER"` per target. The OSS-Fuzz copy at `fuzz/oss-fuzz/build.sh`
   is the source-of-truth; any new fuzz target lands in both files in the
@@ -199,7 +199,7 @@ files live under `fuzz/oss-fuzz/` and are mirrored into the upstream
   `gcr.io/oss-fuzz-base/base-builder-rust`, installs the rustls/openssl
   build deps plus `zip` for seed-corpus packing, and clones the repo at
   `/src/chio`.
-- `fuzz/oss-fuzz/build.sh` enumerates all 27 fuzz targets,
+- `fuzz/oss-fuzz/build.sh` enumerates all 29 fuzz targets,
   invokes `cargo +nightly fuzz build <target> --release --sanitizer
   "$SANITIZER"` for each, copies the resulting binary into `$OUT/`,
   and packs `fuzz/corpus/<target>/` into
@@ -327,6 +327,7 @@ Inventory:
 | `chio-credentials` | `crates/trust/chio-credentials/tests/dudect/jwt_verify.rs`               | `verify_chio_passport_jwt_vc_json` parse-and-fail path                             |
 | `chio-kernel-core` | `crates/kernel/chio-kernel-core/tests/dudect/mac_eq.rs`                   | `chio_core_types::crypto::Signature` byte-equality compare (the MAC-eq surface)    |
 | `chio-kernel-core` | `crates/kernel/chio-kernel-core/tests/dudect/scope_subset.rs`             | `NormalizedScope::is_subset_of` capability-algebra subset check                    |
+| `chio-federation`  | `crates/trust/chio-federation/tests/dudect/bilateral_dsse_verify.rs`     | `verify_chio_bilateral_dsse_envelope` Org A then Org B signature failure order     |
 
 Run locally. Use `--test <binary>` to select a specific dudect harness
 target rather than a positional `TESTNAME` filter; the harnesses are
@@ -340,6 +341,7 @@ conflate runtime / output parsing.
 cargo test -p chio-credentials --features dudect --release --test dudect_jwt_verify
 cargo test -p chio-kernel-core --features dudect --release --test dudect_mac_eq
 cargo test -p chio-kernel-core --features dudect --release --test dudect_scope_subset
+cargo test -p chio-federation --features dudect --release --test dudect_bilateral_dsse_verify
 ```
 
 The release-mode build is required: dudect's t-test is sensitive to the
@@ -357,7 +359,7 @@ Pass criterion:
   classes' runtime distributions at a level that survives multiple
   testing correction across the ~100 t-tests dudect runs internally.
 
-CI lane: `.github/workflows/dudect.yml` wires these three
+CI lane: `.github/workflows/dudect.yml` wires these four
 harnesses into nightly + PR-time runs and applies the
 two-consecutive-runs `t < 4.5` pass rule.
 

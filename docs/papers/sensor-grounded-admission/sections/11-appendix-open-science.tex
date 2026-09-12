@@ -11,9 +11,10 @@ from its primary source.
 
 Three artifact classes accompany the paper. The Lean~4 mechanization
 that discharges the four theorems of Section~\ref{sec:model} is the
-central artifact: a single source module of 583 lines, packaged as a
-self-contained Lake project together with the substrate's Treaty
-modules on which it depends. The bibliography file lists primary-source
+central artifact: a single paper-local source module of 589 lines,
+kept beside the paper rather than in the substrate's proof root, and
+packaged as a self-contained Lake project together with a snapshot of
+the substrate's Treaty modules it imports. The bibliography file lists primary-source
 citations to specifications, standards documents, and peer-reviewed
 papers. The paper text and the supplementary package are released under
 the same permissive license that governs the substrate's public
@@ -33,16 +34,16 @@ tar xzf lean-source.tar.gz
 cd chio-lean && lake build
 \end{verbatim}
 
-A cold cache builds in three to five minutes; the sensor-grounded
-module compiles at job ten of twenty-four in the dependency graph. The
-build produces no warnings and contains no \texttt{sorry}. The
+A cold cache builds in three to five minutes. The build produces no
+warnings and contains no \texttt{sorry}. The
 \texttt{\#print axioms} command run against each of the four theorems
 reports only the standard Lean kernel axioms \texttt{propext},
 \texttt{Classical.choice}, and \texttt{Quot.sound}. No project-local
 \texttt{axiom} declaration appears anywhere in the dependency tree.
 The supplementary package's \path{proof-manifest.toml} records the
 fully qualified theorem names, their source modules, and their axiom
-sets for tool consumption.
+sets for tool consumption, and records that the module is paper-local,
+outside the substrate's own theorem inventory.
 
 \subsection{Reproducing the empirical claims}
 \label{sec:open-science:empirical}

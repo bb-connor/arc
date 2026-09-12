@@ -15,7 +15,7 @@
 #
 # Mechanics:
 #
-#   1. Each nightly run executes all three dudect harnesses in parallel
+#   1. Each nightly run executes all four dudect harnesses in parallel
 #      (`cargo test -p <crate> --features dudect --release <bench> --
 #      --nocapture`), redirects stdout to `<bench>.out`, and pipes each
 #      output through `scripts/check-dudect-threshold.sh --input <file>`.
@@ -59,6 +59,7 @@ on:
           - jwt_verify
           - mac_eq
           - scope_subset
+          - bilateral_dsse_verify
         default: all
       threshold:
         description: "Override |t| leak threshold (default 4.5 per dudect paper)"
@@ -104,6 +105,9 @@ jobs:
           - name: scope_subset
             crate: chio-kernel-core
             test_binary: dudect_scope_subset
+          - name: bilateral_dsse_verify
+            crate: chio-federation
+            test_binary: dudect_bilateral_dsse_verify
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
@@ -270,7 +274,7 @@ jobs:
           # an Issue. The Issue body links both runs so triage starts
           # with the raw .out files attached to each.
           alarms=()
-          for harness in jwt_verify mac_eq scope_subset; do
+          for harness in jwt_verify mac_eq scope_subset bilateral_dsse_verify; do
             cur=$(find current-run -name "${harness}.verdict" -print -quit 2>/dev/null || true)
             pri=$(find prior-run -name "${harness}.verdict" -print -quit 2>/dev/null || true)
             cur_v="MISSING"

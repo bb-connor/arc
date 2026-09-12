@@ -1,6 +1,11 @@
 //! In-process entry points shared by libFuzzer binaries and corpus smoke tests.
 
-use chio_core_types::crypto::Keypair;
+use std::sync::OnceLock;
+
+use chio_core_types::crypto::{Keypair, PublicKey};
+use chio_federation::bilateral_dsse::{
+    verify_chio_bilateral_dsse_envelope, verify_dsse_envelope, DsseEnvelope, DsseStatement,
+};
 use chio_federation::trust_establishment::{
     FederationPeer, HandshakeChallenge, KernelTrustExchange, KernelTrustExchangeConfig,
     PeerHandshakeEnvelope,
@@ -155,6 +160,59 @@ pub fn federation_trust_establishment(data: &[u8]) {
         let _ = exchange.peers();
         let _ = exchange.forget("kernel.remote");
     }
+}
+
+/// Org A verifier seed for `bilateral_dsse_verify`. The committed corpus
+/// under `fuzz/corpus/bilateral_dsse_verify/` is co-signed by the keypairs
+/// derived from this seed and [`BILATERAL_DSSE_ORG_B_SEED`], so a mutation
+/// that leaves both signatures intact still reaches the Ed25519 checks.
+const BILATERAL_DSSE_ORG_A_SEED: [u8; 32] = [
+    0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30,
+    0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40,
+];
+
+/// Org B verifier seed for `bilateral_dsse_verify`.
+const BILATERAL_DSSE_ORG_B_SEED: [u8; 32] = [
+    0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50,
+    0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f, 0x60,
+];
+
+fn bilateral_dsse_verifier_keys() -> &'static (PublicKey, PublicKey) {
+    static KEYS: OnceLock<(PublicKey, PublicKey)> = OnceLock::new();
+    KEYS.get_or_init(|| {
+        (
+            Keypair::from_seed(&BILATERAL_DSSE_ORG_A_SEED).public_key(),
+            Keypair::from_seed(&BILATERAL_DSSE_ORG_B_SEED).public_key(),
+        )
+    })
+}
+
+/// Drive the strict bilateral invocation envelope verifier and its decode
+/// surface with arbitrary bytes. Both organisation keys are fixed so the
+/// committed corpus exercises the full gate order through the two Ed25519
+/// checks; the swapped-key call covers the fingerprint and keyid mismatch
+/// branches on the same input, and the signature-slice verifier covers the
+/// sibling predicate profile.
+pub fn bilateral_dsse_verify(data: &[u8]) {
+    if let Ok(statement) = serde_json::from_slice::<DsseStatement>(data) {
+        let _ = statement.canonical_bytes();
+        let _ = serde_json::to_vec(&statement);
+    }
+
+    let Ok(envelope) = serde_json::from_slice::<DsseEnvelope>(data) else {
+        return;
+    };
+    let _ = envelope.pae_bytes();
+    if let Ok((statement, _)) = envelope.decode_statement() {
+        let _ = statement.canonical_bytes();
+        let _ = serde_json::to_vec(&statement);
+    }
+    let _ = serde_json::to_vec(&envelope);
+
+    let (org_a, org_b) = bilateral_dsse_verifier_keys();
+    let _ = verify_chio_bilateral_dsse_envelope(&envelope, org_a, org_b);
+    let _ = verify_chio_bilateral_dsse_envelope(&envelope, org_b, org_a);
+    let _ = verify_dsse_envelope(&envelope, org_a, org_b);
 }
 
 pub fn underwriting_policy_input(data: &[u8]) {

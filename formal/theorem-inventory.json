@@ -1388,7 +1388,7 @@
       "claimClass": "bounded_model",
       "status": "proved",
       "mapsTo": ["P3"],
-      "notes": "Any predicate containing unsupported syntax denies before Boolean evaluation, including under unrestricted negation."
+      "notes": "A predicate rejected by the `supported` check denies before Boolean evaluation, including under unrestricted negation. The occurrence form, denial whenever an unsupported atom appears anywhere in the tree, is `contains_unsupported_denies`."
     },
     {
       "id": "treaty.predicate.undefined_denies",
@@ -1477,6 +1477,94 @@
       "status": "proved",
       "mapsTo": ["P3"],
       "notes": "A signer outside the treaty participant list fails the modeled signer gate."
+    },
+    {
+      "id": "treaty.predicate.supported_structural",
+      "leanName": "Chio.Treaty.PredicateLang.containsUnsupported_eq_not_supported",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "By induction over the predicate syntax, `supported` is false exactly when an unsupported atom occurs anywhere in the tree. The proof unfolds every arm of `supported`, including `top`, `bot`, and `disj`."
+    },
+    {
+      "id": "treaty.predicate.defined_structural",
+      "leanName": "Chio.Treaty.PredicateLang.containsUndefined_eq_not_defined",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "By induction over the predicate syntax, `defined` is false exactly when an atom the projected input cannot interpret occurs anywhere in the tree. The proof unfolds every arm of `defined`, including `top`, `bot`, and `disj`."
+    },
+    {
+      "id": "treaty.predicate.contains_unsupported_denies",
+      "leanName": "Chio.Treaty.PredicateLang.contains_unsupported_denies",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "A predicate in which an unsupported atom occurs anywhere, at any depth and under any connective, denies on every admission view before Boolean evaluation."
+    },
+    {
+      "id": "treaty.predicate.contains_undefined_denies",
+      "leanName": "Chio.Treaty.PredicateLang.contains_undefined_denies",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "A predicate in which an atom the projected input cannot interpret occurs anywhere, at any depth and under any connective, denies on that admission view before Boolean evaluation."
+    },
+    {
+      "id": "treaty.predicate.supported_atoms_exact",
+      "leanName": "Chio.Treaty.PredicateLang.supported_eq_all_atoms",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "`supported` equals the conjunction of `supportedAtom` over the left-to-right atom list collected from the predicate."
+    },
+    {
+      "id": "treaty.predicate.defined_atoms_exact",
+      "leanName": "Chio.Treaty.PredicateLang.defined_eq_all_atoms",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "`defined` equals the conjunction of `atomDefined` over the left-to-right atom list collected from the predicate."
+    },
+    {
+      "id": "treaty.predicate.unsupported_atom_anywhere_denies",
+      "leanName": "Chio.Treaty.PredicateLang.unsupported_atom_anywhere_denies",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Membership of an `unsupported` tag in the collected atom list of a predicate forces denial on every admission view."
+    },
+    {
+      "id": "treaty.predicate.undefined_atom_anywhere_denies",
+      "leanName": "Chio.Treaty.PredicateLang.undefined_atom_anywhere_denies",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Membership of an atom that is undefined for the admission view in the collected atom list of a predicate forces denial on that view."
     },
     {
       "id": "treaty.bridge.fragment_completeness",
@@ -1752,6 +1840,50 @@
       "status": "proved",
       "mapsTo": ["P3"],
       "notes": "The Boolean refinement checker is equivalent to the finite-domain admission implication over the supplied receipt domain. No claim is made outside that domain; the Rust receipt-predicate evaluator is differential evidence only."
+    },
+    {
+      "id": "treaty.shape.of_receipt_injective",
+      "leanName": "Chio.Treaty.PredicateShape.ofReceipt_injective",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateShape.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The connective-preserving lift of an injective atom map from the receipt predicate syntax into the admission predicate syntax is injective. The two languages are related by connective shape only; no denotation-agreeing atom injection with a receipt-to-view map exists, as documented in the module."
+    },
+    {
+      "id": "treaty.shape.eval_agrees",
+      "leanName": "Chio.Treaty.PredicateShape.eval_ofReceipt",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateShape.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Plain Boolean evaluation of the lifted predicate agrees with receipt evaluation whenever the mapped atoms agree pointwise on the given admission view and receipt. The proof unfolds `ReceiptPredicate.evaluate` at every connective."
+    },
+    {
+      "id": "treaty.shape.denote_agrees_on_supported_fragment",
+      "leanName": "Chio.Treaty.PredicateShape.denote_ofReceipt",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateShape.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Fail-closed denotation of the lifted predicate agrees with receipt evaluation when every mapped atom is supported, defined on the view, and agrees with its receipt atom. Outside that fragment the fail-closed layer has no receipt-side counterpart and no agreement is claimed."
+    },
+    {
+      "id": "treaty.shape.unsupported_image_denies",
+      "leanName": "Chio.Treaty.PredicateShape.denote_ofReceipt_unsupported",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateShape.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "If any atom occurring in a receipt predicate maps to an unsupported tag, the lifted predicate denies on every admission view."
     },
     {
       "id": "proof.finding_status_epoch_advance_is_strict",

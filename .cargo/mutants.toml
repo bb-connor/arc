@@ -61,6 +61,8 @@ minimum_test_timeout = 60
 #   4. chio-credentials (JWT VC verify, OID4VP, SD-JWT)
 #   5. chio-attest-verify (Sigstore bundle and identity verification)
 #   6. chio-anchor (anchor publication, discovery, and verification)
+#   7. chio-federation (treaty co-sign envelope, operational verifier, treaty validators)
+#   8. chio-runtime-core (treaty admission hook, DSSE evidence, continuation replay fence)
 #
 # chio-kernel-core: real `mod` declarations exist for every entry below,
 # so per-file scoping is precise.
@@ -85,6 +87,19 @@ minimum_test_timeout = 60
 # chio-attest-verify and chio-anchor: entries mirror the per-crate
 # baselines and are copied here because cargo-mutants only auto-loads this
 # workspace-root config in CI.
+#
+# chio-federation: `bilateral_dsse.rs` and `bilateral_verifier.rs` are `mod`
+# umbrellas over their module directories, so the production child files
+# are listed alongside them. `treaty.rs` holds the treaty scope, ladder
+# intersection, and bilateral invocation validators.
+#
+# chio-runtime-core: the treaty admission path only. `admission_hook.rs`
+# reserves, consumes, and releases treaty continuations; the `dsse` and
+# `treaty_evidence` children verify the bilateral envelope and the evidence
+# chain before dispatch; `treaty.rs` and `treaty/predicate.rs` hold the
+# validators and the bounded predicate evaluator; `admission_replay.rs` is
+# the durable replay fence. The remaining runtime modules (buyer review,
+# orchestration, swarm authority, trust floors) stay out of scope.
 examine_globs = [
     # chio-kernel-core - pure-compute verdict path.
     "crates/kernel/chio-kernel-core/src/evaluate.rs",
@@ -157,6 +172,28 @@ examine_globs = [
     "crates/economy/chio-anchor/src/functions.rs",
     "crates/economy/chio-anchor/src/ops.rs",
     "crates/economy/chio-anchor/src/solana.rs",
+
+    # chio-federation - treaty co-sign envelope, operational verifier, and
+    # treaty validators.
+    "crates/trust/chio-federation/src/bilateral_dsse.rs",
+    "crates/trust/chio-federation/src/bilateral_dsse/builder.rs",
+    "crates/trust/chio-federation/src/bilateral_dsse/policy.rs",
+    "crates/trust/chio-federation/src/bilateral_dsse/sign.rs",
+    "crates/trust/chio-federation/src/bilateral_dsse/types.rs",
+    "crates/trust/chio-federation/src/bilateral_dsse/typestate_handlers.rs",
+    "crates/trust/chio-federation/src/bilateral_dsse/verify.rs",
+    "crates/trust/chio-federation/src/bilateral_verifier.rs",
+    "crates/trust/chio-federation/src/bilateral_verifier/*.rs",
+    "crates/trust/chio-federation/src/treaty.rs",
+
+    # chio-runtime-core - treaty admission hook, DSSE evidence verification,
+    # treaty validators, and the durable continuation replay fence.
+    "crates/kernel/chio-runtime-core/src/admission_hook.rs",
+    "crates/kernel/chio-runtime-core/src/admission_hook/dsse.rs",
+    "crates/kernel/chio-runtime-core/src/admission_hook/treaty_evidence.rs",
+    "crates/kernel/chio-runtime-core/src/treaty.rs",
+    "crates/kernel/chio-runtime-core/src/treaty/predicate.rs",
+    "crates/kernel/chio-runtime-core/src/store/sqlite/admission_replay.rs",
 ]
 
 # Workspace-wide skip list. Pure plumbing, generated code, test/bench
@@ -201,4 +238,9 @@ exclude_globs = [
     # rationale: fuzz harness code is the oracle input surface, not the target
     # production anchor implementation under mutation.
     "crates/economy/chio-anchor/src/fuzz.rs", # rationale: excluded helper or verification surface.
+    # chio-federation: generated typestate producer behind the `typestate`
+    # feature.
+    # rationale: generated code is regenerated from its template rather than
+    # hand-maintained; the handlers it dispatches to are examined directly.
+    "crates/trust/chio-federation/src/_generated/**", # rationale: excluded helper or verification surface.
 ]

@@ -128,7 +128,7 @@ source notes retained where a citation benefits from primary-source review.
 
 ## The companion technical paper (§5)
 
-- **`ref_chio_parent_paper`** -- Anonymous, *Programmable Sovereignty: Lean-Attestable Constitutions Over Capability-Bounded Federated Receipts* (working paper, 2026). The cited technical paper is a working paper. The author is the same author as this Article and the co-citation is straightforward.
+- **`ref_chio_parent_paper`** -- Anonymous, *Receiver-Owned Bilateral Admission for Cross-Organization Agent Tool Calls* (working paper, 2026). The cited technical paper is a working paper. The author is the same author as this Article and the co-citation is straightforward.
 
 ---
 

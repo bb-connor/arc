@@ -2767,6 +2767,7 @@ dependencies = [
 name = "chio-attest-buyer-core"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "chio-core-types",
  "chio-federation",
  "chio-governance",
@@ -3549,6 +3550,7 @@ dependencies = [
  "chio-revocation-oracle",
  "chio-spec-validate",
  "criterion",
+ "dudect-bencher",
  "frost-ed25519",
  "hex",
  "rand_chacha 0.3.1",
@@ -3588,11 +3590,15 @@ dependencies = [
  "bytes",
  "chio-core-types",
  "chio-federation",
+ "chio-kernel",
+ "chio-kernel-core",
  "chio-metrics-spec",
  "chio-pheromone",
  "chio-pheromone-relay",
  "chio-pheromone-runtime",
  "chio-revocation-oracle",
+ "chio-runtime-core",
+ "chio-store-sqlite",
  "iroh",
  "iroh-blobs",
  "iroh-gossip",

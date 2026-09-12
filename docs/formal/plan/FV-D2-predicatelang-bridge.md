@@ -1,6 +1,7 @@
 # FV-D2: PredicateLang bridge soundness and the treaty-model swap
 
-Status: Implemented (2026-07-11)
+Status: Implemented (2026-07-11); structural occurrence theorems and the
+receipt-shape relation added 2026-09-11
 Theme: D - Widen the verified frontier
 Effort: M
 Depends on: none
@@ -30,7 +31,8 @@ file a transliteration.
 - `AtomTag` names production-shaped admission gates. There are no
   constant-false placeholders for supported atoms.
 - `supported` rejects any predicate containing `.unsupported`, before `neg` or
-  any other Boolean connective is evaluated.
+  any other Boolean connective is evaluated. `containsUnsupported` states the
+  occurrence form directly and is proved equal to `!supported` by induction.
 - `defined` rejects a supported predicate when a required projected value is
   unavailable. In particular, an unknown governance mode remains denied under
   negation.
@@ -64,8 +66,16 @@ that Rust enforces a Lean theorem.
 
 | Theorem | Established boundary |
 | --- | --- |
-| `unsupported_predicate_denies` | Any syntax tree containing an unsupported atom denies before Boolean evaluation |
-| `undefined_predicate_denies` | Missing projected semantics deny before Boolean evaluation |
+| `unsupported_predicate_denies` | A predicate rejected by `supported` denies before Boolean evaluation |
+| `undefined_predicate_denies` | A predicate rejected by `defined` denies before Boolean evaluation |
+| `containsUnsupported_eq_not_supported` | `supported` is false exactly when an unsupported atom occurs anywhere in the tree (induction over `Predicate`, every arm unfolded) |
+| `containsUndefined_eq_not_defined` | `defined` is false exactly when an undefined atom occurs anywhere in the tree (induction over `Predicate`, every arm unfolded) |
+| `contains_unsupported_denies` | Any syntax tree containing an unsupported atom, at any depth and under any connective, denies before Boolean evaluation |
+| `contains_undefined_denies` | Any syntax tree containing an undefined atom, at any depth and under any connective, denies before Boolean evaluation |
+| `supported_eq_all_atoms` | `supported` is the conjunction of `supportedAtom` over the collected atom list |
+| `defined_eq_all_atoms` | `defined` is the conjunction of `atomDefined` over the collected atom list |
+| `unsupported_atom_anywhere_denies` | An `unsupported` tag in the collected atom list forces denial on every view |
+| `undefined_atom_anywhere_denies` | An atom undefined for the view in the collected atom list forces denial |
 | `negated_unknown_atom_denies` | Direct regression for unknown syntax under negation |
 | `negated_unknown_mode_denies` | Direct regression for an unavailable mode under negation |
 | `runtime_admission_policy_exact` | Admission is exactly support, definition, and truth of every registered modeled gate |
@@ -76,6 +86,10 @@ that Rust enforces a Lean theorem.
 | `bridge_global_iff` | Global refinement agrees in both representations |
 | `toClosure_treatyAdmits_agrees` | Treaty admission agrees pointwise after lifting |
 | `toClosure_amendmentVerdict_agrees` | Computed amendment verdict agrees after lifting |
+| `PredicateShape.ofReceipt_injective` | The connective-preserving lift of an injective atom map from `ReceiptPredicate.Predicate` is injective |
+| `PredicateShape.eval_ofReceipt` | Boolean evaluation of the lifted predicate agrees with receipt evaluation under pointwise atom agreement |
+| `PredicateShape.denote_ofReceipt` | Fail-closed denotation agrees with receipt evaluation on the supported-and-defined image |
+| `PredicateShape.denote_ofReceipt_unsupported` | Any receipt atom mapped to an unsupported tag makes the lifted predicate deny |
 
 `IntersectionSyntactic.lean` re-proves the four treaty results and includes an
 executable non-trivial amendment. The old constitution accepts a policy-denied
@@ -101,7 +115,11 @@ symbolic completeness proof.
 ## Mutation calibration
 
 The Lean mutation allowlist includes the fail-closed predicate and amendment
-decision definitions. The mutation runner accepts only explicitly approved
+decision definitions together with the occurrence predicates
+`containsUnsupported` and `containsUndefined`. The structural characterization
+theorems unfold every arm of `supported` and `defined`, so the `top`, `bot`,
+and `disj` mutants of both definitions are observed. The atom collector
+`atoms` carries no mutable token and is deliberately not allowlisted. The mutation runner accepts only explicitly approved
 `Core` and `Treaty` source roots, retains the global activation threshold, and
 records per-source outcomes. Direct negative theorems for unsupported syntax,
 undefined mode interpretation, and rejected widening remain root-imported even
@@ -133,6 +151,17 @@ when mutation sampling rotates.
 - No inverse conversion from arbitrary closures to syntax. Bidirectionality is
   semantic equivalence on the image of `toClosure`, not representation
   isomorphism for arbitrary functions.
+- No denotation-agreeing atom injection between `ReceiptPredicate` and
+  `PredicateLang`. `Treaty/PredicateShape.lean` relates the two languages by
+  connective shape only. At a fixed admission view at most sixteen atom tags
+  can denote true, while `scopeContains` atoms separate arbitrarily many
+  receipts, so no atom map paired with a receipt-to-view map agrees on every
+  atom. In the other direction, an unsupported atom and its negation both
+  denote false, while exactly one of a receipt predicate and its negation is
+  true. No field-wise injection `ReceiptView -> AdmissionView` exists either
+  (`ladderModeRank : Nat` against five modes; hash, continuation, decision,
+  failure-code, and digest fields have no counterpart). Agreement is proved on
+  the supported-and-defined image only.
 
 ## Manifest and registry updates
 

@@ -48,6 +48,14 @@ name = "refinesOnConstitution"
 path = "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean"
 
 [[definition]]
+name = "containsUnsupported"
+path = "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean"
+
+[[definition]]
+name = "containsUndefined"
+path = "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean"
+
+[[definition]]
 name = "ofDecide"
 path = "formal/lean4/Chio/Chio/Treaty/IntersectionSyntactic.lean"
 

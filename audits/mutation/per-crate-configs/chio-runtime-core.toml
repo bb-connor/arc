@@ -1,0 +1,30 @@
+# Per-run config for the chio-runtime-core mutation baseline.
+# Same examine and exclude scope as the workspace .cargo/mutants.toml lane
+# entry, with additional_cargo_test_args scoped to the chio-runtime-core
+# package so the oracle is the crate's own test suite. This matches the
+# mutants-pr lane, which runs the per-crate config with
+# `--test-workspace false`; the hosted nightly sweep remains the
+# authoritative workspace-scope measurement.
+
+additional_cargo_test_args = ["--package", "chio-runtime-core"]
+timeout_multiplier = 3.0
+minimum_test_timeout = 60
+
+examine_globs = [
+    "crates/kernel/chio-runtime-core/src/admission_hook.rs",
+    "crates/kernel/chio-runtime-core/src/admission_hook/dsse.rs",
+    "crates/kernel/chio-runtime-core/src/admission_hook/treaty_evidence.rs",
+    "crates/kernel/chio-runtime-core/src/treaty.rs",
+    "crates/kernel/chio-runtime-core/src/treaty/predicate.rs",
+    "crates/kernel/chio-runtime-core/src/store/sqlite/admission_replay.rs",
+]
+
+exclude_globs = [
+    "**/tests.rs",
+    "**/test_*.rs",
+    "**/*_test.rs",
+    "**/tests/**",
+    "**/benches/**",
+    "**/build.rs",
+    "**/fuzz.rs",
+]

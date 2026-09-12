@@ -2,8 +2,9 @@
 \label{sec:model-ra}
 
 The model abstracts away the OS executor, the canonical JSON encoder,
-and the receipt ledger; those lower layers are audited assumptions in
-the proof manifest. The institutional core that remains is the
+and the receipt ledger; those lower layers are substrate-level
+obligations outside the model, discharged by code citation rather than
+by mechanized refinement. The institutional core that remains is the
 executive-action type, its TTL invariant, the rollback receipt, the
 TTL-bounded amendment chain, and the composition theorem connecting
 the response side to the parent paper's amendment side.
@@ -26,8 +27,8 @@ optional rollback receipt. The expiry $\mathit{t_{\text{expires}}} =
 The action is closed at instant $t$ iff a rollback receipt exists with
 $\mathit{rolledBackAt} \le t$ or the TTL window has elapsed by $t$.
 This is recorded as the definitional bridge
-\thm{rollback_closes_or_ttl_window_active}, which discharges to
-\emph{rfl} after case analysis on the rollback option. The bridge is
+\thm{rollback_closes_or_ttl_window_active}, which discharges by a
+case split on the TTL window. The bridge is
 not the headline theorem; it documents the relationship between the
 type-level fields and the propositional closure claim, in the same
 role \thm{amendment_admissible_iff_backward_refinement} plays for the
@@ -108,30 +109,36 @@ instant.}
 \paragraph{The composition theorem.}
 The headline composition theorem
 \thm{ttl_bounded_amendment_chain_preserves_baseline} states that a
-chain of TTL-bounded amendments, each carrying two witnesses (one
-that the pre-amendment constitution backward-refines a fixed baseline,
-and one per-step witness that the post-amendment constitution
-backward-refines the pre-amendment constitution), preserves the
-baseline at every instant:
+chain of TTL-bounded amendments, each carrying two witnesses over one
+explicit finite admission domain $D$ (one that the pre-amendment
+constitution backward-refines a fixed baseline on $D$, and one per-step
+witness that the post-amendment constitution backward-refines the
+pre-amendment constitution on $D$), preserves the baseline on $D$ at
+every instant:
 \[
   \forall t,\, \forall A \in \mathit{chain},\
-    \mathsf{BackwardRefines}\bigl(\mathsf{activeAt}(A, t),\, \mathit{baseline}\bigr).
+    \mathsf{BackwardRefines}\bigl(\mathsf{activeAt}(A, t),\, \mathit{baseline},\, D\bigr).
 \]
-The conclusion is pointwise over $A \in \mathit{chain}$ under a
-universal quantifier, not inductive over an evolving state. For each
-amendment $A$, the proof case-splits on the $\mathsf{activeAt}$
+Here $\mathsf{BackwardRefines}(c', c, D)$ is the substrate's
+domain-scoped refinement: every admission view in $D$ that $c'$ admits
+is admitted by $c$. The statement is finite-domain, matching the
+witness the substrate's amendment check carries; it says nothing about
+views outside $D$. The conclusion is pointwise over $A \in \mathit{chain}$
+under a universal quantifier, not inductive over an evolving state. For
+each amendment $A$, the proof case-splits on the $\mathsf{activeAt}$
 conditional. Outside the window,
 $\mathsf{activeAt}(A, t) = \delta.\mathit{old}$, and the conclusion is
 the post-expiry hypothesis
-$\mathsf{BackwardRefines}(\delta.\mathit{old}, \mathit{baseline})$
+$\mathsf{BackwardRefines}(\delta.\mathit{old}, \mathit{baseline}, D)$
 applied directly. Inside the window,
 $\mathsf{activeAt}(A, t) = \delta.\mathit{new}$, and the conclusion
 composes the per-step witness
-$\mathsf{BackwardRefines}(\delta.\mathit{new}, \delta.\mathit{old})$
-with the post-expiry hypothesis through transitivity of
-$\mathsf{BackwardRefines}$. Both arms consume the per-step witnesses
-as data rather than discharging by reflexivity, so each amendment in
-the chain contributes substantive content.
+$\mathsf{BackwardRefines}(\delta.\mathit{new}, \delta.\mathit{old}, D)$
+with the post-expiry hypothesis: a view in $D$ admitted by
+$\delta.\mathit{new}$ is admitted by $\delta.\mathit{old}$ and hence by
+the baseline. Both arms consume the per-step witnesses as data rather
+than discharging by reflexivity, so each amendment in the chain
+contributes substantive content.
 
 The shape is the response-side counterpart of the parent paper's
 \thm{essential_preserved_chain}, which composes per-step essential-
@@ -147,13 +154,14 @@ witness that the discharge consumes as data.
 The supporting reduction \thm{rollback_admission_composes_with_refinement}
 states that a rollback receipt admissible under the post-amendment
 syntactic constitution remains admissible under the pre-amendment
-syntactic constitution given the syntactic refinement witness over
-$\mathsf{admits}$:
+syntactic constitution given the global syntactic refinement witness
+over $\mathsf{admits}$, where $\mathit{rb}$ is the rollback receipt's
+admission view:
 \[
   \mathsf{admits}(c_{\text{new}}, \mathit{rb}) = \text{true}
-    \;\wedge\; \bigl(\forall \mathit{rid},\,
-       \mathsf{admits}(c_{\text{new}}, \mathit{rid}) = \text{true}
-       \Rightarrow \mathsf{admits}(c_{\text{old}}, \mathit{rid}) = \text{true}\bigr)
+    \;\wedge\; \bigl(\forall v,\,
+       \mathsf{admits}(c_{\text{new}}, v) = \text{true}
+       \Rightarrow \mathsf{admits}(c_{\text{old}}, v) = \text{true}\bigr)
     \;\Rightarrow\; \mathsf{admits}(c_{\text{old}}, \mathit{rb}) = \text{true}.
 \]
 The proof is a direct application of the refinement hypothesis to the
