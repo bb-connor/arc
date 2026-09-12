@@ -11,6 +11,7 @@ timeout_multiplier = 3.0
 minimum_test_timeout = 60
 
 examine_globs = [
+    "crates/trust/chio-federation/src/bilateral.rs",
     "crates/trust/chio-federation/src/bilateral_dsse.rs",
     "crates/trust/chio-federation/src/bilateral_dsse/builder.rs",
     "crates/trust/chio-federation/src/bilateral_dsse/policy.rs",

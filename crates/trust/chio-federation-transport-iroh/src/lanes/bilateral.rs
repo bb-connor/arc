@@ -53,6 +53,8 @@
 //! sign/verify the exact bytes received).
 
 use std::collections::HashMap;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use chio_core_types::Ed25519Backend;
@@ -62,8 +64,12 @@ use chio_core_types::Signature;
 use chio_core_types::SigningBackend;
 use chio_federation::bilateral::BilateralCoSigningError;
 use chio_federation::bilateral::BilateralCoSigningProtocol;
+use chio_federation::bilateral::CoSigningBody;
+use chio_federation::bilateral::CoSigningRequest;
+use chio_federation::bilateral::CoSigningResponse;
 use chio_federation::bilateral::DsseCoSigningRequest;
 use chio_federation::bilateral::DsseCoSigningResponse;
+use chio_federation::bilateral::BILATERAL_COSIGNING_SCHEMA;
 use chio_federation::bilateral::BILATERAL_DSSE_COSIGNING_SCHEMA;
 use iroh::endpoint::Connection;
 use iroh::endpoint::RecvStream;
@@ -265,6 +271,38 @@ impl WireReply {
         Self::Err { code, detail }
     }
 
+    /// Client-side: fold a receipt-profile reply frame back into the contract's
+    /// Result. Identical to [`Self::into_result`] except that an `Ok` frame must
+    /// carry the receipt profile's schema tag, so a reply minted under the DSSE
+    /// profile can never be accepted here.
+    fn into_receipt_result(self) -> Result<CoSigningResponse, BilateralCoSigningError> {
+        match self {
+            Self::Ok {
+                schema,
+                org_a_signature,
+            } => {
+                if schema != BILATERAL_COSIGNING_SCHEMA {
+                    return Err(BilateralCoSigningError::UnsupportedSchema(schema));
+                }
+                Ok(CoSigningResponse {
+                    schema,
+                    org_a_signature,
+                })
+            }
+            Self::Err { code, detail } => Err(match code {
+                WireErrorCode::UnsupportedSchema => {
+                    BilateralCoSigningError::UnsupportedSchema(detail)
+                }
+                WireErrorCode::UnknownPeer => BilateralCoSigningError::UnknownPeer(detail),
+                WireErrorCode::PeerExpired => BilateralCoSigningError::PeerExpired(detail),
+                WireErrorCode::OrgBSignatureInvalid => {
+                    BilateralCoSigningError::OrgBSignatureInvalid
+                }
+                WireErrorCode::PeerRejected => BilateralCoSigningError::PeerRejected(detail),
+            }),
+        }
+    }
+
     /// Client-side: fold the reply frame back into the contract's Result.
     fn into_result(self) -> Result<DsseCoSigningResponse, BilateralCoSigningError> {
         match self {
@@ -424,6 +462,12 @@ pub struct IrohBilateralCoSigner {
     /// that accepts but never replies cannot hang the caller forever. Generous by
     /// default; tune via [`IrohBilateralCoSigner::with_accept_limits`].
     limits: AcceptLimitConfig,
+    /// QUIC connections this co-signer has opened to Org A, counted across both
+    /// profiles and shared by every clone. Read it through
+    /// [`IrohBilateralCoSigner::connections_opened`] to observe how many co-sign
+    /// hops a workload actually cost instead of inferring the number from the
+    /// protocol.
+    connections: Arc<AtomicU64>,
 }
 
 impl core::fmt::Debug for IrohBilateralCoSigner {
@@ -444,7 +488,17 @@ impl IrohBilateralCoSigner {
             endpoint,
             address_book,
             limits: AcceptLimitConfig::default(),
+            connections: Arc::new(AtomicU64::new(0)),
         }
+    }
+
+    /// How many QUIC connections this co-signer has opened to Org A since it was
+    /// built, across the DSSE and receipt profiles. Clones share the counter, so
+    /// one handle reports every hop the kernel made through it. Monotone and
+    /// saturating.
+    #[must_use]
+    pub fn connections_opened(&self) -> u64 {
+        self.connections.load(Ordering::SeqCst)
     }
 
     /// Override the default client-side slowloris bounds (per-phase timeouts on
@@ -480,10 +534,100 @@ impl IrohBilateralCoSigner {
         )
         .await?
         .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
+        self.connections.fetch_add(1, Ordering::SeqCst);
 
         let result = self.exchange(&connection, request).await;
         connection.close(VarInt::from_u32(CLOSE_OK), b"done");
         result
+    }
+
+    /// Async transport of the RECEIPT co-signing exchange (profile 2).
+    ///
+    /// This is the hop `ChioKernel::apply_federation_cosign` makes first, through
+    /// `chio_federation::bilateral::co_sign_with_origin`, before the DSSE hop. Org B
+    /// re-derives the canonical [`CoSigningBody`] bytes from the receipt it is
+    /// holding and sends those bytes verbatim, so Org A signs exactly what Org B
+    /// signed. The caller verifies `org_a_signature` over the same bytes, which
+    /// `co_sign_with_origin` already does.
+    pub async fn request_cosignature_over_iroh(
+        &self,
+        request: &CoSigningRequest,
+    ) -> Result<CoSigningResponse, BilateralCoSigningError> {
+        if request.schema != BILATERAL_COSIGNING_SCHEMA {
+            return Err(BilateralCoSigningError::UnsupportedSchema(
+                request.schema.clone(),
+            ));
+        }
+        let body = CoSigningBody::from_receipt(
+            &request.body,
+            &request.org_a_kernel_id,
+            &request.org_b_kernel_id,
+        )?;
+        let body_bytes = body.canonical_bytes()?;
+
+        let addr = self
+            .address_book
+            .address_of(&request.org_a_kernel_id)
+            .ok_or_else(|| BilateralCoSigningError::UnknownPeer(request.org_a_kernel_id.clone()))?;
+
+        let connection = client_bounded(
+            &self.limits,
+            AcceptPhase::AcceptStream,
+            self.endpoint.connect(addr, ALPN_BILATERAL_RECEIPT_COSIGN),
+        )
+        .await?
+        .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
+        self.connections.fetch_add(1, Ordering::SeqCst);
+
+        let result = self
+            .receipt_exchange(&connection, request, body_bytes)
+            .await;
+        connection.close(VarInt::from_u32(CLOSE_OK), b"done");
+        result
+    }
+
+    /// The receipt-profile bidi write-request / read-reply half, factored out so
+    /// the connection is always closed exactly once by the caller.
+    async fn receipt_exchange(
+        &self,
+        connection: &Connection,
+        request: &CoSigningRequest,
+        body_bytes: Vec<u8>,
+    ) -> Result<CoSigningResponse, BilateralCoSigningError> {
+        let (mut send, mut recv) = client_bounded(
+            &self.limits,
+            AcceptPhase::AcceptStream,
+            connection.open_bi(),
+        )
+        .await?
+        .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
+
+        let wire = WireReceiptCoSigningRequest {
+            schema: request.schema.clone(),
+            org_a_kernel_id: request.org_a_kernel_id.clone(),
+            org_b_kernel_id: request.org_b_kernel_id.clone(),
+            body_bytes,
+            org_b_signature: request.org_b_signature.clone(),
+        };
+        let request_bytes = serde_json::to_vec(&wire)
+            .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
+        client_bounded(
+            &self.limits,
+            AcceptPhase::WriteResponse,
+            write_frame(&mut send, &request_bytes),
+        )
+        .await?
+        .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
+        send.finish()
+            .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
+
+        let reply_bytes =
+            client_bounded(&self.limits, AcceptPhase::ReadFrame, read_frame(&mut recv))
+                .await?
+                .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
+        let reply: WireReply = serde_json::from_slice(&reply_bytes)
+            .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
+        reply.into_receipt_result()
     }
 
     /// The bidi write-request / read-reply half, factored out so the connection
@@ -547,17 +691,53 @@ where
     }
 }
 
+/// Drive one async lane exchange from the synchronous
+/// [`BilateralCoSigningProtocol`] contract. On a multi-threaded tokio runtime the
+/// blocking wait moves off the async worker with `block_in_place`; off a runtime
+/// entirely a private current-thread runtime is spun up for the call. On a
+/// CURRENT-THREAD runtime `block_in_place` would panic, so the bridge fails closed
+/// with a typed error naming the async method the caller should have used.
+fn block_on_lane<T, F>(
+    exchange: impl FnOnce() -> F,
+    method: &str,
+) -> Result<T, BilateralCoSigningError>
+where
+    F: std::future::Future<Output = Result<T, BilateralCoSigningError>>,
+{
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) => match handle.runtime_flavor() {
+            tokio::runtime::RuntimeFlavor::MultiThread => {
+                tokio::task::block_in_place(|| handle.block_on(exchange()))
+            }
+            _ => Err(BilateralCoSigningError::TransportFailure(format!(
+                "{method} invoked on a current-thread tokio runtime; call \
+                 {method}_over_iroh (async) instead of blocking"
+            ))),
+        },
+        Err(_) => {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
+            runtime.block_on(exchange())
+        }
+    }
+}
+
 impl BilateralCoSigningProtocol for IrohBilateralCoSigner {
+    /// Synchronous contract entry point for the receipt profile. Bridges to
+    /// [`Self::request_cosignature_over_iroh`] under the same runtime rules as
+    /// [`Self::request_dsse_cosignature`]: `block_in_place` on a multi-threaded
+    /// runtime, a private runtime off-runtime, and a typed `TransportFailure` on a
+    /// current-thread runtime rather than the panic `block_in_place` would raise.
     fn request_cosignature(
         &self,
-        request: &chio_federation::bilateral::CoSigningRequest,
-    ) -> Result<chio_federation::bilateral::CoSigningResponse, BilateralCoSigningError> {
-        // This lane implements the DSSE PAE profile only; the legacy detached
-        // CoSigningBody profile is out of scope and rejected fail-closed.
-        let _ = request;
-        Err(BilateralCoSigningError::UnsupportedSchema(
-            chio_federation::bilateral::BILATERAL_COSIGNING_SCHEMA.to_string(),
-        ))
+        request: &CoSigningRequest,
+    ) -> Result<CoSigningResponse, BilateralCoSigningError> {
+        block_on_lane(
+            || self.request_cosignature_over_iroh(request),
+            "request_cosignature",
+        )
     }
 
     /// Synchronous contract entry point. Bridges to
@@ -570,30 +750,10 @@ impl BilateralCoSigningProtocol for IrohBilateralCoSigner {
         &self,
         request: &DsseCoSigningRequest,
     ) -> Result<DsseCoSigningResponse, BilateralCoSigningError> {
-        match tokio::runtime::Handle::try_current() {
-            Ok(handle) => match handle.runtime_flavor() {
-                tokio::runtime::RuntimeFlavor::MultiThread => tokio::task::block_in_place(|| {
-                    handle.block_on(self.request_dsse_cosignature_over_iroh(request))
-                }),
-                // `block_in_place` panics on a current-thread runtime; fail closed with a
-                // typed error instead of crashing during DSSE co-signing. A caller on a
-                // current-thread runtime must use the async method directly.
-                _ => Err(BilateralCoSigningError::TransportFailure(
-                    "request_dsse_cosignature invoked on a current-thread tokio runtime; \
-                     call request_dsse_cosignature_over_iroh (async) instead of blocking"
-                        .to_string(),
-                )),
-            },
-            Err(_) => {
-                let runtime = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .map_err(|error| {
-                        BilateralCoSigningError::TransportFailure(error.to_string())
-                    })?;
-                runtime.block_on(self.request_dsse_cosignature_over_iroh(request))
-            }
-        }
+        block_on_lane(
+            || self.request_dsse_cosignature_over_iroh(request),
+            "request_dsse_cosignature",
+        )
     }
 }
 
@@ -699,74 +859,27 @@ impl BilateralCoSignHandler {
                 request.schema.clone(),
             ));
         }
-        // This server must be the origin (Org A) the request is addressed to.
-        if request.org_a_kernel_id != self.origin_kernel_id {
-            return Err(BilateralCoSigningError::UnknownPeer(
-                request.org_a_kernel_id.clone(),
-            ));
-        }
-        // ONE directory snapshot for the WHOLE verification. Load the current verified
-        // directory ONCE and use it for BOTH the transport-origin
-        // authorization AND the passport-key lookup. Consulting the gate twice (a
-        // `resolve` for the endpoint, then a separate `directory()` for the key) could
-        // straddle a live directory reload: the endpoint might authorize against the OLD
-        // directory while the key is read from the NEW one. In the endpoint-rotation case
-        // where the new directory keeps the same passport key for that kernel but no longer
-        // binds its `EndpointId`, the co-signature would verify even though the CURRENT
-        // directory no longer authorizes the remote endpoint. Holding one owned snapshot Arc
-        // (ArcSwap `load_full`) also keeps the backing directory alive for the borrowed key.
-        let directory = self.gate.directory();
-        // Transport-origin binding: the authenticated EndpointId must resolve to the claimed
-        // Org B kernel id IN THIS SNAPSHOT. `authorize` returns None for unbound/removed
-        // peers (trust + rotation window at the directory layer); the gate should already
-        // have rejected those at handshake, so None here is defense in depth. A
-        // resolved-but-mismatched id means the caller claimed to be a different peer than it
-        // authenticated as: fail closed.
-        let resolved = directory
-            .authorize(remote)
-            .ok_or_else(|| BilateralCoSigningError::UnknownPeer(request.org_b_kernel_id.clone()))?;
-        if resolved != request.org_b_kernel_id.as_str() {
-            return Err(BilateralCoSigningError::UnknownPeer(
-                request.org_b_kernel_id.clone(),
-            ));
-        }
-        // Org B's passport key (any algorithm), read from the SAME issuer-signed snapshot
-        // the endpoint was just authorized against. Sourcing the DSSE-verification key from
-        // the verified directory (not only a separately-fed pinned map that can lag it) means
-        // a rotated-away / revoked passport - one the current directory no longer binds - can
-        // never be used to obtain Org A's co-signature. Fail-closed: an unknown or removed
-        // peer has no directory-bound passport key.
-        let directory_key = directory
-            .resolve_passport_key(&request.org_b_kernel_id)
-            .ok_or_else(|| BilateralCoSigningError::UnknownPeer(request.org_b_kernel_id.clone()))?;
-        // The pinned map is Org A's co-signing allowlist (which admitted peers it
-        // will co-sign for): the peer MUST be pinned. Defense in depth: the pinned
-        // key MUST also agree with the directory's current binding. A pinned key
-        // that lags the signed directory (differs from the current binding) is
-        // refused BEFORE signing rather than silently overriding the verified
-        // snapshot - fail-closed on mismatch/lag.
-        let pinned_key = self
-            .passport_keys
-            .passport_key(&request.org_b_kernel_id)
-            .ok_or_else(|| BilateralCoSigningError::UnknownPeer(request.org_b_kernel_id.clone()))?;
-        if pinned_key != *directory_key {
-            return Err(BilateralCoSigningError::OrgBSignatureInvalid);
-        }
-        // Verify Org B's signature over the exact pae_bytes against the
-        // directory-bound key (above iroh; the pinned map having been proven to
-        // match it).
-        if !directory_key.verify(&request.pae_bytes, &request.org_b_signature) {
-            return Err(BilateralCoSigningError::OrgBSignatureInvalid);
-        }
-
-        // Success: sign the SAME opaque pae_bytes (never re-derived).
-        let backend = Ed25519Backend::new(self.origin_keypair.clone());
-        let signature = backend
-            .sign_bytes(&request.pae_bytes)
-            .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
+        // Sign the SAME opaque pae_bytes the peer sent (never re-derived), once the
+        // shared accept-side decision has bound the transport origin to the claimed
+        // peer and verified Org B's signature over those exact bytes.
+        let org_a_signature = cosign_bytes(
+            CoSignAuthority {
+                gate: &self.gate,
+                origin_kernel_id: &self.origin_kernel_id,
+                origin_keypair: &self.origin_keypair,
+                passport_keys: self.passport_keys.as_ref(),
+            },
+            CoSignSubject {
+                remote,
+                org_a_kernel_id: &request.org_a_kernel_id,
+                org_b_kernel_id: &request.org_b_kernel_id,
+                signed_bytes: &request.pae_bytes,
+                org_b_signature: &request.org_b_signature,
+            },
+        )?;
         Ok(DsseCoSigningResponse {
             schema: BILATERAL_DSSE_COSIGNING_SCHEMA.to_string(),
-            org_a_signature: signature,
+            org_a_signature,
         })
     }
 }
@@ -869,6 +982,324 @@ impl ProtocolHandler for BilateralCoSignHandler {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Profile 2 (receipt co-sign): the kernel's detached `CoSigningBody` hop
+// ---------------------------------------------------------------------------
+
+/// SPEC-FIXED ALPN for the receipt co-sign profile of lane d.
+///
+/// An admitted federated call makes TWO co-signing round trips: the kernel first
+/// asks Org A to sign the canonical [`chio_federation::bilateral::CoSigningBody`]
+/// of the receipt it just signed (`request_cosignature`), and only then asks for
+/// the DSSE PAE signature (`request_dsse_cosignature`). The two profiles sign
+/// different preimages under different schema tags, so they ride separate ALPNs
+/// and separate handlers; neither can be replayed as the other.
+pub const ALPN_BILATERAL_RECEIPT_COSIGN: &[u8] = b"chio/federation/bilateral-receipt-cosign/1";
+
+/// Serde wire frame for the receipt co-sign profile.
+///
+/// The frame carries the canonical [`chio_federation::bilateral::CoSigningBody`]
+/// bytes rather than the receipt, so Org A signs the exact bytes Org B signed and
+/// never re-canonicalises a structure it did not author (the same opaque-bytes
+/// discipline the DSSE profile uses for `pae_bytes`). Org B derives the bytes from
+/// the receipt it is holding; a byte-level disagreement between the two sides can
+/// therefore only fail closed at the signature check.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct WireReceiptCoSigningRequest {
+    schema: String,
+    org_a_kernel_id: String,
+    org_b_kernel_id: String,
+    /// Canonical JSON of the `CoSigningBody`; signed and verified verbatim.
+    body_bytes: Vec<u8>,
+    /// Algorithm-tagged (serde hex); round-trips every passport algorithm.
+    org_b_signature: Signature,
+}
+
+/// Everything the accept side needs to decide whether it will co-sign at all.
+struct CoSignAuthority<'a> {
+    gate: &'a DirectoryGate,
+    origin_kernel_id: &'a str,
+    origin_keypair: &'a Keypair,
+    passport_keys: &'a dyn PinnedPassportKeys,
+}
+
+/// The one exchange being decided: who is asking, for whom, over which bytes.
+struct CoSignSubject<'a> {
+    remote: &'a EndpointId,
+    org_a_kernel_id: &'a str,
+    org_b_kernel_id: &'a str,
+    signed_bytes: &'a [u8],
+    org_b_signature: &'a Signature,
+}
+
+/// Shared accept-side decision for both profiles of lane d: bind the
+/// authenticated transport origin to the claimed peer, verify Org B's signature
+/// over the exact bytes it sent under the directory-bound passport key, and
+/// return Org A's signature over those same bytes.
+///
+/// The bytes are opaque here. Profile framing (which schema tag, which preimage)
+/// is the caller's business; what must not differ between profiles is who is
+/// allowed to obtain a signature, which is this function.
+fn cosign_bytes(
+    authority: CoSignAuthority<'_>,
+    subject: CoSignSubject<'_>,
+) -> Result<Signature, BilateralCoSigningError> {
+    // This server must be the origin (Org A) the request is addressed to.
+    if subject.org_a_kernel_id != authority.origin_kernel_id {
+        return Err(BilateralCoSigningError::UnknownPeer(
+            subject.org_a_kernel_id.to_string(),
+        ));
+    }
+    // ONE directory snapshot for the WHOLE verification. Load the current verified
+    // directory ONCE and use it for BOTH the transport-origin
+    // authorization AND the passport-key lookup. Consulting the gate twice (a
+    // `resolve` for the endpoint, then a separate `directory()` for the key) could
+    // straddle a live directory reload: the endpoint might authorize against the OLD
+    // directory while the key is read from the NEW one. In the endpoint-rotation case
+    // where the new directory keeps the same passport key for that kernel but no longer
+    // binds its `EndpointId`, the co-signature would verify even though the CURRENT
+    // directory no longer authorizes the remote endpoint. Holding one owned snapshot Arc
+    // (ArcSwap `load_full`) also keeps the backing directory alive for the borrowed key.
+    let directory = authority.gate.directory();
+    // Transport-origin binding: the authenticated EndpointId must resolve to the claimed
+    // Org B kernel id IN THIS SNAPSHOT. `authorize` returns None for unbound/removed
+    // peers (trust + rotation window at the directory layer); the gate should already
+    // have rejected those at handshake, so None here is defense in depth. A
+    // resolved-but-mismatched id means the caller claimed to be a different peer than it
+    // authenticated as: fail closed.
+    let resolved = directory
+        .authorize(subject.remote)
+        .ok_or_else(|| BilateralCoSigningError::UnknownPeer(subject.org_b_kernel_id.to_string()))?;
+    if resolved != subject.org_b_kernel_id {
+        return Err(BilateralCoSigningError::UnknownPeer(
+            subject.org_b_kernel_id.to_string(),
+        ));
+    }
+    // Org B's passport key (any algorithm), read from the SAME issuer-signed snapshot
+    // the endpoint was just authorized against. Sourcing the verification key from
+    // the verified directory (not only a separately-fed pinned map that can lag it) means
+    // a rotated-away / revoked passport - one the current directory no longer binds - can
+    // never be used to obtain Org A's co-signature. Fail-closed: an unknown or removed
+    // peer has no directory-bound passport key.
+    let directory_key = directory
+        .resolve_passport_key(subject.org_b_kernel_id)
+        .ok_or_else(|| BilateralCoSigningError::UnknownPeer(subject.org_b_kernel_id.to_string()))?;
+    // The pinned map is Org A's co-signing allowlist (which admitted peers it
+    // will co-sign for): the peer MUST be pinned. Defense in depth: the pinned
+    // key MUST also agree with the directory's current binding. A pinned key
+    // that lags the signed directory (differs from the current binding) is
+    // refused BEFORE signing rather than silently overriding the verified
+    // snapshot - fail-closed on mismatch/lag.
+    let pinned_key = authority
+        .passport_keys
+        .passport_key(subject.org_b_kernel_id)
+        .ok_or_else(|| BilateralCoSigningError::UnknownPeer(subject.org_b_kernel_id.to_string()))?;
+    if pinned_key != *directory_key {
+        return Err(BilateralCoSigningError::OrgBSignatureInvalid);
+    }
+    // Verify Org B's signature over the exact bytes against the directory-bound
+    // key (above iroh; the pinned map having been proven to match it).
+    if !directory_key.verify(subject.signed_bytes, subject.org_b_signature) {
+        return Err(BilateralCoSigningError::OrgBSignatureInvalid);
+    }
+
+    // Success: sign the SAME opaque bytes (never re-derived).
+    let backend = Ed25519Backend::new(authority.origin_keypair.clone());
+    backend
+        .sign_bytes(subject.signed_bytes)
+        .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))
+}
+
+/// Org A's accept-side handler for the receipt co-sign profile. Mounted on
+/// `Router::builder(ep).accept(ALPN_BILATERAL_RECEIPT_COSIGN, handler)` behind the
+/// same [`DirectoryGate`] as the DSSE profile.
+///
+/// Performs exactly the verification `InProcessCoSigner::request_cosignature`
+/// does, plus the transport-origin binding, and signs the canonical
+/// `CoSigningBody` bytes the peer sent instead of re-deriving them from a receipt
+/// it did not author.
+pub struct BilateralReceiptCoSignHandler {
+    gate: DirectoryGate,
+    origin_kernel_id: String,
+    origin_keypair: Keypair,
+    passport_keys: Arc<dyn PinnedPassportKeys>,
+    limiter: AcceptLimiter,
+}
+
+impl core::fmt::Debug for BilateralReceiptCoSignHandler {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        // Never render key material.
+        f.debug_struct("BilateralReceiptCoSignHandler")
+            .field("origin_kernel_id", &self.origin_kernel_id)
+            .finish_non_exhaustive()
+    }
+}
+
+impl BilateralReceiptCoSignHandler {
+    /// Build the handler from the shared admission gate, Org A's identity and
+    /// signing key, and the pinned Org B passport keys.
+    #[must_use]
+    pub fn new(
+        gate: DirectoryGate,
+        origin_kernel_id: impl Into<String>,
+        origin_keypair: Keypair,
+        passport_keys: Arc<dyn PinnedPassportKeys>,
+    ) -> Self {
+        Self {
+            gate,
+            origin_kernel_id: origin_kernel_id.into(),
+            origin_keypair,
+            passport_keys,
+            limiter: AcceptLimiter::default(),
+        }
+    }
+
+    /// Override the default accept-hardening bounds (per-phase timeouts + the
+    /// in-flight concurrency cap).
+    #[must_use]
+    pub fn with_accept_limits(mut self, config: AcceptLimitConfig) -> Self {
+        self.limiter = AcceptLimiter::new(config);
+        self
+    }
+
+    /// Pure verification + co-signature, decoupled from the stream so the
+    /// fail-closed no-signature paths are unit-testable without a live handshake.
+    fn cosign(
+        &self,
+        remote: &EndpointId,
+        request: &WireReceiptCoSigningRequest,
+    ) -> Result<CoSigningResponse, BilateralCoSigningError> {
+        let result = self.cosign_inner(remote, request);
+        if let Err(error) = &result {
+            let reason = bilateral_reason(error);
+            crate::metrics::record_verify_failure(crate::metrics::SEAM_BILATERAL, reason);
+            tracing::warn!(
+                target: crate::observability::TARGET_VERIFY,
+                seam = crate::metrics::SEAM_BILATERAL,
+                reason = reason,
+                "bilateral receipt co-sign refused without signing"
+            );
+        }
+        result
+    }
+
+    fn cosign_inner(
+        &self,
+        remote: &EndpointId,
+        request: &WireReceiptCoSigningRequest,
+    ) -> Result<CoSigningResponse, BilateralCoSigningError> {
+        if request.schema != BILATERAL_COSIGNING_SCHEMA {
+            return Err(BilateralCoSigningError::UnsupportedSchema(
+                request.schema.clone(),
+            ));
+        }
+        let org_a_signature = cosign_bytes(
+            CoSignAuthority {
+                gate: &self.gate,
+                origin_kernel_id: &self.origin_kernel_id,
+                origin_keypair: &self.origin_keypair,
+                passport_keys: self.passport_keys.as_ref(),
+            },
+            CoSignSubject {
+                remote,
+                org_a_kernel_id: &request.org_a_kernel_id,
+                org_b_kernel_id: &request.org_b_kernel_id,
+                signed_bytes: &request.body_bytes,
+                org_b_signature: &request.org_b_signature,
+            },
+        )?;
+        Ok(CoSigningResponse {
+            schema: BILATERAL_COSIGNING_SCHEMA.to_string(),
+            org_a_signature,
+        })
+    }
+
+    /// One bounded request/response exchange. A co-sign REJECTION is delivered
+    /// IN-BAND as a typed [`WireReply::Err`] (never a signature) and returns `Ok`;
+    /// only genuine transport / codec / timeout failures reset the stream.
+    async fn serve(&self, connection: &Connection) -> Result<(), BilateralAcceptError> {
+        let remote = connection.remote_id();
+        let (mut send, mut recv) = self
+            .limiter
+            .bounded(AcceptPhase::AcceptStream, connection.accept_bi())
+            .await?
+            .map_err(|error| BilateralAcceptError::Transport(error.to_string()))?;
+
+        let request_bytes = self
+            .limiter
+            .bounded(AcceptPhase::ReadFrame, read_frame(&mut recv))
+            .await??;
+        let request: WireReceiptCoSigningRequest = serde_json::from_slice(&request_bytes)?;
+
+        let reply = match self.cosign(&remote, &request) {
+            Ok(response) => WireReply::Ok {
+                schema: response.schema,
+                org_a_signature: response.org_a_signature,
+            },
+            Err(error) => WireReply::err(&error),
+        };
+        let reply_bytes = serde_json::to_vec(&reply)?;
+        self.limiter
+            .bounded(
+                AcceptPhase::WriteResponse,
+                write_frame(&mut send, &reply_bytes),
+            )
+            .await??;
+        send.finish()
+            .map_err(|error| BilateralAcceptError::Transport(error.to_string()))?;
+        Ok(())
+    }
+}
+
+impl ProtocolHandler for BilateralReceiptCoSignHandler {
+    async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
+        use tracing::Instrument;
+        let _permit = match self.limiter.admit_peer(&connection.remote_id()).await {
+            Ok(permit) => permit,
+            Err(error) => {
+                crate::metrics::record_lane_frame(
+                    crate::metrics::LANE_BILATERAL,
+                    crate::metrics::LANE_OUTCOME_BUSY,
+                );
+                tracing::warn!(
+                    code = error.code(),
+                    "bilateral receipt lane shed accept (saturated)"
+                );
+                connection.close(error.close_code().into(), error.code().as_bytes());
+                return Err(AcceptError::from_err(error));
+            }
+        };
+        let span = crate::observability::lane_accept_span(crate::metrics::LANE_BILATERAL);
+        let _open = crate::metrics::AcceptOpenGuard::enter(crate::metrics::LANE_BILATERAL);
+        let started = std::time::Instant::now();
+        let result = self.serve(&connection).instrument(span.clone()).await;
+        crate::metrics::observe_accept_duration_nanos(
+            crate::metrics::LANE_BILATERAL,
+            u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX),
+        );
+        match result {
+            Ok(()) => {
+                crate::metrics::record_lane_frame(
+                    crate::metrics::LANE_BILATERAL,
+                    crate::metrics::LANE_OUTCOME_ACCEPT,
+                );
+                crate::observability::record_outcome(&span, crate::metrics::LANE_OUTCOME_ACCEPT);
+                self.limiter.linger(&connection).await;
+                Ok(())
+            }
+            Err(error) => {
+                let outcome = crate::metrics::accept_outcome_for_code(error.code());
+                crate::metrics::record_lane_frame(crate::metrics::LANE_BILATERAL, outcome);
+                crate::observability::record_outcome(&span, outcome);
+                tracing::warn!(code = error.code(), error = %error, "bilateral receipt lane reset");
+                connection.close(error.close_code().into(), error.code().as_bytes());
+                Err(AcceptError::from_err(error))
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
@@ -884,6 +1315,16 @@ mod tests {
     use crate::identity::VerifiedDirectory;
     use crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA;
     use chio_core_types::canonical_json_bytes;
+    use chio_core_types::receipt::body::ChioReceipt;
+    use chio_core_types::receipt::body::ChioReceiptBody;
+    use chio_core_types::receipt::decision::Decision;
+    use chio_core_types::receipt::decision::ToolCallAction;
+    use chio_core_types::receipt::kinds::BoundaryClass;
+    use chio_core_types::receipt::kinds::ReceiptKind;
+    use chio_core_types::receipt::kinds::RedactionMode;
+    use chio_core_types::receipt::kinds::ToolOrigin;
+    use chio_core_types::receipt::kinds::TrustLevel;
+    use chio_core_types::receipt::metadata::ActorRef;
     use chio_core_types::sha256_hex;
     use iroh::endpoint::presets;
     use iroh::protocol::Router;
@@ -1713,5 +2154,266 @@ mod tests {
         );
 
         router.shutdown().await.ok();
+    }
+
+    /// A receipt shaped like the one a receiver kernel signs before it asks the
+    /// origin to co-sign: the body the `CoSigningBody` preimage wraps.
+    fn host_signed_receipt(host: &Keypair) -> ChioReceipt {
+        let arguments = serde_json::json!({ "record": "ledger-7" });
+        ChioReceipt::sign(
+            ChioReceiptBody {
+                id: "invoke-receipt-cosign".to_string(),
+                timestamp: NOW / 1_000,
+                capability_id: "cap-receipt-cosign".to_string(),
+                tool_server: "vendor-ledger".to_string(),
+                tool_name: "close_account".to_string(),
+                action: ToolCallAction::from_parameters(arguments).expect("action"),
+                decision: Some(Decision::Allow),
+                receipt_kind: ReceiptKind::MediatedDecision,
+                boundary_class: BoundaryClass::Prevent,
+                observation_outcome: None,
+                tool_origin: ToolOrigin::CallerExecuted,
+                redaction_mode: RedactionMode::None,
+                actor_chain: vec![ActorRef {
+                    actor_id: "agent:test/receipt-cosign".to_string(),
+                    actor_kind: Some("agent".to_string()),
+                }],
+                content_hash: "4".repeat(64),
+                policy_hash: "policy-receipt-cosign".to_string(),
+                evidence: Vec::new(),
+                metadata: None,
+                trust_level: TrustLevel::default(),
+                tenant_id: None,
+                kernel_key: host.public_key(),
+                bbs_projection_version: None,
+            },
+            host,
+        )
+        .expect("receipt signs")
+    }
+
+    /// Stand up Org A with the RECEIPT co-sign handler mounted instead of the DSSE
+    /// one. Mirrors [`spawn_org_a`] so the two profiles differ only in the lane.
+    async fn spawn_org_a_receipt_profile(
+        org_a: &Peer,
+        gate: DirectoryGate,
+        passport_keys: Arc<dyn PinnedPassportKeys>,
+    ) -> (EndpointAddr, Router) {
+        let endpoint = Endpoint::builder(presets::Minimal)
+            .secret_key(org_a.transport_secret.clone())
+            .relay_mode(RelayMode::Disabled)
+            .bind_addr((Ipv4Addr::LOCALHOST, 0))
+            .expect("valid loopback bind addr")
+            .hooks(gate.clone())
+            .bind()
+            .await
+            .expect("org a endpoint binds");
+
+        let socket = endpoint.bound_sockets()[0];
+        let addr = EndpointAddr::new(org_a.transport_id).with_ip_addr(socket);
+
+        let handler = BilateralReceiptCoSignHandler::new(
+            gate,
+            org_a.kernel_id.clone(),
+            org_a.passport.clone(),
+            passport_keys,
+        );
+        let router = Router::builder(endpoint)
+            .accept(ALPN_BILATERAL_RECEIPT_COSIGN, handler)
+            .spawn();
+        (addr, router)
+    }
+
+    /// Org B signs the canonical co-signing body and assembles the request the
+    /// kernel's `co_sign_with_origin` would assemble.
+    fn org_b_receipt_request(org_b: &Peer, org_a_kernel_id: &str) -> CoSigningRequest {
+        let receipt = host_signed_receipt(&org_b.passport);
+        let body = CoSigningBody::from_receipt(&receipt, org_a_kernel_id, &org_b.kernel_id)
+            .expect("co-signing body");
+        let bytes = body.canonical_bytes().expect("canonical bytes");
+        CoSigningRequest::new(
+            receipt,
+            org_a_kernel_id.to_string(),
+            org_b.kernel_id.clone(),
+            org_b.passport.sign(&bytes),
+        )
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn receipt_cosign_completes_the_kernel_contract_over_the_lane() {
+        let org_a = Peer::new(ORIGIN_KERNEL, 30, 3);
+        let org_b = Peer::new(TOOL_HOST_KERNEL, 31, 4);
+        let gate = DirectoryGate::new(verified_directory(&[&org_a, &org_b]));
+
+        let (addr, _router) = spawn_org_a_receipt_profile(&org_a, gate, pinned_org_b(&org_b)).await;
+        let cosigner = spawn_org_b(&org_b, ORIGIN_KERNEL, addr).await;
+        assert_eq!(cosigner.connections_opened(), 0);
+
+        // The exact contract `ChioKernel::apply_federation_cosign` drives: Org B
+        // signs its own receipt body, the origin co-signs the same bytes across the
+        // network, and the assembled dual-signed receipt verifies under both keys.
+        let receipt = host_signed_receipt(&org_b.passport);
+        let dual = tokio::task::spawn_blocking({
+            let cosigner = cosigner.clone();
+            let org_a_public = org_a.passport.public_key();
+            let org_b_passport = org_b.passport.clone();
+            move || {
+                chio_federation::bilateral::co_sign_with_origin(
+                    ORIGIN_KERNEL,
+                    &org_a_public,
+                    TOOL_HOST_KERNEL,
+                    &org_b_passport,
+                    receipt,
+                    &cosigner,
+                )
+            }
+        })
+        .await
+        .expect("join")
+        .expect("the kernel's co-sign hop completes over iroh");
+
+        assert_eq!(dual.org_a_kernel_id, ORIGIN_KERNEL);
+        assert_eq!(dual.org_b_kernel_id, TOOL_HOST_KERNEL);
+        dual.verify(&org_a.passport.public_key(), &org_b.passport.public_key())
+            .expect("the dual-signed receipt verifies under both passports");
+        // One QUIC connection per receipt co-sign hop, counted at the co-signer:
+        // the hop count an experiment reports is an observation, not an assumption.
+        assert_eq!(cosigner.connections_opened(), 1);
+    }
+
+    #[tokio::test]
+    async fn receipt_cosign_refuses_a_tampered_org_b_signature_without_signing() {
+        let org_a = Peer::new(ORIGIN_KERNEL, 32, 5);
+        let org_b = Peer::new(TOOL_HOST_KERNEL, 33, 6);
+        let gate = DirectoryGate::new(verified_directory(&[&org_a, &org_b]));
+
+        let (addr, _router) = spawn_org_a_receipt_profile(&org_a, gate, pinned_org_b(&org_b)).await;
+        let cosigner = spawn_org_b(&org_b, ORIGIN_KERNEL, addr).await;
+
+        // Org B signs bytes that are not the canonical body of the receipt it sends,
+        // so the origin's re-verification over the transmitted bytes must fail.
+        let mut request = org_b_receipt_request(&org_b, ORIGIN_KERNEL);
+        request.org_b_signature = org_b.passport.sign(b"not the canonical co-signing body");
+
+        let result = cosigner.request_cosignature_over_iroh(&request).await;
+        assert_eq!(
+            result.err(),
+            Some(BilateralCoSigningError::OrgBSignatureInvalid),
+            "a signature over other bytes must never obtain the origin's co-signature"
+        );
+    }
+
+    #[tokio::test]
+    async fn receipt_cosign_rejects_an_org_b_that_claims_another_kernel_id() {
+        let org_a = Peer::new(ORIGIN_KERNEL, 34, 7);
+        let org_b = Peer::new(TOOL_HOST_KERNEL, 35, 8);
+        let gate = DirectoryGate::new(verified_directory(&[&org_a, &org_b]));
+
+        let (addr, _router) = spawn_org_a_receipt_profile(&org_a, gate, pinned_org_b(&org_b)).await;
+        let cosigner = spawn_org_b(&org_b, ORIGIN_KERNEL, addr).await;
+
+        // Org B is admitted as `did:chio:org-b` but claims to be someone else; the
+        // transport-origin binding refuses before any key lookup.
+        let impersonated = "did:chio:evil-impersonator";
+        let receipt = host_signed_receipt(&org_b.passport);
+        let body = CoSigningBody::from_receipt(&receipt, ORIGIN_KERNEL, impersonated)
+            .expect("co-signing body");
+        let bytes = body.canonical_bytes().expect("canonical bytes");
+        let request = CoSigningRequest::new(
+            receipt,
+            ORIGIN_KERNEL.to_string(),
+            impersonated.to_string(),
+            org_b.passport.sign(&bytes),
+        );
+
+        let result = cosigner.request_cosignature_over_iroh(&request).await;
+        assert_eq!(
+            result.err(),
+            Some(BilateralCoSigningError::UnknownPeer(
+                impersonated.to_string()
+            ))
+        );
+    }
+
+    #[tokio::test]
+    async fn receipt_cosign_fails_closed_on_a_schema_mismatch() {
+        let org_a = Peer::new(ORIGIN_KERNEL, 36, 9);
+        let org_b = Peer::new(TOOL_HOST_KERNEL, 37, 10);
+        let gate = DirectoryGate::new(verified_directory(&[&org_a, &org_b]));
+
+        let (addr, _router) =
+            spawn_org_a_receipt_profile(&org_a, gate.clone(), pinned_org_b(&org_b)).await;
+        let cosigner = spawn_org_b(&org_b, ORIGIN_KERNEL, addr).await;
+
+        // Client side: the DSSE schema tag never rides the receipt lane, and the
+        // caller is refused before a connection is dialed.
+        let mut request = org_b_receipt_request(&org_b, ORIGIN_KERNEL);
+        request.schema = BILATERAL_DSSE_COSIGNING_SCHEMA.to_string();
+        let result = cosigner.request_cosignature_over_iroh(&request).await;
+        assert_eq!(
+            result.err(),
+            Some(BilateralCoSigningError::UnsupportedSchema(
+                BILATERAL_DSSE_COSIGNING_SCHEMA.to_string()
+            ))
+        );
+
+        // Accept side: a frame that reaches the handler under the wrong schema tag
+        // is refused without signing, whatever the client did.
+        let handler = BilateralReceiptCoSignHandler::new(
+            gate,
+            ORIGIN_KERNEL,
+            org_a.passport.clone(),
+            pinned_org_b(&org_b),
+        );
+        let wire = WireReceiptCoSigningRequest {
+            schema: BILATERAL_DSSE_COSIGNING_SCHEMA.to_string(),
+            org_a_kernel_id: ORIGIN_KERNEL.to_string(),
+            org_b_kernel_id: org_b.kernel_id.clone(),
+            body_bytes: b"canonical co-signing body".to_vec(),
+            org_b_signature: org_b.passport.sign(b"canonical co-signing body"),
+        };
+        assert_eq!(
+            handler.cosign(&org_b.transport_id, &wire).err(),
+            Some(BilateralCoSigningError::UnsupportedSchema(
+                BILATERAL_DSSE_COSIGNING_SCHEMA.to_string()
+            ))
+        );
+    }
+
+    #[tokio::test]
+    async fn connection_counter_counts_each_dial_and_ignores_a_refusal() {
+        let org_a = Peer::new(ORIGIN_KERNEL, 38, 11);
+        let org_b = Peer::new(TOOL_HOST_KERNEL, 39, 12);
+        let gate = DirectoryGate::new(verified_directory(&[&org_a, &org_b]));
+
+        let (addr, _router) = spawn_org_a(&org_a, gate, pinned_org_b(&org_b)).await;
+        let cosigner = spawn_org_b(&org_b, ORIGIN_KERNEL, addr).await;
+        assert_eq!(cosigner.connections_opened(), 0);
+
+        let pae_bytes = b"DSSEv1 opaque bilateral pae preimage".to_vec();
+        for expected in 1..=2 {
+            cosigner
+                .request_dsse_cosignature_over_iroh(&org_b_request(
+                    &org_b,
+                    ORIGIN_KERNEL,
+                    &pae_bytes,
+                ))
+                .await
+                .expect("the dsse hop completes");
+            assert_eq!(cosigner.connections_opened(), expected);
+        }
+
+        // Clones share the counter, so a kernel holding one handle and an observer
+        // holding another read the same number of hops.
+        assert_eq!(cosigner.clone().connections_opened(), 2);
+
+        // A refusal that never reaches a dial is not a connection.
+        let mut wrong_schema = org_b_receipt_request(&org_b, ORIGIN_KERNEL);
+        wrong_schema.schema = BILATERAL_DSSE_COSIGNING_SCHEMA.to_string();
+        assert!(cosigner
+            .request_cosignature_over_iroh(&wrong_schema)
+            .await
+            .is_err());
+        assert_eq!(cosigner.connections_opened(), 2);
     }
 }

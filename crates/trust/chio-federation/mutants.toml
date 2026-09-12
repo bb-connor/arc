@@ -10,14 +10,16 @@
 #
 # Scope: the treaty admission path. `bilateral_dsse.rs` and
 # `bilateral_verifier.rs` are `mod` umbrellas over their module directories,
-# so the production child files are listed alongside them. `treaty.rs`
-# carries the treaty scope, ladder intersection, and bilateral invocation
-# validators.
+# so the production child files are listed alongside them. `bilateral.rs` is
+# the co-signing producer and holds the rejection-code taxonomy the verifier
+# maps failures onto. `treaty.rs` carries the treaty scope, ladder
+# intersection, and bilateral invocation validators.
 
 timeout_multiplier = 3.0
 minimum_test_timeout = 60
 
 examine_globs = [
+    "crates/trust/chio-federation/src/bilateral.rs",
     "crates/trust/chio-federation/src/bilateral_dsse.rs",
     "crates/trust/chio-federation/src/bilateral_dsse/builder.rs",
     "crates/trust/chio-federation/src/bilateral_dsse/policy.rs",

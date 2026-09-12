@@ -64,8 +64,10 @@ carry a witness for the path back.
 The substrate's amendment operation transforms a polity from $(T, C, K)$ to $(T, C, K')$ where $K'$ is a
 candidate replacement constitution.
 The amendment is admissible only if $K'$ is a backward refinement of $K$:
-every receipt admitted under $K$ remains admissible under $K'$.
-A Lean theorem on the substrate establishes that the backward-refinement check is decidable and that the
+every receipt admitted under $K'$ remains admissible under $K$, so an amendment may narrow the
+admitted set but never widen it.
+A Lean theorem on the substrate establishes that the backward-refinement check is decidable on a
+supplied finite domain of receipts, and that the
 substrate's runtime kernel refuses amendment requests that do not exhibit a refinement witness
 \cite{ref_chio_parent_paper}.
 

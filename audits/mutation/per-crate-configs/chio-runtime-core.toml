@@ -12,8 +12,7 @@ minimum_test_timeout = 60
 
 examine_globs = [
     "crates/kernel/chio-runtime-core/src/admission_hook.rs",
-    "crates/kernel/chio-runtime-core/src/admission_hook/dsse.rs",
-    "crates/kernel/chio-runtime-core/src/admission_hook/treaty_evidence.rs",
+    "crates/kernel/chio-runtime-core/src/admission_hook/*.rs",
     "crates/kernel/chio-runtime-core/src/treaty.rs",
     "crates/kernel/chio-runtime-core/src/treaty/predicate.rs",
     "crates/kernel/chio-runtime-core/src/store/sqlite/admission_replay.rs",
@@ -27,4 +26,5 @@ exclude_globs = [
     "**/benches/**",
     "**/build.rs",
     "**/fuzz.rs",
+    "crates/kernel/chio-runtime-core/src/admission_hook/swarm_*.rs",
 ]

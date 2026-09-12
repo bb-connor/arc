@@ -327,7 +327,7 @@ Inventory:
 | `chio-credentials` | `crates/trust/chio-credentials/tests/dudect/jwt_verify.rs`               | `verify_chio_passport_jwt_vc_json` parse-and-fail path                             |
 | `chio-kernel-core` | `crates/kernel/chio-kernel-core/tests/dudect/mac_eq.rs`                   | `chio_core_types::crypto::Signature` byte-equality compare (the MAC-eq surface)    |
 | `chio-kernel-core` | `crates/kernel/chio-kernel-core/tests/dudect/scope_subset.rs`             | `NormalizedScope::is_subset_of` capability-algebra subset check                    |
-| `chio-federation`  | `crates/trust/chio-federation/tests/dudect/bilateral_dsse_verify.rs`     | `verify_chio_bilateral_dsse_envelope` Org A then Org B signature failure order     |
+| `chio-federation`  | `crates/trust/chio-federation/tests/dudect/bilateral_dsse_verify.rs`    | `verify_chio_bilateral_dsse_envelope` rejection path under either `signatures` order |
 
 Run locally. Use `--test <binary>` to select a specific dudect harness
 target rather than a positional `TESTNAME` filter; the harnesses are

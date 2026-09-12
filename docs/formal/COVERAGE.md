@@ -28,8 +28,7 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 | `chio-data-guards::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-did::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-eval-receipt::*` | - | - | - | - | - | - | 1 | - | - | - |
-| `chio-federation::*` | - | - | - | - | - | - | 1 | 2 | - | - |
-| `chio-federation::bilateral_dsse.rs` | - | - | - | - | - | - | 1 | - | - | - |
+| `chio-federation::*` | - | - | - | - | - | - | 2 | 2 | - | - |
 | `chio-federation::revocation_gossip.rs` | - | - | - | - | 1 | - | - | - | - | - |
 | `chio-finding-worker::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-finding::status.rs` | 1 | - | - | - | - | - | - | - | - | - |
@@ -231,18 +230,13 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 
 **fuzz**
 
+- `fuzz/target-map.toml::bilateral_dsse_verify`
 - `fuzz/target-map.toml::federation_trust_establishment`
 
 **mutants**
 
 - `.cargo/mutants.toml::chio-federation` (scope=workspace-active)
 - `audits/mutation/per-crate-configs/chio-federation.toml` (scope=workspace-exact)
-
-### `chio-federation::bilateral_dsse.rs`
-
-**fuzz**
-
-- `fuzz/target-map.toml::bilateral_dsse_verify`
 
 ### `chio-federation::revocation_gossip.rs`
 
@@ -624,11 +618,11 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `.cargo/mutants.toml::chio-anchor`: `chio-anchor::automation.rs`, `chio-anchor::bitcoin.rs`, `chio-anchor::bundle.rs`, `chio-anchor::discovery.rs`, `chio-anchor::evm/egress.rs`, `chio-anchor::evm/hashing.rs`, `chio-anchor::evm/preparation.rs`, `chio-anchor::evm/publication.rs`, `chio-anchor::evm/records.rs`, `chio-anchor::evm/rpc.rs`, `chio-anchor::evm/types.rs`, `chio-anchor::evm/validation.rs`, `chio-anchor::evm/verification.rs`, `chio-anchor::functions.rs`, `chio-anchor::lib.rs`, `chio-anchor::ops.rs`, `chio-anchor::solana.rs`
 - `.cargo/mutants.toml::chio-attest-verify`: `chio-attest-verify::lib.rs`, `chio-attest-verify::sigstore/bundle_verify.rs`, `chio-attest-verify::sigstore/compat.rs`, `chio-attest-verify::sigstore/core.rs`, `chio-attest-verify::sigstore/identity.rs`, `chio-attest-verify::sigstore/mod.rs`, `chio-attest-verify::sigstore/parse.rs`, `chio-attest-verify::sigstore/policy.rs`, `chio-attest-verify::sigstore/validators.rs`
 - `.cargo/mutants.toml::chio-credentials`: `chio-credentials::lib.rs`, `chio-credentials::trust_tier.rs`
-- `.cargo/mutants.toml::chio-federation`: `chio-federation::bilateral_dsse.rs`, `chio-federation::bilateral_dsse/builder.rs`, `chio-federation::bilateral_dsse/policy.rs`, `chio-federation::bilateral_dsse/sign.rs`, `chio-federation::bilateral_dsse/types.rs`, `chio-federation::bilateral_dsse/typestate_handlers.rs`, `chio-federation::bilateral_dsse/verify.rs`, `chio-federation::bilateral_verifier.rs`, `chio-federation::bilateral_verifier/config.rs`, `chio-federation::bilateral_verifier/cosign.rs`, `chio-federation::bilateral_verifier/error.rs`, `chio-federation::bilateral_verifier/state.rs`, `chio-federation::bilateral_verifier/support.rs`, `chio-federation::bilateral_verifier/treaty.rs`, `chio-federation::treaty.rs`
+- `.cargo/mutants.toml::chio-federation`: `chio-federation::bilateral.rs`, `chio-federation::bilateral_dsse.rs`, `chio-federation::bilateral_dsse/builder.rs`, `chio-federation::bilateral_dsse/policy.rs`, `chio-federation::bilateral_dsse/sign.rs`, `chio-federation::bilateral_dsse/types.rs`, `chio-federation::bilateral_dsse/typestate_handlers.rs`, `chio-federation::bilateral_dsse/verify.rs`, `chio-federation::bilateral_verifier.rs`, `chio-federation::bilateral_verifier/config.rs`, `chio-federation::bilateral_verifier/cosign.rs`, `chio-federation::bilateral_verifier/error.rs`, `chio-federation::bilateral_verifier/state.rs`, `chio-federation::bilateral_verifier/support.rs`, `chio-federation::bilateral_verifier/treaty.rs`, `chio-federation::treaty.rs`
 - `.cargo/mutants.toml::chio-guards`: `chio-guards::agent_velocity.rs`, `chio-guards::behavioral_profile.rs`, `chio-guards::behavioral_sequence.rs`, `chio-guards::browser_automation.rs`, `chio-guards::code_execution.rs`, `chio-guards::computer_use.rs`, `chio-guards::content_review.rs`, `chio-guards::data_flow.rs`, `chio-guards::egress_allowlist.rs`, `chio-guards::embedding_anomaly.rs`, `chio-guards::forbidden_path.rs`, `chio-guards::input_injection.rs`, `chio-guards::internal_network.rs`, `chio-guards::jailbreak.rs`, `chio-guards::jailbreak_detector.rs`, `chio-guards::mcp_tool.rs`, `chio-guards::memory_governance.rs`, `chio-guards::patch_integrity.rs`, `chio-guards::path_allowlist.rs`, `chio-guards::path_normalization.rs`, `chio-guards::pipeline.rs`, `chio-guards::post_invocation.rs`, `chio-guards::prompt_injection.rs`, `chio-guards::remote_desktop.rs`, `chio-guards::response_sanitization/detectors.rs`, `chio-guards::response_sanitization/formatting.rs`, `chio-guards::response_sanitization/overlap.rs`, `chio-guards::response_sanitization/sanitizer.rs`, `chio-guards::response_sanitization/simple.rs`, `chio-guards::response_sanitization/types.rs`, `chio-guards::response_sanitization/validators.rs`, `chio-guards::response_sanitization/vault.rs`, `chio-guards::secret_leak.rs`, `chio-guards::shell_command.rs`, `chio-guards::text_utils.rs`, `chio-guards::velocity.rs`
 - `.cargo/mutants.toml::chio-kernel-core`: `chio-kernel-core::capability_verify.rs`, `chio-kernel-core::evaluate.rs`, `chio-kernel-core::guard.rs`, `chio-kernel-core::normalized.rs`, `chio-kernel-core::passport_verify.rs`, `chio-kernel-core::receipts.rs`, `chio-kernel-core::scope.rs`
 - `.cargo/mutants.toml::chio-policy`: `chio-policy::compiler/budgets.rs`, `chio-policy::compiler/detection.rs`, `chio-policy::compiler/patterns.rs`, `chio-policy::compiler/rules.rs`, `chio-policy::compiler/scope.rs`, `chio-policy::conditions.rs`, `chio-policy::detection.rs`, `chio-policy::evaluate.rs`, `chio-policy::merge.rs`, `chio-policy::receipt.rs`, `chio-policy::regex_safety.rs`, `chio-policy::resolve.rs`, `chio-policy::validate.rs`
-- `.cargo/mutants.toml::chio-runtime-core`: `chio-runtime-core::admission_hook.rs`, `chio-runtime-core::admission_hook/dsse.rs`, `chio-runtime-core::admission_hook/treaty_evidence.rs`, `chio-runtime-core::store/sqlite/admission_replay.rs`, `chio-runtime-core::treaty.rs`, `chio-runtime-core::treaty/predicate.rs`
+- `.cargo/mutants.toml::chio-runtime-core`: `chio-runtime-core::admission_hook.rs`, `chio-runtime-core::admission_hook/dsse.rs`, `chio-runtime-core::admission_hook/metadata.rs`, `chio-runtime-core::admission_hook/request.rs`, `chio-runtime-core::admission_hook/store_artifacts.rs`, `chio-runtime-core::admission_hook/treaty_evidence.rs`, `chio-runtime-core::admission_hook/treaty_ref.rs`, `chio-runtime-core::store/sqlite/admission_replay.rs`, `chio-runtime-core::treaty.rs`, `chio-runtime-core::treaty/predicate.rs`
 - `.dst/harnesses.toml::chio-kernel/dst_drop_injection::dst_budget_wrapper_preserves_replay_outcome`: `chio-kernel::budget_store/in_memory/trait_impl.rs`, `chio-store-sqlite::budget_store/trait_impl.rs`
 - `.dst/harnesses.toml::chio-kernel/dst_drop_injection::dst_child_receipt_flush_regression_is_killed`: `chio-kernel::kernel/evaluation/nested_flow_evaluation.rs`, `chio-kernel::kernel/kernel_drop_guard.rs`
 - `.dst/harnesses.toml::chio-kernel/dst_drop_injection::dst_fixed_seed_corpus`: `chio-kernel::budget_store/in_memory.rs`, `chio-kernel::kernel/evaluation/async_evaluation_core.rs`, `chio-kernel::kernel/kernel_drop_guard.rs`, `chio-kernel::kernel/responses/receipt_persistence.rs`
@@ -648,11 +642,11 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `.loom/harnesses.toml::chio-kernel/loom_concurrency::receipt_writer_liveness_no_lost_wakeup`: `chio-kernel::kernel/construction.rs`, `chio-kernel::kernel/receipt_writer_watchdog.rs`
 - `audits/mutation/per-crate-configs/chio-anchor.toml`: `chio-anchor::automation.rs`, `chio-anchor::bitcoin.rs`, `chio-anchor::bundle.rs`, `chio-anchor::discovery.rs`, `chio-anchor::evm/egress.rs`, `chio-anchor::evm/hashing.rs`, `chio-anchor::evm/preparation.rs`, `chio-anchor::evm/publication.rs`, `chio-anchor::evm/records.rs`, `chio-anchor::evm/rpc.rs`, `chio-anchor::evm/types.rs`, `chio-anchor::evm/validation.rs`, `chio-anchor::evm/verification.rs`, `chio-anchor::functions.rs`, `chio-anchor::lib.rs`, `chio-anchor::ops.rs`, `chio-anchor::solana.rs`
 - `audits/mutation/per-crate-configs/chio-attest-verify.toml`: `chio-attest-verify::lib.rs`, `chio-attest-verify::sigstore/bundle_verify.rs`, `chio-attest-verify::sigstore/compat.rs`, `chio-attest-verify::sigstore/core.rs`, `chio-attest-verify::sigstore/identity.rs`, `chio-attest-verify::sigstore/mod.rs`, `chio-attest-verify::sigstore/parse.rs`, `chio-attest-verify::sigstore/policy.rs`, `chio-attest-verify::sigstore/validators.rs`
-- `audits/mutation/per-crate-configs/chio-federation.toml`: `chio-federation::bilateral_dsse.rs`, `chio-federation::bilateral_dsse/builder.rs`, `chio-federation::bilateral_dsse/policy.rs`, `chio-federation::bilateral_dsse/sign.rs`, `chio-federation::bilateral_dsse/types.rs`, `chio-federation::bilateral_dsse/typestate_handlers.rs`, `chio-federation::bilateral_dsse/verify.rs`, `chio-federation::bilateral_verifier.rs`, `chio-federation::bilateral_verifier/config.rs`, `chio-federation::bilateral_verifier/cosign.rs`, `chio-federation::bilateral_verifier/error.rs`, `chio-federation::bilateral_verifier/state.rs`, `chio-federation::bilateral_verifier/support.rs`, `chio-federation::bilateral_verifier/treaty.rs`, `chio-federation::treaty.rs`
+- `audits/mutation/per-crate-configs/chio-federation.toml`: `chio-federation::bilateral.rs`, `chio-federation::bilateral_dsse.rs`, `chio-federation::bilateral_dsse/builder.rs`, `chio-federation::bilateral_dsse/policy.rs`, `chio-federation::bilateral_dsse/sign.rs`, `chio-federation::bilateral_dsse/types.rs`, `chio-federation::bilateral_dsse/typestate_handlers.rs`, `chio-federation::bilateral_dsse/verify.rs`, `chio-federation::bilateral_verifier.rs`, `chio-federation::bilateral_verifier/config.rs`, `chio-federation::bilateral_verifier/cosign.rs`, `chio-federation::bilateral_verifier/error.rs`, `chio-federation::bilateral_verifier/state.rs`, `chio-federation::bilateral_verifier/support.rs`, `chio-federation::bilateral_verifier/treaty.rs`, `chio-federation::treaty.rs`
 - `audits/mutation/per-crate-configs/chio-guards.toml`: `chio-guards::behavioral_sequence.rs`, `chio-guards::data_flow.rs`, `chio-guards::egress_allowlist.rs`, `chio-guards::embedding_anomaly.rs`, `chio-guards::forbidden_path.rs`, `chio-guards::path_allowlist.rs`, `chio-guards::path_normalization.rs`, `chio-guards::pipeline.rs`, `chio-guards::secret_leak.rs`, `chio-guards::text_utils.rs`
 - `audits/mutation/per-crate-configs/chio-kernel-core.toml`: `chio-kernel-core::capability_verify.rs`, `chio-kernel-core::evaluate.rs`, `chio-kernel-core::guard.rs`, `chio-kernel-core::normalized.rs`, `chio-kernel-core::passport_verify.rs`, `chio-kernel-core::receipts.rs`, `chio-kernel-core::scope.rs`
 - `audits/mutation/per-crate-configs/chio-policy.toml`: `chio-policy::compiler/budgets.rs`, `chio-policy::compiler/detection.rs`, `chio-policy::compiler/patterns.rs`, `chio-policy::compiler/rules.rs`, `chio-policy::compiler/scope.rs`, `chio-policy::conditions.rs`, `chio-policy::detection.rs`, `chio-policy::evaluate.rs`, `chio-policy::merge.rs`, `chio-policy::receipt.rs`, `chio-policy::regex_safety.rs`, `chio-policy::resolve.rs`, `chio-policy::validate.rs`
-- `audits/mutation/per-crate-configs/chio-runtime-core.toml`: `chio-runtime-core::admission_hook.rs`, `chio-runtime-core::admission_hook/dsse.rs`, `chio-runtime-core::admission_hook/treaty_evidence.rs`, `chio-runtime-core::store/sqlite/admission_replay.rs`, `chio-runtime-core::treaty.rs`, `chio-runtime-core::treaty/predicate.rs`
+- `audits/mutation/per-crate-configs/chio-runtime-core.toml`: `chio-runtime-core::admission_hook.rs`, `chio-runtime-core::admission_hook/dsse.rs`, `chio-runtime-core::admission_hook/metadata.rs`, `chio-runtime-core::admission_hook/request.rs`, `chio-runtime-core::admission_hook/store_artifacts.rs`, `chio-runtime-core::admission_hook/treaty_evidence.rs`, `chio-runtime-core::admission_hook/treaty_ref.rs`, `chio-runtime-core::store/sqlite/admission_replay.rs`, `chio-runtime-core::treaty.rs`, `chio-runtime-core::treaty/predicate.rs`
 - `audits/mutation/per-crate-configs/chio-weights.toml`: `chio-weights::bundle.rs`, `chio-weights::card.rs`, `chio-weights::error.rs`, `chio-weights::lineage.rs`
 - `formal/MAPPING.md::Apalache named invariants (kernel-state subset)/AllowReceiptsBudgetChecked`: `chio-kernel::kernel/evaluation/async_evaluation_core.rs`, `chio-kernel::kernel/evaluation/nested_flow_evaluation.rs`, `chio-kernel::kernel/responses/allow_responses.rs`, `chio-kernel::kernel/responses/receipt_persistence.rs`, `chio-kernel::kernel/validation.rs`
 - `formal/MAPPING.md::Lean delivery-contract theorems (Proofs/DeliveryContract.lean)/denied_after_delivery_cannot_settle`: `chio-kernel::admission_operation/state.rs`, `chio-kernel::kernel/admission_coordinator/terminal.rs`
@@ -660,6 +654,7 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `formal/mutation/registry.toml::spec-kernel-transition-cancel`: `chio-kernel::kernel/kernel_drop_guard.rs`, `chio-kernel::kernel/validation.rs`
 - `formal/mutation/registry.toml::spec-post-admission-drop`: `chio-kernel::kernel/dispatch.rs`, `chio-kernel::kernel/kernel_drop_guard.rs`, `chio-kernel::kernel/responses/finalization.rs`
 - `formal/mutation/registry.toml::spec-receipt-before-allow`: `chio-kernel::kernel/responses/allow_responses.rs`, `chio-kernel::kernel/responses/receipt_persistence.rs`
+- `fuzz/target-map.toml::bilateral_dsse_verify`: `chio-federation::bilateral.rs`, `chio-federation::bilateral_dsse.rs`
 - `fuzz/target-map.toml::policy_analyze`: `chio-policy::evaluate.rs`, `chio-policy::glob_pattern.rs`, `chio-policy::models.rs`
 
 ## Unattributed Artifacts
@@ -903,6 +898,7 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `formal/theorem-inventory.json::treaty.shape.denote_agrees_on_supported_fragment` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/PredicateShape.lean has property links but no machine-readable Rust surface link Properties: P3.
 - `formal/theorem-inventory.json::treaty.shape.eval_agrees` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/PredicateShape.lean has property links but no machine-readable Rust surface link Properties: P3.
 - `formal/theorem-inventory.json::treaty.shape.of_receipt_injective` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/PredicateShape.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::treaty.shape.undefined_image_denies` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/PredicateShape.lean has property links but no machine-readable Rust surface link Properties: P3.
 - `formal/theorem-inventory.json::treaty.shape.unsupported_image_denies` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/PredicateShape.lean has property links but no machine-readable Rust surface link Properties: P3.
 - `formal/theorem-inventory.json::treaty.syntactic.admission_iff_intersection` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/IntersectionSyntactic.lean has property links but no machine-readable Rust surface link Properties: P3.
 - `formal/theorem-inventory.json::treaty.syntactic.amendment_iff_refinement` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/Treaty/IntersectionSyntactic.lean has property links but no machine-readable Rust surface link Properties: P3.
@@ -1037,29 +1033,29 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `d796ba4c6d4fd20807a05c18d0668fd859669c295515a5229e51feb056c0fdfc`
+- Input digest: `798fb2b6ad6212dd1f434e98cd66b0b0ee599bfc21c924c25576b5547f6588eb`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
 ### Inputs
 
 - `.cargo/config.toml`: `d1100dc750bd88e2b0484657c792c8ce257c1ab3392a0aad54fcf49f20dae5c4`
-- `.cargo/mutants.toml`: `5b892942a14ce8ba0710244be325e99efd7d0fb4029f958052ba76fe46ac9f71`
+- `.cargo/mutants.toml`: `58fd00abedfa850d21b78031634ede6d72a31ff0010107901d082c3712c8cd24`
 - `.dst/harnesses.toml`: `02c022579994294816ab40683c211766ef131b18a6cd13c2c5692f91fd62f1a1`
 - `.kani/harnesses.toml`: `083b51a1038192bcea1e0498089142d06916e2377ef7179ba7af6efd58706b25`
 - `.loom/harnesses.toml`: `07b7f087e6e7f484c16be0d7cd079def72dcc35e536e02bf241337fc915b562b`
-- `Cargo.lock`: `c5de06fbe3aca93c5802d2da9ff2e9fca1fc0010dc8e688045de6dee3f4e5827`
+- `Cargo.lock`: `0e94fe23e583b02587a683145c4477c689729a9a7b931543534b106502a47b40`
 - `Cargo.toml`: `f1af9cc30375572b2b393e0d4fde6ffd536638f95d3d2e1d48dd75d75e1e1424`
 - `audits/evidence/mutants/chio-weights/2026-05-08.json`: `452aaf5734039a489967a629ec3c6b1b9d1351e06ec1f8e76c136ae389477ca7`
 - `audits/mutation/per-crate-configs/chio-anchor.toml`: `9d5a1f0e850ddadc3e621dd67282bb36460e13d3cb6e1af06a3fc03597af8ec3`
 - `audits/mutation/per-crate-configs/chio-attest-verify.toml`: `28f31f18a2676af227db8d66b6812c2517bdc49a965ac0524c6d50cce0695475`
-- `audits/mutation/per-crate-configs/chio-federation.toml`: `9380d236d3f722c0fa31dbedaa6bb2504e470e39f7f197029425e726815f137d`
+- `audits/mutation/per-crate-configs/chio-federation.toml`: `48f52a514f822dda26ee2bdeae676acef60783a00071e1c2fadafc5369fd770e`
 - `audits/mutation/per-crate-configs/chio-guards-2026-05-08-subset.toml`: `40f90294fdcc04bb33b450888468e0f8b5c8ed5e9105a0c847b3bdd564fb8a94`
 - `audits/mutation/per-crate-configs/chio-guards.toml`: `191c2c1b88e7fd0542aa880f5ab0f476d913ebabe5c77d775750af355d0b5077`
 - `audits/mutation/per-crate-configs/chio-kernel-core.toml`: `36817782c8a584db9c883135043f0b5034f74a2cd114d22aa5cd1b3990d888a1`
 - `audits/mutation/per-crate-configs/chio-policy.toml`: `4a0edd1a6711e51cdeaf48e71f6c94ee512612e962f9f49ee1e0ac4707f76ba3`
-- `audits/mutation/per-crate-configs/chio-runtime-core.toml`: `788d7cc40388789f3103c57bae59e41c7f4b267a054e00c9f3e6aae0d6f30d36`
-- `audits/mutation/per-crate-configs/chio-weights.toml`: `8851bcc823e192ef10d705097257daf8a0ed03a466ead6c1ea11eff467e1e3ce`
+- `audits/mutation/per-crate-configs/chio-runtime-core.toml`: `ba46a0a0b4edd689fe6c88140773a2f879bec11337a8688b57c50d2222dea4e8`
+- `audits/mutation/per-crate-configs/chio-weights.toml`: `46793c985df688dfde109522d8b8ba623357fda87e3c2c80e84baedce90402bc`
 - `cargo-metadata://workspace-packages`: `d23cf993365d94503247ae2466e39fb95911f22fa54e353f6a3405b16a6bbe64`
 - `crates/core/chio-core-types/Cargo.toml`: `a117b5ab06064ee1dbc1ee825dbb58fece5662abac2c7084c39a301868a45336`
 - `crates/core/chio-core-types/src/_generated/chio_wire_v1.rs`: `7e12f403c3531f3050683428c9dfd6adec1f32fc5868901078fd81b9cf93c035`
@@ -1260,7 +1256,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/rust-verification/formal-mutants.toml`: `5f15de2f3833b11db3d783d05ab6efcd2c49840ede010fe7ec54fc2846c48fc6`
 - `formal/rust-verification/kani-harnesses.toml`: `f82442bef24ae67283c3f171cff15e8aa6cc4d808c7893b9e349b6bf315b50ce`
 - `formal/rust-verification/kani-public-harnesses.toml`: `80dc886e2baa589486acdb2e264225d87a4fa6a9407e24fc01b0aacf57bc2269`
-- `formal/theorem-inventory.json`: `a2002c23c62ee8c35c73b2507a572b1002f2532884b96ec044a1787031e924f8`
+- `formal/theorem-inventory.json`: `f2e278af3211daa9fa36233dbc0e6534d7142ab6a185b398500278e0c4b879b2`
 - `formal/tla/DelegationDepthBound.tla`: `69c28ca6b16ef3b2174235347d8bb2aab40fce4cbb79123e4512f363b9717be9`
 - `formal/tla/DistributedRevocation.tla`: `59110faa37eeeaac45b9b206594ae5ef39f94404323a377967012431489b8aa7`
 - `formal/tla/DistributedRevocationTemporal.tla`: `604bdcd34f505b11c6aa9819cc73193f4e455b4d77227d22d6e79e07b48cc2e1`
@@ -1272,9 +1268,9 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceCheckRevocationPropagation.tla`: `60b0a3b0a287605cbd9735c755a5af94a94f84398800d8767400967bf05a1749`
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `36983f13648d47d1ac324ce029786b27d1c5cc7ffbfff364aadebcbf182489c8`
-- `fuzz/target-map.toml`: `cf44d1f1e753af4c04832ac650819f1e2a3bb317bf8723dbaebde0e7138ff244`
-- `git-worktree://rust-files`: `f27162d6a8495bca740bdc2c9472ad4e7c03a66dfb442f20fde7b290b28896d9`
-- `releases.toml`: `a7cd63d7aac9a49e24ac2eac5e622627e6cf5d7d3fb22d1479c630c786cd4c7b`
+- `fuzz/target-map.toml`: `8a4446045fa28878fe848f96ed0e4fb6a13db407d2fbab1eea2d65271095dee0`
+- `git-worktree://rust-files`: `b6c8650b67121b3d6d61f2234f62eddc056b573129647fe91e4d092d1e39cf48`
+- `releases.toml`: `5b3807734b69abf8f4f16c6476a998134588c2cef671cd4e40b6ad3422cf4932`
 - `rust-toolchain.toml`: `d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`
 - `scripts/check-kani-core.sh`: `a70974500c4f73edabf0a8c102d99fa9dc1ff6cc3d33360e74c76954b595064b`

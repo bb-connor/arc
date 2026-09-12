@@ -18,19 +18,20 @@ substrate's Lean root as described in `../lean/build-log.md`.
 
 ## Files
 
-- `lean-source.tar.gz` Lean 4 project that compiles the four
-  sensor-grounded theorems. Includes `lean-toolchain` (pinning
-  `leanprover/lean4:v4.28.0-rc1`), `lakefile.lean`, `lake-manifest.json`,
-  a `Chio.lean` root module, a snapshot of the substrate's `Chio/` subtree
-  (Core, Capability, Proofs, Spec, Treaty) taken when the package was
-  assembled in May 2026, and a build README. The snapshot predates the
-  substrate's current Treaty modules, and the tarball's README names the
-  fourth theorem by an older name; the tarball's copy of the
-  sensor-grounded module is byte-identical to `../lean/SensorGroundedAdmission.lean`.
-- `proof-manifest.toml` Submission-time snapshot of the four theorems,
-  their Lean modules and fully qualified declarations, the paper
-  section in which each is stated, and the axiom set reported by
-  `#print axioms`.
+- `lean-source.tar.gz` Lean 4 project that checks the four
+  sensor-grounded theorems. It carries `lean-toolchain` (pinning
+  `leanprover/lean4:v4.28.0`, the substrate's current release),
+  `lakefile.lean` with no external dependency, `lake-manifest.json`,
+  a `Chio.lean` root module, the three substrate Treaty modules that
+  form the sensor module's import closure
+  (`PredicateLang`, `IntersectionSyntactic`, `Intersection`), the
+  sensor module itself at `Chio/Treaty/SensorGroundedAdmission.lean`,
+  and a build README. The packaged sensor module is byte-identical to
+  `../lean/SensorGroundedAdmission.lean`
+  (SHA-256 `356b2420543b73e9a4e7b9022f54b18bf739df569123eef85934dcd260c5a3bc`).
+- `proof-manifest.toml` Snapshot of the four theorems, their Lean
+  modules and fully qualified declarations, the paper section in which
+  each is stated, and the axiom set reported by `#print axioms`.
 - `theorem-inventory.json` Same content, JSON-shaped for tool
   consumption.
 
@@ -52,27 +53,37 @@ All four are proved in the paper-local module
 
 ## Verifying the build
 
-With `elan` installed, the tarball builds with two commands:
+With `elan` installed, the tarball checks with:
 
 ```
 tar xzf lean-source.tar.gz
-cd chio-lean && lake build
+cd chio-lean
+lake build
+lake env lean Chio/Treaty/SensorGroundedAdmission.lean
 ```
 
-A cold cache takes roughly 3-5 minutes. The build succeeds without
-warnings, without `sorry`, and without any project-local `axiom`. To
-check the paper-local source against the substrate's current Lean root
-instead of the snapshot, run `lake env lean` on it from
-`formal/lean4/Chio` as described in `../lean/build-log.md`.
+`lake build` builds the three substrate Treaty modules, printing the
+`#eval` information lines those modules carry and reporting no warnings
+or errors. `lake env lean` then elaborates the paper-local module
+against them and exits 0 with no output. The package keeps the two
+steps separate so the module is checked exactly as it is in the
+repository: from outside the root module, never registered in it. A
+cold toolchain install dominates the wall time; the build itself takes
+a few seconds. The sources contain no `sorry` and no project-local
+`axiom`.
+
+The same check runs against the substrate's own Lean root, without the
+tarball, as `cd formal/lean4/Chio && lake env lean ../../../docs/papers/sensor-grounded-admission/lean/SensorGroundedAdmission.lean`.
+`../lean/build-log.md` records that run.
 
 ## Verifying the axioms
 
 The axiom set reported by Lean's `#print axioms` for each theorem is
 recorded in `proof-manifest.toml` (and `theorem-inventory.json`). To
 reproduce, append the four `#print axioms <name>` lines listed in
-`../lean/build-log.md` to `Chio/Treaty/SensorGroundedAdmission.lean` and
-run `lake env lean Chio/Treaty/SensorGroundedAdmission.lean` (the
-tarball's own README lists the fourth theorem under an older name).
+`../lean/build-log.md` to a scratch copy of
+`Chio/Treaty/SensorGroundedAdmission.lean` and run `lake env lean` on
+the copy.
 
 Only standard Lean kernel axioms appear:
 - `admission_predicate_separates_healthy_and_degraded_witnesses`
@@ -85,3 +96,29 @@ Only standard Lean kernel axioms appear:
   `propext`, `Quot.sound`.
 
 No project-specific axioms are introduced.
+
+## Regenerating the package
+
+The tarball is a derived artifact. Rebuild it from the repository
+whenever the paper-local module or the substrate's Treaty modules
+change, so that the packaged copy never drifts from the module of
+record:
+
+```
+mkdir -p chio-lean/Chio/Treaty
+cp formal/lean4/Chio/Chio/Treaty/{PredicateLang,IntersectionSyntactic,Intersection}.lean \
+   chio-lean/Chio/Treaty/
+cp docs/papers/sensor-grounded-admission/lean/SensorGroundedAdmission.lean \
+   chio-lean/Chio/Treaty/
+cp formal/lean4/Chio/lean-toolchain chio-lean/lean-toolchain
+# chio-lean/lakefile.lean: the substrate lakefile with the `require` line
+# and the non-Chio libraries dropped.
+# chio-lean/Chio.lean: imports of the three Treaty modules above.
+# chio-lean/README.md: build and axiom instructions for reviewers.
+tar --sort=name --mtime='<date>' --owner=0 --group=0 --numeric-owner \
+    -czf docs/papers/sensor-grounded-admission/supplementary/lean-source.tar.gz \
+    chio-lean
+```
+
+Then re-run the verification commands above on a fresh extract,
+and refresh the SHA-256 recorded under Files.

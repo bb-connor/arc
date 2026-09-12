@@ -1,7 +1,6 @@
 # FV-D2: PredicateLang bridge soundness and the treaty-model swap
 
-Status: Implemented (2026-07-11); structural occurrence theorems and the
-receipt-shape relation added 2026-09-11
+Status: Implemented (2026-07-11; structural occurrence theorems and the receipt-shape relation added 2026-09-11)
 Theme: D - Widen the verified frontier
 Effort: M
 Depends on: none
@@ -90,6 +89,7 @@ that Rust enforces a Lean theorem.
 | `PredicateShape.eval_ofReceipt` | Boolean evaluation of the lifted predicate agrees with receipt evaluation under pointwise atom agreement |
 | `PredicateShape.denote_ofReceipt` | Fail-closed denotation agrees with receipt evaluation on the supported-and-defined image |
 | `PredicateShape.denote_ofReceipt_unsupported` | Any receipt atom mapped to an unsupported tag makes the lifted predicate deny |
+| `PredicateShape.denote_ofReceipt_undefined` | Any receipt atom mapped to a tag undefined for the view makes the lifted predicate deny |
 
 `IntersectionSyntactic.lean` re-proves the four treaty results and includes an
 executable non-trivial amendment. The old constitution accepts a policy-denied
@@ -119,11 +119,14 @@ decision definitions together with the occurrence predicates
 `containsUnsupported` and `containsUndefined`. The structural characterization
 theorems unfold every arm of `supported` and `defined`, so the `top`, `bot`,
 and `disj` mutants of both definitions are observed. The atom collector
-`atoms` carries no mutable token and is deliberately not allowlisted. The mutation runner accepts only explicitly approved
-`Core` and `Treaty` source roots, retains the global activation threshold, and
-records per-source outcomes. Direct negative theorems for unsupported syntax,
-undefined mode interpretation, and rejected widening remain root-imported even
-when mutation sampling rotates.
+`atoms` carries no mutable token and is deliberately not allowlisted.
+`PredicateShape.eval_ofReceipt` unfolds `ReceiptPredicate.evaluate` at every
+connective, so the four allowlisted `evaluate` mutants are observed as well.
+The mutation runner accepts only explicitly approved `Core` and `Treaty`
+source roots, retains the global activation threshold, and records per-source
+outcomes. Direct negative theorems for unsupported syntax, undefined mode
+interpretation, and rejected widening remain root-imported even when mutation
+sampling rotates.
 
 ## Acceptance evidence
 

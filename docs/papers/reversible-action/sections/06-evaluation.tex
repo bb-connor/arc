@@ -95,11 +95,12 @@ a measurement. The deployment instance's destructive executors run
 under the endpoint's single Ed25519 keypair; the substrate-level
 bilateral cosignature path is not wired into the response engine. The
 empirical claim about the destructive subclass is therefore the
-substrate-level reduction
-\thm{destructive_action_requires_bilateral_admission}, not a deployed
-measurement. Wiring the bilateral path requires an operator-polity
-key custody design that is outside the scope of the present
-construction.
+paper-local reduction
+\thm{destructive_action_requires_bilateral_admission}, an instance of
+the substrate's \thm{treaty_admission_iff_predicate_intersection}, not
+a deployed measurement. Wiring the bilateral path requires an
+operator-polity key custody design that is outside the scope of the
+present construction.
 
 \paragraph{Sensor and scheduler gaps.}
 The endpoint sensor subscription is a stub on macOS Endpoint Security:

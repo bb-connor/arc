@@ -1,15 +1,20 @@
-//! Crash-reopen coverage for the durable treaty continuation fence.
+//! Reopen coverage for the durable treaty continuation fence.
 //!
 //! A treaty continuation is consumed at admission and released only when the
-//! owning admission is denied before dispatch. A process that stops between
-//! those two points leaves the consumed marker on disk. After reopen the
+//! owning admission is denied before dispatch. A runtime that stops between
+//! those two points leaves the consumed marker behind in the store file.
+//! Each case here reproduces that state by closing the store handle after
+//! the consume and before any release, then reopening the same path: the
 //! marker must keep denying replay by every admission, including the owner,
-//! until the owner releases it; a release by any other admission must leave
-//! the marker in place.
+//! until the owner releases it, and a release by any other admission must
+//! leave it in place.
+//!
+//! The close is graceful, so this exercises the reopen path rather than
+//! SQLite's own recovery from a connection killed mid-transaction.
 
 use chio_kernel::RuntimeAdmissionHook;
 use chio_runtime_core::{
-    ChioRuntimeAdmissionHook, ChioRuntimeError, RuntimeAdmissionProfile, RuntimeAdmissionStore,
+    ChioRuntimeAdmissionHook, RuntimeAdmissionProfile, RuntimeAdmissionStore,
     SqliteRuntimeOrchestrationStore, CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
 };
 use std::io;
@@ -22,13 +27,20 @@ const REPLAY_CODE: &str = "chio_treaty_continuation_replay";
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-/// Consume the continuation and drop the store handle before any release,
-/// which is the state a crash between admission and pre-dispatch denial
-/// leaves on disk.
-fn consume_then_crash(path: &Path) -> Result<(), ChioRuntimeError> {
+/// Consume the continuation and close the store handle before any release,
+/// which is the state a stop between admission and pre-dispatch denial
+/// leaves behind. Asserts the store is file-backed, so a store that grew an
+/// in-memory fallback would fail here instead of quietly turning every case
+/// below into a single-handle test.
+fn consume_then_close(path: &Path) -> TestResult {
     let store = SqliteRuntimeOrchestrationStore::open(path)?;
     store.consume_treaty_continuation(CONTINUATION_ID, OWNER_ADMISSION_ID)?;
     drop(store);
+    assert!(
+        path.is_file(),
+        "runtime orchestration store is not file-backed at {}",
+        path.display()
+    );
     Ok(())
 }
 
@@ -40,6 +52,10 @@ fn assert_replay_denied(store: &SqliteRuntimeOrchestrationStore, admission_id: &
         .into()),
         Err(error) => {
             assert_eq!(error.code(), REPLAY_CODE, "{error}");
+            assert!(
+                error.to_string().contains(CONTINUATION_ID),
+                "replay rejection does not name the continuation: {error}"
+            );
             Ok(())
         }
     }
@@ -66,10 +82,10 @@ fn profile() -> RuntimeAdmissionProfile {
 }
 
 #[test]
-fn consumed_treaty_continuation_survives_crash_until_owner_release() -> TestResult {
+fn consumed_treaty_continuation_survives_reopen_until_owner_release() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-treaty-continuation.sqlite3");
-    consume_then_crash(&path)?;
+    consume_then_close(&path)?;
 
     let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
     assert_replay_denied(&reopened, OWNER_ADMISSION_ID)?;
@@ -89,7 +105,7 @@ fn consumed_treaty_continuation_survives_crash_until_owner_release() -> TestResu
 fn foreign_admission_release_leaves_consumed_treaty_continuation_durable() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-treaty-continuation.sqlite3");
-    consume_then_crash(&path)?;
+    consume_then_close(&path)?;
 
     let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
     reopened.release_treaty_continuation(CONTINUATION_ID, FOREIGN_ADMISSION_ID)?;
@@ -110,7 +126,7 @@ fn foreign_admission_release_leaves_consumed_treaty_continuation_durable() -> Te
 fn runtime_hook_release_after_reopen_is_scoped_to_the_owning_admission() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-treaty-continuation.sqlite3");
-    consume_then_crash(&path)?;
+    consume_then_close(&path)?;
 
     let hook =
         ChioRuntimeAdmissionHook::new(profile(), SqliteRuntimeOrchestrationStore::open(&path)?);

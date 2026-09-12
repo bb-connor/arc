@@ -10,25 +10,34 @@
 //!
 //! # What this harness measures
 //!
-//! [`verify_chio_bilateral_dsse_envelope`] runs every structural gate, then
-//! checks Org A's Ed25519 signature and only afterwards Org B's, returning on
-//! the first failure. Two input classes are pushed through it:
+//! [`verify_chio_bilateral_dsse_envelope`] matches the two DSSE signature
+//! entries to Org A and Org B by `keyid`, not by array position, and the
+//! envelope profile states that the array order carries no security
+//! meaning. Both input classes are the same co-signed envelope with the
+//! same single-byte corruption of Org B's signature, so both run every
+//! structural gate, verify Org A's Ed25519 signature, and then fail closed
+//! at the Org B check (`signature.server_b_invalid`). They differ only in
+//! the order of the two entries in the `signatures` array:
 //!
-//! - `Class::Left`: a valid co-signed envelope with the last byte of Org A's
-//!   signature flipped. Rejected at the Org A check
-//!   (`signature.server_a_invalid`).
-//! - `Class::Right`: the same envelope with the last byte of Org B's
-//!   signature flipped instead. Org A verifies, then the Org B check rejects
-//!   (`signature.server_b_invalid`).
+//! - `Class::Left`: entries in emitted order, Org A first.
+//! - `Class::Right`: the same two entries, Org B first.
 //!
-//! Both classes fail closed at the Ed25519 step and share every earlier gate,
-//! so the two runtime distributions differ only by the work done between the
-//! Org A and Org B checks. The t-test reports whether that A-then-B failure
-//! order is observable in timing. The rejection code already names the
-//! failing signer, so an above-threshold reading records the cost of the
-//! sequential check rather than a hidden oracle; the harness pins that cost so
-//! a change that widens the gap, or adds data-dependent work ahead of the
-//! signature checks, shows up in the nightly lane.
+//! The elliptic-curve work is byte-identical across the classes: the same
+//! payload, the same two public keys and the same two signature blobs are
+//! consumed in both. What varies is the data the verifier itself walks -
+//! the keyid uniqueness scan and the two `keyid` lookups - so the t-test
+//! isolates this verifier's own handling rather than the timing profile of
+//! the underlying Ed25519 primitive. A distinguishable pair of
+//! distributions means the rejection time reveals which array slot held
+//! which signer, or that a positional fast path crept in ahead of the
+//! signature checks.
+//!
+//! The classes deliberately do not differ by which signer was tampered or
+//! by which signature byte was flipped. Either choice changes the scalars
+//! that `ed25519-dalek`'s variable-time verification consumes (and the
+//! first also changes the number of verifications performed), so the t-test
+//! would report the cost of that primitive instead of a property of this
+//! verifier.
 //!
 //! The CI lane `.github/workflows/dudect.yml` runs this harness nightly with
 //! the two-consecutive-runs `t < 4.5` pass rule.
@@ -48,7 +57,7 @@ use chio_core_types::receipt::{
 use chio_federation::bilateral_dsse::{
     sign_chio_bilateral_dsse_envelope, verify_chio_bilateral_dsse_envelope,
     BilateralPredicateExtensions, CapabilityLeaseRef, DsseEnvelope, GovernanceReceiptRef,
-    HashRecord, PolicyEvaluationSummary, PolicyVerdict, TreatyBindingRef,
+    HashRecord, Keyid, PolicyEvaluationSummary, PolicyVerdict, TreatyBindingRef,
 };
 use dudect_bencher::rand::RngExt;
 use dudect_bencher::{ctbench_main, BenchRng, Class, CtRunner};
@@ -75,8 +84,10 @@ const SAMPLES_PER_RUN: usize = 100_000;
 struct Fixture {
     org_a: PublicKey,
     org_b: PublicKey,
-    signature_a_tampered: DsseEnvelope,
-    signature_b_tampered: DsseEnvelope,
+    /// Co-signed envelope whose Org B signature carries a single flipped
+    /// byte. Entries are in the order `sign_chio_bilateral_dsse_envelope`
+    /// emits them, Org A first.
+    tampered: DsseEnvelope,
 }
 
 fn fixture() -> &'static Fixture {
@@ -99,25 +110,32 @@ fn build_fixture() -> Fixture {
         treaty_extensions(&receipt),
     )
     .expect("fixture envelope signs and self-verifies");
+    let org_b_keyid = Keyid::from_public_key(&org_b.public_key());
     Fixture {
         org_a: org_a.public_key(),
         org_b: org_b.public_key(),
-        signature_a_tampered: with_last_signature_byte_flipped(&envelope, 0),
-        signature_b_tampered: with_last_signature_byte_flipped(&envelope, 1),
+        tampered: with_signature_byte_flipped(&envelope, org_b_keyid.as_str()),
     }
 }
 
-/// Flip the low bit of the final signature byte at `index` (0 = Org A,
-/// 1 = Org B, the order `sign_chio_bilateral_dsse_envelope` emits). The
-/// keyid is untouched so lookup succeeds and only the Ed25519 check fails.
-fn with_last_signature_byte_flipped(envelope: &DsseEnvelope, index: usize) -> DsseEnvelope {
+/// Flip the low bit of the first signature byte of the entry carrying
+/// `keyid`. Byte 0 sits inside the 32-byte `R` component, so the `s` scalar
+/// stays canonical and the verifier runs the full hash-and-recompute check
+/// before rejecting rather than bailing out of the scalar decode. The keyid
+/// is untouched so the lookup succeeds and only the Ed25519 check fails.
+fn with_signature_byte_flipped(envelope: &DsseEnvelope, keyid: &str) -> DsseEnvelope {
     let mut tampered = envelope.clone();
+    let entry = tampered
+        .signatures
+        .iter_mut()
+        .find(|signature| signature.keyid == keyid)
+        .expect("fixture envelope carries the requested keyid");
     let mut bytes = BASE64_STANDARD
-        .decode(&tampered.signatures[index].sig)
+        .decode(&entry.sig)
         .expect("fixture signature is base64");
-    let last = bytes.last_mut().expect("Ed25519 signature is 64 bytes");
-    *last ^= 0x01;
-    tampered.signatures[index].sig = BASE64_STANDARD.encode(bytes);
+    let first = bytes.first_mut().expect("Ed25519 signature is 64 bytes");
+    *first ^= 0x01;
+    entry.sig = BASE64_STANDARD.encode(bytes);
     tampered
 }
 
@@ -207,14 +225,12 @@ fn treaty_extensions(receipt: &ChioReceipt) -> BilateralPredicateExtensions {
 
 /// Dudect harness for `verify_chio_bilateral_dsse_envelope`.
 ///
-/// - `Class::Left`: Org A signature tampered; rejected at the first Ed25519
-///   check.
-/// - `Class::Right`: Org B signature tampered; Org A verifies, then rejected
-///   at the second Ed25519 check.
+/// - `Class::Left`: Org B's signature corrupted, entries in emitted order.
+/// - `Class::Right`: the same envelope with the two entries reversed.
 ///
-/// Both classes fail closed. The t-test asks whether the time taken to fail
-/// depends on which signer was tampered, which is exactly the A-then-B
-/// order the verifier commits to.
+/// Both classes fail closed at the Org B Ed25519 check after the same two
+/// verifications over the same bytes. The t-test asks whether the time
+/// taken to fail depends on where in the array each signer's entry sits.
 fn bilateral_dsse_verify_bench(runner: &mut CtRunner, rng: &mut BenchRng) {
     let fixture = fixture();
 
@@ -230,17 +246,28 @@ fn bilateral_dsse_verify_bench(runner: &mut CtRunner, rng: &mut BenchRng) {
         })
         .collect();
 
+    // One envelope value serves both classes, swapped in place between
+    // draws. Two separately built envelopes would differ in heap layout as
+    // well as in order, and the t-test would pick up the allocator rather
+    // than the verifier.
+    let mut envelope = fixture.tampered.clone();
     for class in classes {
-        let envelope = match class {
-            Class::Left => &fixture.signature_a_tampered,
-            Class::Right => &fixture.signature_b_tampered,
-        };
-        runner.run_one(class, || {
-            // The verdict is always `Err` by construction. Return the outcome
-            // so `run_one`'s `black_box` keeps the verifier call in the
-            // optimized binary.
-            verify_chio_bilateral_dsse_envelope(envelope, &fixture.org_a, &fixture.org_b).is_err()
-        });
+        let reversed = matches!(class, Class::Right);
+        if reversed {
+            envelope.signatures.swap(0, 1);
+        }
+        {
+            let probe = &envelope;
+            runner.run_one(class, || {
+                // The verdict is always `Err` by construction. Return the
+                // outcome so `run_one`'s `black_box` keeps the verifier call
+                // in the optimized binary.
+                verify_chio_bilateral_dsse_envelope(probe, &fixture.org_a, &fixture.org_b).is_err()
+            });
+        }
+        if reversed {
+            envelope.signatures.swap(0, 1);
+        }
     }
 }
 

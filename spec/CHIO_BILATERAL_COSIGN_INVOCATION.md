@@ -616,6 +616,48 @@ failures become `policy.verdict_disagreement`, and any error without a
 recognised prefix, including the signer-independence message and the
 protocol codes above, becomes `dsse.malformed`.
 
+### 7.2 Code-Only Rejection Surface
+
+The code of section 7.1 is the whole of the rejection that is part of
+this protocol. It is a value of the closed set that `RejectionCode`
+([../crates/trust/chio-federation/src/bilateral.rs](../crates/trust/chio-federation/src/bilateral.rs))
+enumerates, reachable as `VerifierError::redacted` and
+`BilateralCoSigningError::redacted`; the dotted string it renders is what
+the two `code()` accessors return, and it names the check that failed and
+nothing else.
+
+Everything else a rejection carries is local diagnostic. The `Display`
+of either error renders `code: detail`, and the detail names the values
+that were compared: presented and expected digests, key fingerprints,
+kernel ids, keyids, epoch heights, and policy verdicts. That detail is
+written for the operator reading the verifier's own log, on the host that
+holds the material already. It is not versioned, not stable across
+releases, and not part of the wire contract; an implementation MAY change
+any of it without notice, and a peer MUST NOT parse it.
+
+A verifier therefore MUST NOT copy the rendered message, or any value the
+message names, into an artifact that leaves the host: a signed receipt, a
+co-signed envelope, a governance finding, or an exported verification
+report. Such an artifact carries the code and, where its schema requires a
+human-readable field, a fixed phrase that does not vary with the material
+under verification. This includes the reply frame of the co-signing
+protocol itself: a peer that refuses to co-sign returns the code, or a
+fixed phrase, and never the rendered message. A rejection that echoed
+presented values back to the presenter would make the verifier an oracle
+over the material it holds: the sender learns which of its guesses matched
+a pinned fingerprint, a receipt digest, or a lease scope, one rejection at
+a time. The code alone answers only which check failed, which the sender
+already knows it provoked.
+
+The offline buyer verifier is the reference for this rule. Its exported
+report
+([../crates/trust/chio-attest-buyer-core/src/report.rs](../crates/trust/chio-attest-buyer-core/src/report.rs))
+is hashed into the buyer attestation packet, so it is an artifact that
+leaves the host: `VerifierFailure::from_error` reduces every failure to
+its code, the stage that owns it, and the fixed phrase
+`WITHHELD_FAILURE_DETAIL`, and the rendered diagnostic stays with the
+local error.
+
 ---
 
 ## 8. Composition With Workflow Receipts

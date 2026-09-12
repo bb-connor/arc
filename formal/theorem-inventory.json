@@ -1886,6 +1886,17 @@
       "notes": "If any atom occurring in a receipt predicate maps to an unsupported tag, the lifted predicate denies on every admission view."
     },
     {
+      "id": "treaty.shape.undefined_image_denies",
+      "leanName": "Chio.Treaty.PredicateShape.denote_ofReceipt_undefined",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateShape.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "If any atom occurring in a receipt predicate maps to a tag the admission view cannot interpret, the lifted predicate denies on that view."
+    },
+    {
       "id": "proof.finding_status_epoch_advance_is_strict",
       "leanName": "Chio.Proofs.FindingStatusFreshness.epoch_advance_is_strict",
       "file": "formal/lean4/Chio/Chio/Proofs/FindingStatusFreshness.lean",

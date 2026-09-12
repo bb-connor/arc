@@ -5,6 +5,7 @@
 
 use super::support::{canonical_json_string, receipt_canonical_digest_hex};
 use super::*;
+use crate::bilateral::{BilateralCoSigningError, RejectionCode, UnknownRejectionCode};
 use crate::bilateral_dsse::{
     pae, receipt_subject_name, sign_chio_bilateral_dsse_envelope, sign_dsse_envelope_full,
     BilateralPredicateExtensions, CapabilityLeaseRef, GovernanceReceiptRef, HashRecord,
@@ -1694,4 +1695,257 @@ fn governance_digest_hash_record_must_be_sha256() {
     let err = verify_bilateral_cosign_invocation(&envelope, &cfg).unwrap_err();
     assert_eq!(err.code(), "governance.receipt_required_missing");
     assert!(err.to_string().contains("sha256"));
+}
+
+// ---------------------------------------------------------------------------
+// Rejection-code surface
+// ---------------------------------------------------------------------------
+
+const PRESENTED_DETAIL: &str =
+    "presented 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 expected \
+     60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752";
+
+fn every_verifier_error() -> Vec<VerifierError> {
+    let detail = PRESENTED_DETAIL.to_string();
+    vec![
+        VerifierError::DsseMalformed(detail.clone()),
+        VerifierError::StatementMalformed(detail.clone()),
+        VerifierError::StatementSchemaInvalid(detail.clone()),
+        VerifierError::PredicateTypeUnrecognised(detail.clone()),
+        VerifierError::PredicateSchemaInvalid(detail.clone()),
+        VerifierError::SubjectDigestMismatch(detail.clone()),
+        VerifierError::PeerUnpinnedOrKeyidMismatch(detail.clone()),
+        VerifierError::PeerRevokedAtEpoch(detail.clone()),
+        VerifierError::SignatureServerAInvalid(detail.clone()),
+        VerifierError::SignatureServerBInvalid(detail.clone()),
+        VerifierError::PolicyVerdictDisagreement(detail.clone()),
+        VerifierError::CapabilityLeaseExpiredOrUnknown(detail.clone()),
+        VerifierError::GovernanceReceiptRequiredMissing(detail.clone()),
+        VerifierError::LadderManifestMissing(detail.clone()),
+        VerifierError::LadderManifestStale(detail.clone()),
+        VerifierError::UnknownActionClass { tool_name: detail },
+    ]
+}
+
+fn every_co_signing_error() -> Vec<BilateralCoSigningError> {
+    let detail = PRESENTED_DETAIL.to_string();
+    vec![
+        BilateralCoSigningError::CanonicalJson(detail.clone()),
+        BilateralCoSigningError::OrgASignatureInvalid,
+        BilateralCoSigningError::OrgBSignatureInvalid,
+        BilateralCoSigningError::UnknownPeer(detail.clone()),
+        BilateralCoSigningError::PeerExpired(detail.clone()),
+        BilateralCoSigningError::TransportFailure(detail.clone()),
+        BilateralCoSigningError::PeerRejected(detail.clone()),
+        BilateralCoSigningError::UnsupportedSchema(detail),
+        BilateralCoSigningError::PeerIdentityMismatch,
+        BilateralCoSigningError::ReceiptMismatch,
+    ]
+}
+
+#[test]
+fn rejection_codes_are_distinct_dotted_strings_that_round_trip() {
+    let mut seen = std::collections::BTreeSet::new();
+    for code in RejectionCode::ALL {
+        let rendered = code.as_str();
+        assert!(
+            seen.insert(rendered),
+            "rejection code {rendered} is used by more than one variant"
+        );
+        assert_eq!(rendered.to_string(), code.to_string());
+        assert!(
+            rendered.contains('.')
+                && rendered
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c == '.' || c == '_'),
+            "rejection code {rendered} is not a lowercase dotted identifier"
+        );
+        assert_eq!(rendered.parse::<RejectionCode>(), Ok(*code));
+        assert_eq!(
+            serde_json::to_string(code).unwrap(),
+            format!("\"{rendered}\"")
+        );
+        assert_eq!(
+            serde_json::from_str::<RejectionCode>(&format!("\"{rendered}\"")).unwrap(),
+            *code
+        );
+    }
+    assert_eq!(seen.len(), RejectionCode::ALL.len());
+    assert_eq!(
+        "subject.digest_mismatch:evidence".parse::<RejectionCode>(),
+        Err(UnknownRejectionCode)
+    );
+}
+
+/// The code column of the two spec §7.1 tables. A table row opens with a
+/// backticked dotted identifier; every other row in the section is skipped.
+fn published_rejection_codes(spec: &'static str) -> std::collections::BTreeSet<&'static str> {
+    let mut codes = std::collections::BTreeSet::new();
+    let mut in_section = false;
+    for line in spec.lines() {
+        if line.starts_with("### 7.1") {
+            in_section = true;
+            continue;
+        }
+        if !in_section {
+            continue;
+        }
+        if line.starts_with("### ") {
+            break;
+        }
+        let Some(rest) = line.strip_prefix("| `") else {
+            continue;
+        };
+        let Some((code, _)) = rest.split_once("` |") else {
+            continue;
+        };
+        let dotted_identifier = code.contains('.')
+            && code
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.' || c == '_');
+        if dotted_identifier {
+            assert!(
+                codes.insert(code),
+                "the specification lists {code} in more than one table row"
+            );
+        }
+    }
+    codes
+}
+
+#[test]
+fn the_invocation_spec_publishes_exactly_the_rejection_code_set() {
+    let spec = include_str!("../../../../../spec/CHIO_BILATERAL_COSIGN_INVOCATION.md");
+    let published = published_rejection_codes(spec);
+    let implemented: std::collections::BTreeSet<&str> = RejectionCode::ALL
+        .iter()
+        .map(|code| code.as_str())
+        .collect();
+    assert_eq!(
+        published, implemented,
+        "the specification's section 7.1 tables and RejectionCode publish different code sets"
+    );
+    for code in published {
+        assert_eq!(
+            code.parse::<RejectionCode>().map(|parsed| parsed.as_str()),
+            Ok(code),
+            "published code {code} has no RejectionCode variant"
+        );
+    }
+}
+
+#[test]
+fn reserved_consistency_codes_are_named_but_not_emittable() {
+    let spec = include_str!("../../../../../spec/CHIO_BILATERAL_COSIGN_INVOCATION.md");
+    for reserved in [
+        "consistency.anchor_unverified",
+        "consistency.quorum_underpopulated",
+    ] {
+        assert!(
+            spec.contains(reserved),
+            "{reserved} is no longer reserved by the specification"
+        );
+        assert_eq!(
+            reserved.parse::<RejectionCode>(),
+            Err(UnknownRejectionCode),
+            "reserved code {reserved} became emittable"
+        );
+    }
+}
+
+#[test]
+fn verifier_error_variants_map_to_distinct_codes_that_carry_no_detail() {
+    let errors = every_verifier_error();
+    let mut seen = std::collections::BTreeSet::new();
+    for error in &errors {
+        let code = error.redacted();
+        assert!(
+            seen.insert(code),
+            "two VerifierError variants share the code {code}"
+        );
+        assert_eq!(error.code(), code.as_str());
+        assert!(
+            RejectionCode::ALL.contains(&code),
+            "{code} is not in the published code set"
+        );
+        assert!(
+            !code.as_str().contains(PRESENTED_DETAIL),
+            "code {code} embeds the presented detail"
+        );
+        assert!(
+            error.to_string().contains(PRESENTED_DETAIL),
+            "{code} dropped the diagnostic detail from its local Display"
+        );
+        assert!(error.to_string().starts_with(code.as_str()));
+    }
+    assert_eq!(seen.len(), errors.len());
+}
+
+#[test]
+fn co_signing_error_variants_map_into_the_published_code_set() {
+    for error in every_co_signing_error() {
+        let code = error.redacted();
+        assert_eq!(error.code(), code.as_str());
+        assert!(
+            RejectionCode::ALL.contains(&code),
+            "{code} is not in the published code set"
+        );
+        assert!(!code.as_str().contains(PRESENTED_DETAIL));
+    }
+    assert_eq!(
+        BilateralCoSigningError::ReceiptMismatch.redacted(),
+        RejectionCode::SubjectDigestMismatch
+    );
+}
+
+#[test]
+fn envelope_layer_message_prefixes_select_a_code_and_fall_closed() {
+    let cases = [
+        (
+            "dsse.malformed: two signatures",
+            RejectionCode::DsseMalformed,
+        ),
+        ("payload base64: bad symbol", RejectionCode::DsseMalformed),
+        (
+            "statement.malformed: not canonical",
+            RejectionCode::StatementMalformed,
+        ),
+        (
+            "payload json: trailing comma",
+            RejectionCode::StatementMalformed,
+        ),
+        (
+            "statement.schema_invalid: two subjects",
+            RejectionCode::StatementSchemaInvalid,
+        ),
+        (
+            "predicate.type_unrecognised: chio.other.v1",
+            RejectionCode::PredicateTypeUnrecognised,
+        ),
+        (
+            "predicate.schema_invalid: missing tool_args_hash",
+            RejectionCode::PredicateSchemaInvalid,
+        ),
+        (
+            "subject.digest_mismatch: 9f86d0 != 60303a",
+            RejectionCode::SubjectDigestMismatch,
+        ),
+        (
+            "strict Chio requires independent Org A and Org B signer keys",
+            RejectionCode::SignerIndependenceRequired,
+        ),
+        (
+            "predicate.schema_invalid: strict Chio requires independent Org A and Org B signer keys",
+            RejectionCode::SignerIndependenceRequired,
+        ),
+        (PRESENTED_DETAIL, RejectionCode::CanonicalJsonInvalid),
+        ("", RejectionCode::CanonicalJsonInvalid),
+    ];
+    for (message, expected) in cases {
+        assert_eq!(
+            BilateralCoSigningError::CanonicalJson(message.to_string()).redacted(),
+            expected,
+            "message {message:?} selected the wrong code"
+        );
+    }
 }

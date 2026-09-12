@@ -2767,7 +2767,6 @@ dependencies = [
 name = "chio-attest-buyer-core"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
  "chio-core-types",
  "chio-federation",
  "chio-governance",

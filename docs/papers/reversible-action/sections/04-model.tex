@@ -93,16 +93,16 @@ evolution of an admitted amendment across the window boundary.
 \draw[decorate, decoration={brace, mirror, amplitude=4pt}]
   (1.2,-0.55) -- (7.6,-0.55)
   node[midway, below=6pt, align=center]
-  {per-step $\mathsf{BackwardRefines}$ witness preserves baseline\\[1pt]
-   (Theorem~3: baseline preserved at every $t$)};
+  {per-step $\mathsf{BackwardRefines}$ witness preserves baseline on $D$\\[1pt]
+   (Theorem~3: baseline preserved on $D$ at every $t$)};
 \end{tikzpicture}
 \caption{TTL-window evolution. An admitted action is bound to a
 positive TTL $T$ at admission time $t_0$. Within the window
 $[t_0,\, t_0+T]$, a per-step refinement witness preserves the
 baseline. At $t_0+T$, auto-reversion fires if no explicit rollback
 receipt has closed the chain. The composition theorem
-(Theorem~3) states that the baseline is preserved at every
-instant.}
+(Theorem~3) states that the baseline is preserved on the finite
+admission domain $D$ at every instant.}
 \label{fig:ttl-window}
 \end{figure}
 
@@ -158,11 +158,13 @@ syntactic constitution given the global syntactic refinement witness
 over $\mathsf{admits}$, where $\mathit{rb}$ is the rollback receipt's
 admission view:
 \[
-  \mathsf{admits}(c_{\text{new}}, \mathit{rb}) = \text{true}
-    \;\wedge\; \bigl(\forall v,\,
-       \mathsf{admits}(c_{\text{new}}, v) = \text{true}
-       \Rightarrow \mathsf{admits}(c_{\text{old}}, v) = \text{true}\bigr)
-    \;\Rightarrow\; \mathsf{admits}(c_{\text{old}}, \mathit{rb}) = \text{true}.
+  \begin{aligned}
+    &\mathsf{admits}(c_{\text{new}}, \mathit{rb}) = \text{true}
+      \;\wedge\; \bigl(\forall v,\,
+         \mathsf{admits}(c_{\text{new}}, v) = \text{true}
+         \Rightarrow \mathsf{admits}(c_{\text{old}}, v) = \text{true}\bigr) \\
+    &\qquad \Rightarrow\; \mathsf{admits}(c_{\text{old}}, \mathit{rb}) = \text{true}.
+  \end{aligned}
 \]
 The proof is a direct application of the refinement hypothesis to the
 rollback receipt's admission. The reduction supplies the rollback-
@@ -170,30 +172,35 @@ preservation step the headline composition leans on: a rollback
 receipt produced inside an amendment's TTL window remains admittable
 when the window expires and the baseline returns.
 
-The two theorems range over different objects. The composition theorem
-ranges over $\mathsf{Constitution}$ via $\mathsf{BackwardRefines}$
-(opaque receipt-to-Boolean closures); the rollback reduction ranges
-over $\mathsf{SyntacticConstitution}$ via $\mathsf{admits}$ (decidable
-denotation of a predicate ADT). The bridge between the two layers is
-the closure-to-syntactic soundness theorem in the parent paper's
-$\mathsf{PredicateLang}$: a syntactic constitution induces a closure
-constitution whose receipt-by-receipt admission decision agrees with
-$\mathsf{admits}$. Once that bridge is invoked, the composition
-theorem's $\mathsf{BackwardRefines}$ refines, on each receipt id, to
-the syntactic implication
-$\mathsf{admits}(c_{\text{new}}, \mathit{rid}) = \text{true} \Rightarrow
- \mathsf{admits}(c_{\text{old}}, \mathit{rid}) = \text{true}$, which is
-the hypothesis the rollback reduction consumes. The bridge itself is
-not reproved here; the substrate inherits it from $\mathsf{PredicateLang}$.
+The two theorems range over the same objects. Both state admission of
+an $\mathsf{AdmissionView}$ under a $\mathsf{SyntacticConstitution}$,
+decided by $\mathsf{admits}$. What differs is the scope of the
+refinement premise. The composition theorem consumes the domain-scoped
+$\mathsf{BackwardRefines}(c_{\text{new}}, c_{\text{old}}, D)$, which
+quantifies only over views in $D$ and is the witness a checked
+$\mathsf{ConstitutionalDelta}$ carries; the rollback reduction consumes
+the unrestricted $\mathsf{GlobalSynBackwardRefines}$, which quantifies
+over every view. Composing the two therefore carries a side condition:
+the rollback receipt's admission view must lie in the delta's domain
+$D$, since outside $D$ the composition theorem asserts nothing.
+
+The closure representation the substrate retains under
+$\mathsf{Chio.Treaty.Legacy}$ is related to the syntactic one
+pointwise: the closure induced by a syntactic constitution admits a
+view exactly when $\mathsf{admits}$ does. That is the parent
+substrate's $\mathsf{bridge\_pointwise}$, restated in the paper-local
+file as \thm{closure_to_syntactic_admission_bridge} so that both
+reductions can be read against either representation. It is an
+instance of the parent theorem, not a new proof.
 
 \paragraph{Bilateral destructive admission.}
 The bilateral reduction \thm{destructive_action_requires_bilateral_admission}
 specializes the parent paper's
 \thm{treaty_admission_iff_predicate_intersection} to the destructive
-subclass of the action taxonomy. For a bilateral envelope binding a
-device-polity receipt id and an operator-polity receipt id under a
-destructive action class, admission requires that each polity's
-predicates accept its own receipt. The reduction is structural rather
+subclass of the action taxonomy. For a bilateral envelope binding one
+admission view to a destructive action class under a bilateral treaty,
+admission holds iff both the device polity's and the operator polity's
+predicates accept that view. The reduction is structural rather
 than novel: the parent theorem already establishes the bilateral
 intersection; this theorem renames it for the destructive class. The
 contribution at this point is the typed envelope, not a new theorem.

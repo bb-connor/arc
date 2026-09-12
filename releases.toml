@@ -115,7 +115,7 @@ max_age_hours = 48
 #   nightly_wall_budget_hours_per_crate
 #                    : wall-clock budget for each mutants-nightly crate job.
 #   trust_boundary_crates
-#                    : crates covered by the six-crate mutation gate.
+#                    : crates covered by the mutation gate.
 #
 # Lifecycle:
 #   1. File lands with cycle_end_tag empty and observed_consecutive_nightly_

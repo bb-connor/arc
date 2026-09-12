@@ -681,7 +681,7 @@ and an adversarial corpus case behind each row.
 - **A coliseum.** [`chio-arena`](crates/core/chio-arena) runs scenarios against a real kernel,
   mutates and co-evolves adversary populations against the guard pipeline, and promotes the
   failures into the corpus.
-- **Fuzzing.** 28 fuzz targets run under ClusterFuzzLite on every pull request and in batch, with
+- **Fuzzing.** 29 fuzz targets run under ClusterFuzzLite on every pull request and in batch, with
   crash triage and corpus sync as separate workflows. See [`fuzz`](fuzz).
 - **Timing leaks.** dudect harnesses check constant-time behavior for signature-byte equality
   and scope subset checks. See [`tests/dudect`](crates/kernel/chio-kernel-core/tests/dudect).

@@ -16,8 +16,8 @@
 # Mechanics:
 #
 #   1. Each nightly run executes all four dudect harnesses in parallel
-#      (`cargo test -p <crate> --features dudect --release <bench> --
-#      --nocapture`), redirects stdout to `<bench>.out`, and pipes each
+#      (`cargo test -p <crate> --features dudect --release --test
+#      <bench>`), redirects stdout to `<bench>.out`, and pipes each
 #      output through `scripts/check-dudect-threshold.sh --input <file>`.
 #      The script's exit code (0 = under threshold, 1 = over) is captured
 #      per harness as `<bench>.verdict` (the literal string "PASS" or
@@ -143,17 +143,17 @@ jobs:
           mkdir -p dudect-out
           out_file="dudect-out/${{ matrix.harness.name }}.out"
           # `--release` is mandatory; debug builds give meaningless timing
-          # distributions. `--nocapture` forwards dudect-bencher's stdout
-          # (which carries the "max t = ..." lines) through cargo so we
-          # can grep them. The harness is wired as `harness = false` so
-          # `ctbench_main!` provides its own argv parser; no extra dudect
-          # flags are passed, so its defaults apply.
+          # distributions. Each harness is wired as `harness = false`, so
+          # cargo does not capture its stdout (the "max t = ..." lines
+          # reach the log unaided) and `ctbench_main!` supplies its own
+          # argv parser, which rejects libtest flags such as
+          # `--nocapture`. No extra dudect flags are passed, so its
+          # defaults apply.
           cargo test \
             -p ${{ matrix.harness.crate }} \
             --features dudect \
             --release \
             --test ${{ matrix.harness.test_binary }} \
-            -- --nocapture \
             | tee "${out_file}"
 
       - name: Apply threshold check

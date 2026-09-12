@@ -89,6 +89,8 @@ path     = "fuzz/fuzz_targets/bilateral_dsse_verify.rs"
 triggers = [
     "crates/trust/chio-federation/src/bilateral_dsse.rs",
     "crates/trust/chio-federation/src/bilateral_dsse/**",
+    "crates/trust/chio-federation/src/bilateral.rs",
+    "crates/trust/chio-federation/src/bilateral_verifier/**",
     "spec/schemas/chio-wire/v1/federation/**",
     "fuzz/fuzz_targets/bilateral_dsse_verify.rs",
     "fuzz/corpus/bilateral_dsse_verify/**",

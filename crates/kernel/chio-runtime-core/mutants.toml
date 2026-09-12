@@ -9,21 +9,26 @@
 # against the source-tree root even when this file is loaded explicitly.
 #
 # Scope: the treaty admission path inside the runtime hook.
-# `admission_hook.rs` reserves, consumes, and releases treaty continuations;
-# `admission_hook/dsse.rs` and `admission_hook/treaty_evidence.rs` verify the
-# bilateral DSSE envelope and the treaty evidence chain before dispatch;
-# `treaty.rs` and `treaty/predicate.rs` hold the treaty validators and the
-# bounded predicate evaluator; `store/sqlite/admission_replay.rs` is the
-# durable replay fence behind the continuation. The remaining runtime modules
-# (buyer review, orchestration, swarm authority, trust floors) are out of scope.
+# `admission_hook.rs` reserves, consumes, and releases treaty continuations,
+# and its module directory is examined as a directory glob so that splitting
+# the hook into further children keeps that logic in scope:
+# `admission_hook/treaty_ref.rs` parses the `chioTreaty` request context and
+# rejects request-borne trust, `admission_hook/store_artifacts.rs` resolves
+# treaty artifacts from the store, and `admission_hook/dsse.rs` and
+# `admission_hook/treaty_evidence.rs` verify the bilateral DSSE envelope and
+# the treaty evidence chain before dispatch. `treaty.rs` and
+# `treaty/predicate.rs` hold the treaty validators and the bounded predicate
+# evaluator; `store/sqlite/admission_replay.rs` is the durable replay fence
+# behind the continuation. The swarm-authority children of the hook are
+# excluded below, and the remaining runtime modules (buyer review,
+# orchestration, trust floors) are out of scope.
 
 timeout_multiplier = 3.0
 minimum_test_timeout = 60
 
 examine_globs = [
     "crates/kernel/chio-runtime-core/src/admission_hook.rs",
-    "crates/kernel/chio-runtime-core/src/admission_hook/dsse.rs",
-    "crates/kernel/chio-runtime-core/src/admission_hook/treaty_evidence.rs",
+    "crates/kernel/chio-runtime-core/src/admission_hook/*.rs",
     "crates/kernel/chio-runtime-core/src/treaty.rs",
     "crates/kernel/chio-runtime-core/src/treaty/predicate.rs",
     "crates/kernel/chio-runtime-core/src/store/sqlite/admission_replay.rs",
@@ -37,4 +42,7 @@ exclude_globs = [
     "**/*_test.rs", # rationale: excluded helper or verification surface.
     "**/tests/**", # rationale: excluded helper or verification surface.
     "**/benches/**", # rationale: excluded helper or verification surface.
+    # rationale: the swarm-authority children of the admission hook belong to
+    # the swarm lane, not the treaty admission path this shard scores.
+    "crates/kernel/chio-runtime-core/src/admission_hook/swarm_*.rs", # rationale: excluded helper or verification surface.
 ]

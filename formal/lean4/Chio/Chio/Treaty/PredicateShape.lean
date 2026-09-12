@@ -64,6 +64,7 @@ def receiptAtoms : ReceiptPredicate.Predicate -> List ReceiptPredicate.Atom
   | .disj left right => receiptAtoms left ++ receiptAtoms right
   | .neg predicate => receiptAtoms predicate
 
+/-- The lifted predicate's atom list is the atom map applied pointwise. -/
 theorem atoms_ofReceipt
     (f : ReceiptPredicate.Atom -> PredicateLang.AtomTag)
     (predicate : ReceiptPredicate.Predicate) :
@@ -78,6 +79,7 @@ theorem atoms_ofReceipt
       simp [ofReceipt, receiptAtoms, PredicateLang.atoms, ihl, ihr]
   | neg predicate ih => simp [ofReceipt, receiptAtoms, PredicateLang.atoms, ih]
 
+/-- An injective atom map lifts to an injective transport. -/
 theorem ofReceipt_injective
     (f : ReceiptPredicate.Atom -> PredicateLang.AtomTag)
     (hf : Function.Injective f) :
@@ -124,6 +126,7 @@ theorem eval_ofReceipt
   | neg predicate ih =>
       simp [ofReceipt, PredicateLang.eval, ReceiptPredicate.evaluate, ih]
 
+/-- Every atom mapped to a supported tag makes the lifted predicate supported. -/
 theorem supported_ofReceipt
     (f : ReceiptPredicate.Atom -> PredicateLang.AtomTag)
     (hSupported : forall atom, PredicateLang.supportedAtom (f atom) = true)
@@ -137,6 +140,7 @@ theorem supported_ofReceipt
   | disj left right ihl ihr => simp [ofReceipt, PredicateLang.supported, ihl, ihr]
   | neg predicate ih => simp [ofReceipt, PredicateLang.supported, ih]
 
+/-- Every atom mapped to a tag defined for the view makes the lifted predicate defined. -/
 theorem defined_ofReceipt
     (f : ReceiptPredicate.Atom -> PredicateLang.AtomTag)
     (view : PredicateLang.AdmissionView)

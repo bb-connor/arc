@@ -49,6 +49,11 @@
       "claimClass": "runtime_enforced",
       "command": "cargo test -p chio-conformance --test c2_bilateral_invocation_partial_verifier --test b4_bilateral_dsse_signature_slice --test b4_bilateral_dsse_pae_conformance",
       "id": "PS-T10"
+    },
+    {
+      "claimClass": "runtime_enforced",
+      "command": "cargo test -p chio-runtime-core --test runtime_treaty_continuation_reopen",
+      "id": "PS-T11"
     }
   ],
   "benchmarks": [

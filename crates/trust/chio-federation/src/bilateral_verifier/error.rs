@@ -1,16 +1,23 @@
 use super::*;
 
+use crate::bilateral::RejectionCode;
+
 // ---------------------------------------------------------------------------
 // Spec §7.1 error codes
 // ---------------------------------------------------------------------------
 
-/// Fail-closed error codes returned by [`verify_bilateral_cosign_invocation`].
-/// Each exposed variant maps verbatim to a spec §7.1 code (the `Display`
-/// impl emits the code itself); kernels that surface verifier output in
-/// receipts SHOULD log the code as the canonical value. Strict Chio
-/// ordered and quorum consistency claims are accepted only by strict
-/// treaty-bound Chio predicates that carry matching treaty refs and an
-/// explicit consistency anchor.
+/// Fail-closed error returned by [`verify_bilateral_cosign_invocation`] and
+/// [`verify_chio_bilateral_invocation`].
+///
+/// Each variant maps to one spec §7.1 code through [`Self::redacted`]; the
+/// code is the only part of the error that crosses the protocol surface.
+/// `Display` renders `code: detail`, where the detail names presented and
+/// expected values (digests, fingerprints, keyids, verdicts) for the local
+/// log; anything that surfaces verifier output in a receipt, a finding, or
+/// an exported report MUST record the code and not the rendered message.
+/// Strict Chio ordered and quorum consistency claims are accepted only by
+/// strict treaty-bound Chio predicates that carry matching treaty refs and
+/// an explicit consistency anchor.
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
 pub enum VerifierError {
     /// `dsse.malformed` - envelope JSON is not parseable, payloadType
@@ -82,28 +89,40 @@ pub enum VerifierError {
 }
 
 impl VerifierError {
-    /// The bare spec code (e.g. `"subject.digest_mismatch"`), without
-    /// the trailing context. Stable across releases.
+    /// The rejection code, the only part of this error that may cross the
+    /// protocol surface. `Display` keeps the diagnostic detail for local
+    /// logs.
+    #[must_use]
+    pub fn redacted(&self) -> RejectionCode {
+        match self {
+            Self::DsseMalformed(_) => RejectionCode::DsseMalformed,
+            Self::StatementMalformed(_) => RejectionCode::StatementMalformed,
+            Self::StatementSchemaInvalid(_) => RejectionCode::StatementSchemaInvalid,
+            Self::PredicateTypeUnrecognised(_) => RejectionCode::PredicateTypeUnrecognised,
+            Self::PredicateSchemaInvalid(_) => RejectionCode::PredicateSchemaInvalid,
+            Self::SubjectDigestMismatch(_) => RejectionCode::SubjectDigestMismatch,
+            Self::PeerUnpinnedOrKeyidMismatch(_) => RejectionCode::PeerUnpinnedOrKeyidMismatch,
+            Self::PeerRevokedAtEpoch(_) => RejectionCode::PeerRevokedAtEpoch,
+            Self::SignatureServerAInvalid(_) => RejectionCode::SignatureServerAInvalid,
+            Self::SignatureServerBInvalid(_) => RejectionCode::SignatureServerBInvalid,
+            Self::PolicyVerdictDisagreement(_) => RejectionCode::PolicyVerdictDisagreement,
+            Self::CapabilityLeaseExpiredOrUnknown(_) => {
+                RejectionCode::CapabilityLeaseExpiredOrUnknown
+            }
+            Self::GovernanceReceiptRequiredMissing(_) => {
+                RejectionCode::GovernanceReceiptRequiredMissing
+            }
+            Self::LadderManifestMissing(_) => RejectionCode::LadderManifestMissing,
+            Self::LadderManifestStale(_) => RejectionCode::LadderManifestStale,
+            Self::UnknownActionClass { .. } => RejectionCode::GovernanceUnknownActionClass,
+        }
+    }
+
+    /// The dotted string of [`Self::redacted`] (e.g.
+    /// `"subject.digest_mismatch"`). Stable across releases.
     #[must_use]
     pub fn code(&self) -> &'static str {
-        match self {
-            Self::DsseMalformed(_) => "dsse.malformed",
-            Self::StatementMalformed(_) => "statement.malformed",
-            Self::StatementSchemaInvalid(_) => "statement.schema_invalid",
-            Self::PredicateTypeUnrecognised(_) => "predicate.type_unrecognised",
-            Self::PredicateSchemaInvalid(_) => "predicate.schema_invalid",
-            Self::SubjectDigestMismatch(_) => "subject.digest_mismatch",
-            Self::PeerUnpinnedOrKeyidMismatch(_) => "peer.unpinned_or_keyid_mismatch",
-            Self::PeerRevokedAtEpoch(_) => "peer.revoked_at_epoch",
-            Self::SignatureServerAInvalid(_) => "signature.server_a_invalid",
-            Self::SignatureServerBInvalid(_) => "signature.server_b_invalid",
-            Self::PolicyVerdictDisagreement(_) => "policy.verdict_disagreement",
-            Self::CapabilityLeaseExpiredOrUnknown(_) => "capability.lease_expired_or_unknown",
-            Self::GovernanceReceiptRequiredMissing(_) => "governance.receipt_required_missing",
-            Self::LadderManifestMissing(_) => "ladder.manifest_missing",
-            Self::LadderManifestStale(_) => "ladder.manifest_stale",
-            Self::UnknownActionClass { .. } => "governance.unknown_action_class",
-        }
+        self.redacted().as_str()
     }
 }
 

@@ -13,8 +13,11 @@ Three artifact classes accompany the paper. The Lean~4 mechanization
 that discharges the four theorems of Section~\ref{sec:model} is the
 central artifact: a single paper-local source module of 589 lines,
 kept beside the paper rather than in the substrate's proof root, and
-packaged as a self-contained Lake project together with a snapshot of
-the substrate's Treaty modules it imports. The bibliography file lists primary-source
+packaged as a self-contained Lake project together with the three
+substrate Treaty modules that form its import closure. The packaged
+copy is byte-identical to the module of record, and the supplementary
+package records the SHA-256 that a reviewer checks this against. The
+bibliography file lists primary-source
 citations to specifications, standards documents, and peer-reviewed
 papers. The paper text and the supplementary package are released under
 the same permissive license that governs the substrate's public
@@ -26,16 +29,26 @@ camera-ready version.
 \label{sec:open-science:lean}
 
 The Lake project pins a Lean toolchain through a checked-in
-\path{lean-toolchain} file and a \path{lakefile.lean} that declares the
-substrate dependency. A reviewer rebuilds the proof with two commands:
+\path{lean-toolchain} file, matching the release the substrate's own
+proof root pins, and declares no external dependency. A reviewer checks
+the mechanization from a fresh extract:
 
 \begin{verbatim}
 tar xzf lean-source.tar.gz
-cd chio-lean && lake build
+cd chio-lean
+lake build
+lake env lean Chio/Treaty/SensorGroundedAdmission.lean
 \end{verbatim}
 
-A cold cache builds in three to five minutes. The build produces no
-warnings and contains no \texttt{sorry}. The
+The \path{lake build} step builds the three substrate Treaty modules;
+the \path{lake env lean} step elaborates the paper-local module against
+them and exits with no output. The two steps stay separate because the
+module is checked exactly as it sits in the repository: from outside
+the root module, never registered in it. Against the substrate's own
+proof root, the same check is \path{lake env lean} on
+\path{lean/SensorGroundedAdmission.lean} run from
+\path{formal/lean4/Chio}, and that is the run of record. Neither route
+reports a warning, and the sources contain no \texttt{sorry}. The
 \texttt{\#print axioms} command run against each of the four theorems
 reports only the standard Lean kernel axioms \texttt{propext},
 \texttt{Classical.choice}, and \texttt{Quot.sound}. No project-local

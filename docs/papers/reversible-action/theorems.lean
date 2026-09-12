@@ -4,7 +4,8 @@
   This file is a PLANNING ARTIFACT. It is not registered in any lakefile and
   is not part of the proof root (`formal/lean4/Chio`). It is checked by hand
   with `lake env lean` from `formal/lean4/Chio` against the syntactic treaty
-  model in `Chio.Treaty.Intersection` and `Chio.Treaty.PredicateLang`:
+  model in `Chio.Treaty.Intersection`, `Chio.Treaty.PredicateLang` and
+  `Chio.Treaty.BridgeEquivalence`:
   constitutions are `SyntacticConstitution`, admission inputs are
   `AdmissionView`, and `BackwardRefines new old domain` is refinement on an
   explicit finite domain.
