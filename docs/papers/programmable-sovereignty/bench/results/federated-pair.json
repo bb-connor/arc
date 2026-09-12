@@ -3,41 +3,42 @@
     "calls": 100,
     "dispatched": 100,
     "evidencePreparation": {
-      "ci_high_ms": 3.9266777499999996,
-      "ci_low_ms": 3.3940354999999998,
-      "max_ms": 12.979,
-      "mean_ms": 3.63159,
-      "min_ms": 2.918,
-      "p50_ms": 3.1935000000000002,
-      "p99_ms": 8.188390000000025,
+      "ci_high_ms": 4.1197625,
+      "ci_low_ms": 3.622137,
+      "max_ms": 8.673,
+      "mean_ms": 3.85832,
+      "min_ms": 2.947,
+      "p50_ms": 3.2969999999999997,
+      "p99_ms": 8.28888,
       "samples": 100,
-      "std_ms": 1.3692421637275465
+      "std_ms": 1.281558709091583
     },
-    "freshnessDenialsAbsorbed": 2,
+    "freshnessDenialsAbsorbed": 0,
     "receiverEvaluate": {
-      "ci_high_ms": 213.11083049999996,
-      "ci_low_ms": 200.74661700000004,
-      "max_ms": 413.153,
-      "mean_ms": 206.09776000000002,
-      "min_ms": 180.387,
-      "p50_ms": 199.516,
-      "p99_ms": 397.8773000000001,
+      "ci_high_ms": 207.23227175,
+      "ci_low_ms": 203.18731325000002,
+      "max_ms": 231.817,
+      "mean_ms": 205.17253,
+      "min_ms": 184.771,
+      "p50_ms": 203.78699999999998,
+      "p99_ms": 231.79918,
       "samples": 100,
-      "std_ms": 31.847606390915896
+      "std_ms": 10.418116968085311
     },
     "roundTrip": {
-      "ci_high_ms": 215.531771149,
-      "ci_low_ms": 203.137359791,
-      "max_ms": 415.048842,
-      "mean_ms": 208.51695286999998,
-      "min_ms": 182.401697,
-      "p50_ms": 201.60139149999998,
-      "p99_ms": 400.0437347400001,
+      "ci_high_ms": 209.99819906925,
+      "ci_low_ms": 205.92375450900002,
+      "max_ms": 238.328653,
+      "mean_ms": 207.92031007000003,
+      "min_ms": 186.656959,
+      "p50_ms": 206.80303750000002,
+      "p99_ms": 234.51970819000002,
       "samples": 100,
-      "std_ms": 31.899458512929343
+      "std_ms": 10.511506755273675
     }
   },
-  "commit": "85acf72cdee4253f1589d5cbee98a38986c09672",
+  "benchmarkInputTreeSha256": "65c70f5f3a9787eb70f047ee81d22ff7003d9372980f169217c83b4ec6f4162b",
+  "commit": "041aa18374a0d24c29cb2794bc4f716141fc97aa",
   "denied": {
     "cases": {
       "intersection_hash_mismatch": {
@@ -48,15 +49,15 @@
         "failureCode": "chio_treaty_intersection_mismatch",
         "freshnessDenialsAbsorbed": 0,
         "roundTrip": {
-          "ci_high_ms": 66.15864990125,
-          "ci_low_ms": 55.109845701249995,
-          "max_ms": 109.456138,
-          "mean_ms": 59.735834,
-          "min_ms": 47.083392,
-          "p50_ms": 56.85518,
-          "p99_ms": 101.40212767999995,
+          "ci_high_ms": 68.5122279475,
+          "ci_low_ms": 59.07018825625,
+          "max_ms": 94.959907,
+          "mean_ms": 63.516328599999994,
+          "min_ms": 48.955241,
+          "p50_ms": 62.9159495,
+          "p99_ms": 91.63923044999999,
           "samples": 20,
-          "std_ms": 13.14022309236477
+          "std_ms": 11.040723098108701
         }
       },
       "missing_required_evidence": {
@@ -67,15 +68,15 @@
         "failureCode": "chio_treaty_missing_required_evidence",
         "freshnessDenialsAbsorbed": 0,
         "roundTrip": {
-          "ci_high_ms": 61.28282379875001,
-          "ci_low_ms": 55.4768961,
-          "max_ms": 70.998429,
-          "mean_ms": 58.31012085,
-          "min_ms": 49.721125,
-          "p50_ms": 58.023505,
-          "p99_ms": 70.53221992,
+          "ci_high_ms": 63.834645300000005,
+          "ci_low_ms": 57.7757686475,
+          "max_ms": 73.525962,
+          "mean_ms": 60.74402705,
+          "min_ms": 49.700204,
+          "p50_ms": 60.2208165,
+          "p99_ms": 73.33910745,
           "samples": 20,
-          "std_ms": 6.847328727055424
+          "std_ms": 7.133406546635916
         }
       },
       "scope_hash_mismatch": {
@@ -84,17 +85,17 @@
         "dispatched": 0,
         "expectedDispatched": 0,
         "failureCode": "chio_treaty_scope_hash_mismatch",
-        "freshnessDenialsAbsorbed": 0,
+        "freshnessDenialsAbsorbed": 1,
         "roundTrip": {
-          "ci_high_ms": 60.522994249999996,
-          "ci_low_ms": 54.34105024875001,
-          "max_ms": 71.843153,
-          "mean_ms": 57.285955799999996,
-          "min_ms": 48.271558,
-          "p50_ms": 55.914215,
-          "p99_ms": 71.53712988,
+          "ci_high_ms": 73.0130315,
+          "ci_low_ms": 57.16271364875,
+          "max_ms": 133.256096,
+          "mean_ms": 63.87001435,
+          "min_ms": 47.496954,
+          "p50_ms": 58.954770499999995,
+          "p99_ms": 122.81415370999994,
           "samples": 20,
-          "std_ms": 7.2852399452291765
+          "std_ms": 18.919231143726954
         }
       },
       "smuggled_dynamic_trust": {
@@ -105,15 +106,15 @@
         "failureCode": "request_smuggled_dynamic_trust",
         "freshnessDenialsAbsorbed": 0,
         "roundTrip": {
-          "ci_high_ms": 59.9182596975,
-          "ci_low_ms": 54.45642005249999,
-          "max_ms": 69.515622,
-          "mean_ms": 57.1221771,
-          "min_ms": 47.327313,
-          "p50_ms": 56.83592,
-          "p99_ms": 69.35510923999999,
+          "ci_high_ms": 60.6573446,
+          "ci_low_ms": 57.104319446249995,
+          "max_ms": 67.834294,
+          "mean_ms": 58.84708365,
+          "min_ms": 51.066091,
+          "p50_ms": 58.403228,
+          "p99_ms": 67.31979414,
           "samples": 20,
-          "std_ms": 6.446211838754144
+          "std_ms": 4.1595561010666975
         }
       },
       "smuggled_trust_root": {
@@ -124,15 +125,15 @@
         "failureCode": "request_smuggled_trust_root",
         "freshnessDenialsAbsorbed": 0,
         "roundTrip": {
-          "ci_high_ms": 60.67707239875,
-          "ci_low_ms": 54.2492170575,
-          "max_ms": 72.999839,
-          "mean_ms": 57.360816150000005,
-          "min_ms": 48.073996,
-          "p50_ms": 56.3059565,
-          "p99_ms": 72.52414511999999,
+          "ci_high_ms": 63.4239428,
+          "ci_low_ms": 57.116731103750006,
+          "max_ms": 74.176365,
+          "mean_ms": 60.2340986,
+          "min_ms": 47.363673,
+          "p50_ms": 59.9666555,
+          "p99_ms": 73.79748809,
           "samples": 20,
-          "std_ms": 7.5768607114018165
+          "std_ms": 7.403799772172099
         }
       },
       "unknown_ladder_intersection": {
@@ -141,17 +142,17 @@
         "dispatched": 0,
         "expectedDispatched": 0,
         "failureCode": "chio_treaty_missing_intersection",
-        "freshnessDenialsAbsorbed": 0,
+        "freshnessDenialsAbsorbed": 1,
         "roundTrip": {
-          "ci_high_ms": 61.87576700000001,
-          "ci_low_ms": 54.7124684525,
-          "max_ms": 75.766733,
-          "mean_ms": 58.1584443,
-          "min_ms": 47.667315,
-          "p50_ms": 54.1523065,
-          "p99_ms": 74.68006448,
+          "ci_high_ms": 62.161003253749996,
+          "ci_low_ms": 56.786650107499995,
+          "max_ms": 69.704383,
+          "mean_ms": 59.45197475,
+          "min_ms": 49.193683,
+          "p50_ms": 58.831629,
+          "p99_ms": 69.44100367,
           "samples": 20,
-          "std_ms": 8.436846336588792
+          "std_ms": 6.372934301108299
         }
       },
       "unknown_treaty_scope": {
@@ -160,39 +161,39 @@
         "dispatched": 0,
         "expectedDispatched": 0,
         "failureCode": "chio_treaty_missing_scope",
-        "freshnessDenialsAbsorbed": 0,
+        "freshnessDenialsAbsorbed": 1,
         "roundTrip": {
-          "ci_high_ms": 61.1697711525,
-          "ci_low_ms": 53.754481096250004,
-          "max_ms": 74.413806,
-          "mean_ms": 57.307863999999995,
-          "min_ms": 48.064837,
-          "p50_ms": 54.648109000000005,
-          "p99_ms": 73.77994776,
+          "ci_high_ms": 62.472064395,
+          "ci_low_ms": 56.791795996249995,
+          "max_ms": 73.19132,
+          "mean_ms": 59.577361350000004,
+          "min_ms": 47.308993,
+          "p50_ms": 58.084925999999996,
+          "p99_ms": 72.7795273,
           "samples": 20,
-          "std_ms": 8.7785918041596
+          "std_ms": 6.69302116370469
         }
       }
     },
-    "freshnessDenialsAbsorbed": 0,
+    "freshnessDenialsAbsorbed": 3,
     "roundTrip": {
-      "ci_high_ms": 59.3392733375,
-      "ci_low_ms": 56.57241634178571,
-      "max_ms": 109.456138,
-      "mean_ms": 57.897316028571424,
-      "min_ms": 47.083392,
-      "p50_ms": 56.4378375,
-      "p99_ms": 75.23909146999998,
+      "ci_high_ms": 62.58936491446429,
+      "ci_low_ms": 59.37139551482143,
+      "max_ms": 133.256096,
+      "mean_ms": 60.89155547857143,
+      "min_ms": 47.308993,
+      "p50_ms": 58.82067,
+      "p99_ms": 88.46196021999975,
       "samples": 140,
-      "std_ms": 8.473994168143522
+      "std_ms": 9.877165778887147
     }
   },
   "environment": {
     "cargo": "1.94.1",
-    "commit": "85acf72cdee4253f1589d5cbee98a38986c09672",
+    "commit": "041aa18374a0d24c29cb2794bc4f716141fc97aa",
     "cores": 12,
     "cpuModel": "Neoverse-N1",
-    "loadAverage1m": 2.66,
+    "loadAverage1m": 5.37,
     "memoryGiB": 46.94236373901367,
     "os": "Linux 6.17.0-1020-oracle aarch64",
     "rolesStartedHere": [
@@ -208,10 +209,10 @@
   "environments": {
     "driver-origin-receiver": {
       "cargo": "1.94.1",
-      "commit": "85acf72cdee4253f1589d5cbee98a38986c09672",
+      "commit": "041aa18374a0d24c29cb2794bc4f716141fc97aa",
       "cores": 12,
       "cpuModel": "Neoverse-N1",
-      "loadAverage1m": 2.66,
+      "loadAverage1m": 5.37,
       "memoryGiB": 46.94236373901367,
       "os": "Linux 6.17.0-1020-oracle aarch64",
       "rolesStartedHere": [
@@ -226,10 +227,10 @@
     }
   },
   "freshnessDenialsAbsorbed": {
-    "admitted": 2,
-    "denied": 0,
-    "revocation": 112,
-    "total": 114
+    "admitted": 0,
+    "denied": 3,
+    "revocation": 85,
+    "total": 88
   },
   "method": {
     "bootstrap": {
@@ -244,91 +245,90 @@
     "freshnessDenialsAbsorbed": "calls the receiver denied because its revocation snapshot fell outside the kernel's freshness window. They are the clock rather than the treaty, so they are retried and excluded from every latency distribution above; the counts record how many were excluded",
     "hosts": "derived from the roles this run started: every role left to another machine adds a host, and a run that starts all of them records one",
     "percentile": "linear interpolation between order statistics",
-    "revokeToDeny": "control document written to first observing call, repeated 10 times. Each observation includes up to one origin control-poll period (250 ms, the epoch tick) and one call of polling resolution (the admitted round trip, p50 201.601 ms)",
+    "revokeToDeny": "control document written to first observing call, repeated 10 times. Each observation includes up to one origin control-poll period (250 ms, the epoch tick) and one call of polling resolution (the admitted round trip, p50 206.803 ms)",
     "roundTrip": "sender send to sender receive on the experiment lane; includes the receiver's whole admission decision and, on the admitted path, both co-sign hops back to the origin"
   },
   "profile": "release",
   "revocation": {
     "callsUntilDeny": [
-      14,
-      3,
+      2,
       1,
+      1,
+      17,
       2,
       2,
-      19,
+      13,
       2,
       2,
-      2,
-      2
+      1
     ],
     "cutCallsUntilDeny": [
-      1,
-      3,
-      1,
+      2,
       3,
       2,
       3,
       3,
       2,
+      2,
       3,
-      2
+      2,
+      3
     ],
     "cutConfirmations": 3,
     "cutFailureCodes": [
-      "delegation admission failed: revocation view snapshot epoch 178 is stale: age 1000 ms exceeds 500 ms; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:ba33bf20253ec78911f53db408aa26e5ea6288cd6f38ccaf47c997bffc4ac4e9:0`",
-      "delegation admission failed: revocation view snapshot epoch 182 is stale: age 1000 ms exceeds 500 ms",
-      "delegation admission failed: revocation view snapshot epoch 184 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 177 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 181 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 185 is stale: age 1000 ms exceeds 500 ms",
       "delegation admission failed: revocation view snapshot epoch 189 is stale: age 1000 ms exceeds 500 ms",
-      "delegation admission failed: revocation view snapshot epoch 193 is stale: age 1000 ms exceeds 500 ms; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:f82ffd87c42353a6c7348c15950b469bcab253a4f3206bbd63e4cc52754a5b81:0`",
-      "delegation admission failed: revocation view snapshot epoch 197 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 193 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 196 is stale: age 1000 ms exceeds 500 ms",
       "delegation admission failed: revocation view snapshot epoch 202 is stale: age 1000 ms exceeds 500 ms",
       "delegation admission failed: revocation view snapshot epoch 207 is stale: age 1000 ms exceeds 500 ms",
-      "delegation admission failed: revocation view snapshot epoch 211 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 210 is stale: age 1000 ms exceeds 500 ms",
       "delegation admission failed: revocation view snapshot epoch 216 is stale: age 1000 ms exceeds 500 ms"
     ],
     "cutRepeats": 10,
     "cutToDeny": {
-      "ci_high_ms": 874.5459057349999,
-      "ci_low_ms": 422.23258579250006,
-      "max_ms": 1060.544899,
-      "mean_ms": 658.636737,
-      "min_ms": 25.281324,
-      "p50_ms": 726.6181555000001,
-      "p99_ms": 1057.90323475,
+      "ci_high_ms": 916.1100163374999,
+      "ci_low_ms": 609.4233421775,
+      "max_ms": 1093.7685589999999,
+      "mean_ms": 760.7399419000001,
+      "min_ms": 476.23670400000003,
+      "p50_ms": 744.6812655000001,
+      "p99_ms": 1093.5348350299998,
       "samples": 10,
-      "std_ms": 382.67014028488444
+      "std_ms": 260.8291719819958
     },
     "failureCodes": [
       "capability has been revoked: cap-federated-pair",
-      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:1cecb9ccc5c373b77f1a8e7d15ed694158b3ad125891b0968c6e3b8c63314bae:0`",
-      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:8d84c1ff271b7a8433e8c60a57d3661d083047116e80489f6911bb4952ee2783:0`",
-      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:8f7b4af9650163d5b0ae4fb8b05c4feddeb8b4d2ce0096699991f892520aacf2:0`",
-      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:a7016be3be5ab57f6f08673e1f1729673812b54cbf28b4d8e5f615486f8aaf38:0`"
+      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:159c2a9a87a63ef978aced6ca13b7778df098ec98d7e9c7bc28700e259dde21e:0`",
+      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:2f247233dc325beb6c48f91d7c45acc80cf0ebde28aeaab99d62122897017aa2:0`",
+      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:796a17b4e82b490f614dfd9afbeb5d177cf2121399e65042188f0a1c8594f074:0`"
     ],
-    "freshnessDenialsAbsorbed": 112,
+    "freshnessDenialsAbsorbed": 85,
     "revokeRepeats": 10,
     "revokeToDeny": {
-      "ci_high_ms": 560.2251514124999,
-      "ci_low_ms": 323.84074025750004,
-      "max_ms": 784.914822,
-      "mean_ms": 441.54051680000003,
-      "min_ms": 70.087945,
-      "p50_ms": 426.962721,
-      "p99_ms": 776.77990524,
+      "ci_high_ms": 368.28764000499996,
+      "ci_low_ms": 178.977385,
+      "max_ms": 437.435153,
+      "mean_ms": 276.128539,
+      "min_ms": 67.611973,
+      "p50_ms": 322.898769,
+      "p99_ms": 437.34839975,
       "samples": 10,
-      "std_ms": 198.43191891842926
+      "std_ms": 160.9882608240278
     }
   },
   "schema": "chio.programmable-sovereignty.federated-pair-results.v1",
   "topology": {
     "achievedEpochRate": {
-      "deliveredRoots": 212,
+      "deliveredRoots": 208,
       "deliveryInterruptions": 14,
-      "epoch": 219,
+      "epoch": 216,
       "intervalMaxMs": 500,
-      "intervalMinMs": 244,
+      "intervalMinMs": 246,
       "intervalP50Ms": 250,
-      "intervalSamples": 197,
+      "intervalSamples": 193,
       "nominalTickMs": 250,
       "schema": "chio.experiment.federated-pair-epoch-rate.v1"
     },
