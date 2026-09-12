@@ -1330,3 +1330,92 @@ fn treaty_intersection_rejects_manifest_hash_mismatch_and_unknown_class(
     assert_eq!(err.code(), "chio_treaty_action_class_not_allowed");
     Ok(())
 }
+
+/// Both co-signing modes that produce a two-signature envelope force the
+/// invocation record into the required-evidence set. A class co-signed
+/// `bilateral_if_cross_org` that forced nothing would admit a cross-boundary
+/// call with no statement resolved and no continuation consumed, which is the
+/// opposite of what its name says.
+#[test]
+fn every_two_signature_co_sign_mode_requires_the_invocation_record(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for mode in ["bilateral_required", "bilateral_if_cross_org"] {
+        let mut buyer_class = treaty_action_class(
+            "receipt_backed",
+            true,
+            "totally_ordered",
+            vec!["governance_receipt"],
+        );
+        buyer_class.co_sign = mode.to_string();
+        let mut vendor_class = treaty_action_class(
+            "receipt_backed",
+            true,
+            "totally_ordered",
+            vec!["governance_receipt"],
+        );
+        vendor_class.co_sign = mode.to_string();
+        let buyer = treaty_manifest("kernel.buyer", buyer_class);
+        let vendor = treaty_manifest("kernel.vendor-b", vendor_class);
+
+        let mut treaty = treaty_scope();
+        treaty.ladder_manifest_sha256s = vec![
+            chio_runtime_core::governance_ladder_manifest_sha256(&buyer)?,
+            chio_runtime_core::governance_ladder_manifest_sha256(&vendor)?,
+        ];
+        let intersection =
+            compute_ladder_intersection(&treaty, &[buyer, vendor], 1_800_000_010_000)?;
+        let expected = chio_runtime_core::ladder_intersection_sha256(&intersection)?;
+
+        let denied = evaluate_cross_boundary_admission(CrossBoundaryAdmissionInput {
+            treaty_scope: &treaty,
+            ladder_intersection: &intersection,
+            expected_ladder_intersection_sha256: Some(expected.clone()),
+            action_class_id: "workflow.destructive.vendor_call",
+            present_evidence: vec!["governance_receipt".to_string()],
+            verified_evidence: vec![CrossBoundaryEvidenceRef {
+                evidence_class: "governance_receipt".to_string(),
+                artifact_sha256: "0".repeat(64),
+                verified: true,
+            }],
+            now_unix_ms: 1_800_000_010_000,
+        })?;
+        assert!(
+            !denied.accepted,
+            "{mode} admitted a call that presented no invocation record"
+        );
+        assert_eq!(
+            denied.failure_code.as_deref(),
+            Some("chio_treaty_missing_required_evidence"),
+            "{mode} denied for the wrong reason"
+        );
+
+        let accepted = evaluate_cross_boundary_admission(CrossBoundaryAdmissionInput {
+            treaty_scope: &treaty,
+            ladder_intersection: &intersection,
+            expected_ladder_intersection_sha256: Some(expected),
+            action_class_id: "workflow.destructive.vendor_call",
+            present_evidence: vec![
+                "governance_receipt".to_string(),
+                "bilateral_invocation".to_string(),
+            ],
+            verified_evidence: vec![
+                CrossBoundaryEvidenceRef {
+                    evidence_class: "governance_receipt".to_string(),
+                    artifact_sha256: "0".repeat(64),
+                    verified: true,
+                },
+                CrossBoundaryEvidenceRef {
+                    evidence_class: "bilateral_invocation".to_string(),
+                    artifact_sha256: "1".repeat(64),
+                    verified: true,
+                },
+            ],
+            now_unix_ms: 1_800_000_010_000,
+        })?;
+        assert!(
+            accepted.accepted,
+            "{mode} refused a call that presented the invocation record"
+        );
+    }
+    Ok(())
+}

@@ -647,10 +647,17 @@ pub fn evaluate_cross_boundary_admission(
 fn required_evidence_for_action(action: &LadderIntersectionActionClass) -> Vec<String> {
     let mut required = action.evidence_required.clone();
     let co_sign = ladder_co_sign_mode(&action.co_sign).ok();
-    if co_sign == Some("bilateral_required")
-        && !required
-            .iter()
-            .any(|evidence| evidence == "bilateral_invocation")
+    // Both modes that produce a two-signature envelope force the invocation
+    // record into the required-evidence set. A class co-signed
+    // `bilateral_if_cross_org` that forced nothing would admit a cross-boundary
+    // call with no statement resolved and no continuation consumed, which is the
+    // opposite of what its name says and of what the specification requires.
+    if matches!(
+        co_sign,
+        Some("bilateral_required") | Some("bilateral_if_cross_org")
+    ) && !required
+        .iter()
+        .any(|evidence| evidence == "bilateral_invocation")
     {
         required.push("bilateral_invocation".to_string());
     }

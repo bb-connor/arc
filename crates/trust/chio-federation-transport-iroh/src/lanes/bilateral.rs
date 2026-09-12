@@ -27,9 +27,11 @@
 //!    [`chio_core_types::PublicKey::verify`], and re-checks trust / rotation-window
 //!    through the same directory resolution. On ANY failure it writes a typed error
 //!    mirroring [`BilateralCoSigningError`] and terminates WITHOUT signing.
-//! 5. On success Org A signs the SAME `pae_bytes` (mirroring
-//!    `InProcessCoSigner::request_dsse_cosignature`) and writes the response frame
-//!    on the same stream.
+//! 5. On success Org A reconstructs `pae_bytes` as the DSSE pre-authentication
+//!    encoding of an in-toto bilateral statement naming both kernels (mirroring
+//!    `InProcessCoSigner::request_dsse_cosignature`), signs those same bytes,
+//!    and writes the response frame on the same stream. Bytes that do not
+//!    reconstruct are refused without signing.
 //!
 //! ## Wire mirror (the KNOWN GOTCHA)
 //!
@@ -49,8 +51,9 @@
 //! algorithm (Ed25519, P-256, P-384, ML-DSA-65, Hybrid) round-trips. NOTE:
 //! `Signature::to_bytes()` is Ed25519-only (it returns zeros for other algorithms),
 //! so the wire path MUST use the serde/hex encoding, never `to_bytes`. `pae_bytes`
-//! maps 1:1 as opaque bytes and is NEVER re-derived server-side (ADAPTER-SPEC 4.2:
-//! sign/verify the exact bytes received).
+//! maps 1:1 on the wire and is signed and verified exactly as received
+//! (ADAPTER-SPEC 4.2), but the accept side reconstructs it from the statement it
+//! decodes to before signing and refuses any byte disagreement.
 
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
@@ -62,6 +65,7 @@ use chio_core_types::Keypair;
 use chio_core_types::PublicKey;
 use chio_core_types::Signature;
 use chio_core_types::SigningBackend;
+use chio_federation::bilateral::reconstruct_cosigning_body;
 use chio_federation::bilateral::BilateralCoSigningError;
 use chio_federation::bilateral::BilateralCoSigningProtocol;
 use chio_federation::bilateral::CoSigningBody;
@@ -71,6 +75,8 @@ use chio_federation::bilateral::DsseCoSigningRequest;
 use chio_federation::bilateral::DsseCoSigningResponse;
 use chio_federation::bilateral::BILATERAL_COSIGNING_SCHEMA;
 use chio_federation::bilateral::BILATERAL_DSSE_COSIGNING_SCHEMA;
+use chio_federation::bilateral_dsse::reconstruct_dsse_pae;
+use chio_federation::bilateral_dsse::DssePreimageBinding;
 use iroh::endpoint::Connection;
 use iroh::endpoint::RecvStream;
 use iroh::endpoint::SendStream;
@@ -160,7 +166,8 @@ struct WireDsseCoSigningRequest {
     schema: String,
     org_a_kernel_id: String,
     org_b_kernel_id: String,
-    /// Opaque DSSE PAE preimage; signed/verified verbatim, never re-derived.
+    /// DSSE PAE preimage; signed and verified verbatim, and reconstructed from
+    /// the statement it decodes to before the accept side will sign it.
     pae_bytes: Vec<u8>,
     /// Algorithm-tagged (serde hex); round-trips every passport algorithm.
     org_b_signature: Signature,
@@ -915,9 +922,10 @@ impl BilateralCoSignHandler {
                 request.schema.clone(),
             ));
         }
-        // Sign the SAME opaque pae_bytes the peer sent (never re-derived), once the
-        // shared accept-side decision has bound the transport origin to the claimed
-        // peer and verified Org B's signature over those exact bytes.
+        // Sign the exact pae_bytes the peer sent, once the shared accept-side
+        // decision has bound the transport origin to the claimed peer, verified Org
+        // B's signature over those exact bytes, and reconstructed them as this
+        // profile's preimage.
         let org_a_signature = cosign_bytes(
             CoSignAuthority {
                 gate: &self.gate,
@@ -931,6 +939,7 @@ impl BilateralCoSignHandler {
                 org_b_kernel_id: &request.org_b_kernel_id,
                 signed_bytes: &request.pae_bytes,
                 org_b_signature: &request.org_b_signature,
+                profile: CoSignProfile::DssePreAuthentication,
             },
         )?;
         Ok(DsseCoSigningResponse {
@@ -1055,18 +1064,18 @@ pub const ALPN_BILATERAL_RECEIPT_COSIGN: &[u8] = b"chio/federation/bilateral-rec
 /// Serde wire frame for the receipt co-sign profile.
 ///
 /// The frame carries the canonical [`chio_federation::bilateral::CoSigningBody`]
-/// bytes rather than the receipt, so Org A signs the exact bytes Org B signed and
-/// never re-canonicalises a structure it did not author (the same opaque-bytes
-/// discipline the DSSE profile uses for `pae_bytes`). Org B derives the bytes from
-/// the receipt it is holding; a byte-level disagreement between the two sides can
-/// therefore only fail closed at the signature check.
+/// bytes rather than the receipt, so Org A signs the exact bytes Org B signed. Org
+/// B derives the bytes from the receipt it is holding, and Org A re-derives them
+/// from the receipt those bytes carry before it will sign: a byte-level
+/// disagreement between the two sides fails closed without a signature.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct WireReceiptCoSigningRequest {
     schema: String,
     org_a_kernel_id: String,
     org_b_kernel_id: String,
-    /// Canonical JSON of the `CoSigningBody`; signed and verified verbatim.
+    /// Canonical JSON of the `CoSigningBody`; signed and verified verbatim, and
+    /// re-derived from the receipt it carries before the accept side will sign it.
     body_bytes: Vec<u8>,
     /// Algorithm-tagged (serde hex); round-trips every passport algorithm.
     org_b_signature: Signature,
@@ -1080,23 +1089,42 @@ struct CoSignAuthority<'a> {
     passport_keys: &'a dyn PinnedPassportKeys,
 }
 
-/// The one exchange being decided: who is asking, for whom, over which bytes.
+/// Which preimage family the bytes of an exchange must reconstruct as.
+///
+/// The co-signing key also signs receipts, so the profile is what keeps this
+/// endpoint from being a signing oracle for the other preimage families the
+/// key covers. Every profile of the lane names one here; there is no variant
+/// that signs bytes without reconstructing them.
+#[derive(Debug, Clone, Copy)]
+enum CoSignProfile {
+    /// Canonical `chio_federation::bilateral::CoSigningBody`.
+    ReceiptCoSigningBody,
+    /// DSSE v1 pre-authentication encoding of an in-toto bilateral statement.
+    DssePreAuthentication,
+}
+
+/// The one exchange being decided: who is asking, for whom, over which bytes,
+/// under which preimage profile.
 struct CoSignSubject<'a> {
     remote: &'a EndpointId,
     org_a_kernel_id: &'a str,
     org_b_kernel_id: &'a str,
     signed_bytes: &'a [u8],
     org_b_signature: &'a Signature,
+    profile: CoSignProfile,
 }
 
 /// Shared accept-side decision for both profiles of lane d: bind the
 /// authenticated transport origin to the claimed peer, verify Org B's signature
-/// over the exact bytes it sent under the directory-bound passport key, and
-/// return Org A's signature over those same bytes.
+/// over the exact bytes it sent under the directory-bound passport key,
+/// reconstruct those bytes as the preimage the profile expects, and return Org
+/// A's signature over them.
 ///
-/// The bytes are opaque here. Profile framing (which schema tag, which preimage)
-/// is the caller's business; what must not differ between profiles is who is
-/// allowed to obtain a signature, which is this function.
+/// The bytes are never opaque here. Who is allowed to obtain a signature and
+/// what a signature may cover are both decided in this one function, because
+/// either one alone is insufficient: the same key signs receipts and DSSE
+/// statements, so an admitted peer that can choose the bytes can choose which
+/// preimage family it walks away with a signature over.
 fn cosign_bytes(
     authority: CoSignAuthority<'_>,
     subject: CoSignSubject<'_>,
@@ -1159,8 +1187,36 @@ fn cosign_bytes(
     if !directory_key.verify(subject.signed_bytes, subject.org_b_signature) {
         return Err(BilateralCoSigningError::OrgBSignatureInvalid);
     }
+    // Recompute and refuse, immediately above the signature and on every
+    // profile: parse the bytes as the content this profile signs, re-derive
+    // their canonical encoding from that content, and refuse unless the two
+    // agree byte for byte. An admitted peer authenticating bytes of its own
+    // choosing is otherwise enough to obtain this kernel's signature over any
+    // preimage its key covers, including the canonical signing preimage of a
+    // receipt the peer invented and attributed to this kernel.
+    let origin_public_key = authority.origin_keypair.public_key();
+    match subject.profile {
+        CoSignProfile::ReceiptCoSigningBody => {
+            reconstruct_cosigning_body(
+                subject.signed_bytes,
+                subject.org_a_kernel_id,
+                subject.org_b_kernel_id,
+            )?;
+        }
+        CoSignProfile::DssePreAuthentication => {
+            reconstruct_dsse_pae(
+                subject.signed_bytes,
+                DssePreimageBinding {
+                    org_a_kernel_id: subject.org_a_kernel_id,
+                    org_a_public_key: &origin_public_key,
+                    org_b_kernel_id: subject.org_b_kernel_id,
+                    org_b_public_key: directory_key,
+                },
+            )?;
+        }
+    }
 
-    // Success: sign the SAME opaque bytes (never re-derived).
+    // Success: sign the reconstructed bytes.
     let backend = Ed25519Backend::new(authority.origin_keypair.clone());
     backend
         .sign_bytes(subject.signed_bytes)
@@ -1172,9 +1228,10 @@ fn cosign_bytes(
 /// same [`DirectoryGate`] as the DSSE profile.
 ///
 /// Performs exactly the verification `InProcessCoSigner::request_cosignature`
-/// does, plus the transport-origin binding, and signs the canonical
-/// `CoSigningBody` bytes the peer sent instead of re-deriving them from a receipt
-/// it did not author.
+/// does, plus the transport-origin binding. It signs the canonical
+/// `CoSigningBody` bytes the peer sent, but only after re-deriving them from the
+/// receipt those bytes carry, so the signature covers content this kernel
+/// reconstructed rather than bytes it was handed.
 pub struct BilateralReceiptCoSignHandler {
     gate: DirectoryGate,
     origin_kernel_id: String,
@@ -1263,6 +1320,7 @@ impl BilateralReceiptCoSignHandler {
                 org_b_kernel_id: &request.org_b_kernel_id,
                 signed_bytes: &request.body_bytes,
                 org_b_signature: &request.org_b_signature,
+                profile: CoSignProfile::ReceiptCoSigningBody,
             },
         )?;
         Ok(CoSigningResponse {
@@ -1371,6 +1429,7 @@ mod tests {
     use crate::identity::VerifiedDirectory;
     use crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA;
     use chio_core_types::canonical_json_bytes;
+    use chio_core_types::receipt::body::prepare_receipt_body_for_signing;
     use chio_core_types::receipt::body::ChioReceipt;
     use chio_core_types::receipt::body::ChioReceiptBody;
     use chio_core_types::receipt::decision::Decision;
@@ -1381,7 +1440,14 @@ mod tests {
     use chio_core_types::receipt::kinds::ToolOrigin;
     use chio_core_types::receipt::kinds::TrustLevel;
     use chio_core_types::receipt::metadata::ActorRef;
+    use chio_core_types::receipt::signing::ChioReceiptSigningBody;
     use chio_core_types::sha256_hex;
+    use chio_federation::bilateral_dsse::build_predicate;
+    use chio_federation::bilateral_dsse::build_statement;
+    use chio_federation::bilateral_dsse::pae;
+    use chio_federation::bilateral_dsse::KernelIdentity;
+    use chio_federation::bilateral_dsse::Keyid;
+    use chio_federation::bilateral_dsse::PAYLOAD_TYPE_IN_TOTO;
     use iroh::endpoint::presets;
     use iroh::protocol::Router;
     use iroh::RelayMode;
@@ -1538,6 +1604,33 @@ mod tests {
         )
     }
 
+    /// The DSSE pre-authentication encoding the producer path signs: the PAE of
+    /// the in-toto statement `sign_dsse_envelope_with_cosigner` builds for these
+    /// two kernels over a receipt the tool host signed. The accept side
+    /// reconstructs this statement before it will co-sign, so a legitimate
+    /// exchange carries one.
+    fn dsse_pae_preimage(org_a: &Peer, org_b: &Peer) -> Vec<u8> {
+        let receipt = host_signed_receipt(&org_b.passport);
+        let identity = |peer: &Peer| KernelIdentity {
+            kernel_id: peer.kernel_id.clone(),
+            passport_key_fingerprint: Keyid::from_public_key(&peer.passport.public_key()),
+            alg: "ed25519".to_string(),
+        };
+        let predicate = build_predicate(
+            &receipt,
+            identity(org_a),
+            identity(org_b),
+            &receipt.tool_name,
+            NOW,
+        )
+        .expect("bilateral predicate");
+        let statement = build_statement(&receipt, predicate).expect("in-toto statement");
+        pae(
+            PAYLOAD_TYPE_IN_TOTO,
+            &statement.canonical_bytes().expect("canonical statement"),
+        )
+    }
+
     fn pinned_org_b(org_b: &Peer) -> Arc<dyn PinnedPassportKeys> {
         let mut keys: HashMap<String, PublicKey> = HashMap::new();
         keys.insert(org_b.kernel_id.clone(), org_b.passport.public_key());
@@ -1553,7 +1646,7 @@ mod tests {
         let (addr, _router) = spawn_org_a(&org_a, gate, pinned_org_b(&org_b)).await;
         let cosigner = spawn_org_b(&org_b, ORIGIN_KERNEL, addr).await;
 
-        let pae_bytes = b"DSSEv1 opaque bilateral pae preimage".to_vec();
+        let pae_bytes = dsse_pae_preimage(&org_a, &org_b);
         let request = org_b_request(&org_b, ORIGIN_KERNEL, &pae_bytes);
 
         let response = cosigner
@@ -1584,7 +1677,7 @@ mod tests {
         let (addr, _router) = spawn_org_a(&org_a, gate, pinned_org_b(&org_b)).await;
         let cosigner = spawn_org_b(&org_b, ORIGIN_KERNEL, addr).await;
 
-        let pae_bytes = b"DSSEv1 trait-path pae preimage".to_vec();
+        let pae_bytes = dsse_pae_preimage(&org_a, &org_b);
         let request = org_b_request(&org_b, ORIGIN_KERNEL, &pae_bytes);
 
         // Drive the SYNC BilateralCoSigningProtocol contract (block_in_place path).
@@ -1795,7 +1888,7 @@ mod tests {
             pinned_org_b(&org_b),
         );
 
-        let pae_bytes = b"pae bound to the directory passport".to_vec();
+        let pae_bytes = dsse_pae_preimage(&org_a, &org_b);
         let request = DsseCoSigningRequest::new(
             ORIGIN_KERNEL.to_string(),
             org_b.kernel_id.clone(),
@@ -1977,7 +2070,7 @@ mod tests {
             spawn_org_a_with_limits(&org_a, gate, pinned_org_b(&org_b), limits).await;
         let cosigner = spawn_org_b(&org_b, ORIGIN_KERNEL, addr).await;
 
-        let pae_bytes = b"DSSEv1 opaque bilateral pae preimage (bounded path)".to_vec();
+        let pae_bytes = dsse_pae_preimage(&org_a, &org_b);
         let request = org_b_request(&org_b, ORIGIN_KERNEL, &pae_bytes);
 
         let response = cosigner
@@ -2066,7 +2159,7 @@ mod tests {
             .expect("admitted dialer connects");
         let (mut send, mut recv) = conn.open_bi().await.expect("dialer opens bi stream");
 
-        let pae_bytes = b"pae for the never-close linger test".to_vec();
+        let pae_bytes = dsse_pae_preimage(&org_a, &org_b);
         let request = org_b_request(&org_b, ORIGIN_KERNEL, &pae_bytes);
         let request_bytes =
             serde_json::to_vec(&WireDsseCoSigningRequest::from_request(&request)).unwrap();
@@ -2446,7 +2539,7 @@ mod tests {
         let cosigner = spawn_org_b(&org_b, ORIGIN_KERNEL, addr).await;
         assert_eq!(cosigner.connections_opened(), 0);
 
-        let pae_bytes = b"DSSEv1 opaque bilateral pae preimage".to_vec();
+        let pae_bytes = dsse_pae_preimage(&org_a, &org_b);
         for expected in 1..=2 {
             cosigner
                 .request_dsse_cosignature_over_iroh(&org_b_request(
@@ -2487,7 +2580,7 @@ mod tests {
         // Both halves are cumulative across hops and shared by every clone, which
         // is what lets a caller take a before/after difference around one
         // operation and read it as that operation's share.
-        let pae_bytes = b"DSSEv1 opaque bilateral pae preimage".to_vec();
+        let pae_bytes = dsse_pae_preimage(&org_a, &org_b);
         let mut connect = 0_u64;
         let mut exchange = 0_u64;
         for hop in 1..=2_u64 {
@@ -2520,5 +2613,150 @@ mod tests {
             .is_err());
         assert_eq!(cosigner.connect_nanos(), connect);
         assert_eq!(cosigner.exchange_nanos(), exchange);
+    }
+
+    /// A receipt body attributed to `kernel_key`, prepared exactly as the
+    /// receipt signer prepares it, together with the canonical signing
+    /// preimage a kernel's receipt signature covers.
+    fn attributed_receipt_preimage(kernel_key: &PublicKey) -> (ChioReceiptBody, Vec<u8>) {
+        let arguments = serde_json::json!({ "record": "ledger-forged" });
+        let body = prepare_receipt_body_for_signing(ChioReceiptBody {
+            id: "invoke-forged".to_string(),
+            timestamp: NOW / 1_000,
+            capability_id: "cap-forged".to_string(),
+            tool_server: "vendor-ledger".to_string(),
+            tool_name: "wire_transfer".to_string(),
+            action: ToolCallAction::from_parameters(arguments).expect("action"),
+            decision: Some(Decision::Allow),
+            receipt_kind: ReceiptKind::MediatedDecision,
+            boundary_class: BoundaryClass::Prevent,
+            observation_outcome: None,
+            tool_origin: ToolOrigin::CallerExecuted,
+            redaction_mode: RedactionMode::None,
+            actor_chain: vec![ActorRef {
+                actor_id: "agent:test/forged".to_string(),
+                actor_kind: Some("agent".to_string()),
+            }],
+            content_hash: "7".repeat(64),
+            policy_hash: "policy-forged".to_string(),
+            evidence: Vec::new(),
+            metadata: None,
+            trust_level: TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: kernel_key.clone(),
+            bbs_projection_version: None,
+        })
+        .expect("body prepares for signing");
+        let preimage =
+            canonical_json_bytes(&ChioReceiptSigningBody::from(&body)).expect("signing preimage");
+        (body, preimage)
+    }
+
+    /// Assemble the receipt a holder of a signature over
+    /// [`attributed_receipt_preimage`]'s preimage can publish.
+    fn receipt_from_signature(body: ChioReceiptBody, signature: Signature) -> ChioReceipt {
+        ChioReceipt {
+            id: body.id,
+            timestamp: body.timestamp,
+            capability_id: body.capability_id,
+            tool_server: body.tool_server,
+            tool_name: body.tool_name,
+            action: body.action,
+            decision: body.decision,
+            receipt_kind: body.receipt_kind,
+            boundary_class: body.boundary_class,
+            observation_outcome: body.observation_outcome,
+            tool_origin: body.tool_origin,
+            redaction_mode: body.redaction_mode,
+            actor_chain: body.actor_chain,
+            content_hash: body.content_hash,
+            policy_hash: body.policy_hash,
+            evidence: body.evidence,
+            metadata: body.metadata,
+            trust_level: body.trust_level,
+            tenant_id: body.tenant_id,
+            bbs_projection_version: body.bbs_projection_version,
+            kernel_key: body.kernel_key,
+            bbs_signature: None,
+            algorithm: None,
+            signature,
+        }
+    }
+
+    #[test]
+    fn receipt_cosign_refuses_a_receipt_signing_preimage() {
+        let org_a = Peer::new(ORIGIN_KERNEL, 46, 21);
+        let org_b = Peer::new(TOOL_HOST_KERNEL, 47, 22);
+        let gate = DirectoryGate::new(verified_directory(&[&org_a, &org_b]));
+        let handler = BilateralReceiptCoSignHandler::new(
+            gate,
+            ORIGIN_KERNEL,
+            org_a.passport.clone(),
+            pinned_org_b(&org_b),
+        );
+
+        // A receipt the peer invented, attributed to the co-signing kernel.
+        let (body, preimage) = attributed_receipt_preimage(&org_a.passport.public_key());
+
+        // These bytes are a live forgery vector: the co-signing kernel's own
+        // signature over them is a receipt that passes ordinary receipt
+        // verification while naming that kernel as its signer.
+        let harvested = Ed25519Backend::new(org_a.passport.clone())
+            .sign_bytes(&preimage)
+            .expect("origin signs");
+        let forged = receipt_from_signature(body, harvested);
+        assert!(
+            forged.verify_signature().expect("verification runs"),
+            "the preimage must be a real receipt preimage for this proof to mean anything"
+        );
+
+        // The peer is pinned, directory-bound, and signs the exact bytes it
+        // sends, so every admission check passes: only the preimage discipline
+        // stands between it and the signature above.
+        let request = WireReceiptCoSigningRequest {
+            schema: BILATERAL_COSIGNING_SCHEMA.to_string(),
+            org_a_kernel_id: ORIGIN_KERNEL.to_string(),
+            org_b_kernel_id: org_b.kernel_id.clone(),
+            body_bytes: preimage.clone(),
+            org_b_signature: org_b.passport.sign(&preimage),
+        };
+        let refusal = handler.cosign(&org_b.transport_id, &request).err();
+        assert!(
+            matches!(refusal, Some(BilateralCoSigningError::CanonicalJson(_))),
+            "a receipt signing preimage is not a co-signing body and must never be \
+             signed, got {refusal:?}"
+        );
+    }
+
+    #[test]
+    fn dsse_cosign_refuses_a_receipt_signing_preimage() {
+        let org_a = Peer::new(ORIGIN_KERNEL, 48, 23);
+        let org_b = Peer::new(TOOL_HOST_KERNEL, 49, 24);
+        let gate = DirectoryGate::new(verified_directory(&[&org_a, &org_b]));
+        let handler = BilateralCoSignHandler::new(
+            gate,
+            ORIGIN_KERNEL,
+            org_a.passport.clone(),
+            pinned_org_b(&org_b),
+        );
+
+        let (body, preimage) = attributed_receipt_preimage(&org_a.passport.public_key());
+        let harvested = Ed25519Backend::new(org_a.passport.clone())
+            .sign_bytes(&preimage)
+            .expect("origin signs");
+        assert!(
+            receipt_from_signature(body, harvested)
+                .verify_signature()
+                .expect("verification runs"),
+            "the preimage must be a real receipt preimage for this proof to mean anything"
+        );
+
+        let request = org_b_request(&org_b, ORIGIN_KERNEL, &preimage);
+        let refusal = handler.cosign(&org_b.transport_id, &request).err();
+        assert!(
+            matches!(refusal, Some(BilateralCoSigningError::CanonicalJson(_))),
+            "a receipt signing preimage is not a DSSE pre-authentication encoding and \
+             must never be signed, got {refusal:?}"
+        );
     }
 }

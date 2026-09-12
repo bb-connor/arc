@@ -83,6 +83,56 @@ impl CoSigningBody {
     }
 }
 
+/// Rebuild the canonical [`CoSigningBody`] a peer asked to have signed from
+/// the content those bytes carry, and refuse anything that does not rebuild
+/// byte-for-byte.
+///
+/// A kernel's co-signing key also signs receipts and DSSE statements, and the
+/// three preimage families are separated by structure alone. A signer that
+/// signs bytes it has not parsed is therefore a signing oracle for every other
+/// preimage its key covers: a peer can present the canonical receipt signing
+/// preimage of a receipt it invented, attributed to the co-signing kernel, and
+/// walk away with that kernel's signature over it. The accept side closes that
+/// by parsing the bytes as the content this profile expects, re-deriving the
+/// canonical encoding from the receipt they carry, and signing only on an
+/// exact match.
+///
+/// # Errors
+///
+/// Fails closed when the bytes are not a [`CoSigningBody`], when the body
+/// carries another schema tag or another pair of kernel ids, when the embedded
+/// receipt does not parse, or when the re-derived canonical bytes differ from
+/// the bytes presented.
+pub fn reconstruct_cosigning_body(
+    signed_bytes: &[u8],
+    org_a_kernel_id: &str,
+    org_b_kernel_id: &str,
+) -> Result<CoSigningBody, BilateralCoSigningError> {
+    let presented: CoSigningBody = serde_json::from_slice(signed_bytes).map_err(|e| {
+        BilateralCoSigningError::CanonicalJson(format!(
+            "presented bytes are not a bilateral co-signing body: {e}"
+        ))
+    })?;
+    if presented.schema != BILATERAL_COSIGNING_SCHEMA {
+        return Err(BilateralCoSigningError::UnsupportedSchema(presented.schema));
+    }
+    if presented.org_a_kernel_id != org_a_kernel_id || presented.org_b_kernel_id != org_b_kernel_id
+    {
+        return Err(BilateralCoSigningError::PeerIdentityMismatch);
+    }
+    let receipt: ChioReceipt =
+        serde_json::from_str(&presented.receipt_canonical_json).map_err(|e| {
+            BilateralCoSigningError::CanonicalJson(format!(
+                "co-signing body does not carry a receipt: {e}"
+            ))
+        })?;
+    let rebuilt = CoSigningBody::from_receipt(&receipt, org_a_kernel_id, org_b_kernel_id)?;
+    if rebuilt.canonical_bytes()? != signed_bytes {
+        return Err(BilateralCoSigningError::ReceiptMismatch);
+    }
+    Ok(presented)
+}
+
 /// A receipt co-signed by two kernels across a federation boundary.
 ///
 /// * `body` -- the underlying `ChioReceipt` that both kernels agreed on.
@@ -521,8 +571,12 @@ pub trait BilateralCoSigningProtocol: Send + Sync {
     ) -> Result<CoSigningResponse, BilateralCoSigningError>;
 
     /// Request a DSSE PAE co-signature for the bilateral invocation
-    /// envelope. Implementations should verify Org B's signature over
-    /// `request.pae_bytes` before returning Org A's signature.
+    /// envelope. Implementations MUST verify Org B's signature over
+    /// `request.pae_bytes` and reconstruct those bytes as a DSSE
+    /// pre-authentication encoding naming both kernels (see
+    /// [`crate::bilateral_dsse::reconstruct_dsse_pae`]) before returning Org
+    /// A's signature. Signing bytes that have not been reconstructed makes the
+    /// origin key an oracle for every other preimage family it covers.
     fn request_dsse_cosignature(
         &self,
         request: &DsseCoSigningRequest,
@@ -633,6 +687,21 @@ impl BilateralCoSigningProtocol for InProcessCoSigner {
         {
             return Err(BilateralCoSigningError::OrgBSignatureInvalid);
         }
+        // Recompute and refuse, the same discipline `request_cosignature`
+        // applies by taking the receipt rather than its preimage: the origin
+        // key also signs receipts, so signing unreconstructed bytes would let
+        // any peer it co-signs for choose which preimage family it obtains a
+        // signature over.
+        let origin_public_key = self.origin_keypair.public_key();
+        crate::bilateral_dsse::reconstruct_dsse_pae(
+            &request.pae_bytes,
+            crate::bilateral_dsse::DssePreimageBinding {
+                org_a_kernel_id: &self.origin_kernel_id,
+                org_a_public_key: &origin_public_key,
+                org_b_kernel_id: &request.org_b_kernel_id,
+                org_b_public_key: &self.tool_host_public_key,
+            },
+        )?;
 
         let backend = Ed25519Backend::new(self.origin_keypair.clone());
         let signature = backend

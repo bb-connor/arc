@@ -3590,8 +3590,8 @@ impl Receiver {
 
         // The co-sign hop that crosses the organization boundary: Org B signs the
         // DSSE preimage with its own passport key and asks Org A, over lane d, for
-        // the second signature. Org A never holds Org B's key and never parses the
-        // preimage.
+        // the second signature. Org A never holds Org B's key, and it reconstructs
+        // the preimage as a statement naming both kernels before it signs.
         let dsse = self.sign_dsse(DsseInputs {
             lineage_sha256: &lineage_sha256,
             continuation_sha256: &continuation_sha256,
