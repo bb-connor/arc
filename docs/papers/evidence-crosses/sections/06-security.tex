@@ -1,0 +1,150 @@
+\section{Security}
+\label{sec:security}
+
+Four properties carry the protocol, each stated over the adversary of Section~2
+and reduced to an assumption in Table~\ref{tab:assumptions}.
+
+\paragraph{Admission binding.}
+\emph{If a receiving kernel dispatches under cross-organization admission, then
+there is a statement $S$ such that both keys the receiver pinned for this
+agreement signed the identical pre-authentication bytes of $S$; the subject of
+$S$ is the digest of a receipt the receiver resolved from its own store; every
+binding field of $S$ that the receiver compares equals the value the receiver
+computed for this request from its own state; and the continuation named by $S$
+was unconsumed when admission began.}
+Suppose not. Each comparison is byte equality between a digest the receiver
+computed and one the statement carries, so a difference that passed means two
+distinct objects share a SHA-256 image, contradicting ASSUME-SHA256, or share a
+canonical encoding, contradicting injectivity of the encoder under
+ASSUME-CANONICAL-JSON. A difference in a signature means one verified under a
+pinned key over bytes that key never signed, contradicting ASSUME-ED25519; one
+in the continuation means a single-row insert reported a create for a key that
+already had a row, contradicting ASSUME-SQLITE-ATOMICITY. What remains is the
+completeness of the comparison set, and that is Table~\ref{tab:subst}. The
+property holds as stated for an action class that resolves the receipt
+lineage; without one the comparison that binds the lineage bundle does not run,
+and the table says which.
+
+\paragraph{Receiver locality.}
+\emph{The trust roots, pins, agreements, action-class tables, and registries
+used to decide a request are a function of the receiver's state before the
+request arrived, and are independent of the request's content.}
+This one is syntactic rather than cryptographic: the eleven key names of
+Section~\ref{sec:cross} are rejected before any resolution runs, and what
+remains are identifiers, each the argument of a total lookup over receiver-owned
+state.
+
+\paragraph{Single use.}
+\emph{For a continuation identifier $c$, at most one admission ever reaches
+dispatch with $c$ bound to it.}
+Under ASSUME-SQLITE-ATOMICITY exactly one of any set of concurrent inserts on a
+primary key creates the row; every other reports zero created and denies.
+Release deletes only when keyed by both $c$ and the admission that took it, so
+no admission frees another's row and no post-dispatch path frees one at all.
+
+\paragraph{Audience binding.}
+\emph{A statement accepted by receiver $R$ is not accepted by a different
+receiver $R'$ unless $R'$ separately pinned the same two keys, activated the
+same agreement, and holds the same receipt.}
+The statement names the two kernels, but no receiver takes its audience from
+that name: the identifier is only an index into the pin set, so rewriting it
+fails the pin lookup before any signature is checked.
+
+\paragraph{Substitution over the binding reference.}
+Table~\ref{tab:subst} is an executed corpus over the \PSBindingFieldCount{}
+binding fields, evidence \PSSubstitutionEvidenceId{}: a case builds a complete
+admissible bundle, substitutes one field with a well-formed different value,
+re-signs the statement with both participant keys, asserts both signatures
+verify over the substituted bytes, and drives it through the pre-dispatch hook,
+asserting the outcome the field's row records: for a compared field the failure
+code and that no tool was dispatched, and for the one field the receiver never
+compares, admission. Of the \PSSubstitutionCaseCount{} cases one substitutes
+nothing and admits, so every denial is attributable to the field that changed. There \code{binding_mismatch} and
+\code{unverified_evidence} abbreviate
+\code{chio_treaty_dsse_binding_mismatch} and
+\code{chio_treaty_unverified_required_evidence}.
+\scriptsize
+\begin{longtable}{@{}p{3.15cm}p{6.15cm}p{2.75cm}p{1.75cm}@{}}
+\caption{Substituting one binding field at a time, with both signatures valid over the substituted statement, as decided by the pre-dispatch hook. Ten fields are compared on every cross-organization admission, the signer list twice, as a set and in order. Four more are compared only when the admission resolves the artifact they bind, which the action class's required-evidence set decides; the refund call resolves both the invocation record and the lineage bundle. The fifteenth is never compared, and the case that substitutes it is admitted.}\label{tab:subst}\\
+\toprule
+Field & Receiver-side value it must equal & First code & Compared when \\
+\midrule
+\endfirsthead
+\toprule
+Field & Receiver-side value it must equal & First code & Compared when \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\code{treaty_id} & the agreement the receiver resolved for this request & \code{binding_mismatch} & always \\
+\code{treaty_scope_sha256} & the digest the receiver computes over its own agreement record & \code{binding_mismatch} & always \\
+\code{ladder_intersection}\code{_sha256} & the intersection digest the receiver resolved & \code{binding_mismatch} & always \\
+\code{admission_report}\code{_sha256} & \emph{nothing}: 64 hex characters, then overwritten by the receiver's own report digest & none: the substituted call is admitted and dispatches & never \\
+\code{continuation_sha256} & the resolved continuation's digest & \code{binding_mismatch} & always \\
+\code{action_class_id} & the action class the receiver resolved for this request & \code{binding_mismatch} & always \\
+\code{consistency_model} & the model the resolved intersection fixed & \code{binding_mismatch} & always \\
+\code{request_sha256} & this dispatch's argument hash, and the predicate's own \code{tool_args_hash} & \code{binding_mismatch} & always \\
+\code{lease_refs} & the lease in the receiver's own admission bundle & \code{binding_mismatch} & always \\
+\code{governance_refs} & the governance record in that bundle & \code{binding_mismatch} & always \\
+\code{signer_kernel_ids}, as a set & exactly two, equal as a set to the agreement's participants & \code{binding_mismatch} & always \\
+\code{signer_kernel_ids}, in order & the invocation record's order; a reversal resolves the two pinned keys transposed, and strict envelope verification refuses that pairing before the ordered comparison runs & \code{unverified}\code{_evidence} & always \\
+\code{lineage_bundle_sha256} & the lineage bundle the receiver resolved & \code{binding_mismatch} & lineage required \\
+\code{outcome_sha256} & the outcome digest in the receiver's invocation record & \code{binding_mismatch} & record required \\
+\code{local_receipt_sha256} & the lineage bundle's root receipt digest, and the invocation record's & \code{binding_mismatch} & either required \\
+\code{remote_receipt_sha256} & the lineage bundle's leaf receipt digest, and the invocation record's & \code{binding_mismatch} & either required \\
+\end{longtable}
+\normalsize
+
+\noindent
+A class in the bilateral-required co-signing mode has the invocation record
+forced into its required-evidence set, so the last three rows run on every
+admission under that mode, and two named signers resolving to equal public keys are
+refused before any signature is checked. \code{admission_report_sha256} is
+outside the property: it is never compared, and the case that substitutes it is
+admitted and dispatches. Nothing rests on it, because the receiver overwrites it
+with its own report digest before signing, so the peer's value reaches neither
+the decision nor the receipt. The interesting
+attack is substituting the whole
+statement for another validly co-signed statement from the same pair of kernels,
+and it is the continuation, not any digest, that stops it: the substituted
+statement names a continuation the receiver either does not know or has already
+consumed.
+
+Two quantities follow from the table's shape, not from measurement. The
+evidence a receiver resolves is fixed by the fields of one binding reference
+rather than by the size of the request: exactly what
+Figure~\ref{fig:mechanism} shows. The one term that grows is the lineage bundle, whose edges
+the receiver walks when the action class requires lineage, and that walk is the
+only part of admission linear in anything the request presents. The window in
+which a statement can be presented is the intersection of its lease, governance,
+and continuation validity intervals; in the refund example the lease runs
+60{,}000\,ms and the authorization 40{,}000\,ms, so the window is at most
+40\,s, and after the first dispatch it is zero.
+
+\paragraph{Revocation.}
+Revocation is the only part of this protocol that depends on something
+arriving. Each origin publishes a signed root carrying a monotone epoch counter
+and an issue time. A kernel installs a snapshot only if its epoch strictly
+exceeds the installed one, by compare-and-swap, so a replayed or rewound frame
+cannot take effect and a concurrent install cannot be lost, and it applies its
+own freshness window to that snapshot's issue time before trusting it.
+Safety holds unconditionally, in every partition, because both halves are local
+predicates that never wait for a message: no call is allowed against a
+revocation the kernel has observed, and a call evaluated against a stale
+snapshot is denied. There is no third branch.
+
+Liveness holds only under ASSUME-GOSSIP-FAIRNESS-PARTITION-BOUND. We bound the
+time before a revocation is observed, not the number of evaluations, which is
+unbounded. Let $F$ be
+the freshness window, $T$ the origin's control-poll period, $L$ the latency of
+one admitted call, and $k$ the number of calls made before one is decided
+against the newer snapshot, one at best and more when a call already in flight
+was decided against the older. A still-connected receiver denies
+no later than $T + kL$ after publication, and a cut receiver no later than
+$F + T + kL$, because its snapshot must first age past $F$. With $F = \PSFreshnessMs$\,ms,
+$T = \PSEpochTickMs$\,ms, $k = 1$, and the median $L$ of
+Section~\ref{sec:eval}, those are
+\fpeval{round(\PSEpochTickMs + \PSFedAllowPFiftyMs, 1)}\,ms connected and
+\fpeval{round(\PSFreshnessMs + \PSEpochTickMs + \PSFedAllowPFiftyMs, 1)}\,ms
+cut. An operator sizing $F$ is choosing how long a withdrawn capability may
+still be honored on a failed link.

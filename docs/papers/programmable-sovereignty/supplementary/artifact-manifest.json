@@ -54,6 +54,11 @@
       "claimClass": "runtime_enforced",
       "command": "cargo test -p chio-runtime-core --test runtime_treaty_continuation_reopen",
       "id": "PS-T11"
+    },
+    {
+      "claimClass": "runtime_enforced",
+      "command": "cargo test -p chio-runtime-core --test runtime_treaty_binding_substitution",
+      "id": "PS-T12"
     }
   ],
   "benchmarks": [

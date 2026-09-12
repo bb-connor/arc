@@ -1,10 +1,10 @@
-44170f921363cb15a5b1c21114d957007a6f6ca6
+b20144b8bd334d3e79cf5536fee448df22a91e3a
 worktree=clean
 cpu_model=Neoverse-N1
 cores=12
 memory_bytes=50403979264
 os=Linux 6.17.0-1020-oracle aarch64
-load_average_1m=11.55
+load_average_1m=4.69
 max_load_average_1m=16
 toolchain_pin=1.94.1
 rustc 1.94.1 (e408947bf 2026-03-25)
@@ -52,8 +52,8 @@ Vulnerability Tsa:                       Not affected
 Vulnerability Tsx async abort:           Not affected
 Vulnerability Vmscape:                   Not affected
 MemTotal:       49222636 kB
-MemFree:         7311220 kB
-MemAvailable:   43701144 kB
+MemFree:         7440484 kB
+MemAvailable:   45622996 kB
 profile=release
 end_to_end_samples=100
 end_to_end_warmups=2

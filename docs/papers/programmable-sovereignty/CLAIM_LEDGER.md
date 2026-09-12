@@ -38,11 +38,11 @@ produced the result files. The MacBook Pro results previously retained under
 <!-- BEGIN GENERATED MEASUREMENTS -->
 - Host: Neoverse-N1, 12 cores, 46.9 GiB, Linux 6.17.0-1020-oracle aarch64, rustc 1.94.1.
 - Samples: 100 runs per workflow path after 2 warm-up runs; 100 Criterion samples per component.
-- Pre-dispatch treaty denial: 11.173 ms p50, 26.578 ms p99, 12.222 ms mean (95 percent CI 11.392 to 13.245 ms) over 300 invocations.
-- Pre-dispatch treaty allow: 15.933 ms p50, 34.131 ms p99, 17.899 ms mean (95 percent CI 16.475 to 19.888 ms) over 200 invocations.
-- Complete buyer workflow: 2.390 s p50 and 2.509 s p99.
-- Producer workflow: 2.196 s p50 and 2.591 s p99.
-- Sustained load: 58.7 calls per second over 60 s with 40975.3 KiB of receipt store growth.
+- Pre-dispatch treaty denial: 7.423 ms p50, 18.364 ms p99, 9.221 ms mean (95 percent CI 8.517 to 10.103 ms) over 400 invocations.
+- Pre-dispatch treaty allow: 14.140 ms p50, 26.937 ms p99, 16.372 ms mean (95 percent CI 14.963 to 18.368 ms) over 200 invocations.
+- Complete buyer workflow: 2.097 s p50 and 2.146 s p99.
+- Producer workflow: 1.836 s p50 and 1.905 s p99.
+- Sustained load: 58.3 calls per second over 60 s with 40559.2 KiB of receipt store growth.
 - Buyer package: 51,843 bytes.
 - Negative matrix: 20 cases.
 <!-- END GENERATED MEASUREMENTS -->

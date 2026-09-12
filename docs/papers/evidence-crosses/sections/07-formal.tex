@@ -1,0 +1,39 @@
+\section{What is mechanized}
+
+The decision core is a pure function with no input or output of its own: verify
+a capability, resolve the matching grants, evaluate, sign. It is modeled in
+Lean 4 \cite{lean4}, and the published theorem inventory carries
+\PSTheoremCount{} declarations and one explicit axiom, a symbolic
+collision-resistance idealization registered against ASSUME-SHA256. No
+serializer, protocol step, or kernel behavior is axiomatized; an unproved
+property is an assumption-registry entry, not a hole in the development.
+
+Three results bear on this paper, all bounded. A finite-domain refinement
+checker is sound and exact: it succeeds exactly when every receipt in the
+supplied finite domain admitted under the amended agreement was admitted under
+the prior one. Occurrence theorems make the predicate language fail closed: an
+atom that is unsupported, or undefined for the admission view, anywhere in a
+predicate forces denial on every view, by induction over the predicate. An
+accept-set decomposition shows envelope acceptance is exactly issuer-key trust,
+kernel-key trust, and satisfaction of the fail-closed predicate, with signature
+validity abstracted into trust-store membership.
+
+\dfn{Lean does not verify the running Rust.} That is the boundary. What exists
+instead is four kinds of tripwire, each failing loudly when implementation and
+model drift apart: named Rust functions mirrored to named Lean definitions by
+content hash and checked on every change; \PSAeneasFunctionCount{} production
+functions extracted through a Rust-to-Lean pipeline with equivalence theorems
+that must rebuild byte-identically; \PSKaniHarnessCount{} bounded
+model-checking harnesses over public entry points, among them ones asserting
+that an untrusted issuer is rejected before dispatch and that the signer refuses
+a content-digest mismatch; and the cross-language encoder corpus of
+Section~\ref{sec:eval}. Distributed revocation has a bounded
+model over lossy, duplicating, reordering channels with skew and partition.
+
+We report mutation survivors rather than percentages. Of \PSLeanMutants{}
+mutants introduced into the Lean development \PSLeanMutantsKilled{} were killed
+and \PSLeanMutantsSurvived{} survived, each with an open issue; of
+\PSProofMutants{} introduced into the Rust proof-facing sources
+\PSProofMutantsKilled{} were killed, \PSProofMutantsUnviable{} were unviable,
+and \PSProofMutantsSurvived{} survived. A survivor is a place where some theorem
+is weaker than it looks.

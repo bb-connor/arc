@@ -1,9 +1,9 @@
 {
   "cargo": "1.94.1",
-  "commit": "aec44099845acac1b14e00a192e763e2b143e7e4",
+  "commit": "b20144b8bd334d3e79cf5536fee448df22a91e3a",
   "cores": 12,
   "cpuModel": "Neoverse-N1",
-  "loadAverage1m": 7.1,
+  "loadAverage1m": 4.8,
   "memoryGiB": 46.94236373901367,
   "os": "Linux 6.17.0-1020-oracle aarch64",
   "rolesStartedHere": [
@@ -14,5 +14,5 @@
   "rustc": "1.94.1",
   "toolchainPin": "1.94.1",
   "topology": "one host, 3 processes",
-  "worktreeDirty": false
+  "worktreeDirty": true
 }

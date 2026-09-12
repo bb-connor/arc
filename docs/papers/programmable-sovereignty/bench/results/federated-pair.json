@@ -3,41 +3,41 @@
     "calls": 100,
     "dispatched": 100,
     "evidencePreparation": {
-      "ci_high_ms": 3.8026704999999996,
-      "ci_low_ms": 3.3182789999999995,
-      "max_ms": 10.156,
-      "mean_ms": 3.54234,
-      "min_ms": 2.874,
-      "p50_ms": 3.1295,
-      "p99_ms": 8.827420000000007,
+      "ci_high_ms": 4.454320500000001,
+      "ci_low_ms": 3.5185690000000003,
+      "max_ms": 23.603,
+      "mean_ms": 3.9161799999999998,
+      "min_ms": 2.937,
+      "p50_ms": 3.2735000000000003,
+      "p99_ms": 11.170580000000063,
       "samples": 100,
-      "std_ms": 1.2451965746399039
+      "std_ms": 2.42849525418436
     },
-    "freshnessDenialsAbsorbed": 0,
+    "freshnessDenialsAbsorbed": 12,
     "receiverEvaluate": {
-      "ci_high_ms": 198.281273,
-      "ci_low_ms": 194.29591725,
-      "max_ms": 226.512,
-      "mean_ms": 196.23087999999998,
-      "min_ms": 178.878,
-      "p50_ms": 194.913,
-      "p99_ms": 222.65298,
+      "ci_high_ms": 216.7219115,
+      "ci_low_ms": 202.63389125,
+      "max_ms": 435.866,
+      "mean_ms": 208.82268,
+      "min_ms": 181.009,
+      "p50_ms": 201.2415,
+      "p99_ms": 419.60525,
       "samples": 100,
-      "std_ms": 10.305249674517423
+      "std_ms": 36.186457506452086
     },
     "roundTrip": {
-      "ci_high_ms": 200.64901041049998,
-      "ci_low_ms": 196.63053690075003,
-      "max_ms": 228.507684,
-      "mean_ms": 198.59089329,
-      "min_ms": 180.86493,
-      "p50_ms": 197.68251249999997,
-      "p99_ms": 224.52042039000003,
+      "ci_high_ms": 219.19420711074997,
+      "ci_low_ms": 205.0984831495,
+      "max_ms": 440.575681,
+      "mean_ms": 211.30783812,
+      "min_ms": 182.901417,
+      "p50_ms": 203.8085795,
+      "p99_ms": 421.6113469300001,
       "samples": 100,
-      "std_ms": 10.380949927757554
+      "std_ms": 36.382145537946876
     }
   },
-  "commit": "aec44099845acac1b14e00a192e763e2b143e7e4",
+  "commit": "b20144b8bd334d3e79cf5536fee448df22a91e3a",
   "denied": {
     "cases": {
       "intersection_hash_mismatch": {
@@ -48,15 +48,15 @@
         "failureCode": "chio_treaty_intersection_mismatch",
         "freshnessDenialsAbsorbed": 0,
         "roundTrip": {
-          "ci_high_ms": 66.6259326475,
-          "ci_low_ms": 56.30329354875,
-          "max_ms": 103.999872,
-          "mean_ms": 60.8247234,
-          "min_ms": 49.675964,
-          "p50_ms": 58.6371285,
-          "p99_ms": 97.34334891999995,
+          "ci_high_ms": 70.736085605,
+          "ci_low_ms": 56.28126154875001,
+          "max_ms": 124.472091,
+          "mean_ms": 62.4997225,
+          "min_ms": 47.911315,
+          "p50_ms": 60.2388755,
+          "p99_ms": 115.79216424999994,
           "samples": 20,
-          "std_ms": 12.252960826463706
+          "std_ms": 17.186472435233288
         }
       },
       "missing_required_evidence": {
@@ -67,15 +67,15 @@
         "failureCode": "chio_treaty_missing_required_evidence",
         "freshnessDenialsAbsorbed": 0,
         "roundTrip": {
-          "ci_high_ms": 62.88126735,
-          "ci_low_ms": 56.552890398749994,
-          "max_ms": 73.791723,
-          "mean_ms": 59.631403399999996,
-          "min_ms": 49.199202,
-          "p50_ms": 59.618413000000004,
-          "p99_ms": 73.24820653,
+          "ci_high_ms": 62.113894605,
+          "ci_low_ms": 56.5869497525,
+          "max_ms": 71.788913,
+          "mean_ms": 59.29444885,
+          "min_ms": 49.00264,
+          "p50_ms": 59.652932500000006,
+          "p99_ms": 71.77538480999999,
           "samples": 20,
-          "std_ms": 7.406433143085831
+          "std_ms": 6.51267583964062
         }
       },
       "scope_hash_mismatch": {
@@ -86,15 +86,15 @@
         "failureCode": "chio_treaty_scope_hash_mismatch",
         "freshnessDenialsAbsorbed": 0,
         "roundTrip": {
-          "ci_high_ms": 95.390345895,
-          "ci_low_ms": 55.44728809875001,
-          "max_ms": 259.799038,
-          "mean_ms": 71.19021430000001,
-          "min_ms": 47.414434,
-          "p50_ms": 57.478282500000006,
-          "p99_ms": 237.31311901999987,
+          "ci_high_ms": 61.66228325375,
+          "ci_low_ms": 55.93067154875,
+          "max_ms": 72.012793,
+          "mean_ms": 58.73650024999999,
+          "min_ms": 49.461203,
+          "p50_ms": 57.664863,
+          "p99_ms": 71.32322656999999,
           "samples": 20,
-          "std_ms": 48.837226175773
+          "std_ms": 6.758260836755936
         }
       },
       "smuggled_dynamic_trust": {
@@ -103,17 +103,17 @@
         "dispatched": 0,
         "expectedDispatched": 0,
         "failureCode": "request_smuggled_dynamic_trust",
-        "freshnessDenialsAbsorbed": 1,
+        "freshnessDenialsAbsorbed": 0,
         "roundTrip": {
-          "ci_high_ms": 61.661695353750005,
-          "ci_low_ms": 55.18320830374999,
-          "max_ms": 69.724303,
-          "mean_ms": 58.3605673,
-          "min_ms": 49.131442,
-          "p50_ms": 57.2324415,
-          "p99_ms": 69.55627384,
+          "ci_high_ms": 62.95406310375001,
+          "ci_low_ms": 56.03028929875,
+          "max_ms": 75.31881,
+          "mean_ms": 59.426067599999996,
+          "min_ms": 47.563953,
+          "p50_ms": 57.709843,
+          "p99_ms": 74.49994401,
           "samples": 20,
-          "std_ms": 7.673993453856968
+          "std_ms": 8.167117497176038
         }
       },
       "smuggled_trust_root": {
@@ -122,17 +122,17 @@
         "dispatched": 0,
         "expectedDispatched": 0,
         "failureCode": "request_smuggled_trust_root",
-        "freshnessDenialsAbsorbed": 0,
+        "freshnessDenialsAbsorbed": 1,
         "roundTrip": {
-          "ci_high_ms": 62.583878003749994,
-          "ci_low_ms": 57.043854355,
-          "max_ms": 74.418926,
-          "mean_ms": 59.769392100000005,
-          "min_ms": 49.295083,
-          "p50_ms": 59.741694,
-          "p99_ms": 73.31373608999999,
+          "ci_high_ms": 64.39330949875,
+          "ci_low_ms": 57.88752205125,
+          "max_ms": 79.51843,
+          "mean_ms": 61.01177325,
+          "min_ms": 51.978255,
+          "p50_ms": 58.9586895,
+          "p99_ms": 77.98637639999998,
           "samples": 20,
-          "std_ms": 6.524167518816657
+          "std_ms": 7.694742022854853
         }
       },
       "unknown_ladder_intersection": {
@@ -141,17 +141,17 @@
         "dispatched": 0,
         "expectedDispatched": 0,
         "failureCode": "chio_treaty_missing_intersection",
-        "freshnessDenialsAbsorbed": 1,
+        "freshnessDenialsAbsorbed": 0,
         "roundTrip": {
-          "ci_high_ms": 63.40223874875001,
-          "ci_low_ms": 55.67343600000001,
-          "max_ms": 79.505511,
-          "mean_ms": 59.39490425,
-          "min_ms": 48.633759,
-          "p50_ms": 57.2532615,
-          "p99_ms": 78.42016487999999,
+          "ci_high_ms": 62.474189994999996,
+          "ci_low_ms": 55.43396869625,
+          "max_ms": 73.004079,
+          "mean_ms": 58.8042765,
+          "min_ms": 47.430473,
+          "p50_ms": 56.302536,
+          "p99_ms": 72.97804102,
           "samples": 20,
-          "std_ms": 9.100020653491027
+          "std_ms": 8.263832648739882
         }
       },
       "unknown_treaty_scope": {
@@ -162,37 +162,37 @@
         "failureCode": "chio_treaty_missing_scope",
         "freshnessDenialsAbsorbed": 0,
         "roundTrip": {
-          "ci_high_ms": 60.320097704999995,
-          "ci_low_ms": 54.079011949999995,
-          "max_ms": 71.867113,
-          "mean_ms": 57.1444552,
-          "min_ms": 46.147107,
-          "p50_ms": 56.6369385,
-          "p99_ms": 71.16787918,
+          "ci_high_ms": 62.079607700000004,
+          "ci_low_ms": 55.7857911975,
+          "max_ms": 75.944893,
+          "mean_ms": 58.76152015,
+          "min_ms": 49.789324,
+          "p50_ms": 57.0586795,
+          "p99_ms": 75.03931803999998,
           "samples": 20,
-          "std_ms": 7.358016987546116
+          "std_ms": 7.414208131664593
         }
       }
     },
-    "freshnessDenialsAbsorbed": 2,
+    "freshnessDenialsAbsorbed": 1,
     "roundTrip": {
-      "ci_high_ms": 64.71581140803572,
-      "ci_low_ms": 58.14778068571429,
-      "max_ms": 259.799038,
-      "mean_ms": 60.90223713571429,
-      "min_ms": 46.147107,
-      "p50_ms": 58.615567999999996,
-      "p99_ms": 126.84572863999946,
+      "ci_high_ms": 61.40313685017856,
+      "ci_low_ms": 58.324508785,
+      "max_ms": 124.472091,
+      "mean_ms": 59.790615585714285,
+      "min_ms": 47.430473,
+      "p50_ms": 58.322866000000005,
+      "p99_ms": 79.23366603999999,
       "samples": 140,
-      "std_ms": 20.138538365381308
+      "std_ms": 9.39429616625012
     }
   },
   "environment": {
     "cargo": "1.94.1",
-    "commit": "aec44099845acac1b14e00a192e763e2b143e7e4",
+    "commit": "b20144b8bd334d3e79cf5536fee448df22a91e3a",
     "cores": 12,
     "cpuModel": "Neoverse-N1",
-    "loadAverage1m": 7.1,
+    "loadAverage1m": 4.8,
     "memoryGiB": 46.94236373901367,
     "os": "Linux 6.17.0-1020-oracle aarch64",
     "rolesStartedHere": [
@@ -203,15 +203,15 @@
     "rustc": "1.94.1",
     "toolchainPin": "1.94.1",
     "topology": "one host, 3 processes",
-    "worktreeDirty": false
+    "worktreeDirty": true
   },
   "environments": {
     "driver-origin-receiver": {
       "cargo": "1.94.1",
-      "commit": "aec44099845acac1b14e00a192e763e2b143e7e4",
+      "commit": "b20144b8bd334d3e79cf5536fee448df22a91e3a",
       "cores": 12,
       "cpuModel": "Neoverse-N1",
-      "loadAverage1m": 7.1,
+      "loadAverage1m": 4.8,
       "memoryGiB": 46.94236373901367,
       "os": "Linux 6.17.0-1020-oracle aarch64",
       "rolesStartedHere": [
@@ -222,14 +222,14 @@
       "rustc": "1.94.1",
       "toolchainPin": "1.94.1",
       "topology": "one host, 3 processes",
-      "worktreeDirty": false
+      "worktreeDirty": true
     }
   },
   "freshnessDenialsAbsorbed": {
-    "admitted": 0,
-    "denied": 2,
-    "revocation": 65,
-    "total": 67
+    "admitted": 12,
+    "denied": 1,
+    "revocation": 71,
+    "total": 84
   },
   "method": {
     "bootstrap": {
@@ -244,16 +244,16 @@
     "freshnessDenialsAbsorbed": "calls the receiver denied because its revocation snapshot fell outside the kernel's freshness window. They are the clock rather than the treaty, so they are retried and excluded from every latency distribution above; the counts record how many were excluded",
     "hosts": "derived from the roles this run started: every role left to another machine adds a host, and a run that starts all of them records one",
     "percentile": "linear interpolation between order statistics",
-    "revokeToDeny": "control document written to first observing call, repeated 10 times. Each observation includes up to one origin control-poll period (250 ms, the epoch tick) and one call of polling resolution (the admitted round trip, p50 197.683 ms)",
+    "revokeToDeny": "control document written to first observing call, repeated 10 times. Each observation includes up to one origin control-poll period (250 ms, the epoch tick) and one call of polling resolution (the admitted round trip, p50 203.809 ms)",
     "roundTrip": "sender send to sender receive on the experiment lane; includes the receiver's whole admission decision and, on the admitted path, both co-sign hops back to the origin"
   },
   "profile": "release",
   "revocation": {
     "callsUntilDeny": [
+      1,
+      1,
+      1,
       2,
-      1,
-      1,
-      1,
       2,
       2,
       2,
@@ -263,72 +263,72 @@
     ],
     "cutCallsUntilDeny": [
       1,
-      1,
       3,
       3,
       3,
       3,
       3,
+      2,
       3,
-      3,
-      3
+      2,
+      2
     ],
     "cutConfirmations": 3,
     "cutFailureCodes": [
-      "delegation admission failed: revocation view snapshot epoch 172 is stale: age 1000 ms exceeds 500 ms",
-      "delegation admission failed: revocation view snapshot epoch 175 is stale: age 1000 ms exceeds 500 ms",
-      "delegation admission failed: revocation view snapshot epoch 179 is stale: age 1000 ms exceeds 500 ms",
-      "delegation admission failed: revocation view snapshot epoch 184 is stale: age 1000 ms exceeds 500 ms",
-      "delegation admission failed: revocation view snapshot epoch 188 is stale: age 1000 ms exceeds 500 ms",
-      "delegation admission failed: revocation view snapshot epoch 192 is stale: age 1000 ms exceeds 500 ms",
-      "delegation admission failed: revocation view snapshot epoch 196 is stale: age 1000 ms exceeds 500 ms",
-      "delegation admission failed: revocation view snapshot epoch 200 is stale: age 1000 ms exceeds 500 ms",
-      "delegation admission failed: revocation view snapshot epoch 204 is stale: age 1000 ms exceeds 500 ms",
-      "delegation admission failed: revocation view snapshot epoch 208 is stale: age 1000 ms exceeds 500 ms"
+      "delegation admission failed: revocation view snapshot epoch 180 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 185 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 189 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 193 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 197 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 201 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 205 is stale: age 1000 ms exceeds 500 ms; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:dacc01b84d3aa19a31ff83ab6121aeb0957d9c199a59af00e828aeee6e606270:0`",
+      "delegation admission failed: revocation view snapshot epoch 209 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 212 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 218 is stale: age 1000 ms exceeds 500 ms"
     ],
     "cutRepeats": 10,
     "cutToDeny": {
-      "ci_high_ms": 936.4612318024999,
-      "ci_low_ms": 478.23998158750004,
-      "max_ms": 966.017314,
-      "mean_ms": 745.2130753,
-      "min_ms": 19.045013,
-      "p50_ms": 932.471309,
-      "p99_ms": 963.7774946200001,
+      "ci_high_ms": 917.8471618025,
+      "ci_low_ms": 546.06215169,
+      "max_ms": 1085.970809,
+      "mean_ms": 749.2445729,
+      "min_ms": 25.856607,
+      "p50_ms": 928.304356,
+      "p99_ms": 1073.62914203,
       "samples": 10,
-      "std_ms": 384.1550136951819
+      "std_ms": 319.1234269529131
     },
     "failureCodes": [
       "capability has been revoked: cap-federated-pair",
-      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:1f4e5aea8d7880d5e3a6d85fa85e111a78146be6e1af140192790ee5a0e17c31:0`",
-      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:504b7a6290636fc811f00ce84c53a2aa7964fa2bdf6df04d682e59207602fb36:0`",
-      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:58bac500d3231897a64275db1e9f68f2e369de2184132d79d1059b2208401be6:0`",
-      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:762e8aab9c80a329c2307644a808b8c8f3e8d099d3d95519773fe41899e40d82:0`"
+      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:1bf334ebcd5cb615d6730ad7cd472c3c520395be878ea23c9b13061344e4c98c:0`",
+      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:4a0ca6ff975dde8df138c4f9717416d336d0a2f5b8cebbcec770ea155819e730:0`",
+      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:ca91a15efda25b697b60ba4eb4426fcc0aca901c48db47bbc6b83626d249cdf0:0`",
+      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:f736df5325bd7c2807b373cb70fa8e36b413246c169b48d284f36d1b12d4ee40:0`"
     ],
-    "freshnessDenialsAbsorbed": 65,
+    "freshnessDenialsAbsorbed": 71,
     "revokeRepeats": 10,
     "revokeToDeny": {
-      "ci_high_ms": 410.54310020749995,
-      "ci_low_ms": 208.5671309975,
-      "max_ms": 475.704901,
-      "mean_ms": 316.0895316,
-      "min_ms": 64.666318,
-      "p50_ms": 406.049758,
-      "p99_ms": 471.76349365000004,
+      "ci_high_ms": 437.3382044199999,
+      "ci_low_ms": 221.25137170000002,
+      "max_ms": 486.342946,
+      "mean_ms": 335.2322729,
+      "min_ms": 66.276845,
+      "p50_ms": 430.385032,
+      "p99_ms": 485.72729974,
       "samples": 10,
-      "std_ms": 170.2930528660769
+      "std_ms": 180.7916020103836
     }
   },
   "schema": "chio.programmable-sovereignty.federated-pair-results.v1",
   "topology": {
     "achievedEpochRate": {
-      "deliveredRoots": 204,
-      "deliveryInterruptions": 10,
-      "epoch": 208,
+      "deliveredRoots": 212,
+      "deliveryInterruptions": 15,
+      "epoch": 221,
       "intervalMaxMs": 254,
-      "intervalMinMs": 245,
+      "intervalMinMs": 246,
       "intervalP50Ms": 250,
-      "intervalSamples": 193,
+      "intervalSamples": 196,
       "nominalTickMs": 250,
       "schema": "chio.experiment.federated-pair-epoch-rate.v1"
     },
@@ -344,5 +344,5 @@
     ],
     "transport": "iroh QUIC, relays disabled"
   },
-  "worktreeDirty": false
+  "worktreeDirty": true
 }

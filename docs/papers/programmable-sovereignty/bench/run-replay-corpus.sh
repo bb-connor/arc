@@ -19,6 +19,12 @@ if [[ -n "$(git -C "$SOURCE" status --short -- "${INPUT_PATHS[@]}")" ]]; then
 else
   SOURCE_DIRTY=false
 fi
+if [[ "$SOURCE_DIRTY" == true && "${CHIO_BENCH_ALLOW_DIRTY:-0}" != "1" ]]; then
+  echo "refusing to measure: the benchmark input tree has uncommitted changes." >&2
+  echo "commit them, or set CHIO_BENCH_ALLOW_DIRTY=1 for a result that must not be pinned." >&2
+  git -C "$SOURCE" status --short -- "${INPUT_PATHS[@]}" >&2
+  exit 2
+fi
 BENCHMARK_INPUT_TREE_SHA256="$(
   python3 "$GENERATOR" --source-commit "$SOURCE_COMMIT" --benchmark-input-digest PS-B02
 )"

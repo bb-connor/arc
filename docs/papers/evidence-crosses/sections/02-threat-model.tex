@@ -1,0 +1,51 @@
+\section{Threat model and trusted base}
+
+The kernel sits between an agent and the tool servers whose transport it owns:
+child processes it spawned and speaks to over their standard streams, HTTP tools
+it fronts, and sidecars it proxies. It does not
+confine the agent: the model, the orchestrator, the prompt, and any library the
+agent imports are untrusted, and an agent that opens its own socket reaches
+whatever that socket reaches.
+
+The adversary is given everything outside the receiving kernel. It controls every request
+field this paper names; it controls the peer
+kernel and can make it sign anything with the peer's key; it controls the
+network and may drop, delay, reorder, duplicate, and replay; and it may present
+any receipt, statement, lease, or governance record it has ever observed, in any
+combination, to any kernel. It does not hold the receiving kernel's signing key
+and cannot write to its stores. The question is what such an adversary can cause
+a receiving kernel to dispatch.
+
+The trusted base is the receiving kernel's process, its signing key, and its
+stores; everything outside it is verified or assumed. The assumptions appear
+once, in Table~\ref{tab:assumptions}.
+
+\scriptsize
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{4.3cm}p{10.9cm}@{}}
+\caption{Assumptions outside the receiving kernel, by the identifiers of the implementation's assumption registry. The registry has \PSAssumptionCount{} entries; the ten this protocol rests on are listed.}\label{tab:assumptions}\\
+\toprule
+Identifier & What is assumed \\
+\midrule
+\endfirsthead
+\toprule
+Identifier & What is assumed \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+ASSUME-ED25519 & Ed25519 meets existential unforgeability under chosen-message attack for keys the kernel trusts. \\
+ASSUME-SHA256 & SHA-256 is collision resistant over receipt and statement preimages. \\
+ASSUME-CANONICAL-JSON & The production canonical encoder agrees byte for byte with the mechanized one on strings, bounded integers, finite arrays, and objects ordered by UTF-16 code unit. Floats are outside that domain. \\
+ASSUME-SQLITE-ATOMICITY & A single-row insert commits atomically, so a primary-key conflict is a reliable witness that a row existed. Cross-row recovery and ordering are not assumed. \\
+ASSUME-OS-CLOCK & The injected clock reports Unix time within the operator's declared tolerance. \\
+ASSUME-NETWORK-TRANSPORT, ASSUME-TLS & Delivery is not assumed reliable; arriving messages are assumed not rewritten below the signature checks, and remote surfaces authenticate their endpoints. \\
+ASSUME-SUBPROCESS-ISOLATION & Effects after an allow, and isolation between tool processes, rest on operating-system boundaries. \\
+ASSUME-FEDERATED-ORIGIN-CLASSIFICATION & The receiving edge marks cross-organization origin from a transport-authenticated peer identity; a request misclassified as local never reaches these checks. \\
+ASSUME-GOSSIP-FAIRNESS-PARTITION-BOUND & Revocation liveness only: recurring delivery under weak fairness, bounded skew, operator-bounded partition healing. Safety does not depend on it. \\
+\end{longtable}
+\normalsize
+
+One assumption is deliberately absent: we do not assume the two signing keys on
+a co-signed statement are held by two different organizations, because one
+operator holding both satisfies every check in this paper. Key independence is a
+deployment property and the protocol carries no evidence of it.

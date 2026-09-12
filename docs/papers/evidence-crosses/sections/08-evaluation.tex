@@ -1,0 +1,129 @@
+\section{Evaluation}
+\label{sec:eval}
+
+Everything below ran on one machine: \PSHostCores{} \PSHostCpuModel{} cores,
+\PSHostMemoryGiB{} GiB, \PSHostOs{}, compiler \PSRustcVersion{} at the pinned
+toolchain. Percentiles interpolate between order statistics.
+
+\paragraph{Two kernels in separate processes.}
+Two kernels were brought up as separate operating-system processes, each
+generating its own keys and owning its own stores, issuers, agreements, leases,
+and receipt log, with a third process driving calls over \PSFedTransport{}; the
+topology record reports \PSFedHosts{} host. The co-signing
+and revocation hops are the shipped lanes unchanged; the request hop uses a
+transport defined for this experiment, since no shipped lane carries a tool
+call. Admitted calls: \PSFedAllowSampleCount{} calls, p50
+\PSFedAllowPFiftyMs{} ms, p99 \PSFedAllowPNinetyNineMs{} ms at the driver, each
+costing \PSFedCosignConnections{} co-signing connections, counted by the
+receiver. Of
+that round trip the receiver's evaluation window is
+\PSFedReceiverEvalPFiftyMs{} ms at the median and the driver's evidence
+preparation \PSFedEvidencePrepPFiftyMs{} ms.
+
+Denied calls: \PSFedDenyCases{} scenarios driven over the wire,
+\PSFedDenySampleCount{} calls, p50 \PSFedDenyPFiftyMs{} ms, p99
+\PSFedDenyPNinetyNineMs{} ms. They return \code{chio_treaty_missing_scope},
+\code{chio_treaty_scope_hash_mismatch},
+\code{chio_treaty_missing_intersection},
+\code{chio_treaty_intersection_mismatch},
+\code{chio_treaty_missing_required_evidence},
+\code{request_smuggled_trust_root}, and
+\code{request_smuggled_dynamic_trust}. In every one the receiver's dispatch
+counter was zero: not one of these calls reached a tool. The latencies are
+reported because a denial slower than an allow is an availability problem.
+
+Across the run \PSFedAbsorbedCount{} further calls were denied because the
+receiver's snapshot had aged past its \PSFreshnessMs{} ms freshness window while
+the origin publishes every \PSEpochTickMs{} ms: \PSFedAllowAbsorbedCount{} of
+the \PSFedAllowAttemptCount{} attempts behind the admitted measurement, about
+\fpeval{round(100*\PSFedAllowAbsorbedCount/\PSFedAllowAttemptCount,0)} percent,
+\PSFedDenyAbsorbedCount{} in the denial experiment, and
+\PSFedRevokeAbsorbedCount{} in the revocation experiment. They are the
+safety rule of Section~\ref{sec:security} firing on the clock rather than on a
+revocation; they were retried and are excluded from the latency distributions.
+
+Revoking at the origin and measuring to the receiver's first denial took
+\PSFedRevokeToDenyMs{} ms at the median over \PSFedRevokeRepeats{} repeats, from
+\PSFedRevokeMinMs{} to \PSFedRevokeMaxMs{} ms, a median of
+\PSFedRevokeCallsMedian{} calls. With the link cut the receiver serves until its
+snapshot leaves the freshness window and then denies, \PSFedCutToDenyMs{} ms at
+the median over \PSFedCutRepeats{} repeats, from \PSFedCutMinMs{} to
+\PSFedCutMaxMs{} ms, a median of \PSFedCutCallsMedian{} calls, counting a
+denial only once it persists for three further calls. Both medians sit under the
+$k = 1$ bounds of Section~\ref{sec:security}, and every observation, both maxima
+included, sits under those bounds evaluated at the largest call count the run
+recorded and the admitted p99 latency,
+\fpeval{round(\PSEpochTickMs + \PSFedRevokeCallsMax*\PSFedAllowPNinetyNineMs, 1)}\,ms
+and
+\fpeval{round(\PSFreshnessMs + \PSEpochTickMs + \PSFedCutCallsMax*\PSFedAllowPNinetyNineMs, 1)}\,ms.
+The partitioned receiver stops rather than falling back to its last good
+answer. On
+\PSFedRevokeAmbiguousReleases{} of the \PSFedRevokeDenialRecords{} retained
+revoke records and \PSFedCutAmbiguousReleases{} of the
+\PSFedCutDenialRecords{} cut records the denial's pre-dispatch release could
+not be confirmed and was recorded as ambiguous rather than released, the path
+Section~\ref{sec:admission} names; the denial was unaffected and no call
+dispatched.
+
+\paragraph{What admission costs locally.}
+\begin{table}[!tb]
+\centering
+\small
+\caption{Local cost decomposition. The first two rows are complete kernel paths measured per invocation with both kernels in one process; the rest are components.}
+\label{tab:local}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Path or component & p50 & p99 or max & samples \\
+\midrule
+Admitted call, both kernels in one process & \PSPredispatchAllowPFiftyMs{} ms & \PSPredispatchAllowPNinetyNineMs{} ms & \PSPredispatchAllowSampleCount{} \\
+Refused before dispatch & \PSPredispatchDenyPFiftyMs{} ms & \PSPredispatchDenyPNinetyNineMs{} ms & \PSPredispatchDenySampleCount{} \\
+Receipt append to the store & \PSReceiptAppendPFiftyUs{} us & \PSReceiptAppendPNinetyNineUs{} us & \PSReceiptAppendSampleCount{} \\
+Receipt signing & \PSReceiptSignPFiftyUs{} us & \PSReceiptSignMaxUs{} us & \PSReceiptSignSampleCount{} \\
+Receipt verification & \PSReceiptVerifyPFiftyUs{} us & \PSReceiptVerifyMaxUs{} us & \PSReceiptVerifySampleCount{} \\
+Two-signature statement verification & \PSBilateralVerifyPFiftyUs{} us & \PSBilateralVerifyMaxUs{} us & \PSBilateralVerifySampleCount{} \\
+Cross-boundary admission decision & \PSCrossBoundaryPFiftyUs{} us & \PSCrossBoundaryMaxUs{} us & \PSCrossBoundarySampleCount{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The shape of Table~\ref{tab:local} is the finding: the cryptography is not the
+expense. Appending the receipt durably costs
+\fpeval{round(\PSReceiptAppendPFiftyUs/\PSBilateralVerifyPFiftyUs,1)} times what
+verifying the two-signature statement costs, its schema and self-consistency
+rules included, and
+\fpeval{round(\PSReceiptAppendPFiftyUs/\PSCrossBoundaryPFiftyUs,0)} times the
+receiver's decision over already resolved evidence, where the comparisons of
+Table~\ref{tab:subst} run. Durability dominates, which is the price of
+Section~\ref{sec:admission}'s ordering. The same admission across two processes
+costs \PSFedAllowPFiftyMs{} ms; the difference is the transport and the
+\PSFedCosignConnections{} co-signing connections, not the decision. One caveat belongs with the refusal
+row: its fixture refuses on a unanimous deny verdict, an early exit that never
+reaches the comparisons of Table~\ref{tab:subst} or the signature checks, so it
+is a lower bound on a refusal. Held at saturation for \PSSustainedSeconds{} s
+the same path admitted \PSSustainedCalls{} calls at
+\PSSustainedCallsPerSecond{} calls per second with \PSSustainedDenials{}
+denials and
+\fpeval{round(\PSSustainedReceiptStoreGrowthKiB/1024,1)}\,MiB of receipt-store
+growth.
+
+The negative corpus is \PSThreatCaseCount{} in-process cases, each asserting its
+expected code; \PSThreatDispatchCaseCount{} run through the dispatch-capable
+hook with the tool-invocation counter asserted zero, and the remaining
+\PSThreatVerifierCaseCount{} exercise the verifier directly. Alongside it run \PSBilateralReplayCases{} bilateral and
+\PSGenericReplayCases{} generic replay cases.
+
+\paragraph{Verification by someone who was not there.}
+The \PSProofPackageKiB{} KiB evidence package for the refund workflow verifies with
+no access to either kernel, every receipt, statement, lease, and governance
+record, in \fpeval{round(\PSBuyerVerifyPFiftyUs/1000,1)}\,ms at the median over
+\PSBuyerVerifySampleCount{} runs. A frozen corpus of \PSVectorCaseCount{}
+receipt cases holds \PSVectorLanguages{} independent implementations, in Rust,
+TypeScript, Python, and Go, to the same canonical body bytes and verdict.
+
+\paragraph{Reproduction.}
+Every measurement above was taken at commit \code{\PSRunCommit{}}. The
+cross-process run's environment
+record marks its worktree \PSFedWorktreeState{}; what differed were the retained
+result files written by the benchmark that ran before it, and no source file. Each run writes its environment record, raw samples, and the
+macro file this paper compiles from, so a printed and a retained number cannot
+drift.
