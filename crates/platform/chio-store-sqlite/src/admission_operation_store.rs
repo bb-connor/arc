@@ -64,7 +64,11 @@ pub(crate) use governed_approval_claim::{
     verify_approval_budget_selection_tx, verify_fresh_approval_tx,
 };
 #[cfg(feature = "admission-test-support")]
+pub(crate) use native_capture_test_support::reach_native_capture_transaction_cutpoint;
+#[cfg(feature = "admission-test-support")]
 pub use native_capture_test_support::NativeDispatchCaptureResponseTestFault;
+#[cfg(feature = "admission-test-support")]
+pub use native_capture_test_support::NativeDispatchCaptureTransactionTestCutpoint;
 #[cfg(feature = "admission-test-support")]
 pub use security_participant_state::output::NativeOutputJoinTestFault;
 mod nonce_preflight;

@@ -439,12 +439,28 @@ impl SqliteBudgetStore {
             }
             None => None,
         };
+        #[cfg(feature = "admission-test-support")]
+        let native_capture = native.is_some();
         if let Some(native) = native {
             native
                 .verify_deadline(&transaction)
                 .map_err(|error| map_admission_error(self, error))?;
         }
+        #[cfg(feature = "admission-test-support")]
+        if native_capture {
+            crate::admission_operation_store::reach_native_capture_transaction_cutpoint(
+                &transaction,
+                crate::admission_operation_store::NativeDispatchCaptureTransactionTestCutpoint::BeforeCommit,
+            )?;
+        }
         self.commit_joint_transaction(transaction)?;
+        #[cfg(feature = "admission-test-support")]
+        if native_capture {
+            crate::admission_operation_store::reach_native_capture_transaction_cutpoint(
+                &connection,
+                crate::admission_operation_store::NativeDispatchCaptureTransactionTestCutpoint::CommittedBeforeAnchor,
+            )?;
+        }
         self.sync_joint_anchor(&connection)?;
         Ok((
             BudgetInvocationCaptureDecision::Captured(decision),

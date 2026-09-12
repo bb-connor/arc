@@ -266,6 +266,9 @@ pub(crate) struct DurableToolAdmission {
     issued_nonce: Option<crate::admission_operation::AdmissionExecutionNonceReservationV1>,
     /// Owned preflight participant when the operation already carries one.
     nonce_preflight: Option<crate::admission_operation::AdmissionNoncePreflightRecoveryV1>,
+    /// Excludes overlapping evaluation/recovery, but grants no store authority.
+    /// Drop last so exclusion outlives every field of this live admission.
+    _live_owner: Option<crate::admission_operation::AdmissionLiveOperation>,
 }
 
 /// The transport a durable dispatch binds its provider attempt to.
@@ -713,6 +716,14 @@ impl ChioKernel {
             trusted_now_unix_ms / 1000,
         )?;
         let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
+        let live_owner = runtime
+            .mutation_sequencer
+            .try_own_operation(prepared.binding().operation_id())?
+            .ok_or_else(|| {
+                KernelError::DurableAdmission(
+                    "operation already has a live evaluation or recovery owner".into(),
+                )
+            })?;
         let retained_request = authority_profile.as_ref().map(|profile| {
             crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission_with_profile(
                 request,
@@ -865,6 +876,7 @@ impl ChioKernel {
         }
         let nonce_preflight = self.load_durable_nonce_preflight(&operation, trusted_now_unix_ms)?;
         Ok(Some(DurableToolAdmission {
+            _live_owner: Some(live_owner),
             operation,
             aggregate_quota,
             supplemental_quota,
@@ -1001,6 +1013,7 @@ impl ChioKernel {
         };
         Ok((
             DurableToolAdmission {
+                _live_owner: None,
                 operation,
                 aggregate_quota: None,
                 supplemental_quota: None,
@@ -1859,30 +1872,6 @@ impl ChioKernel {
             }
         }
         Ok(())
-    }
-
-    fn claim_admission_recovery(
-        &self,
-        operation: &AdmissionOperationV1,
-        trusted_now_unix_ms: u64,
-    ) -> Result<crate::admission_operation::AdmissionRecoveryLease, KernelError> {
-        let runtime = self.durable_runtime()?;
-        let expires_at_unix_ms = trusted_now_unix_ms
-            .checked_add(RECOVERY_LEASE_DURATION_MS)
-            .ok_or_else(|| {
-                KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
-            })?;
-        runtime
-            .store
-            .claim_recovery(
-                operation.binding().operation_id(),
-                operation.version(),
-                &runtime.claimant_id,
-                trusted_now_unix_ms,
-                expires_at_unix_ms,
-                &runtime.fence,
-            )
-            .map_err(durable_store_error)
     }
 
     pub(super) fn apply_admission_command(

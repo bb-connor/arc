@@ -2,7 +2,9 @@
 
 Status: accepted for local execution on 2026-09-10. M0 is consolidated. M1's
 implementation and local acceptance are complete under the explicit confinement
-qualification deferral below. M2 is next. See [current execution status](launch-status.md).
+qualification deferral below. M2's native failure/restart safety acceptance is
+locally complete under the existing fail-closed release contract. M3 is next.
+See [current execution status](launch-status.md).
 On 2026-09-11 the
 user authorized committing, pushing and maintaining the accumulated work as a PR,
 then continuing implementation. The 2026-09-12 M1 runner decision is recorded
@@ -248,7 +250,8 @@ declassification and combined-credential profiles. The
 [M1 acceptance closeout](launch-status.md#m1-local-acceptance-closeout) records
 the exact inventories, corrected regression fixtures and final quality gates.
 Stop expanding M1 unless a new demonstrated failure affects its contract. The
-next implementation milestone is M2, not further M1 factorization or fault variants.
+subsequent M2 closeout below records native crash/recovery qualification; M3 is
+now next, not further M1 factorization or fault variants.
 
 M1 checkpoint: the frozen receipt-signing subtask now connects pre-dispatch
 selection, private raw return/caller persistence, identity-bound portable signing
@@ -302,6 +305,20 @@ Acceptance: observed effects, quota/cumulative accounting, credential dispositio
 operation state and receipts agree at every named cutpoint. No claim of generic
 exactly-once network effects: document the downstream idempotency and authenticated
 status contract, and retain uncertainty when that contract cannot resolve it.
+
+2026-09-12 local closeout: the complete named safety matrix and affected gates
+pass. A duplicate-start race exposed and fixed live-operation ownership theft;
+the existing serving-fence sequencer now excludes overlapping evaluation and
+recovery without holding a mutation mutex across callbacks or awaits. See the
+[cutpoint matrix](native-restart-safety.md) and
+[acceptance evidence](launch-status.md#m2-local-acceptance-closeout).
+
+The existing release contract remains explicit: a retained checkpoint recovers
+the original terminal result; loss of the original owner without that checkpoint
+retains `Finalizing`, captured quota and the outcome, and blocks readiness.
+This is a verified fail-closed stop, not automatic terminal recovery or guaranteed
+client delivery. No confinement, power-loss, enterprise-topology or release
+qualification follows from these local tests. Proceed to M3.
 
 ## M3. Finish authenticated caller start and delivery
 
@@ -569,26 +586,18 @@ None is evidence of a property merely because the surrounding suite is green.
 
 ## 6. Immediate next execution steps
 
-The original dependency order is retained below. M0's maps and the first successful
-ordinary/nested native in-process lifecycle are now implemented. The current M1
-frontier is the required nonce/declassification/flow-use profiles and confinement
-qualification. Frozen participant references are bound. Native strict-nonce
-preflight now has separate operation-owned taint custody; it does not satisfy the
-dispatch join or authorize capture. The next nonce slice must bind actual issued
-material through fresh dispatch preparation, capture and ordinary/nested release.
+M0's maps, M1's complete required native profiles and M2's local failure/restart
+safety matrix are complete. Confinement remains explicitly deferred, and missing
+release custody remains a fail-closed availability limit. The dependency order
+above still governs the remaining milestones.
 
-1. Complete M0's support/requirement and review-slice maps, preserving the stopped
-   capture checkpoint without rerunning its completed tests.
-2. Define M1's real successful ordinary/nested native invocation acceptance test
-   using the existing kernel, store, resolver and tool harness. Expose the precise
-   first missing lifecycle link; do not create another capture-only observer.
-3. Complete combined credential freshness and the frozen return-context ownership
-   needed by that invocation. Then compose nonce/declassification and real dispatch,
-   output release and terminal receipts in the specified order.
-4. Close M1 with one affected-surface qualification and graph refresh; execute M2's
-   bounded real crash/recovery matrix next.
-5. Proceed to the caller lost-report contract, consumer wiring and enforced
-   reference-swarm acceptance. Keep operator prerequisites visible from M0 onward.
+1. Execute M3's authenticated caller start and durable delivery contract. Keep the
+   lost-report counterexample until the actual handshake and executor claim fix it.
+2. Complete M4's constructor, adapter and SDK inventory with positive supported
+   paths and required startup/dispatch denials after the caller contract is sound.
+3. Qualify M5's capability-bound reference swarm and M6's enterprise topology on
+   an authorized, suitable host. Then follow M7-M11's declared dependencies and
+   operator-authorization boundaries. Do not infer release approval from M1/M2.
 
 Do not restart open-ended repository cleanup, add new frameworks, or add another
 round of capture metadata fault variants without a demonstrated missing invariant.

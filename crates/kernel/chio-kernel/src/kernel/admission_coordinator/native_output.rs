@@ -231,6 +231,7 @@ impl ChioKernel {
         })?
         .ok_or_else(|| invalid("test native output original admission is absent"))?;
         let admission = DurableToolAdmission {
+            _live_owner: None,
             operation,
             retained_request: Some(retained_request),
             aggregate_quota: None,

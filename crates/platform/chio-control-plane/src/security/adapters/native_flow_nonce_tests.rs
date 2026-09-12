@@ -9,7 +9,7 @@ pub(super) mod execution {
     ));
 }
 
-struct NoLegacyNonce(Arc<AtomicUsize>);
+pub(super) struct NoLegacyNonce(pub(super) Arc<AtomicUsize>);
 
 impl ExecutionNonceStore for NoLegacyNonce {
     fn reserve(&self, _: &str) -> Result<bool, KernelError> {

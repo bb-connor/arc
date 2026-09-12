@@ -1536,10 +1536,10 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs"
 rust_symbols = ["ChioKernel::capture_and_commit_durable_dispatch","ChioKernel::begin_durable_tool_admission_for_transport","ChioKernel::native_security_authority_binding","immutable_tool_admission_request_hash"]
-normalized_sha256 = "aae4115a6ded64460cd5853f9dc81db9ea7fdd54b598b2e716bc3db4e04d3eb1"
+normalized_sha256 = "6e66eca5dce589203f7a904596bb16a1be9025b4fb50dd9449886e9c290b79b2"
 symbol_sha256 = [
   { symbol = "ChioKernel::capture_and_commit_durable_dispatch", sha256 = "ac0418a5e900801b2d8c2ead9661992b0dcfed6e2d5a99b5e3a0b02a56724432" },
-  { symbol = "ChioKernel::begin_durable_tool_admission_for_transport", sha256 = "4be20619c35eebfad170d345006cae0f32e50e96444c8b097e26996238ef1da0" },
+  { symbol = "ChioKernel::begin_durable_tool_admission_for_transport", sha256 = "326d5c04ef26bccd5b55ddb42958f38847f1a590d7c387405b417c5321e924ae" },
   { symbol = "ChioKernel::native_security_authority_binding", sha256 = "db50adade9669310b59adce0cd240a97fa3daa22ed31d8cb4278576b74cefcb2" },
   { symbol = "immutable_tool_admission_request_hash", sha256 = "2223fc6166bfa3bee87a1917c2cac027781b898493de814f27cd7cb2371d06a0" },
 ]
@@ -2942,9 +2942,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/budget_store/composite/transitions/capture.rs"
 rust_symbols = ["SqliteBudgetStore::capture_composite_invocation_inner"]
-normalized_sha256 = "7f8dbaa96404673f2c2e25158e9244524563fe469ccba41c6d93227ff987ffbd"
+normalized_sha256 = "5e25eabec3f63524ae8b12995e88041b21e11fcf001841de9c4f88f9f9ab91ac"
 symbol_sha256 = [
-  { symbol = "SqliteBudgetStore::capture_composite_invocation_inner", sha256 = "e6fd248b2eb774bba5f931308a37dc752f7175b048e5fc2a8fba5d6cda63b7d7" },
+  { symbol = "SqliteBudgetStore::capture_composite_invocation_inner", sha256 = "119627203057c6db2903d800788bcfe269976c2df9df56d31f8c43e2dadfedf1" },
 ]
 
 [[mirror]]
@@ -3795,4 +3795,33 @@ rust_symbols = ["expected"]
 normalized_sha256 = "91328b1ff04ada1b20c01506842efe2ce89507a0f31876eff0fbf3da44c3fa8b"
 symbol_sha256 = [
   { symbol = "expected", sha256 = "8e55eabfde3225749dbf69eff4c8d48e3b21a64e1313fdd4186a9928ac6eee08" },
+]
+# Live native operation ownership and restart source review.
+
+# Live-operation exclusion supports per-invocation custody. These are source
+# review anchors, not a proof of duplicate-start or SQLite restart interleavings.
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/admission_operation/sequencer.rs"
+rust_symbols = ["SequencerState", "AdmissionLiveOperation", "AdmissionLiveOperation::drop", "AdmissionMutationSequencer::for_fence", "AdmissionMutationSequencer::try_own_operation"]
+normalized_sha256 = "3f9b2c08758961c27bbe067f05aea1f24062a31cd3824f83f5abbe9aeebbfbde"
+symbol_sha256 = [
+  { symbol = "SequencerState", sha256 = "c5954ac3cbba173f441c24ff3191ef809e6eb95ba5e4da4ce281e6117930cfba" },
+  { symbol = "AdmissionLiveOperation", sha256 = "52f24c95ed8fd5bc95b4187c0766044ac52318928f4125d809f209c66dc54c92" },
+  { symbol = "AdmissionLiveOperation::drop", sha256 = "37d3570481c4908870c616a160bde19b5c34d7c3bd7c8532d3165854cbc244cc" },
+  { symbol = "AdmissionMutationSequencer::for_fence", sha256 = "c345a24539030637ee487961b19e3a918bf1ca194203983ff0d1dbc823e9e4af" },
+  { symbol = "AdmissionMutationSequencer::try_own_operation", sha256 = "c35f34c7202f5b93adce8ce72f442f4ab1c3bbca6dfe2c963a9af163eeb183f2" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery.rs"
+rust_symbols = ["ChioKernel::reconcile_recoverable_admissions"]
+normalized_sha256 = "fd971304a07c310a7cca110ab8c15a747e7f1175ad12dcc5709fa29aef8780f5"
+symbol_sha256 = [
+  { symbol = "ChioKernel::reconcile_recoverable_admissions", sha256 = "7d80f130d9a2c2f77bd7c82d88bd8ee5070b0ec1a2b8436a4e671a11e762753c" },
 ]

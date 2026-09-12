@@ -6,18 +6,19 @@ Candidate: `/tmp/arc-security-launch`, `security/launch-integration`, base HEAD
 `8b9f9243905dfa61acac82d83438684940777fe3`. The accumulated 722-path checkpoint
 was committed and pushed as `7e54c14a60` to
 [draft PR #1117](https://github.com/bb-connor/arc/pull/1117) under the user's
-2026-09-11 authorization. The commit containing this status update closes M1's
-implementation and local acceptance; earlier hashes below identify historical
-checkpoints, not the current candidate. Work continues on the same branch with
-M2 next. This is not merge or release approval.
+2026-09-11 authorization. M1's local closeout is `252b259d44da44e5f323ac9653f2ee32f05bee8a`.
+The commit containing this update closes M2's native failure/restart safety
+acceptance under the existing fail-closed release contract. Earlier hashes below
+identify historical checkpoints, not the current candidate. M3 is next on the
+same branch. This is not merge or release approval.
 
 ## Milestone control
 
 | Milestone | State / missing acceptance | Next action / blocker | Evidence |
 | --- | --- | --- | --- |
 | M0 | Consolidated for implementation | Keep this index current; no independent cleanup campaign | Requirement and review maps below |
-| M1 | Complete: implementation and local acceptance | Proceed to M2; confinement qualification explicitly deferred by the user | [Acceptance closeout](#m1-local-acceptance-closeout), [qualification deferral](#m1-confined-process-qualification-deferral) |
-| M2 | Process qualification pending; in-process native lifecycle reachable | Process cutpoints and recovery against M1 | Existing reply-fault coverage is partial evidence only |
+| M1 | Complete: implementation and local acceptance | Keep closed absent a demonstrated regression; confinement remains explicitly deferred | [Acceptance closeout](#m1-local-acceptance-closeout), [qualification deferral](#m1-confined-process-qualification-deferral) |
+| M2 | Complete: local native failure/restart safety acceptance | Proceed to M3; missing release custody still blocks output and readiness | [Acceptance closeout](#m2-local-acceptance-closeout), [cutpoints and downstream contract](native-restart-safety.md) |
 | M3 | Missing authenticated caller start and durable delivery | Preserve lost-report counterexample until real handshake fixes it | [Caller design](../superpowers/specs/2026-09-07-caller-dispatch-commitment-design.md) |
 | M4 | Consumer qualification incomplete | Inventory positive supported paths and required startup denials after M1-M3 | [Original requirement ledger](launch-plan.md#requirement-ledger) |
 | M5 | Swarm is a Disabled-profile integration smoke | Bind issued capability identities, shared budget and enforced cage | [Swarm limitations](../../examples/reference-swarm/README.md) |
@@ -27,6 +28,62 @@ M2 next. This is not merge or release approval.
 | M9 | Entry packages unpublished and external consumer unqualified | Package dependency closure and clean install after M4-M8 | Three intended entrypoints remain `publish = false` |
 | M10 | Not release qualified | Local gates, audits, authorized exact-candidate hosted and publication steps | Candidate lacks passing exact-head hosted qualification |
 | M11 | Not started | Authorized observed pilot and signed promotion stages | [Numeric operator contract](active-defense-rollout.md) |
+
+## M2 local acceptance closeout
+
+The named M2 safety matrix passes against real SQLite authorities on
+Linux/aarch64: 31 child-death scenarios and three live races, covering baseline,
+combined runtime/approval/DPoP, nonce, declassification and cumulative accounting.
+Child termination bypasses Rust destructors. Tests check the exact abort marker,
+physical accounting and custody, original operation/receipt identity, independent
+effect counts and new-owner fencing. The complete cutpoint map and downstream
+idempotency/status requirements are in [native restart safety](native-restart-safety.md).
+
+The campaign found and fixed a real duplicate-start bug: an overlapping retry
+could attach to a live operation and compensate its owner's hold. The existing
+serving-fence sequencer now holds a process-local, non-cloneable live-operation
+guard. Duplicate evaluation and background recovery cannot take that operation
+while its owner is live. No mutation mutex is held across a callback or await;
+SQL fences and original credential custody remain authoritative.
+
+| Current-source local gate | Result | Log |
+| --- | --- | --- |
+| `scripts/check-native-restart-safety.sh` | 34 exact process/race tests and five exact ownership tests | `/tmp/chio-m2-exact-restart-gate.log` |
+| Native control-plane integration | 114 exact tests, including all 80 prior M1 cases and the 34 M2 cases | `/tmp/chio-m2-native-composed.log` |
+| Kernel library | 1,421 tests | `/tmp/chio-m2-kernel-library-qualified.log` |
+| Native SQLite custody | 93 exact tests | `/tmp/chio-m2-native-custody.log` |
+| Kernel `durable_admission_sqlite` | 15 tests, unfiltered | `/tmp/chio-m2-durable-sqlite.log` |
+| SQLite `security_release_recovery` | 25 exact tests, unfiltered | `/tmp/chio-m2-release-recovery.log` |
+
+Every row passed with zero failed or ignored tests. Counts overlap where stated.
+Five older kernel fixtures held a live admission while simulating its owner's
+death or beginning a subsequent attempt. They now explicitly drop that owner;
+their original identity, accounting, payment and recovery assertions remain.
+
+Final strict all-target Clippy passes for kernel, SQLite, control plane and xtask
+(`/tmp/chio-m2-final-clippy.log`). The production library build passes with normal
+features; its dependency graph excludes admission/cognition test-support features
+(`/tmp/chio-m2-production-build.log`, `/tmp/chio-m2-normal-features.log`). All 21
+formal-source checker tests pass and all 223 source-review entries match.
+Generated coverage remains 58 rows and 168 artifacts. These are source-review
+anchors, not new formal proofs. Workspace/include-reachable formatting, file
+hygiene, the 69-inventory flow-script contract, exact-inventory self-tests and
+security CI contract/mutation tests pass. The AST-only graph refresh completed;
+HTML stayed skipped at the unchanged size limit. Changed Rust source hashes are
+retained in `/tmp/chio-m2-final-rust.sha256` and remained unchanged through gates.
+
+Release recovery preserves the existing contract, not unconditional availability:
+an exact release checkpoint recovers the original guarded result and receipt;
+without the original live owner or its checkpoint, `Finalizing`, captured quota
+and the original outcome remain retained, and startup withholds readiness. The
+tests do not fabricate successful terminal recovery in that case. No generic
+exactly-once network effect or guaranteed client delivery is claimed.
+
+No persistent schema, dependency, production deadline, activation default,
+populated operator store or workflow authorization changed. The complete broader
+flow/workspace/hosted release campaigns did not run as part of this milestone.
+M1 confinement remains deferred; M6, M10 and M11 are not qualified. M3's
+authenticated caller start and durable delivery are the next implementation work.
 
 ## M1 confined-process qualification deferral
 
@@ -38,12 +95,16 @@ for candidate `d4a7c718376ee277b554717ea9db08c9d4c1715d` failed
 `Authorize exact source and controller context`; its dispatch step was skipped.
 The capture workflow requires a controller-issued authenticated dispatch context.
 A manually invented context or weakened source authorization is not a substitute.
+The later controller for M1 closeout `252b259d44da44e5f323ac9653f2ee32f05bee8a`,
+[run 34707292866](https://github.com/bb-connor/arc/actions/runs/34707292866), also
+completed with failure in its isolated-capture dispatch job. Neither run is
+passing confined-process evidence.
 
 Confined-process qualification is therefore explicitly deferred, not passed.
 Continue the full M1 implementation and local acceptance without blocking on this
 runner. Revisit qualification using an authorized exact-candidate Actions run
-before claims of confined execution or production readiness. The M2 process
-failure/recovery and M6 integrated enterprise gates remain open. No repository
+before claims of confined execution or production readiness. M2's local process
+failure/recovery acceptance above does not qualify M6's enterprise topology. No repository
 authorization variables, pinned workflow definitions or release gates were changed
 to implement this decision.
 
@@ -61,11 +122,11 @@ the normative plans retain their detailed acceptance requirements.
 | 2 Signed aggregate root | Carried; bound swarm acceptance pending | M5 |
 | 3 Capability negotiation | Carried; consumer parity pending | M4 |
 | 4 Composite holds and mutation | Native composition locally verified | M1 |
-| 5 Durable SQLite and remote authority semantics | Partial local; crash/recovery qualification pending | M2 |
+| 5 Durable SQLite and remote authority semantics | Native SQLite crash/recovery locally verified; full original requirement not release-qualified | M2, M10 |
 | 6 Admission ordering and signed terminal projection | Native profiles locally verified; caller handshake missing | M1, M3 |
 | 7 Policy-owned threshold requirements | Carried; composed action acceptance pending | M7 |
 | 8 Bounded approval verification | Complete native credential composition locally verified | M1 |
-| 9 Durable replay and collection | Partial local; composed recovery and response pending | M2, M7 |
+| 9 Durable replay and collection | Native replay/restart locally verified; response composition pending | M2, M7 |
 | 10 Federation threshold compatibility | Shared authorization and frozen native return context locally verified | M1 |
 | 11 Existing bounded runtime evidence | Signed validity bounds, physical capture and combined native invocation locally verified | M1 |
 | 12 Authoritative schemas and four-language generation | Carried; final changed-wire parity pending | M4 |
@@ -79,7 +140,7 @@ the normative plans retain their detailed acceptance requirements.
 | 0 Provenance and dependency direction | Carried; exact-candidate gate pending | M10 |
 | 1 Portable labels and lattice | Carried; exact-candidate portable gate pending | M10 |
 | 2 Authenticated manifests and bridges | Partial local; constructor/consumer parity pending | M4 |
-| 3 Durable security stores | Partial local; native recovery and retention pending | M2, M8 |
+| 3 Durable security stores | Native store recovery locally verified; retention pending | M2, M8 |
 | 4 Flow and one-shot declassification | Native consumption, output outcome and release locally verified | M1 |
 | 5 Kernel adapter composition | Partial local; complete positive profiles pending | M4 |
 | 6 Deception and tripwires | Carried; integrated pre-effect/raw-output acceptance pending | M7 |
@@ -220,14 +281,15 @@ calls execute through the production captured lifecycle, return expected guarded
 output and independently verifiable signed receipts, and replay the original
 receipt without another effect. Required nonce, declassification and combined
 runtime/approval/DPoP variants pass. Default and diagnostic activation remain
-closed. Confinement is deferred by the decision above; M2 is next.
+closed. Confinement is deferred by the decision above. M2 subsequently qualified
+the native failure/restart safety contract; its current evidence is above.
 
-Current-source evidence:
+Historical evidence for M1 closeout `252b259d44da44e5f323ac9653f2ee32f05bee8a`:
 
 - All 37 named M1 inventories pass: 472 test executions, with overlapping filters
   counted separately. This includes all 80 native control-plane tests, all 93
   native-store custody tests, 25 durable release tests and 13 federation tests.
-  The source commands live in the flow gate, which now declares 68 inventories
+  The source commands live in the flow gate, which then declared 68 inventories
   across the wider roadmap. This does not claim that the entire flow gate ran.
 - `/tmp/chio-m1-cohesive-acceptance-final.log` retains the first 12 passing
   inventories. Its subsequent native-authority group exposed a stale unsupported
@@ -266,7 +328,10 @@ local debug correctness checks, not a portable hosted artifact bundle,
 throughput/latency qualification, a full-workspace release gate or authorization
 to migrate populated operator stores, merge, publish or activate production.
 
-## Current M1 checkpoint
+## Historical M1 checkpoints
+
+The incremental records below retain earlier implementation frontiers. They are
+superseded by the M1/M2 closeouts and milestone-control table above.
 
 The entries below retain historical checkpoint-by-checkpoint evidence. Current
 composition is tracked [above](#native-nonce-and-declassification-composition).

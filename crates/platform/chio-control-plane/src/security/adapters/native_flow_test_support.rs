@@ -43,7 +43,53 @@ mod declassification {
     ));
 }
 
+#[cfg(unix)]
+mod process_recovery {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_flow_process_recovery.rs"
+    ));
+}
+
 pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+fn open_kernel(
+    directory: &std::path::Path,
+    authority: &SqliteAuthorityStore,
+    signer: &Keypair,
+) -> TestResult<(ChioKernel, Arc<AtomicUsize>)> {
+    let mut kernel = ChioKernel::new(KernelConfig {
+        ca_public_keys: vec![signer.public_key()],
+        keypair: signer.clone(),
+        max_delegation_depth: 5,
+        policy_hash: chio_core::sha256_hex(b"native-flow-policy-test"),
+        allow_sampling: false,
+        allow_sampling_tool_use: false,
+        allow_elicitation: false,
+        max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+        max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        require_web3_evidence: false,
+        allow_ephemeral_receipt_log: false,
+        allow_ephemeral_revocation_store: false,
+        checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+        retention_config: None,
+        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+    });
+    let receipts = SqliteReceiptStore::open(directory.join("receipts.db"))?;
+    receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
+    kernel.set_receipt_store_handle(Arc::new(receipts))?;
+    kernel.set_durable_admission_store(
+        Arc::new(authority.admission_operation_store()),
+        Arc::new(authority.tool_outcome_store()),
+        authority.mutation_fence(),
+    )?;
+    kernel.set_budget_store_handle(Arc::new(authority.budget_store()));
+    kernel.set_revocation_store_handle(Arc::new(authority.revocation_store()));
+    let invocations = Arc::new(AtomicUsize::new(0));
+    kernel.register_tool_server(Box::new(CountingServer(invocations.clone())));
+    Ok((kernel, invocations))
+}
 
 pub(super) fn now_ms() -> PortResult<u64> {
     std::time::SystemTime::now()
@@ -133,6 +179,9 @@ impl Fixture {
         governed: bool,
         declassification: bool,
     ) -> TestResult<Self> {
+        #[cfg(unix)]
+        let directory = process_recovery::fixture_directory()?;
+        #[cfg(not(unix))]
         let directory = tempdir()?;
         let locks = directory.path().join("locks");
         std::fs::create_dir(&locks)?;
@@ -147,36 +196,7 @@ impl Fixture {
         SqliteAuthorityStore::provision(&database, &locks)?;
         let authority = SqliteAuthorityStore::open_serving(database, locks)?;
         let signer = Keypair::generate();
-        let mut kernel = ChioKernel::new(KernelConfig {
-            ca_public_keys: vec![signer.public_key()],
-            keypair: signer.clone(),
-            max_delegation_depth: 5,
-            policy_hash: chio_core::sha256_hex(b"native-flow-policy-test"),
-            allow_sampling: false,
-            allow_sampling_tool_use: false,
-            allow_elicitation: false,
-            max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-            max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
-            require_web3_evidence: false,
-            allow_ephemeral_receipt_log: false,
-            allow_ephemeral_revocation_store: false,
-            checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
-            retention_config: None,
-            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-        });
-        let receipts = SqliteReceiptStore::open(directory.path().join("receipts.db"))?;
-        receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
-        kernel.set_receipt_store_handle(Arc::new(receipts))?;
-        kernel.set_durable_admission_store(
-            Arc::new(authority.admission_operation_store()),
-            Arc::new(authority.tool_outcome_store()),
-            authority.mutation_fence(),
-        )?;
-        kernel.set_budget_store_handle(Arc::new(authority.budget_store()));
-        kernel.set_revocation_store_handle(Arc::new(authority.revocation_store()));
-        let invocations = Arc::new(AtomicUsize::new(0));
-        kernel.register_tool_server(Box::new(CountingServer(invocations.clone())));
+        let (mut kernel, invocations) = open_kernel(directory.path(), &authority, &signer)?;
         kernel.reconcile_durable_admission_startup()?;
 
         let agent = Keypair::generate();

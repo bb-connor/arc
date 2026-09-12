@@ -24,6 +24,7 @@ for required in \
   'MCInformationFlowLatticeReaderDirectionBroken.cfg' \
   'wasm32-unknown-unknown' \
   'umask 022' \
+  'ulimit -c 0' \
   'export RUST_TEST_THREADS=1' \
   'run_exact_target --label "security types library"' \
   'run_exact_target --label "flow lattice and enforcement engine"' \
@@ -84,11 +85,12 @@ def parse(source: str) -> dict[str, tuple[bool, list[str], list[str]]]:
 
 
 expected_counts = {
+    "live admission ownership": 5,
     "frozen federation context": 13,
     "frozen dispatch participant context": 27,
     "durable caller participant persistence": 3,
     "native compiled catalog identity": 2,
-    "native post-join policy": 80,
+    "native post-join policy": 114,
     "native declassification row semantics": 1,
     "native declassification issuer window": 1,
     "public nested credential custody": 5,
@@ -192,6 +194,9 @@ required_adapter_commands = {
     "Cohere canonical stream": "chio-cohere-tools-adapter",
 }
 required_native_commands = {
+    "live admission ownership": [
+        "cargo", "test", "-p", "chio-kernel", "--lib", "admission_operation::sequencer::tests::",
+    ],
     "frozen federation context": [
         "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::federation_context::",
     ],
@@ -317,6 +322,34 @@ def validate(calls: dict[str, tuple[bool, list[str], list[str]]]) -> None:
 
 source = Path(sys.argv[1]).read_text(encoding="utf-8")
 validate(parse(source))
+
+# The standalone M2 gate must name exactly the process/race subset of the
+# composed native gate, not a smaller passing filter.
+restart_source = Path("scripts/check-native-restart-safety.sh").read_text(encoding="utf-8")
+restart_lines = [line for line in restart_source.replace("\\\n", " ").splitlines()
+                 if line.startswith("./scripts/run-exact-cargo-test-inventory.sh ")]
+if len(restart_lines) != 2:
+    raise SystemExit("native restart gate requires process and ownership inventories")
+restart_tokens = shlex.split(restart_lines[0])
+restart_separator = restart_tokens.index("--")
+restart_expected = restart_tokens[restart_tokens.index("--expected") + 1:restart_separator]
+restart_prefix = "security::adapters::tests::native_flow::support::process_recovery::"
+native_process = [name for name in parse(source)["native post-join policy"][1]
+                  if name.startswith(restart_prefix)]
+if len(restart_expected) != 34 or sorted(restart_expected) != sorted(native_process):
+    raise SystemExit("native restart and composed flow inventories disagree")
+if restart_tokens[restart_separator + 1:] != [
+    "cargo", "test", "-p", "chio-control-plane", "--lib", "--locked", restart_prefix,
+]:
+    raise SystemExit("native restart gate changed its supported target")
+ownership_tokens = shlex.split(restart_lines[1])
+ownership_separator = ownership_tokens.index("--")
+if ownership_tokens[ownership_tokens.index("--expected") + 1:ownership_separator] != parse(source)["live admission ownership"][1]:
+    raise SystemExit("native restart and composed ownership inventories disagree")
+if ownership_tokens[ownership_separator + 1:] != [
+    "cargo", "test", "-p", "chio-kernel", "--lib", "--locked", "admission_operation::sequencer::tests::",
+]:
+    raise SystemExit("native restart gate changed its ownership target")
 
 
 def rejects(name: str, source: str, expected_error: str) -> None:

@@ -1,7 +1,50 @@
-//! Default-off reply faults after real capture or readback, never replacement writes.
+//! Default-off process and reply faults, never replacement writes.
 use super::*;
 use chio_kernel::budget_store::{BudgetGuaranteeLevel, BudgetInvocationCaptureDecision};
 use chio_kernel::AdmissionBudgetCapture;
+
+/// Process-death boundaries of the real, fresh combined native capture.
+/// The control is connection-local and absent from production builds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NativeDispatchCaptureTransactionTestCutpoint {
+    BeforeCommit,
+    CommittedBeforeAnchor,
+}
+
+impl SqliteAdmissionOperationStore {
+    pub fn install_native_capture_transaction_cutpoint_for_test(
+        &self,
+        point: NativeDispatchCaptureTransactionTestCutpoint,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.connection()?.execute_batch(&format!(
+            "CREATE TEMP TABLE native_capture_transaction_cutpoint (point INTEGER NOT NULL); INSERT INTO temp.native_capture_transaction_cutpoint VALUES ({});",
+            point as u8,
+        )).map_err(sqlite_error)
+    }
+}
+
+pub(crate) fn reach_native_capture_transaction_cutpoint(
+    connection: &Connection,
+    point: NativeDispatchCaptureTransactionTestCutpoint,
+) -> Result<(), rusqlite::Error> {
+    let installed: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_temp_schema WHERE name = 'native_capture_transaction_cutpoint' AND type = 'table')",
+        [], |row| row.get(0),
+    )?;
+    if installed {
+        let selected: u8 = connection.query_row(
+            "SELECT point FROM temp.native_capture_transaction_cutpoint",
+            [],
+            |row| row.get(0),
+        )?;
+        if selected == point as u8 {
+            // No unwinding, Drop compensation, reply or later anchor sync.
+            eprintln!("native capture transaction cutpoint: {point:?}");
+            std::process::abort();
+        }
+    }
+    Ok(())
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NativeDispatchCaptureResponseTestFault {

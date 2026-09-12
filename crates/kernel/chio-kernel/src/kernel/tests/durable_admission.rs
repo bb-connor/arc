@@ -1384,6 +1384,8 @@ fn cumulative_approval_membership_does_not_change_operation_identity() {
             .expect("cumulative admission must be durable")
     };
 
+    let first_operation_id = first.operation_id().to_owned();
+    drop(first);
     let approver = CoreKeypair::generate();
     let subject = CoreKeypair::generate();
     request.approval_tokens.push(hitl_sign_token(
@@ -1406,7 +1408,7 @@ fn cumulative_approval_membership_does_not_change_operation_identity() {
             .expect("cumulative admission must remain durable")
     };
 
-    assert_eq!(first.operation_id(), resumed.operation_id());
+    assert_eq!(first_operation_id, resumed.operation_id());
 }
 
 #[test]
@@ -1976,6 +1978,7 @@ fn startup_recovery_terminalizes_admission_before_budget_authorization() {
         admission.state(),
         AdmissionOperationState::BrokerAttemptRegistered
     );
+    drop(admission);
 
     assert_eq!(
         kernel
@@ -2029,6 +2032,7 @@ fn startup_recovery_reverses_the_executable_hold_after_budget_authorization() {
 
     // The coordinator dies here. Recovery must reverse the retained hold before
     // it can project a no-effect compensation, and must never dispatch.
+    drop(admission);
     assert_eq!(
         kernel
             .reconcile_recoverable_admissions()

@@ -451,6 +451,8 @@ fn durable_monetary_lifecycle_uses_the_qualified_projection_store() {
         1
     );
 
+    let original_operation = admission.operation().clone();
+    drop(admission);
     let mut resumed = kernel
         .begin_durable_tool_admission(&request, &matching, now + 3)
         .expect("resume durable monetary admission")
@@ -469,8 +471,9 @@ fn durable_monetary_lifecycle_uses_the_qualified_projection_store() {
         .expect("authorized replay outcome");
 
     assert!(replayed_mutation.durable_hold_result().is_some());
-    assert_eq!(resumed.operation(), admission.operation());
+    assert_eq!(resumed.operation(), &original_operation);
     assert_eq!(store.payment_journal(), Some(authorized_journal));
+    drop(resumed);
 
     let response = kernel
         .evaluate_tool_call_blocking(&request)

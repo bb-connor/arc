@@ -9,6 +9,30 @@ use crate::budget_store::BudgetReverseHoldRequest;
 use crate::kernel::kernel_scopes::RECEIPT_EVALUATION_SCOPE_KEY;
 
 impl ChioKernel {
+    pub(super) fn claim_admission_recovery(
+        &self,
+        operation: &AdmissionOperationV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<crate::admission_operation::AdmissionRecoveryLease, KernelError> {
+        let runtime = self.durable_runtime()?;
+        let expires_at_unix_ms = trusted_now_unix_ms
+            .checked_add(RECOVERY_LEASE_DURATION_MS)
+            .ok_or_else(|| {
+                KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
+            })?;
+        runtime
+            .store
+            .claim_recovery(
+                operation.binding().operation_id(),
+                operation.version(),
+                &runtime.claimant_id,
+                trusted_now_unix_ms,
+                expires_at_unix_ms,
+                &runtime.fence,
+            )
+            .map_err(durable_store_error)
+    }
+
     /// Reverse the executable budget hold a retained pre-dispatch operation still
     /// owns. A crash between authorization and the terminal projection leaves
     /// that hold reserved; compensation must release it physically before it can
@@ -110,6 +134,14 @@ impl ChioKernel {
             }
             let reconciled_before_page = reconciled;
             for operation in recoverable {
+                // A live evaluation owns its cleanup and connector handoff.
+                // Background recovery must not borrow that coordinator's lease.
+                let Some(_live_owner) = runtime
+                    .mutation_sequencer
+                    .try_own_operation(operation.binding().operation_id())?
+                else {
+                    continue;
+                };
                 match operation.state() {
                     AdmissionOperationState::DispatchCommitted => {
                         if let Err(error) = self.terminalize_dispatch_committed_admission(
@@ -226,6 +258,7 @@ impl ChioKernel {
                             trusted_now_unix_ms,
                         )?;
                         let mut admission = DurableToolAdmission {
+                            _live_owner: None,
                             operation,
                             aggregate_quota: None,
                             supplemental_quota: None,

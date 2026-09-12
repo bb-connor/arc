@@ -176,6 +176,7 @@ pub(super) fn fixture() -> TestResult<Fixture> {
     }
     request.execution_nonce = Some(nonce.signed_nonce().clone());
     let admission = DurableToolAdmission {
+        _live_owner: None,
         operation,
         retained_request: Some(original),
         aggregate_quota: None,
