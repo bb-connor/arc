@@ -24,24 +24,24 @@
 \newcommand{\PSThreatVerifierCaseCount}{12}         % treaty-runtime-negative-corpus.json, cases on the verifier alone
 \newcommand{\PSSubstitutionCaseCount}{20}           % tests/runtime_treaty_binding_substitution.rs, test cases
 \newcommand{\PSSubstitutionEvidenceId}{PS-T12}      % artifact-manifest.json, the behavioral test that runs the substitution corpus
-\newcommand{\PSRunCommit}{b20144b8bd}               % federated-pair.json, commit
+\newcommand{\PSRunCommit}{041aa18374}               % federated-pair.json, commit
 \newcommand{\PSEpochTickMs}{250}                    % federated-pair.json, topology.epochTickMs
 \newcommand{\PSFreshnessMs}{500}                    % federated-pair.json, freshness window named in every cut denial
-\newcommand{\PSFedRevokeMinMs}{66.277}              % federated-pair.json, revocation.revokeToDeny
-\newcommand{\PSFedRevokeMaxMs}{486.343}             % same distribution
-\newcommand{\PSFedCutMinMs}{25.857}                 % federated-pair.json, revocation.cutToDeny
-\newcommand{\PSFedCutMaxMs}{1085.971}               % same distribution
+\newcommand{\PSFedRevokeMinMs}{67.612}              % federated-pair.json, revocation.revokeToDeny
+\newcommand{\PSFedRevokeMaxMs}{437.435}             % same distribution
+\newcommand{\PSFedCutMinMs}{476.237}                % federated-pair.json, revocation.cutToDeny
+\newcommand{\PSFedCutMaxMs}{1093.769}               % same distribution
 \newcommand{\PSFedRevokeCallsMedian}{2}             % federated-pair.json, revocation.callsUntilDeny
-\newcommand{\PSFedRevokeCallsMax}{2}                % same array
-\newcommand{\PSFedCutCallsMedian}{3}                % federated-pair.json, revocation.cutCallsUntilDeny
+\newcommand{\PSFedRevokeCallsMax}{17}               % same array
+\newcommand{\PSFedCutCallsMedian}{2}                % federated-pair.json, revocation.cutCallsUntilDeny
 \newcommand{\PSFedCutCallsMax}{3}                   % same array
-\newcommand{\PSFedRevokeDenialRecords}{5}           % federated-pair.json, revocation.failureCodes
-\newcommand{\PSFedRevokeAmbiguousReleases}{4}       % same array, records reporting an unconfirmed pre-dispatch release
+\newcommand{\PSFedRevokeDenialRecords}{4}           % federated-pair.json, revocation.failureCodes
+\newcommand{\PSFedRevokeAmbiguousReleases}{3}       % same array, records reporting an unconfirmed pre-dispatch release
 \newcommand{\PSFedCutDenialRecords}{10}             % federated-pair.json, revocation.cutFailureCodes
-\newcommand{\PSFedCutAmbiguousReleases}{1}          % same array, records reporting an unconfirmed pre-dispatch release
-\newcommand{\PSFedRevokeAbsorbedCount}{71}          % federated-pair.json, revocation.freshnessDenialsAbsorbed
-\newcommand{\PSFedDenyAbsorbedCount}{1}             % federated-pair.json, freshnessDenialsAbsorbed.total less its admitted and revocation buckets
-\newcommand{\PSFedAllowAttemptCount}{112}           % federated-pair.json, admitted.calls plus admitted.freshnessDenialsAbsorbed
-\newcommand{\PSFedReceiverEvalPFiftyMs}{201.242}    % federated-pair.json, admitted.receiverEvaluate
-\newcommand{\PSFedEvidencePrepPFiftyMs}{3.274}      % federated-pair.json, admitted.evidencePreparation
-\newcommand{\PSFedWorktreeState}{modified}          % federated-pair.json, environment.worktreeDirty
+\newcommand{\PSFedCutAmbiguousReleases}{0}          % same array, records reporting an unconfirmed pre-dispatch release
+\newcommand{\PSFedRevokeAbsorbedCount}{85}          % federated-pair.json, revocation.freshnessDenialsAbsorbed
+\newcommand{\PSFedDenyAbsorbedCount}{3}             % federated-pair.json, freshnessDenialsAbsorbed.total less its admitted and revocation buckets
+\newcommand{\PSFedAllowAttemptCount}{100}           % federated-pair.json, admitted.calls plus admitted.freshnessDenialsAbsorbed
+\newcommand{\PSFedReceiverEvalPFiftyMs}{203.787}    % federated-pair.json, admitted.receiverEvaluate
+\newcommand{\PSFedEvidencePrepPFiftyMs}{3.297}      % federated-pair.json, admitted.evidencePreparation
+\newcommand{\PSFedWorktreeState}{clean}             % federated-pair.json, environment.worktreeDirty
