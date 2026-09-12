@@ -1,7 +1,7 @@
 {
   "generated_at": "2026-09-11",
   "paper": "Sensor-Grounded Admission: Polity Receipts with Attested Substrate State",
-  "target_venue": "USENIX Security 2027 Cycle 1",
+  "target_venue": "USENIX Security 2027 (submission cycle to be confirmed)",
   "lean_toolchain": "leanprover/lean4:v4.28.0",
   "status": "paper-local; not in formal/theorem-inventory.json",
   "source": "docs/papers/sensor-grounded-admission/lean/SensorGroundedAdmission.lean",

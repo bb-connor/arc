@@ -1,13 +1,21 @@
 \section{Formal Model}
 \label{sec:model-ra}
 
+Every statement in this section is mechanized in the paper-local Lean
+file beside this paper, not in the substrate's proof root: the file is
+in no lakefile, is not built by the substrate's \emph{lake build}, and
+none of its declarations is in the substrate's theorem inventory. It is
+checked by hand with \emph{lake env lean} against the substrate's
+syntactic treaty model and carries no \emph{sorry}. Where a statement
+below is an instance of a proof-root theorem, the text says so.
+
 The model abstracts away the OS executor, the canonical JSON encoder,
 and the receipt ledger; those lower layers are substrate-level
 obligations outside the model, discharged by code citation rather than
 by mechanized refinement. The institutional core that remains is the
 executive-action type, its TTL invariant, the rollback receipt, the
 TTL-bounded amendment chain, and the composition theorem connecting
-the response side to the parent paper's amendment side.
+the response side to the amendment side of the proof root.
 
 \paragraph{Executive action.}
 An executive action is a structure that cannot be constructed without
@@ -32,7 +40,7 @@ case split on the TTL window. The bridge is
 not the headline theorem; it documents the relationship between the
 type-level fields and the propositional closure claim, in the same
 role \thm{amendment_admissible_iff_backward_refinement} plays for the
-amendment side of the parent paper.
+amendment side of the proof root.
 
 \paragraph{TTL-bounded amendment.}
 A TTL-bounded amendment $A$ is a constitutional delta $\delta$ paired
@@ -140,9 +148,9 @@ the baseline. Both arms consume the per-step witnesses as data rather
 than discharging by reflexivity, so each amendment in the chain
 contributes substantive content.
 
-The shape is the response-side counterpart of the parent paper's
+The shape is the response-side counterpart of the proof root's
 \thm{essential_preserved_chain}, which composes per-step essential-
-admission witnesses over an amendment sequence. The parent theorem
+admission witnesses over an amendment sequence. That theorem
 ranges over receipts and a chain of constitutions and is structurally
 inductive over the chain; this theorem ranges over instants and a
 chain of TTL-bounded amendments and discharges pointwise per amendment
@@ -187,21 +195,21 @@ $D$, since outside $D$ the composition theorem asserts nothing.
 The closure representation the substrate retains under
 $\mathsf{Chio.Treaty.Legacy}$ is related to the syntactic one
 pointwise: the closure induced by a syntactic constitution admits a
-view exactly when $\mathsf{admits}$ does. That is the parent
-substrate's $\mathsf{bridge\_pointwise}$, restated in the paper-local
+view exactly when $\mathsf{admits}$ does. That is the proof root's
+$\mathsf{bridge\_pointwise}$, restated in the paper-local
 file as \thm{closure_to_syntactic_admission_bridge} so that both
 reductions can be read against either representation. It is an
-instance of the parent theorem, not a new proof.
+instance of the proof-root theorem, not a new proof.
 
 \paragraph{Bilateral destructive admission.}
 The bilateral reduction \thm{destructive_action_requires_bilateral_admission}
-specializes the parent paper's
+specializes the proof root's
 \thm{treaty_admission_iff_predicate_intersection} to the destructive
 subclass of the action taxonomy. For a bilateral envelope binding one
 admission view to a destructive action class under a bilateral treaty,
 admission holds iff both the device polity's and the operator polity's
 predicates accept that view. The reduction is structural rather
-than novel: the parent theorem already establishes the bilateral
+than novel: the proof-root theorem already establishes the bilateral
 intersection; this theorem renames it for the destructive class. The
 contribution at this point is the typed envelope, not a new theorem.
 

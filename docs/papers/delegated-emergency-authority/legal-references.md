@@ -22,7 +22,7 @@ source notes retained where a citation benefits from primary-source review.
 
 - **`ref_posner_vermeule_terror`** -- Eric A. Posner & Adrian Vermeule, *Terror in the Balance: Security, Liberty, and the Courts* (Oxford Univ. Press, 2007). The standard counter to Ackerman from the deferentialist side.
 
-- **`ref_sunstein_sunset_clauses`** -- Cass R. Sunstein, *Should Statutes Have Sunset Clauses?*, 80 Vand. L. Rev. (forthcoming) or relevant prior article. Confirm the specific citation; Sunstein has written about sunset clauses in multiple venues including *On Rumors* and earlier work. Settle on the right Sunstein article on temporary legislation.
+- **`ref_gersen_temporary_legislation`** -- Jacob E. Gersen, *Temporary Legislation*, 74 U. Chi. L. Rev. 247 (2007). The systematic account of duration clauses and the termination default, and the piece the pattern section relies on.
 
 ### Comparative emergency-powers scholarship
 
@@ -84,9 +84,9 @@ source notes retained where a citation benefits from primary-source review.
 
 ### Scholarly literature
 
-- **`ref_kuner_gdpr_erasure`** -- Christopher Kuner, *The Internet and the Global Reach of EU Law*, in *EU Law Beyond EU Borders: The Extraterritorial Reach of EU Law* (Oxford Univ. Press, 2019). Or Kuner's commentary in *The EU General Data Protection Regulation: A Commentary* (Oxford Univ. Press, 2020). Confirm the specific volume reference.
+- **`ref_kuner_gdpr_erasure`** -- Christopher Kuner, *The Internet and the Global Reach of EU Law*, in *EU Law Beyond EU Borders: The Extraterritorial Reach of EU Law* (Marise Cremona & Joanne Scott eds., Oxford Univ. Press, 2019).
 
-- **`ref_mantelero_gdpr_enforcement`** -- Alessandro Mantelero, *The EU Proposal for a Regulation on the Protection of Individuals with Regard to the Processing of Personal Data and on the Free Movement of Such Data*, 30 Computer L. & Sec. Rev. 643 (2014). Or Mantelero's more recent work on GDPR enforcement and right-to-be-forgotten implementation in practice.
+- **`ref_mantelero_gdpr_enforcement`** -- Alessandro Mantelero, *The EU Proposal for a General Data Protection Regulation and the Roots of the "Right to Be Forgotten"*, 29 Computer L. & Sec. Rev. 229 (2013).
 
 ---
 
@@ -118,9 +118,9 @@ source notes retained where a citation benefits from primary-source review.
 
 ### Scholarly literature
 
-- **`ref_brennan_center_aumf`** -- Brennan Center for Justice, *How the 2001 AUMF Has Been Expanded Beyond Recognition* (multiple reports and updates, 2017-2024). Confirm the specific report.
+- **`ref_brennan_center_aumf`** -- Elizabeth Goitein, *Congress's Role in Military Conflict: The Growing Gap Between Constitutional Principle and Practice* (Brennan Center for Justice at NYU School of Law, Jan. 15, 2020). Records the count of 2001 AUMF invocations and the countries they covered.
 
-- **`ref_chesney_aumf`** -- Robert Chesney, *Postwar*, 1 Harv. Nat'l Sec. J. 1 (2010). And subsequent work by Chesney on the AUMF's evolution. Or Robert Chesney & Jack Goldsmith, *The 2001 AUMF: A Comprehensive Look at the Statute, Its Interpretation, and What Congress Can Do About It*, Lawfare (multiple posts).
+- **`ref_chesney_aumf`** -- Robert M. Chesney, *Postwar*, 5 Harv. Nat'l Sec. J. 305 (2014).
 
 - **`ref_jaffer_aumf`** -- Jameel Jaffer (ed.), *The Drone Memos* (The New Press, 2016). And related writing from the Knight First Amendment Institute.
 

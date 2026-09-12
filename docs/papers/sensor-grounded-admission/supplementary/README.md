@@ -2,7 +2,7 @@
 
 Paper: "Sensor-Grounded Admission: Polity Receipts with Attested
 Substrate State"
-Venue: USENIX Security 2027 (Cycle 1)
+Venue: USENIX Security 2027 (submission cycle to be confirmed)
 
 This package makes the Lean 4 mechanization behind the paper's formal
 claims auditable by artifact reviewers. It contains a self-contained
