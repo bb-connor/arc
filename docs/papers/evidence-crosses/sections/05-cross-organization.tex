@@ -1,53 +1,51 @@
 \section{Cross-organization admission}
 \label{sec:cross}
 
-A call from another organization is the same admission operation. The peer
-kernel's receipt and co-signature enter at step 4 as evidence and add no
-authority: the receiver's issuer set, pinned peers, agreements, and clocks are
-what they were before the request arrived. Figure~\ref{fig:mechanism} is the
-whole of what a statement can name.
+A call from another organization is the same admission operation, and both
+co-signed statements occur in it. The inbound one is named by the request and
+resolved by the pre-dispatch hook at step 4; it adds no authority, because the
+receiver's issuer set, pinned peers, agreements, and clocks are what they were
+before the request arrived. Section~\ref{sec:security} concerns it, and the
+outbound one closes this section. Figure~\ref{fig:sequence} follows one call
+end to end.
+
+\input{figures/sequence.tex}
 
 \subsection{Receiver-owned resolution}
 
-Two organizations pin each other out of band, each recording the other's kernel
-identity, the passport key that kernel co-signs with, and a rotation deadline.
+Two organizations pin each other out of band, each recording the other's
+kernel identity, the passport key it co-signs with, and a rotation deadline.
 The agreement is an activated record naming exactly two kernels, the action
 classes in scope, a validity window, and a revocation epoch. Each participant
 publishes a signed manifest, the action classes it accepts and at what
 intensity on the ascending ladder \code{observation}, \code{guarded},
-\code{receipt_backed}, \code{partition_contingency},
-\code{maintenance}, and each receiver activates the agreement and
-both manifests locally and intersects the two per action class itself: the
-higher-intensity mode wins, the stricter co-signing requirement wins, a
-destructive class below \code{receipt_backed} rejects, and
-mismatched consistency models reject. Consistency is a separate axis, not a
-mode. Continuations resolve by identifier against the receiver's own copy. A pin the receiver has not activated is a
-denial, not a prompt.
+\code{receipt_backed}, \code{partition_contingency}, \code{maintenance}, and
+each receiver activates the agreement and both manifests locally and
+intersects them per action class itself: the higher-intensity mode wins, the
+stricter co-signing requirement wins, and a destructive class below
+\code{receipt_backed} rejects. A pin the receiver has not activated is a
+denial.
 
-The request may carry identifiers. It may not carry trust. Its agreement context
-is names and digests, each a lookup key into a store the receiver owns: the
-agreement and the intersection with the digest the receiver should find for
-each, the action class, and identifiers for the continuation, the lineage
-bundle that chains this call to the receipts behind it, and the co-signed
-evidence. Eleven further key names are refused wherever they appear. Seven name
-a trust root, a bundle, an agreement record, a manifest, a signing key, or a
-peer directory, refused with
-\code{request_smuggled_trust_root}: \code{trustRoot}, \code{trustRoots},
-\code{trustBundle}, \code{treatyScope}, \code{ladderManifest},
-\code{signingKey}, \code{peerDirectory}. Four name dynamic trust input or peer
-discovery, refused with \code{request_smuggled_dynamic_trust}:
-\code{dynamicTrust}, \code{dynamicTrustBundle}, \code{runtimeTrustInput},
-\code{peerDiscovery}. The check is on names, runs before anything is resolved,
-and is the operational form of the rule.
+The request may carry identifiers. It may not carry trust. Its agreement
+context is names and digests, each a lookup key into a store the receiver
+owns; Figure~\ref{fig:mechanism} is the whole of what such a name reaches.
+Eleven further key names are refused wherever they appear, seven naming a
+trust root, bundle, agreement record, manifest, signing key or peer directory
+and four naming dynamic trust input or peer discovery, with
+\code{request_smuggled_trust_root} and \code{request_smuggled_dynamic_trust}.
 
 \subsection{The co-signed statement}
 
-The statement is an in-toto Statement v1 \cite{intoto} in a DSSE envelope
-\cite{dsse} whose predicate is snake\_case and rejects unknown fields. Its
-single subject names the invocation identifier, which is the receipt's
-\code{id}, and carries as its digest the SHA-256 of the canonical receipt body
-of Section~3. The envelope for the refund step, then its payload, abridged from
-the committed evidence package for workflow \code{wf-chio-refund-001}:
+One wire form serves both directions: an in-toto Statement v1 \cite{intoto} in
+a DSSE envelope \cite{dsse} whose predicate is snake\_case and rejects unknown
+fields. Its single subject names an invocation identifier and carries the
+SHA-256 of that receipt's canonical body of Section~\ref{sec:receipt}. Below is
+the refund envelope, the outbound one the vendor minted over that receipt, then
+its payload.
+An inbound subject instead names a receipt the receiver already held, in the
+reference path one record per receiver process named identically on every call,
+so it carries no per-call information and the per-call binding rests on the
+binding reference alone.
 \begin{lstlisting}
 { "payloadType": "application/vnd.in-toto+json",
   "payload": "eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9T...",
@@ -100,85 +98,91 @@ the committed evidence package for workflow \code{wf-chio-refund-001}:
       "signer_kernel_ids": [ "did:chio:buyer-kernel", "did:chio:vendor-c" ] } } }
 \end{lstlisting}
 
-Both signatures cover the DSSE pre-authentication encoding of the payload, which
-here begins \code{DSSEv1 28 application/vnd.in-toto+json 2972 \{"_type":"https:}
-and runs to 3016 bytes; over those bytes both verify, one under each
-kernel's key, and each \code{keyid} is the SHA-256 of its raw public key.
-Every identity above was recomputed from the committed bytes:
-\code{outcome_sha256} is the receipt's \code{content_hash}, and
-\code{request_sha256} is both \code{tool_args_hash.value} and the receipt's
-\code{action.parameter_hash}.
+Both signatures cover the DSSE pre-authentication encoding of the payload,
+which here begins \code{DSSEv1 28 application/vnd.in-toto+json}, and each
+\code{keyid} is the SHA-256 of its raw public key. Recomputed from the
+committed bytes, \code{request_sha256} is \code{tool_args_hash.value} and the
+receipt's \code{action.parameter_hash}.
 
 \subsection{The verifier, in the order it runs}
 
-Table~\ref{tab:verifier} is the shipped order. Two components decide, in two
-disjoint code families. The conforming verifier returns the
-specification's dotted codes, a closed set of \PSRejectionCodeCount{} strings of
-which it emits \PSVerifierCodeCount{} and the envelope layer the rest. The
-kernel's pre-dispatch hook, which resolves the same evidence inline during
-admission, answers from the kernel's runtime failure-code set of
+Table~\ref{tab:verifier} is the shipped order; two components decide, in two
+disjoint code families. The conforming verifier returns the specification's
+dotted codes, a closed set of \PSRejectionCodeCount{} strings of which it
+emits \PSVerifierCodeCount{} and the envelope layer the rest. The kernel's
+pre-dispatch hook answers from the kernel's runtime failure-code set of
 \PSRuntimeCodeCount{} strings, \PSRuntimeTreatyCodeCount{} of them
 agreement-scoped, and maps every envelope-layer failure to
-\code{chio_treaty_unverified_required_evidence}. Table~\ref{tab:subst} and the
-denial experiment of Section~\ref{sec:eval} report the hook, because the hook
-decides a live call.
+\code{chio_treaty_unverified_required_evidence}. Table~\ref{tab:subst} and
+Section~\ref{sec:eval}'s denial experiment report the hook, which decides live
+calls.
 \begin{table}[!tb]
 \centering
 \scriptsize
-\caption{The conforming verifier, \PSVerifierStepCount{} steps. The receiver's
-own state decides everything outside steps 8 to 14, which are the envelope
-layer, called with the two keys the receiver pinned.}
+\caption{The conforming verifier, \PSVerifierStepCount{} steps, grouped by where
+the state each step reads comes from. Every failure returns one code from the
+closed set; the specification maps each step to its own. Steps 8 to 14 are the
+envelope layer, called with the two keys the receiver pinned.}
 \label{tab:verifier}
-\begin{tabular}{@{}rp{7.4cm}p{5.5cm}@{}}
+\begin{tabular}{@{}rp{11.6cm}@{}}
 \toprule
-\# & Check & Code on failure \\
+\# & Check \\
 \midrule
-1--5 & Media type, at least one signature, payload decodes and parses; predicate type \code{chio.\allowbreak{}bilateral-cosign-\allowbreak{}invocation.v1}; Statement v1; exactly one subject & \code{dsse.malformed}, \code{statement.malformed}, \code{predicate.type_unrecognised}, \code{statement.schema_invalid} \\
-6--7 & Both kernel identifiers are in the pinned peer set and each pin's fingerprint equals the declared one & \code{peer.unpinned_or_keyid_mismatch} \\
-8--13 & Exactly two signatures; re-canonicalizing reproduces the payload bytes; predicate schema and strict rules; both verdicts present, equal, in $\{\mathrm{allow},\mathrm{deny}\}$; subject name is \code{chio-receipt:} plus the invocation identifier; the two pinned keys and their identifiers distinct & \code{statement.malformed}, \code{predicate.schema_invalid}, \code{policy.verdict_disagreement}, \code{subject.digest_mismatch}, \code{signer.independence_required} at the envelope layer, surfacing as \code{dsse.malformed} \\
-14 & \emph{Only now:} compute the pre-authentication encoding, select each signature by a pinned key's identifier, and verify both & \code{signature.server_a_invalid}, \code{signature.server_b_invalid} \\
-15--16 & Each pinned peer's manifest reference is present and fresh, and the peer is active at the pinned epoch height & \code{ladder.manifest_missing}, \code{ladder.manifest_stale}, \code{peer.revoked_at_epoch} \\
-17--19 & Resolve the receipt by invocation identifier in the receiver's own store; its signature verifies, its tool name and argument hash agree, its kernel key is the pinned second-party key, and subject name and digest match the resolved body & \code{subject.digest_mismatch}, \code{peer.unpinned_or_keyid_mismatch} \\
-20--22 & Both verdicts resolve and agree; the lease resolves with matching issuer, expiry and scope digest and is unexpired; the tool name is in the action-class table; a receipt-backed class resolves its governance record & \code{policy.verdict_disagreement}, \code{capability.lease_expired_or_unknown}, \code{governance.unknown_action_class}, \code{governance.receipt_required_missing} \\
-23--26 & Binding cross-checks (Table~\ref{tab:subst}), consistency model and anchor, co-signing mode; return the verified material & \code{predicate.schema_invalid} \\
+1--5 & Media type, at least one signature, payload decodes and parses; predicate type \code{chio.\allowbreak{}bilateral-cosign-\allowbreak{}invocation.v1}; Statement v1; exactly one subject \\
+6--7 & Both kernel identifiers are in the pinned peer set and each pin's fingerprint equals the declared one \\
+8--13 & Exactly two signatures; re-canonicalizing reproduces the payload bytes; predicate schema and strict rules; both verdicts present, equal, and in $\{\mathrm{allow},\mathrm{deny}\}$; subject name is \code{chio-receipt:} plus the invocation identifier; the two pinned keys and their identifiers distinct \\
+14 & \emph{Only now:} compute the pre-authentication encoding, select each signature by a pinned key's identifier, and verify both \\
+15--16 & Each pinned peer's manifest reference is present and fresh, and the peer is active at the pinned epoch height \\
+17--19 & Resolve the receipt by invocation identifier in the receiver's own store; its signature verifies, its tool name and argument hash agree, its kernel key is the pinned second-party key, and subject name and digest match the resolved body \\
+20--22 & Both verdicts resolve and agree; the lease resolves with matching issuer, expiry and scope digest and is unexpired; the tool name is in the action-class table; a receipt-backed class resolves its governance record \\
+23--26 & Binding cross-checks (Table~\ref{tab:subst}), consistency model and anchor, co-signing mode; return the verified material \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Signatures are verified last and the pin lookup first, the opposite of the usual
-advice: the verifier cannot verify until it knows which keys to verify under,
-and it takes those from its own pin set, never from the envelope, so a signature
-whose key identifier matches no pinned key is a missing signature. No gate before
-step 14 consults a secret, so the ordering costs nothing in soundness. The typed error exposes a code and keeps the rendered detail for the
-local log, since that message names presented and expected digests and would
-make the verifier an oracle.
+Signatures are verified last and the key lookup first, the opposite of the
+usual advice: neither decider can verify until it knows which keys to verify
+under, neither takes them from the envelope, and no gate before step 14
+consults a secret, so the ordering costs nothing in soundness. They read
+different receiver-owned records for those keys, the verifier its pin set and
+the hook the activated agreement, and either can be ahead of the other, so a
+rotation carried into one and not the other is admitted by whichever decider
+holds the key the envelope names. Steps 17 to 19 are the verifier's alone:
+neither the hook nor the kernel's treaty verification resolves a receipt by
+invocation identifier or compares the subject digest, so on a live call the
+receipt binding rests on \code{local_receipt_sha256} and
+\code{remote_receipt_sha256} against the lineage bundle and the invocation
+record.
 
 \input{figures/mechanism.tex}
 
 \subsection{Consume, bind, co-sign}
 
-Replay is not defeated by a signature, since a replayed statement is validly
-signed. It is defeated by a single-use continuation: a token minted by the
-origin binding the parent receipt, the parent session anchor, the capability,
-the action class, the target tool, a nonce, the two kernel identities, and a
-validity window, whose digest is one of the \PSBindingFieldCount{} bound fields.
-The receiver's state machine over it is two operations on one table keyed by the
-continuation identifier: \emph{consume} inserts, ignoring a conflict, and reads
-the affected row count; zero rows means the continuation was already spent and
-the call is denied with \code{chio_treaty_continuation_replay}. \emph{Release}
-deletes the row for that identifier and that admission, and runs only when a
-later pre-dispatch step denies, so a rejected call does not burn a continuation
-the origin will retry. Once dispatch commits the row stays: at-most-once, on
-purpose.
+A replayed statement is validly signed, so no signature defeats replay. A
+single-use continuation does, and the receiver mints it before the call: a
+record binding the parent receipt and session anchor, the capability, the
+action class, the target tool, a nonce, the two kernel identities, and a
+validity window, whose digest is one of the \PSBindingFieldCount{} bound
+fields. It carries no signature and needs none: what authenticates it is
+residency in the receiver's own store and the digest the request presents,
+which sharpens the rule rather than relaxing it. Two operations run on one
+table keyed by that identifier. \emph{Consume} inserts, ignoring a conflict,
+and reads the affected row count; zero rows means the continuation was already
+spent and the call is denied with \code{chio_treaty_continuation_replay}.
+\emph{Release} deletes the row for that identifier and that admission, and
+runs only on a later pre-dispatch denial, so a rejected call does not burn a
+continuation. Once dispatch commits the row stays: at-most-once, on purpose.
 
 The receiver then builds its own admission report and binds the accepted
-material into the receipt it is about to sign. One field is treated differently
-from the other fourteen: the receiver checks only that
-\code{admission_report_sha256} is well-formed hex, then recomputes the digest of its \emph{own} report and overwrites the field before
-signing, because a peer-supplied hash must never sit inside a locally signed
-receipt as though the receiver had computed it. Verified material is installed
-for that one request as a validated value, never as configuration. The local
-receipt is persisted; only then does the kernel ask the peer to co-sign a
-statement whose subject is the new receipt's digest, so a refusal or a transport
-failure is recorded against a receipt that already exists rather than erasing
-it.
+material into the receipt it signs, checking only that the statement's
+\code{admission_report_sha256} is well-formed hex before overwriting it with
+its \emph{own} report's digest.
+
+The outbound statement is minted here, a different object: its subject is the
+receipt this call just produced, the receiver authors its pre-authentication
+bytes, and the peer signs them without parsing. The local receipt is persisted
+first, so a refusal or a transport failure is recorded against a receipt that
+already exists. The reference kernel mints it on every federated request and
+fails the response when it cannot, and no admission path resolves it. Its
+second signature constrains nothing the receiver decided, since the Section~\ref{sec:threat}
+adversary holds the peer's key: evidence, not prevention.

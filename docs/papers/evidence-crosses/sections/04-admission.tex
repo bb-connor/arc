@@ -2,42 +2,44 @@
 \label{sec:admission}
 
 Admission is the one operation. Every tool call, local or foreign, goes through
-it, and every path out of it that reached a decision produces a signed receipt.
+it, and every path that reached a decision produces a signed receipt.
 
 \begin{enumerate}\itemsep0pt
 \item Verify the presented capability against the kernel's own trusted issuer
   set: signature, time window, subject binding, and the revocation state of the
-  leaf and every ancestor in the presented chain; resolve the grants matching
-  this tool and these arguments. Nothing in the request extends that set.
+  leaf and every ancestor; resolve the grants matching this tool and these
+  arguments.
 \item Open a durable admission operation, a fenced write-ahead record whose
-  state machine has \PSAdmissionStateCount{} states, from prepared to a terminal
-  classification. The fence is a store lease with an epoch, so a second
-  coordinator cannot advance the same operation.
+  state machine has \PSAdmissionStateCount{} states. Its fence is a store lease
+  with an epoch: no second coordinator can advance it.
 \item Run the guard pipeline. Deny dominates, and so does error: a guard that
-  fails to produce a verdict is a denial, not a pass.
+  produces no verdict denies.
 \item Run the admission hook, where Section~\ref{sec:cross} runs for a request
-  classified as coming from another organization; such a request carrying no
-  agreement context is denied here.
+  classified as foreign; one carrying no agreement context is denied here.
 \item Take the budget hold, charging the reservation before dispatch.
-\item Revalidate the mutable inputs immediately before dispatch, mark the
-  operation dispatch-committed, and only then hand the call to the tool server
-  over a transport the kernel owns.
+\item Revalidate the mutable inputs, mark the operation dispatch-committed, and
+  only then hand the call to the tool server over a transport the kernel owns.
 \item Run output guards, build the receipt, recheck its fields against the
-  admitted inputs, sign it, persist it, and only then return.
+  admitted inputs, sign and persist it, then return.
 \end{enumerate}
 
-Two orderings are the whole of its value. \dfn{Durable before dispatch}: no
+Three orderings are the whole of its value. \dfn{Durable before dispatch}: no
 dispatch occurs without a committed pre-dispatch record. Before that commit
-recovery compensates, releasing the hold; after it, with no outcome known,
-recovery cannot invent one, so the operation terminates as outcome-unknown, the
-honest answer and the one a reconciling system can act on. An output that does not match the committed
-digest terminates as denied-after-delivery, with a signed deny persisted and
-nothing captured against the hold. Every crash is classified rather than lost,
-in the signed record.
+recovery releases the hold; after it, with no outcome known, recovery terminates
+the operation as outcome-unknown rather than inventing one. An output not
+matching the committed digest terminates as denied-after-delivery, with a signed
+deny and nothing captured against the hold.
 
-\dfn{Receipt before response}: the receipt is persisted locally before the
-caller sees the result, and a kernel that cannot persist a receipt denies. The log is
-a write-ahead record of what was admitted, not a trace of what was observed.
-Denials release what they did not use, scoped to the admission that took the
-reservation, and an unconfirmed release is recorded as ambiguous rather than
+\dfn{Receipt before response}: the receipt is persisted before the caller sees
+the result, and a kernel that cannot persist a receipt denies. The log is a
+write-ahead record of what was admitted, not a trace of what was observed.
+
+\dfn{Consume after compare}: step 4 spends a foreign request's single-use
+continuation after every comparison against the inbound statement it presented,
+and after both signatures on that statement verify, and before the local
+admission report that rebuilds this call's binding from the live request. A
+statement the receiver refuses cannot burn a continuation a legitimate call
+still needs. A statement that passes every comparison on a request the report
+then denies does spend one, and gets it back through a release scoped to that
+admission; an unconfirmed release is recorded as ambiguous rather than
 released.

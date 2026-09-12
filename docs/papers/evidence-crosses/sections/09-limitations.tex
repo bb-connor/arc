@@ -2,19 +2,20 @@
 
 The cross-organization run of Section~\ref{sec:eval} put the two kernels in
 separate processes on one host, not on two separately administered machines.
-That removes the shared address space,
-store, and key material, which are what the claim is about; it does not remove
-the shared operating system or clock source. A two-host run would, and the
-latencies would change. The rule does not depend on that experiment; the
-strength of the demonstration does. The corpus of Section~\ref{sec:security}
-substitutes one field at a time; no case combines two.
+That removes the shared address space, store, and key material, which are what
+the claim is about; it leaves the shared operating system and clock source. Two
+machines would remove those and change the latencies. The rule does not
+depend on that experiment; the strength of the demonstration does.
 
+Section~\ref{sec:eval}'s alternative is one construction judged on one corpus;
+only the missing carrier is a fact about the request format rather than the
+wiring.
 Continuation consumption is at-most-once, so a crash between consume and
 dispatch loses the call rather than repeating it: right for a refund, an
 avoidable retry for an idempotent read. The chain closes in the kernel for one
 hop, since the next continuation in a longer chain is minted outside it.
 Denial paths below the verifier still return a rendered detail alongside the
-code, and separating the two everywhere is unfinished. Receipts are batched into
+code; separating them is unfinished. Receipts are batched into
 Merkle checkpoints in the RFC 6962 shape \cite{rfc6962} with offline inclusion
 proofs, and that is the whole claim: local audit evidence with verifiable
 inclusion, not a public append-only log, and with no anti-equivocation
@@ -25,8 +26,8 @@ by someone holding both.
 Capability discipline without ambient authority is the tradition this protocol
 sits in \cite{saltzer1975,watson2010capsicum}, saying exactly where a proof
 stops is seL4's discipline \cite{sel4}, and attenuable credentials are old and
-good, from the trust-management line \cite{spki,keynote} through macaroons
-\cite{macaroons} to the modern token families \cite{ucan,biscuit}, which carry
+good: the trust-management line \cite{spki,keynote}, macaroons
+\cite{macaroons}, and the modern token families \cite{ucan,biscuit}, which carry
 caveats without a kernel, a decision record, or a price. Kerberos
 \cite{kerberos} crossed the boundary by transferring authority, workload
 identity by exchanging trust bundles and minting a local credential for a
@@ -34,8 +35,8 @@ foreign workload \cite{spiffe}, and token exchange by converting one issuer's
 token into another's \cite{rfc8693}. All three move authority across the
 boundary, which is the step this protocol declines to take. Interchain light
 clients \cite{ibc} solve pinned keys plus a monotone clock for chains rather
-than tool calls, and policy engines decide from a request they are handed and do
-not sign \cite{cedar}. The envelope shapes we reuse \cite{dsse,intoto},
+than tool calls, and policy engines decide from a request they are handed
+\cite{cedar}. The envelope shapes we reuse \cite{dsse,intoto},
 transparent registration \cite{scitt}, and certificate transparency
 \cite{rfc6962} answer how an artifact was built, who may register a statement,
 and how to publish verifiable records. What none of them defines is the object

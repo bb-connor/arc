@@ -44,6 +44,7 @@
 \input{../programmable-sovereignty/bench/results/bilateral-admission-inline.tex}
 \input{../programmable-sovereignty/bench/results/replay-corpus-inline.tex}
 \input{../programmable-sovereignty/bench/results/federated-pair-inline.tex}
+\input{../programmable-sovereignty/bench/results/baseline-inline.tex}
 \input{derived-macros.tex}
 \input{local-macros.tex}
 
@@ -84,23 +85,23 @@ Within and Across Organizations}
 
 \begin{abstract}
 \noindent
-An agent that calls a tool through an ordinary client holds whatever authority
-its host process holds and leaves whatever record that process chooses to keep,
-and when the call crosses into a second organization the receiver has nothing to
-check but the sender's word. We describe a protocol built on one rule: authority
-is minted and verified only inside the kernel that dispatches, against roots
-that kernel activated itself, and nothing in a request can add a root; only
-signed, content-addressed evidence crosses an organization boundary. The object
-that crosses is the receipt. Locally it is a kernel-signed record of one
-admission decision whose identity is the hash of its own content, written
-durably before the caller sees a result and, when the exercised grant carries a
-monetary cap, carrying what the call cost and who paid. Across a boundary it is
-co-signed: a statement whose single subject is the digest of a receipt the
-receiving kernel already holds, signed by exactly two keys the receiver pinned
-before the request arrived, binding the agreement, the request hash, and a
-single-use continuation. The statement is a pointer, not a bearer credential, so
-every deviation is a hash mismatch, a signature failure, or a lookup that
-returns nothing.
+An agent calling a tool through an ordinary client holds whatever authority its
+host process holds; across an organization boundary the receiver has only the
+sender's word. Our protocol rests on one rule: authority is minted and verified
+only inside the kernel that dispatches, against roots it activated
+itself, and nothing in a request can add a root; only signed, content-addressed
+evidence crosses. What crosses is the receipt, a kernel-signed record of one
+admission decision named by its content hash. Two co-signed statements name
+receipts. The inbound one is evidence a request presents about a receipt the
+receiver already holds; resolving it before dispatch is where the security
+property lives. The outbound one the receiver mints over its own new receipt
+once that receipt is durable, and the peer signs those bytes unparsed; it gates
+the response, never the dispatch. Neither is a bearer credential: a statement
+names only what the receiver stores. Hardened with every check a
+competent operator would write, a composition of a pinned peer identity, a
+signing policy engine, and a replay table reaches receiver locality, single use,
+and audience binding, but not admission binding: most of what the receiver binds
+has no carrier there. The contribution is the carrier, not the check.
 \end{abstract}
 
 \input{sections/01-rule.tex}

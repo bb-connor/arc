@@ -1,7 +1,7 @@
 PAPER     := paper
 LATEX     := pdflatex -interaction=nonstopmode -halt-on-error
 BIBTEX    := bibtex
-MAXPAGES  := 10
+MAXPAGES  := 12
 MAXWORDS  := 5000
 RESULTS   := ../programmable-sovereignty/bench/results
 
@@ -55,7 +55,10 @@ check-bibtex:
 	  echo "FAIL: cited key with no bib entry"; fail=1; fi; \
 	if [ $$fail -eq 0 ]; then echo "check-bibtex: clean"; else exit 1; fi
 
-# Fail if the built PDF exceeds MAXPAGES pages, references included.
+# Fail if the built PDF exceeds MAXPAGES pages, references included. Twelve is
+# the tightest limit among the venues this paper targets (USENIX Security and
+# IEEE S&P allow thirteen excluding references, CCS and SOSP twelve), so a build
+# that passes here fits all of them.
 check-pages:
 	@pages=$$(pdfinfo $(PAPER).pdf | awk '/^Pages:/ {print $$2}'); \
 	echo "pages: $$pages (maximum $(MAXPAGES))"; \

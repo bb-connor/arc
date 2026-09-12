@@ -1,24 +1,23 @@
 \section{Threat model and trusted base}
+\label{sec:threat}
 
 The kernel sits between an agent and the tool servers whose transport it owns:
-child processes it spawned and speaks to over their standard streams, HTTP tools
-it fronts, and sidecars it proxies. It does not
-confine the agent: the model, the orchestrator, the prompt, and any library the
-agent imports are untrusted, and an agent that opens its own socket reaches
-whatever that socket reaches.
+child processes on their standard streams, HTTP tools it fronts, sidecars it
+proxies. It does not confine the agent, whose model, orchestrator, prompt, and
+libraries are untrusted; one that opens its own socket reaches whatever that
+socket reaches.
 
-The adversary is given everything outside the receiving kernel. It controls every request
-field this paper names; it controls the peer
-kernel and can make it sign anything with the peer's key; it controls the
-network and may drop, delay, reorder, duplicate, and replay; and it may present
-any receipt, statement, lease, or governance record it has ever observed, in any
-combination, to any kernel. It does not hold the receiving kernel's signing key
-and cannot write to its stores. The question is what such an adversary can cause
-a receiving kernel to dispatch.
+The adversary is given everything outside the receiving kernel. It controls
+every request field this paper names; it controls the peer kernel and can make
+it sign anything with the peer's key; it controls the network and may drop,
+delay, reorder, duplicate, and replay; and it may present any receipt,
+statement, lease, or governance record it has observed, in any combination. It
+does not hold the receiving kernel's signing key and cannot write to its stores.
+The question is what it can cause a receiving kernel to dispatch.
 
 The trusted base is the receiving kernel's process, its signing key, and its
-stores; everything outside it is verified or assumed. The assumptions appear
-once, in Table~\ref{tab:assumptions}.
+stores; everything outside is verified or assumed. The assumptions appear once,
+in Table~\ref{tab:assumptions}.
 
 \scriptsize
 \begin{longtable}{@{}>{\raggedright\arraybackslash}p{4.3cm}p{10.9cm}@{}}
@@ -45,7 +44,9 @@ ASSUME-GOSSIP-FAIRNESS-PARTITION-BOUND & Revocation liveness only: recurring del
 \end{longtable}
 \normalsize
 
-One assumption is deliberately absent: we do not assume the two signing keys on
-a co-signed statement are held by two different organizations, because one
-operator holding both satisfies every check in this paper. Key independence is a
-deployment property and the protocol carries no evidence of it.
+One assumption is deliberately absent: that the two signing keys on a co-signed
+statement belong to different organizations. One operator holding both satisfies
+every check here; key independence is a deployment property the protocol carries
+no evidence of. Nor does the peer's countersignature constrain this adversary:
+the receiver authors an outbound statement's bytes and the peer signs them
+unparsed, so it buys a record a non-adversarial peer cannot disown.
