@@ -1,0 +1,348 @@
+{
+  "admitted": {
+    "calls": 100,
+    "dispatched": 100,
+    "evidencePreparation": {
+      "ci_high_ms": 3.8026704999999996,
+      "ci_low_ms": 3.3182789999999995,
+      "max_ms": 10.156,
+      "mean_ms": 3.54234,
+      "min_ms": 2.874,
+      "p50_ms": 3.1295,
+      "p99_ms": 8.827420000000007,
+      "samples": 100,
+      "std_ms": 1.2451965746399039
+    },
+    "freshnessDenialsAbsorbed": 0,
+    "receiverEvaluate": {
+      "ci_high_ms": 198.281273,
+      "ci_low_ms": 194.29591725,
+      "max_ms": 226.512,
+      "mean_ms": 196.23087999999998,
+      "min_ms": 178.878,
+      "p50_ms": 194.913,
+      "p99_ms": 222.65298,
+      "samples": 100,
+      "std_ms": 10.305249674517423
+    },
+    "roundTrip": {
+      "ci_high_ms": 200.64901041049998,
+      "ci_low_ms": 196.63053690075003,
+      "max_ms": 228.507684,
+      "mean_ms": 198.59089329,
+      "min_ms": 180.86493,
+      "p50_ms": 197.68251249999997,
+      "p99_ms": 224.52042039000003,
+      "samples": 100,
+      "std_ms": 10.380949927757554
+    }
+  },
+  "commit": "aec44099845acac1b14e00a192e763e2b143e7e4",
+  "denied": {
+    "cases": {
+      "intersection_hash_mismatch": {
+        "calls": 20,
+        "cosignConnectionsPerCall": 1,
+        "dispatched": 0,
+        "expectedDispatched": 0,
+        "failureCode": "chio_treaty_intersection_mismatch",
+        "freshnessDenialsAbsorbed": 0,
+        "roundTrip": {
+          "ci_high_ms": 66.6259326475,
+          "ci_low_ms": 56.30329354875,
+          "max_ms": 103.999872,
+          "mean_ms": 60.8247234,
+          "min_ms": 49.675964,
+          "p50_ms": 58.6371285,
+          "p99_ms": 97.34334891999995,
+          "samples": 20,
+          "std_ms": 12.252960826463706
+        }
+      },
+      "missing_required_evidence": {
+        "calls": 20,
+        "cosignConnectionsPerCall": 1,
+        "dispatched": 0,
+        "expectedDispatched": 0,
+        "failureCode": "chio_treaty_missing_required_evidence",
+        "freshnessDenialsAbsorbed": 0,
+        "roundTrip": {
+          "ci_high_ms": 62.88126735,
+          "ci_low_ms": 56.552890398749994,
+          "max_ms": 73.791723,
+          "mean_ms": 59.631403399999996,
+          "min_ms": 49.199202,
+          "p50_ms": 59.618413000000004,
+          "p99_ms": 73.24820653,
+          "samples": 20,
+          "std_ms": 7.406433143085831
+        }
+      },
+      "scope_hash_mismatch": {
+        "calls": 20,
+        "cosignConnectionsPerCall": 1,
+        "dispatched": 0,
+        "expectedDispatched": 0,
+        "failureCode": "chio_treaty_scope_hash_mismatch",
+        "freshnessDenialsAbsorbed": 0,
+        "roundTrip": {
+          "ci_high_ms": 95.390345895,
+          "ci_low_ms": 55.44728809875001,
+          "max_ms": 259.799038,
+          "mean_ms": 71.19021430000001,
+          "min_ms": 47.414434,
+          "p50_ms": 57.478282500000006,
+          "p99_ms": 237.31311901999987,
+          "samples": 20,
+          "std_ms": 48.837226175773
+        }
+      },
+      "smuggled_dynamic_trust": {
+        "calls": 20,
+        "cosignConnectionsPerCall": 1,
+        "dispatched": 0,
+        "expectedDispatched": 0,
+        "failureCode": "request_smuggled_dynamic_trust",
+        "freshnessDenialsAbsorbed": 1,
+        "roundTrip": {
+          "ci_high_ms": 61.661695353750005,
+          "ci_low_ms": 55.18320830374999,
+          "max_ms": 69.724303,
+          "mean_ms": 58.3605673,
+          "min_ms": 49.131442,
+          "p50_ms": 57.2324415,
+          "p99_ms": 69.55627384,
+          "samples": 20,
+          "std_ms": 7.673993453856968
+        }
+      },
+      "smuggled_trust_root": {
+        "calls": 20,
+        "cosignConnectionsPerCall": 1,
+        "dispatched": 0,
+        "expectedDispatched": 0,
+        "failureCode": "request_smuggled_trust_root",
+        "freshnessDenialsAbsorbed": 0,
+        "roundTrip": {
+          "ci_high_ms": 62.583878003749994,
+          "ci_low_ms": 57.043854355,
+          "max_ms": 74.418926,
+          "mean_ms": 59.769392100000005,
+          "min_ms": 49.295083,
+          "p50_ms": 59.741694,
+          "p99_ms": 73.31373608999999,
+          "samples": 20,
+          "std_ms": 6.524167518816657
+        }
+      },
+      "unknown_ladder_intersection": {
+        "calls": 20,
+        "cosignConnectionsPerCall": 1,
+        "dispatched": 0,
+        "expectedDispatched": 0,
+        "failureCode": "chio_treaty_missing_intersection",
+        "freshnessDenialsAbsorbed": 1,
+        "roundTrip": {
+          "ci_high_ms": 63.40223874875001,
+          "ci_low_ms": 55.67343600000001,
+          "max_ms": 79.505511,
+          "mean_ms": 59.39490425,
+          "min_ms": 48.633759,
+          "p50_ms": 57.2532615,
+          "p99_ms": 78.42016487999999,
+          "samples": 20,
+          "std_ms": 9.100020653491027
+        }
+      },
+      "unknown_treaty_scope": {
+        "calls": 20,
+        "cosignConnectionsPerCall": 1,
+        "dispatched": 0,
+        "expectedDispatched": 0,
+        "failureCode": "chio_treaty_missing_scope",
+        "freshnessDenialsAbsorbed": 0,
+        "roundTrip": {
+          "ci_high_ms": 60.320097704999995,
+          "ci_low_ms": 54.079011949999995,
+          "max_ms": 71.867113,
+          "mean_ms": 57.1444552,
+          "min_ms": 46.147107,
+          "p50_ms": 56.6369385,
+          "p99_ms": 71.16787918,
+          "samples": 20,
+          "std_ms": 7.358016987546116
+        }
+      }
+    },
+    "freshnessDenialsAbsorbed": 2,
+    "roundTrip": {
+      "ci_high_ms": 64.71581140803572,
+      "ci_low_ms": 58.14778068571429,
+      "max_ms": 259.799038,
+      "mean_ms": 60.90223713571429,
+      "min_ms": 46.147107,
+      "p50_ms": 58.615567999999996,
+      "p99_ms": 126.84572863999946,
+      "samples": 140,
+      "std_ms": 20.138538365381308
+    }
+  },
+  "environment": {
+    "cargo": "1.94.1",
+    "commit": "aec44099845acac1b14e00a192e763e2b143e7e4",
+    "cores": 12,
+    "cpuModel": "Neoverse-N1",
+    "loadAverage1m": 7.1,
+    "memoryGiB": 46.94236373901367,
+    "os": "Linux 6.17.0-1020-oracle aarch64",
+    "rolesStartedHere": [
+      "driver",
+      "origin",
+      "receiver"
+    ],
+    "rustc": "1.94.1",
+    "toolchainPin": "1.94.1",
+    "topology": "one host, 3 processes",
+    "worktreeDirty": false
+  },
+  "environments": {
+    "driver-origin-receiver": {
+      "cargo": "1.94.1",
+      "commit": "aec44099845acac1b14e00a192e763e2b143e7e4",
+      "cores": 12,
+      "cpuModel": "Neoverse-N1",
+      "loadAverage1m": 7.1,
+      "memoryGiB": 46.94236373901367,
+      "os": "Linux 6.17.0-1020-oracle aarch64",
+      "rolesStartedHere": [
+        "driver",
+        "origin",
+        "receiver"
+      ],
+      "rustc": "1.94.1",
+      "toolchainPin": "1.94.1",
+      "topology": "one host, 3 processes",
+      "worktreeDirty": false
+    }
+  },
+  "freshnessDenialsAbsorbed": {
+    "admitted": 0,
+    "denied": 2,
+    "revocation": 65,
+    "total": 67
+  },
+  "method": {
+    "bootstrap": {
+      "resamples": 10000,
+      "seed": 1
+    },
+    "confidence": 0.95,
+    "cosignConnections": "measured, not assumed: the receiver reports the QUIC connections its co-signer opened to the origin when a call's preparation began and again once it had decided, and the run fails closed unless every call of a scenario cost the same number. The span covers the preparation's DSSE hop as well as the hops the admission decision makes, so a denied case, which never reaches the decision's hops, isolates the preparation's share: see denied.cases[name].cosignConnectionsPerCall",
+    "cutToDeny": "control document written to the first freshness denial that persists for 3 further calls, repeated 10 times. Each observation includes the kernel's own freshness bound, one origin control-poll period (250 ms) and one call of polling resolution",
+    "deniedRoundTrip": "pooled across the denial cases, which refuse at different depths of the admission hook; each case's own distribution is under denied.cases[name].roundTrip",
+    "evidencePreparation": "untimed relative to admission: the receiver mints the per-call treaty evidence and obtains the origin's DSSE signature over lane d",
+    "freshnessDenialsAbsorbed": "calls the receiver denied because its revocation snapshot fell outside the kernel's freshness window. They are the clock rather than the treaty, so they are retried and excluded from every latency distribution above; the counts record how many were excluded",
+    "hosts": "derived from the roles this run started: every role left to another machine adds a host, and a run that starts all of them records one",
+    "percentile": "linear interpolation between order statistics",
+    "revokeToDeny": "control document written to first observing call, repeated 10 times. Each observation includes up to one origin control-poll period (250 ms, the epoch tick) and one call of polling resolution (the admitted round trip, p50 197.683 ms)",
+    "roundTrip": "sender send to sender receive on the experiment lane; includes the receiver's whole admission decision and, on the admitted path, both co-sign hops back to the origin"
+  },
+  "profile": "release",
+  "revocation": {
+    "callsUntilDeny": [
+      2,
+      1,
+      1,
+      1,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2
+    ],
+    "cutCallsUntilDeny": [
+      1,
+      1,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3
+    ],
+    "cutConfirmations": 3,
+    "cutFailureCodes": [
+      "delegation admission failed: revocation view snapshot epoch 172 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 175 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 179 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 184 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 188 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 192 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 196 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 200 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 204 is stale: age 1000 ms exceeds 500 ms",
+      "delegation admission failed: revocation view snapshot epoch 208 is stale: age 1000 ms exceeds 500 ms"
+    ],
+    "cutRepeats": 10,
+    "cutToDeny": {
+      "ci_high_ms": 936.4612318024999,
+      "ci_low_ms": 478.23998158750004,
+      "max_ms": 966.017314,
+      "mean_ms": 745.2130753,
+      "min_ms": 19.045013,
+      "p50_ms": 932.471309,
+      "p99_ms": 963.7774946200001,
+      "samples": 10,
+      "std_ms": 384.1550136951819
+    },
+    "failureCodes": [
+      "capability has been revoked: cap-federated-pair",
+      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:1f4e5aea8d7880d5e3a6d85fa85e111a78146be6e1af140192790ee5a0e17c31:0`",
+      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:504b7a6290636fc811f00ce84c53a2aa7964fa2bdf6df04d682e59207602fb36:0`",
+      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:58bac500d3231897a64275db1e9f68f2e369de2184132d79d1059b2208401be6:0`",
+      "capability has been revoked: cap-federated-pair; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: missing budget hold `admission-budget:762e8aab9c80a329c2307644a808b8c8f3e8d099d3d95519773fe41899e40d82:0`"
+    ],
+    "freshnessDenialsAbsorbed": 65,
+    "revokeRepeats": 10,
+    "revokeToDeny": {
+      "ci_high_ms": 410.54310020749995,
+      "ci_low_ms": 208.5671309975,
+      "max_ms": 475.704901,
+      "mean_ms": 316.0895316,
+      "min_ms": 64.666318,
+      "p50_ms": 406.049758,
+      "p99_ms": 471.76349365000004,
+      "samples": 10,
+      "std_ms": 170.2930528660769
+    }
+  },
+  "schema": "chio.programmable-sovereignty.federated-pair-results.v1",
+  "topology": {
+    "achievedEpochRate": {
+      "deliveredRoots": 204,
+      "deliveryInterruptions": 10,
+      "epoch": 208,
+      "intervalMaxMs": 254,
+      "intervalMinMs": 245,
+      "intervalP50Ms": 250,
+      "intervalSamples": 193,
+      "nominalTickMs": 250,
+      "schema": "chio.experiment.federated-pair-epoch-rate.v1"
+    },
+    "cosignConnectionsPerAdmittedCall": 3,
+    "description": "one host, 3 processes",
+    "epochTickMs": 250,
+    "hosts": 1,
+    "processesStartedHere": 3,
+    "rolesStartedHere": [
+      "driver",
+      "origin",
+      "receiver"
+    ],
+    "transport": "iroh QUIC, relays disabled"
+  },
+  "worktreeDirty": false
+}
