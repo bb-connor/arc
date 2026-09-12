@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-11",
+  "generatedAt": "2026-09-12",
   "implementationRelation": "independent Rust differential testing, not extraction or refinement",
   "leanToolchain": "leanprover/lean4:v4.28.0",
   "modelBoundary": "bounded receipt predicates and supplied finite domains",

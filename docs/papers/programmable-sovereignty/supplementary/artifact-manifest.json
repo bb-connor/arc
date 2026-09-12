@@ -68,108 +68,108 @@
       "results": [
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/bilateral-admission-raw.csv",
-          "sha256": "e0bf952fc0153f3e3571e9ddf6e1667763a71b2619c2c268fd5f7e32da263876"
+          "sha256": "a2bbd9cac8990229c7b4689e0dd2e9df6404abe15d2dca6948b03eebd7cfd6f4"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/bilateral-admission-components.csv",
-          "sha256": "9168e6ab14ff1fbbb8b62d6a20c1de20d1acf4f28d1eadb5f07518c3bddd3a63"
+          "sha256": "8106b28b79e39ae4b4cc87abb2774b8daba1c7ba46d0e43f77835b8c5dc5e8a5"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/bilateral-admission.json",
-          "sha256": "a6f68c8e843a0999f7103c7112d383afb17bca3c225e0c07394c77913bf20314"
+          "sha256": "b5d23bdec8469f495e03df7585e8bdc522a65c75144fe2799b95f79d8802267d"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/bilateral-admission-inline.tex",
-          "sha256": "42ea2758227b769ad15f0b77c4824ab97ba769f7b389de75fd554d3aa0a69750"
+          "sha256": "3d4d5b425939716f43c1b81ada0d9b923b6b622fb38cb708a6febdc13dd86532"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/bilateral-admission-environment.txt",
-          "sha256": "e0e6fd511910189715e50ac464564a76d5b2aab4c304cf6cb94ce74b9f65606d"
+          "sha256": "18f22f6f271b35b917dc54470b1bf9278cdabebe9206a178bf866883c1912653"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/bilateral-admission-environment.json",
-          "sha256": "14c8751a8e86a50e57e29d39e2caf7d7f79216b93d4e211d3c12848e394ef235"
+          "sha256": "01d8721d8cd181b17fa624e523a5f9531273e58cd0236ea1876e4ac7b7f51aa1"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/bilateral-admission-treaty_predispatch_deny-samples.csv",
-          "sha256": "64e58349b628f86b5d08bd24e1d7375226ffacfbc0bd53b54d5bbc9a315c55d0"
+          "sha256": "97571dad86153f6f4e0cbbf94b27f11606c211ba187637f2b388c95c14175441"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/bilateral-admission-treaty_predispatch_allow-samples.csv",
-          "sha256": "ebdd8d26f94ca4e540ff2f34cfff72099a8f968b5196c12030038fcab2f5adbf"
+          "sha256": "7a1faaea2731b6b8e6d3d903498dd283391014e152cc78043015d541f846bfc9"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/bilateral-admission-receipt_append_sqlite-samples.csv",
-          "sha256": "5a41f5ac9929fb2d9638d75bc2949743d8cb0eefc1f2ac507763930c984e87aa"
+          "sha256": "231ca8807b6c866b61b09afcfd20f3066464ea2cdd7f343e3a7405cb54ed1649"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/receipt_sign/estimates.json",
-          "sha256": "6a0255412b30a9f50e607137d25ccfc0d59e76730af510492d1065a115ad3b87"
+          "sha256": "89bc529d0ab9847bb5c265c7368790359df9f4057dc8d2eda01a3ce9706cee43"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/receipt_sign/sample.json",
-          "sha256": "55b89f1671af6b54593ae769cf8f481cbf549ef7b705b2212fc398b4768f11b3"
+          "sha256": "09259d2b0bf9e0bc6e70c432996abfafb11357f7c9f76516fd411b35b20fedd7"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/receipt_verify/estimates.json",
-          "sha256": "d469175d292a931d12bbad91a9137f71ba1c3ef32cb06e92ed57936bb997bad4"
+          "sha256": "83d1eda5d08b7efffba43ec56304a997f51bdb7ab89491739a70bb1ff0eaf360"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/receipt_verify/sample.json",
-          "sha256": "16a2f98758c5c32ec756b7f29eb95bc7cf3702114935fe5fdccc52b279bb1452"
+          "sha256": "e80d8dc2227eb77c2abd6c0259f0744760d91f0101ef784efef29c340adfd878"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/receipt_append_sqlite/estimates.json",
-          "sha256": "248738d710129cf8142bfdbde70d1b363a07e5315f257d9433fa86c57b1ed6fe"
+          "sha256": "28418f2fe16ce0798b05cdd9c30fd0c747531d14356740ac508387bd6412f63f"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/receipt_append_sqlite/sample.json",
-          "sha256": "57c60073d802eea6629d418fa4fb596ce2063321cf429062bc2ff723ee6b88a3"
+          "sha256": "bacf8fa00d6fb37e729c4b8f23ebb16279a75bb47631a707176b130fe17c70a8"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/treaty_predispatch_deny/estimates.json",
-          "sha256": "73475054b58146614ffc24179e60cae1f38a87644e14460abaccafd3882a7674"
+          "sha256": "817427d7e5dfc357e997e4bb0f46bf3ff6a97adcbbc1fd79e07736f9a2f5ec89"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/treaty_predispatch_deny/sample.json",
-          "sha256": "545ed531a5b2009d253ce4f1b08666ed1bff42e6a6b6787c073ec66aa7838b9c"
+          "sha256": "c356f5ef0151602fb32b3c63bd25994cd7d5ad49ab92e2239153ba85de29e5f3"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/treaty_predispatch_allow/estimates.json",
-          "sha256": "b78842ebe7ac2cbe7a81a3a80d897fb65a080fc755c2c06a2901b3cbad182275"
+          "sha256": "5ae44e954e4ec4af2b56402fff38191e61303eb0d8b6fd86cb680f920d85f8eb"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/treaty_predispatch_allow/sample.json",
-          "sha256": "ffda4915edbbd68155b7880378ecb538bd09729e0a8b225d4c2599003db4a316"
+          "sha256": "98bd6961c0d557ed4e0e288680094649dc36bfc9363d4e68dd889a90d76d9c5a"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/strict_bilateral_dsse_verify/estimates.json",
-          "sha256": "7ed38d2169c8dd606d860c4766313ada24d36529c2d5c341362a84d0a3c155ff"
+          "sha256": "e78f4c5b6362d3e4fc14a609804271644ad9463171ec8876c21780899132d7be"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/strict_bilateral_dsse_verify/sample.json",
-          "sha256": "f8e392fc26c63b095a6aede5560c187df8c6fdac66d6df12498bfd6fa0e19a9a"
+          "sha256": "fa13e40b1016ba8f3c8c9fc7de4a47a69ee4a4a8a741cb3d90bd0abc71de3698"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/cross_boundary_admission_allow/estimates.json",
-          "sha256": "0a2fd0fb0f5c8355b0e4c35db8f5a8aab8e24a13e813696db546d0087404ca46"
+          "sha256": "7ed172123be09d5b73b669352ac38422342325f00a9701e490a752caff9f7f76"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/cross_boundary_admission_allow/sample.json",
-          "sha256": "566d0aa8d5e3af338d0b6d2f422dfe89f6fa3d79b6147716016564d12299fbf9"
+          "sha256": "c02067564ebca2c6db4a4686211d78ba99f9c089f043fa806e5641ae485c1c93"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/buyer_proof_package_verify/estimates.json",
-          "sha256": "e98ac03ae6925733a20f8aacb5470c7705a581c0266a8e2665032081fe1f6b8a"
+          "sha256": "1b9ac4c32edde49560fe7d0dfbdb4713bbe66b69ecd1a5ced8a5b2307301615e"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/criterion/buyer_proof_package_verify/sample.json",
-          "sha256": "70cbbafe7c32f124d1f78824f8f13639eef9e0d922f0204f728d318d8fa7acfe"
+          "sha256": "7f5f3bada2c8d85823546c5a93a3f561550e07267532930fca094bdf959d4827"
         }
       ],
       "script": {
         "path": "docs/papers/programmable-sovereignty/bench/run-bilateral-admission.sh",
-        "sha256": "286340cd6c0b68f676d0e80981460e4570d8c3422bb96c858103fc48ef7e9d26"
+        "sha256": "f28509635d2544b09babd8ef7b041ffe0f03d5fe457bc9d217d1a91346f1578a"
       }
     },
     {
@@ -178,20 +178,20 @@
       "results": [
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/replay-corpus.csv",
-          "sha256": "a68a46d4854b6d5b99507bc3b4eb295baa07d508c5c9f209ee69758004e989f4"
+          "sha256": "fdd46ef3672e0651ce94668b10f0a65b333875c88e65595b50e1b7bdad7cd03d"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/replay-corpus.json",
-          "sha256": "903e7cac079c8f2750ff8de22abb828af004042d376376dc7b213f297a235811"
+          "sha256": "e3141a135e8f82656ab1a928a27b6d24f557778bbeb479bcaa863eb245a2085f"
         },
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/replay-corpus-inline.tex",
-          "sha256": "8d17736a5bbb00c6ed837c01f75c729133f3e884ab1b12f54e11650c3fd0be7e"
+          "sha256": "aca66041c003e6e5bcc98941f6a1eabde3d5e1b84ad3e7e4c68387106b66d90d"
         }
       ],
       "script": {
         "path": "docs/papers/programmable-sovereignty/bench/run-replay-corpus.sh",
-        "sha256": "b80d4a9a007b38b9cf1fc7e760fdb7b2878bdf76737ce33a56ec77948663bf5b"
+        "sha256": "48b8a06f4aa81f4c41fba4c109f6904aaab282b5ec899ac758feb60173f1af6f"
       }
     },
     {
@@ -200,12 +200,46 @@
       "results": [
         {
           "path": "docs/papers/programmable-sovereignty/bench/results/bilateral-admission-sustained-load.json",
-          "sha256": "8410adcb9e4237a9c47342b3e0f830f7b59c170d7c022fd57de48619aef22c5b"
+          "sha256": "54aaaefe5a98d810b0a3c33a393300cd3c1aa6f3bdc9f41399e5a37aca4b8d92"
         }
       ],
       "script": {
         "path": "docs/papers/programmable-sovereignty/bench/run-bilateral-admission.sh",
-        "sha256": "286340cd6c0b68f676d0e80981460e4570d8c3422bb96c858103fc48ef7e9d26"
+        "sha256": "f28509635d2544b09babd8ef7b041ffe0f03d5fe457bc9d217d1a91346f1578a"
+      }
+    },
+    {
+      "claimClass": "experimentally_measured",
+      "id": "PS-B04",
+      "results": [
+        {
+          "path": "docs/papers/programmable-sovereignty/bench/results/federated-pair.json",
+          "sha256": "ba040bb458b7fc52b8e4ccb180107bb00240e028882c2c5f0442f61073fbe196"
+        },
+        {
+          "path": "docs/papers/programmable-sovereignty/bench/results/federated-pair-inline.tex",
+          "sha256": "a96a5d4ada9b0f15c9826191e744db8500ab8cfa4a6fad0fd50927bc7ab0fe60"
+        },
+        {
+          "path": "docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv",
+          "sha256": "433c44a53d228aec4b5effb470250d8e6b8b2c4e6f3557eb89b221840458e2e4"
+        },
+        {
+          "path": "docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv",
+          "sha256": "a51437ff480cca90e6238967861cefc2aafc2ffb266f7737914c9d081944b0a5"
+        },
+        {
+          "path": "docs/papers/programmable-sovereignty/bench/results/federated-pair-environment.json",
+          "sha256": "93690180708b82cea6fdad1360fe891e73f9c7ceed0d4d93ab867c3c6fca567c"
+        },
+        {
+          "path": "docs/papers/programmable-sovereignty/bench/results/federated-pair-environment.txt",
+          "sha256": "05e9baa9c4400eb582fec22ea4eab6598a63029f3f892202709327c44fa706fe"
+        }
+      ],
+      "script": {
+        "path": "docs/papers/programmable-sovereignty/bench/run-federated-pair.sh",
+        "sha256": "d01ae3d4b5a1b42a6c79b8d88fee6abb3153650df8ea748f6bd77e757323da1c"
       }
     }
   ],
@@ -252,7 +286,7 @@
       "surface": "wide-area performance and failure recovery"
     }
   ],
-  "generatedAt": "2026-09-11",
+  "generatedAt": "2026-09-12",
   "implementationSymbols": [
     {
       "claimClass": "runtime_enforced",
@@ -318,15 +352,15 @@
   "rebuildCommand": "bash scripts/check-programmable-sovereignty-artifact.sh --full",
   "schema": "chio.programmable-sovereignty.artifact-manifest.v1",
   "source": {
-    "cargoLockSha256": "1d6a55f1428e2281f8993a048c00a8679ab59591c12b0ae56d3a12d0b42a3adb",
-    "commit": "4338338e0810909856f5b61300c8128704fd7f88",
-    "contentSetSha256": "da39b817d2b427b3b6336398d18288ee86b2cd63796cc3d5ca06ac5f9680d5ec",
+    "cargoLockSha256": "0e94fe23e583b02587a683145c4477c689729a9a7b931543534b106502a47b40",
+    "commit": "b13ceda988f299855aa86799c9c7cc3cabb1bbf7",
+    "contentSetSha256": "418d07c3038ca7e54d3b2f98ba5f2b7b9db66fe4df73d9a0f3ff85d7cf88e63a",
     "snapshotMode": "recorded source commit plus self-contained content-addressed snapshot"
   },
   "sourceFiles": [
     {
       "path": "docs/papers/programmable-sovereignty/CLAIM_LEDGER.md",
-      "sha256": "d88c2a6916de1b9ee5921f29059136ff8451526f1274ba954f16b69664d7ea9b"
+      "sha256": "85395292d1e51a304dffbf6b4576769e45c85a6264f82b71cfe7fcce06fcc815"
     },
     {
       "path": "docs/papers/programmable-sovereignty/README.md",
@@ -338,7 +372,7 @@
     },
     {
       "path": "docs/papers/programmable-sovereignty/paper-usenix.pdf",
-      "sha256": "1dddacb1f117c02b37b7c9e52fa5ac065f59fe6a4848e3384913b753736b2256"
+      "sha256": "d3e2fb5141e4aeb09a2a7bd5a7614c7b2356f781074a5f4c5e7ac9f967877506"
     },
     {
       "path": "docs/papers/programmable-sovereignty/paper.tex",
@@ -346,7 +380,7 @@
     },
     {
       "path": "docs/papers/programmable-sovereignty/paper.pdf",
-      "sha256": "31d188d8de1ad0c63e2214dc75e0f9ee248f7a865b966bdd05761a53493ee5d2"
+      "sha256": "f5fc4320ac484414f94a29da228027f6b4533990ab71aebcda763d11d2f59f4d"
     },
     {
       "path": "docs/papers/programmable-sovereignty/sections/01-introduction.tex",
@@ -454,7 +488,7 @@
     },
     {
       "path": "crates/trust/chio-federation/src/bilateral.rs",
-      "sha256": "db1026ff38134bd780a44783f036a2557d72e272841db513ef6f70a8b208fd2c"
+      "sha256": "0c9a9a7e25be832445d23ee27abbc42f31617df34fac128ce0037b4c6e63057d"
     },
     {
       "path": "crates/trust/chio-federation/src/bilateral_verifier/cosign.rs",
@@ -462,7 +496,7 @@
     },
     {
       "path": "crates/trust/chio-attest-buyer-core/src/report.rs",
-      "sha256": "ade649088908194457be6eae331923d0a4fe2f5e24597ad35a50cdcb36963e56"
+      "sha256": "95c1ca30f877fa358847b0611c45c8de3b3520a39c600155c1897dc9ba2e1991"
     },
     {
       "path": "crates/kernel/chio-runtime-harness/src/lib.rs",
@@ -482,7 +516,7 @@
     },
     {
       "path": "scripts/generate-programmable-sovereignty-artifact.py",
-      "sha256": "dc58405032489e3f6057b57ed259d3bde16f8a02f90bcc724c16410cf48ce697"
+      "sha256": "c1acf277f0df7fb6ebf8d5778b76ac7cef4def037812a200fd6e09d015b16b46"
     },
     {
       "path": "docs/papers/programmable-sovereignty/supplementary/README.md",
@@ -496,19 +530,19 @@
   "supplementaryFiles": [
     {
       "path": "docs/papers/programmable-sovereignty/supplementary/source-commit.txt",
-      "sha256": "70063196769120e0af8d4cfde94791868f3c6c20a9defb5bf381cb5f5faa63ab"
+      "sha256": "e92f43a4dd1fe25c131d24ea4082bbe8e6a932c63b7fcfc61d2f5d03dfbdf944"
     },
     {
       "path": "docs/papers/programmable-sovereignty/supplementary/proof-manifest.toml",
-      "sha256": "f3863219c1a006bb85b667c06e349db89258bd72bf33cad3ec039e4ca5492e9d"
+      "sha256": "955c5e8aadaabc7a56646a91f37395c81dd743554c5b454150423f9fad4ed837"
     },
     {
       "path": "docs/papers/programmable-sovereignty/supplementary/theorem-inventory.json",
-      "sha256": "d0f800053e973f11552c9c6110a33d163eae6fa450bd3956da7c3eec3829428a"
+      "sha256": "6309514e4ccb5dac229a3a720b883f1d4d4aad549533a18c8eed54b0ceeeceb6"
     },
     {
       "path": "docs/papers/programmable-sovereignty/supplementary/lean-source.tar.gz",
-      "sha256": "70fcc0a89f6547d0ac7c7e7ff332d4a97e568c5ada08b2fcb01dc378d3a852c7"
+      "sha256": "73e81752b178b36122a7293743cded173fcbfa84b7a63529158cae4229969194"
     }
   ],
   "theorems": [

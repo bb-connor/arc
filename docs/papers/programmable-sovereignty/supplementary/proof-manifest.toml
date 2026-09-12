@@ -1,6 +1,6 @@
 [manifest]
 schema = "chio.programmable-sovereignty.proof-manifest.v1"
-generated_at = "2026-09-11"
+generated_at = "2026-09-12"
 paper = "Receiver-Owned Bilateral Admission for Cross-Organization Agent Tool Calls"
 target_venue = "USENIX Security 2027 (submission cycle to be confirmed)"
 lean_toolchain = "leanprover/lean4:v4.28.0"
