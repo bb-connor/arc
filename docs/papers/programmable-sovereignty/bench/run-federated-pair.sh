@@ -46,6 +46,9 @@ if [[ -n "$(git -C "$SOURCE" status --short -- "${INPUT_PATHS[@]}")" ]]; then
 else
   SOURCE_DIRTY=false
 fi
+BENCHMARK_INPUT_TREE_SHA256="$(
+  python3 "$GENERATOR" --source-commit "$SOURCE_COMMIT" --benchmark-input-digest PS-B04
+)"
 if [[ "$SOURCE_DIRTY" == true && "${CHIO_BENCH_ALLOW_DIRTY:-0}" != "1" ]]; then
   echo "refusing to measure: the benchmark input tree has uncommitted changes." >&2
   echo "commit them, or set CHIO_BENCH_ALLOW_DIRTY=1 for a result that must not be pinned." >&2
@@ -617,6 +620,7 @@ python3 - \
   "$ALLOW_SAMPLES" "$ALLOW_SUMMARY" "$REVOKE_JSON" "$CUT_JSON" \
   "$SOURCE_COMMIT" "$SOURCE_DIRTY" "$HOST_COUNT" "$HOST_TOPOLOGY" "$TICK_MS" \
   "$ROLE_LABEL" "$LOCAL_PROCESSES" "$EPOCH_RATE" "$RESULT_DIR" \
+  "$BENCHMARK_INPUT_TREE_SHA256" \
   "${DENY_SAMPLE_FILES[@]}" -- "${DENY_SUMMARY_FILES[@]}" <<'PY'
 import csv
 import json
@@ -648,8 +652,9 @@ CONFIDENCE = 0.95
     local_processes,
     epoch_rate_path,
     result_dir,
-) = sys.argv[1:19]
-rest = sys.argv[19:]
+    benchmark_input_tree_sha256,
+) = sys.argv[1:20]
+rest = sys.argv[20:]
 split = rest.index("--")
 deny_sample_files = rest[:split]
 deny_summary_files = rest[split + 1 :]
@@ -846,6 +851,7 @@ document = {
     "schema": "chio.programmable-sovereignty.federated-pair-results.v1",
     "commit": source_commit,
     "worktreeDirty": source_dirty == "true",
+    "benchmarkInputTreeSha256": benchmark_input_tree_sha256,
     "profile": "release",
     "environment": environment,
     "environments": environments,
