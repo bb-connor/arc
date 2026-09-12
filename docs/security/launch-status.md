@@ -7,10 +7,11 @@ Candidate: `/tmp/arc-security-launch`, `security/launch-integration`, base HEAD
 was committed and pushed as `7e54c14a60` to
 [draft PR #1117](https://github.com/bb-connor/arc/pull/1117) under the user's
 2026-09-11 authorization. M1's local closeout is `252b259d44da44e5f323ac9653f2ee32f05bee8a`.
-The commit containing this update closes M2's native failure/restart safety
-acceptance under the existing fail-closed release contract. Earlier hashes below
-identify historical checkpoints, not the current candidate. M3 is next on the
-same branch. This is not merge or release approval.
+M2's native failure/restart safety acceptance is committed as
+`13fa4585d2a87eebf45d643638c4c6e145ac3cea` under the existing fail-closed release
+contract. Earlier hashes below identify historical checkpoints, not the current
+candidate. M3 implementation is in progress on the same branch. This is not
+merge or release approval.
 
 ## Milestone control
 
@@ -19,7 +20,7 @@ same branch. This is not merge or release approval.
 | M0 | Consolidated for implementation | Keep this index current; no independent cleanup campaign | Requirement and review maps below |
 | M1 | Complete: implementation and local acceptance | Keep closed absent a demonstrated regression; confinement remains explicitly deferred | [Acceptance closeout](#m1-local-acceptance-closeout), [qualification deferral](#m1-confined-process-qualification-deferral) |
 | M2 | Complete: local native failure/restart safety acceptance | Proceed to M3; missing release custody still blocks output and readiness | [Acceptance closeout](#m2-local-acceptance-closeout), [cutpoints and downstream contract](native-restart-safety.md) |
-| M3 | Missing authenticated caller start and durable delivery | Preserve lost-report counterexample until real handshake fixes it | [Caller design](../superpowers/specs/2026-09-07-caller-dispatch-commitment-design.md) |
+| M3 | Partial: physical caller snapshot and authenticated executor ledger; kernel start and historical delivery integration missing | Commit before publishing start; reconcile late reports without reopening admission; preserve counterexample until that handshake passes | [Current implementation and remaining work](../superpowers/specs/2026-09-07-caller-dispatch-commitment-design.md#m3-caller-custody-and-executor-ledger-checkpoint-2026-09-12) |
 | M4 | Consumer qualification incomplete | Inventory positive supported paths and required startup denials after M1-M3 | [Original requirement ledger](launch-plan.md#requirement-ledger) |
 | M5 | Swarm is a Disabled-profile integration smoke | Bind issued capability identities, shared budget and enforced cage | [Swarm limitations](../../examples/reference-swarm/README.md) |
 | M6 | Components present, integrated topology unqualified | Compose keyring, broker, cage and receipts; designated runner needed | Enterprise ledger and original plan |
@@ -28,6 +29,48 @@ same branch. This is not merge or release approval.
 | M9 | Entry packages unpublished and external consumer unqualified | Package dependency closure and clean install after M4-M8 | Three intended entrypoints remain `publish = false` |
 | M10 | Not release qualified | Local gates, audits, authorized exact-candidate hosted and publication steps | Candidate lacks passing exact-head hosted qualification |
 | M11 | Not started | Authorized observed pilot and signed promotion stages | [Numeric operator contract](active-defense-rollout.md) |
+
+## M3 implementation checkpoint
+
+Caller snapshot v4 now checks physical original claim episodes rather than
+trusting their digests alone. The real sealed/activated runtime path retains the
+original reservation and revalidates it without reacquiring a claim. The
+authenticated message codecs and private executor SQLite ledger are implemented
+as components, with explicit separation between live execution permission and
+late historical evidence.
+
+These components do not close the milestone. The kernel does not yet issue a
+start authorization, authenticate an executor report into historical finalization,
+or enable the new contract in sidecar/SDK clients. Credential/native caller
+profiles still fail closed. The existing lost-report/expiry counterexample is
+unchanged: explicitly running it with `--ignored` reproduces the original refund
+and second-execution failure both before and after this checkpoint
+(`/tmp/chio-m3-original-counterexample.log`, `/tmp/chio-m3-current-counterexample.log`). No
+executor-only fixture is substituted for this acceptance test. The remaining
+implementation sequence is recorded in the [caller design checkpoint](../superpowers/specs/2026-09-07-caller-dispatch-commitment-design.md#m3-caller-custody-and-executor-ledger-checkpoint-2026-09-12).
+
+| Local gate | Result | Log |
+| --- | --- | --- |
+| Full kernel library | 1,428 passed, zero failed or ignored | `/tmp/chio-m3-kernel-full.log` |
+| Full runtime-admission integration | 86 passed, zero failed or ignored, including the real caller custody and duplicate-reservation regression | `/tmp/chio-m3-runtime-full.log` |
+| Executor SQLite ledger | Nine passed, zero failed or ignored; real child death before/after effect and after report persistence | `/tmp/chio-m3-executor-final.log` |
+| Existing caller SQLite integration | 21 passed, zero failed, one known ignored missing-handshake counterexample | `/tmp/chio-m3-caller-store.log` |
+| Kernel durable SQLite integration | 15 passed, zero failed or ignored | `/tmp/chio-m3-durable-sqlite.log` |
+| Formal source-review bindings | 21 checker tests passed; 225 matching entries; generated coverage remains 58 rows / 168 artifacts | `/tmp/chio-m3-formal-tests.log`, `/tmp/chio-m3-formal-check.log`, `/tmp/chio-m3-proof-coverage.log` |
+
+The executor tests use explicitly signed authorizer fixtures, not a kernel start
+producer. Matching source hashes are review anchors, not new formal proofs.
+These are local component/regression results, not the full M3 acceptance gate,
+full-workspace testing or exact-head hosted qualification.
+
+Strict all-target Clippy passes for kernel, runtime core, SQLite, control plane
+and xtask (`/tmp/chio-m3-clippy.log`). Workspace formatting and file hygiene pass.
+The required AST-only graph refresh completed; HTML rendering remains skipped
+at the unchanged graph-size limit. No activation or verification limit was
+weakened to obtain these results.
+
+No populated authority migration, SDK activation, workflow authorization change,
+merge or release is included. M1's confinement qualification remains deferred.
 
 ## M2 local acceptance closeout
 

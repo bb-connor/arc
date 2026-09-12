@@ -126,7 +126,7 @@ impl ChioKernel {
     ) -> Result<ToolCallResponse, KernelError> {
         let CallerReservation {
             request,
-            durable_admission,
+            mut durable_admission,
             budget_mutation,
             credential_reservation,
             extra_metadata,
@@ -137,6 +137,7 @@ impl ChioKernel {
             budget_lease_acquired,
         } = reservation;
         let reserved = durable_admission
+            .as_deref_mut()
             .filter(|admission| admission.requires_execution_nonce())
             .ok_or_else(|| {
                 KernelError::DurableAdmission(
@@ -170,6 +171,7 @@ impl ChioKernel {
         self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
             self.build_execution_nonce_authorization_reserving_response(
                 ExecutionNonceReservingResponse {
+                    durable_admission: durable_admission.as_deref(),
                     request,
                     timestamp: now,
                     matched_grant_index,

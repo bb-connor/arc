@@ -1463,3 +1463,68 @@ The existing in-kernel/remote dispatch profile is not a substitute for this
 caller-delivery work. Nor does this document replace provider-signed delivery
 receipts, the remaining protocol/active-defense/enterprise plans, native
 enforcement, dependency audits, hosted qualification or the operational pilot.
+
+## M3 caller custody and executor ledger checkpoint (2026-09-12)
+
+The private caller return component now writes
+`chio.kernel-caller-return-context.v4`. It reads the original operation's bounded
+runtime, governed-approval and DPoP claim histories from the fenced authority.
+The component freezes the selected dispatch episode, exact claim and intent,
+and the complete ordered history, including released predecessors. The decoder
+independently reads physical custody and compares it with those bindings. It
+does not recreate credentials or native release owners. An originally selected
+runtime authority cannot silently lose its ledger. Old v1-v3 bytes remain
+readable under their original contracts and cannot acquire v4 custody on reissue.
+
+The actual runtime integration exposed two reservation-path bugs. A successful
+caller reservation used the legacy denial helper to release runtime metadata;
+the acknowledgement now verifies and retains operation-owned custody. Resuming
+that reservation tried to acquire a runtime episode outside an acquisition phase;
+the runtime now revalidates the original prepared plan and trust floor without
+another claim, replay mutation or trust-floor CAS. This is pre-dispatch
+revalidation, not the future historical-report path.
+
+`chio_kernel::caller_delivery` provides bounded canonical signed authorization
+and report codecs. Independent kernel and executor key selections, key epoch,
+original operation and request, capability, parameters, committed attempt,
+hold/nonce and context digest are bound. A live half-open execution interval is
+distinct from authentication of historical evidence. Signing a DTO is not proof
+that the kernel committed those participants. No start route uses these codecs
+yet, and they are not advertised as a negotiated SDK execution protocol.
+
+`SqliteCallerExecutionLedger` explicitly provisions a private, bounded executor
+ledger or opens existing history. It verifies authorization, durably claims the
+operation, invokes without a SQLite lock, and durably records the exact signed
+report before publishing it. Duplicate delivery returns that report or an
+unknown outcome, never another callback. Operation identity is unique across
+attempt and kernel-key changes. Expiry, capacity exhaustion, missing history,
+schema changes and physical-file substitution cannot reset a claim. All
+processes serving one executor must share this physical ledger. Privileged
+filesystem rollback and separate provisioned ledgers are outside this boundary.
+Capacity is explicitly limited to 64 retained operations; this is not a qualified
+long-running deployment or retention policy. There is no eviction or implicit key
+rotation. The executor is a trusted boundary: its raw signed report is evidence
+for the kernel, not guard-approved output for an untrusted agent. Integration
+must keep that report on the trusted return path until kernel output evaluation
+and release have completed. Populated operator stores were
+not migrated; old caller frames are not rewritten, and opening an executor
+ledger never creates or repairs one.
+
+M3 remains incomplete. Its remaining critical path is:
+
+1. Persist the independently configured executor identity and epoch in the
+   original authority selection, then publish an exact signed authorization only
+   after the shared kernel pipeline commits the original hold, nonce and required
+   custody. Lost start replies must recover the same authorization.
+2. Add authenticated late-report reconciliation through original finalization.
+   Preserve the existing unknown-outcome terminal and its audit history; neither
+   reopening ordinary admission nor fabricating a native release owner is valid.
+3. Complete credential/native caller custody and sidecar/SDK/schema integration,
+   including explicit rejection of reserve-only execution and the populated-store
+   compatibility decision. Component codecs and executor fixtures do not qualify
+   those public paths.
+4. Replace the ignored lost-report counterexample with the real passing
+   start/effect/lost-report/expiry/restart regression, retaining its bad-outcome
+   calibration. Run delegated, cumulative and economic custody through that same
+   handshake. The original ignored test remains unchanged and still demonstrates
+   the unfixed two-call protocol boundary when explicitly executed.

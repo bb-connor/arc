@@ -12,6 +12,9 @@ use crate::admission_operation::runtime_participant::{
 use crate::admission_operation::{AdmissionOperationStoreError, AdmissionRecoveryLease};
 use std::cell::{Cell, RefCell};
 
+#[path = "runtime_reserved.rs"]
+mod reserved;
+
 /// Call-scoped, non-serializable authority to claim a completely prepared plan.
 /// The kernel owns the operation and immediately retains every confirmed store
 /// update, even when the verifier subsequently denies or panics. The verifier
@@ -343,6 +346,14 @@ impl ChioKernel {
         admission: &mut DurableToolAdmission,
         binding: &RuntimeParticipantAuthorityBindingV1,
     ) -> Result<RuntimeAdmissionDecision, KernelError> {
+        if admission.operation.state() == AdmissionOperationState::ReadyToDispatch
+            && admission
+                .operation
+                .provider_attempt()
+                .is_some_and(is_caller_report_attempt)
+        {
+            return self.revalidate_reserved_caller_runtime(hook, context, admission, binding);
+        }
         let phase = match admission.operation.state() {
             AdmissionOperationState::Prepared
                 if admission

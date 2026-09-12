@@ -16,6 +16,9 @@ use fixture::fixture;
 #[path = "tests/participants.rs"]
 mod participants;
 
+#[path = "tests/custody.rs"]
+mod custody;
+
 #[test]
 fn caller_return_codec_keeps_frozen_facts_without_credentials_or_return_observations() -> TestResult
 {
@@ -147,6 +150,10 @@ fn caller_return_codec_keeps_legacy_identity_absence_explicit() -> TestResult {
         "current frames require a frozen identity"
     );
     payload["schema"] = serde_json::json!(LEGACY_SCHEMA);
+    payload
+        .as_object_mut()
+        .ok_or("caller object")?
+        .remove("participant_custody");
     payload
         .as_object_mut()
         .ok_or("caller object")?

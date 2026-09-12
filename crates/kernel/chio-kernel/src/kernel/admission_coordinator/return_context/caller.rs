@@ -8,7 +8,12 @@ use serde::{Deserialize, Serialize};
 
 const LEGACY_SCHEMA: &str = "chio.kernel-caller-return-context.v1";
 const SIGNING_SCHEMA: &str = "chio.kernel-caller-return-context.v2";
-const SCHEMA: &str = "chio.kernel-caller-return-context.v3";
+const PARTICIPANT_SCHEMA: &str = "chio.kernel-caller-return-context.v3";
+const SCHEMA: &str = "chio.kernel-caller-return-context.v4";
+
+#[path = "caller/custody.rs"]
+mod custody;
+pub(super) use custody::CallerParticipantCustody;
 
 #[cfg(test)]
 #[path = "caller/tests.rs"]
@@ -37,6 +42,8 @@ struct CallerReturnWire {
     receipt_signing_identity: Option<crate::tool_outcome::FrozenReceiptSigningIdentityV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     participants: Option<Box<FrozenDispatchParticipants>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    participant_custody: Option<CallerParticipantCustody>,
 }
 
 impl ChioKernel {
@@ -67,6 +74,7 @@ impl ChioKernel {
             kernel_public_key: self.config.keypair.public_key(),
             receipt_signing_identity: context.receipt_signing_identity.clone(),
             participants: context.participants.clone(),
+            participant_custody: context.caller_participant_custody.clone(),
             frozen_at_unix_ms: now,
             operation_id: context.operation_id.clone(),
             request_binding_hash: context.request_binding_hash.clone(),
@@ -181,11 +189,12 @@ impl ChioKernel {
             wire.schema.as_str(),
             wire.receipt_signing_identity.as_ref(),
             wire.participants.as_ref(),
+            wire.participant_custody.as_ref(),
         ) {
-            (SCHEMA, Some(identity), Some(_)) | (SIGNING_SCHEMA, Some(identity), None) => {
-                identity.validate().is_ok()
-            }
-            (LEGACY_SCHEMA, None, None) => true,
+            (SCHEMA, Some(identity), Some(_), Some(_))
+            | (PARTICIPANT_SCHEMA, Some(identity), Some(_), None)
+            | (SIGNING_SCHEMA, Some(identity), None, None) => identity.validate().is_ok(),
+            (LEGACY_SCHEMA, None, None, None) => true,
             _ => false,
         };
         if !schema_valid
@@ -199,6 +208,18 @@ impl ChioKernel {
             return Err(invalid(
                 "caller return component lost its admission binding",
             ));
+        }
+        if let Some(custody) = wire.participant_custody.as_ref() {
+            let retained = self.read_caller_participant_custody(
+                admission,
+                wire.matched_grant_index,
+                observed_at_unix_ms,
+            )?;
+            if custody != &retained {
+                return Err(invalid(
+                    "caller context changed its original participant episodes",
+                ));
+            }
         }
         let request = original.request_for_revalidation();
         self.validate_original_authority_profile(original)?;
@@ -253,6 +274,7 @@ impl ChioKernel {
             federation_context,
             receipt_signing_identity: wire.receipt_signing_identity,
             participants: wire.participants,
+            caller_participant_custody: wire.participant_custody,
         };
         context.validate_binding(admission, request)?;
         Ok(context)

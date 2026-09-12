@@ -22,6 +22,9 @@ mod grant_fallback;
 #[path = "operation_owned/nonce.rs"]
 mod nonce;
 
+#[path = "operation_owned/caller.rs"]
+mod caller;
+
 #[path = "operation_owned/combined.rs"]
 mod combined;
 

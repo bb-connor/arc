@@ -367,6 +367,7 @@ impl ChioKernel {
             self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
                 self.build_execution_nonce_authorization_reserving_response(
                     ExecutionNonceReservingResponse {
+                        durable_admission: None,
                         request,
                         timestamp: now,
                         matched_grant_index,

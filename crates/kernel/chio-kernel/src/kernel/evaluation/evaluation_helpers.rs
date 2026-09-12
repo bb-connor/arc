@@ -84,6 +84,7 @@ pub(super) struct PreDispatchCleanupDeny<'a> {
 }
 
 pub(super) struct ExecutionNonceReservingResponse<'a> {
+    pub(super) durable_admission: Option<&'a DurableToolAdmission>,
     pub(super) request: &'a ToolCallRequest,
     pub(super) timestamp: u64,
     pub(super) matched_grant_index: usize,
@@ -980,6 +981,7 @@ impl ChioKernel {
         reserving: ExecutionNonceReservingResponse<'_>,
     ) -> Result<ToolCallResponse, KernelError> {
         let ExecutionNonceReservingResponse {
+            durable_admission,
             request,
             timestamp,
             matched_grant_index,
@@ -989,11 +991,32 @@ impl ChioKernel {
             budget_lease_acquired,
             nonce,
         } = reserving;
-        let (runtime_admission_metadata, runtime_release_confirmed) = self
-            .release_runtime_admission_reservations_for_pre_dispatch_denial(
+        let (runtime_admission_metadata, runtime_release_confirmed) = if let Some(admission) =
+            durable_admission
+        {
+            // A caller's Ready reservation retains its original operation
+            // custody. It is not a pre-dispatch denial or nonce preflight.
+            // Validate physical episodes before acknowledging retention.
+            if admission.state()
+                != crate::admission_operation::AdmissionOperationState::ReadyToDispatch
+                || !matches!(&nonce, PreflightNonceSource::Durable(value) if admission.issued_nonce() == Some(value.as_ref()))
+            {
+                return Err(KernelError::DurableAdmission(
+                    "caller reservation response lost its original nonce owner".into(),
+                ));
+            }
+            self.read_caller_participant_custody(
+                admission,
+                matched_grant_index,
+                current_unix_timestamp_ms(),
+            )?;
+            (runtime_admission_metadata, true)
+        } else {
+            self.release_runtime_admission_reservations_for_pre_dispatch_denial(
                 None,
                 runtime_admission_metadata,
-            );
+            )
+        };
         if !runtime_release_confirmed {
             return self.build_deny_response_with_metadata(
                 request,

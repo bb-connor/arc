@@ -807,6 +807,30 @@ where
         true
     }
 
+    fn revalidate_reserved_operation(
+        &self,
+        context: &KernelRuntimeAdmissionContext<'_>,
+        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        claim: &chio_kernel::admission_operation::runtime_participant::RuntimeParticipantClaimHistoryV1,
+    ) -> Result<KernelRuntimeAdmissionDecision, KernelError> {
+        self.store
+            .verify_operation_owned_replay_source(source)
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        match self.prepare_request(context)? {
+            preparation::HookAdmissionPreparation::Prepared(prepared) => {
+                prepared.resume_operation_owned(claim, context.now_unix_ms)
+            }
+            preparation::HookAdmissionPreparation::Immediate(decision) if !decision.allowed => {
+                Ok(*decision)
+            }
+            preparation::HookAdmissionPreparation::Immediate(_) => {
+                Err(KernelError::DurableAdmission(
+                    "reserved runtime revalidation requires its complete original plan".into(),
+                ))
+            }
+        }
+    }
+
     fn revalidate_before_dispatch(
         &self,
         context: &KernelRuntimeAdmissionRevalidationContext<'_>,

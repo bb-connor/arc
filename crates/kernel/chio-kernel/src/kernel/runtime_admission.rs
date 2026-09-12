@@ -117,6 +117,21 @@ pub trait RuntimeAdmissionHook: Send + Sync {
         ))
     }
 
+    /// Revalidate an already reserved caller's exact claim without acquiring,
+    /// releasing or replacing any runtime participant. The kernel supplies
+    /// independently loaded history and checks it again after this callback.
+    /// This is a live pre-dispatch check, not historical report reconciliation.
+    fn revalidate_reserved_operation(
+        &self,
+        _context: &RuntimeAdmissionContext<'_>,
+        _source: &crate::admission_operation::RuntimeReplaySourceSnapshotV1,
+        _claim: &crate::admission_operation::runtime_participant::RuntimeParticipantClaimHistoryV1,
+    ) -> Result<RuntimeAdmissionDecision, KernelError> {
+        Err(KernelError::DurableAdmission(
+            "reserved caller runtime revalidation is unsupported".into(),
+        ))
+    }
+
     /// Declare that this trusted hook verifies stored swarm authority, binds
     /// the selected task to the exact request capability, and revalidates the
     /// evidence at dispatch. Required-swarm kernels reject the default.

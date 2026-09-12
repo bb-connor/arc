@@ -34,6 +34,7 @@ pub mod approval_store;
 pub mod authority;
 pub mod batch_approval_store;
 pub mod budget_store;
+pub mod caller_execution_ledger;
 pub mod capability_lineage;
 pub mod channel_lifecycle_store;
 pub mod channel_release_publisher_store;

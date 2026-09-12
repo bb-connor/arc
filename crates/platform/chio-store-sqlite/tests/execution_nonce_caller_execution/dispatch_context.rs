@@ -65,7 +65,7 @@ fn caller_report_retains_typed_private_context_with_capture_and_exact_restart_re
         assert!(completed.receipt.verify_signature()?);
         let frame = load(&runtime, &execution)?;
         let payload: serde_json::Value = serde_json::from_slice(frame.kernel_context_json())?;
-        assert_eq!(payload["schema"], "chio.kernel-caller-return-context.v3");
+        assert_eq!(payload["schema"], "chio.kernel-caller-return-context.v4");
         let participants = payload["participants"]
             .as_object()
             .ok_or("frozen participants")?;

@@ -71,7 +71,7 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
     /// Recomputed from the exact verified artifacts, not a plan digest copied
     /// out of receipt metadata. This read-only path cannot reserve or release.
     pub(super) fn verify_owned_dispatch(
-        self,
+        &self,
         intent: &RuntimeParticipantClaimIntentV1,
         now_unix_ms: u64,
     ) -> Result<RuntimeDispatchValidity, KernelError> {
@@ -96,6 +96,43 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
         }
         self.hook
             .native_dispatch_validity(now_unix_ms, self.valid_until_unix_ms)
+    }
+
+    pub(super) fn resume_operation_owned(
+        self,
+        claim: &chio_kernel::admission_operation::runtime_participant::RuntimeParticipantClaimHistoryV1,
+        now: u64,
+    ) -> Result<KernelRuntimeAdmissionDecision, KernelError> {
+        self.verify_owned_dispatch(&claim.intent, now)?;
+        let resources_digest = crate::hash::canonical_sha256(&self.operation_owned_resources()?)
+            .map_err(runtime_error)?;
+        let bundle_digest = self.core.bundle_digest.clone();
+        let report = self
+            .core
+            .resume_operation_owned(&self.hook.store)
+            .map_err(runtime_error)?;
+        let mut metadata = report.receipt_metadata;
+        metadata["chio_runtime"]["operation_owned_replay"] = serde_json::json!({
+            "reference": claim.reference,
+            "plan_sha256": claim.intent.plan_digest().as_str(),
+            "bundle_sha256": bundle_digest,
+            "resources_sha256": resources_digest,
+            "treaty_evidence_sha256": self.treaty_evidence_digest,
+            "swarm_evidence_sha256": self.swarm_evidence_digest,
+        });
+        if let Some(route) = self.verified_swarm_route_metadata {
+            metadata["chio_runtime"]["verified_swarm_route_metadata"] = route;
+        }
+        if let Some(binding) = self.verified_swarm_request_binding {
+            metadata["chio_runtime"]["verified_swarm_request_binding"] = binding;
+        }
+        Ok(match self.federation_treaty_material {
+            Some(material) => KernelRuntimeAdmissionDecision::allow_with_verified_treaty_material(
+                Some(metadata),
+                material,
+            ),
+            None => KernelRuntimeAdmissionDecision::allow(Some(metadata)),
+        })
     }
 
     fn operation_owned_resources(&self) -> Result<Vec<RuntimeParticipantResourceV1>, KernelError> {

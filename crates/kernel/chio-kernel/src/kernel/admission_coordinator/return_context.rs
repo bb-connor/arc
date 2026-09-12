@@ -43,6 +43,9 @@ pub(crate) struct DurableToolReturnContext {
     // Legacy caller frames stay explicitly unbound. New live contexts always
     // retain the original selection, including absent participants.
     participants: Option<Box<FrozenDispatchParticipants>>,
+    // None on native dispatch and on older caller formats. Historical frames
+    // cannot acquire missing custody by reading a newer current projection.
+    caller_participant_custody: Option<caller::CallerParticipantCustody>,
 }
 
 pub(crate) struct DurableToolReturnContextInput<'a> {
@@ -248,6 +251,19 @@ impl ChioKernel {
             participants: Some(Box::new(FrozenDispatchParticipants::from_operation(
                 &admission.operation,
             )?)),
+            caller_participant_custody: if admission
+                .operation
+                .provider_attempt()
+                .is_some_and(is_caller_report_attempt)
+            {
+                Some(self.read_caller_participant_custody(
+                    admission,
+                    matched_grant_index,
+                    trusted_now_unix_ms,
+                )?)
+            } else {
+                None
+            },
         };
         context.validate_binding(admission, request)?;
         Ok(context)

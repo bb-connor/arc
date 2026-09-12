@@ -41,6 +41,8 @@ pub mod boot;
 #[cfg(not(loom))]
 pub mod budget_store;
 #[cfg(not(loom))]
+pub mod caller_delivery;
+#[cfg(not(loom))]
 pub mod capability_lineage;
 #[cfg(not(loom))]
 pub mod checkpoint;

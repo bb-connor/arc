@@ -143,6 +143,10 @@ fn frozen_participants_preserve_legacy_absence_without_upgrading_custody() -> Te
         "v3 cannot omit its participant snapshot"
     );
     for schema in [SIGNING_SCHEMA, LEGACY_SCHEMA] {
+        payload
+            .as_object_mut()
+            .ok_or("caller object")?
+            .remove("participant_custody");
         payload["schema"] = serde_json::json!(schema);
         if schema == LEGACY_SCHEMA {
             payload

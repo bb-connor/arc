@@ -43,6 +43,34 @@ impl PreparedRuntimeAdmission {
                 }
             }
         }
+        self.operation_owned_report()
+    }
+
+    /// Reuse a committed trust floor without another CAS or replay mutation.
+    /// The hook separately verifies the kernel-loaded original claim intent.
+    pub(crate) fn resume_operation_owned(
+        mut self,
+        store: &dyn RuntimeAdmissionStore,
+    ) -> Result<RuntimeAdmissionReport, ChioRuntimeError> {
+        if let Some((entry, previous_hash)) = self.trust_floor_update.take() {
+            let retained = store.runtime_trust_floor(&entry.verifier_id, &entry.key_id)?;
+            validate_runtime_trust_floor_transition(
+                retained.clone(),
+                &entry,
+                previous_hash.as_deref(),
+            )?;
+            if retained.as_ref() != Some(&entry) {
+                return Err(ChioRuntimeError::Rejected {
+                    code: "runtime_trust_floor_changed",
+                    detail: "reserved operation lost its original trust floor".into(),
+                });
+            }
+            self.checks.push(passed("runtime_trust.floor"));
+        }
+        self.operation_owned_report()
+    }
+
+    fn operation_owned_report(mut self) -> Result<RuntimeAdmissionReport, ChioRuntimeError> {
         self.checks.push(passed("runtime.operation_owned_replay"));
         if self.bundle.destructive {
             self.checks.push(passed("destructive.lease_reserved"));
