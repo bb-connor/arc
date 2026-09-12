@@ -418,3 +418,150 @@ the JSON and in-memory continuation release by admission id. It did not touch
 P2's sources beyond the retirement note. It did not execute Phase 4: the
 sibling venue metadata, P1's bibliography, the P1 directory name and the
 sovereignty paragraph are unchanged.
+
+## Phase 5: answer the conditions the paper's readers set
+
+Six readers were asked to judge `docs/papers/evidence-crosses` as a program
+committee would, each against the standards of a venue the work targets. They
+scored it 2.42 of 5 and none accepted it. Between them they named six
+conditions, and every one asked for an artifact rather than an edit: a
+head-to-head baseline, a formal execution model with constructed reducing
+adversaries, a real two-host experiment with a decomposed receiver budget, a
+message-sequence trace resolving who holds what and when, a normative data-flow
+section with a conformance relation between the two deciders, and completeness
+of the comparison set generated from the schema rather than hand-listed.
+
+All six were built, in commits `884fd7894d` and `c8ce0d2285`. The artifacts
+were committed before their own review, deliberately, so that what they found
+could be recorded rather than quietly absorbed.
+
+What they found is the substance of this phase. Each of the four workstreams
+concluded that the paper claimed more than the system delivered, and in every
+case the repair was made at the source rather than in the wording.
+
+### The claim narrowed, and the paper is stronger for it
+
+The composed alternative was built in good faith from a pinned peer identity, a
+signing policy engine and a replay table, and run through both corpora under two
+wirings. Its first review found the hardened wiring was not as hard as a
+competent operator would build: it omitted a replay table keyed on the
+authorization's own identifier, which is what every deployment of a signed token
+with a unique claim already runs. Adding it, and a receiver-held bound on the
+validity window, and a check that the receiver is a party to the agreement it
+just resolved, the alternative reaches three of the four properties.
+
+| Property | Composed | Hardened |
+| --- | --- | --- |
+| Admission binding | fails | fails |
+| Receiver locality | fails | holds |
+| Single use | holds, weakened | holds |
+| Audience binding | holds | holds |
+
+The paper had claimed four differentiators and has one. That one is structural
+rather than a forgotten check: nine of the fifteen bound facts have no field in
+the composed request at all, so no wiring of those parts can compare them. The
+driven witness is `agreement-version-advanced-in-flight`, an unmodified
+admissible call presented against a receiver whose own record for that agreement
+has moved to a later version. It dispatches under both wirings.
+
+Two attacks survive hardening, not three. Audience binding is no longer a
+differentiator. Single use is reachable by hardening; what is not reachable is
+receiver-side minting of the identifier that is made single-use. Hardening is
+also no longer free, costing a second durable write of 102.4 bytes per call.
+
+### Four errors in the paper that pointed the wrong way
+
+Three of these made the system sound better than it is, which is the direction
+that matters.
+
+1. The paper described one co-signed statement. There are two. The inbound one
+   is evidence a request presents about a receipt the receiver already holds and
+   signed, and resolving it before dispatch is where every security property
+   lives. The outbound one the receiver mints over its own new receipt once that
+   receipt is durable, and the peer signs those bytes without parsing them, so
+   it gates the response and never the dispatch. The envelope displayed in the
+   paper was labelled inbound and is outbound.
+2. The continuation was described as a token minted by the origin. The receiver
+   mints it and it carries no signature. Its authentication is residency in the
+   receiver's own store.
+3. The subject receipt is not the one this call produces. In the shipped
+   reference path it is one record per receiver process, named identically on
+   every call that process serves, so the per-call binding rests entirely on the
+   binding reference.
+4. Admission binding was stated over a resolved subject receipt, which made it a
+   property of the conforming verifier rather than of the hook that decides live
+   calls. Neither the hook nor the kernel's treaty verification compares the
+   statement's subject digest at all.
+
+### Numbers that did not measure what they claimed
+
+- The lineage walk was reported at 8.456 us per statement. That window
+  canonicalized and re-hashed the whole bundle, which the admission path never
+  does: the hook compares a digest the store took at registration. Corrected,
+  the slope is about 2.4 us per statement, and the linearity claim survives with
+  a bootstrap interval around it.
+- Mediation was reported as a 54.3x multiplier. The ratio is not a stable
+  statistic, producing 54x and 81x from the same code on the same host, because
+  its denominator is a round trip dominated by a fresh handshake. The macro is
+  deleted.
+- Concurrency was reported at 1.14x. That compared a throughput counting
+  preparation plus call against a sequential figure counting the call alone.
+- Confidence intervals for means were printed beside medians they need not
+  contain. Every interval in both artifacts is now a percentile bootstrap
+  interval for the median beside it.
+- A per-statement slope for the admitted call was fitted to noise, with an
+  interval straddling zero. No macro prints it.
+
+### What the mechanization now carries
+
+The comparison set is a classification of every leaf of the co-signed predicate,
+total by exhaustiveness over the leaf type, and the executed corpus reads the
+Lean module and fails if the leaf paths or the classifications disagree. The
+binding property splits: 23 leaves are compared for equality against a named
+receiver-held value, and two are bound to a receiver-held set instead, the lease
+expiry to the instants after the receiver's clock and the lease issuer to the
+agreement's two participants. The residual holds for replacements of the
+declared shape, and it has an additive half nothing had previously noted: four
+leaves the strict validator permits but never reads can be added by an adversary
+holding both keys.
+
+## Phase 6: the experiment on two machines
+
+Three of the six readers made a two-host run a condition. It was blocked on host
+authorization and is no longer: the run executed between this Linux host and a
+macOS workstation on the same tailnet, over a direct wide-area path, with
+independent clocks and separate administration. The origin ran on macOS and the
+receiver on Linux.
+
+Two defects had to be cleared first, and both are worth recording because
+neither could have been found on one machine.
+
+### A receiver cannot start on macOS
+
+`crates/platform/chio-sqlite-file-identity` reads the database's device and
+inode by calling `stat` on a path naming the open descriptor. On Linux that path
+is a magic symlink and resolves to the file. On macOS it is a device-filesystem
+node, so the call returns that node's identity and the guard can never agree
+with itself. Every macOS receiver fails closed with
+`sqlite read companion borrowed file identity changed`.
+
+The guard is right to fail closed. The reading is wrong, and the fix is to stat
+the descriptor rather than a path that names it, which also removes a
+path-resolution window. The same pattern appears in the qualified finding pool.
+Both files are on the security branch, so this is reported rather than patched.
+
+### The contention experiment mis-counted its own evidence
+
+The single-use race read the receiver's dispatch counter once before the run and
+once after, and compared the delta to the number of rounds it kept. A round
+discarded for a revocation-freshness denial had still dispatched for whichever
+racer won it, so the delta counted a round the run did not. On one host those
+discards are rare and the check passed. Across a real network they are not, and
+the check failed on a run whose property had held in every round: one admission,
+every other racer refused as a replay.
+
+The counter is now read around each round. A kept round must dispatch exactly
+once and a discarded round at most once, since the clock can deny the racer that
+would have won but can never admit a second. That is a stronger assertion than
+the one it replaces, and it is the kind of defect that only a second machine
+surfaces.
