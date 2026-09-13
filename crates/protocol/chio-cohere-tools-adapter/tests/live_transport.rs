@@ -51,7 +51,6 @@ fn registry_bound_adapter(transport: Arc<dyn Transport>) -> CohereAdapter {
                 destructive: false,
                 idempotent: true,
                 requires_approval: false,
-                estimated_duration_ms: None,
             },
             latency_hint: None,
             flow: None,

@@ -30,6 +30,86 @@ use chio_manifest::{
 };
 use serde_json::{json, Value};
 
+mod authorization_projection {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../tests/bindings/support/authorization_projection.rs"
+    ));
+}
+
+#[test]
+fn cross_protocol_kernel_request_preserves_complete_authorization_context() {
+    let expected = authorization_projection::complete_wire_request();
+    let request = CrossProtocolExecutionRequest {
+        origin_request_id: "wire-origin".to_string(),
+        kernel_request_id: expected.request_id.clone(),
+        target_protocol: DiscoveryProtocol::Native,
+        target_server_id: expected.server_id.clone(),
+        target_tool_name: expected.tool_name.clone(),
+        agent_id: expected.agent_id.clone(),
+        arguments: expected.arguments.clone(),
+        capability: expected.capability.clone(),
+        source_envelope: json!({}),
+        dpop_proof: expected.dpop_proof.clone(),
+        execution_nonce: expected.execution_nonce.clone(),
+        governed_intent: expected.governed_intent.clone(),
+        approval_token: expected.approval_token.clone(),
+        approval_tokens: expected.approval_tokens.clone(),
+        threshold_approval_proposal: expected.threshold_approval_proposal.clone(),
+        supplemental_authorization: expected.supplemental_authorization.clone(),
+        model_metadata: expected.model_metadata.clone(),
+        authenticated_session_id: None,
+        security_context: None,
+        bridge_security: BridgeSecurityMetadata::unconstrained(),
+    };
+    authorization_projection::assert_authorization_preserved(
+        &expected,
+        &kernel_tool_call_request(&request),
+    );
+}
+
+#[test]
+fn native_cross_protocol_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation() {
+    let (issuer, mut kernel) = test_kernel();
+    let subject = Keypair::generate();
+    let registry = test_manifest_registry();
+    let calls = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(authorization_projection::CountedToolServer {
+        server: "test-srv".to_string(),
+        tool: "echo".to_string(),
+        calls: calls.clone(),
+    }));
+    let mut baseline = boundary_request(registry.bridge_security("test-srv", "echo").unwrap());
+    baseline.capability = capability_for_tool(&issuer, &subject, "test-srv", "echo");
+    baseline.agent_id = subject.public_key().to_hex();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
+    let positive = orchestrator.execute(&MockBridge, baseline.clone()).unwrap();
+    assert_eq!(positive.response.verdict, KernelVerdict::Allow);
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    let receipts = kernel.receipt_log().receipts().len();
+    for (feature, mutation) in
+        authorization_projection::extension_cases(&kernel_tool_call_request(&baseline))
+    {
+        let mut request = baseline.clone();
+        request.kernel_request_id = mutation.request_id;
+        request.capability = mutation.capability;
+        request.approval_tokens = mutation.approval_tokens;
+        request.threshold_approval_proposal = mutation.threshold_approval_proposal;
+        request.governed_intent = mutation.governed_intent;
+        request.supplemental_authorization = mutation.supplemental_authorization;
+        request.source_envelope["peer_capabilities"] = json!({"features":{feature:true}});
+        let error = orchestrator.execute(&MockBridge, request).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("invocation feature {feature} was not negotiated")),
+            "{error}"
+        );
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(kernel.receipt_log().receipts().len(), receipts);
+    }
+}
+
 struct MockBridge;
 
 impl CapabilityBridge for MockBridge {
@@ -232,7 +312,6 @@ fn flow_manifest_registry() -> VerifiedManifestRegistry {
                 destructive: false,
                 idempotent: true,
                 requires_approval: false,
-                estimated_duration_ms: None,
             },
             latency_hint: Some(LatencyHint::Fast),
             flow: Some(ToolFlowDeclaration::public_egress()),
@@ -511,7 +590,6 @@ fn semantic_tool(
             destructive: false,
             idempotent: false,
             requires_approval: false,
-            estimated_duration_ms: None,
         },
         latency_hint,
         flow: None,

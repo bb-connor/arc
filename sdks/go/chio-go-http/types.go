@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: f45573ca7ea29e544db29a849dc5152e47b0d2c2d3f7093dc6d28379b35e7ad2
+// Schema content SHA-256: 706cff7c58d41fb3e788bbc44edf6741118a7a7966f144967e651ad9eb450c18
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -34,7 +34,7 @@ const (
 
 // Defines values for AgentActiveResponseGovernedIntentPlanSchema.
 const (
-	AgentActiveResponseGovernedIntentPlanSchemaChioGovernedResponsePlanV1 AgentActiveResponseGovernedIntentPlanSchema = "chio.governed-response-plan.v1"
+	AgentActiveResponseGovernedIntentPlanSchemaChioResponsePlanV1 AgentActiveResponseGovernedIntentPlanSchema = "chio.response-plan.v1"
 )
 
 // Defines values for AgentGovernedTransactionIntentBody0Kind.
@@ -8291,6 +8291,9 @@ func (t CapabilityAggregateInvocationBudget) MarshalJSON() ([]byte, error) {
 }
 
 func (t *CapabilityAggregateInvocationBudget) UnmarshalJSON(b []byte) error {
+	if err := validateAggregateBudgetJSON(b); err != nil {
+		return err
+	}
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

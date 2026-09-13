@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 87aeeadf1295c6ed5c56ce7813afa5a254c07827c1029566566991a30ebeb7d7
+# Schema sha256: 9bba9aeb3efe11ef5ed158d8ad1a12f77957a07c488313f64a3cdf3ffbd36138
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -13,7 +13,9 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field, conint, constr
+from chio_sdk._manifest_wire import SecurityWireModel as BaseModel
+
+from pydantic import ConfigDict, Field, conint, constr
 
 
 class Schema(Enum):
@@ -47,8 +49,8 @@ class Nonce(BaseModel):
         description="v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
     )
     nonce_id: constr(min_length=1)
-    issued_at: conint(ge=0)
-    expires_at: conint(ge=0)
+    issued_at: conint(strict=True, ge=0)
+    expires_at: conint(strict=True, ge=0)
     bound_to: BoundTo
     reserved_hold_id: constr(min_length=1) | None = None
     reserving_request_id: constr(min_length=1) | None = None

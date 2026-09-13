@@ -164,6 +164,7 @@ fn agent_card_custom_config() {
         agent_version: "2.0.0".to_string(),
         endpoint_url: "https://myagent.com".to_string(),
         protocol_binding: "HTTP+JSON".to_string(),
+        ..A2aEdgeConfig::default()
     };
     let edge = ChioA2aEdge::new(config, vec![test_manifest()]).test_unwrap();
     let card = edge.agent_card();

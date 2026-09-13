@@ -19,10 +19,10 @@ acceptance is complete. This is not merge or release approval.
 | Milestone | State / missing acceptance | Next action / blocker | Evidence |
 | --- | --- | --- | --- |
 | M0 | Consolidated for implementation | Keep this index current; no independent cleanup campaign | Requirement and review maps below |
-| M1 | Complete: implementation and local acceptance | Keep closed absent a demonstrated regression; confinement remains explicitly deferred | [Acceptance closeout](#m1-local-acceptance-closeout), [qualification deferral](#m1-confined-process-qualification-deferral) |
-| M2 | Complete: local native failure/restart safety acceptance | Proceed to M3; missing release custody still blocks output and readiness | [Acceptance closeout](#m2-local-acceptance-closeout), [cutpoints and downstream contract](native-restart-safety.md) |
-| M3 | Complete: local authenticated start, durable delivery and native caller custody acceptance | Proceed to M4; retain explicit unsupported-profile denials and separate release gates | [Acceptance closeout](#m3-local-acceptance-closeout), [caller contract](authenticated-caller-delivery.md) |
-| M4 | Consumer qualification incomplete | Inventory positive supported paths and required startup denials after M1-M3 | [Original requirement ledger](launch-plan.md#requirement-ledger) |
+| M1 | Complete: named local acceptance; composed repair locally verified | Final M4 workspace rerun remains required; default-stack repair passed the original 1,134-test control-plane target; confinement remains deferred | [Acceptance closeout](#m1-local-acceptance-closeout), [qualification deferral](#m1-confined-process-qualification-deferral) |
+| M2 | Complete: local native failure/restart safety acceptance | Preserve exact failure/recovery contracts during M4 repairs | [Acceptance closeout](#m2-local-acceptance-closeout), [cutpoints and downstream contract](native-restart-safety.md) |
+| M3 | Complete: named local caller acceptance; final M4 dependency rerun pending | Preserve native caller custody and qualify the current dependency closure; observed broader regressions have focused repairs | [Acceptance closeout](#m3-local-acceptance-closeout), [caller contract](authenticated-caller-delivery.md) |
+| M4 | Consumer changes implemented; final qualification in progress | Finish current workspace, M3, protocol/SDK, compatibility, C++/FFI and codegen gates; no skipped required cases | [Expanded execution plan](m4-consumer-qualification.md), [consumer support ledger](consumer-support.md), [migration contract](m4-consumer-migration.md) |
 | M5 | Swarm is a Disabled-profile integration smoke | Bind issued capability identities, shared budget and enforced cage | [Swarm limitations](../../examples/reference-swarm/README.md) |
 | M6 | Components present, integrated topology unqualified | Compose keyring, broker, cage and receipts; designated runner needed | Enterprise ledger and original plan |
 | M7 | Active-defense components present, composed paths unqualified | Complete flow, response and rollback acceptance in controlled profiles | Active-defense ledger and original plan |
@@ -102,14 +102,25 @@ M3 gate; they do not stand in for completed full-workspace qualification.
 
 Supplemental authorization and the combined threshold-approval/credit-exposure
 resume profile remain explicitly unsupported and fail closed. No new deferral of
-native caller custody was taken. Full-workspace testing and the refreshed normal
-workspace build remain in progress, not passing evidence
-(`/tmp/chio-m3-final-workspace-tests-resumed.log`,
+native caller custody was taken. The broader checks were still running at M3
+closeout. Their terminal results were reviewed during M4 planning on 2026-09-13:
+the normal workspace build passed, but full-workspace tests exited 101 with 11
+failed targets, including a nested-nonce stack overflow under the workspace
+feature configuration. Runtime proof, hosted-MCP startup, canonical JSON and
+boundary-assertion failures also required diagnosis. M4 has since repaired these
+signatures and passed the focused targets, including the original full
+control-plane/default-stack suite. Final composed qualification is still pending.
+The exact local M3 evidence
+above is retained, not a claim that the composed workspace is green. See
+[M4's baseline repair queue](m4-consumer-qualification.md#fresh-baseline-broad-regression-results-now-available)
+and the terminal logs (`/tmp/chio-m3-final-workspace-tests-resumed.log`,
 `/tmp/chio-m3-final-workspace-build-qualified.log`). Exact-head hosted qualification
 is not complete: controller run `34736189135` failed its source/controller
 authorization step and skipped capture. No workflow bypass, populated operator
 migration, merge, publication or deployment is authorized by this closeout.
-M1's confinement deferral is unchanged. Proceed to M4's consumer-boundary work.
+M1's confinement deferral is unchanged. The M4 support ledger records current
+consumer implementation and qualification separately from this historical M3
+closeout.
 
 ### Historical component checkpoint (before start/report integration)
 

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 87aeeadf1295c6ed5c56ce7813afa5a254c07827c1029566566991a30ebeb7d7
+# Schema sha256: 9bba9aeb3efe11ef5ed158d8ad1a12f77957a07c488313f64a3cdf3ffbd36138
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,7 +14,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
+from pydantic import StrictBool, BaseModel, ConfigDict, Field, RootModel, conint, constr
 
 from . import aggregate_invocation_budget_schema, cumulative_approval_root_schema
 
@@ -50,7 +50,7 @@ class MonetaryAmount(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    units: conint(ge=0)
+    units: conint(strict=True, ge=0)
     currency: constr(min_length=1)
 
 
@@ -70,7 +70,7 @@ class Value(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    threshold_units: conint(ge=0)
+    threshold_units: conint(strict=True, ge=0)
 
 
 class LegacyApprovalConstraint(BaseModel):
@@ -87,7 +87,7 @@ class Value1(BaseModel):
     )
     threshold: MonetaryAmount
     approval_budget_id: constr(min_length=1)
-    approval_budget_epoch: conint(ge=0)
+    approval_budget_epoch: conint(strict=True, ge=0)
     cumulative_approval_root_binding: Any | None = None
 
 
@@ -145,7 +145,7 @@ class DelegationLink(BaseModel):
         pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:[a-z0-9_-]+:[a-z0-9_-]+:[a-z0-9_+.-]+:[0-9a-f]+)$"
     )
     attenuations: list[Attenuation] | None = None
-    timestamp: conint(ge=0)
+    timestamp: conint(strict=True, ge=0)
     signature: constr(
         pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:[a-z0-9_-]+:[a-z0-9_-]+:[a-z0-9_+.-]+:[0-9a-f]+:[0-9a-f]+)$"
     )
@@ -170,8 +170,8 @@ class GrantSubsetRelation(BaseModel):
         extra="forbid",
     )
     grantKind: GrantKind
-    childIndex: conint(ge=0)
-    parentIndex: conint(ge=0)
+    childIndex: conint(strict=True, ge=0)
+    parentIndex: conint(strict=True, ge=0)
     subset: Subset
 
 
@@ -205,7 +205,7 @@ class Value2(BaseModel):
     )
     threshold: MonetaryAmount
     approval_budget_id: constr(min_length=1)
-    approval_budget_epoch: conint(ge=0)
+    approval_budget_epoch: conint(strict=True, ge=0)
     cumulative_approval_root_binding: (
         cumulative_approval_root_schema.ChioCumulativeApprovalRootBinding
     )
@@ -274,10 +274,10 @@ class ToolGrant(BaseModel):
     tool_name: constr(min_length=1)
     operations: list[Operation] = Field(..., min_length=1)
     constraints: list[Constraint] | None = None
-    max_invocations: conint(ge=0) | None = None
+    max_invocations: conint(strict=True, ge=0) | None = None
     max_cost_per_invocation: MonetaryAmount | None = None
     max_total_cost: MonetaryAmount | None = None
-    dpop_required: bool | None = None
+    dpop_required: StrictBool | None = None
 
 
 class ChioScope(BaseModel):
@@ -310,8 +310,8 @@ class ChioCapabilitytoken(BaseModel):
         pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\+mldsa65)$"
     )
     scope: ChioScope
-    issued_at: conint(ge=0)
-    expires_at: conint(ge=0)
+    issued_at: conint(strict=True, ge=0)
+    expires_at: conint(strict=True, ge=0)
     delegation_chain: list[DelegationLink] | None = None
     aggregate_invocation_budget: (
         aggregate_invocation_budget_schema.ChioAggregateInvocationBudget | None
@@ -320,7 +320,7 @@ class ChioCapabilitytoken(BaseModel):
     caveats: list[Caveat] | None = None
     scope_attenuations: list[ScopeAttenuation] | None = None
     attenuation_proof: AttenuationProof | None = None
-    budget_share_bps: conint(ge=0, le=10000) | None = Field(
+    budget_share_bps: conint(strict=True, ge=0, le=10000) | None = Field(
         None,
         description="Fixed-point child share in basis points. Values above 10000 re-amplify budget and fail closed.",
     )

@@ -327,6 +327,8 @@ jobs:
           bash scripts/tests/check-active-defense-conformance.test.sh
           python3 scripts/tests/check-exact-cargo-test-inventory.test.py
           bash scripts/tests/check-protocol-peer-negotiation.test.sh
+          bash scripts/tests/check-consumer-boundaries.test.sh
+          python3 scripts/tests/check-consumer-sdk-inventory.test.py
           bash scripts/tests/check-cage-enforcement.test.sh
           python3 scripts/tests/check-security-ci-contract.test.py
           python3 scripts/tests/check-security-wire-lane.test.py
@@ -458,6 +460,17 @@ jobs:
 
       - name: Protocol peer negotiation
         run: ./scripts/check-protocol-peer-negotiation.sh
+
+      - name: Durable consumer boundaries
+        run: ./scripts/check-consumer-boundaries.sh
+
+      - name: Install current consumer SDK test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -e 'sdks/python/chio-sdk-python[dev]'
+          npm ci --ignore-scripts --prefix sdks/typescript
+
+      - name: Current consumer SDK parity
+        run: ./scripts/check-consumer-sdk-parity.sh
 
   adversarial-evidence:
     name: enterprise adversarial evidence

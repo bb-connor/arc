@@ -68,6 +68,7 @@ fn permission_not_required_when_config_disabled() {
     let config = AcpEdgeConfig {
         require_permission: false,
         default_category: AcpCategory::Tool,
+        ..AcpEdgeConfig::default()
     };
     let edge = ChioAcpEdge::new(config, vec![test_manifest()]).test_unwrap();
     // read_file has no side effects and require_permission is false

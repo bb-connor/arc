@@ -63,7 +63,6 @@ fn taxonomy_manifest(server_id: &str, name: &str, version: &str, public_key: &st
                 destructive: false,
                 idempotent: true,
                 requires_approval: false,
-                estimated_duration_ms: None,
             },
             latency_hint: None,
             flow: None,

@@ -129,7 +129,6 @@ pub fn demo_manifest() -> ToolManifest {
                 destructive: false,
                 idempotent: false,
                 requires_approval: false,
-                estimated_duration_ms: None,
             },
             latency_hint: None,
             flow: None,

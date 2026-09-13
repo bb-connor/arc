@@ -276,6 +276,18 @@ fn the_digest_tool_computes_without_any_grant() {
         structured(&canonical)["canonical"],
         "{\"a\":{\"b\":\"x\",\"y\":null},\"z\":[1,2]}"
     );
+    // Canonical output must not depend on serde_json's map-order feature or
+    // retain noncanonical floating-point spellings.
+    let canonical = tool.call(
+        "canonical_json",
+        json!({ "value": { "z": -0.0, "a": 1.0 } }),
+    );
+    let expected = "{\"a\":1,\"z\":0}";
+    assert_eq!(structured(&canonical)["canonical"], expected);
+    assert_eq!(
+        structured(&canonical)["sha256"],
+        chio_reference_tools::sha256_hex(expected.as_bytes())
+    );
     let unknown = tool.request("resources/list", json!({}));
     assert_eq!(unknown["error"]["code"], -32601);
     assert!(tool.finish().success());

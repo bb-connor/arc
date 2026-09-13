@@ -34,7 +34,10 @@ pub struct ChioA2aEdgeCompatibility<'a> {
     edge: &'a mut ChioA2aEdge,
 }
 
-fn validate_execution_context(execution: &A2aKernelExecutionContext) -> Result<(), A2aEdgeError> {
+fn validate_execution_context(
+    execution: &A2aKernelExecutionContext,
+    peer: &chio_core::capability::features::CapabilityNegotiation,
+) -> Result<(), A2aEdgeError> {
     validate_execution_agent_id(&execution.agent_id)?;
     if execution.approval_token.is_some() && !execution.approval_tokens.is_empty() {
         return Err(A2aEdgeError::InvalidRequest(
@@ -54,6 +57,14 @@ fn validate_execution_context(execution: &A2aKernelExecutionContext) -> Result<(
             "A2A threshold approval tokens and proposal must be supplied together".to_string(),
         ));
     }
+    peer.validate_invocation_features(
+        &execution.capability,
+        &execution.approval_tokens,
+        execution.threshold_approval_proposal.as_ref(),
+        execution.governed_intent.as_ref(),
+        execution.supplemental_authorization.as_ref(),
+    )
+    .map_err(|error| A2aEdgeError::InvalidRequest(error.to_string()))?;
     Ok(())
 }
 
@@ -448,7 +459,7 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.resolve_skill_binding(skill_id)?;
 
@@ -463,8 +474,12 @@ impl ChioA2aEdge {
             task_id.clone(),
             format!("a2a-{task_id}"),
         )?;
-        let orchestrated =
-            execute_orchestrated_a2a_request(kernel, self.manifest_registry()?, request)?;
+        let orchestrated = execute_orchestrated_a2a_request(
+            &self.config.peer_capabilities,
+            kernel,
+            self.manifest_registry()?,
+            request,
+        )?;
         Ok(task_response_from_orchestrated(task_id, orchestrated))
     }
 
@@ -482,7 +497,7 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         let binding = self.resolve_skill_binding(skill_id)?;
 
         let arguments = extract_arguments_from_message(&request.message)?;
@@ -497,6 +512,7 @@ impl ChioA2aEdge {
             request_id.to_string(),
         )?;
         let orchestrated = execute_orchestrated_a2a_request(
+            &self.config.peer_capabilities,
             kernel,
             self.manifest_registry()?,
             execution_request,
@@ -518,7 +534,7 @@ impl ChioA2aEdge {
         execution: &A2aKernelExecutionContext,
         reason: impl Into<String>,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.resolve_skill_binding(skill_id)?;
         let arguments = extract_arguments_from_message(&request.message)?;
@@ -532,8 +548,12 @@ impl ChioA2aEdge {
             task_id.clone(),
             format!("a2a-{task_id}"),
         )?;
-        let mut orchestrated =
-            execute_orchestrated_a2a_request(kernel, self.manifest_registry()?, request)?;
+        let mut orchestrated = execute_orchestrated_a2a_request(
+            &self.config.peer_capabilities,
+            kernel,
+            self.manifest_registry()?,
+            request,
+        )?;
         let reason = reason.into();
         orchestrated.response.verdict = KernelVerdict::PendingApproval;
         orchestrated.response.output = None;
@@ -549,7 +569,7 @@ impl ChioA2aEdge {
         request: &SendMessageRequest,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
         self.handle_stream_message_with_optional_request_id(skill_id, request, execution, None)
     }
@@ -562,7 +582,7 @@ impl ChioA2aEdge {
         request: &SendMessageRequest,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         self.handle_stream_message_with_optional_request_id(
             skill_id,
             request,
@@ -687,11 +707,11 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> A2aJsonRpcResponse {
-        let A2aJsonRpcEnvelope { id, method, params } =
-            match Self::parse_jsonrpc_envelope(&message) {
-                Ok(envelope) => envelope,
-                Err(response) => return A2aJsonRpcResponse::from_optional(response),
-            };
+        let A2aJsonRpcEnvelope { id, method, params } = match Self::parse_jsonrpc_envelope(&message)
+        {
+            Ok(envelope) => envelope,
+            Err(response) => return A2aJsonRpcResponse::from_optional(response),
+        };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
@@ -731,11 +751,11 @@ impl ChioA2aEdge {
         message: Value,
         server: &dyn ToolServerConnection,
     ) -> A2aJsonRpcResponse {
-        let A2aJsonRpcEnvelope { id, method, params } =
-            match Self::parse_jsonrpc_envelope(&message) {
-                Ok(envelope) => envelope,
-                Err(response) => return A2aJsonRpcResponse::from_optional(response),
-            };
+        let A2aJsonRpcEnvelope { id, method, params } = match Self::parse_jsonrpc_envelope(&message)
+        {
+            Ok(envelope) => envelope,
+            Err(response) => return A2aJsonRpcResponse::from_optional(response),
+        };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
@@ -842,7 +862,7 @@ impl ChioA2aEdge {
             Ok(task_id) => task_id,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
-        if let Err(error) = validate_execution_context(execution) {
+        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
             return Self::jsonrpc_error_response(id, error);
         }
 
@@ -866,7 +886,7 @@ impl ChioA2aEdge {
         execution: &A2aKernelExecutionContext,
         id: Value,
     ) -> Value {
-        if let Err(error) = validate_execution_context(execution) {
+        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
             return Self::jsonrpc_error_response(id, error);
         }
         let Some(task) = self.tasks.get(task_id).cloned() else {
@@ -890,6 +910,7 @@ impl ChioA2aEdge {
         }
 
         let orchestrated = match execute_orchestrated_a2a_request(
+            &self.config.peer_capabilities,
             kernel,
             match self.manifest_registry() {
                 Ok(registry) => registry,
@@ -932,7 +953,7 @@ impl ChioA2aEdge {
             Ok(task_id) => task_id,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
-        if let Err(error) = validate_execution_context(execution) {
+        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
             return Self::jsonrpc_error_response(id, error);
         }
 
@@ -1029,5 +1050,4 @@ impl ChioA2aEdgeCompatibility<'_> {
     ) -> A2aJsonRpcResponse {
         self.edge.handle_jsonrpc_passthrough(message, server)
     }
-
 }

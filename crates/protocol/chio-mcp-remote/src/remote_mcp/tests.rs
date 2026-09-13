@@ -330,6 +330,14 @@ mod tests {
         config: &mut RemoteServeHttpConfig,
         directory: &std::path::Path,
     ) -> PathBuf {
+        configure_signed_manifest_with_flow(config, directory, None)
+    }
+
+    fn configure_signed_manifest_with_flow(
+        config: &mut RemoteServeHttpConfig,
+        directory: &std::path::Path,
+        flow: Option<chio_manifest::ToolFlowDeclaration>,
+    ) -> PathBuf {
         let signer = Keypair::generate();
         let public_key = signer.public_key().to_hex();
         let manifest = chio_manifest::ToolManifest {
@@ -349,10 +357,9 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
-                flow: None,
+                flow,
             }],
             server_tools: Vec::new(),
             required_permissions: Some(chio_manifest::RequiredPermissions {

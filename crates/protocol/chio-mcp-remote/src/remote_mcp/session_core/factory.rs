@@ -27,6 +27,15 @@ impl RemoteSessionFactory {
                 ))
             })?,
         );
+        // This factory constructs the ordinary kernel, not a trusted flow host.
+        // Reject the authenticated requirement before acquiring launch or store
+        // authority. Discovery metadata cannot downgrade this requirement.
+        if manifest_registry.requires_flow_runtime() {
+            return Err(CliError::cli_other_error(
+                "remote MCP session construction requires an active-defense host for flow-required manifests"
+                    .to_string(),
+            ));
+        }
         canonicalize_remote_upstream_command(&mut config)?;
         validate_durable_admission_participant_paths(
             loaded_policy.kernel.durable_admission_mode,

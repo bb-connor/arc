@@ -1,10 +1,8 @@
 package chio
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -22,6 +20,10 @@ type protocolPrimitiveFixtureCase struct {
 func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 	var target any
 	switch schemaFile {
+	case "kernel/caller_dispatch_authorization.schema.json":
+		target = &KernelCallerDispatchAuthorization{}
+	case "kernel/caller_delivery_report.schema.json":
+		target = &KernelCallerDeliveryReport{}
 	case "kernel/execution_nonce.schema.json":
 		target = &KernelExecutionNonce{}
 	case "capability/token.schema.json":
@@ -57,13 +59,9 @@ func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 		return nil, fmt.Errorf("unmapped protocol-primitives fixture schema %q", schemaFile)
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(payload))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
+	// Exercise the ordinary public parser, not a stricter test-only decoder.
+	if err := json.Unmarshal(payload, target); err != nil {
 		return nil, err
-	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		return nil, fmt.Errorf("trailing JSON after protocol primitive: %w", err)
 	}
 	return target, nil
 }

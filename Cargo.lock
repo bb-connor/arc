@@ -3131,6 +3131,7 @@ dependencies = [
  "chio-control-plane",
  "chio-core-types",
  "chio-credit",
+ "chio-cross-protocol",
  "chio-custody-hw",
  "chio-decoy",
  "chio-egress-contract",
@@ -4754,6 +4755,7 @@ dependencies = [
 name = "chio-reference-tools"
 version = "0.1.0"
 dependencies = [
+ "chio-core-types",
  "hex",
  "serde_json",
  "sha2 0.10.9",

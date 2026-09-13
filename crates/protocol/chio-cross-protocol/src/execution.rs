@@ -73,11 +73,80 @@ pub fn kernel_tool_call_request(request: &CrossProtocolExecutionRequest) -> Tool
     }
 }
 
+/// Project the kernel's signed proposal into the shared pending-approval result
+/// schema. This is representation only, never approval or execution authority.
+pub fn pending_approval_result(
+    verdict: chio_kernel::Verdict,
+    output: Option<&chio_kernel::ToolCallOutput>,
+) -> Option<Value> {
+    if verdict != chio_kernel::Verdict::PendingApproval {
+        return None;
+    }
+    let chio_kernel::ToolCallOutput::Value(value) = output? else {
+        return None;
+    };
+    serde_json::from_value::<ThresholdApprovalProposal>(value.clone()).ok()?;
+    Some(json!({"status":"pending_approval", "proposal":value}))
+}
+
+/// Evaluate a projected request without discarding its authenticated host or
+/// manifest context. Target executors may be called directly, so this boundary
+/// validates the request even when no orchestrator ran beforehand.
+pub fn evaluate_bound_kernel_request(
+    kernel: &ChioKernel,
+    registry: &chio_manifest::VerifiedManifestRegistry,
+    execution: &CrossProtocolExecutionRequest,
+    peer_capabilities: &chio_core::capability::features::CapabilityNegotiation,
+    metadata: Value,
+) -> Result<ToolCallResponse, BridgeError> {
+    crate::validation::validate_execution_request_boundary(execution, registry)?;
+    let request = kernel_tool_call_request(execution);
+    request
+        .validate_peer_capabilities(peer_capabilities)
+        .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?;
+    match (
+        execution.security_context.as_ref(),
+        execution.authenticated_session_id.as_ref(),
+    ) {
+        (Some(context), Some(session)) => kernel
+            .evaluate_tool_call_blocking_with_manifest_security_and_authenticated_session_context(
+                &request,
+                registry,
+                &execution.bridge_security,
+                Some(metadata),
+                session,
+                context,
+            ),
+        (Some(context), None) => kernel
+            .evaluate_tool_call_blocking_with_manifest_security_and_security_context(
+                &request,
+                registry,
+                &execution.bridge_security,
+                Some(metadata),
+                context,
+            ),
+        (None, None) => kernel.evaluate_tool_call_blocking_with_manifest_security(
+            &request,
+            registry,
+            &execution.bridge_security,
+            Some(metadata),
+        ),
+        (None, Some(_)) => {
+            return Err(BridgeError::InvalidRequest(
+                "authenticated session requires an authoritative security context".to_string(),
+            ))
+        }
+    }
+    .map_err(BridgeError::Kernel)
+}
+
 /// Fully prepared target-protocol request handed to a protocol-specific executor.
 pub struct CrossProtocolTargetRequest<'a> {
     pub kernel: &'a ChioKernel,
     pub manifest_registry: &'a chio_manifest::VerifiedManifestRegistry,
     pub execution: &'a CrossProtocolExecutionRequest,
+    /// Host-established profile, not a feature claim in the source envelope.
+    pub peer_capabilities: &'a chio_core::capability::features::CapabilityNegotiation,
     pub source_protocol: DiscoveryProtocol,
     pub bridge_id: &'a str,
     pub capability_ref: &'a CrossProtocolCapabilityRef,
@@ -126,51 +195,17 @@ impl TargetProtocolExecutor for OpenAiTargetExecutor {
         &self,
         request: CrossProtocolTargetRequest<'_>,
     ) -> Result<CrossProtocolTargetExecution, BridgeError> {
-        request
-            .manifest_registry
-            .validate_invocation_arguments(
-                &request.execution.target_server_id,
-                &request.execution.target_tool_name,
-                &request.execution.bridge_security,
-                &request.execution.arguments,
-            )
-            .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?;
         let route_metadata = metadata_with_source_receipt_context(
             route_selection_metadata(request.route_selection)?,
             &request.execution.source_envelope,
         )?;
-        let kernel_request = kernel_tool_call_request(request.execution);
-        let response = match (
-            request.execution.security_context.as_ref(),
-            request.execution.authenticated_session_id.as_ref(),
-        ) {
-            (Some(security_context), Some(authenticated_session_id)) => request
-                .kernel
-                .evaluate_tool_call_blocking_with_manifest_security_and_authenticated_session_context(
-                    &kernel_request,
-                    request.manifest_registry,
-                    &request.execution.bridge_security,
-                    Some(route_metadata),
-                    authenticated_session_id,
-                    security_context,
-                ),
-            (Some(security_context), None) => request
-                .kernel
-                .evaluate_tool_call_blocking_with_manifest_security_and_security_context(
-                    &kernel_request,
-                    request.manifest_registry,
-                    &request.execution.bridge_security,
-                    Some(route_metadata),
-                    security_context,
-                ),
-            (None, _) => request.kernel.evaluate_tool_call_blocking_with_manifest_security(
-                &kernel_request,
-                request.manifest_registry,
-                &request.execution.bridge_security,
-                Some(route_metadata),
-            ),
-        }
-        .map_err(BridgeError::Kernel)?;
+        let response = evaluate_bound_kernel_request(
+            request.kernel,
+            request.manifest_registry,
+            request.execution,
+            request.peer_capabilities,
+            route_metadata,
+        )?;
 
         let receipt_ref = response.receipt.id.clone();
         let output = render_protocol_output(&response.output, response.reason.as_deref());

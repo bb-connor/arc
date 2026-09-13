@@ -14,6 +14,7 @@
 export * from "./types.js";
 export * from "./identity.js";
 export * from "./sidecar-client.js";
+export { createWireSchemaValidator } from "./wire-schema.js";
 export {
   VALID_METHODS,
   verdictStatus,

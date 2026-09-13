@@ -129,7 +129,6 @@ fn metrics_manifest_with_schema(input_schema: Value) -> ToolManifest {
                 destructive: false,
                 idempotent: false,
                 requires_approval: false,
-                estimated_duration_ms: None,
             },
             latency_hint: None,
             flow: None,
@@ -311,6 +310,8 @@ fn mcp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
     let bridge = chio_mcp_edge::execute_bridge_mcp_tool_call(
         &kernel,
         chio_mcp_edge::BridgeMcpToolCallRequest {
+            dpop_proof: None,
+            peer_capabilities: Default::default(),
             request_id: "metrics-mcp-1".to_string(),
             capability: capability_for_tool(&issuer, &agent)?,
             server_id: "metrics-srv".to_string(),
@@ -370,6 +371,8 @@ fn mcp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
     let error_result = chio_mcp_edge::execute_bridge_mcp_tool_call(
         &error_kernel,
         chio_mcp_edge::BridgeMcpToolCallRequest {
+            dpop_proof: None,
+            peer_capabilities: Default::default(),
             request_id: "metrics-mcp-error-1".to_string(),
             capability: capability_for_tool(&error_issuer, &error_agent)?,
             server_id: "metrics-srv".to_string(),
@@ -1489,6 +1492,8 @@ fn existing_infra_driver(name: &str) -> Result<Option<String>, Box<dyn Error>> {
         let _ = chio_mcp_edge::execute_bridge_mcp_tool_call(
             &kernel,
             chio_mcp_edge::BridgeMcpToolCallRequest {
+                dpop_proof: None,
+                peer_capabilities: Default::default(),
                 request_id: "emission-gate-mcp-1".to_string(),
                 capability: capability_for_tool(&issuer, &agent)?,
                 server_id: "emission-gate-srv".to_string(),

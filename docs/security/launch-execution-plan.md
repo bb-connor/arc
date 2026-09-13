@@ -4,7 +4,8 @@ Status: accepted for local execution on 2026-09-10. M0 is consolidated. M1's
 implementation and local acceptance are complete under the explicit confinement
 qualification deferral below. M2's native failure/restart safety acceptance is
 locally complete under the existing fail-closed release contract. M3's local
-authenticated and native caller custody acceptance is complete; M4 is next.
+authenticated and native caller custody acceptance is complete. M4 consumer
+implementation and final composed qualification are in progress.
 See [current execution status](launch-status.md).
 On 2026-09-11 the
 user authorized committing, pushing and maintaining the accumulated work as a PR,
@@ -366,6 +367,17 @@ complete it without creating authority for another call.
 
 ## M4. Close constructor, protocol and SDK bypasses
 
+Execution detail: [M4 consumer-boundary qualification](m4-consumer-qualification.md).
+The 2026-09-13 expansion retains all five requirements below and defines M4.0-M4.8
+with source owners, a complete consumer inventory, positive/negative acceptance,
+four-language parity, calibrated no-bypass gates and final qualification.
+The workspace run's 11 failed targets were diagnosed and their focused regressions
+passed, including the nested-nonce default-stack repair. The consumer inventory,
+negotiated protocol boundaries, strict current-wire parsers and executable gates
+are implemented. Final composed qualification is still running. Historical M3
+results and the focused repairs do not substitute for those final gates. See the
+[migration contract](m4-consumer-migration.md) for intentional source/wire changes.
+
 1. Reconcile every non-test kernel constructor and each caller/remote dispatch
    entrypoint with the support matrix. Centralized installation must be used, or
    an opted-in unsupported profile must be rejected before authority acquisition.
@@ -601,10 +613,10 @@ safety matrix are complete. Confinement remains explicitly deferred, and missing
 release custody remains a fail-closed availability limit. The dependency order
 above still governs the remaining milestones.
 
-1. Execute M3's authenticated caller start and durable delivery contract. Keep the
-   lost-report counterexample until the actual handshake and executor claim fix it.
-2. Complete M4's constructor, adapter and SDK inventory with positive supported
-   paths and required startup/dispatch denials after the caller contract is sound.
+1. Preserve M3's authenticated caller start, durable executor ledger and native
+   custody acceptance; rerun its exact dependency gate on the M4 candidate.
+2. Finish M4's consumer, parser, compatibility, C++/FFI and composed qualification
+   with its classified inventory and required startup/dispatch denials.
 3. Qualify M5's capability-bound reference swarm and M6's enterprise topology on
    an authorized, suitable host. Then follow M7-M11's declared dependencies and
    operator-authorization boundaries. Do not infer release approval from M1/M2.

@@ -34,7 +34,10 @@ pub(crate) use security_binding::AdmissionSecurityBindingV1;
 /// version establishes a current trusted host context or claim authority.
 #[derive(Clone)]
 pub struct RetainedToolAdmissionRequestV1 {
-    wire: RetainedRequestWire,
+    // Historical custody verification composes several store layers. Keep the
+    // decoded request heap-owned so each validating frame carries a handle,
+    // not another full capability/request/authority-profile value.
+    wire: Box<RetainedRequestWire>,
     canonical: Vec<u8>,
 }
 
@@ -50,7 +53,7 @@ impl std::fmt::Debug for RetainedToolAdmissionRequestV1 {
 #[serde(deny_unknown_fields)]
 struct RetainedRequestWire {
     schema: String,
-    request: ToolCallRequest,
+    request: Box<ToolCallRequest>,
     matching_grant_indices: Vec<usize>,
     post_return_steps: Vec<FrozenEvaluationStepV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -226,7 +229,7 @@ impl RetainedToolAdmissionRequestV1 {
         let request = Self::request_without_transient_credentials(request);
         let wire = RetainedRequestWire {
             schema: Self::schema(security_binding, authority_profile).to_owned(),
-            request,
+            request: Box::new(request),
             matching_grant_indices: matching_grants.iter().map(|grant| grant.index).collect(),
             post_return_steps: post_return_steps.to_vec(),
             security_binding: security_binding.cloned(),
@@ -242,7 +245,7 @@ impl RetainedToolAdmissionRequestV1 {
         if bytes.is_empty() || bytes.len() > MAX_BYTES {
             return Err(invalid("retained request exceeds its artifact bound"));
         }
-        let wire: RetainedRequestWire = serde_json::from_slice(bytes).map_err(invalid)?;
+        let wire: Box<RetainedRequestWire> = serde_json::from_slice(bytes).map_err(invalid)?;
         let request = &wire.request;
         let expected_schema = Self::schema(
             wire.security_binding.as_ref(),

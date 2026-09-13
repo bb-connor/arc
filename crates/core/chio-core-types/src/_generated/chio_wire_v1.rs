@@ -1663,7 +1663,7 @@ pub mod agent_tool_call_request {
     ///                      "minLength": 1
     ///                    },
     ///                    "plan_schema": {
-    ///                      "const": "chio.governed-response-plan.v1"
+    ///                      "const": "chio.response-plan.v1"
     ///                    },
     ///                    "rollback_binding": {
     ///                      "type": "object"
@@ -5187,7 +5187,7 @@ pub mod agent_tool_call_request {
     ///                  "minLength": 1
     ///                },
     ///                "plan_schema": {
-    ///                  "const": "chio.governed-response-plan.v1"
+    ///                  "const": "chio.response-plan.v1"
     ///                },
     ///                "rollback_binding": {
     ///                  "type": "object"
@@ -5376,7 +5376,7 @@ pub mod agent_tool_call_request {
     ///              "minLength": 1
     ///            },
     ///            "plan_schema": {
-    ///              "const": "chio.governed-response-plan.v1"
+    ///              "const": "chio.response-plan.v1"
     ///            },
     ///            "rollback_binding": {
     ///              "type": "object"

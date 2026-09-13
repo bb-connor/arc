@@ -553,6 +553,14 @@ async fn handle_initialize_post(
         );
     }
 
+    let initialize_params = message.get("params").cloned().unwrap_or_else(|| json!({}));
+    let authorization = match chio_mcp_adapter::edge::authorization::negotiate_authorization_capabilities(&initialize_params) {
+        Ok(profile) => profile,
+        Err(error) => return jsonrpc_http_error(StatusCode::BAD_REQUEST, -32602, &error.to_string()),
+    };
+    let mut peer_capabilities = parse_remote_session_peer_capabilities(&initialize_params);
+    peer_capabilities.authorization = Some(authorization);
+
     let session = match state.factory.spawn_session(auth_context) {
         Ok(session) => session,
         Err(error) => {
@@ -561,8 +569,6 @@ async fn handle_initialize_post(
     };
 
     let request_id = message.get("id").cloned().unwrap_or(Value::Null);
-    let initialize_params = message.get("params").cloned().unwrap_or_else(|| json!({}));
-    let peer_capabilities = parse_remote_session_peer_capabilities(&initialize_params);
     let mut event_rx = session.subscribe();
     if let Err(error) = session.send(message) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
@@ -1140,6 +1146,7 @@ fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
         .is_some_and(|value| value.get("url").is_some() || value.get("openUrl").is_some());
 
     PeerCapabilities {
+        authorization: None,
         supports_progress: declared_peer_capability(capabilities, "progress"),
         supports_cancellation: declared_peer_capability(capabilities, "cancellation"),
         supports_subscriptions: resources

@@ -16,6 +16,7 @@ export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
 
 ./scripts/check-proptest-coverage.sh
 ./scripts/check-protocol-peer-negotiation.sh
+./scripts/check-consumer-boundaries.sh
 
 ./scripts/check-release-inputs.sh
 ./scripts/check-workspace-layering.sh

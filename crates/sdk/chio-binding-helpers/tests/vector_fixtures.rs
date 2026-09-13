@@ -1013,7 +1013,6 @@ fn sample_signed_manifest(public_key: String, tool_names: &[&str]) -> SignedTool
                     destructive: *tool_name == "file_write",
                     idempotent: false,
                     requires_approval: *tool_name == "file_write",
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(if *tool_name == "file_read" {
                     LatencyHint::Fast

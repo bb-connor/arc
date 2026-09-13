@@ -944,6 +944,37 @@ pub(crate) fn cmd_mcp_serve(
         _ => unreachable!("policy path resolution validated above"),
     };
 
+    let signed_manifest_path = signed_manifest_path.ok_or_else(|| {
+        CliError::cli_other_error(
+            "MCP serve requires --signed-manifest with an existing publisher-signed manifest"
+                .to_string(),
+        )
+    })?;
+    let manifest_public_key = manifest_public_key.ok_or_else(|| {
+        CliError::cli_other_error(
+            "MCP serve requires --manifest-public-key with an independently registered key"
+                .to_string(),
+        )
+    })?;
+    let manifest_registry = Arc::new(
+        chio_manifest::load_existing_verified_manifest_registry(
+            signed_manifest_path,
+            manifest_public_key,
+            server_id,
+            chio_manifest::RuntimeToolTopology::local(),
+        )
+        .map_err(|error| {
+            CliError::cli_other_error(format!("failed to load admitted MCP manifest: {error}"))
+        })?,
+    );
+    // This command installs the ordinary kernel. Validate the authenticated
+    // profile before acquiring durable stores or effect-capable launch authority.
+    if manifest_registry.requires_flow_runtime() {
+        return Err(CliError::cli_other_error(
+            "MCP serve requires an active-defense host for flow-required manifests".to_string(),
+        ));
+    }
+
     let loaded_policy = load_policy(resolved_policy_path)?;
     let policy_identity = loaded_policy.identity.clone();
     let default_capabilities = loaded_policy.default_capabilities.clone();
@@ -992,29 +1023,6 @@ pub(crate) fn cmd_mcp_serve(
         .ok_or_else(|| CliError::cli_other_error("empty MCP server command".to_string()))?;
     let wrapped_arg_refs = wrapped_args.iter().map(String::as_str).collect::<Vec<_>>();
 
-    let signed_manifest_path = signed_manifest_path.ok_or_else(|| {
-        CliError::cli_other_error(
-            "MCP serve requires --signed-manifest with an existing publisher-signed manifest"
-                .to_string(),
-        )
-    })?;
-    let manifest_public_key = manifest_public_key.ok_or_else(|| {
-        CliError::cli_other_error(
-            "MCP serve requires --manifest-public-key with an independently registered key"
-                .to_string(),
-        )
-    })?;
-    let manifest_registry = Arc::new(
-        chio_manifest::load_existing_verified_manifest_registry(
-            signed_manifest_path,
-            manifest_public_key,
-            server_id,
-            chio_manifest::RuntimeToolTopology::local(),
-        )
-        .map_err(|error| {
-            CliError::cli_other_error(format!("failed to load admitted MCP manifest: {error}"))
-        })?,
-    );
     let native_launch = crate::mcp_cli::load_native_mcp_launch(
         cage_policy_path,
         cage_policy_signer,

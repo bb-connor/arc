@@ -178,7 +178,6 @@ fn anthropic_server_tool_manifest() -> chio_manifest::ToolManifest {
                 destructive: false,
                 idempotent: false,
                 requires_approval: false,
-                estimated_duration_ms: None,
             },
             latency_hint: Some(LatencyHint::Fast),
             flow: None,

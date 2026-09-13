@@ -1,5 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 use super::*;
+
+#[path = "runtime_tests/authorization.rs"]
+mod authorization;
 use chio_core::capability::{
     governance::ProvenanceEvidenceClass,
     scope::{
@@ -551,6 +554,8 @@ fn make_kernel_error_bridge_fixture(
         )
         .unwrap();
     let request = BridgeMcpToolCallRequest {
+        dpop_proof: None,
+        peer_capabilities: Default::default(),
         request_id: request_id.to_string(),
         capability,
         server_id: server_id.to_string(),
@@ -721,7 +726,6 @@ fn sample_manifest() -> ToolManifest {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(LatencyHint::Fast),
                 flow: None,
@@ -743,7 +747,6 @@ fn sample_manifest() -> ToolManifest {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(LatencyHint::Moderate),
                 flow: None,
@@ -759,7 +762,6 @@ fn sample_manifest() -> ToolManifest {
                     destructive: true,
                     idempotent: false,
                     requires_approval: true,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(LatencyHint::Slow),
                 flow: None,
@@ -790,7 +792,6 @@ fn streaming_manifest() -> ToolManifest {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(LatencyHint::Moderate),
                 flow: None,
@@ -806,7 +807,6 @@ fn streaming_manifest() -> ToolManifest {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(LatencyHint::Slow),
                 flow: None,
@@ -963,6 +963,25 @@ fn normalize_transport_output(messages: &mut [Value]) {
 fn normalize_dynamic_transport_fields(value: &mut Value) {
     match value {
         Value::Object(map) => {
+            if let Some(value) = map.get_mut("receipt") {
+                let receipt: chio_core::receipt::body::ChioReceipt =
+                    serde_json::from_value(value.clone()).unwrap();
+                assert!(receipt.verify_signature().unwrap());
+                // These transcripts use separately constructed kernels and
+                // sessions. Verify each signature, then compare decision and
+                // tool semantics without comparing fresh signing identities.
+                *value = json!({
+                    "tool_server":receipt.tool_server, "tool_name":receipt.tool_name,
+                    "action":receipt.action, "decision":receipt.decision,
+                    "receipt_kind":receipt.receipt_kind, "boundary_class":receipt.boundary_class,
+                    "observation_outcome":receipt.observation_outcome, "tool_origin":receipt.tool_origin,
+                    "redaction_mode":receipt.redaction_mode, "trust_level":receipt.trust_level,
+                    "policy_hash":receipt.policy_hash, "tenant_id":receipt.tenant_id,
+                });
+            }
+            if let Some(receipt_id) = map.get_mut("receiptId") {
+                *receipt_id = json!("$receipt");
+            }
             if let Some(owner_session_id) = map.get_mut("ownerSessionId") {
                 *owner_session_id = json!("$session");
             }
@@ -1063,6 +1082,8 @@ fn execute_bridge_mcp_tool_call_preserves_model_metadata() {
     let bridge = execute_bridge_mcp_tool_call(
         &kernel,
         BridgeMcpToolCallRequest {
+            dpop_proof: None,
+            peer_capabilities: Default::default(),
             request_id: "mcp-model-1".to_string(),
             capability,
             server_id: "srv".to_string(),
@@ -1099,6 +1120,8 @@ fn pending_approval_receipt_write_uses_pending_outcome_label() {
     let bridge = execute_bridge_mcp_tool_call(
         &kernel,
         BridgeMcpToolCallRequest {
+            dpop_proof: None,
+            peer_capabilities: Default::default(),
             request_id: "mcp-pending-seed".to_string(),
             capability,
             server_id: "srv".to_string(),
@@ -1400,6 +1423,8 @@ fn kernel_error_records_receipt_write_error_outcome() {
     let error = execute_bridge_mcp_tool_call(
         &kernel,
         BridgeMcpToolCallRequest {
+            dpop_proof: None,
+            peer_capabilities: Default::default(),
             request_id: "mcp-error-1".to_string(),
             capability,
             server_id: "srv".to_string(),
@@ -1555,6 +1580,8 @@ async fn execute_bridge_mcp_tool_call_async_preserves_model_metadata() {
     let bridge = execute_bridge_mcp_tool_call_async(
         &kernel,
         BridgeMcpToolCallRequest {
+            dpop_proof: None,
+            peer_capabilities: Default::default(),
             request_id: "mcp-model-async-1".to_string(),
             capability,
             server_id: "srv".to_string(),
@@ -1730,7 +1757,6 @@ fn make_dispatched_url_elicitation_edge() -> ChioMcpEdge {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(LatencyHint::Moderate),
                 flow: None,

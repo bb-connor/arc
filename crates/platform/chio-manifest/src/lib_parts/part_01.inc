@@ -328,17 +328,18 @@ pub struct RequiredPermissions {
 #[serde(deny_unknown_fields)]
 pub struct NetworkDestination {
     host: NormalizedHost,
-    port: u16,
+    port: std::num::NonZeroU16,
 }
 
 impl NetworkDestination {
     pub fn new(host: impl AsRef<str>, port: u16) -> Result<Self, ManifestError> {
-        if port == 0 {
-            return Err(ManifestError::InvalidRequiredPermission {
+        // Preserve the invariant through both construction and deserialization.
+        let port = std::num::NonZeroU16::new(port).ok_or_else(|| {
+            ManifestError::InvalidRequiredPermission {
                 field: "required_permissions.network_destinations.port",
                 value: port.to_string(),
-            });
-        }
+            }
+        })?;
         Ok(Self {
             host: NormalizedHost::new(host)?,
             port,
@@ -352,7 +353,7 @@ impl NetworkDestination {
 
     #[must_use]
     pub const fn port(&self) -> u16 {
-        self.port
+        self.port.get()
     }
 }
 
@@ -832,7 +833,6 @@ fn migrate_legacy_tool(tool: LegacyToolDefinitionV1) -> Result<ToolDefinition, M
                     destructive: true,
                     idempotent: false,
                     requires_approval: true,
-                    estimated_duration_ms: None,
                 }
             } else {
                 ToolAnnotations {
@@ -840,7 +840,6 @@ fn migrate_legacy_tool(tool: LegacyToolDefinitionV1) -> Result<ToolDefinition, M
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 }
             },
             None,
@@ -851,7 +850,6 @@ fn migrate_legacy_tool(tool: LegacyToolDefinitionV1) -> Result<ToolDefinition, M
                 destructive: legacy.destructive,
                 idempotent: legacy.idempotent,
                 requires_approval: legacy.requires_approval,
-                estimated_duration_ms: None,
             },
             legacy.estimated_duration_ms,
         ),
@@ -960,7 +958,6 @@ mod tests {
                     destructive: false,
                     idempotent: true,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(LatencyHint::Instant),
                 flow: None,

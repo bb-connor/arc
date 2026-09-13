@@ -194,7 +194,6 @@ fn conformance_registry(
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(chio_manifest::LatencyHint::Fast),
                 flow: None,

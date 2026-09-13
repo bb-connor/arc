@@ -461,7 +461,6 @@ fn build_tool_definition(
             destructive: true,
             idempotent: false,
             requires_approval: true,
-            estimated_duration_ms: None,
         },
         latency_hint: Some(LatencyHint::Moderate),
         flow: None,

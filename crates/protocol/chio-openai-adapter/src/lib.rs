@@ -8,7 +8,8 @@
 //! - **Chat Completions API** format (function_call / tool_calls)
 //! - **Responses API** format (tool invocations)
 //!
-//! Every function call produces a signed receipt. Guards fail closed by default.
+//! Admitted evaluations produce signed receipts. Invalid or unnegotiated input
+//! rejects before admission; guards fail closed by default.
 
 #![forbid(unsafe_code)]
 
@@ -198,6 +199,7 @@ pub struct OpenAiExecutionContext {
 #[derive(Debug)]
 pub struct ChioOpenAiAdapter {
     manifest: ToolManifest,
+    peer_capabilities: chio_core::capability::features::CapabilityNegotiation,
     /// Maps function name to (server_id, tool_name).
     function_bindings: BTreeMap<String, (String, String)>,
 }
@@ -213,6 +215,12 @@ impl ChioOpenAiAdapter {
 
         for manifest in &manifests {
             for tool in &manifest.tools {
+                if tool.flow.is_some() {
+                    return Err(OpenAiAdapterError::InvalidRequest(
+                        "flow-required OpenAI tools require the verified cross-protocol host"
+                            .to_string(),
+                    ));
+                }
                 let func_name = tool.name.clone();
                 if function_bindings.contains_key(&func_name) {
                     continue;
@@ -246,7 +254,21 @@ impl ChioOpenAiAdapter {
         Ok(Self {
             manifest,
             function_bindings,
+            peer_capabilities: Default::default(),
         })
+    }
+
+    /// Bind a peer profile established by the host, never by a model tool call.
+    /// This does not install budget, approval or native release authority.
+    pub fn with_peer_capabilities(
+        mut self,
+        profile: &chio_core::capability::features::CapabilityNegotiation,
+    ) -> Result<Self, OpenAiAdapterError> {
+        profile
+            .validate()
+            .map_err(|error| OpenAiAdapterError::InvalidRequest(error.to_string()))?;
+        self.peer_capabilities = profile.clone();
+        Ok(self)
     }
 
     /// Get the manifest.
@@ -287,8 +309,8 @@ impl ChioOpenAiAdapter {
 
     /// Execute an OpenAI tool call through the Chio kernel.
     ///
-    /// This is the core interception point. Every function call produces
-    /// a signed receipt via the kernel guard pipeline.
+    /// This is the core interception point. Admitted evaluations produce a
+    /// signed receipt; malformed or unnegotiated input rejects before admission.
     pub fn execute_tool_call(
         &self,
         tool_call: &OpenAiToolCall,
@@ -360,6 +382,10 @@ impl ChioOpenAiAdapter {
             federated_origin_kernel_id: None,
             declassification_grant: None,
         };
+
+        if let Err(error) = request.validate_peer_capabilities(&self.peer_capabilities) {
+            return denied_tool_call_result(tool_call, format!("Error: {error}"));
+        }
 
         let route_plan = match plan_authoritative_route(
             &request.request_id,

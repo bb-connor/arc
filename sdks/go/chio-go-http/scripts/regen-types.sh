@@ -1276,6 +1276,15 @@ func rawJsonIsNull(raw json.RawMessage) bool {
 """,
 )
 
+aggregate_decoder = "func (t *CapabilityAggregateInvocationBudget) UnmarshalJSON(b []byte) error {\n"
+if text.count(aggregate_decoder) != 1:
+    raise SystemExit("generated aggregate decoder inventory changed")
+text = text.replace(
+    aggregate_decoder,
+    aggregate_decoder + "\tif err := validateAggregateBudgetJSON(b); err != nil {\n\t\treturn err\n\t}\n",
+    1,
+)
+
 path.write_text(text, encoding="utf-8")
 PY
 

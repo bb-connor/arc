@@ -500,6 +500,7 @@ fn session_operation_list_roots_uses_session_snapshot() {
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,
@@ -741,6 +742,7 @@ fn tool_call_nested_flow_bridge_roundtrips_sampling() {
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,
@@ -844,6 +846,7 @@ fn tool_call_nested_flow_bridge_roundtrips_elicitation() {
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,
@@ -929,6 +932,7 @@ fn tool_call_nested_flow_bridge_updates_session_roots() {
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,
@@ -1016,6 +1020,7 @@ fn tool_call_nested_flow_bridge_propagates_parent_cancellation() {
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: true,
                 supports_subscriptions: false,
@@ -1118,6 +1123,7 @@ fn tool_call_nested_flow_bridge_propagates_child_cancellation() {
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: true,
                 supports_subscriptions: false,

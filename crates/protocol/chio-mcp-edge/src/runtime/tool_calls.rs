@@ -10,6 +10,9 @@ pub struct BridgeMcpToolCallRequest {
     pub tool_name: String,
     pub arguments: Value,
     pub agent_id: String,
+    pub dpop_proof: Option<chio_kernel::dpop::DpopProof>,
+    /// Host-established peer profile. It is not read from request metadata.
+    pub peer_capabilities: chio_core::capability::features::CapabilityNegotiation,
     pub execution_nonce: Option<SignedExecutionNonce>,
     pub governed_intent: Option<GovernedTransactionIntent>,
     pub approval_token: Option<GovernedApprovalToken>,
@@ -19,6 +22,29 @@ pub struct BridgeMcpToolCallRequest {
     pub model_metadata: Option<ModelMetadata>,
     pub route_selection_metadata: Option<Value>,
     pub peer_supports_chio_tool_streaming: bool,
+}
+
+impl BridgeMcpToolCallRequest {
+    pub(super) fn kernel_request(&self) -> ToolCallRequest {
+        ToolCallRequest {
+            request_id: self.request_id.clone(),
+            capability: self.capability.clone(),
+            tool_name: self.tool_name.clone(),
+            server_id: self.server_id.clone(),
+            agent_id: self.agent_id.clone(),
+            arguments: self.arguments.clone(),
+            dpop_proof: self.dpop_proof.clone(),
+            execution_nonce: self.execution_nonce.clone(),
+            governed_intent: self.governed_intent.clone(),
+            approval_token: self.approval_token.clone(),
+            approval_tokens: self.approval_tokens.clone(),
+            threshold_approval_proposal: self.threshold_approval_proposal.clone(),
+            supplemental_authorization: self.supplemental_authorization.clone(),
+            model_metadata: self.model_metadata.clone(),
+            federated_origin_kernel_id: None,
+            declassification_grant: None,
+        }
+    }
 }
 
 /// Bridge-only MCP tool-call execution result.
@@ -67,13 +93,13 @@ impl TargetProtocolExecutor for McpTargetExecutor {
             route_selection_metadata(request.route_selection)?,
             &request.execution.source_envelope,
         )?;
-        let response = request
-            .kernel
-            .evaluate_tool_call_blocking_with_metadata(
-                &kernel_tool_call_request(request.execution),
-                Some(route_metadata),
-            )
-            .map_err(BridgeError::Kernel)?;
+        let response = evaluate_bound_kernel_request(
+            request.kernel,
+            request.manifest_registry,
+            request.execution,
+            request.peer_capabilities,
+            route_metadata,
+        )?;
         let bridge = bridge_mcp_tool_call_from_response(
             response,
             &request.execution.kernel_request_id,
@@ -107,43 +133,12 @@ pub async fn execute_bridge_mcp_tool_call_async(
     kernel: &ChioKernel,
     request: BridgeMcpToolCallRequest,
 ) -> Result<BridgeMcpToolCall, AdapterError> {
-    let BridgeMcpToolCallRequest {
-        request_id,
-        capability,
-        server_id,
-        tool_name,
-        arguments,
-        agent_id,
-        execution_nonce,
-        governed_intent,
-        approval_token,
-        approval_tokens,
-        threshold_approval_proposal,
-        supplemental_authorization,
-        model_metadata,
-        route_selection_metadata,
-        peer_supports_chio_tool_streaming,
-    } = request;
-    let kernel_request = ToolCallRequest {
-        request_id: request_id.clone(),
-        capability,
-        tool_name,
-        server_id,
-        agent_id,
-        arguments,
-        dpop_proof: None,
-        execution_nonce,
-        governed_intent,
-        approval_token,
-        approval_tokens,
-        threshold_approval_proposal,
-        supplemental_authorization,
-        model_metadata,
-        federated_origin_kernel_id: None,
-        declassification_grant: None,
-    };
+    let kernel_request = request.kernel_request();
+    kernel_request
+        .validate_peer_capabilities(&request.peer_capabilities)
+        .map_err(|error| AdapterError::ParseError(error.to_string()))?;
     let response = match kernel
-        .evaluate_tool_call_with_metadata(&kernel_request, route_selection_metadata)
+        .evaluate_tool_call_with_metadata(&kernel_request, request.route_selection_metadata.clone())
         .await
     {
         Ok(response) => response,
@@ -152,8 +147,8 @@ pub async fn execute_bridge_mcp_tool_call_async(
 
     BridgeMcpToolCall::from_kernel_response(
         response,
-        &request_id,
-        peer_supports_chio_tool_streaming,
+        &request.request_id,
+        request.peer_supports_chio_tool_streaming,
     )
 }
 
@@ -168,24 +163,10 @@ pub fn execute_bridge_mcp_tool_call(
             })
         }
         Ok(_) => {
-            let kernel_request = ToolCallRequest {
-                request_id: request.request_id.clone(),
-                capability: request.capability.clone(),
-                tool_name: request.tool_name.clone(),
-                server_id: request.server_id.clone(),
-                agent_id: request.agent_id.clone(),
-                arguments: request.arguments.clone(),
-                dpop_proof: None,
-                execution_nonce: request.execution_nonce.clone(),
-                governed_intent: request.governed_intent.clone(),
-                approval_token: request.approval_token.clone(),
-                approval_tokens: request.approval_tokens.clone(),
-                threshold_approval_proposal: request.threshold_approval_proposal.clone(),
-                supplemental_authorization: request.supplemental_authorization.clone(),
-                model_metadata: request.model_metadata.clone(),
-                federated_origin_kernel_id: None,
-                declassification_grant: None,
-            };
+            let kernel_request = request.kernel_request();
+            kernel_request
+                .validate_peer_capabilities(&request.peer_capabilities)
+                .map_err(|error| AdapterError::ParseError(error.to_string()))?;
             let response = match kernel.evaluate_tool_call_blocking_with_metadata(
                 &kernel_request,
                 request.route_selection_metadata.clone(),
@@ -237,6 +218,7 @@ fn bridge_mcp_tool_call_from_response(
         output: response.output.clone(),
         reason: response.reason.clone(),
         verdict: response.verdict,
+        receipt: &response.receipt,
         terminal_state: &response.terminal_state,
         execution_nonce: response.execution_nonce.as_deref(),
         peer_supports_chio_tool_streaming,
@@ -271,6 +253,7 @@ pub(super) struct KernelToolResultArgs<'a> {
     pub(super) output: Option<ToolCallOutput>,
     pub(super) reason: Option<String>,
     pub(super) verdict: Verdict,
+    pub(super) receipt: &'a chio_core::receipt::body::ChioReceipt,
     pub(super) terminal_state: &'a OperationTerminalState,
     pub(super) execution_nonce: Option<Box<SignedExecutionNonce>>,
     pub(super) related_task_id: Option<&'a str>,
@@ -402,6 +385,27 @@ impl ChioMcpEdge {
             }
         };
 
+        let peer = self
+            .kernel
+            .session(&session_id)
+            .ok_or_else(|| {
+                jsonrpc_error(
+                    id.clone(),
+                    JSONRPC_INVALID_REQUEST,
+                    "MCP session is unavailable",
+                )
+            })?
+            .peer_capabilities()
+            .authorization
+            .unwrap_or_default();
+        peer.validate_invocation_features(
+            &capability,
+            &approval_tokens,
+            threshold_approval_proposal.as_ref(),
+            governed_intent.as_ref(),
+            supplemental_authorization.as_ref(),
+        )
+        .map_err(|error| jsonrpc_error(id.clone(), JSONRPC_INVALID_PARAMS, &error.to_string()))?;
         let nonce_bound_request_id = execution_nonce
             .as_ref()
             .map(|nonce| nonce.nonce.bound_to.request_id.as_str());
@@ -461,6 +465,7 @@ impl ChioMcpEdge {
                     output: response.output,
                     reason: response.reason,
                     verdict: response.verdict,
+                    receipt: &response.receipt,
                     terminal_state: &response.terminal_state,
                     execution_nonce: response.execution_nonce,
                     related_task_id,
@@ -542,6 +547,7 @@ impl ChioMcpEdge {
                 output: response.output,
                 reason: response.reason,
                 verdict: response.verdict,
+                receipt: &response.receipt,
                 terminal_state: &response.terminal_state,
                 execution_nonce: response.execution_nonce,
                 related_task_id,
@@ -608,6 +614,7 @@ impl ChioMcpEdge {
                 output: response.output,
                 reason: response.reason,
                 verdict: response.verdict,
+                receipt: &response.receipt,
                 terminal_state: &response.terminal_state,
                 execution_nonce: response.execution_nonce,
                 related_task_id,
@@ -750,6 +757,7 @@ impl ChioMcpEdge {
             output,
             reason,
             verdict,
+            receipt,
             terminal_state,
             execution_nonce,
             related_task_id,
@@ -762,6 +770,7 @@ impl ChioMcpEdge {
             output,
             reason,
             verdict,
+            receipt,
             terminal_state,
             execution_nonce: execution_nonce.as_deref(),
             peer_supports_chio_tool_streaming,

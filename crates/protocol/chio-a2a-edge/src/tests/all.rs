@@ -1,7 +1,129 @@
 #[cfg(test)]
 mod tests {
-    use chio_test_support::prelude::*;
+    mod authorization_projection {
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../tests/bindings/support/authorization_projection.rs"
+        ));
+    }
+
+    fn authorization_context(request: &chio_kernel::ToolCallRequest) -> A2aKernelExecutionContext {
+        A2aKernelExecutionContext {
+            capability: request.capability.clone(),
+            agent_id: request.agent_id.clone(),
+            dpop_proof: request.dpop_proof.clone(),
+            execution_nonce: request.execution_nonce.clone(),
+            governed_intent: request.governed_intent.clone(),
+            approval_token: request.approval_token.clone(),
+            approval_tokens: request.approval_tokens.clone(),
+            threshold_approval_proposal: request.threshold_approval_proposal.clone(),
+            supplemental_authorization: request.supplemental_authorization.clone(),
+            model_metadata: request.model_metadata.clone(),
+        }
+    }
+
+    #[test]
+    fn a2a_execution_request_preserves_complete_authorization_context() {
+        let expected = authorization_projection::complete_wire_request();
+        let execution = authorization_context(&expected);
+        validate_execution_context(
+            &execution,
+            &chio_mcp_edge::authorization::authorization_capabilities(),
+        )
+        .test_unwrap();
+        let source = SendMessageRequest {
+            message: A2aMessage {
+                role: "user".to_string(),
+                parts: vec![A2aPart::Data {
+                    data: expected.arguments.clone(),
+                }],
+                metadata: None,
+            },
+            metadata: None,
+        };
+        let projected = ChioA2aEdge::build_execution_request(
+            SkillBinding {
+                target_protocol: DiscoveryProtocol::Native,
+                server_id: expected.server_id.clone(),
+                tool_name: expected.tool_name.clone(),
+                security: BridgeSecurityMetadata::unconstrained(),
+            },
+            &expected.tool_name,
+            &source,
+            expected.arguments.clone(),
+            &execution,
+            "wire-origin".to_string(),
+            expected.request_id.clone(),
+        )
+        .test_unwrap();
+        authorization_projection::assert_authorization_preserved(
+            &expected,
+            &chio_cross_protocol::execution::kernel_tool_call_request(&projected),
+        );
+    }
+
+    #[test]
+    fn a2a_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation() {
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let calls = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        kernel.register_tool_server(Box::new(authorization_projection::CountedToolServer {
+            server: "test-srv".to_string(),
+            tool: "echo".to_string(),
+            calls: calls.clone(),
+        }));
+        let baseline: chio_kernel::ToolCallRequest = serde_json::from_value(json!({
+            "request_id":"ordinary-positive", "capability":capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+            "agent_id":subject.public_key().to_hex(), "server_id":"test-srv", "tool_name":"echo", "arguments":{}
+        })).test_unwrap();
+        let source = SendMessageRequest {
+            message: A2aMessage {
+                role: "user".to_string(),
+                parts: vec![A2aPart::Data { data: json!({}) }],
+                metadata: None,
+            },
+            metadata: Some(
+                json!({"chioAuthorization":chio_mcp_edge::authorization::authorization_capabilities()}),
+            ),
+        };
+        let positive = edge
+            .handle_send_message_with_request_id(
+                &baseline.request_id,
+                "echo",
+                &source,
+                &kernel,
+                &authorization_context(&baseline),
+            )
+            .test_unwrap();
+        assert_eq!(positive.status, TaskStatus::Completed);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let receipts = kernel.receipt_log().receipts().len();
+        for (feature, request) in authorization_projection::extension_cases(&baseline) {
+            let error = edge
+                .handle_send_message_with_request_id(
+                    &request.request_id,
+                    "echo",
+                    &source,
+                    &kernel,
+                    &authorization_context(&request),
+                )
+                .test_unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("invocation feature {feature} was not negotiated")),
+                "{error}"
+            );
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            assert_eq!(kernel.receipt_log().receipts().len(), receipts);
+        }
+    }
     use super::*;
+    use chio_test_support::prelude::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex, MutexGuard};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -19,8 +141,8 @@ mod tests {
     use chio_kernel::{
         ChioKernel, KernelConfig, KernelError, NestedFlowBridge, RuntimeAdmissionContext,
         RuntimeAdmissionDecision, RuntimeAdmissionHook, ToolCallChunk, ToolCallStream,
-        ToolServerStreamResult, DEFAULT_CHECKPOINT_BATCH_SIZE,
-        DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        ToolServerStreamResult, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+        DEFAULT_MAX_STREAM_TOTAL_BYTES,
     };
     use chio_manifest::LatencyHint;
 
@@ -205,7 +327,6 @@ mod tests {
                         destructive: false,
                         idempotent: false,
                         requires_approval: false,
-                        estimated_duration_ms: None,
                     },
                     latency_hint: None,
                     flow: None,
@@ -221,7 +342,6 @@ mod tests {
                         destructive: true,
                         idempotent: false,
                         requires_approval: true,
-                        estimated_duration_ms: None,
                     },
                     latency_hint: None,
                     flow: None,
@@ -259,10 +379,8 @@ mod tests {
         .test_unwrap()
     }
 
-    fn registry_with_nontrivial_flow() -> (
-        VerifiedManifestRegistry,
-        chio_manifest::ToolFlowDeclaration,
-    ) {
+    fn registry_with_nontrivial_flow(
+    ) -> (VerifiedManifestRegistry, chio_manifest::ToolFlowDeclaration) {
         let signer = Keypair::from_seed(&[1; 32]);
         let flow = nontrivial_registry_flow();
         let mut manifest = test_manifest();
@@ -325,7 +443,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: None,
@@ -357,7 +474,6 @@ mod tests {
                     destructive: true,
                     idempotent: false,
                     requires_approval: true,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: None,
@@ -389,7 +505,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: None,
@@ -421,7 +536,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(LatencyHint::Fast),
                 flow: None,
@@ -453,7 +567,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(LatencyHint::Fast),
                 flow: None,
@@ -485,7 +598,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(LatencyHint::Fast),
                 flow: None,
@@ -517,7 +629,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: None,
@@ -715,8 +826,8 @@ mod tests {
     #[test]
     fn registry_admitted_flow_survives_a2a_execution_projection_canonically() {
         let (registry, expected_flow) = registry_with_nontrivial_flow();
-        let edge = ChioA2aEdge::new_with_registry(A2aEdgeConfig::default(), &registry)
-            .test_unwrap();
+        let edge =
+            ChioA2aEdge::new_with_registry(A2aEdgeConfig::default(), &registry).test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let subject = Keypair::generate();
@@ -761,8 +872,8 @@ mod tests {
     #[test]
     fn a2a_execution_boundary_rejects_removed_or_mismatched_flow_sidecar() {
         let (registry, _) = registry_with_nontrivial_flow();
-        let edge = ChioA2aEdge::new_with_registry(A2aEdgeConfig::default(), &registry)
-            .test_unwrap();
+        let edge =
+            ChioA2aEdge::new_with_registry(A2aEdgeConfig::default(), &registry).test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -792,8 +903,13 @@ mod tests {
         )
         .test_unwrap();
 
-        let runtime_error = execute_orchestrated_a2a_request(&kernel, &registry, request.clone())
-            .test_expect_err("flow-required A2A registry must reject an unprotected kernel");
+        let runtime_error = execute_orchestrated_a2a_request(
+            &Default::default(),
+            &kernel,
+            &registry,
+            request.clone(),
+        )
+        .test_expect_err("flow-required A2A registry must reject an unprotected kernel");
         assert!(matches!(
             runtime_error,
             A2aEdgeError::Bridge(BridgeError::Kernel(KernelError::FlowRuntimeUnavailable))
@@ -801,16 +917,18 @@ mod tests {
 
         let mut removed = request.clone();
         removed.bridge_security = BridgeSecurityMetadata::unconstrained();
-        let removed_error = execute_orchestrated_a2a_request(&kernel, &registry, removed)
-            .test_expect_err("removed A2A flow sidecar must fail before dispatch");
+        let removed_error =
+            execute_orchestrated_a2a_request(&Default::default(), &kernel, &registry, removed)
+                .test_expect_err("removed A2A flow sidecar must fail before dispatch");
         assert!(removed_error
             .to_string()
             .contains("bridge security does not match live registry entry for test-srv/echo"));
 
         let mut mismatched = request;
         mismatched.target_tool_name = "different-tool".to_string();
-        let mismatch_error = execute_orchestrated_a2a_request(&kernel, &registry, mismatched)
-            .test_expect_err("mismatched A2A flow sidecar must fail before dispatch");
+        let mismatch_error =
+            execute_orchestrated_a2a_request(&Default::default(), &kernel, &registry, mismatched)
+                .test_expect_err("mismatched A2A flow sidecar must fail before dispatch");
         assert!(mismatch_error.to_string().contains(
             "bridge security does not match live registry entry for test-srv/different-tool"
         ));
@@ -837,7 +955,8 @@ mod tests {
 
     #[test]
     fn send_message_completes_successfully() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let server = test_server();
         let request = text_message("hello");
         let response = edge
@@ -857,7 +976,8 @@ mod tests {
 
     #[test]
     fn send_message_returns_task_id() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let server = test_server();
         let request = text_message("test");
         let r1 = edge
@@ -874,7 +994,8 @@ mod tests {
 
     #[test]
     fn send_message_unknown_skill_errors() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let server = test_server();
         let request = text_message("test");
         let err = edge
@@ -905,7 +1026,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: None,
@@ -933,7 +1053,8 @@ mod tests {
 
     #[test]
     fn send_message_with_kernel_emits_signed_receipt_metadata() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1026,8 +1147,14 @@ mod tests {
 
     #[test]
     fn send_message_rejects_supplemental_authorization_without_stable_request_id() {
-        let mut edge =
-            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge = ChioA2aEdge::new(
+            A2aEdgeConfig {
+                peer_capabilities: chio_mcp_edge::authorization::authorization_capabilities(),
+                ..A2aEdgeConfig::default()
+            },
+            vec![test_manifest()],
+        )
+        .test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1103,8 +1230,14 @@ mod tests {
 
     #[test]
     fn send_message_with_request_id_accepts_request_bound_artifacts() {
-        let mut edge =
-            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge = ChioA2aEdge::new(
+            A2aEdgeConfig {
+                peer_capabilities: chio_mcp_edge::authorization::authorization_capabilities(),
+                ..A2aEdgeConfig::default()
+            },
+            vec![test_manifest()],
+        )
+        .test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1174,7 +1307,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let error = validate_execution_context(&execution)
+        let error = validate_execution_context(&execution, &Default::default())
             .test_expect_err("oversized A2A threshold approval set must fail");
 
         assert_eq!(
@@ -1202,7 +1335,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let error = validate_execution_context(&execution)
+        let error = validate_execution_context(&execution, &Default::default())
             .test_expect_err("control character A2A execution agent_id must fail");
 
         assert_eq!(
@@ -1213,7 +1346,8 @@ mod tests {
 
     #[test]
     fn send_message_with_kernel_denial_still_returns_receipt_metadata() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1237,7 +1371,9 @@ mod tests {
             .handle_send_message("write", &text_message("blocked"), &kernel, &execution)
             .test_unwrap();
         assert_eq!(response.status, TaskStatus::Failed);
-        let metadata = response.metadata.test_expect("deny path should attach metadata");
+        let metadata = response
+            .metadata
+            .test_expect("deny path should attach metadata");
         assert_eq!(
             metadata["chio"]["authorityPath"].as_str(),
             Some("cross_protocol_orchestrator")
@@ -1256,7 +1392,8 @@ mod tests {
 
         let subject = Keypair::generate();
         let request = text_message("blocked pending approval");
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let before_pending = receipt_write_total(RECEIPT_WRITE_OUTCOME_PENDING_APPROVAL);
         let before_error = receipt_write_total(RECEIPT_WRITE_OUTCOME_ERROR);
 
@@ -1284,7 +1421,8 @@ mod tests {
             .metadata
             .test_expect("pending approval should attach metadata");
 
-        assert_eq!(response.status, TaskStatus::Failed);
+        assert_eq!(response.status, TaskStatus::Working);
+        assert!(!response.status.is_terminal());
         assert_eq!(
             response.status_message.as_deref(),
             Some("approval required")
@@ -1309,7 +1447,8 @@ mod tests {
     #[test]
     fn send_message_kernel_error_records_receipt_write_error_outcome() {
         let _metrics_guard = metrics_test_guard();
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let mut config = test_kernel_config();
         config.require_web3_evidence = true;
         let kernel_issuer = config.keypair.clone();
@@ -1347,7 +1486,8 @@ mod tests {
     #[test]
     fn pre_kernel_bridge_error_does_not_record_receipt_write_error_outcome() {
         let _metrics_guard = metrics_test_guard();
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1411,7 +1551,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: None,
@@ -1500,8 +1639,7 @@ mod tests {
 
     #[test]
     fn jsonrpc_send_message_param_parser_requires_skill_id_for_multiple_skills() {
-        let edge =
-            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
 
         let error = match edge.parse_jsonrpc_send_message_params(
             json!({
@@ -1625,8 +1763,7 @@ mod tests {
 
     #[test]
     fn jsonrpc_rejects_padded_target_skill_id_before_lookup() {
-        let edge =
-            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
 
         let error = match edge.parse_jsonrpc_send_message_params(
             json!({
@@ -1756,7 +1893,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_send_message_with_skill_id() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1801,7 +1939,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_missing_skill_id_with_multiple_skills_errors() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1839,7 +1978,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_unknown_method_returns_error() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1872,7 +2012,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_send_rejects_non_object_params_before_skill_resolution() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1903,12 +2044,16 @@ mod tests {
         );
 
         assert_eq!(response["error"]["code"], -32602);
-        assert_eq!(response["error"]["message"], "message/send params must be an object");
+        assert_eq!(
+            response["error"]["message"],
+            "message/send params must be an object"
+        );
     }
 
     #[test]
     fn jsonrpc_task_get_rejects_non_object_params_before_lookup() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -1938,12 +2083,16 @@ mod tests {
         );
 
         assert_eq!(response["error"]["code"], -32602);
-        assert_eq!(response["error"]["message"], "task/get params must be an object");
+        assert_eq!(
+            response["error"]["message"],
+            "task/get params must be an object"
+        );
     }
 
     #[test]
     fn jsonrpc_rejects_non_scalar_request_ids_before_method_dispatch() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -2043,7 +2192,10 @@ mod tests {
         );
 
         assert_eq!(response["error"]["code"], -32602);
-        assert_eq!(response["error"]["message"], "message/send params must be an object");
+        assert_eq!(
+            response["error"]["message"],
+            "message/send params must be an object"
+        );
     }
 
     #[test]
@@ -2098,7 +2250,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_send_with_streaming_tool_collates_output_into_final_message() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -2147,7 +2300,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_stream_creates_deferred_task_and_task_get_resolves_result() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -2337,7 +2491,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_task_get_retains_completed_deferred_task_result() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -2406,7 +2561,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_task_get_rejects_empty_task_id_before_lookup() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -2480,7 +2636,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_stream_rejects_deferred_task_map_over_cap() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -2658,7 +2815,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_task_cancel_marks_stream_task_cancelled() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -2872,8 +3030,8 @@ mod tests {
 
     #[test]
     fn authoritative_send_supports_openai_target_binding() {
-        let mut edge =
-            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![openai_target_manifest()]).test_unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![openai_target_manifest()])
+            .test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);

@@ -29,7 +29,6 @@ fn v2_manifest(public_key: String) -> ToolManifest {
                 destructive: false,
                 idempotent: true,
                 requires_approval: false,
-                estimated_duration_ms: None,
             },
             latency_hint: Some(LatencyHint::Instant),
             flow: None,
@@ -900,13 +899,25 @@ fn required_permissions_reject_implicit_ports_and_loader_environment() {
     );
     assert!(EnvironmentVariableName::new("LD_PRELOAD").is_err());
     assert!(NetworkDestination::new("*.example.com", 443).is_err());
-    let mut zero_port = v2_manifest(Keypair::from_seed(&[3; 32]).public_key().to_hex());
-    zero_port.required_permissions = serde_json::from_value(serde_json::json!({
-        "network_destinations": [{"host": "api.example.com", "port": 0}],
-        "native_syscall_profile": "native_minimal_v1"
-    }))
-    .ok();
-    assert!(chio_manifest::validate_manifest(&zero_port).is_err());
+    assert!(
+        serde_json::from_value::<RequiredPermissions>(serde_json::json!({
+            "network_destinations": [{"host": "api.example.com", "port": 0}],
+            "native_syscall_profile": "native_minimal_v1"
+        }))
+        .is_err()
+    );
+    assert!(NetworkDestination::new("api.example.com", 0).is_err());
+    for port in [1, u16::MAX] {
+        let wire = serde_json::json!({"host": "api.example.com", "port": port});
+        let destination: NetworkDestination = serde_json::from_value(wire.clone())
+            .unwrap_or_else(|error| panic!("valid boundary port: {error}"));
+        assert_eq!(destination.port(), port);
+        assert_eq!(
+            serde_json::to_value(destination)
+                .unwrap_or_else(|error| panic!("encode boundary port: {error}")),
+            wire,
+        );
+    }
 }
 
 #[test]
@@ -998,6 +1009,45 @@ fn environment_variable_names_reject_injection_and_credential_names() {
 }
 
 #[test]
+fn current_manifest_consumer_corpus_preserves_wire_and_registered_signature() {
+    let corpus: serde_json::Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../tests/bindings/fixtures/manifest-v2-consumers.json"
+    )))
+    .unwrap_or_else(|error| panic!("manifest consumer corpus: {error}"));
+    let cases = corpus["cases"]
+        .as_array()
+        .unwrap_or_else(|| panic!("manifest consumer cases must be an array"));
+    assert_eq!(cases.len(), 14);
+    // This pin comes from the existing cage vector, not the envelope under test.
+    let registered = chio_core::crypto::PublicKey::from_hex(
+        "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
+    )
+    .unwrap_or_else(|error| panic!("registered vector key: {error}"));
+    for case in cases {
+        let parsed =
+            serde_json::from_value::<chio_manifest::SignedManifest>(case["instance"].clone());
+        let valid = case["valid"]
+            .as_bool()
+            .unwrap_or_else(|| panic!("manifest consumer validity must be a boolean"));
+        assert_eq!(parsed.is_ok(), valid, "consumer case {}", case["name"]);
+        if let Ok(signed) = parsed {
+            verify_manifest(&signed, &registered)
+                .unwrap_or_else(|error| panic!("registered vector signature: {error}"));
+            let source = chio_core::canonical_json_bytes(&case["instance"])
+                .unwrap_or_else(|error| panic!("canonical source: {error}"));
+            let encoded = chio_core::canonical_json_bytes(&signed)
+                .unwrap_or_else(|error| panic!("canonical round trip: {error}"));
+            assert_eq!(source, encoded);
+            assert_eq!(
+                chio_core::sha256_hex(&encoded),
+                "4f9a91d6859c909e118bc89d1645d20da15fc3ac90aae26c4d796e3c56e8d603"
+            );
+        }
+    }
+}
+
+#[test]
 fn v2_schema_accepts_runtime_shape_and_rejects_unknown_nested_fields() {
     let schema: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -1049,4 +1099,8 @@ fn v2_schema_accepts_runtime_shape_and_rejects_unknown_nested_fields() {
     let mut unknown = value;
     unknown["tools"][0]["annotations"]["estimated_duration_ms"] = serde_json::json!(10);
     assert!(!validator.is_valid(&unknown));
+    assert!(
+        serde_json::from_value::<ToolManifest>(unknown).is_err(),
+        "the v2 runtime must reject the same second latency authority as its schema",
+    );
 }

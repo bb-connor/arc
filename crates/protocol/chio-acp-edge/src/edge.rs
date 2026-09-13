@@ -15,6 +15,7 @@ struct DeferredAcpTask {
 /// Maps Chio tools to ACP capabilities and routes invocations through
 /// the kernel guard pipeline.
 pub struct ChioAcpEdge {
+    config: AcpEdgeConfig,
     manifest_registry: Option<VerifiedManifestRegistry>,
     capabilities: Vec<AcpCapability>,
     capability_fidelity: BTreeMap<String, BridgeFidelity>,
@@ -32,7 +33,10 @@ pub struct ChioAcpEdgeCompatibility<'a> {
     edge: &'a ChioAcpEdge,
 }
 
-fn validate_execution_context(execution: &AcpKernelExecutionContext) -> Result<(), AcpEdgeError> {
+fn validate_execution_context(
+    execution: &AcpKernelExecutionContext,
+    peer: &chio_core::capability::features::CapabilityNegotiation,
+) -> Result<(), AcpEdgeError> {
     validate_execution_agent_id(&execution.agent_id)?;
     if execution.approval_token.is_some() && !execution.approval_tokens.is_empty() {
         return Err(AcpEdgeError::InvalidRequest(
@@ -42,18 +46,24 @@ fn validate_execution_context(execution: &AcpKernelExecutionContext) -> Result<(
     if execution.approval_tokens.len()
         > chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
     {
-        return Err(AcpEdgeError::InvalidRequest(
-            format!(
-                "ACP threshold approval set exceeds {} tokens",
-                chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
-            ),
-        ));
+        return Err(AcpEdgeError::InvalidRequest(format!(
+            "ACP threshold approval set exceeds {} tokens",
+            chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+        )));
     }
     if execution.approval_tokens.is_empty() != execution.threshold_approval_proposal.is_none() {
         return Err(AcpEdgeError::InvalidRequest(
             "ACP threshold approval tokens and proposal must be supplied together".to_string(),
         ));
     }
+    peer.validate_invocation_features(
+        &execution.capability,
+        &execution.approval_tokens,
+        execution.threshold_approval_proposal.as_ref(),
+        execution.governed_intent.as_ref(),
+        execution.supplemental_authorization.as_ref(),
+    )
+    .map_err(|error| AcpEdgeError::InvalidRequest(error.to_string()))?;
     Ok(())
 }
 
@@ -159,6 +169,10 @@ impl ChioAcpEdge {
         manifest_registry: Option<VerifiedManifestRegistry>,
     ) -> Result<Self, AcpEdgeError> {
         let mut capabilities = BTreeMap::new();
+        config
+            .peer_capabilities
+            .validate()
+            .map_err(|error| AcpEdgeError::InvalidRequest(error.to_string()))?;
         let mut capability_fidelity = BTreeMap::new();
         let mut capability_bindings = BTreeMap::new();
         let mut capability_sources: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -229,6 +243,7 @@ impl ChioAcpEdge {
         }
 
         Ok(Self {
+            config,
             manifest_registry,
             capabilities: capabilities.into_values().collect(),
             capability_fidelity,
@@ -391,7 +406,7 @@ impl ChioAcpEdge {
         execution: &AcpKernelExecutionContext,
         kernel: Option<&ChioKernel>,
     ) -> PermissionDecision {
-        if validate_execution_context(execution).is_err() {
+        if validate_execution_context(execution, &self.config.peer_capabilities).is_err() {
             return PermissionDecision::Deny;
         }
 
@@ -484,7 +499,7 @@ impl ChioAcpEdge {
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
@@ -499,8 +514,12 @@ impl ChioAcpEdge {
                 kernel_request_id: format!("acp-{capability_id}-{request_suffix}"),
             },
         )?;
-        let orchestrated =
-            execute_orchestrated_acp_request(kernel, self.manifest_registry()?, request)?;
+        let orchestrated = execute_orchestrated_acp_request(
+            &self.config.peer_capabilities,
+            kernel,
+            self.manifest_registry()?,
+            request,
+        )?;
         Ok(acp_invocation_result_from_orchestrated(orchestrated))
     }
 
@@ -513,7 +532,7 @@ impl ChioAcpEdge {
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         let binding = self.capability_binding(capability_id)?;
         let request = Self::build_execution_request(
             capability_id,
@@ -526,8 +545,12 @@ impl ChioAcpEdge {
                 kernel_request_id: request_id.to_string(),
             },
         )?;
-        let orchestrated =
-            execute_orchestrated_acp_request(kernel, self.manifest_registry()?, request)?;
+        let orchestrated = execute_orchestrated_acp_request(
+            &self.config.peer_capabilities,
+            kernel,
+            self.manifest_registry()?,
+            request,
+        )?;
         Ok(acp_invocation_result_from_orchestrated(orchestrated))
     }
 
@@ -545,7 +568,7 @@ impl ChioAcpEdge {
         execution: &AcpKernelExecutionContext,
         reason: impl Into<String>,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
@@ -560,8 +583,12 @@ impl ChioAcpEdge {
                 kernel_request_id: format!("acp-{capability_id}-pending-{request_suffix}"),
             },
         )?;
-        let mut orchestrated =
-            execute_orchestrated_acp_request(kernel, self.manifest_registry()?, request)?;
+        let mut orchestrated = execute_orchestrated_acp_request(
+            &self.config.peer_capabilities,
+            kernel,
+            self.manifest_registry()?,
+            request,
+        )?;
         let reason = reason.into();
         orchestrated.response.verdict = KernelVerdict::PendingApproval;
         orchestrated.response.output = None;
@@ -582,7 +609,7 @@ impl ChioAcpEdge {
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
@@ -597,8 +624,12 @@ impl ChioAcpEdge {
                 kernel_request_id: format!("acp-mcp-{capability_id}-{request_suffix}"),
             },
         )?;
-        let orchestrated =
-            execute_orchestrated_acp_request(kernel, self.manifest_registry()?, request)?;
+        let orchestrated = execute_orchestrated_acp_request(
+            &self.config.peer_capabilities,
+            kernel,
+            self.manifest_registry()?,
+            request,
+        )?;
         Ok(acp_invocation_result_from_orchestrated(orchestrated))
     }
 
@@ -663,11 +694,11 @@ impl ChioAcpEdge {
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
     ) -> AcpJsonRpcResponse {
-        let AcpJsonRpcEnvelope { id, method, params } =
-            match Self::parse_jsonrpc_envelope(&message) {
-                Ok(envelope) => envelope,
-                Err(response) => return AcpJsonRpcResponse::from_optional(response),
-            };
+        let AcpJsonRpcEnvelope { id, method, params } = match Self::parse_jsonrpc_envelope(&message)
+        {
+            Ok(envelope) => envelope,
+            Err(response) => return AcpJsonRpcResponse::from_optional(response),
+        };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_known_method(
@@ -700,7 +731,9 @@ impl ChioAcpEdge {
                         )
                     }
                 };
-                if let Err(error) = validate_execution_context(execution) {
+                if let Err(error) =
+                    validate_execution_context(execution, &self.config.peer_capabilities)
+                {
                     return AcpJsonRpcResponse::from_optional(
                         should_respond.then_some(Self::jsonrpc_error_response(id, error)),
                     );
@@ -726,7 +759,9 @@ impl ChioAcpEdge {
                             )
                         }
                     };
-                if let Err(error) = validate_execution_context(execution) {
+                if let Err(error) =
+                    validate_execution_context(execution, &self.config.peer_capabilities)
+                {
                     return AcpJsonRpcResponse::from_optional(
                         should_respond.then_some(Self::jsonrpc_error_response(id, error)),
                     );
@@ -773,11 +808,11 @@ impl ChioAcpEdge {
         message: Value,
         server: &dyn ToolServerConnection,
     ) -> AcpJsonRpcResponse {
-        let AcpJsonRpcEnvelope { id, method, params } =
-            match Self::parse_jsonrpc_envelope(&message) {
-                Ok(envelope) => envelope,
-                Err(response) => return AcpJsonRpcResponse::from_optional(response),
-            };
+        let AcpJsonRpcEnvelope { id, method, params } = match Self::parse_jsonrpc_envelope(&message)
+        {
+            Ok(envelope) => envelope,
+            Err(response) => return AcpJsonRpcResponse::from_optional(response),
+        };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_known_method(
@@ -889,7 +924,7 @@ impl ChioAcpEdge {
                 Ok(parsed) => parsed,
                 Err(error) => return Self::jsonrpc_error_response(id, error),
             };
-        if let Err(error) = validate_execution_context(execution) {
+        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
             return Self::jsonrpc_error_response(id, error);
         }
         match self.start_stream_task(&capability_id, arguments, execution) {
@@ -921,7 +956,7 @@ impl ChioAcpEdge {
             Ok(task_id) => task_id,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
-        if let Err(error) = validate_execution_context(execution) {
+        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
             return Self::jsonrpc_error_response(id, error);
         }
         match self.cancel_stream_task(&task_id, execution) {
@@ -954,7 +989,7 @@ impl ChioAcpEdge {
             Ok(task_id) => task_id,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
-        if let Err(error) = validate_execution_context(execution) {
+        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
             return Self::jsonrpc_error_response(id, error);
         }
         match self.resume_stream_task(&task_id, kernel, execution) {
@@ -983,7 +1018,7 @@ impl ChioAcpEdge {
         arguments: Value,
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationTask, AcpEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
         self.start_stream_task_with_optional_request_id(capability_id, arguments, execution, None)
     }
@@ -996,7 +1031,7 @@ impl ChioAcpEdge {
         arguments: Value,
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationTask, AcpEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         self.start_stream_task_with_optional_request_id(
             capability_id,
             arguments,
@@ -1053,7 +1088,7 @@ impl ChioAcpEdge {
         task_id: &str,
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationTask, AcpEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         self.prune_deferred_tasks();
         let mut tasks = self.tasks.borrow_mut();
         let task = tasks
@@ -1086,7 +1121,7 @@ impl ChioAcpEdge {
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
     ) -> Result<(AcpInvocationTask, Value), AcpEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         self.prune_deferred_tasks();
         let task_snapshot = {
             let tasks = self.tasks.borrow();
@@ -1103,6 +1138,7 @@ impl ChioAcpEdge {
 
         if task_snapshot.task.status == AcpTaskStatus::Working {
             let orchestrated = execute_orchestrated_acp_request(
+                &self.config.peer_capabilities,
                 kernel,
                 self.manifest_registry()?,
                 task_snapshot.request,

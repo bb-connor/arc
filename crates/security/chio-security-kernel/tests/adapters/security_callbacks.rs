@@ -225,10 +225,10 @@ fn caller_reservation_rejects_live_security_hook_before_acquiring_it() {
         .reserve_caller_execution_blocking(&request)
         .test_unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .test_unwrap()
-        .contains("recoverable security-hook custody"));
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("caller execution requires qualified native capture and recoverable release custody")
+    );
     assert!(response.execution_nonce.is_none());
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     assert!(outcomes.lock().test_unwrap().is_empty());

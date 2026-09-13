@@ -1,7 +1,104 @@
 #[cfg(test)]
 mod tests {
-    use chio_test_support::prelude::*;
+    mod authorization_projection {
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../tests/bindings/support/authorization_projection.rs"
+        ));
+    }
+
+    fn authorization_context(request: &chio_kernel::ToolCallRequest) -> AcpKernelExecutionContext {
+        AcpKernelExecutionContext {
+            capability: request.capability.clone(),
+            agent_id: request.agent_id.clone(),
+            dpop_proof: request.dpop_proof.clone(),
+            execution_nonce: request.execution_nonce.clone(),
+            governed_intent: request.governed_intent.clone(),
+            approval_token: request.approval_token.clone(),
+            approval_tokens: request.approval_tokens.clone(),
+            threshold_approval_proposal: request.threshold_approval_proposal.clone(),
+            supplemental_authorization: request.supplemental_authorization.clone(),
+            model_metadata: request.model_metadata.clone(),
+        }
+    }
+
+    #[test]
+    fn acp_execution_request_preserves_complete_authorization_context() {
+        let expected = authorization_projection::complete_wire_request();
+        let execution = authorization_context(&expected);
+        validate_execution_context(
+            &execution,
+            &chio_mcp_edge::authorization::authorization_capabilities(),
+        )
+        .test_unwrap();
+        let projected = ChioAcpEdge::build_execution_request(
+            &expected.tool_name,
+            expected.arguments.clone(),
+            &execution,
+            &CapabilityBinding {
+                target_protocol: DiscoveryProtocol::Native,
+                server_id: expected.server_id.clone(),
+                tool_name: expected.tool_name.clone(),
+                security: BridgeSecurityMetadata::unconstrained(),
+            },
+            DiscoveryProtocol::Native,
+            AcpRequestIds {
+                origin_request_id: "wire-origin".to_string(),
+                kernel_request_id: expected.request_id.clone(),
+            },
+        )
+        .test_unwrap();
+        authorization_projection::assert_authorization_preserved(
+            &expected,
+            &chio_cross_protocol::execution::kernel_tool_call_request(&projected),
+        );
+    }
+
+    #[test]
+    fn acp_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let calls = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        kernel.register_tool_server(Box::new(authorization_projection::CountedToolServer {
+            server: "test-srv".to_string(),
+            tool: "read_file".to_string(),
+            calls: calls.clone(),
+        }));
+        let baseline: chio_kernel::ToolCallRequest = serde_json::from_value(json!({
+            "request_id":"ordinary-positive", "capability":capability_for_tool(&issuer, &subject, "test-srv", "read_file"),
+            "agent_id":subject.public_key().to_hex(), "server_id":"test-srv", "tool_name":"read_file", "arguments":{}
+        })).test_unwrap();
+        let positive = edge
+            .invoke_with_request_id(
+                &baseline.request_id,
+                "read_file",
+                json!({}),
+                &kernel,
+                &authorization_context(&baseline),
+            )
+            .test_unwrap();
+        assert!(positive.success, "{positive:?}");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let receipts = kernel.receipt_log().receipts().len();
+        for (feature, request) in authorization_projection::extension_cases(&baseline) {
+            let error = edge.invoke_with_request_id(&request.request_id, "read_file", json!({
+                "chioAuthorization":chio_mcp_edge::authorization::authorization_capabilities()
+            }), &kernel, &authorization_context(&request)).test_unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("invocation feature {feature} was not negotiated")),
+                "{error}"
+            );
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            assert_eq!(kernel.receipt_log().receipts().len(), receipts);
+        }
+    }
     use super::*;
+    use chio_test_support::prelude::*;
     use std::sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Mutex, MutexGuard,
@@ -153,7 +250,6 @@ mod tests {
                         destructive: false,
                         idempotent: false,
                         requires_approval: false,
-                        estimated_duration_ms: None,
                     },
                     latency_hint: None,
                     flow: None,
@@ -169,7 +265,6 @@ mod tests {
                         destructive: true,
                         idempotent: false,
                         requires_approval: true,
-                        estimated_duration_ms: None,
                     },
                     latency_hint: None,
                     flow: None,
@@ -185,7 +280,6 @@ mod tests {
                         destructive: true,
                         idempotent: false,
                         requires_approval: true,
-                        estimated_duration_ms: None,
                     },
                     latency_hint: None,
                     flow: None,
@@ -201,7 +295,6 @@ mod tests {
                         destructive: false,
                         idempotent: false,
                         requires_approval: false,
-                        estimated_duration_ms: None,
                     },
                     latency_hint: None,
                     flow: None,
@@ -231,10 +324,8 @@ mod tests {
         .test_unwrap()
     }
 
-    fn registry_with_nontrivial_flow() -> (
-        VerifiedManifestRegistry,
-        chio_manifest::ToolFlowDeclaration,
-    ) {
+    fn registry_with_nontrivial_flow(
+    ) -> (VerifiedManifestRegistry, chio_manifest::ToolFlowDeclaration) {
         let signer = Keypair::from_seed(&[1; 32]);
         let flow = nontrivial_registry_flow();
         let mut manifest = test_manifest();
@@ -309,7 +400,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: None,
@@ -338,7 +428,6 @@ mod tests {
                     destructive: true,
                     idempotent: false,
                     requires_approval: true,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: None,
@@ -370,7 +459,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: None,
@@ -404,7 +492,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: None,
@@ -436,7 +523,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(LatencyHint::Fast),
                 flow: None,
@@ -468,7 +554,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(LatencyHint::Fast),
                 flow: None,
@@ -500,7 +585,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(LatencyHint::Fast),
                 flow: None,
@@ -532,7 +616,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: None,
@@ -561,7 +644,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: None,
@@ -754,8 +836,8 @@ mod tests {
     #[test]
     fn registry_admitted_flow_survives_acp_execution_projection_canonically() {
         let (registry, expected_flow) = registry_with_nontrivial_flow();
-        let edge = ChioAcpEdge::new_with_registry(AcpEdgeConfig::default(), &registry)
-            .test_unwrap();
+        let edge =
+            ChioAcpEdge::new_with_registry(AcpEdgeConfig::default(), &registry).test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let subject = Keypair::generate();
@@ -801,8 +883,8 @@ mod tests {
     #[test]
     fn acp_execution_boundary_rejects_removed_or_mismatched_flow_sidecar() {
         let (registry, _) = registry_with_nontrivial_flow();
-        let edge = ChioAcpEdge::new_with_registry(AcpEdgeConfig::default(), &registry)
-            .test_unwrap();
+        let edge =
+            ChioAcpEdge::new_with_registry(AcpEdgeConfig::default(), &registry).test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -833,8 +915,13 @@ mod tests {
         )
         .test_unwrap();
 
-        let runtime_error = execute_orchestrated_acp_request(&kernel, &registry, request.clone())
-            .test_expect_err("flow-required ACP registry must reject an unprotected kernel");
+        let runtime_error = execute_orchestrated_acp_request(
+            &Default::default(),
+            &kernel,
+            &registry,
+            request.clone(),
+        )
+        .test_expect_err("flow-required ACP registry must reject an unprotected kernel");
         assert!(matches!(
             runtime_error,
             AcpEdgeError::Bridge(BridgeError::Kernel(KernelError::FlowRuntimeUnavailable))
@@ -842,16 +929,18 @@ mod tests {
 
         let mut removed = request.clone();
         removed.bridge_security = BridgeSecurityMetadata::unconstrained();
-        let removed_error = execute_orchestrated_acp_request(&kernel, &registry, removed)
-            .test_expect_err("removed ACP flow sidecar must fail before dispatch");
-        assert!(removed_error.to_string().contains(
-            "bridge security does not match live registry entry for test-srv/read_file"
-        ));
+        let removed_error =
+            execute_orchestrated_acp_request(&Default::default(), &kernel, &registry, removed)
+                .test_expect_err("removed ACP flow sidecar must fail before dispatch");
+        assert!(removed_error
+            .to_string()
+            .contains("bridge security does not match live registry entry for test-srv/read_file"));
 
         let mut mismatched = request;
         mismatched.target_tool_name = "different-tool".to_string();
-        let mismatch_error = execute_orchestrated_acp_request(&kernel, &registry, mismatched)
-            .test_expect_err("mismatched ACP flow sidecar must fail before dispatch");
+        let mismatch_error =
+            execute_orchestrated_acp_request(&Default::default(), &kernel, &registry, mismatched)
+                .test_expect_err("mismatched ACP flow sidecar must fail before dispatch");
         assert!(mismatch_error.to_string().contains(
             "bridge security does not match live registry entry for test-srv/different-tool"
         ));
@@ -996,7 +1085,8 @@ mod tests {
 
     #[test]
     fn browser_tools_are_not_auto_published() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![browser_manifest()]).test_unwrap();
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![browser_manifest()]).test_unwrap();
         assert!(edge.capability("browser_navigate").is_none());
         assert_eq!(
             edge.bridge_fidelity("browser_navigate"),
@@ -1024,7 +1114,8 @@ mod tests {
 
     #[test]
     fn approval_required_capability_is_adapted_with_permission_caveat() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![approval_manifest()]).test_unwrap();
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![approval_manifest()]).test_unwrap();
         let cap = edge.capability("read_secret").test_unwrap();
         let BridgeFidelity::Adapted { caveats } = &cap.bridge_fidelity else {
             panic!("expected adapted fidelity");
@@ -1036,7 +1127,8 @@ mod tests {
 
     #[test]
     fn streaming_capability_is_adapted_with_stream_and_cancellation_caveats() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let cap = edge.capability("search_stream").test_unwrap();
         let BridgeFidelity::Adapted { caveats } = &cap.bridge_fidelity else {
             panic!("expected adapted fidelity");
@@ -1054,7 +1146,8 @@ mod tests {
 
     #[test]
     fn hidden_capability_is_not_auto_published() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![hidden_manifest()]).test_unwrap();
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![hidden_manifest()]).test_unwrap();
         assert!(edge.capability("hidden_tool").is_none());
         assert_eq!(
             edge.bridge_fidelity("hidden_tool"),
@@ -1117,7 +1210,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: None,
@@ -1169,7 +1261,9 @@ mod tests {
             .invoke("read_file", json!({"path": "/tmp"}), &kernel, &execution)
             .test_unwrap();
         assert!(result.success);
-        let metadata = result.metadata.test_expect("kernel path should attach metadata");
+        let metadata = result
+            .metadata
+            .test_expect("kernel path should attach metadata");
         assert!(metadata["chio"]["receiptId"].as_str().is_some());
         assert_eq!(
             metadata["chio"]["authorityPath"].as_str(),
@@ -1223,7 +1317,14 @@ mod tests {
 
     #[test]
     fn invoke_rejects_supplemental_authorization_without_stable_request_id() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let edge = ChioAcpEdge::new(
+            AcpEdgeConfig {
+                peer_capabilities: chio_mcp_edge::authorization::authorization_capabilities(),
+                ..AcpEdgeConfig::default()
+            },
+            vec![test_manifest()],
+        )
+        .test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1372,7 +1473,9 @@ mod tests {
             .invoke("write_file", json!({"path": "/tmp"}), &kernel, &execution)
             .test_unwrap();
         assert!(!result.success);
-        let metadata = result.metadata.test_expect("deny path should attach metadata");
+        let metadata = result
+            .metadata
+            .test_expect("deny path should attach metadata");
         assert_eq!(
             metadata["chio"]["authorityPath"].as_str(),
             Some("cross_protocol_orchestrator")
@@ -1491,8 +1594,7 @@ mod tests {
             parent_capability_hash: "wrong-parent-hash".to_string(),
         };
         let arguments = json!({ "path": "/tmp" });
-        let registry =
-            test_registry_from_unverified_manifests(&[test_manifest()]).test_unwrap();
+        let registry = test_registry_from_unverified_manifests(&[test_manifest()]).test_unwrap();
         let request = CrossProtocolExecutionRequest {
             origin_request_id: "acp-pre-kernel-mismatch".to_string(),
             kernel_request_id: "acp-pre-kernel-mismatch-kernel".to_string(),
@@ -1527,8 +1629,9 @@ mod tests {
         };
         let before_error = receipt_write_total(RECEIPT_WRITE_OUTCOME_ERROR);
 
-        let error = execute_orchestrated_acp_request(&kernel, &registry, request)
-            .test_expect_err("ACP capability reference mismatch must reject");
+        let error =
+            execute_orchestrated_acp_request(&Default::default(), &kernel, &registry, request)
+                .test_expect_err("ACP capability reference mismatch must reject");
 
         assert!(error.to_string().contains("capability reference mismatch"));
         assert_eq!(
@@ -1570,7 +1673,9 @@ mod tests {
             result.data["structuredContent"]["result"].as_str(),
             Some("ok")
         );
-        let metadata = result.metadata.test_expect("MCP target should attach metadata");
+        let metadata = result
+            .metadata
+            .test_expect("MCP target should attach metadata");
         assert_eq!(
             metadata["chio"]["authorityPath"].as_str(),
             Some("cross_protocol_orchestrator")
@@ -1599,7 +1704,8 @@ mod tests {
 
     #[test]
     fn default_invoke_honors_protocol_aware_target_binding() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![mcp_target_manifest()]).test_unwrap();
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![mcp_target_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1638,8 +1744,8 @@ mod tests {
 
     #[test]
     fn default_invoke_supports_openai_target_binding() {
-        let edge =
-            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![openai_target_manifest()]).test_unwrap();
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![openai_target_manifest()])
+            .test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1708,7 +1814,10 @@ mod tests {
         }))
         .test_unwrap();
         assert_eq!(permission.capability_id, "read_file");
-        assert_eq!(permission.arguments, json!({ "path": "/workspace/README.md" }));
+        assert_eq!(
+            permission.arguments,
+            json!({ "path": "/workspace/README.md" })
+        );
 
         let non_string = match ChioAcpEdge::jsonrpc_invocation_params(
             &json!({
@@ -1725,11 +1834,13 @@ mod tests {
             "invalid request: tool/invoke params.capabilityId must be a string"
         );
 
-        let (capability_id, default_arguments) =
-            ChioAcpEdge::jsonrpc_invocation_params(&json!({
+        let (capability_id, default_arguments) = ChioAcpEdge::jsonrpc_invocation_params(
+            &json!({
                 "capabilityId": "search"
-            }), "tool/invoke")
-            .test_unwrap();
+            }),
+            "tool/invoke",
+        )
+        .test_unwrap();
         assert_eq!(capability_id, "search");
         assert_eq!(default_arguments, json!({}));
     }
@@ -2239,7 +2350,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_resume_rejects_non_object_params_before_task_lookup() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -2486,7 +2598,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_stream_creates_deferred_task_and_resume_resolves_result() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -2680,7 +2793,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_resume_retains_completed_deferred_task_result() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -2760,7 +2874,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_lifecycle_rejects_empty_task_id_before_lookup() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -2802,7 +2917,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_lifecycle_rejects_padded_task_id_before_lookup() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -2844,7 +2960,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_lifecycle_rejects_control_character_task_id_before_lookup() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -2886,7 +3003,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_stream_rejects_deferred_task_map_over_cap() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -3073,7 +3191,8 @@ mod tests {
 
     #[test]
     fn jsonrpc_cancel_marks_deferred_stream_task_cancelled() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -3154,7 +3273,8 @@ mod tests {
 
     #[test]
     fn compatibility_jsonrpc_explicitly_rejects_unimplemented_lifecycle_methods() {
-        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let server = test_server();
 
         let response = edge.compatibility().handle_jsonrpc(

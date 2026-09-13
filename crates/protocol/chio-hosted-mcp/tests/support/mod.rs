@@ -140,6 +140,7 @@ pub struct TestServer {
     pub base_url: String,
     pub client: Client,
     pub token: String,
+    pub admin_token: String,
     pub receipt_db_path: PathBuf,
     _guard: ServerGuard,
 }
@@ -155,9 +156,15 @@ pub fn start_http_server(token: &str) -> TestServer {
 
 pub fn start_http_server_with_lifecycle_tuning(token: &str, tuning: LifecycleTuning) -> TestServer {
     let spawn_tuning = tuning.clone();
-    start_server(token.to_string(), tuning, |dir, listen| {
-        spawn_static_bearer_server_thread(dir, listen, token, spawn_tuning)
-    })
+    let admin_token = format!("hosted-admin-{}", Keypair::generate().public_key().to_hex());
+    start_server(
+        token.to_string(),
+        admin_token.clone(),
+        tuning,
+        |dir, listen| {
+            spawn_static_bearer_server_thread(dir, listen, token, &admin_token, spawn_tuning)
+        },
+    )
 }
 
 pub fn start_jwt_http_server(
@@ -167,6 +174,8 @@ pub fn start_jwt_http_server(
     admin_token: &str,
 ) -> TestServer {
     start_server(
+        // JWT sessions must supply their own authenticated user token.
+        String::new(),
         admin_token.to_string(),
         LifecycleTuning::default(),
         |dir, listen| {
@@ -184,6 +193,8 @@ pub fn start_jwt_http_server(
 
 pub fn start_local_oauth_http_server(admin_token: &str) -> TestServer {
     start_server(
+        // OAuth sessions must supply the token issued by their grant flow.
+        String::new(),
         admin_token.to_string(),
         LifecycleTuning::default(),
         |dir, listen| spawn_local_oauth_http_server_thread(dir, listen, admin_token),
@@ -211,7 +222,12 @@ pub fn unix_now() -> u64 {
         .as_secs()
 }
 
-fn start_server<F>(token: String, tuning: LifecycleTuning, spawn: F) -> TestServer
+fn start_server<F>(
+    token: String,
+    admin_token: String,
+    tuning: LifecycleTuning,
+    spawn: F,
+) -> TestServer
 where
     F: FnOnce(&Path, SocketAddr) -> ServerGuard,
 {
@@ -241,6 +257,7 @@ where
         base_url,
         client,
         token,
+        admin_token,
         receipt_db_path,
         _guard: guard,
     }
@@ -524,7 +541,7 @@ impl TestServer {
     }
 
     pub fn get_admin_session_trust(&self, session_id: &str) -> Response {
-        self.get_admin_session_trust_with_token(&self.token, session_id)
+        self.get_admin_session_trust_with_token(&self.admin_token, session_id)
     }
 
     pub fn get_admin_session_trust_with_token(&self, token: &str, session_id: &str) -> Response {
@@ -542,7 +559,7 @@ impl TestServer {
         self.client
             .get(format!("{}/admin/receipts/tools", self.base_url))
             .query(query)
-            .header(AUTHORIZATION, format!("Bearer {}", self.token))
+            .header(AUTHORIZATION, format!("Bearer {}", self.admin_token))
             .send()
             .expect("send admin tool receipts request")
     }
@@ -564,7 +581,7 @@ impl TestServer {
                 "{}/admin/sessions/{session_id}/drain",
                 self.base_url
             ))
-            .header(AUTHORIZATION, format!("Bearer {}", self.token))
+            .header(AUTHORIZATION, format!("Bearer {}", self.admin_token))
             .send()
             .expect("send admin session drain request")
     }
@@ -576,7 +593,7 @@ impl TestServer {
                 "{}/admin/sessions/{session_id}/shutdown",
                 self.base_url
             ))
-            .header(AUTHORIZATION, format!("Bearer {}", self.token))
+            .header(AUTHORIZATION, format!("Bearer {}", self.admin_token))
             .send()
             .expect("send admin session shutdown request")
     }
@@ -744,7 +761,6 @@ fn write_signed_manifest(dir: &Path) -> (PathBuf, String) {
                 destructive: false,
                 idempotent: false,
                 requires_approval: false,
-                estimated_duration_ms: None,
             },
             latency_hint: None,
             flow: None,
@@ -773,6 +789,7 @@ fn spawn_static_bearer_server_thread(
     dir: &Path,
     listen: SocketAddr,
     token: &str,
+    admin_token: &str,
     tuning: LifecycleTuning,
 ) -> ServerGuard {
     let mut config = base_remote_config(dir, listen);
@@ -780,6 +797,8 @@ fn spawn_static_bearer_server_thread(
         .session_db_path
         .unwrap_or_else(|| dir.join("remote-session-tombstones.sqlite3"));
     config.auth_token = Some(token.to_string());
+    // Session credentials never authorize the administrative control routes.
+    config.admin_token = Some(admin_token.to_string());
     config.session_db_path = Some(session_db_path);
     spawn_server_thread(config)
 }

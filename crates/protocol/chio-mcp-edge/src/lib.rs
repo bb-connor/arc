@@ -8,6 +8,7 @@ use chio_core::{
 use chio_kernel::{NestedFlowBridge, ToolDispatchContext};
 use serde::{Deserialize, Serialize};
 
+pub mod authorization;
 pub mod metrics;
 mod runtime;
 

@@ -25,7 +25,6 @@ fn sample_manifest(server_tools: Vec<ServerTool>) -> ToolManifest {
                 destructive: false,
                 idempotent: true,
                 requires_approval: false,
-                estimated_duration_ms: None,
             },
             latency_hint: Some(LatencyHint::Fast),
             flow: None,

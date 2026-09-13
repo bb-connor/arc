@@ -96,7 +96,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake curl git pkg-config python3 python3-pip zip unzip tar libcurl4-openssl-dev
+          sudo apt-get install -y build-essential cmake curl git pkg-config python3 python3-pip zip unzip tar libcurl4-openssl-dev libssl-dev zlib1g-dev
           cargo install cbindgen --locked --version "${CHIO_CPP_CBINDGEN_VERSION}"
           python3 -m pip install --user "conan==${CHIO_CPP_CONAN_VERSION}"
           git init "${RUNNER_TEMP}/vcpkg"
@@ -126,7 +126,10 @@ jobs:
       - name: chio-drogon release gate
         env:
           CHIO_CPP_REQUIRE_PACKAGERS: "1"
-        run: ./scripts/check-chio-drogon-release.sh
+        run: |
+          CMAKE_PREFIX_PATH="$(./scripts/setup-drogon-test-deps.sh)"
+          export CMAKE_PREFIX_PATH
+          ./scripts/check-chio-drogon-release.sh
 
       - name: Snapshot Conan cache
         # The release gates already populated the local cache via

@@ -1,3 +1,4 @@
+use super::authorization::initialize_authorization_edge;
 use super::*;
 
 #[test]
@@ -101,7 +102,10 @@ fn caller_supplied_request_identity_rejects_invalid_values() {
 #[test]
 fn request_bound_artifacts_require_a_caller_supplied_request_identity() {
     let mut edge = make_edge(10);
-    initialize_edge(&mut edge);
+    initialize_authorization_edge(
+        &mut edge,
+        json!(crate::authorization::authorization_capabilities()),
+    );
     let params = json!({
         "name": "read_file",
         "arguments": { "path": "/tmp/demo.txt" },

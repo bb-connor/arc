@@ -2,6 +2,11 @@ use super::*;
 
 #[test]
 fn cumulative_admission_retains_the_original_request_and_capability() -> TestResult {
+    // Store validation passes this handle through several custody layers.
+    // Keep the large decoded payload out of each caller's stack frame.
+    assert!(
+        std::mem::size_of::<crate::admission_operation::RetainedToolAdmissionRequestV1>() <= 64
+    );
     let mut fixture = Fixture::new()?;
     let proposal = fixture.pending()?;
     let original = {

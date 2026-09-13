@@ -190,9 +190,6 @@ pub struct ToolAnnotations {
     pub idempotent: bool,
     /// Whether a human must approve each invocation.
     pub requires_approval: bool,
-    /// Expected execution time in milliseconds (for timeout planning).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub estimated_duration_ms: Option<u64>,
 }
 
 /// Hint about how long a tool invocation typically takes.
@@ -242,7 +239,6 @@ mod tests {
                 destructive: false,
                 idempotent: true,
                 requires_approval: false,
-                estimated_duration_ms: Some(50),
             },
             latency_hint: Some(LatencyHint::Fast),
             flow: None,
@@ -313,10 +309,6 @@ mod tests {
                 .map(|pricing| pricing.pricing_model)
         );
         assert_eq!(tool.annotations.read_only, restored.annotations.read_only);
-        assert_eq!(
-            tool.annotations.estimated_duration_ms,
-            restored.annotations.estimated_duration_ms
-        );
         assert_eq!(tool.latency_hint, restored.latency_hint);
     }
 
@@ -327,6 +319,16 @@ mod tests {
         assert!(!ann.destructive);
         assert!(!ann.idempotent);
         assert!(!ann.requires_approval);
-        assert!(ann.estimated_duration_ms.is_none());
+    }
+
+    #[test]
+    fn tool_annotations_reject_legacy_duration() {
+        let valid = serde_json::to_value(ToolAnnotations::default()).unwrap();
+        assert!(serde_json::from_value::<ToolAnnotations>(valid.clone()).is_ok());
+        for duration in [serde_json::json!(50), serde_json::Value::Null] {
+            let mut legacy = valid.clone();
+            legacy["estimated_duration_ms"] = duration;
+            assert!(serde_json::from_value::<ToolAnnotations>(legacy).is_err());
+        }
     }
 }

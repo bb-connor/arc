@@ -107,6 +107,10 @@ impl SessionState {
 /// Feature flags negotiated with the peer at session establishment.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PeerCapabilities {
+    /// Persisted invocation feature intersection. Legacy sessions have no
+    /// extension profile and must not gain features merely by being restored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization: Option<chio_core::capability::features::CapabilityNegotiation>,
     pub supports_progress: bool,
     pub supports_cancellation: bool,
     pub supports_subscriptions: bool,

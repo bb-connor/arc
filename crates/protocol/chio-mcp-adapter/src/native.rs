@@ -59,7 +59,6 @@ impl NativeTool {
                     destructive: true,
                     idempotent: false,
                     requires_approval: true,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: None,
@@ -85,7 +84,6 @@ impl NativeTool {
             destructive: false,
             idempotent: false,
             requires_approval: false,
-            estimated_duration_ms: None,
         };
         self
     }

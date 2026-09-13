@@ -206,6 +206,7 @@ rusqlite = { workspace = true }
 # Registry-consumed smoke test pulls in the six edges plus
 # chio-wasm-guards so it can drive each emission boundary directly.
 chio-mcp-edge = { workspace = true }
+chio-cross-protocol = { workspace = true }
 chio-acp-edge = { workspace = true }
 chio-a2a-edge = { workspace = true }
 chio-manifest = { workspace = true }

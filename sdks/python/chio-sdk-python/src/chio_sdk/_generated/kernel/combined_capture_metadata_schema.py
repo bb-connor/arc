@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 87aeeadf1295c6ed5c56ce7813afa5a254c07827c1029566566991a30ebeb7d7
+# Schema sha256: 9bba9aeb3efe11ef5ed158d8ad1a12f77957a07c488313f64a3cdf3ffbd36138
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -13,7 +13,9 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, conint, constr
+from chio_sdk._manifest_wire import SecurityWireModel as BaseModel
+
+from pydantic import ConfigDict, Field, conint, constr
 
 
 class QuotaKey(BaseModel):
@@ -22,7 +24,7 @@ class QuotaKey(BaseModel):
     )
     profile: constr(min_length=1)
     owner_id: constr(min_length=1)
-    grant_index: conint(ge=0, le=4294967295) | None = None
+    grant_index: conint(strict=True, ge=0, le=4294967295) | None = None
 
 
 class ChioCombinedAdmissionCaptureMetadata(BaseModel):
@@ -34,6 +36,6 @@ class ChioCombinedAdmissionCaptureMetadata(BaseModel):
     hold_id: constr(min_length=1)
     quota_keys: list[QuotaKey] = Field(..., max_length=8, min_length=1)
     revocation_set_digest: constr(pattern=r"^[0-9a-f]{64}$")
-    budget_commit_index: conint(ge=1)
-    revocation_commit_index: conint(ge=1)
-    leader_epoch: conint(ge=1)
+    budget_commit_index: conint(strict=True, ge=1)
+    revocation_commit_index: conint(strict=True, ge=1)
+    leader_epoch: conint(strict=True, ge=1)

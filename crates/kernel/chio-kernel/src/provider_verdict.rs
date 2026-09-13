@@ -46,6 +46,10 @@ pub enum ProviderVerdictError {
     /// Decoded arguments must satisfy the registry-admitted schema.
     #[error("provider arguments do not satisfy the registry-admitted input schema: {0}")]
     ManifestArguments(String),
+    /// The provider-fabric envelope has no negotiated authorization extension
+    /// channel. Use the complete native or mediated protocol request API instead.
+    #[error("provider fabric authorization profile is unsupported: {0}")]
+    UnsupportedAuthorization(#[source] chio_core::Error),
 }
 
 /// Build a [`ToolCallRequest`] from a fabric [`ToolInvocation`] plus the
@@ -98,7 +102,7 @@ pub fn build_tool_call_request(
         )
         .map_err(|error| ProviderVerdictError::ManifestArguments(error.to_string()))?;
 
-    Ok(ToolCallRequest {
+    let request = ToolCallRequest {
         request_id: invocation.provenance.request_id.clone(),
         capability,
         tool_name: invocation.tool_name.clone(),
@@ -115,7 +119,15 @@ pub fn build_tool_call_request(
         model_metadata: None,
         federated_origin_kernel_id: None,
         declassification_grant: None,
-    })
+    };
+    // This bounded fabric vocabulary has no peer negotiation or complete proof
+    // envelope. Do not admit extensions merely because the token can carry them.
+    request
+        .validate_peer_capabilities(
+            &chio_core::capability::features::CapabilityNegotiation::default(),
+        )
+        .map_err(ProviderVerdictError::UnsupportedAuthorization)?;
+    Ok(request)
 }
 
 /// Lower a kernel [`ToolCallResponse`] into a fabric [`VerdictResult`].
@@ -593,6 +605,41 @@ mod tests {
         assert_eq!(request.server_id, "srv-test");
         assert_eq!(request.tool_name, "search_web");
         assert_eq!(request.arguments, serde_json::json!({"query": "chio"}));
+    }
+
+    #[test]
+    fn provider_fabric_rejects_unnegotiated_authorization_before_lowering() {
+        let (invocation, registry) = registry_bound_invocation();
+        let mut capability = sample_capability();
+        let expected = canonical_json_bytes(&capability).unwrap();
+        let request = build_tool_call_request(
+            &invocation,
+            capability.clone(),
+            "agent-test".to_string(),
+            "srv-test".to_string(),
+            &registry,
+        )
+        .unwrap();
+        assert_eq!(canonical_json_bytes(&request.capability).unwrap(), expected);
+        capability.aggregate_invocation_budget = Some(
+            serde_json::from_value(serde_json::json!({"scope":"capability", "max_invocations":1}))
+                .unwrap(),
+        );
+        let error = build_tool_call_request(
+            &invocation,
+            capability,
+            "agent-test".to_string(),
+            "srv-test".to_string(),
+            &registry,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            ProviderVerdictError::UnsupportedAuthorization(_)
+        ));
+        assert!(error
+            .to_string()
+            .contains("aggregate_invocation_budget was not negotiated"));
     }
 
     #[test]

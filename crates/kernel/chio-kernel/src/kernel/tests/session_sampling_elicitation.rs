@@ -56,6 +56,7 @@ fn sampling_validation_requires_policy_and_negotiation() {
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,
@@ -161,6 +162,7 @@ fn elicitation_validation_requires_policy_and_form_negotiation() {
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,
@@ -186,6 +188,7 @@ fn elicitation_validation_requires_policy_and_form_negotiation() {
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,
@@ -221,6 +224,7 @@ fn elicitation_validation_requires_policy_and_form_negotiation() {
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,

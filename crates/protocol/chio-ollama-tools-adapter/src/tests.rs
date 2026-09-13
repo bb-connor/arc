@@ -63,7 +63,6 @@ fn admitted_registry(
                 destructive: false,
                 idempotent: false,
                 requires_approval: false,
-                estimated_duration_ms: None,
             },
             latency_hint: None,
             flow: Some(flow.clone()),

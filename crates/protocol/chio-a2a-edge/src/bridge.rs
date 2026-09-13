@@ -190,6 +190,7 @@ fn build_skill_candidate(
 }
 
 fn execute_orchestrated_a2a_request(
+    peer: &chio_core::capability::features::CapabilityNegotiation,
     kernel: &ChioKernel,
     manifest_registry: &VerifiedManifestRegistry,
     request: CrossProtocolExecutionRequest,
@@ -203,6 +204,7 @@ fn execute_orchestrated_a2a_request(
     }
 
     match CrossProtocolOrchestrator::new(kernel, manifest_registry)
+        .with_peer_capabilities(peer)?
         .with_registry(registry)
         .execute(&A2aCapabilityBridge, request)
     {

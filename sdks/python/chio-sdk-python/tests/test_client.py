@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import httpx
 import pytest
 import respx
 
 from chio_sdk.client import ChioClient, _canonical_json, _sha256_hex
+from chio_sdk._generated.kernel.caller_delivery_report_schema import (
+    ChioSignedCallerDeliveryReport,
+)
+from chio_sdk._generated.kernel.caller_dispatch_authorization_schema import (
+    ChioSignedCallerDispatchAuthorization,
+)
 from chio_sdk.errors import (
     ChioDeniedError,
     ChioError,
@@ -716,8 +723,15 @@ class TestAuthenticatedCallerDelivery:
     @respx.mock
     async def test_start_and_report_are_separate_control_requests(self) -> None:
         # These are transport fixtures, not cryptographically verified permits.
-        authorization = {"authorization": {"schema": "chio.caller-dispatch-authorization.v1"}, "signature": "test"}
-        report = {"report": {"schema": "chio.caller-delivery-report.v1"}, "signature": "test"}
+        corpus = json.loads(
+            (
+                Path(__file__).resolve().parents[4]
+                / "tests/bindings/fixtures/protocol-primitives-v1.json"
+            ).read_text(encoding="utf-8")
+        )
+        fixtures = {case["name"]: case["instance"] for case in corpus["cases"]}
+        authorization = fixtures["caller-dispatch-authorization"]
+        report = fixtures["caller-delivery-report-explicit-null"]
         started = {"status": "dispatch_committed", "protocol": "chio.caller-delivery.v1", "authorization": authorization}
         completed = {"status": "reconciled", "protocol": "chio.caller-delivery.v1", "execution_authorized": False, "receipt": _make_receipt_dict()}
         start = respx.post(f"{BASE}/v1/caller/start").mock(return_value=httpx.Response(200, json=started))
@@ -728,7 +742,9 @@ class TestAuthenticatedCallerDelivery:
             ) == started
             assert not delivered.called, "start cannot implicitly report or execute a tool"
             assert await client.report_mediated_execution(
-                control_token="executor-control", authorization=authorization, report=report,
+                control_token="executor-control",
+                authorization=ChioSignedCallerDispatchAuthorization.model_validate(authorization),
+                report=ChioSignedCallerDeliveryReport.model_validate(report),
             ) == completed
         assert start.call_count == 1
         assert delivered.call_count == 1

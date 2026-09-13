@@ -76,7 +76,6 @@ mod tests {
                     destructive: false,
                     idempotent: false,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: Some(LatencyHint::Fast),
                 flow: None,

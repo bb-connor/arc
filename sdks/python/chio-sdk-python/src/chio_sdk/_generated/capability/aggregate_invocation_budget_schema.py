@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 87aeeadf1295c6ed5c56ce7813afa5a254c07827c1029566566991a30ebeb7d7
+# Schema sha256: 9bba9aeb3efe11ef5ed158d8ad1a12f77957a07c488313f64a3cdf3ffbd36138
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -13,7 +13,9 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, conint
+from chio_sdk._manifest_wire import SecurityWireModel as BaseModel
+
+from pydantic import ConfigDict, Field, RootModel, conint
 
 from . import aggregate_budget_root_schema
 
@@ -23,7 +25,7 @@ class ChioAggregateInvocationBudget1(BaseModel):
         extra="forbid",
     )
     scope: Literal["capability"]
-    max_invocations: conint(ge=0, le=4294967295)
+    max_invocations: conint(strict=True, ge=0, le=4294967295)
     root_binding: Any | None = None
 
 
@@ -32,7 +34,7 @@ class ChioAggregateInvocationBudget2(BaseModel):
         extra="forbid",
     )
     scope: Literal["delegation_family"]
-    max_invocations: conint(ge=0, le=4294967295)
+    max_invocations: conint(strict=True, ge=0, le=4294967295)
     root_binding: aggregate_budget_root_schema.ChioAggregateBudgetRootBinding
 
 

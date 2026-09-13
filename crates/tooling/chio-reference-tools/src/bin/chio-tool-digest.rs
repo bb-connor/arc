@@ -38,7 +38,7 @@ impl ToolServer for Digest {
             },
             ToolDescriptor {
                 name: "canonical_json",
-                description: "A JSON value with sorted keys and no whitespace, and its SHA-256",
+                description: "RFC 8785 canonical JSON and its SHA-256",
                 input_schema: json!({
                     "type": "object",
                     "properties": { "value": {} },
@@ -66,7 +66,9 @@ impl ToolServer for Digest {
                 let value = arguments
                     .get("value")
                     .ok_or_else(|| ToolError::InvalidArguments("value is required".to_string()))?;
-                let canonical = value.to_string();
+                let canonical = chio_core_types::canonical_json_string(value).map_err(|error| {
+                    ToolError::InvalidArguments(format!("value cannot be canonicalized: {error}"))
+                })?;
                 if canonical.len() > MAX_INPUT_BYTES {
                     return Err(ToolError::Refused(format!(
                         "value exceeds {MAX_INPUT_BYTES} bytes"

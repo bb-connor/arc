@@ -36,6 +36,12 @@ from chio_sdk._generated.kernel.combined_capture_metadata_schema import (
     ChioCombinedAdmissionCaptureMetadata,
 )
 from chio_sdk._generated.kernel.execution_nonce_schema import ChioSignedExecutionNonce
+from chio_sdk._generated.kernel.caller_delivery_report_schema import (
+    ChioSignedCallerDeliveryReport,
+)
+from chio_sdk._generated.kernel.caller_dispatch_authorization_schema import (
+    ChioSignedCallerDispatchAuthorization,
+)
 from chio_sdk._generated.result.pending_approval_schema import ChioToolcallresultPendingApproval
 from chio_sdk.models import (
     ChioReceipt,
@@ -128,6 +134,8 @@ class TestGeneratedWireModels:
         self,
     ) -> None:
         models: dict[str, type[Any]] = {
+            "kernel/caller_dispatch_authorization.schema.json": ChioSignedCallerDispatchAuthorization,
+            "kernel/caller_delivery_report.schema.json": ChioSignedCallerDeliveryReport,
             "kernel/execution_nonce.schema.json": ChioSignedExecutionNonce,
             "capability/token.schema.json": ChioCapabilitytoken,
             "capability/aggregate-invocation-budget.schema.json": ChioAggregateInvocationBudget,
@@ -149,9 +157,18 @@ class TestGeneratedWireModels:
             model = models[case["schema_file"]]
             if case["valid"]:
                 parsed = model.model_validate(case["instance"])
-                assert parsed.model_dump(mode="json", by_alias=True, exclude_none=True) == case[
+                assert parsed.model_dump(mode="json", by_alias=True, exclude_unset=True) == case[
                     "instance"
                 ]
+                if isinstance(parsed, ChioSignedCallerDeliveryReport):
+                    from chio_sdk.client import _jsonable
+
+                    assert _jsonable(parsed) == case["instance"]
+                    assert _jsonable(parsed.report) == case["instance"]["report"]
+                    missing_cost = json.loads(json.dumps(case["instance"]))
+                    del missing_cost["report"]["realized_cost"]
+                    with pytest.raises(ValidationError):
+                        model.model_validate(missing_cost)
             else:
                 with pytest.raises(ValidationError):
                     model.model_validate(case["instance"])

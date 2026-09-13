@@ -1,6 +1,205 @@
 {
   "cases": [
     {
+      "name": "caller-dispatch-authorization",
+      "schema_file": "kernel/caller_dispatch_authorization.schema.json",
+      "valid": true,
+      "instance": {
+        "authorization": {
+          "schema": "chio.caller-dispatch-authorization.v1",
+          "kernel_public_key": "0101010101010101010101010101010101010101010101010101010101010101",
+          "executor": {
+            "executor_id": "fixture-executor",
+            "public_key": "0101010101010101010101010101010101010101010101010101010101010101",
+            "key_epoch": 1
+          },
+          "invocation": {
+            "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "request_id": "fixture-request",
+            "request_binding_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "capability_id": "fixture-capability",
+            "capability_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "server_id": "fixture-server",
+            "tool_name": "fixture-tool",
+            "parameters_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "committed": {
+            "execution_nonce_id": "fixture-nonce",
+            "budget_hold_id": "fixture-hold",
+            "frozen_context_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "dispatch_commit": {
+              "committed_version": 1,
+              "coordinator_lease_id": "fixture-coordinator",
+              "coordinator_lease_epoch": 1,
+              "store_fence": {
+                "store_uuid": "fixture-store",
+                "lease_id": "fixture-lease",
+                "owner_epoch": 1
+              },
+              "provider_attempt": {
+                "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "attempt_id": "fixture-attempt",
+                "transport_id": "caller-report:fixture",
+                "transport_key_epoch": 1
+              }
+            }
+          },
+          "not_before_unix_ms": 100,
+          "expires_at_unix_ms": 200
+        },
+        "signature": "02020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202"
+      }
+    },
+    {
+      "name": "caller-authorization-rejects-numeric-boolean",
+      "schema_file": "kernel/caller_dispatch_authorization.schema.json",
+      "valid": false,
+      "instance": {
+        "authorization": {
+          "schema": "chio.caller-dispatch-authorization.v1",
+          "kernel_public_key": "0101010101010101010101010101010101010101010101010101010101010101",
+          "executor": {
+            "executor_id": "fixture-executor",
+            "public_key": "0101010101010101010101010101010101010101010101010101010101010101",
+            "key_epoch": true
+          },
+          "invocation": {
+            "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "request_id": "fixture-request",
+            "request_binding_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "capability_id": "fixture-capability",
+            "capability_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "server_id": "fixture-server",
+            "tool_name": "fixture-tool",
+            "parameters_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "committed": {
+            "execution_nonce_id": "fixture-nonce",
+            "budget_hold_id": "fixture-hold",
+            "frozen_context_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "dispatch_commit": {
+              "committed_version": 1,
+              "coordinator_lease_id": "fixture-coordinator",
+              "coordinator_lease_epoch": 1,
+              "store_fence": {
+                "store_uuid": "fixture-store",
+                "lease_id": "fixture-lease",
+                "owner_epoch": 1
+              },
+              "provider_attempt": {
+                "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "attempt_id": "fixture-attempt",
+                "transport_id": "caller-report:fixture",
+                "transport_key_epoch": 1
+              }
+            }
+          },
+          "not_before_unix_ms": 100,
+          "expires_at_unix_ms": 200
+        },
+        "signature": "02020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202"
+      }
+    },
+    {
+      "name": "caller-delivery-report-explicit-null",
+      "schema_file": "kernel/caller_delivery_report.schema.json",
+      "valid": true,
+      "instance": {
+        "report": {
+          "schema": "chio.caller-delivery-report.v1",
+          "authorization_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "executor": {
+            "executor_id": "fixture-executor",
+            "public_key": "0101010101010101010101010101010101010101010101010101010101010101",
+            "key_epoch": 1
+          },
+          "claim_id": "fixture-claim",
+          "execution_started_at_unix_ms": 110,
+          "completed_at_unix_ms": 120,
+          "output": null,
+          "realized_cost": null
+        },
+        "signature": "02020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202"
+      }
+    },
+    {
+      "name": "caller-delivery-report-realized-cost",
+      "schema_file": "kernel/caller_delivery_report.schema.json",
+      "valid": true,
+      "instance": {
+        "report": {
+          "schema": "chio.caller-delivery-report.v1",
+          "authorization_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "executor": {
+            "executor_id": "fixture-executor",
+            "public_key": "0101010101010101010101010101010101010101010101010101010101010101",
+            "key_epoch": 1
+          },
+          "claim_id": "fixture-claim",
+          "execution_started_at_unix_ms": 110,
+          "completed_at_unix_ms": 120,
+          "output": {
+            "result": null
+          },
+          "realized_cost": {
+            "units": 7,
+            "currency": "USD"
+          }
+        },
+        "signature": "02020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202"
+      }
+    },
+    {
+      "name": "caller-report-rejects-numeric-boolean",
+      "schema_file": "kernel/caller_delivery_report.schema.json",
+      "valid": false,
+      "instance": {
+        "report": {
+          "schema": "chio.caller-delivery-report.v1",
+          "authorization_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "executor": {
+            "executor_id": "fixture-executor",
+            "public_key": "0101010101010101010101010101010101010101010101010101010101010101",
+            "key_epoch": 1
+          },
+          "claim_id": "fixture-claim",
+          "execution_started_at_unix_ms": 110,
+          "completed_at_unix_ms": 120,
+          "output": {
+            "result": null
+          },
+          "realized_cost": {
+            "units": true,
+            "currency": "USD"
+          }
+        },
+        "signature": "02020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202"
+      }
+    },
+    {
+      "name": "caller-report-rejects-unknown-executor-field",
+      "schema_file": "kernel/caller_delivery_report.schema.json",
+      "valid": false,
+      "instance": {
+        "report": {
+          "schema": "chio.caller-delivery-report.v1",
+          "authorization_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "executor": {
+            "executor_id": "fixture-executor",
+            "public_key": "0101010101010101010101010101010101010101010101010101010101010101",
+            "key_epoch": 1,
+            "authority": "untrusted"
+          },
+          "claim_id": "fixture-claim",
+          "execution_started_at_unix_ms": 110,
+          "completed_at_unix_ms": 120,
+          "output": null,
+          "realized_cost": null
+        },
+        "signature": "02020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202"
+      }
+    },
+    {
       "name": "legacy-execution-nonce",
       "schema_file": "kernel/execution_nonce.schema.json",
       "valid": true,
@@ -170,12 +369,17 @@
             {
               "server_id": "server-1",
               "tool_name": "tool-1",
-              "operations": ["invoke"],
+              "operations": [
+                "invoke"
+              ],
               "constraints": [
                 {
                   "type": "require_cumulative_approval_above",
                   "value": {
-                    "threshold": { "units": 100, "currency": "USD" },
+                    "threshold": {
+                      "units": 100,
+                      "currency": "USD"
+                    },
                     "approval_budget_id": "budget-1",
                     "approval_budget_epoch": 7
                   }
@@ -285,18 +489,26 @@
       "schema_file": "agent/active-response-governed-intent.schema.json",
       "valid": true,
       "instance": {
-        "plan_schema": "chio.governed-response-plan.v1",
+        "plan_schema": "chio.response-plan.v1",
         "plan_id": "plan-1",
         "operator_capability_id": "operator-cap-1",
         "operator_capability_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "operator_capability_expires_at": 300,
         "executor_subject": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "canonical_plan_body": { "action": "throttle" },
-        "plan_body_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "target_binding": { "session_id": "session-1" },
-        "ordered_effects": ["throttle_session"],
+        "canonical_plan_body": {
+          "action": "throttle"
+        },
+        "plan_body_hash": "abc03336b75d0f0b396fc101c9ab500e5f1b5b5298998b777e859b7dcfac8eac",
+        "target_binding": {
+          "session_id": "session-1"
+        },
+        "ordered_effects": [
+          "throttle_session"
+        ],
         "expires_at": 250,
-        "rollback_binding": { "mode": "automatic" }
+        "rollback_binding": {
+          "mode": "automatic"
+        }
       }
     },
     {
@@ -304,18 +516,26 @@
       "schema_file": "agent/active-response-governed-intent.schema.json",
       "valid": false,
       "instance": {
-        "plan_schema": "chio.governed-response-plan.v1",
+        "plan_schema": "chio.response-plan.v1",
         "plan_id": "plan-1",
         "operator_capability_id": "operator-cap-1",
         "operator_capability_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "operator_capability_expires_at": 300,
         "executor_subject": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "canonical_plan_body": { "action": "delete" },
-        "plan_body_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "target_binding": { "session_id": "session-1" },
-        "ordered_effects": [7],
+        "canonical_plan_body": {
+          "action": "delete"
+        },
+        "plan_body_hash": "abc03336b75d0f0b396fc101c9ab500e5f1b5b5298998b777e859b7dcfac8eac",
+        "target_binding": {
+          "session_id": "session-1"
+        },
+        "ordered_effects": [
+          7
+        ],
         "expires_at": 250,
-        "rollback_binding": { "mode": "automatic" }
+        "rollback_binding": {
+          "mode": "automatic"
+        }
       }
     },
     {
@@ -375,6 +595,204 @@
       "instance": {
         "signed_extension": "AQID",
         "max_invocations": 1000000
+      }
+    },
+    {
+      "name": "execution-nonce-rejects-numeric-boolean",
+      "schema_file": "kernel/execution_nonce.schema.json",
+      "valid": false,
+      "instance": {
+        "nonce": {
+          "schema": "chio.execution_nonce.v2",
+          "nonce_id": "schema-fixture-nonce",
+          "issued_at": true,
+          "expires_at": 130,
+          "bound_to": {
+            "subject_id": "subject",
+            "request_id": "request",
+            "capability_id": "capability",
+            "tool_server": "server",
+            "tool_name": "tool",
+            "parameter_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "signature": "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "aggregate-budget-rejects-numeric-boolean",
+      "schema_file": "capability/aggregate-invocation-budget.schema.json",
+      "valid": false,
+      "instance": {
+        "scope": "capability",
+        "max_invocations": true
+      }
+    },
+    {
+      "name": "threshold-proposal-rejects-coerced-integer",
+      "schema_file": "capability/threshold-approval-proposal.schema.json",
+      "valid": false,
+      "instance": {
+        "schema": "chio.threshold-approval-proposal.v1",
+        "proposal_id": "proposal-1",
+        "request_id": "request-1",
+        "governed_intent_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+        "subject": "2222222222222222222222222222222222222222222222222222222222222222",
+        "authorizing_capability_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "policy_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+        "threshold": "2",
+        "eligible_set_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+        "proposal_created_at": 100,
+        "proposal_deadline": 200,
+        "policy_authority": "6666666666666666666666666666666666666666666666666666666666666666",
+        "signature": "77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777"
+      }
+    },
+    {
+      "name": "governed-approval-rejects-numeric-boolean",
+      "schema_file": "capability/governed-approval-token.schema.json",
+      "valid": false,
+      "instance": {
+        "id": "approval-1",
+        "approver": "8888888888888888888888888888888888888888888888888888888888888888",
+        "subject": "2222222222222222222222222222222222222222222222222222222222222222",
+        "governed_intent_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+        "request_id": "request-1",
+        "threshold_proposal_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+        "issued_at": true,
+        "expires_at": 190,
+        "decision": "approved",
+        "signature": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "name": "active-response-rejects-coerced-integer",
+      "schema_file": "agent/active-response-governed-intent.schema.json",
+      "valid": false,
+      "instance": {
+        "plan_schema": "chio.response-plan.v1",
+        "plan_id": "plan-1",
+        "operator_capability_id": "operator-cap-1",
+        "operator_capability_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operator_capability_expires_at": 300,
+        "executor_subject": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "canonical_plan_body": {
+          "action": "throttle"
+        },
+        "plan_body_hash": "abc03336b75d0f0b396fc101c9ab500e5f1b5b5298998b777e859b7dcfac8eac",
+        "target_binding": {
+          "session_id": "session-1"
+        },
+        "ordered_effects": [
+          "throttle_session"
+        ],
+        "expires_at": "2",
+        "rollback_binding": {
+          "mode": "automatic"
+        }
+      }
+    },
+    {
+      "name": "combined-capture-rejects-numeric-boolean",
+      "schema_file": "kernel/combined-capture-metadata.schema.json",
+      "valid": false,
+      "instance": {
+        "schema": "chio.admission-capture-metadata.v1",
+        "operation_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "hold_id": "hold-1",
+        "quota_keys": [
+          {
+            "profile": "chio.grant-invocation.v1",
+            "owner_id": "capability-1",
+            "grant_index": 0
+          }
+        ],
+        "revocation_set_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "budget_commit_index": 41,
+        "revocation_commit_index": 41,
+        "leader_epoch": true
+      }
+    },
+    {
+      "name": "pending-approval-rejects-missing-request-binding",
+      "schema_file": "result/pending_approval.schema.json",
+      "valid": false,
+      "instance": {
+        "status": "pending_approval",
+        "proposal": {
+          "schema": "chio.threshold-approval-proposal.v1",
+          "proposal_id": "proposal-1",
+          "governed_intent_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+          "subject": "2222222222222222222222222222222222222222222222222222222222222222",
+          "authorizing_capability_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "policy_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+          "threshold": 2,
+          "eligible_set_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "proposal_created_at": 100,
+          "proposal_deadline": 200,
+          "policy_authority": "6666666666666666666666666666666666666666666666666666666666666666",
+          "signature": "77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777"
+        }
+      }
+    },
+    {
+      "name": "capability-with-dpop-required",
+      "schema_file": "capability/token.schema.json",
+      "valid": true,
+      "instance": {
+        "schema": "chio.capability.v1",
+        "id": "aggregate-capability-1",
+        "issuer": "0101010101010101010101010101010101010101010101010101010101010101",
+        "subject": "0202020202020202020202020202020202020202020202020202020202020202",
+        "scope": {
+          "grants": [
+            {
+              "server_id": "server",
+              "tool_name": "tool",
+              "operations": [
+                "invoke"
+              ],
+              "dpop_required": true
+            }
+          ]
+        },
+        "issued_at": 100,
+        "expires_at": 200,
+        "aggregate_invocation_budget": {
+          "scope": "capability",
+          "max_invocations": 3
+        },
+        "signature": "03030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303"
+      }
+    },
+    {
+      "name": "capability-rejects-coerced-dpop-required",
+      "schema_file": "capability/token.schema.json",
+      "valid": false,
+      "instance": {
+        "schema": "chio.capability.v1",
+        "id": "aggregate-capability-1",
+        "issuer": "0101010101010101010101010101010101010101010101010101010101010101",
+        "subject": "0202020202020202020202020202020202020202020202020202020202020202",
+        "scope": {
+          "grants": [
+            {
+              "server_id": "server",
+              "tool_name": "tool",
+              "operations": [
+                "invoke"
+              ],
+              "dpop_required": "true"
+            }
+          ]
+        },
+        "issued_at": 100,
+        "expires_at": 200,
+        "aggregate_invocation_budget": {
+          "scope": "capability",
+          "max_invocations": 3
+        },
+        "signature": "03030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303"
       }
     }
   ]

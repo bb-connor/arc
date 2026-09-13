@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 87aeeadf1295c6ed5c56ce7813afa5a254c07827c1029566566991a30ebeb7d7
+# Schema sha256: 9bba9aeb3efe11ef5ed158d8ad1a12f77957a07c488313f64a3cdf3ffbd36138
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,7 +14,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
+from chio_sdk._manifest_wire import SecurityWireModel as BaseModel
+
+from pydantic import StrictBool, ConfigDict, Field, RootModel, conint, constr
 
 from . import tool_flow_declaration_schema
 
@@ -43,7 +45,7 @@ class MonetaryAmount(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    units: conint(ge=0, le=18446744073709551615)
+    units: conint(strict=True, ge=0, le=18446744073709551615)
     currency: constr(pattern=r"^[A-Z]{3}$")
 
 
@@ -51,10 +53,10 @@ class ToolAnnotations(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    read_only: bool
-    destructive: bool
-    idempotent: bool
-    requires_approval: bool
+    read_only: StrictBool
+    destructive: StrictBool
+    idempotent: StrictBool
+    requires_approval: StrictBool
 
 
 class ReadPath(RootModel):
@@ -91,7 +93,7 @@ class NetworkDestination(BaseModel):
         extra="forbid",
     )
     host: constr(pattern=r"^[^A-Z*\s/]+$", min_length=1, max_length=253)
-    port: conint(ge=1, le=65535)
+    port: conint(strict=True, ge=1, le=65535)
 
 
 class ToolPricing(BaseModel):

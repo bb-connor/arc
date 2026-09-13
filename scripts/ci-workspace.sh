@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ./scripts/check-protocol-peer-negotiation.sh
+./scripts/check-consumer-boundaries.sh
 ./scripts/check-release-inputs.sh
 ./scripts/check-workspace-layering.sh
 python3 scripts/check-review-slices.py

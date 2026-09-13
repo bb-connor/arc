@@ -81,7 +81,6 @@ fn test_manifest() -> ToolManifest {
                 destructive: false,
                 idempotent: false,
                 requires_approval: false,
-                estimated_duration_ms: None,
             },
             latency_hint: None,
             flow: None,
@@ -147,8 +146,14 @@ fn generated_request_id_rejects_threshold_approvals() {
         supplemental_authorization: None,
         model_metadata: None,
     };
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![shared_manifest()])
-        .test_expect("ACP edge should construct");
+    let edge = ChioAcpEdge::new(
+        AcpEdgeConfig {
+            peer_capabilities: chio_mcp_edge::authorization::authorization_capabilities(),
+            ..AcpEdgeConfig::default()
+        },
+        vec![shared_manifest()],
+    )
+    .test_expect("ACP edge should construct");
     let kernel = ChioKernel::new(shared_kernel_config());
 
     let error = edge

@@ -24,7 +24,6 @@ fn manifest_sign_and_verify_roundtrip_uses_public_api() -> Result<(), Box<dyn st
                 destructive: false,
                 idempotent: true,
                 requires_approval: false,
-                estimated_duration_ms: None,
             },
             latency_hint: Some(LatencyHint::Instant),
             flow: None,

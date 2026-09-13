@@ -117,7 +117,6 @@ fn test_authority_manifest_registry_with(
                     destructive: false,
                     idempotent: true,
                     requires_approval: false,
-                    estimated_duration_ms: None,
                 },
                 latency_hint: None,
                 flow: flow.clone(),

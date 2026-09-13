@@ -113,6 +113,20 @@ pub struct ToolCallRequest {
 }
 
 impl ToolCallRequest {
+    /// Fail closed on extensions absent from the host-established peer profile.
+    pub fn validate_peer_capabilities(
+        &self,
+        peer: &chio_core::capability::features::CapabilityNegotiation,
+    ) -> Result<(), chio_core::Error> {
+        peer.validate_invocation_features(
+            &self.capability,
+            &self.approval_tokens,
+            self.threshold_approval_proposal.as_ref(),
+            self.governed_intent.as_ref(),
+            self.supplemental_authorization.as_ref(),
+        )
+    }
+
     pub fn validate_authorization_extensions(&self) -> Result<(), chio_core::Error> {
         self.approval_artifact_digest()?;
         Ok(())

@@ -175,6 +175,7 @@ run_exact_target --label "strict manifest v2" --expected \
   cage_authorization_binds_registry_manifest_and_every_tool_topology \
   cage_authorization_requires_profile_matched_runtime_topology \
   changing_flow_metadata_invalidates_manifest_signature \
+  current_manifest_consumer_corpus_preserves_wire_and_registered_signature \
   environment_variable_names_accept_non_sensitive_operational_names \
   environment_variable_names_reject_injection_and_credential_names \
   existing_signed_manifest_loader_never_creates_missing_paths \

@@ -13,9 +13,9 @@ use crate::capability_bridge::{
 use crate::discovery::{DiscoveryProtocol, TargetProtocolRegistry};
 use crate::error::BridgeError;
 use crate::execution::{
-    kernel_tool_call_request, metadata_with_source_receipt_context, CrossProtocolExecutionRequest,
-    CrossProtocolTargetExecution, CrossProtocolTargetRequest, TargetExecutionHop,
-    TargetProtocolExecutor,
+    evaluate_bound_kernel_request, kernel_tool_call_request, metadata_with_source_receipt_context,
+    CrossProtocolExecutionRequest, CrossProtocolTargetExecution, CrossProtocolTargetRequest,
+    TargetExecutionHop, TargetProtocolExecutor,
 };
 use crate::routing::{
     build_route_evidence, plan_authoritative_route, route_hops_from_planning,
@@ -101,6 +101,7 @@ pub struct CrossProtocolOrchestrator<'a> {
     manifest_registry: &'a chio_manifest::VerifiedManifestRegistry,
     target_registry: TargetProtocolRegistry<'a>,
     route_availability: BTreeMap<DiscoveryProtocol, RouteAvailabilityStatus>,
+    peer_capabilities: chio_core::capability::features::CapabilityNegotiation,
 }
 
 impl<'a> CrossProtocolOrchestrator<'a> {
@@ -114,6 +115,7 @@ impl<'a> CrossProtocolOrchestrator<'a> {
             manifest_registry,
             target_registry: TargetProtocolRegistry::new(DiscoveryProtocol::Native),
             route_availability: BTreeMap::new(),
+            peer_capabilities: Default::default(),
         }
     }
 
@@ -121,6 +123,18 @@ impl<'a> CrossProtocolOrchestrator<'a> {
     pub fn with_executor(mut self, executor: &'a dyn TargetProtocolExecutor) -> Self {
         self.target_registry = self.target_registry.with_executor(executor);
         self
+    }
+
+    /// Bind the authenticated peer profile supplied by the embedding host.
+    /// Request envelopes cannot select or upgrade this profile.
+    pub fn with_peer_capabilities(
+        mut self,
+        peer: &chio_core::capability::features::CapabilityNegotiation,
+    ) -> Result<Self, BridgeError> {
+        peer.validate()
+            .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?;
+        self.peer_capabilities = peer.clone();
+        Ok(self)
     }
 
     #[must_use]
@@ -145,6 +159,9 @@ impl<'a> CrossProtocolOrchestrator<'a> {
         request: CrossProtocolExecutionRequest,
     ) -> Result<OrchestratedToolCall, BridgeError> {
         validate_execution_request_boundary(&request, self.manifest_registry)?;
+        kernel_tool_call_request(&request)
+            .validate_peer_capabilities(&self.peer_capabilities)
+            .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?;
         let source_protocol = bridge.source_protocol();
         let provided_ref = bridge.extract_capability_ref(&request.source_envelope)?;
         let capability_ref = match provided_ref {
@@ -308,38 +325,13 @@ impl<'a> CrossProtocolOrchestrator<'a> {
                 route_selection_metadata(route_selection)?,
                 &request.source_envelope,
             )?;
-            let kernel_request = kernel_tool_call_request(request);
-            let response = match (
-                request.security_context.as_ref(),
-                request.authenticated_session_id.as_ref(),
-            ) {
-                (Some(security_context), Some(authenticated_session_id)) => self
-                    .kernel
-                    .evaluate_tool_call_blocking_with_manifest_security_and_authenticated_session_context(
-                        &kernel_request,
-                        self.manifest_registry,
-                        &request.bridge_security,
-                        Some(route_metadata),
-                        authenticated_session_id,
-                        security_context,
-                    ),
-                (Some(security_context), None) => self
-                    .kernel
-                    .evaluate_tool_call_blocking_with_manifest_security_and_security_context(
-                        &kernel_request,
-                        self.manifest_registry,
-                        &request.bridge_security,
-                        Some(route_metadata),
-                        security_context,
-                    ),
-                (None, _) => self.kernel.evaluate_tool_call_blocking_with_manifest_security(
-                    &kernel_request,
-                    self.manifest_registry,
-                    &request.bridge_security,
-                    Some(route_metadata),
-                ),
-            }
-            .map_err(BridgeError::Kernel)?;
+            let response = evaluate_bound_kernel_request(
+                self.kernel,
+                self.manifest_registry,
+                request,
+                &self.peer_capabilities,
+                route_metadata,
+            )?;
             let receipt_id = response.receipt.id.clone();
             return Ok(CrossProtocolTargetExecution {
                 response,
@@ -364,6 +356,7 @@ impl<'a> CrossProtocolOrchestrator<'a> {
             kernel: self.kernel,
             manifest_registry: self.manifest_registry,
             execution: request,
+            peer_capabilities: &self.peer_capabilities,
             source_protocol,
             bridge_id,
             capability_ref,

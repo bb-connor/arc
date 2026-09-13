@@ -138,6 +138,10 @@ jobs:
           bash ./scripts/check-agent-web-proof-envelope-schema.sh
           bash ./scripts/tests/check-agent-web-proof-envelope-schema.test.sh
           bash ./scripts/tests/check-protocol-peer-negotiation.test.sh
+          bash ./scripts/tests/check-consumer-boundaries.test.sh
+          python3 scripts/tests/check-consumer-sdk-inventory.test.py
+          python3 scripts/tests/check-fuzz-manifest-selection.test.py
+          bash scripts/tests/check-drogon-consumer-gate.test.sh
           bash ./scripts/tests/check-flow-security.test.sh
           bash ./scripts/tests/check-deception-security.test.sh
           /bin/bash -p ./scripts/tests/check-temporal-security.test.sh
@@ -289,6 +293,12 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: ./scripts/check-protocol-peer-negotiation.sh
+
+      - name: Durable consumer boundaries
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+        run: ./scripts/check-consumer-boundaries.sh
 
       - name: chio-cli default build excludes iroh
         env:

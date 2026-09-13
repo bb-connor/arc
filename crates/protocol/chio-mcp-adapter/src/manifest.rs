@@ -112,7 +112,6 @@ pub(crate) fn tool_definition_from_mcp(tool: McpToolInfo) -> Result<ToolDefiniti
             destructive: tool.has_side_effects,
             idempotent: false,
             requires_approval: tool.has_side_effects,
-            estimated_duration_ms: None,
         },
         latency_hint: None,
         flow: None,

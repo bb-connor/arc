@@ -590,6 +590,7 @@ fn kernel_persists_child_receipts_to_sqlite_store() {
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,
@@ -700,6 +701,7 @@ fn nested_admission_denied_while_rss_shedding() {
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,

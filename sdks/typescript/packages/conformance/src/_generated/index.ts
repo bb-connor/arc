@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 9e307e6daa51395f15c9766f881fd70541e224eebe89a05139195be154d9b493
+// Schema SHA: 73153fd32c8a01bebd24270788a9c941fe0554dc990be68d150a81c7e6d52b49
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -16,7 +16,7 @@
 // Source: spec/schemas/chio-wire/v1/agent/active-response-governed-intent.schema.json
 export namespace Agent_ActiveResponseGovernedIntent {
   export interface ChioGovernedActiveResponseIntentBody {
-    plan_schema: "chio.governed-response-plan.v1";
+    plan_schema: "chio.response-plan.v1";
     plan_id: string;
     operator_capability_id: string;
     operator_capability_hash: string;
@@ -66,7 +66,7 @@ export namespace Agent_GovernedTransactionIntent {
         };
   }
   export interface ChioGovernedActiveResponseIntentBody {
-    plan_schema: "chio.governed-response-plan.v1";
+    plan_schema: "chio.response-plan.v1";
     plan_id: string;
     operator_capability_id: string;
     operator_capability_hash: string;
@@ -369,7 +369,7 @@ export namespace Agent_ToolCallRequest {
         };
   }
   export interface ChioGovernedActiveResponseIntentBody {
-    plan_schema: "chio.governed-response-plan.v1";
+    plan_schema: "chio.response-plan.v1";
     plan_id: string;
     operator_capability_id: string;
     operator_capability_hash: string;

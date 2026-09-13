@@ -19,8 +19,12 @@ use chio_manifest::{
     VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
 };
 use serde_json::{json, Value};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
-struct EchoServer;
+struct EchoServer(Arc<AtomicUsize>);
 
 #[async_trait::async_trait]
 impl ToolServerConnection for EchoServer {
@@ -38,6 +42,7 @@ impl ToolServerConnection for EchoServer {
         arguments: Value,
         _nested_flow_bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
     ) -> Result<Value, KernelError> {
+        self.0.fetch_add(1, Ordering::SeqCst);
         Ok(json!({
             "tool": tool_name,
             "arguments": arguments,
@@ -48,7 +53,8 @@ impl ToolServerConnection for EchoServer {
 #[test]
 fn mcp_target_executor_carries_source_receipt_context_into_kernel_receipt_metadata() {
     let mut kernel = make_kernel();
-    kernel.register_tool_server(Box::new(EchoServer));
+    let calls = Arc::new(AtomicUsize::new(0));
+    kernel.register_tool_server(Box::new(EchoServer(Arc::clone(&calls))));
     let agent = Keypair::generate();
     let capability = kernel
         .issue_capability(
@@ -166,11 +172,12 @@ fn mcp_target_executor_carries_source_receipt_context_into_kernel_receipt_metada
         peer_supports_chio_tool_streaming: false,
     };
 
-    let result = executor
-        .execute(CrossProtocolTargetRequest {
+    let execute = |execution: &CrossProtocolExecutionRequest| {
+        executor.execute(CrossProtocolTargetRequest {
             kernel: &kernel,
             manifest_registry: &manifest_registry,
-            execution: &execution,
+            execution,
+            peer_capabilities: &Default::default(),
             source_protocol: DiscoveryProtocol::Acp,
             bridge_id: "bridge-test",
             capability_ref: &capability_ref,
@@ -178,13 +185,37 @@ fn mcp_target_executor_carries_source_receipt_context_into_kernel_receipt_metada
             route_selection: &route_selection,
             projected_request: &projected_request,
         })
-        .unwrap();
+    };
+    let result = execute(&execution).unwrap();
+    assert_eq!(result.response.verdict, chio_kernel::Verdict::Allow);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
     let metadata = result.response.receipt.metadata.as_ref().unwrap();
     assert_eq!(
         metadata["source_receipt_context"]["sourceReceiptId"],
         "source-receipt-1"
     );
     assert_eq!(metadata["source_receipt_context"]["sourceProtocol"], "acp");
+
+    let receipts = kernel.receipt_log().receipts().len();
+    for mutation in 0..2 {
+        let mut changed = execution.clone();
+        changed.kernel_request_id = format!("mcp-target-authority-mutation-{mutation}");
+        if mutation == 0 {
+            changed.bridge_security = chio_manifest::BridgeSecurityMetadata::unconstrained();
+        } else {
+            changed.authenticated_session_id =
+                Some(chio_core::session::SessionId::new("unbound-session"));
+        }
+        let error = execute(&changed)
+            .err()
+            .expect("target executor must validate its exact authority boundary");
+        assert!(matches!(
+            error,
+            chio_cross_protocol::error::BridgeError::InvalidRequest(_)
+        ));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(kernel.receipt_log().receipts().len(), receipts);
+    }
 }
 
 fn make_kernel() -> ChioKernel {

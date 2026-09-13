@@ -6,6 +6,7 @@ pub(in crate::runtime) struct KernelResponseToToolResultArgs<'a> {
     pub output: Option<ToolCallOutput>,
     pub reason: Option<String>,
     pub verdict: Verdict,
+    pub receipt: &'a chio_core::receipt::body::ChioReceipt,
     pub terminal_state: &'a OperationTerminalState,
     pub execution_nonce: Option<&'a SignedExecutionNonce>,
     pub peer_supports_chio_tool_streaming: bool,
@@ -20,6 +21,7 @@ pub(in crate::runtime) fn kernel_response_to_tool_result(
         output,
         reason,
         verdict,
+        receipt,
         terminal_state,
         execution_nonce,
         peer_supports_chio_tool_streaming,
@@ -30,34 +32,59 @@ pub(in crate::runtime) fn kernel_response_to_tool_result(
         .as_deref()
         .or_else(|| terminal_state_reason(terminal_state));
 
-    let result = match output {
-        Some(ToolCallOutput::Value(value)) if !is_error => value_to_tool_result(value),
-        Some(ToolCallOutput::Stream(stream)) => {
-            if peer_supports_chio_tool_streaming {
-                queue_tool_stream_chunk_notifications(
-                    pending_notifications,
-                    request_id,
-                    &stream,
-                    related_task_id,
-                );
-                streamed_notification_tool_result(
-                    request_id,
-                    stream.chunk_count(),
-                    terminal_state,
-                    terminal_reason,
-                    is_error,
-                )
-            } else {
-                collapsed_stream_tool_result(stream, terminal_state, terminal_reason, is_error)
+    let result = if let Some(pending) =
+        chio_cross_protocol::execution::pending_approval_result(verdict, output.as_ref())
+    {
+        json!({"content":[], "structuredContent":pending, "isError":false})
+    } else {
+        match output {
+            Some(ToolCallOutput::Value(value)) if !is_error => value_to_tool_result(value),
+            Some(ToolCallOutput::Stream(stream)) => {
+                if peer_supports_chio_tool_streaming {
+                    queue_tool_stream_chunk_notifications(
+                        pending_notifications,
+                        request_id,
+                        &stream,
+                        related_task_id,
+                    );
+                    streamed_notification_tool_result(
+                        request_id,
+                        stream.chunk_count(),
+                        terminal_state,
+                        terminal_reason,
+                        is_error,
+                    )
+                } else {
+                    collapsed_stream_tool_result(stream, terminal_state, terminal_reason, is_error)
+                }
             }
+            Some(ToolCallOutput::Value(_)) | None if is_error => tool_error_result(
+                &reason.unwrap_or_else(|| default_tool_failure_reason(terminal_state)),
+            ),
+            Some(ToolCallOutput::Value(value)) => value_to_tool_result(value),
+            None => value_to_tool_result(Value::Null),
         }
-        Some(ToolCallOutput::Value(_)) | None if is_error => tool_error_result(
-            &reason.unwrap_or_else(|| default_tool_failure_reason(terminal_state)),
-        ),
-        Some(ToolCallOutput::Value(value)) => value_to_tool_result(value),
-        None => value_to_tool_result(Value::Null),
     };
-    attach_execution_nonce_meta_to_result(result, execution_nonce)
+    let mut result = attach_execution_nonce_meta_to_result(result, execution_nonce);
+    if let Some(object) = result.as_object_mut() {
+        let meta = object.entry("_meta").or_insert_with(|| json!({}));
+        if !meta.is_object() {
+            *meta = json!({});
+        }
+        // Connector-provided metadata is not a receipt authority. Replace the
+        // Chio namespace with the actual kernel decision and signed receipt.
+        meta["chio"] = json!({
+            "decision": match verdict {
+                Verdict::Allow => "allow",
+                Verdict::Deny => "deny",
+                Verdict::PendingApproval => "pending_approval",
+            },
+            "receipt": receipt,
+            "receiptId": receipt.id,
+            "terminalState": terminal_state,
+        });
+    }
+    result
 }
 
 pub(in crate::runtime) fn queue_tool_stream_chunk_notifications(

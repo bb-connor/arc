@@ -11,6 +11,7 @@ use syn::{Attribute, ExprBinary, ExprCall, ExprMethodCall, ExprPath, ItemImpl};
 
 use crate::{display_path, workspace_root, XtaskError};
 
+mod constructors;
 mod source;
 
 const SOURCE_INVENTORY_PATH: &str = "formal/adapter-source-inventory.toml";
@@ -26,6 +27,9 @@ struct SourceInventory {
     crate_name_markers: Vec<String>,
     explicit_roots: Vec<String>,
     contract_sources: Vec<String>,
+    constructor_sites: Vec<constructors::Site>,
+    #[serde(default)]
+    dispatch_sites: Vec<constructors::Site>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -193,6 +197,117 @@ struct CallContract {
 
 const CALL_CONTRACTS: &[CallContract] = &[
     CallContract {
+        path: "crates/kernel/chio-kernel/src/provider_verdict.rs",
+        function: "build_tool_call_request",
+        target: "request.validate_peer_capabilities",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-openai-adapter/src/lib.rs",
+        function: "ChioOpenAiAdapter::execute_tool_call",
+        target: "request.validate_peer_capabilities",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-openai-adapter/src/lib.rs",
+        function: "ChioOpenAiAdapter::execute_tool_call",
+        target: "kernel.evaluate_tool_call_blocking_with_metadata",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-tower/src/kernel_service.rs",
+        function: "<KernelService as Service<KernelRequest>>::call",
+        target: "req.call.validate_peer_capabilities",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-tower/src/kernel_service.rs",
+        function: "<KernelService as Service<KernelRequest>>::call",
+        target: "kernel.evaluate_tool_call",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-a2a-edge/src/edge.rs",
+        function: "validate_execution_context",
+        target: "peer.validate_invocation_features",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-acp-edge/src/edge.rs",
+        function: "validate_execution_context",
+        target: "peer.validate_invocation_features",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-cross-protocol/src/execution.rs",
+        function: "evaluate_bound_kernel_request",
+        target: "crate::validation::validate_execution_request_boundary",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-cross-protocol/src/execution.rs",
+        function: "evaluate_bound_kernel_request",
+        target: "request.validate_peer_capabilities",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-cross-protocol/src/execution.rs",
+        function: "evaluate_bound_kernel_request",
+        target: "kernel.evaluate_tool_call_blocking_with_manifest_security_and_authenticated_session_context",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-cross-protocol/src/execution.rs",
+        function: "evaluate_bound_kernel_request",
+        target: "kernel.evaluate_tool_call_blocking_with_manifest_security_and_security_context",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-cross-protocol/src/execution.rs",
+        function: "evaluate_bound_kernel_request",
+        target: "kernel.evaluate_tool_call_blocking_with_manifest_security",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-cross-protocol/src/execution.rs",
+        function: "<OpenAiTargetExecutor as TargetProtocolExecutor>::execute",
+        target: "evaluate_bound_kernel_request",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-cross-protocol/src/orchestrator.rs",
+        function: "CrossProtocolOrchestrator::execute_target",
+        target: "evaluate_bound_kernel_request",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
+        function: "<McpTargetExecutor as TargetProtocolExecutor>::execute",
+        target: "evaluate_bound_kernel_request",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
+        function: "ChioMcpEdge::prepare_tool_call_request",
+        target: "peer.validate_invocation_features",
+        minimum: 1,
+    },
+    // These ordinary-kernel factories cannot install a trusted flow host.
+    // Behavioral startup tests establish that rejection precedes launch/store
+    // acquisition; the source contracts prevent removing the selected gate.
+    CallContract {
+        path: "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs",
+        function: "RemoteSessionFactory::new",
+        target: "manifest_registry.requires_flow_runtime",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/products/chio-cli/src/cli/runtime.rs",
+        function: "cmd_mcp_serve",
+        target: "manifest_registry.requires_flow_runtime",
+        minimum: 1,
+    },
+    CallContract {
         path: MCP_LAUNCH_SOURCE,
         function: "LegacyNativeLaunchAuthorization::revalidate",
         target: "self.manifest_registry.authorize_cage_manifest",
@@ -346,7 +461,10 @@ pub(crate) fn run() -> Result<(), XtaskError> {
 }
 
 fn validate_workspace(root: &Path) -> Result<(), String> {
-    let inventory = load_source_inventory(root)?;
+    let mut inventory = load_source_inventory(root)?;
+    let dispatch_sites = std::mem::take(&mut inventory.dispatch_sites);
+    inventory.constructor_sites.extend(dispatch_sites);
+    constructors::validate(root, &inventory.constructor_sites)?;
     validate_contract_source_registry(&inventory)?;
     let adapter_sources = discover_adapter_sources(root, &inventory)?;
     let mut parsed = source::parse_repo_sources(root, &adapter_sources)?;
@@ -926,6 +1044,29 @@ fn require_binary_tokens(
 mod tests {
     use super::*;
 
+    #[test]
+    fn every_current_mediation_contract_detects_a_removed_required_call() -> Result<(), String> {
+        let root = workspace_root().map_err(|error| error.to_string())?;
+        for contract in CALL_CONTRACTS {
+            let source =
+                fs::read_to_string(root.join(contract.path)).map_err(|error| error.to_string())?;
+            let mut facts = parse_source(&source, contract.path)?;
+            require_call(&facts, contract)?;
+            let function = facts
+                .functions
+                .get_mut(contract.function)
+                .ok_or_else(|| format!("missing positive function {}", contract.function))?;
+            function.calls.retain(|call| call.target != contract.target);
+            assert!(
+                require_call(&facts, contract).is_err(),
+                "removed {} from {} did not break the required contract",
+                contract.target,
+                contract.function,
+            );
+        }
+        Ok(())
+    }
+
     fn validate_fixture(path: &str, source: &str) -> Result<(), String> {
         let mut sources = BTreeMap::new();
         sources.insert(path.to_string(), parse_source(source, path)?);
@@ -1141,6 +1282,27 @@ mod tests {
                 contract.target
             );
         }
+    }
+
+    #[test]
+    fn startup_factory_flow_gates_cannot_be_removed() -> Result<(), String> {
+        let root = workspace_root().map_err(|error| error.to_string())?;
+        let contracts: Vec<_> = CALL_CONTRACTS
+            .iter()
+            .filter(|contract| contract.target == "manifest_registry.requires_flow_runtime")
+            .collect();
+        assert_eq!(contracts.len(), 2);
+        for contract in contracts {
+            let source = fs::read_to_string(root.join(contract.path))
+                .map_err(|error| format!("read {}: {error}", contract.path))?;
+            let facts = parse_source(&source, contract.path)?;
+            require_call(&facts, contract)?;
+            let mutated = source.replace("manifest_registry.requires_flow_runtime()", "false");
+            assert_ne!(mutated, source);
+            let mutated_facts = parse_source(&mutated, contract.path)?;
+            assert!(require_call(&mutated_facts, contract).is_err());
+        }
+        Ok(())
     }
 
     #[test]

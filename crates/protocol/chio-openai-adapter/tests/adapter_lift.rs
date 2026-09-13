@@ -60,7 +60,6 @@ fn admitted_adapter(tool_name: &str) -> (OpenAiAdapter, ToolFlowDeclaration) {
                 destructive: false,
                 idempotent: false,
                 requires_approval: false,
-                estimated_duration_ms: None,
             },
             latency_hint: None,
             flow: Some(flow.clone()),

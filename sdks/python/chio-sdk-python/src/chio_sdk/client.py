@@ -30,6 +30,13 @@ from typing import Any, NoReturn
 import httpx
 from pydantic import BaseModel
 
+from chio_sdk._generated.kernel.caller_delivery_report_schema import (
+    ChioSignedCallerDeliveryReport,
+    Report as CallerDeliveryReportBody,
+)
+from chio_sdk._generated.kernel.caller_dispatch_authorization_schema import (
+    ChioSignedCallerDispatchAuthorization,
+)
 from chio_sdk.errors import (
     ChioConnectionError,
     ChioDeniedError,
@@ -64,7 +71,11 @@ def _jsonable(obj: Any) -> Any:
         return _jsonable(
             obj.model_dump(
                 mode="json",
-                exclude_none=True,
+                # Required nullable fields are part of the signed caller report.
+                # Preserve the established omission contract for other models.
+                exclude_none=not isinstance(
+                    obj, (ChioSignedCallerDeliveryReport, CallerDeliveryReportBody)
+                ),
                 by_alias=True,
             )
         )
@@ -696,8 +707,8 @@ class ChioClient:
         self,
         *,
         control_token: str,
-        authorization: dict[str, Any],
-        report: dict[str, Any],
+        authorization: dict[str, Any] | ChioSignedCallerDispatchAuthorization,
+        report: dict[str, Any] | ChioSignedCallerDeliveryReport,
     ) -> dict:
         """Deliver the executor's durably retained signed report for finalization.
 

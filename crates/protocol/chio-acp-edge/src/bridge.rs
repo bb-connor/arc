@@ -176,6 +176,7 @@ fn current_unix_millis() -> u64 {
 }
 
 fn execute_orchestrated_acp_request(
+    peer: &chio_core::capability::features::CapabilityNegotiation,
     kernel: &ChioKernel,
     manifest_registry: &VerifiedManifestRegistry,
     request: CrossProtocolExecutionRequest,
@@ -189,6 +190,7 @@ fn execute_orchestrated_acp_request(
     }
 
     match CrossProtocolOrchestrator::new(kernel, manifest_registry)
+        .with_peer_capabilities(peer)?
         .with_registry(registry)
         .execute(&AcpCapabilityBridge, request)
     {
