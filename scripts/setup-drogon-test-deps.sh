@@ -4,6 +4,8 @@ set -euo pipefail
 # Build the Conan recipe's Drogon version in an isolated prefix. Nothing is
 # installed system-wide. stdout is only the prefix for CMAKE_PREFIX_PATH; build
 # diagnostics go to stderr. The caller retains this temporary acceptance input.
+# Linux hosts must provide OpenSSL, zlib and UUID development headers/libraries
+# (libssl-dev, zlib1g-dev and uuid-dev on the Ubuntu qualification runners).
 for tool in git cmake; do
   command -v "${tool}" >/dev/null
 done

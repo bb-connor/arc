@@ -169,7 +169,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake curl git pkg-config python3 python3-pip zip unzip tar libssl-dev zlib1g-dev libcurl4-openssl-dev
+          sudo apt-get install -y build-essential cmake curl git pkg-config python3 python3-pip zip unzip tar libssl-dev zlib1g-dev uuid-dev libcurl4-openssl-dev
           cargo install cbindgen --locked --version "${CHIO_CPP_CBINDGEN_VERSION}"
           python3 -m pip install --user "conan==${CHIO_CPP_CONAN_VERSION}"
           git init "${{ runner.temp }}/vcpkg"
@@ -227,7 +227,7 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/apt-install
         with:
-          packages: build-essential cmake curl git pkg-config libssl-dev zlib1g-dev libcurl4-openssl-dev
+          packages: build-essential cmake curl git pkg-config libssl-dev zlib1g-dev uuid-dev libcurl4-openssl-dev
       - name: Build Drogon SDK smoke
         run: |
           CMAKE_PREFIX_PATH="$(./scripts/setup-drogon-test-deps.sh)"

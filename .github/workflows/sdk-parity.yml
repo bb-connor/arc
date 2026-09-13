@@ -150,7 +150,7 @@ jobs:
       - name: Install parity dependencies
         uses: ./.github/actions/apt-install
         with:
-          packages: protobuf-compiler cmake build-essential libcurl4-openssl-dev libssl-dev zlib1g-dev pkg-config
+          packages: protobuf-compiler cmake build-essential libcurl4-openssl-dev libssl-dev zlib1g-dev uuid-dev pkg-config
 
       - name: Install current consumer SDK dependencies
         run: |

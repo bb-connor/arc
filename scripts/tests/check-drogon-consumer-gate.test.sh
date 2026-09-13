@@ -22,5 +22,9 @@ for gate in scripts/check-chio-cpp.sh sdks/cpp/chio-cpp-kernel/scripts/check-wit
 done
 for workflow in .github/workflows/chio-cpp.yml .github/workflows/release-cpp.yml .github/workflows/sdk-parity.yml; do
   grep -Fq 'CMAKE_PREFIX_PATH="$(./scripts/setup-drogon-test-deps.sh)"' "${workflow}"
+  # Each pinned-bootstrap job needs the Linux UUID development dependency.
+  bootstrap_count="$(grep -Fc 'CMAKE_PREFIX_PATH="$(./scripts/setup-drogon-test-deps.sh)"' "${workflow}")"
+  uuid_install_count="$(grep -Ec '^[[:space:]]*(packages:|sudo apt-get install).* uuid-dev( |$)' "${workflow}")"
+  test "${uuid_install_count}" -eq "${bootstrap_count}"
 done
 echo 'C++ consumer gates require real dependency and nonempty test execution'
