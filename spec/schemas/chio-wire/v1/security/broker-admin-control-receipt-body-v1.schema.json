@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-admin-control-receipt-body-v1.schema.json",
+  "title": "Chio broker admin control receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "operationId", "requestId", "intentDigest", "authorizationDigest", "operation", "tenantScope", "responseDigest", "completedAtUnixSeconds", "outcome"],
+  "properties": {
+    "schema": { "const": "chio.broker-admin-control-receipt.v1" },
+    "operationId": { "$ref": "#/$defs/digest" },
+    "requestId": { "$ref": "#/$defs/identifier" },
+    "intentDigest": { "$ref": "#/$defs/digest" },
+    "authorizationDigest": { "$ref": "#/$defs/digest" },
+    "operation": { "enum": ["issue", "revoke", "status"] },
+    "tenantScope": { "$ref": "#/$defs/identifier" },
+    "responseDigest": { "$ref": "#/$defs/digest" },
+    "completedAtUnixSeconds": { "type": "integer", "minimum": 1 },
+    "outcome": { "const": "applied" }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

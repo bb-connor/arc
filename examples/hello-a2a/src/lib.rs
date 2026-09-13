@@ -9,13 +9,17 @@ use chio_kernel::{
     ToolServerConnection, ToolServerStreamResult, DEFAULT_CHECKPOINT_BATCH_SIZE,
     DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
-use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::{RuntimeToolTopology, ToolDefinition, ToolManifest, VerifiedManifestRegistry};
 use serde_json::{json, Value};
 
 const SERVER_ID: &str = "hello-a2a-srv";
 const TOOL_NAME: &str = "hello_task";
 
 pub type HelloA2aResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
+
+fn manifest_signer() -> Keypair {
+    Keypair::from_seed(&[75; 32])
+}
 
 struct HelloStreamServer;
 
@@ -105,7 +109,7 @@ fn kernel_config() -> KernelConfig {
 
 pub fn demo_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: SERVER_ID.to_string(),
         name: "Hello A2A Server".to_string(),
         description: Some("A tiny receipt-bearing A2A hello surface".to_string()),
@@ -120,13 +124,28 @@ pub fn demo_manifest() -> ToolManifest {
             }),
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+                estimated_duration_ms: None,
+            },
             latency_hint: None,
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
-        public_key: "hello-a2a-manifest".to_string(),
+        public_key: manifest_signer().public_key().to_hex(),
     }
+}
+
+fn demo_registry() -> HelloA2aResult<VerifiedManifestRegistry> {
+    let signer = manifest_signer();
+    let signed = chio_manifest::sign_manifest(&demo_manifest(), &signer)?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry.register_public_only(signed, &signer.public_key(), RuntimeToolTopology::local())?;
+    Ok(registry)
 }
 
 pub fn build_demo_state() -> HelloA2aResult<HelloA2aDemoState> {
@@ -169,8 +188,9 @@ pub fn build_demo_state() -> HelloA2aResult<HelloA2aDemoState> {
         model_metadata: None,
     };
 
+    let registry = demo_registry()?;
     Ok(HelloA2aDemoState {
-        edge: ChioA2aEdge::new(A2aEdgeConfig::default(), vec![demo_manifest()]).map_err(
+        edge: ChioA2aEdge::new(A2aEdgeConfig::default(), &registry).map_err(
             |error| -> Box<dyn Error + Send + Sync> { format!("create edge: {error}").into() },
         )?,
         kernel,

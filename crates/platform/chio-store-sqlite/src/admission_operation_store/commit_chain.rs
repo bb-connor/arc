@@ -38,6 +38,8 @@ struct ChainEntry<'a> {
     store_lease_id: &'a str,
     store_owner_epoch: u64,
     recorded_at_unix_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    observed_at_unix_ms: Option<u64>,
 }
 
 struct CommitRow {
@@ -54,6 +56,7 @@ struct CommitRow {
     store_lease_id: String,
     store_owner_epoch: u64,
     recorded_at_unix_ms: u64,
+    observed_at_unix_ms: Option<u64>,
 }
 
 pub(super) fn append_operation_commit(
@@ -93,8 +96,14 @@ pub(crate) fn append_operation_commit_with_participant(
     }
     let current = load_admission_commit_head(transaction)?;
     validate_trusted_time(recorded_at_unix_ms, "recorded_at_unix_ms")?;
-    if recorded_at_unix_ms < current.trusted_time_high_water_unix_ms {
-        return Err(invariant("trusted admission operation time regressed"));
+    let authority_time = super::schema::observe_authority_time(transaction)?;
+    #[cfg(not(test))]
+    let observed_at_unix_ms = Some(authority_time);
+    #[cfg(test)]
+    let (authority_time, observed_at_unix_ms) =
+        super::tests::legacy_clock::fixture_clocks(authority_time, recorded_at_unix_ms);
+    if authority_time < current.trusted_time_high_water_unix_ms {
+        return Err(invariant("trusted admission authority time regressed"));
     }
     let next = current
         .head_sequence
@@ -103,7 +112,7 @@ pub(crate) fn append_operation_commit_with_participant(
     let operation_digest = sha256_hex(encoded);
     let claim_digest = recovery_claim.map(recovery_claim_digest).transpose()?;
     let chain_digest = chain_digest(&ChainEntry {
-        format: "chio.admission-operation-commit-chain.v1",
+        format: commit_format(observed_at_unix_ms),
         previous_chain_digest: &current.chain_digest,
         commit_sequence: next,
         operation_id: operation.binding().operation_id().as_str(),
@@ -116,6 +125,7 @@ pub(crate) fn append_operation_commit_with_participant(
         store_lease_id: &owner.fence.lease_id,
         store_owner_epoch: owner.fence.owner_epoch,
         recorded_at_unix_ms,
+        observed_at_unix_ms,
     })?;
     let inserted = transaction
         .execute(
@@ -124,8 +134,9 @@ pub(crate) fn append_operation_commit_with_participant(
                 commit_sequence, operation_id, operation_version, mutation_kind,
                 operation_digest, recovery_claim_digest, participant_digest,
                 previous_chain_digest, chain_digest,
-                store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+                store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms,
+                observed_at_unix_ms
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
             "#,
             params![
                 sqlite_i64(next, "commit_sequence")?,
@@ -141,6 +152,9 @@ pub(crate) fn append_operation_commit_with_participant(
                 &owner.fence.lease_id,
                 sqlite_i64(owner.fence.owner_epoch, "store_owner_epoch")?,
                 sqlite_i64(recorded_at_unix_ms, "recorded_at_unix_ms")?,
+                observed_at_unix_ms
+                    .map(|value| sqlite_i64(value, "observed_at_unix_ms"))
+                    .transpose()?,
             ],
         )
         .map_err(sqlite_error)?;
@@ -158,7 +172,7 @@ pub(crate) fn append_operation_commit_with_participant(
                 sqlite_i64(next, "commit_sequence")?,
                 sqlite_i64(current.head_sequence, "current_commit_sequence")?,
                 chain_digest,
-                sqlite_i64(recorded_at_unix_ms, "recorded_at_unix_ms")?,
+                sqlite_i64(authority_time, "authority_time")?,
                 current.chain_digest,
                 sqlite_i64(
                     current.trusted_time_high_water_unix_ms,
@@ -225,7 +239,8 @@ pub(crate) fn verify_admission_commit_chain(
             SELECT commit_sequence, operation_id, operation_version, mutation_kind,
                    operation_digest, recovery_claim_digest, participant_digest,
                    previous_chain_digest, chain_digest,
-                   store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
+                   store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms,
+                   observed_at_unix_ms
             FROM admission_operation_commits ORDER BY commit_sequence
             "#,
         )
@@ -234,6 +249,7 @@ pub(crate) fn verify_admission_commit_chain(
     let mut expected_sequence = 0_u64;
     let mut expected_digest = GENESIS_CHAIN_DIGEST.to_string();
     let mut expected_high_water = 0_u64;
+    let mut observed_clock_started = false;
     while let Some(row) = rows.next().map_err(sqlite_error)? {
         let commit = read_commit(row)?;
         expected_sequence = expected_sequence
@@ -244,6 +260,7 @@ pub(crate) fn verify_admission_commit_chain(
             expected_sequence,
             &expected_digest,
             expected_high_water,
+            &mut observed_clock_started,
         )?;
     }
     if committed.head_sequence != expected_sequence
@@ -274,7 +291,8 @@ pub(crate) fn verify_admission_commit_suffix(
             SELECT commit_sequence, operation_id, operation_version, mutation_kind,
                    operation_digest, recovery_claim_digest, participant_digest,
                    previous_chain_digest, chain_digest,
-                   store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
+                   store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms,
+                   observed_at_unix_ms
             FROM admission_operation_commits
             WHERE commit_sequence > ?1 ORDER BY commit_sequence
             "#,
@@ -289,6 +307,13 @@ pub(crate) fn verify_admission_commit_suffix(
     let mut expected_sequence = anchored.head_sequence;
     let mut expected_digest = anchored.chain_digest.clone();
     let mut expected_high_water = anchored.trusted_time_high_water_unix_ms;
+    let mut observed_clock_started: bool = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM admission_operation_commits WHERE commit_sequence = ?1 AND observed_at_unix_ms IS NOT NULL)",
+            [sqlite_i64(anchored.head_sequence, "anchored_head_sequence")?],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
     while let Some(row) = rows.next().map_err(sqlite_error)? {
         let commit = read_commit(row)?;
         expected_sequence = expected_sequence
@@ -299,6 +324,7 @@ pub(crate) fn verify_admission_commit_suffix(
             expected_sequence,
             &expected_digest,
             expected_high_water,
+            &mut observed_clock_started,
         )?;
     }
     if expected_sequence != current.head_sequence
@@ -327,7 +353,7 @@ pub(crate) fn verify_anchored_ancestor(
     let row = connection
         .query_row(
             r#"
-            SELECT chain_digest, recorded_at_unix_ms
+            SELECT chain_digest, COALESCE(observed_at_unix_ms, recorded_at_unix_ms)
             FROM admission_operation_commits WHERE commit_sequence = ?1
             "#,
             [sqlite_i64(
@@ -338,7 +364,7 @@ pub(crate) fn verify_anchored_ancestor(
         )
         .map_err(sqlite_error)?;
     if row.0 != anchored.chain_digest
-        || stored_u64(row.1, "anchored_recorded_at_unix_ms")?
+        || stored_u64(row.1, "anchored_observed_at_unix_ms")?
             != anchored.trusted_time_high_water_unix_ms
     {
         return Err(invariant(
@@ -369,6 +395,11 @@ fn read_commit(row: &Row<'_>) -> Result<CommitRow, AdmissionOperationStoreError>
         store_lease_id: row.get(10).map_err(sqlite_error)?,
         store_owner_epoch: stored_u64(row.get(11).map_err(sqlite_error)?, "store_owner_epoch")?,
         recorded_at_unix_ms: stored_u64(row.get(12).map_err(sqlite_error)?, "recorded_at_unix_ms")?,
+        observed_at_unix_ms: row
+            .get::<_, Option<i64>>(13)
+            .map_err(sqlite_error)?
+            .map(|value| stored_u64(value, "observed_at_unix_ms"))
+            .transpose()?,
     })
 }
 
@@ -377,10 +408,17 @@ fn advance_chain(
     expected_sequence: u64,
     previous_digest: &str,
     previous_time: u64,
+    observed_clock_started: &mut bool,
 ) -> Result<(String, u64), AdmissionOperationStoreError> {
+    validate_trusted_time(commit.recorded_at_unix_ms, "recorded_at_unix_ms")?;
+    let observed = commit
+        .observed_at_unix_ms
+        .unwrap_or(commit.recorded_at_unix_ms);
+    validate_trusted_time(observed, "observed_at_unix_ms")?;
     if commit.sequence != expected_sequence
         || commit.previous_chain_digest != previous_digest
-        || commit.recorded_at_unix_ms < previous_time
+        || observed < previous_time
+        || (*observed_clock_started && commit.observed_at_unix_ms.is_none())
         || !is_digest(&commit.operation_digest)
         || commit
             .recovery_claim_digest
@@ -394,7 +432,7 @@ fn advance_chain(
         return Err(invariant("admission operation commit chain is invalid"));
     }
     let calculated = chain_digest(&ChainEntry {
-        format: "chio.admission-operation-commit-chain.v1",
+        format: commit_format(commit.observed_at_unix_ms),
         previous_chain_digest: previous_digest,
         commit_sequence: commit.sequence,
         operation_id: &commit.operation_id,
@@ -407,13 +445,15 @@ fn advance_chain(
         store_lease_id: &commit.store_lease_id,
         store_owner_epoch: commit.store_owner_epoch,
         recorded_at_unix_ms: commit.recorded_at_unix_ms,
+        observed_at_unix_ms: commit.observed_at_unix_ms,
     })?;
     if commit.chain_digest != calculated {
         return Err(invariant(
             "admission operation commit chain digest is invalid",
         ));
     }
-    Ok((calculated, commit.recorded_at_unix_ms))
+    *observed_clock_started |= commit.observed_at_unix_ms.is_some();
+    Ok((calculated, observed))
 }
 
 fn is_digest(value: &str) -> bool {
@@ -421,4 +461,12 @@ fn is_digest(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn commit_format(observed_at_unix_ms: Option<u64>) -> &'static str {
+    if observed_at_unix_ms.is_some() {
+        "chio.admission-operation-commit-chain.v2"
+    } else {
+        "chio.admission-operation-commit-chain.v1"
+    }
 }

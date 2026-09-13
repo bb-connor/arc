@@ -120,6 +120,7 @@ mod replay_bless_tests {
                 },
                 received_at: SystemTime::UNIX_EPOCH,
             },
+            bridge_security: None,
         };
         let bytes = chio_core::canonical::canonical_json_bytes(&invocation).unwrap();
         serde_json::from_slice(&bytes).unwrap()

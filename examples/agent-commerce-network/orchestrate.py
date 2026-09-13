@@ -91,9 +91,17 @@ def main(argv: list[str] | None = None) -> int:
                     "tool_name": "procurement_job_write",
                     "operations": ["invoke"],
                     "constraints": [],
-                    "maxInvocations": 3,
-                    "maxCostPerInvocation": _usd(args.budget_minor),
-                    "maxTotalCost": _usd(args.budget_minor),
+                    "max_invocations": 3,
+                    "max_cost_per_invocation": _usd(args.budget_minor),
+                    "max_total_cost": _usd(args.budget_minor),
+                },
+                # Side-effect routes behind the buyer sidecar are deny-by-default and
+                # bind to the sidecar's HTTP authority tool.
+                {
+                    "server_id": "chio_http_authority",
+                    "tool_name": "authorize_http_request",
+                    "operations": ["invoke"],
+                    "constraints": [],
                 },
             ],
             "resource_grants": [],

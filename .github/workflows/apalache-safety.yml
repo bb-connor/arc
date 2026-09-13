@@ -1,80 +1,17 @@
 name: apalache-safety
 
 on:
+  workflow_call:
   workflow_dispatch:
   schedule:
     - cron: "23 7 * * *"
-  pull_request:
-    paths:
-      - "formal/apalache/**"
-      - "formal/tla/**"
-      - "crates/tooling/chio-trace-validate/**"
-      - "scripts/check-receipt-trace.sh"
-      - "scripts/check-receipt-trace-bindings.py"
-      - "scripts/check-receipt-trace-negative-registry.py"
-      - "scripts/tests/check-receipt-trace-bindings.test.sh"
-      - "formal/MAPPING.md"
-      - "formal/proof-manifest.toml"
-      - "formal/assumptions.toml"
-      - "docs/reference/CLAIM_REGISTRY.md"
-      - "crates/trust/chio-federation/src/revocation_gossip.rs"
-      - "crates/trust/chio-federation/tests/distributed_revocation_refinement.rs"
-      - "crates/trust/chio-revocation-oracle/src/**"
-      - "crates/core/chio-core-types/src/capability/attenuation.rs"
-      - "crates/core/chio-core-types/src/capability/scope.rs"
-      - "crates/kernel/chio-kernel-core/src/evaluate.rs"
-      - "crates/kernel/chio-kernel-core/src/normalized.rs"
-      - "crates/kernel/chio-kernel-core/src/revocation_view.rs"
-      - "crates/kernel/chio-kernel/src/budget_store.rs"
-      - "crates/kernel/chio-kernel/src/runtime_trace.rs"
-      - "crates/kernel/chio-kernel/src/kernel/construction.rs"
-      - "crates/kernel/chio-kernel/src/kernel/credential_reservation.rs"
-      - "crates/kernel/chio-kernel/src/kernel/mod.rs"
-      - "crates/kernel/chio-kernel/src/receipt_store.rs"
-      - "crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs"
-      - "crates/kernel/chio-kernel/src/kernel/kernel_scopes.rs"
-      - "crates/kernel/chio-kernel/src/kernel/delegation.rs"
-      - "crates/kernel/chio-kernel/src/kernel/dispatch.rs"
-      - "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs"
-      - "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs"
-      - "crates/kernel/chio-kernel/src/kernel/responses/allow_responses.rs"
-      - "crates/kernel/chio-kernel/src/kernel/responses/finalization.rs"
-      - "crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs"
-      - "crates/kernel/chio-kernel/src/kernel/validation.rs"
-      - "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime.rs"
-      - "crates/kernel/chio-runtime-core/src/admission.rs"
-      - "crates/kernel/chio-runtime-core/src/admission_hook.rs"
-      - "crates/kernel/chio-runtime-core/src/admission_hook/**"
-      - "crates/platform/chio-store-sqlite/src/receipt_store.rs"
-      - "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs"
-      - "crates/tooling/chio-conformance/tests/budget_split_rejects_oversubscribed_siblings.rs"
-      - "crates/tooling/chio-conformance/src/native_suite.rs"
-      - "crates/tooling/chio-conformance/src/bin/chio_native_conformance_runner.rs"
-      - "crates/tooling/chio-conformance/tests/runtime_trace_corpus.rs"
-      - "scripts/check-apalache-formal-slice.py"
-      - "scripts/check-apalache-negative.sh"
-      - "scripts/check-apalache-positive.sh"
-      - "scripts/check-distributed-revocation-temporal.sh"
-      - "scripts/lib/apalache_evidence.py"
-      - "scripts/file-mutation-survivors.py"
-      - "scripts/spec-mutants.py"
-      - "scripts/check-distributed-revocation-refinement.sh"
-      - "scripts/validate-distributed-revocation-trace.py"
-      - "scripts/tests/check-apalache-negative.test.sh"
-      - "scripts/tests/check-apalache-positive.test.sh"
-      - "scripts/tests/apalache-workflow.test.sh"
-      - "scripts/tests/file-mutation-survivors.test.sh"
-      - "scripts/tests/spec-mutants.test.sh"
-      - "tools/install-apalache.sh"
-      - ".github/workflows/apalache-safety.yml"
-      - ".github/workflows/apalache-temporal.yml"
 
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && format('pr-{0}-apalache-safety', github.ref) || format('main-{0}-apalache-safety', github.ref) }}
+  group: apalache-safety-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

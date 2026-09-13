@@ -1,9 +1,20 @@
 use super::*;
 use rusqlite::{params, Connection, Transaction};
 
+mod caller_resume;
 mod cumulative_model;
 mod event_projection;
 mod model;
+mod native_capture;
+mod nonce;
+mod preflight;
+pub(crate) use nonce::{
+    verify_compensated_budget_hold_tx, verify_nonce_budget_phase_tx, NonceBudgetPhase,
+};
+pub(crate) use preflight::{
+    preflight_authorization_commit_index, verify_preflight_hold,
+    NoncePreflightAuthorizationBinding, NoncePreflightHoldState,
+};
 mod transitions;
 
 pub(crate) use transitions::AdmissionCaptureBinding;
@@ -22,6 +33,12 @@ pub(crate) struct AdmissionAuthorizationBinding<'a> {
     pub(crate) credit_exposure:
         Option<&'a chio_credit::obligation::CreditExposureReservationRequest>,
     pub(crate) trusted_now_unix_ms: u64,
+}
+
+#[derive(Clone, Copy)]
+enum AuthorizationParticipant<'a> {
+    Executable(AdmissionAuthorizationBinding<'a>),
+    NoncePreflight(NoncePreflightAuthorizationBinding<'a>),
 }
 
 impl SqliteBudgetStore {
@@ -118,7 +135,10 @@ impl SqliteBudgetStore {
         ),
         BudgetStoreError,
     > {
-        let (decision, operation) = self.authorize_composite_hold_inner(request, Some(binding))?;
+        let (decision, operation) = self.authorize_composite_hold_inner(
+            request,
+            Some(AuthorizationParticipant::Executable(binding)),
+        )?;
         let operation = operation.ok_or_else(|| {
             BudgetStoreError::Invariant(
                 "combined budget authorization omitted its admission operation".to_owned(),
@@ -130,7 +150,7 @@ impl SqliteBudgetStore {
     fn authorize_composite_hold_inner(
         &self,
         request: BudgetAuthorizeHoldRequest,
-        binding: Option<AdmissionAuthorizationBinding<'_>>,
+        binding: Option<AuthorizationParticipant<'_>>,
     ) -> Result<
         (
             BudgetAuthorizeHoldDecision,
@@ -139,6 +159,18 @@ impl SqliteBudgetStore {
         BudgetStoreError,
     > {
         request.validate()?;
+        let preflight_identity = request.admission_binding.as_ref().is_some_and(|binding| {
+            binding
+                .operation_id
+                .starts_with(chio_kernel::admission_operation::NONCE_PREFLIGHT_BUDGET_PREFIX)
+        });
+        if preflight_identity
+            != matches!(binding, Some(AuthorizationParticipant::NoncePreflight(_)))
+        {
+            return Err(BudgetStoreError::Invariant(
+                "nonce preflight budget identity requires its owning participant".into(),
+            ));
+        }
         let quotas = normalized_quotas(&request)?;
         validate_composite_sqlite_range(&request, &quotas)?;
         let hold_id = request.hold_id.as_deref().ok_or_else(|| {
@@ -182,6 +214,16 @@ impl SqliteBudgetStore {
                 return Err(BudgetStoreError::Invariant(format!(
                     "budget event_id `{event_id}` was reused for a different mutation"
                 )));
+            }
+            if let Some(AuthorizationParticipant::Executable(binding)) = binding {
+                if let Some(decision) =
+                    self.resume_approved_caller_hold(&transaction, &existing, binding)?
+                {
+                    // The original operation and its approved hold already
+                    // exist. Revalidation is read-only and creates no event.
+                    transaction.rollback()?;
+                    return Ok((decision, Some(binding.operation.clone())));
+                }
             }
             let decision = self.authorization_decision_from_event(&transaction, &existing)?;
             let operation = self.bind_authorization_to_admission(
@@ -524,12 +566,20 @@ impl SqliteBudgetStore {
         transaction: &Transaction<'_>,
         request: &BudgetAuthorizeHoldRequest,
         decision: &BudgetAuthorizeHoldDecision,
-        binding: Option<AdmissionAuthorizationBinding<'_>>,
+        binding: Option<AuthorizationParticipant<'_>>,
         insert_journal: bool,
     ) -> Result<Option<chio_kernel::admission_operation::AdmissionOperationV1>, BudgetStoreError>
     {
         let Some(binding) = binding else {
             return Ok(None);
+        };
+        let binding = match binding {
+            AuthorizationParticipant::Executable(binding) => binding,
+            AuthorizationParticipant::NoncePreflight(binding) => {
+                return self
+                    .bind_nonce_preflight(transaction, request, decision, binding, insert_journal)
+                    .map(Some);
+            }
         };
         // A denied authorization reserves nothing, so its operation is untouched. An
         // approval-required authorization does reserve budget, so its binding is still
@@ -542,6 +592,23 @@ impl SqliteBudgetStore {
         let admission = request.admission_binding.as_ref().ok_or_else(|| {
             BudgetStoreError::Invariant("combined authorization omitted admission binding".into())
         })?;
+        crate::admission_operation_store::verify_runtime_budget_selection_tx(
+            transaction,
+            binding.operation,
+            request.grant_index,
+            chio_kernel::admission_operation::runtime_participant::RuntimeParticipantPhase::Dispatch,
+        ).map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        crate::admission_operation_store::verify_approval_budget_selection_tx(
+            transaction, binding.operation, request.grant_index,
+            chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalClaimPhase::Dispatch,
+        ).map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        crate::admission_operation_store::verify_dpop_budget_selection_tx(
+            transaction,
+            binding.operation,
+            request.grant_index,
+            chio_kernel::admission_operation::dpop_claim::DpopReplayClaimPhase::Dispatch,
+        )
+        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
         let hold_id = request.hold_id.as_deref().ok_or_else(|| {
             BudgetStoreError::Invariant("combined authorization omitted hold_id".into())
         })?;

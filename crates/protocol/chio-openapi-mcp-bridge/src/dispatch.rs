@@ -53,7 +53,7 @@ pub(crate) fn build_route_dispatches(
 
     for (path, path_item) in &spec.paths {
         for (method_str, operation) in &path_item.operations {
-            let extensions = ChioExtensions::from_operation(&operation.raw);
+            let extensions = ChioExtensions::from_operation(&operation.raw)?;
             if !extensions.should_publish() {
                 continue;
             }

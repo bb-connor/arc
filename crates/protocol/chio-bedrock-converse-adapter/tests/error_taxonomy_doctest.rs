@@ -3,6 +3,11 @@ use std::sync::Arc;
 
 use chio_bedrock_converse_adapter::transport::MockTransport;
 use chio_bedrock_converse_adapter::{BedrockAdapter, BedrockAdapterConfig};
+use chio_core::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+    TOOL_MANIFEST_SCHEMA,
+};
 use chio_tool_call_fabric::{ProviderError, ProviderRequest, ReceiptId, Redaction, VerdictResult};
 use serde_json::{json, Value};
 
@@ -16,15 +21,48 @@ struct TaxonomyRow {
 }
 
 fn adapter() -> Result<BedrockAdapter, String> {
+    let signer = Keypair::from_seed(&[67; 32]);
     let config = BedrockAdapterConfig::new(
         "bedrock-1",
         "Bedrock Converse",
         "0.1.0",
-        "deadbeef",
+        signer.public_key().to_hex(),
         "arn:aws:iam::111122223333:role/chio-bedrock-prod",
         "111122223333",
     );
-    BedrockAdapter::new(config, Arc::new(MockTransport::new()))
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: config.server_id.clone(),
+        name: config.server_name.clone(),
+        description: None,
+        version: config.server_version.clone(),
+        tools: vec![ToolDefinition {
+            name: "get_weather".to_string(),
+            description: "Taxonomy fixture tool".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+                estimated_duration_ms: None,
+            },
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer)
+        .map_err(|error| format!("failed to sign Bedrock manifest: {error}"))?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .map_err(|error| format!("failed to admit Bedrock manifest: {error}"))?;
+    BedrockAdapter::new_with_registry(config, Arc::new(MockTransport::new()), &registry)
         .map_err(|error| format!("failed to build Bedrock adapter: {error}"))
 }
 

@@ -1,0 +1,34 @@
+[package]
+name = "chio-flow"
+description = "Pure decentralized-label-model lattice for Chio"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_flow"
+
+[dependencies]
+chio-security-types = { workspace = true }
+chio-core-types = { path = "../../core/chio-core-types", default-features = false }
+serde_json = { version = "1", default-features = false, features = ["alloc", "float_roundtrip"] }
+sha2 = { version = "0.10", default-features = false }
+
+[features]
+default = []
+std = [
+    "chio-security-types/std",
+    "chio-core-types/std",
+    "serde_json/std",
+]
+
+[dev-dependencies]
+chio-security-types = { workspace = true, features = ["std"] }
+proptest = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

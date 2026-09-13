@@ -22,6 +22,25 @@ pub(crate) enum TrustCommands {
         #[arg(long = "tenant-read-token", value_name = "TENANT=TOKEN")]
         tenant_read_tokens: Vec<String>,
 
+        /// Bearer token accepted only for capability-authority status and issuance.
+        ///
+        /// Keep this distinct from the administrative service token and from
+        /// every edge service or session bearer.
+        #[arg(
+            long,
+            env = "CHIO_TRUST_AUTHORITY_WORKLOAD_TOKEN",
+            hide_env_values = true
+        )]
+        authority_workload_token: Option<String>,
+
+        /// Witnessed authority-key transparency runtime configuration.
+        ///
+        /// This requires the global `--authority-seed-file`, `--receipt-db`,
+        /// and `--authority-workload-token` options. Startup also requires all
+        /// configured witness and audit services to prove readiness.
+        #[arg(long)]
+        authority_keyring_config: Option<PathBuf>,
+
         /// Public base URL this trust-control node advertises to peers and clients.
         #[arg(long)]
         advertise_url: Option<String>,

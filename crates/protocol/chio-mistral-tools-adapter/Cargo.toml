@@ -19,6 +19,7 @@ mistral_api_version = "2025-04"
 
 [dependencies]
 chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-manifest = { workspace = true }
 chio-provider-adapter-core = { workspace = true }
 chio-tool-call-fabric = { workspace = true }
 async-trait = { workspace = true }
@@ -28,6 +29,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+chio-test-support = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 wiremock = { workspace = true }
 

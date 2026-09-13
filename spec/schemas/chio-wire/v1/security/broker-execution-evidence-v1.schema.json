@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-execution-evidence-v1.schema.json",
+  "title": "Chio broker execution evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "attemptId", "invocationId", "holdId", "requestDigest", "capabilityDigest", "revocationSetDigest", "budgetCommitIndex", "revocationCommitIndex", "authorityCommitIndex", "leaderEpoch", "upstreamStatus", "responseBodySha256"],
+  "properties": {
+    "schema": { "const": "chio.broker-execution-evidence.v1" },
+    "attemptId": { "$ref": "#/$defs/identifier" },
+    "invocationId": { "$ref": "#/$defs/identifier" },
+    "holdId": { "$ref": "#/$defs/identifier" },
+    "requestDigest": { "$ref": "#/$defs/digest" },
+    "capabilityDigest": { "$ref": "#/$defs/digest" },
+    "revocationSetDigest": { "$ref": "#/$defs/digest" },
+    "budgetCommitIndex": { "type": "integer", "minimum": 0 },
+    "revocationCommitIndex": { "type": "integer", "minimum": 0 },
+    "authorityCommitIndex": { "type": "integer", "minimum": 0 },
+    "leaderEpoch": { "type": "integer", "minimum": 0 },
+    "upstreamStatus": { "type": "integer", "minimum": 100, "maximum": 599 },
+    "responseBodySha256": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

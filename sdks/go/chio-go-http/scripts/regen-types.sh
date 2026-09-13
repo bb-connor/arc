@@ -115,6 +115,7 @@ RAW_OUTPUT_PATH="${WORK_DIR}/types.raw.go"
 #   3. property value `false`  -> `not: {}`   (impossible schema; rarely used)
 #   4. `oneOf` member with `type: "null"` -> drop the member, set
 #      `nullable: true` on the parent (OpenAPI 3.0 nullable convention)
+#      and null-only narrowing schemas -> `nullable: true`.
 #   5. `$defs` -> lift into `components.schemas` and rewrite local
 #      `$ref: "#/$defs/..."` into `$ref: "#/components/schemas/..."`
 #   6. Top-level `$schema` and `$id` keys are stripped (oapi-codegen ignores
@@ -206,6 +207,14 @@ def rewrite(node, lifts: dict, prefix: str):
                     node["type"] = "integer"
                     node.setdefault("format", "int64")
 
+        # OpenAPI 3.0 has no null primitive. Null-only schemas occur inside
+        # validation branches that narrow an already-declared nullable field;
+        # preserve the nullable marker and let the surrounding schema provide
+        # the concrete generated type.
+        if node.get("type") == "null":
+            node.pop("type")
+            node["nullable"] = True
+
         # oapi-codegen v2.4.1 emits invalid Go for singleton boolean enums
         # (for example `map[]`). Keep the boolean shape in Go generation;
         # the canonical JSON schema still enforces the singleton value.
@@ -291,6 +300,37 @@ def rewrite(node, lifts: dict, prefix: str):
             else:
                 del node["allOf"]
 
+        # Some closed state records use allOf branches solely to narrow
+        # already-declared parent properties for validation. In particular,
+        # a branch may require an existing nullable field to be exactly null.
+        # OpenAPI 3.0 cannot express a null-only schema, and oapi-codegen tries
+        # to materialize each branch as a distinct struct. Drop only branches
+        # that add no fields and only narrow parent properties; the canonical
+        # JSON Schema remains authoritative for those state constraints.
+        if (
+            "allOf" in node
+            and isinstance(node["allOf"], list)
+            and isinstance(node.get("properties"), dict)
+        ):
+            parent_property_names = set(node["properties"].keys())
+
+            def _is_property_narrowing_member(member) -> bool:
+                if not isinstance(member, dict):
+                    return False
+                if set(member.keys()) - {"type", "properties"}:
+                    return False
+                properties = member.get("properties")
+                return (
+                    member.get("type") == "object"
+                    and isinstance(properties, dict)
+                    and set(properties.keys()).issubset(parent_property_names)
+                )
+
+            if node["allOf"] and all(
+                _is_property_narrowing_member(member) for member in node["allOf"]
+            ):
+                del node["allOf"]
+
         # Lift `$defs` (JSON Schema 2020-12) into the components.schemas
         # bag. Rewrite local `$ref` strings to point at the lifted name.
         if "$defs" in node:
@@ -354,6 +394,36 @@ def rewrite(node, lifts: dict, prefix: str):
                     ):
                         properties[key] = copy.deepcopy(parent_properties[key])
 
+        # A closed state record may express its state-dependent nullability as
+        # oneOf branches that only narrow fields already present on the parent.
+        # These branches add no Go fields and can contain null-only schemas that
+        # OpenAPI 3.0 cannot represent. Keep the parent shape for generated Go
+        # while leaving the oneOf constraint in the canonical JSON Schema.
+        if (
+            "oneOf" in node
+            and isinstance(node["oneOf"], list)
+            and isinstance(node.get("properties"), dict)
+        ):
+            parent_property_names = set(node["properties"].keys())
+
+            def _is_one_of_property_narrowing_member(member) -> bool:
+                if not isinstance(member, dict):
+                    return False
+                if set(member.keys()) - {"type", "properties"}:
+                    return False
+                properties = member.get("properties")
+                return (
+                    member.get("type") == "object"
+                    and isinstance(properties, dict)
+                    and set(properties.keys()).issubset(parent_property_names)
+                )
+
+            if node["oneOf"] and all(
+                _is_one_of_property_narrowing_member(member)
+                for member in node["oneOf"]
+            ):
+                del node["oneOf"]
+
         # Recurse. Do not rewrite enum arrays: their values are data, not
         # schema nodes. In particular, boolean enums produced from
         # `const: true` must stay `[true]`; rewriting that list to `[{}]`
@@ -402,8 +472,9 @@ def component_name_for(rel_path: Path) -> str:
     return name_prefix + pascalize(file_stem)
 
 
-# Rewrite cross-file `$ref` strings (e.g. "../receipt/record.schema.json")
-# into local component refs ("#/components/schemas/ReceiptRecord"). JSON
+# Rewrite cross-file `$ref` strings (e.g. "../receipt/record.schema.json" and
+# "tool-manifest-v2.schema.json#/$defs/networkDestination") into local
+# component refs. JSON
 # Schema 2020-12 resolves a relative ref against the referencing file's own
 # location; oapi-codegen has no notion of the original directory layout
 # once every schema is flattened into components.schemas, so it would 404
@@ -412,8 +483,15 @@ def component_name_for(rel_path: Path) -> str:
 def _rewrite_cross_file_refs(node, base_dir: Path):
     if isinstance(node, dict):
         ref = node.get("$ref")
-        if isinstance(ref, str) and ref.endswith(".schema.json") and "://" not in ref:
-            target = (base_dir / ref).resolve()
+        if isinstance(ref, str) and "://" not in ref:
+            path_part, separator, fragment = ref.partition("#")
+            if not path_part.endswith(".schema.json"):
+                path_part = ""
+            if not path_part:
+                for value in node.values():
+                    _rewrite_cross_file_refs(value, base_dir)
+                return
+            target = (base_dir / path_part).resolve()
             try:
                 rel_target = target.relative_to(schemas_dir.resolve())
             except ValueError as exc:
@@ -421,9 +499,16 @@ def _rewrite_cross_file_refs(node, base_dir: Path):
                     "regen-types.sh: cross-file $ref escapes the schema root: "
                     f"{ref}"
                 ) from exc
-            node["$ref"] = (
-                f"#/components/schemas/{component_name_for(rel_target)}"
-            )
+            component = component_name_for(rel_target)
+            if separator:
+                fragment_parts = fragment.split("/")
+                if len(fragment_parts) != 3 or fragment_parts[:2] != ["", "$defs"]:
+                    raise SystemExit(
+                        "regen-types.sh: unsupported cross-file $ref fragment: "
+                        f"{ref}"
+                    )
+                component += pascalize(fragment_parts[2])
+            node["$ref"] = f"#/components/schemas/{component}"
         for value in node.values():
             _rewrite_cross_file_refs(value, base_dir)
     elif isinstance(node, list):

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-enforcement-record-v1.schema.json",
+  "title": "Chio cage enforcement record v1",
+  "description": "Closed state record that cannot claim fully-enforced or exited without complete enforcement evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "state", "fully_enforced", "failure", "exit"],
+  "properties": {
+    "schema": { "const": "chio.cage.enforcement-record.v1" },
+    "state": {
+      "enum": ["unsupported", "rejected", "bootstrap_failed", "fully_enforced", "exited"]
+    },
+    "fully_enforced": {
+      "oneOf": [
+        { "$ref": "cage-fully-enforced-evidence-v1.schema.json" },
+        { "type": "null" }
+      ]
+    },
+    "failure": {
+      "oneOf": [
+        { "$ref": "cage-enforcement-failure-v1.schema.json" },
+        { "type": "null" }
+      ]
+    },
+    "exit": {
+      "oneOf": [
+        { "$ref": "cage-process-exit-evidence-v1.schema.json" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "state": { "const": "fully_enforced" },
+        "fully_enforced": { "$ref": "cage-fully-enforced-evidence-v1.schema.json" },
+        "failure": { "type": "null" },
+        "exit": { "type": "null" }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "state": { "const": "exited" },
+        "fully_enforced": { "$ref": "cage-fully-enforced-evidence-v1.schema.json" },
+        "failure": { "type": "null" },
+        "exit": { "$ref": "cage-process-exit-evidence-v1.schema.json" }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "state": { "enum": ["unsupported", "rejected", "bootstrap_failed"] },
+        "fully_enforced": { "type": "null" },
+        "failure": { "$ref": "cage-enforcement-failure-v1.schema.json" },
+        "exit": { "type": "null" }
+      }
+    }
+  ]
+}

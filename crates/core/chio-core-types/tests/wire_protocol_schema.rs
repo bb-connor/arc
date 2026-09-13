@@ -26,6 +26,12 @@ use chio_core_types::{
 use serde::Serialize;
 use serde_json::{json, Value};
 
+#[path = "wire_protocol_schema/pending_approval.rs"]
+mod pending_approval;
+
+#[path = "wire_protocol_schema/operation_nonce.rs"]
+mod operation_nonce;
+
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")
@@ -173,6 +179,12 @@ fn validator_for_schema(schema_path: &std::path::Path, schema: &Value) -> jsonsc
                     &fs::read_to_string(&path).expect("schema resource is readable"),
                 )
                 .expect("schema resource parses");
+                let canonical = path.canonicalize().expect("schema path canonicalizes");
+                let mut file_path = canonical.to_string_lossy().replace('\\', "/");
+                if !file_path.starts_with('/') {
+                    file_path.insert(0, '/');
+                }
+                resources.push((format!("file://{file_path}"), value.clone()));
                 if let Some(id) = value["$id"].as_str() {
                     resources.push((id.to_string(), value));
                 }

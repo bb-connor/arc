@@ -120,7 +120,7 @@ fn make_bridge_nonce_request(kernel: &ChioKernel, agent: &Keypair) -> BridgeMcpT
 
 fn nonce_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".into(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.into(),
         server_id: "srv".into(),
         name: "Nonce Test Server".into(),
         description: Some("nonce test".into()),
@@ -131,8 +131,15 @@ fn nonce_manifest() -> ToolManifest {
             input_schema: json!({"type": "object"}),
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+                estimated_duration_ms: None,
+            },
             latency_hint: Some(LatencyHint::Fast),
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,

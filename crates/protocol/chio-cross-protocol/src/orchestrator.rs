@@ -98,15 +98,20 @@ impl OrchestratedToolCall {
 /// Shared cross-protocol runtime over the existing kernel substrate.
 pub struct CrossProtocolOrchestrator<'a> {
     kernel: &'a ChioKernel,
+    manifest_registry: &'a chio_manifest::VerifiedManifestRegistry,
     target_registry: TargetProtocolRegistry<'a>,
     route_availability: BTreeMap<DiscoveryProtocol, RouteAvailabilityStatus>,
 }
 
 impl<'a> CrossProtocolOrchestrator<'a> {
     #[must_use]
-    pub fn new(kernel: &'a ChioKernel) -> Self {
+    pub fn new(
+        kernel: &'a ChioKernel,
+        manifest_registry: &'a chio_manifest::VerifiedManifestRegistry,
+    ) -> Self {
         Self {
             kernel,
+            manifest_registry,
             target_registry: TargetProtocolRegistry::new(DiscoveryProtocol::Native),
             route_availability: BTreeMap::new(),
         }
@@ -139,7 +144,7 @@ impl<'a> CrossProtocolOrchestrator<'a> {
         bridge: &B,
         request: CrossProtocolExecutionRequest,
     ) -> Result<OrchestratedToolCall, BridgeError> {
-        validate_execution_request_boundary(&request)?;
+        validate_execution_request_boundary(&request, self.manifest_registry)?;
         let source_protocol = bridge.source_protocol();
         let provided_ref = bridge.extract_capability_ref(&request.source_envelope)?;
         let capability_ref = match provided_ref {
@@ -190,9 +195,11 @@ impl<'a> CrossProtocolOrchestrator<'a> {
                 .unwrap_or_else(|| "route selection denied".to_string());
             let response = self
                 .kernel
-                .sign_planned_deny_response(
+                .sign_planned_deny_response_with_manifest_security(
                     &kernel_tool_call_request(&request),
                     &deny_reason,
+                    self.manifest_registry,
+                    &request.bridge_security,
                     Some(route_selection_metadata(&planning.evidence)?),
                 )
                 .map_err(BridgeError::Kernel)?;
@@ -301,13 +308,38 @@ impl<'a> CrossProtocolOrchestrator<'a> {
                 route_selection_metadata(route_selection)?,
                 &request.source_envelope,
             )?;
-            let response = self
-                .kernel
-                .evaluate_tool_call_blocking_with_metadata(
-                    &kernel_tool_call_request(request),
+            let kernel_request = kernel_tool_call_request(request);
+            let response = match (
+                request.security_context.as_ref(),
+                request.authenticated_session_id.as_ref(),
+            ) {
+                (Some(security_context), Some(authenticated_session_id)) => self
+                    .kernel
+                    .evaluate_tool_call_blocking_with_manifest_security_and_authenticated_session_context(
+                        &kernel_request,
+                        self.manifest_registry,
+                        &request.bridge_security,
+                        Some(route_metadata),
+                        authenticated_session_id,
+                        security_context,
+                    ),
+                (Some(security_context), None) => self
+                    .kernel
+                    .evaluate_tool_call_blocking_with_manifest_security_and_security_context(
+                        &kernel_request,
+                        self.manifest_registry,
+                        &request.bridge_security,
+                        Some(route_metadata),
+                        security_context,
+                    ),
+                (None, _) => self.kernel.evaluate_tool_call_blocking_with_manifest_security(
+                    &kernel_request,
+                    self.manifest_registry,
+                    &request.bridge_security,
                     Some(route_metadata),
-                )
-                .map_err(BridgeError::Kernel)?;
+                ),
+            }
+            .map_err(BridgeError::Kernel)?;
             let receipt_id = response.receipt.id.clone();
             return Ok(CrossProtocolTargetExecution {
                 response,
@@ -330,6 +362,7 @@ impl<'a> CrossProtocolOrchestrator<'a> {
 
         executor.execute(CrossProtocolTargetRequest {
             kernel: self.kernel,
+            manifest_registry: self.manifest_registry,
             execution: request,
             source_protocol,
             bridge_id,

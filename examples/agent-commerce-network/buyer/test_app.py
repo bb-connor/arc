@@ -192,6 +192,8 @@ class BuyerApiTests(unittest.TestCase):
     def test_provider_review_client_calls_wrapped_mcp_edge(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
             if request.method == "GET" and request.url.path == "/admin/sessions/session_test_001/trust":
+                if request.headers.get("Authorization") != "Bearer demo-admin-token":
+                    return httpx.Response(401, json={"error": "admin bearer required"})
                 return httpx.Response(
                     200,
                     json={"capabilities": [{"capabilityId": "cap_test_001"}]},
@@ -224,6 +226,7 @@ class BuyerApiTests(unittest.TestCase):
         client = ProviderReviewClient(
             base_url="http://provider-edge.test",
             auth_token="demo-token",
+            admin_token="demo-admin-token",
             client=httpx.Client(transport=transport),
         )
 

@@ -1399,8 +1399,11 @@ mod tests {
         // with the working directory.
         let directory = private_directory_test_root()?;
         let state = directory.path().join("state");
-        fs::create_dir(directory.path().join("bin"))?;
+        let bin = directory.path().join("bin");
+        fs::create_dir(&bin)?;
         fs::create_dir(&state)?;
+        fs::set_permissions(&bin, fs::Permissions::from_mode(0o700))?;
+        fs::set_permissions(&state, fs::Permissions::from_mode(0o700))?;
         let traversed = durable_admission_lock_root(
             &directory
                 .path()
@@ -1534,6 +1537,8 @@ mod tests {
         let target = fs::canonicalize(directory.path())?.join("state");
         fs::create_dir(&first)?;
         fs::create_dir(&second)?;
+        fs::set_permissions(&first, fs::Permissions::from_mode(0o700))?;
+        fs::set_permissions(&second, fs::Permissions::from_mode(0o700))?;
 
         let prepared = prepare_private_directory(&second.join("..").join("..").join("state"))?;
 

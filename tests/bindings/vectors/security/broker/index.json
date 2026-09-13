@@ -1,0 +1,32 @@
+{
+  "schema": "chio.test-vector.broker.index.v1",
+  "canonical_encoding": "RFC 8785",
+  "description": "Cryptographically valid broker capability, proof, privileged audit transport, durable attempt registration, execute, capture-evidence, success and failure response, and enterprise receipt vectors with complete request and quota bindings.",
+  "positive": [
+    { "id": "capability_body", "file": "positive/broker-capability-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-capability-body-v1.schema.json" },
+    { "id": "capability_envelope", "file": "positive/broker-capability-envelope-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-capability-envelope-v1.schema.json" },
+    { "id": "request_proof_body", "file": "positive/broker-request-proof-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-request-proof-body-v1.schema.json" },
+    { "id": "request_proof_envelope", "file": "positive/broker-request-proof-envelope-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-request-proof-envelope-v1.schema.json" },
+    { "id": "execute_request", "file": "positive/broker-execute-request-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execute-request-v1.schema.json" },
+    { "id": "privileged_audit_open", "file": "positive/broker-privileged-audit-open-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-privileged-audit-open-v1.schema.json" },
+    { "id": "privileged_audit_challenge", "file": "positive/broker-privileged-audit-challenge-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-privileged-audit-challenge-v1.schema.json" },
+    { "id": "privileged_audit_commit", "file": "positive/broker-privileged-audit-commit-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-privileged-audit-commit-v1.schema.json" },
+    { "id": "privileged_audit_evidence", "file": "positive/broker-privileged-audit-evidence-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-privileged-audit-evidence-v1.schema.json" },
+    { "id": "attempt_registration", "file": "positive/broker-attempt-registration-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-attempt-registration-v1.schema.json" },
+    { "id": "register_attempt_authorization_body", "file": "positive/broker-register-attempt-authorization-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-register-attempt-authorization-body-v1.schema.json" },
+    { "id": "register_attempt_authorization_envelope", "file": "positive/broker-register-attempt-authorization-envelope-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-register-attempt-authorization-envelope-v1.schema.json" },
+    { "id": "register_attempt_acknowledgement", "file": "positive/broker-register-attempt-acknowledgement-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-register-attempt-acknowledgement-v1.schema.json" },
+    { "id": "prepare_dispatch_acknowledgement", "file": "positive/broker-prepare-dispatch-acknowledgement-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-prepare-dispatch-acknowledgement-v1.schema.json" },
+    { "id": "release_attempt_acknowledgement", "file": "positive/broker-release-attempt-acknowledgement-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-release-attempt-acknowledgement-v1.schema.json" },
+    { "id": "execution_evidence", "file": "positive/broker-execution-evidence-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execution-evidence-v1.schema.json" },
+    { "id": "execute_response", "file": "positive/broker-execute-response-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execute-response-v1.schema.json" },
+    { "id": "execute_failure", "file": "positive/broker-execute-failure-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execute-failure-v1.schema.json" },
+    { "id": "execution_receipt_body", "file": "positive/broker-execution-receipt-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execution-receipt-body-v1.schema.json" },
+    { "id": "execution_receipt_envelope", "file": "positive/broker-execution-receipt-envelope-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execution-receipt-envelope-v1.schema.json" },
+    { "id": "execution_failure_receipt_body", "file": "positive/broker-execution-failure-receipt-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execution-failure-receipt-body-v1.schema.json" },
+    { "id": "execution_failure_receipt_envelope", "file": "positive/broker-execution-failure-receipt-envelope-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execution-failure-receipt-envelope-v1.schema.json" }
+  ],
+  "negative": [
+    { "id": "broker_mutations_v1", "file": "mutations-v1.json" }
+  ]
+}

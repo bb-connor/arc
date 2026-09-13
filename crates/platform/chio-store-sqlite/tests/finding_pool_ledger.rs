@@ -40,6 +40,20 @@ use chio_swarm_authority::finding_pool::{
 use chio_swarm_authority::{SwarmBudgetPool, CHIO_SWARM_BUDGET_POOL_SCHEMA};
 use chio_test_support::prelude::*;
 
+mod tempfile {
+    pub use ::tempfile::{Builder, TempDir};
+
+    pub fn tempdir() -> std::io::Result<TempDir> {
+        let mut builder = Builder::new();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            builder.permissions(std::fs::Permissions::from_mode(0o700));
+        }
+        builder.tempdir()
+    }
+}
+
 fn ledger_domain() -> String {
     let thread = std::thread::current();
     format!(
@@ -75,8 +89,14 @@ fn rollback_anchor_root() -> &'static std::path::Path {
 }
 
 fn rollback_anchor_tempdir(prefix: &str) -> tempfile::TempDir {
-    tempfile::Builder::new()
-        .prefix(prefix)
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(prefix);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    builder
         .tempdir_in("/dev/shm")
         .test_expect("create rollback anchor directory")
 }

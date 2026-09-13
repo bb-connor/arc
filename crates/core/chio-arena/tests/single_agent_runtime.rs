@@ -111,6 +111,7 @@ async fn runs_single_agent_scenario_and_collects_signed_receipt(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let runtime = ArenaRuntime::new(Arc::new(kernel));

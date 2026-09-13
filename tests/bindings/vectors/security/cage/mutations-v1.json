@@ -1,0 +1,757 @@
+{
+  "schema": "chio.test-vector.cage.mutations.v1",
+  "operation_format": "RFC 6902 single-operation subset plus append_bytes and replace_from_related",
+  "cases": [
+    {
+      "id": "signed_manifest_signature_tampered",
+      "base": "positive/signed-tool-manifest-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/signature",
+        "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "coverage": ["signed_manifest", "signature"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "invalid_manifest_signature"
+      }
+    },
+    {
+      "id": "policy_noncanonical_trailing_newline",
+      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "mutation": {
+        "op": "append_bytes",
+        "hex": "0a"
+      },
+      "coverage": ["canonical_policy"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "noncanonical_policy_bytes"
+      }
+    },
+    {
+      "id": "policy_signature_tampered",
+      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/signature",
+        "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "coverage": ["signed_policy", "signature"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "invalid_policy_signature"
+      }
+    },
+    {
+      "id": "policy_unknown_field",
+      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "mutation": {
+        "op": "add",
+        "path": "/body/allow_legacy_fallback",
+        "value": true
+      },
+      "coverage": ["closed_vocabulary", "no_fallback"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "unknown_field"
+      }
+    },
+    {
+      "id": "policy_registered_key_mismatch",
+      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/body/registered_public_key",
+        "value": "abababababababababababababababababababababababababababababababab"
+      },
+      "coverage": ["signed_manifest", "registered_key"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "registered_key_mismatch"
+      }
+    },
+    {
+      "id": "policy_receipt_runtime_missing",
+      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "mutation": {
+        "op": "remove",
+        "path": "/body/receipt"
+      },
+      "coverage": ["signed_receipt", "fail_closed_release"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "missing_receipt_runtime"
+      }
+    },
+    {
+      "id": "policy_enterprise_migration_missing",
+      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "mutation": {
+        "op": "remove",
+        "path": "/body/enterprise_migration"
+      },
+      "coverage": ["enterprise_migration", "fail_closed_launch"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "missing_enterprise_migration"
+      }
+    },
+    {
+      "id": "policy_enterprise_migration_stage_generation_mismatch",
+      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/body/enterprise_migration/stage",
+        "value": "shadow"
+      },
+      "coverage": ["enterprise_migration", "stage_generation_binding"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "migration_stage_generation_mismatch"
+      }
+    },
+    {
+      "id": "policy_receipt_trusted_signer_mismatch",
+      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/body/receipt/trusted_signer_public_key",
+        "value": "abababababababababababababababababababababababababababababababab"
+      },
+      "coverage": ["signed_receipt", "trusted_signer"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "receipt_signer_trust_mismatch"
+      }
+    },
+    {
+      "id": "policy_independent_ceiling_denies_read_path",
+      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/body/operator_ceilings/read_paths",
+        "value": []
+      },
+      "coverage": ["independent_operator_ceiling"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "manifest_permission_exceeds_operator_ceiling"
+      }
+    },
+    {
+      "id": "policy_target_pin_wrong_length",
+      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/body/runtime/target_binding_digest",
+        "value": "ffff"
+      },
+      "coverage": ["target_digest"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "invalid_digest"
+      }
+    },
+    {
+      "id": "policy_broker_on_nonbroker_profile",
+      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "mutation": {
+        "op": "add",
+        "path": "/body/broker",
+        "value": {
+          "inherited_fd": 8,
+          "authentication_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "expected_peer_identity": {
+            "pid": 4242,
+            "uid": 1000,
+            "gid": 1000
+          }
+        }
+      },
+      "coverage": ["broker_binding", "profile_binding"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "broker_profile_mismatch"
+      }
+    },
+    {
+      "id": "policy_broker_binding_ambiguous",
+      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "mutation": {
+        "op": "add",
+        "path": "/body/broker",
+        "value": {
+          "inherited_fd": 8,
+          "socket_path": "/run/chio/broker.sock",
+          "authentication_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "expected_peer_identity": {
+            "pid": 4242,
+            "uid": 1000,
+            "gid": 1000
+          }
+        }
+      },
+      "coverage": ["broker_binding", "closed_vocabulary"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "ambiguous_broker_binding"
+      }
+    },
+    {
+      "id": "argv_empty_argv0",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/target_argv/0",
+        "value": ""
+      },
+      "coverage": ["argv"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "invalid_target_argv"
+      }
+    },
+    {
+      "id": "argv_embedded_nul",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/target_argv/1",
+        "value": "--stdio\u0000hidden"
+      },
+      "coverage": ["argv"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "invalid_target_argv"
+      }
+    },
+    {
+      "id": "argv0_target_path_mismatch",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/target_argv/0",
+        "value": "/operator/other-server"
+      },
+      "coverage": ["argv", "target_binding"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "argv0_target_path_mismatch"
+      }
+    },
+    {
+      "id": "plan_unreviewed_seccomp_architecture",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/seccomp/architecture",
+        "value": "aarch64"
+      },
+      "coverage": ["seccomp", "reviewed_architecture"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "seccomp_architecture_mismatch"
+      }
+    },
+    {
+      "id": "environment_casefolded_credential_marker",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "add",
+        "path": "/environment/app_secret",
+        "value": "hidden"
+      },
+      "coverage": ["environment", "credential_injection"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "forbidden_environment_variable"
+      }
+    },
+    {
+      "id": "environment_unicode_control_value",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "add",
+        "path": "/environment/LANG",
+        "value": "C\u0085hidden"
+      },
+      "coverage": ["environment", "control_character"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "invalid_environment_value"
+      }
+    },
+    {
+      "id": "fd_stdout_role_swapped",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/fd_table/3/purpose/kind",
+        "value": "target_stderr"
+      },
+      "coverage": ["fd_roles"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "fd_role_slot_mismatch"
+      }
+    },
+    {
+      "id": "fd_stdio_identity_not_socket",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/fd_table/2/identity/kind",
+        "value": "regular_file"
+      },
+      "coverage": ["fd_identities"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "fd_identity_kind_mismatch"
+      }
+    },
+    {
+      "id": "fd_live_identity_changed",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/fd_table/3/identity/inode",
+        "value": 9999
+      },
+      "coverage": ["fd_identities", "live_descriptor_binding"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "live_descriptor_identity_mismatch"
+      }
+    },
+    {
+      "id": "helper_binding_digest_mismatch",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/fd_table/0/binding_digest",
+        "value": "0101010101010101010101010101010101010101010101010101010101010101"
+      },
+      "coverage": ["helper_digest"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "helper_binding_digest_mismatch"
+      }
+    },
+    {
+      "id": "target_binding_digest_mismatch",
+      "base": "positive/cage-enforcement-prepared-v1.json",
+      "related_positive": "positive/cage-exec-transition-observed-v1.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/target_binding_digest",
+        "value": "0101010101010101010101010101010101010101010101010101010101010101"
+      },
+      "coverage": ["target_digest", "cross_evidence_binding"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "target_binding_digest_mismatch"
+      }
+    },
+    {
+      "id": "profile_digest_mismatch",
+      "base": "positive/cage-enforcement-prepared-v1.json",
+      "related_positive": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/profile_digest",
+        "value": "0909090909090909090909090909090909090909090909090909090909090909"
+      },
+      "coverage": ["profile_digest", "cross_artifact_binding"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "profile_digest_mismatch"
+      }
+    },
+    {
+      "id": "enforcement_prepared_missing_nono_provenance",
+      "base": "positive/cage-enforcement-prepared-v1.json",
+      "mutation": {
+        "op": "remove",
+        "path": "/nono_patch_version"
+      },
+      "coverage": ["enforcement_provenance", "closed_vocabulary"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "missing_enforcement_provenance"
+      }
+    },
+    {
+      "id": "enforcement_prepared_partial_landlock",
+      "base": "positive/cage-enforcement-prepared-v1.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/landlock_filesystem_status",
+        "value": "partially_enforced"
+      },
+      "coverage": ["landlock", "no_false_success"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "landlock_not_fully_enforced"
+      }
+    },
+    {
+      "id": "enforcement_prepared_unreviewed_architecture",
+      "base": "positive/cage-enforcement-prepared-v1.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/seccomp_architecture",
+        "value": "aarch64"
+      },
+      "coverage": ["seccomp", "reviewed_architecture"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "seccomp_architecture_mismatch"
+      }
+    },
+    {
+      "id": "broker_fd_missing",
+      "base": "positive/cage-init-plan-brokered-v2.json",
+      "mutation": {
+        "op": "remove",
+        "path": "/fd_table/3"
+      },
+      "coverage": ["broker_binding", "fd_roles"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "broker_fd_missing"
+      }
+    },
+    {
+      "id": "broker_authentication_digest_mismatch",
+      "base": "positive/cage-init-plan-brokered-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/fd_table/3/binding_digest",
+        "value": "0505050505050505050505050505050505050505050505050505050505050505"
+      },
+      "coverage": ["broker_binding", "broker_authentication"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "broker_authentication_digest_mismatch"
+      }
+    },
+    {
+      "id": "enforcement_eof_false",
+      "base": "positive/cage-fully-enforced-evidence-v1.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/status_eof_observed",
+        "value": false
+      },
+      "coverage": ["enforcement_state", "status_eof", "no_false_success"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "missing_status_eof"
+      }
+    },
+    {
+      "id": "enforcement_exec_identity_mismatch",
+      "base": "positive/cage-fully-enforced-evidence-v1.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/exec_transition/target_identity/inode",
+        "value": 9999
+      },
+      "coverage": ["fd_identities", "cross_evidence_binding", "no_false_success"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "exec_identity_mismatch"
+      }
+    },
+    {
+      "id": "fully_enforced_state_without_evidence",
+      "base": "positive/cage-enforcement-record-fully-enforced-v1.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/fully_enforced",
+        "value": null
+      },
+      "coverage": ["enforcement_state", "no_false_success"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "invalid_state_shape"
+      }
+    },
+    {
+      "id": "exited_state_without_enforcement",
+      "base": "positive/cage-enforcement-record-exited-v1.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/fully_enforced",
+        "value": null
+      },
+      "coverage": ["terminal_record", "no_false_success"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "invalid_state_shape"
+      }
+    },
+    {
+      "id": "bootstrap_failure_carries_false_success_evidence",
+      "base": "positive/cage-enforcement-record-bootstrap-failed-v1.json",
+      "related_positive": "positive/cage-fully-enforced-evidence-v1.json",
+      "mutation": {
+        "op": "replace_from_related",
+        "path": "/fully_enforced",
+        "related_path": ""
+      },
+      "coverage": ["failure_record", "no_false_success"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "invalid_state_shape"
+      }
+    },
+    {
+      "id": "exit_record_process_mismatch",
+      "base": "positive/cage-enforcement-record-exited-v1.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/exit/process_id",
+        "value": 4243
+      },
+      "coverage": ["terminal_record", "cross_evidence_binding", "no_false_success"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "exit_process_binding_mismatch"
+      }
+    },
+    {
+      "id": "execution_identity_missing",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "remove",
+        "path": "/execution_identity"
+      },
+      "coverage": ["execution_identity", "fail_closed_launch"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "missing_execution_identity"
+      }
+    },
+    {
+      "id": "execution_identity_root_uid",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/execution_identity/uid",
+        "value": 0
+      },
+      "coverage": ["execution_identity", "root_rejection"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "root_execution_identity"
+      }
+    },
+    {
+      "id": "execution_identity_root_gid",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/execution_identity/gid",
+        "value": 0
+      },
+      "coverage": ["execution_identity", "root_rejection"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "root_execution_identity"
+      }
+    },
+    {
+      "id": "execution_identity_sentinel_uid",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/execution_identity/uid",
+        "value": 4294967295
+      },
+      "coverage": ["execution_identity", "credential_sentinel"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "sentinel_execution_identity"
+      }
+    },
+    {
+      "id": "execution_identity_sentinel_gid",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/execution_identity/gid",
+        "value": 4294967295
+      },
+      "coverage": ["execution_identity", "credential_sentinel"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "sentinel_execution_identity"
+      }
+    },
+    {
+      "id": "execution_identity_sentinel_supplementary_gid",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/execution_identity/supplementary_gids/0",
+        "value": 4294967295
+      },
+      "coverage": ["execution_identity", "credential_sentinel"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "sentinel_execution_identity"
+      }
+    },
+    {
+      "id": "execution_identity_primary_gid_duplicated",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/execution_identity/supplementary_gids",
+        "value": [10001, 10002]
+      },
+      "coverage": ["execution_identity", "canonical_groups"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "primary_gid_duplicated"
+      }
+    },
+    {
+      "id": "execution_identity_groups_unsorted",
+      "base": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/execution_identity/supplementary_gids",
+        "value": [10003, 10002]
+      },
+      "coverage": ["execution_identity", "canonical_groups"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "noncanonical_supplementary_gids"
+      }
+    },
+    {
+      "id": "prepared_execution_identity_mismatch",
+      "base": "positive/cage-enforcement-prepared-v1.json",
+      "related_positive": "positive/cage-init-plan-native-v2.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/applied_execution_identity/uid",
+        "value": 10003
+      },
+      "coverage": ["execution_identity", "cross_evidence_binding", "no_false_success"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": true,
+        "semantic_valid": false,
+        "failure": "execution_identity_mismatch"
+      }
+    },
+    {
+      "id": "process_exit_code_out_of_range",
+      "base": "positive/cage-process-exit-evidence-v1.json",
+      "mutation": {
+        "op": "replace",
+        "path": "/exit_code",
+        "value": 256
+      },
+      "coverage": ["terminal_record", "exit_status"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "invalid_process_exit"
+      }
+    }
+  ]
+}

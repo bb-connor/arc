@@ -17,6 +17,8 @@ on:
       - "scripts/check-chio-go.sh"
       - "scripts/check-chio-cpp.sh"
       - "scripts/check-chio-drogon.sh"
+      - "scripts/run-exact-cargo-test-inventory.sh"
+      - "scripts/check-exact-cargo-test-inventory.py"
       - "tests/bindings/**"
       - ".github/workflows/sdk-parity.yml"
   push:
@@ -35,6 +37,8 @@ on:
       - "scripts/check-chio-go.sh"
       - "scripts/check-chio-cpp.sh"
       - "scripts/check-chio-drogon.sh"
+      - "scripts/run-exact-cargo-test-inventory.sh"
+      - "scripts/check-exact-cargo-test-inventory.py"
       - "tests/bindings/**"
       - ".github/workflows/sdk-parity.yml"
 
@@ -49,6 +53,70 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  sidecar-control-authority:
+    name: Exact sidecar control authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+
+      - name: Install build dependencies
+        uses: ./.github/actions/apt-install
+        with:
+          packages: protobuf-compiler cmake build-essential
+
+      - name: Exact control credential regressions
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Sidecar control authority" --allow-filtered --expected \
+            proxy::tests::control_auth::unconfigured_control_denies_ipv4_loopback_on_every_route \
+            proxy::tests::control_auth::unconfigured_control_denies_ipv6_loopback_on_every_route \
+            proxy::tests::control_auth::unconfigured_control_denies_unknown_and_remote_peers \
+            proxy::tests::control_auth::blank_control_configuration_denies_even_loopback \
+            proxy::tests::control_auth::configured_control_denies_missing_and_wrong_credentials \
+            proxy::tests::control_auth::duplicate_authorization_headers_are_rejected_in_either_order \
+            proxy::tests::control_auth::malformed_authorization_is_rejected_on_every_route \
+            proxy::tests::control_auth::forwarded_localhost_headers_do_not_authenticate_control_requests \
+            proxy::tests::control_auth::unauthenticated_loopback_cannot_sign_or_resolve_operator_approval \
+            proxy::tests::control_auth::unauthenticated_loopback_cannot_revoke_capabilities \
+            proxy::tests::control_auth::authenticated_control_works_without_peer_metadata \
+            proxy::tests::control_auth::public_liveness_is_available_without_control_credentials \
+            -- cargo test --locked -p chio-api-protect --lib proxy::tests::control_auth
+
+      - name: Exact control credential containment
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          umask 022
+          bash scripts/run-exact-cargo-test-inventory.sh \
+            --label "Sidecar control credential containment" --allow-filtered --expected \
+            proxy::tests::control_containment::control_bearer_is_denied_before_upstream_dispatch \
+            proxy::tests::control_containment::malformed_bearer_cannot_leak_reserved_credential \
+            proxy::tests::control_containment::duplicate_headers_cannot_hide_reserved_credential \
+            proxy::tests::control_containment::non_authorization_headers_cannot_forward_control_credential \
+            proxy::tests::control_containment::non_utf8_header_cannot_hide_control_credential \
+            proxy::tests::control_containment::unknown_operator_path_cannot_fall_through_with_control_credential \
+            proxy::tests::control_containment::ordinary_upstream_authentication_is_preserved \
+            proxy::tests::control_containment::disabled_control_configuration_preserves_proxy_authentication \
+            proxy::tests::control_containment::unrelated_duplicate_and_binary_headers_remain_byte_preserved \
+            proxy::tests::control_containment::excessive_header_scan_is_denied_before_upstream_dispatch \
+            proxy::tests::control_containment::invalid_control_configuration_rejects_before_runtime_io \
+            proxy::tests::control_containment::configuration_grammar_and_size_bounds_are_shared_by_authentication \
+            proxy::tests::control_containment::exact_scan_budget_admits_and_counts_every_duplicate_field \
+            proxy::tests::control_containment::maximum_token_and_header_sizes_are_admitted_without_a_match \
+            proxy::tests::control_containment::complete_control_bytes_are_detected_at_every_offset_but_near_matches_are_not \
+            proxy::tests::control_containment::normalized_configuration_is_identical_for_authentication_and_containment \
+            proxy::tests::control_containment::serving_proxy_rejects_control_headers_without_waiting_for_request_body \
+            -- cargo test --locked -p chio-api-protect --lib proxy::tests::control_containment
+
   sdk-parity:
     name: SDK parity contract lane
     runs-on: ubuntu-latest

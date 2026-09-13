@@ -23,7 +23,12 @@ use std::{
 #[cfg(any(
     feature = "fixtures-openai",
     feature = "fixtures-anthropic",
-    feature = "fixtures-bedrock"
+    feature = "fixtures-bedrock",
+    feature = "fixtures-gemini",
+    feature = "fixtures-mistral",
+    feature = "fixtures-groq",
+    feature = "fixtures-ollama",
+    feature = "fixtures-cohere"
 ))]
 use std::collections::BTreeSet;
 
@@ -142,6 +147,84 @@ use stream::stream_event_item;
     feature = "fixtures-cohere"
 ))]
 use stream::{event_name, fixture_sse_bytes};
+
+#[cfg(any(
+    feature = "fixtures-openai",
+    feature = "fixtures-bedrock",
+    feature = "fixtures-gemini",
+    feature = "fixtures-mistral",
+    feature = "fixtures-groq",
+    feature = "fixtures-ollama",
+    feature = "fixtures-cohere"
+))]
+fn conformance_registry(
+    path: &Path,
+    server_id: &str,
+    server_name: &str,
+    server_version: &str,
+    seed_byte: u8,
+    captured: &[CapturedVerdict],
+    known_tool_names: &[&str],
+) -> Result<(String, chio_manifest::VerifiedManifestRegistry), ReplayError> {
+    let keypair = chio_core::Keypair::from_seed(&[seed_byte; 32]);
+    let mut tool_names = captured
+        .iter()
+        .map(|entry| entry.invocation.tool_name.as_str())
+        .collect::<BTreeSet<_>>();
+    tool_names.extend(known_tool_names.iter().copied());
+    if tool_names.is_empty() {
+        tool_names.insert("conformance_noop");
+    }
+    let manifest = chio_manifest::ToolManifest {
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: server_id.to_string(),
+        name: server_name.to_string(),
+        description: Some("Provider conformance replay manifest".to_string()),
+        version: server_version.to_string(),
+        tools: tool_names
+            .into_iter()
+            .map(|name| chio_manifest::ToolDefinition {
+                name: name.to_string(),
+                description: format!("Provider conformance tool {name}"),
+                input_schema: serde_json::json!({"type": "object"}),
+                output_schema: Some(serde_json::json!({"type": "object"})),
+                pricing: None,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                    estimated_duration_ms: None,
+                },
+                latency_hint: Some(chio_manifest::LatencyHint::Fast),
+                flow: None,
+            })
+            .collect(),
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: keypair.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &keypair).map_err(|error| {
+        invalid_fixture(
+            path,
+            format!("provider conformance manifest signing failed: {error}"),
+        )
+    })?;
+    let mut registry = chio_manifest::VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(
+            signed,
+            &keypair.public_key(),
+            chio_manifest::RuntimeToolTopology::remote(),
+        )
+        .map_err(|error| {
+            invalid_fixture(
+                path,
+                format!("provider conformance manifest admission failed: {error}"),
+            )
+        })?;
+    Ok((keypair.public_key().to_hex(), registry))
+}
 
 #[cfg(test)]
 #[path = "replay/tests.rs"]

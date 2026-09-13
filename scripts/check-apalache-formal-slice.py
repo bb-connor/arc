@@ -39,24 +39,6 @@ def workflow_job(source: str, name: str, next_name: str | None) -> str:
     return source[start:end]
 
 
-def workflow_pull_request_paths(source: str) -> tuple[str, ...]:
-    match = re.search(
-        r'(?m)^    paths:\n((?:      - "[^"]+"\n)+)',
-        source,
-    )
-    require(match is not None, "workflow pull_request.paths block was not found")
-    return tuple(re.findall(r'(?m)^      - "([^"]+)"$', match.group(1)))
-
-
-def workflow_path_covers(source_path: str, workflow_paths: tuple[str, ...]) -> bool:
-    for pattern in workflow_paths:
-        if pattern == source_path:
-            return True
-        if pattern.endswith("/**") and source_path.startswith(f"{pattern[:-3]}/"):
-            return True
-    return False
-
-
 def check_receipt_before_allow() -> None:
     text = read("formal/apalache/ReceiptBeforeAllow.tla")
     persist = body(text, "PersistAllowReceipt")
@@ -593,58 +575,29 @@ def check_temporal_workflow() -> None:
     )
 
 
-def check_safety_workflow_paths() -> None:
+def check_safety_workflow_wiring() -> None:
     text = read(".github/workflows/apalache-safety.yml")
+    ci = read(".github/workflows/ci.yml")
     distributed_cfg = read("formal/tla/MCDistributedRevocation.cfg")
     distributed_domains_cfg = read("formal/tla/MCDistributedRevocationDomains.cfg")
 
-    required_paths = (
-        "formal/MAPPING.md",
-        "formal/proof-manifest.toml",
-        "crates/trust/chio-revocation-oracle/src/**",
-        "crates/kernel/chio-kernel-core/src/evaluate.rs",
-        "crates/kernel/chio-kernel-core/src/revocation_view.rs",
-        "crates/kernel/chio-kernel/src/budget_store.rs",
-        "crates/kernel/chio-kernel/src/receipt_store.rs",
-        "crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs",
-        "crates/kernel/chio-kernel/src/kernel/kernel_scopes.rs",
-        "crates/kernel/chio-kernel/src/kernel/dispatch.rs",
-        "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs",
-        "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs",
-        "crates/kernel/chio-kernel/src/kernel/responses/finalization.rs",
-        "crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs",
-        "crates/kernel/chio-kernel/src/kernel/validation.rs",
-        "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime.rs",
-        "crates/kernel/chio-runtime-core/src/admission.rs",
-        "crates/kernel/chio-runtime-core/src/admission_hook.rs",
-        "crates/kernel/chio-runtime-core/src/admission_hook/**",
-        "scripts/check-apalache-formal-slice.py",
-        "scripts/check-apalache-positive.sh",
-        ".github/workflows/apalache-temporal.yml",
-    )
-    for path in required_paths:
-        require(
-            f'- "{path}"' in text,
-            f"apalache-safety paths must include {path}",
-        )
-
-    with (REPO / "formal/proof-manifest.toml").open("rb") as handle:
-        manifest = tomllib.load(handle)
-    mirror_sources = {
-        mirror["rust_source"]
-        for mirror in manifest.get("mirror", [])
-        if mirror.get("model_file", "").startswith(("formal/apalache/", "formal/tla/"))
-    }
-    workflow_paths = workflow_pull_request_paths(text)
-    uncovered_sources = sorted(
-        source
-        for source in mirror_sources
-        if not workflow_path_covers(source, workflow_paths)
+    require(
+        "  workflow_call:\n" in text and "  pull_request:\n" not in text,
+        "apalache-safety must be reusable without a second direct pull-request trigger",
     )
     require(
-        not uncovered_sources,
-        "apalache-safety paths omit registered TLA/Apalache mirror sources: "
-        + ", ".join(uncovered_sources),
+        "\n  pull_request:\n    branches: [main]\n" in ci,
+        "required CI must run for every pull request to main",
+    )
+    ci_job = workflow_job(
+        ci,
+        "apalache-full-contract",
+        "threat-model-coverage-contract",
+    )
+    require(
+        "uses: ./.github/workflows/apalache-safety.yml" in ci_job
+        and "\n    if:" not in ci_job,
+        "required CI must invoke the complete Apalache workflow unconditionally",
     )
 
     def has_matrix_row(
@@ -809,7 +762,7 @@ def main() -> int:
         check_post_admission_drop_guard,
         check_negative_registry,
         check_temporal_workflow,
-        check_safety_workflow_paths,
+        check_safety_workflow_wiring,
         check_negative_gate_boundary,
         check_distributed_trace_gate,
     )

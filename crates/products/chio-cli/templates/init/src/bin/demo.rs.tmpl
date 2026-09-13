@@ -34,12 +34,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(&target_dir)?;
 
     let chio_bin = env::var("CHIO_BIN").unwrap_or_else(|_| "chio".to_string());
+    let hello_server = build_hello_server(&project_root, &target_dir)?;
+    let security_dir = state_dir.join("native-mcp-security");
+    provision_native_mcp_demo(
+        &chio_bin,
+        &project_root,
+        &hello_server,
+        &security_dir,
+    )?;
     let mut edge = spawn_chio_edge(
         &chio_bin,
         &project_root,
         &receipt_db,
         &session_db,
-        &target_dir,
+        &hello_server,
+        &security_dir,
     )?;
 
     send_json(
@@ -149,13 +158,110 @@ fn create_private_directory(path: &Path) -> std::io::Result<()> {
     builder.create(path)
 }
 
+fn build_hello_server(
+    project_root: &Path,
+    target_dir: &Path,
+) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let output = Command::new("cargo")
+        .arg("build")
+        .arg("--quiet")
+        .arg("--manifest-path")
+        .arg(project_root.join("Cargo.toml"))
+        .arg("--bin")
+        .arg("hello_server")
+        .env("CARGO_TARGET_DIR", target_dir)
+        .output()?;
+    if !output.status.success() {
+        return Err(format!(
+            "failed to build the MCP server: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )
+        .into());
+    }
+
+    let executable = target_dir
+        .join("debug")
+        .join(format!("hello_server{}", env::consts::EXE_SUFFIX));
+    Ok(executable.canonicalize()?)
+}
+
+fn provision_native_mcp_demo(
+    chio_bin: &str,
+    project_root: &Path,
+    hello_server: &Path,
+    security_dir: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (execution_uid, execution_gid) = project_owner_identity(project_root)?;
+    let output = Command::new(chio_bin)
+        .arg("security")
+        .arg("provision-native-mcp-demo")
+        .arg("--output-dir")
+        .arg(security_dir)
+        .arg("--tools-fixture")
+        .arg(project_root.join("tools.json"))
+        .arg("--target")
+        .arg(hello_server)
+        .arg("--working-directory")
+        .arg(project_root)
+        .arg("--execution-uid")
+        .arg(execution_uid.to_string())
+        .arg("--execution-gid")
+        .arg(execution_gid.to_string())
+        .arg("--server-id")
+        .arg("hello")
+        .arg("--server-name")
+        .arg("{{PROJECT_NAME}} hello server")
+        .arg("--server-version")
+        .arg("0.1.0")
+        .current_dir(project_root)
+        .output()?;
+    if !output.status.success() {
+        return Err(format!(
+            "failed to provision signed MCP launch artifacts: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )
+        .into());
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn project_owner_identity(project_root: &Path) -> Result<(u32, u32), Box<dyn std::error::Error>> {
+    use std::os::unix::fs::MetadataExt as _;
+
+    let metadata = fs::metadata(project_root)?;
+    let uid = metadata.uid();
+    let gid = metadata.gid();
+    if uid == 0 || gid == 0 {
+        return Err("the native MCP demo requires a non-root project owner".into());
+    }
+    Ok((uid, gid))
+}
+
+#[cfg(not(unix))]
+fn project_owner_identity(_project_root: &Path) -> Result<(u32, u32), Box<dyn std::error::Error>> {
+    Err("the native MCP demo currently requires a Unix execution identity".into())
+}
+
+fn read_public_key(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
+    let public_key = fs::read_to_string(path)?;
+    let public_key = public_key.trim();
+    if public_key.is_empty() {
+        return Err(format!("public key file is empty: {}", path.display()).into());
+    }
+    Ok(public_key.to_string())
+}
+
 fn spawn_chio_edge(
     chio_bin: &str,
     project_root: &Path,
     receipt_db: &Path,
     session_db: &Path,
-    target_dir: &Path,
+    hello_server: &Path,
+    security_dir: &Path,
 ) -> Result<ChioEdge, Box<dyn std::error::Error>> {
+    let manifest_public_key = read_public_key(&security_dir.join("manifest-public-key"))?;
+    let cage_policy_signer = read_public_key(&security_dir.join("cage-policy-signer"))?;
     let mut child = Command::new(chio_bin)
         .arg("--receipt-db")
         .arg(receipt_db)
@@ -167,13 +273,21 @@ fn spawn_chio_edge(
         .arg("policy.yaml")
         .arg("--server-id")
         .arg("hello")
-        .arg("cargo")
-        .arg("run")
-        .arg("--quiet")
-        .arg("--bin")
-        .arg("hello_server")
+        .arg("--server-name")
+        .arg("{{PROJECT_NAME}} hello server")
+        .arg("--server-version")
+        .arg("0.1.0")
+        .arg("--signed-manifest")
+        .arg(security_dir.join("signed-manifest.json"))
+        .arg("--manifest-public-key")
+        .arg(manifest_public_key)
+        .arg("--cage-policy")
+        .arg(security_dir.join("cage-launch-policy.json"))
+        .arg("--cage-policy-signer")
+        .arg(cage_policy_signer)
+        .arg("--")
+        .arg(hello_server)
         .current_dir(project_root)
-        .env("CARGO_TARGET_DIR", target_dir)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())

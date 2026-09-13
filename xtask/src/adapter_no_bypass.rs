@@ -11,7 +11,13 @@ use syn::{Attribute, ExprBinary, ExprCall, ExprMethodCall, ExprPath, ItemImpl};
 
 use crate::{display_path, workspace_root, XtaskError};
 
+mod source;
+
 const SOURCE_INVENTORY_PATH: &str = "formal/adapter-source-inventory.toml";
+const MCP_LAUNCH_SOURCE: &str =
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc";
+const MCP_LIFECYCLE_SOURCE: &str =
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -63,6 +69,7 @@ struct FunctionFacts {
 #[derive(Clone, Debug, Default)]
 struct SourceFacts {
     functions: BTreeMap<String, FunctionFacts>,
+    includes: Vec<String>,
 }
 
 #[derive(Clone, Copy)]
@@ -76,6 +83,33 @@ struct ExceptionRule {
 }
 
 const EXCEPTION_RULES: &[ExceptionRule] = &[
+    // These exact thread builders supervise an already admitted process. Their
+    // closures are still visited, so this does not authorize nested tool launches.
+    mcp_thread_rule(
+        MCP_LAUNCH_SOURCE,
+        "StdioMcpTransport::from_launched_process",
+        "std::thread::Builder::new().name(\"chio-mcp-stdin\".to_string())",
+    ),
+    mcp_thread_rule(
+        MCP_LAUNCH_SOURCE,
+        "StdioMcpTransport::from_launched_process",
+        "std::thread::Builder::new().name(\"chio-mcp-stderr\".to_string())",
+    ),
+    mcp_thread_rule(
+        MCP_LAUNCH_SOURCE,
+        "StdioMcpTransport::from_launched_process",
+        "std::thread::Builder::new().name(\"chio-mcp-stdout\".to_string())",
+    ),
+    mcp_thread_rule(
+        MCP_LAUNCH_SOURCE,
+        "StdioMcpTransport::from_launched_process",
+        "std::thread::Builder::new().name(\"chio-mcp-child\".to_string())",
+    ),
+    mcp_thread_rule(
+        MCP_LIFECYCLE_SOURCE,
+        "detach_legacy_child_reaper",
+        "std::thread::Builder::new().name(\"chio-mcp-legacy-reaper\".to_string())",
+    ),
     ExceptionRule {
         path: "crates/protocol/chio-acp-proxy/src/transport.rs",
         function: "AcpTransport::spawn",
@@ -93,16 +127,16 @@ const EXCEPTION_RULES: &[ExceptionRule] = &[
         compatibility_only: false,
     },
     ExceptionRule {
-        path: "crates/protocol/chio-mcp-adapter/src/transport/stdio.rs",
-        function: "StdioMcpTransport::spawn",
+        path: MCP_LAUNCH_SOURCE,
+        function: "StdioMcpTransport::spawn_legacy_with_gate_and_timeouts",
         kind: DangerousKind::CommandNew,
         receiver: None,
         class: "MCP server process lifecycle",
         compatibility_only: false,
     },
     ExceptionRule {
-        path: "crates/protocol/chio-mcp-adapter/src/transport/stdio.rs",
-        function: "StdioMcpTransport::spawn",
+        path: MCP_LAUNCH_SOURCE,
+        function: "StdioMcpTransport::spawn_legacy_with_gate_and_timeouts",
         kind: DangerousKind::Spawn,
         receiver: Some("child_command"),
         class: "MCP server process lifecycle",
@@ -134,6 +168,21 @@ const EXCEPTION_RULES: &[ExceptionRule] = &[
     },
 ];
 
+const fn mcp_thread_rule(
+    path: &'static str,
+    function: &'static str,
+    receiver: &'static str,
+) -> ExceptionRule {
+    ExceptionRule {
+        path,
+        function,
+        kind: DangerousKind::Spawn,
+        receiver: Some(receiver),
+        class: "MCP admitted-process supervision thread",
+        compatibility_only: false,
+    }
+}
+
 #[derive(Clone, Copy)]
 struct CallContract {
     path: &'static str,
@@ -143,6 +192,48 @@ struct CallContract {
 }
 
 const CALL_CONTRACTS: &[CallContract] = &[
+    CallContract {
+        path: MCP_LAUNCH_SOURCE,
+        function: "LegacyNativeLaunchAuthorization::revalidate",
+        target: "self.manifest_registry.authorize_cage_manifest",
+        minimum: 1,
+    },
+    CallContract {
+        path: MCP_LAUNCH_SOURCE,
+        function: "StdioMcpTransport::spawn_legacy_authorized",
+        target: "authorization.revalidate",
+        minimum: 1,
+    },
+    CallContract {
+        path: MCP_LAUNCH_SOURCE,
+        function: "StdioMcpTransport::spawn_legacy_authorized",
+        target: "validate_signed_mcp_tool_surface",
+        minimum: 1,
+    },
+    CallContract {
+        path: MCP_LAUNCH_SOURCE,
+        function: "LegacyNativeLaunchAuthorization::revalidate",
+        target: "self.migration.require_legacy_fallback_permitted",
+        minimum: 1,
+    },
+    CallContract {
+        path: MCP_LAUNCH_SOURCE,
+        function: "StdioMcpTransport::spawn_legacy_with_gate_and_timeouts",
+        target: "prelaunch",
+        minimum: 1,
+    },
+    CallContract {
+        path: MCP_LAUNCH_SOURCE,
+        function: "StdioMcpTransport::spawn_cage_required",
+        target: "migration.require_enforced",
+        minimum: 1,
+    },
+    CallContract {
+        path: MCP_LAUNCH_SOURCE,
+        function: "StdioMcpTransport::spawn_cage_required",
+        target: "chio_cage::launch_prepared",
+        minimum: 1,
+    },
     CallContract {
         path: "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
         function: "ChioMcpEdge::evaluate_tool_call_operation",
@@ -194,13 +285,25 @@ const CALL_CONTRACTS: &[CallContract] = &[
     CallContract {
         path: "crates/kernel/chio-runtime-core/src/admission_hook.rs",
         function: "<ChioRuntimeAdmissionHook as RuntimeAdmissionHook>::evaluate",
-        target: "verify_swarm_authority_reference_from_store",
+        target: "self.prepare_request",
         minimum: 1,
     },
     CallContract {
         path: "crates/kernel/chio-runtime-core/src/admission_hook.rs",
         function: "<ChioRuntimeAdmissionHook as RuntimeAdmissionHook>::evaluate",
-        target: "self.store.consume_swarm_continuation",
+        target: "prepared.reserve",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/kernel/chio-runtime-core/src/admission_hook/preparation.rs",
+        function: "ChioRuntimeAdmissionHook::prepare_request",
+        target: "verify_swarm_authority_reference_from_store",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/kernel/chio-runtime-core/src/admission_hook/reservation.rs",
+        function: "PreparedHookAdmission::reserve",
+        target: "hook.store.consume_swarm_continuation",
         minimum: 1,
     },
     CallContract {
@@ -212,6 +315,12 @@ const CALL_CONTRACTS: &[CallContract] = &[
     CallContract {
         path: "crates/kernel/chio-kernel/src/kernel/validation.rs",
         function: "ChioKernel::admit_capability_budget",
+        target: "self.admit_capability_budget_for_dispatch",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/kernel/chio-kernel/src/kernel/validation/caller_budget.rs",
+        function: "ChioKernel::admit_capability_budget_for_dispatch",
         target: "budgets.try_admit_child",
         minimum: 1,
     },
@@ -240,23 +349,24 @@ fn validate_workspace(root: &Path) -> Result<(), String> {
     let inventory = load_source_inventory(root)?;
     validate_contract_source_registry(&inventory)?;
     let adapter_sources = discover_adapter_sources(root, &inventory)?;
-    let mut parsed = BTreeMap::new();
-    for relative in &adapter_sources {
-        parsed.insert(relative.clone(), parse_repo_source(root, relative)?);
-    }
+    let mut parsed = source::parse_repo_sources(root, &adapter_sources)?;
     validate_dangerous_calls(&parsed, true)?;
 
-    for relative in &inventory.contract_sources {
-        if !parsed.contains_key(relative) {
-            parsed.insert(relative.clone(), parse_repo_source(root, relative)?);
-        }
-    }
+    parsed.extend(source::parse_repo_sources(
+        root,
+        &inventory.contract_sources,
+    )?);
     for contract in CALL_CONTRACTS {
         let source = parsed
             .get(contract.path)
             .ok_or_else(|| format!("internal source lookup failed: {}", contract.path))?;
         require_call(source, contract)?;
     }
+    require_native_launch_gate(
+        parsed
+            .get(MCP_LAUNCH_SOURCE)
+            .ok_or_else(|| "native MCP launch source was not parsed".to_string())?,
+    )?;
     require_path(
         parsed
             .get("crates/products/chio-api-protect/src/evaluator.rs")
@@ -290,6 +400,21 @@ fn validate_workspace(root: &Path) -> Result<(), String> {
         ],
     )?;
     Ok(())
+}
+
+fn require_native_launch_gate(source: &SourceFacts) -> Result<(), String> {
+    require_call_tokens(
+        source,
+        "StdioMcpTransport::spawn_legacy_authorized",
+        "Self::spawn_legacy_with_gate",
+        &["||authorization.revalidate()"],
+    )?;
+    require_call_tokens(
+        source,
+        "StdioMcpTransport::spawn_legacy_with_gate_and_timeouts",
+        "dispatch_native_launch",
+        &["NativeLaunchRequirement::LegacyAllowed,||{prelaunch()?;child_command.spawn()"],
+    )
 }
 
 fn load_source_inventory(root: &Path) -> Result<SourceInventory, String> {
@@ -377,22 +502,6 @@ fn validate_contract_source_registry(inventory: &SourceInventory) -> Result<(), 
         ));
     }
     Ok(())
-}
-
-fn parse_repo_source(root: &Path, relative: impl AsRef<Path>) -> Result<SourceFacts, String> {
-    let relative = relative.as_ref();
-    let absolute = root.join(relative);
-    let metadata = fs::symlink_metadata(&absolute)
-        .map_err(|error| format!("cannot stat {}: {error}", display_path(relative)))?;
-    if metadata.file_type().is_symlink() || !metadata.is_file() {
-        return Err(format!(
-            "production Rust source is not a regular file: {}",
-            display_path(relative)
-        ));
-    }
-    let source = fs::read_to_string(&absolute)
-        .map_err(|error| format!("cannot read {}: {error}", display_path(relative)))?;
-    parse_source(&source, &display_path(relative))
 }
 
 fn discover_adapter_sources(
@@ -524,7 +633,12 @@ fn parse_source(source: &str, label: &str) -> Result<SourceFacts, String> {
             return Err(format!("duplicate function identity in {label}: {name}"));
         }
     }
-    Ok(SourceFacts { functions })
+    let includes = source::include_paths(&syntax)
+        .map_err(|error| format!("cannot inventory includes in {label}: {error}"))?;
+    Ok(SourceFacts {
+        functions,
+        includes,
+    })
 }
 
 #[derive(Default)]
@@ -819,6 +933,49 @@ mod tests {
     }
 
     #[test]
+    fn supervision_thread_exception_does_not_authorize_a_process_launch_in_its_closure() {
+        let safe = r#"
+            fn detach_legacy_child_reaper(mut child: Child) {
+                std::thread::Builder::new().name("chio-mcp-legacy-reaper".to_string())
+                    .spawn(move || { child.wait(); });
+            }
+        "#;
+        assert!(validate_fixture(MCP_LIFECYCLE_SOURCE, safe).is_ok());
+        let unsafe_source = safe.replace("child.wait();", "Command::new(\"tool\").spawn();");
+        assert!(validate_fixture(MCP_LIFECYCLE_SOURCE, &unsafe_source).is_err());
+    }
+
+    #[test]
+    fn native_launch_gate_must_propagate_reauthorization_before_spawning() -> Result<(), String> {
+        let safe = r#"
+            impl StdioMcpTransport {
+                fn spawn_legacy_authorized() {
+                    Self::spawn_legacy_with_gate(command, args, || authorization.revalidate())?;
+                }
+                fn spawn_legacy_with_gate_and_timeouts() {
+                    dispatch_native_launch(NativeLaunchRequirement::LegacyAllowed,
+                        || { prelaunch()?; child_command.spawn() }, || Err(error))?;
+                }
+            }
+        "#;
+        require_native_launch_gate(&parse_source(safe, MCP_LAUNCH_SOURCE)?)?;
+        for (from, to) in [
+            ("prelaunch()?;", "let _ = prelaunch();"),
+            (
+                "prelaunch()?; child_command.spawn()",
+                "child_command.spawn()?; prelaunch()",
+            ),
+            ("authorization.revalidate()", "Ok(())"),
+        ] {
+            let mutated = safe.replace(from, to);
+            assert_ne!(safe, mutated);
+            let facts = parse_source(&mutated, MCP_LAUNCH_SOURCE)?;
+            assert!(require_native_launch_gate(&facts).is_err(), "{mutated}");
+        }
+        Ok(())
+    }
+
+    #[test]
     fn comments_strings_and_unrelated_functions_do_not_mediate_command_new() {
         let source = r#"
             fn evaluate() {}
@@ -943,6 +1100,47 @@ mod tests {
         assert!(
             validate_fixture("crates/protocol/chio-acp-proxy/src/transport.rs", source).is_ok()
         );
+    }
+
+    #[test]
+    fn prepared_runtime_boundary_requires_both_entry_and_leaf_calls() {
+        let root = workspace_root().unwrap_or_else(|error| panic!("workspace root: {error}"));
+        let contracts: Vec<_> = CALL_CONTRACTS
+            .iter()
+            .filter(|contract| {
+                matches!(
+                    contract.target,
+                    "self.prepare_request"
+                        | "prepared.reserve"
+                        | "verify_swarm_authority_reference_from_store"
+                        | "hook.store.consume_swarm_continuation"
+                )
+            })
+            .collect();
+        assert_eq!(contracts.len(), 4);
+        for contract in contracts {
+            let source = fs::read_to_string(root.join(contract.path))
+                .unwrap_or_else(|error| panic!("read {}: {error}", contract.path));
+            let facts = parse_source(&source, contract.path)
+                .unwrap_or_else(|error| panic!("parse {}: {error}", contract.path));
+            assert!(
+                require_call(&facts, contract).is_ok(),
+                "{}",
+                contract.target
+            );
+            let mut missing = facts;
+            missing
+                .functions
+                .get_mut(contract.function)
+                .unwrap_or_else(|| panic!("missing {}", contract.function))
+                .calls
+                .retain(|call| call.target != contract.target);
+            assert!(
+                require_call(&missing, contract).is_err(),
+                "{}",
+                contract.target
+            );
+        }
     }
 
     #[test]

@@ -210,6 +210,20 @@ lane = "pr"
 
 [[harness]]
 crate = "chio-kernel-core"
+harness = "verify_captured_invocation_count_monotonic"
+default_unwind = 8
+timeout_secs = 1800
+lane = "pr"
+
+[[harness]]
+crate = "chio-kernel-core"
+harness = "verify_replay_fingerprint_uniqueness"
+default_unwind = 8
+timeout_secs = 1800
+lane = "pr"
+
+[[harness]]
+crate = "chio-kernel-core"
 harness = "verify_family_binding_preservation"
 default_unwind = 8
 timeout_secs = 1800

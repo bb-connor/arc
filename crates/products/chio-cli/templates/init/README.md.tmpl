@@ -5,6 +5,7 @@ This project was scaffolded by `chio init`.
 ## What You Get
 
 - `policy.yaml`: a minimal Chio policy that grants one governed tool call
+- `tools.json`: the reviewed MCP tool surface bound into the signed manifest
 - `src/bin/hello_server.rs`: a tiny MCP tool server stub
 - `src/bin/demo.rs`: a smoke runner that launches `chio mcp serve`, calls the
   governed tool, and prints the resulting receipt line
@@ -23,8 +24,16 @@ This project was scaffolded by `chio init`.
    CHIO_BIN=/path/to/chio cargo run --quiet --bin demo
    ```
 
-3. The demo writes the durable admission authority and receipt store under
-   `.chio/` and prints the latest receipt after the governed tool call succeeds.
+3. The demo builds the server first, provisions demo-only signed manifest and
+   native-launch artifacts for that exact executable, and writes them with the
+   durable admission state and receipt store under `.chio/`. It then prints the
+   latest receipt after the governed tool call succeeds.
+
+The scaffold provisions migration stage `Disabled`, which is an explicitly
+authorized legacy demo mode. It demonstrates signature, registry, executable,
+and argv binding, but it is not evidence of production cage containment. Use
+operator-managed signers and advance the reviewed migration ledger before a
+production deployment.
 
 ## Prove The Loop
 
@@ -56,6 +65,7 @@ chio --receipt-db ./.chio/receipts.db receipt verify <receipt-id>
 ## Customize It
 
 - Rename `hello_world` in `src/bin/hello_server.rs` to your first tool
+- Update `tools.json` to the exact reviewed tool schema before reprovisioning
 - Tighten `policy.yaml` to the exact server, tool, and budget envelope you need
 - Extend `demo.rs` into your own client or replace it with a framework SDK in
   later phases

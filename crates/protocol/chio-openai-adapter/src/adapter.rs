@@ -4,6 +4,7 @@
 //! `responses.create` function-call items into the shared Chio
 //! [`chio_tool_call_fabric::ToolInvocation`] shape.
 
+use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::time::SystemTime;
@@ -64,14 +65,53 @@ impl From<String> for OpenAiAdapterConfig {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OpenAiAdapter {
     config: OpenAiAdapterConfig,
+    admitted_security: Option<BTreeMap<String, chio_manifest::BridgeSecurityMetadata>>,
 }
 
 impl OpenAiAdapter {
-    /// Build a new adapter from a config or organization id.
+    /// Build a raw provider projection with no manifest authority attached.
+    ///
+    /// Use [`Self::new_with_registry`] whenever lifted calls may execute as
+    /// admitted Chio tools.
     pub fn new(config: impl Into<OpenAiAdapterConfig>) -> Self {
         Self {
             config: config.into(),
+            admitted_security: None,
         }
+    }
+
+    /// Build an adapter bound to one verified, policy-admitted Chio server.
+    pub fn new_with_registry(
+        config: impl Into<OpenAiAdapterConfig>,
+        server_id: impl AsRef<str>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, ProviderError> {
+        let server_id = server_id.as_ref();
+        let manifest = registry
+            .verified_manifest(server_id)
+            .map(|signed| &signed.manifest)
+            .ok_or_else(|| {
+                ProviderError::Malformed(format!(
+                    "verified manifest registry has no OpenAI server `{server_id}`"
+                ))
+            })?;
+        let mut admitted_security = BTreeMap::new();
+        for tool in &manifest.tools {
+            let security = registry
+                .bridge_security(server_id, &tool.name)
+                .filter(chio_manifest::BridgeSecurityMetadata::has_registry_coordinates)
+                .ok_or_else(|| {
+                    ProviderError::Malformed(format!(
+                        "verified manifest registry has no admitted security sidecar for OpenAI tool `{server_id}/{}`",
+                        tool.name
+                    ))
+                })?;
+            admitted_security.insert(tool.name.clone(), security);
+        }
+        Ok(Self {
+            config: config.into(),
+            admitted_security: Some(admitted_security),
+        })
     }
 
     /// Borrow the adapter configuration.
@@ -150,6 +190,17 @@ impl OpenAiAdapter {
         call: &OpenAiToolCall,
         org_id: &str,
     ) -> Result<ToolInvocation, ProviderError> {
+        let bridge_security = match &self.admitted_security {
+            Some(bindings) => {
+                Some(bindings.get(&call.function.name).cloned().ok_or_else(|| {
+                    ProviderError::Malformed(format!(
+                        "admitted security sidecar is missing for OpenAI tool `{}`",
+                        call.function.name
+                    ))
+                })?)
+            }
+            None => None,
+        };
         let arguments: Value = serde_json::from_str(&call.function.arguments).map_err(|error| {
             ProviderError::BadToolArgs(format!(
                 "function_call `{}` arguments were not valid JSON: {error}",
@@ -176,6 +227,7 @@ impl OpenAiAdapter {
                 },
                 received_at: SystemTime::now(),
             },
+            bridge_security,
         })
     }
 }

@@ -14,6 +14,14 @@
 //! [`ApprovalGuard::evaluate`] and
 //! [`ChioKernel::evaluate_tool_call_with_hitl`](crate::ChioKernel).
 
+mod collector;
+
+pub use collector::{
+    ThresholdApprovalCollectorStatus, ThresholdApprovalProposalCreationContext,
+    ThresholdApprovalProposalCreationParameters, ThresholdApprovalProposalRecord,
+    ThresholdApprovalProposalRegistration, ThresholdApprovalVoteRecord,
+};
+
 use std::collections::HashMap;
 use std::sync::{Mutex, RwLock};
 
@@ -29,6 +37,7 @@ use chio_log_redact::redacted;
 use serde::{Deserialize, Serialize};
 
 use crate::runtime::{ToolCallRequest, Verdict};
+use crate::security_admission_operation::ReplayReservationState;
 use crate::{AgentId, KernelError, ServerId};
 
 /// Maximum lifetime (in seconds) permitted on a single approval token.
@@ -36,6 +45,7 @@ use crate::{AgentId, KernelError, ServerId};
 /// section 15: the single-use replay registry's TTL is pinned to this
 /// value so no token can outlive its replay entry.
 pub const MAX_APPROVAL_TTL_SECS: u64 = 3600;
+pub(crate) const MAX_RESERVATION_IDENTIFIER_BYTES: usize = 512;
 
 /// A request for human approval, produced when the approval guard
 /// returns `Verdict::PendingApproval`. Designed to be serialized into
@@ -252,16 +262,255 @@ impl ApprovalToken {
 /// Errors emitted by approval stores.
 #[derive(Debug, thiserror::Error)]
 pub enum ApprovalStoreError {
+    #[error("invalid approval reservation: {0}")]
+    Invalid(String),
     #[error("approval request not found: {0}")]
     NotFound(String),
     #[error("approval already resolved: {0}")]
     AlreadyResolved(String),
+    #[error("approval state conflict: {0}")]
+    Conflict(String),
     #[error("approval token already consumed (replay detected): {0}")]
     Replay(String),
     #[error("storage backend error: {0}")]
     Backend(String),
     #[error("serialization error: {0}")]
     Serialization(String),
+}
+
+/// Durability and coordination guarantees provided by an approval replay authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApprovalStoreProfile {
+    EphemeralLocal,
+    SingleNodeDurable,
+    SharedLinearizable,
+}
+
+impl ApprovalStoreProfile {
+    #[must_use]
+    pub fn supports_dispatch_workers(self, dispatch_worker_count: usize) -> bool {
+        match self {
+            Self::EphemeralLocal => false,
+            Self::SingleNodeDurable => dispatch_worker_count == 1,
+            Self::SharedLinearizable => dispatch_worker_count > 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApprovalReservationMember {
+    token_id: String,
+    token_digest: String,
+}
+
+impl ApprovalReservationMember {
+    pub fn new(token_id: String, token_digest: String) -> Result<Self, ApprovalStoreError> {
+        validate_reservation_identifier(&token_id, "token_id")?;
+        validate_reservation_digest(&token_digest, "token_digest")?;
+        Ok(Self {
+            token_id,
+            token_digest,
+        })
+    }
+
+    pub fn token_id(&self) -> &str {
+        &self.token_id
+    }
+
+    pub fn token_digest(&self) -> &str {
+        &self.token_digest
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApprovalSetReservationInput {
+    approval_set_hash: String,
+    members: Vec<ApprovalReservationMember>,
+    proposal_deadline: u64,
+}
+
+impl ApprovalSetReservationInput {
+    pub fn new(
+        approval_set_hash: String,
+        members: Vec<ApprovalReservationMember>,
+        proposal_deadline: u64,
+    ) -> Result<Self, ApprovalStoreError> {
+        validate_reservation_digest(&approval_set_hash, "approval_set_hash")?;
+        if proposal_deadline == 0 || proposal_deadline > i64::MAX as u64 {
+            return Err(ApprovalStoreError::Invalid(
+                "proposal_deadline is outside the durable timestamp range".to_string(),
+            ));
+        }
+        let members = normalize_approval_reservation_members(members)?;
+        Ok(Self {
+            approval_set_hash,
+            members,
+            proposal_deadline,
+        })
+    }
+
+    pub fn from_persisted_parts(
+        approval_set_hash: String,
+        members: Vec<ApprovalReservationMember>,
+        proposal_deadline: u64,
+    ) -> Result<Self, ApprovalStoreError> {
+        let normalized = Self::new(
+            approval_set_hash.clone(),
+            members.clone(),
+            proposal_deadline,
+        )
+        .map_err(persisted_approval_reservation_error)?;
+        if normalized.members != members {
+            return Err(ApprovalStoreError::Serialization(
+                "persisted approval members are not normalized".to_string(),
+            ));
+        }
+        Ok(normalized)
+    }
+
+    pub fn approval_set_hash(&self) -> &str {
+        &self.approval_set_hash
+    }
+
+    pub fn members(&self) -> &[ApprovalReservationMember] {
+        &self.members
+    }
+
+    pub fn proposal_deadline(&self) -> u64 {
+        self.proposal_deadline
+    }
+}
+
+/// Immutable operation ownership for one normalized verified approval set.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApprovalReservation {
+    operation_id: String,
+    approval_set: ApprovalSetReservationInput,
+    state: ReplayReservationState,
+}
+
+impl ApprovalReservation {
+    pub fn new(
+        operation_id: String,
+        approval_set: ApprovalSetReservationInput,
+    ) -> Result<Self, ApprovalStoreError> {
+        validate_reservation_digest(&operation_id, "operation_id")?;
+        let approval_set = ApprovalSetReservationInput::new(
+            approval_set.approval_set_hash,
+            approval_set.members,
+            approval_set.proposal_deadline,
+        )?;
+        Ok(Self {
+            operation_id,
+            approval_set,
+            state: ReplayReservationState::Reserved,
+        })
+    }
+
+    pub fn from_persisted_parts(
+        operation_id: String,
+        approval_set: ApprovalSetReservationInput,
+        state: ReplayReservationState,
+    ) -> Result<Self, ApprovalStoreError> {
+        let approval_set = ApprovalSetReservationInput::from_persisted_parts(
+            approval_set.approval_set_hash,
+            approval_set.members,
+            approval_set.proposal_deadline,
+        )?;
+        let mut reservation =
+            Self::new(operation_id, approval_set).map_err(persisted_approval_reservation_error)?;
+        reservation.state = state;
+        Ok(reservation)
+    }
+
+    pub fn operation_id(&self) -> &str {
+        &self.operation_id
+    }
+
+    pub fn approval_set(&self) -> &ApprovalSetReservationInput {
+        &self.approval_set
+    }
+
+    pub fn state(&self) -> ReplayReservationState {
+        self.state
+    }
+}
+
+fn validate_reservation_identifier(
+    value: &str,
+    label: &'static str,
+) -> Result<(), ApprovalStoreError> {
+    if value.is_empty()
+        || value.len() > MAX_RESERVATION_IDENTIFIER_BYTES
+        || value.bytes().any(|byte| byte == 0)
+    {
+        return Err(ApprovalStoreError::Invalid(format!(
+            "{label} is empty, oversized, or contains NUL"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_reservation_digest(value: &str, label: &'static str) -> Result<(), ApprovalStoreError> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        return Err(ApprovalStoreError::Invalid(format!(
+            "{label} must be lowercase SHA-256 hex"
+        )));
+    }
+    Ok(())
+}
+
+fn normalize_approval_reservation_members(
+    mut members: Vec<ApprovalReservationMember>,
+) -> Result<Vec<ApprovalReservationMember>, ApprovalStoreError> {
+    if members.is_empty()
+        || members.len()
+            > crate::security_admission_operation::MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION
+    {
+        return Err(ApprovalStoreError::Invalid(format!(
+            "approval member count must be between 1 and {}",
+            crate::security_admission_operation::MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION
+        )));
+    }
+    for member in &members {
+        validate_reservation_identifier(&member.token_id, "token_id")?;
+        validate_reservation_digest(&member.token_digest, "token_digest")?;
+    }
+    members.sort_unstable_by(|left, right| {
+        left.token_digest
+            .cmp(&right.token_digest)
+            .then_with(|| left.token_id.cmp(&right.token_id))
+    });
+    if members
+        .windows(2)
+        .any(|pair| pair[0].token_digest == pair[1].token_digest)
+    {
+        return Err(ApprovalStoreError::Invalid(
+            "approval-token digests contain a duplicate".to_string(),
+        ));
+    }
+    let mut token_ids = members
+        .iter()
+        .map(|member| member.token_id.as_str())
+        .collect::<Vec<_>>();
+    token_ids.sort_unstable();
+    if token_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(ApprovalStoreError::Invalid(
+            "approval token IDs contain a duplicate".to_string(),
+        ));
+    }
+    Ok(members)
+}
+
+fn persisted_approval_reservation_error(error: ApprovalStoreError) -> ApprovalStoreError {
+    match error {
+        ApprovalStoreError::Invalid(message) => ApprovalStoreError::Serialization(message),
+        other => other,
+    }
 }
 
 /// Filter for `list_pending`.
@@ -297,6 +546,10 @@ pub struct ResolvedApproval {
 /// synchronous, and the kernel itself does not run on an async
 /// executor.
 pub trait ApprovalStore: Send + Sync {
+    fn authority_profile(&self) -> ApprovalStoreProfile {
+        ApprovalStoreProfile::EphemeralLocal
+    }
+
     /// Persist a new pending request. Idempotent on `approval_id`: a
     /// second call with the same id returns without error as long as
     /// the stored payload matches.
@@ -342,6 +595,45 @@ pub trait ApprovalStore: Send + Sync {
 
     /// Fetch the resolution record for a previously resolved approval.
     fn get_resolution(&self, id: &str) -> Result<Option<ResolvedApproval>, ApprovalStoreError>;
+    /// Atomically bind a normalized approval-token digest set to an operation.
+    /// The default fails closed so operation-owned callers never fall back to
+    /// the legacy immediate-consumption registry.
+    fn reserve_approval_set(
+        &self,
+        _operation_id: &str,
+        _approval_set: &ApprovalSetReservationInput,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        Err(ApprovalStoreError::Backend(
+            "operation-owned approval reservations are unavailable".to_string(),
+        ))
+    }
+
+    fn commit_approval_reservation(
+        &self,
+        _operation_id: &str,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        Err(ApprovalStoreError::Backend(
+            "operation-owned approval reservations are unavailable".to_string(),
+        ))
+    }
+
+    fn cancel_approval_reservation(
+        &self,
+        _operation_id: &str,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        Err(ApprovalStoreError::Backend(
+            "operation-owned approval reservations are unavailable".to_string(),
+        ))
+    }
+
+    fn get_approval_reservation(
+        &self,
+        _operation_id: &str,
+    ) -> Result<Option<ApprovalReservation>, ApprovalStoreError> {
+        Err(ApprovalStoreError::Backend(
+            "operation-owned approval reservations are unavailable".to_string(),
+        ))
+    }
 }
 
 /// Batch approvals let a human pre-approve a class of calls.

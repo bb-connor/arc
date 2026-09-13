@@ -328,15 +328,17 @@ impl KernelConfig {
 /// 32-byte ML-DSA-65 keygen seed. Construct one of these from a parsed
 /// HushSpec policy plus the boot-loaded PQ seed and pass it to
 /// [`ChioKernel::with_hybrid_signing_backend`] with a verified self-quote
-/// port to obtain a `Box<dyn SigningBackend>` for hybrid receipt signing.
+/// port to install proposal and ordinary receipt signing. The returned boxed
+/// handle shares that authority; it does not expose seed material.
 ///
 /// A separate input from [`KernelConfig`]: the hybrid fields are not folded
 /// into `KernelConfig`, so its wire form is unaffected.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct HybridSigningConfig {
-    /// Minimum cryptographic posture enforced on receipts, capability
-    /// tokens, and compliance certificates. Default
-    /// [`KernelCryptoFloor::AllowClassical`].
+    /// Floor installed for capability admission, threshold verification and
+    /// ordinary receipt signing. Other artifact authorities remain separate;
+    /// this configuration alone does not establish an all-artifact PQ runtime.
+    /// Default [`KernelCryptoFloor::AllowClassical`].
     pub crypto_floor: KernelCryptoFloor,
 
     /// Optional 32-byte ML-DSA-65 keygen seed. Required when
@@ -344,6 +346,19 @@ pub struct HybridSigningConfig {
     /// [`KernelCryptoFloor::PqRequired`]; ignored under
     /// [`KernelCryptoFloor::AllowClassical`].
     pub pq_signing_seed: Option<[u8; 32]>,
+}
+
+impl std::fmt::Debug for HybridSigningConfig {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("HybridSigningConfig")
+            .field("crypto_floor", &self.crypto_floor)
+            .field(
+                "pq_signing_seed",
+                &self.pq_signing_seed.as_ref().map(|_| "[REDACTED]"),
+            )
+            .finish()
+    }
 }
 
 pub(crate) fn capability_crypto_floor(
@@ -532,6 +547,14 @@ pub struct ChioKernel {
     pub(super) config: KernelConfig,
     pub(super) durable_admission_mode: crate::admission_operation::DurableAdmissionMode,
     pub(super) durable_admission_runtime: Option<DurableAdmissionRuntime>,
+    #[cfg(feature = "admission-test-support")]
+    pub(super) durable_finalization_cutpoint_hook: Option<super::DurableFinalizationCutpointHook>,
+    #[cfg(feature = "admission-test-support")]
+    pub(super) caller_execution_checkpoint_hook: Option<super::CallerExecutionCheckpointHook>,
+    #[cfg(feature = "admission-test-support")]
+    pub(super) native_egress_checkpoint_hook: Option<super::NativeSecurityEgressCheckpointHook>,
+    #[cfg(feature = "admission-test-support")]
+    pub(super) native_capture_checkpoint_hook: Option<super::NativeSecurityCaptureCheckpointHook>,
     /// Explicit compatibility escape for development fixtures that exercise the
     /// legacy non-durable financial lifecycle. Production construction leaves
     /// this false, so a financial hold cannot cross a connector boundary without
@@ -544,8 +567,25 @@ pub struct ChioKernel {
     pub(super) post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline,
     pub(super) budget_store: Arc<dyn BudgetStore>,
     pub(super) budget_store_lock: Mutex<()>,
+    pub(super) admission_operation_store:
+        Option<Arc<dyn crate::security_admission_operation::AdmissionOperationStore>>,
+    pub(super) approval_store: Option<Arc<dyn crate::approval::ApprovalStore>>,
+    pub(super) dispatch_worker_count: usize,
     pub(super) revocation_store: Arc<dyn RevocationStore>,
     pub(super) capability_authority: Box<dyn CapabilityAuthority>,
+    pub(super) capability_issuance_admission_authority:
+        Option<Arc<dyn CapabilityIssuanceAdmissionAuthority>>,
+    pub(super) active_response_requirement_resolver:
+        Option<Arc<dyn super::active_response_policy::ActiveResponseRequirementResolver>>,
+    pub(super) active_response_finding_authority:
+        Option<Arc<dyn super::active_response_admission::ActiveResponseFindingAuthority>>,
+    pub(super) active_response_submission_authority: Option<chio_core::PublicKey>,
+    pub(super) active_response_executor:
+        Option<super::active_response_executor::InstalledActiveResponseExecutor>,
+    pub(super) active_response_executor_generation_floor: u64,
+    pub(super) governed_active_response_plans_enabled: bool,
+    pub(super) security_invocation_context_authority:
+        Option<Arc<dyn SecurityInvocationContextAuthority>>,
     // Held behind `Arc` so a single connection can be cloned into a
     // `spawn_blocking` task, letting the dispatch deadline drive the call off the
     // async worker (a connection that blocks before its first `.await` cannot then
@@ -600,6 +640,11 @@ pub struct ChioKernel {
     pub(crate) finding_pool_mutation_receipt_flush_lock: Mutex<()>,
     pub(super) price_oracle: Option<Box<dyn PriceOracle>>,
     pub(super) runtime_admission_hook: Option<Arc<dyn RuntimeAdmissionHook>>,
+    /// Independently configured, and frozen in every original admission profile.
+    pub(super) caller_executor: Option<crate::caller_delivery::CallerExecutorIdentityV1>,
+    pub(super) swarm_admission_required: bool,
+    pub(super) security_pre_dispatch_policy: SecurityPreDispatchPolicy,
+    pub(super) security_pre_dispatch_hook: Option<Arc<dyn SecurityPreDispatchHook>>,
     pub(super) runtime_admission_readiness_timeout: Duration,
     pub(super) runtime_trace_observer: Option<Arc<dyn RuntimeTraceObserver>>,
     pub(super) runtime_trace_transition_lock: Mutex<()>,
@@ -616,6 +661,8 @@ pub struct ChioKernel {
     pub(super) dpop_nonce_store: Option<dpop::DpopNonceStore>,
     /// Configuration for DPoP proof verification TTLs and clock skew.
     pub(super) dpop_config: Option<dpop::DpopConfig>,
+    /// Explicit activated durable domain. This never falls back to the legacy cache.
+    pub(super) dpop_authority: Option<dpop::authority::DpopReplayAuthorityV1>,
     /// Execution-nonce config (TTL, capacity, strict-mode flag).
     /// When `None`, no nonce is minted on allow and strict verification is
     /// disabled (compatibility deployments keep working).
@@ -628,8 +675,15 @@ pub struct ChioKernel {
     /// `(subject_id, request_id, governed_intent_hash)`.
     pub(super) approval_replay_store:
         Option<Box<dyn crate::governed_approval_replay::GovernedApprovalReplayStore>>,
+    pub(super) governed_approval_authority:
+        Option<super::admission_coordinator::GovernedApprovalAuthority>,
     pub(super) threshold_approval_requirement_resolver:
         Option<Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>>,
+    pub(super) signing_authority: super::signing_authority::KernelSigningAuthority,
+    pub(super) threshold_approval_policy_configured: bool,
+    pub(super) threshold_governed_approvals_enabled: bool,
+    pub(super) threshold_approval_policy_authorities: Vec<chio_core::PublicKey>,
+    pub(super) governed_security_runtime_generation: u64,
     pub(super) supplemental_quota_verifier:
         Option<crate::supplemental_quota::SupplementalQuotaVerifierRuntime>,
     /// Emergency kill switch. When `true`, every evaluate entry point returns
@@ -799,54 +853,4 @@ pub(crate) enum RestartReservedHoldGate {
     /// drains to zero; while denied this kernel opens no new holds, so the count
     /// faithfully tracks the prior process's holds draining away.
     PendingOpaqueCount,
-}
-
-impl ChioKernel {
-    /// Construct the hybrid signing backend the kernel would use under
-    /// `hybrid`'s configured floor and PQ key material after the kernel
-    /// self-quote gate has run.
-    ///
-    /// Threads the kernel's classical Ed25519 keypair into a
-    /// [`chio_core::crypto::Ed25519Backend`] under
-    /// [`KernelCryptoFloor::AllowClassical`], or composes it with an
-    /// [`chio_core::crypto::MlDsa65Backend`] derived from `hybrid.pq_signing_seed`
-    /// into a [`chio_core::crypto::HybridBackend`] under
-    /// [`KernelCryptoFloor::AllowHybrid`] or [`KernelCryptoFloor::PqRequired`],
-    /// but only after [`crate::boot::load_kernel_signing_backend_after_self_quote`]
-    /// accepts `self_quote_bytes`.
-    ///
-    /// Receipt body construction continues to flow through the existing
-    /// inline path (`build_and_sign_receipt`); callers that opt in to
-    /// hybrid signing pass the returned backend through
-    /// [`crate::sign_receipt_body_with_backend`] (along with the canonical
-    /// content preimage the body's `content_hash` was derived from) before
-    /// persistence, so the hybrid path recomputes `content_hash` inside the
-    /// trust boundary and is WYSIWYS fail-closed just like the inline
-    /// classical path.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::boot::KernelBootError::SelfQuoteRejected`] when the
-    /// self-quote verifier rejects a non-classical floor, or
-    /// [`crate::boot::KernelBootError::SigningBackend`] when the configured
-    /// floor needs a PQ key but `hybrid.pq_signing_seed` is `None`. Mirrors
-    /// the policy-level check in `chio_policy::CryptoFloor::validate_with_pq_key`
-    /// so the boot path catches the misconfiguration even when the policy crate
-    /// is bypassed.
-    pub fn with_hybrid_signing_backend(
-        &mut self,
-        hybrid: &HybridSigningConfig,
-        self_quote_bytes: &[u8],
-        verifier: &dyn crate::boot::KernelSelfQuoteVerifier,
-    ) -> Result<Box<dyn chio_core::crypto::SigningBackend>, crate::boot::KernelBootError> {
-        let backend = crate::boot::load_kernel_signing_backend_after_self_quote(
-            hybrid.crypto_floor,
-            self.config.keypair.clone(),
-            hybrid.pq_signing_seed.as_ref(),
-            self_quote_bytes,
-            verifier,
-        )?;
-        self.capability_crypto_floor = hybrid.crypto_floor;
-        Ok(backend)
-    }
 }

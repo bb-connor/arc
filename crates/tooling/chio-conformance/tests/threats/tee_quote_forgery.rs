@@ -32,9 +32,14 @@
 //      it pins the threat-row's "or misbinding" sub-vector
 //      separately from generic body tampering.
 //
+// This row directly proves the TEE-frame tenant-signature boundary. The
+// platform quote verifiers for TDX, SEV-SNP, and Nitro are separate
+// production controls whose test files are pinned below but whose bypass
+// mutations remain follow-up work.
+//
 // Production call sites:
-//   `crates/chio-tee-frame/src/schema.rs:93` (`validate_signed`).
-//   `crates/chio-tee-frame/src/schema.rs:117` (`verify_tenant_sig`).
+//   `crates/trust/chio-tee-frame/src/schema.rs:95` (`validate_signed`).
+//   `crates/trust/chio-tee-frame/src/schema.rs:119` (`verify_tenant_sig`).
 
 use std::path::PathBuf;
 

@@ -19,10 +19,13 @@ use chio_core::session::{
     ResourceTemplateDefinition,
 };
 use chio_core::{capability::token::CapabilityToken, AgentId};
+
+mod threshold_continuation;
 #[cfg(loom)]
 use loom::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 #[cfg(not(loom))]
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+pub use threshold_continuation::PendingThresholdApproval;
 
 #[cfg(not(loom))]
 use crate::{ToolCallResponse, ToolServerEvent};
@@ -131,6 +134,8 @@ pub struct InflightRequest {
     pub cancellation_reason: Option<String>,
     pub cancellable: bool,
     pub pending_execution_nonce_id: Option<String>,
+    /// Session retry binding only, never approval or execution authority.
+    pub pending_threshold_approval: Option<PendingThresholdApproval>,
 }
 
 impl InflightRequest {
@@ -206,6 +211,7 @@ impl InflightRegistry {
                 cancellation_reason: None,
                 cancellable,
                 pending_execution_nonce_id: None,
+                pending_threshold_approval: None,
             },
         );
         self.active_count.fetch_add(1, Ordering::AcqRel);
@@ -239,6 +245,7 @@ impl InflightRegistry {
                 cancellation_reason: None,
                 cancellable,
                 pending_execution_nonce_id: None,
+                pending_threshold_approval: None,
             },
         );
         self.active_count.fetch_add(1, Ordering::AcqRel);
@@ -352,6 +359,7 @@ impl InflightRegistry {
             });
         }
         request.pending_execution_nonce_id = Some(nonce_id.to_string());
+        request.pending_threshold_approval = None;
         Ok(())
     }
 
@@ -588,6 +596,9 @@ pub enum SessionError {
         "execution nonce retry for request {request_id} does not match a pending session preflight"
     )]
     ExecutionNonceRetryMismatch { request_id: RequestId },
+
+    #[error("threshold retry for request {request_id} does not match its pending session request")]
+    ThresholdApprovalRetryMismatch { request_id: RequestId },
 
     #[error("request {request_id} is not cancellable")]
     RequestNotCancellable { request_id: RequestId },

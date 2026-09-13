@@ -8,17 +8,25 @@ ARG ALPINE_VERSION=3.22
 ARG NODE_VERSION=22
 
 FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:797631f9efd6957d0013f200e410478c380907eee3b469c6f80d89022df28bc7 AS rust-builder
-RUN apk add --no-cache build-base cmake openssl-dev pkgconf
+RUN apk add --no-cache build-base cmake openssl-dev openssl-libs-static pkgconf
+# The musl target links statically, so OpenSSL must be the static archive.
+ENV OPENSSL_STATIC=1 \
+    OPENSSL_NO_VENDOR=1 \
+    PKG_CONFIG_ALL_STATIC=1
 WORKDIR /workspace
 
 COPY deploy/docker/chio-workspace/Cargo.toml ./Cargo.toml
 COPY deploy/docker/chio-workspace/Cargo.lock ./Cargo.lock
 COPY .cargo ./.cargo
 COPY crates ./crates
+COPY third_party ./third_party
 COPY examples/chio-3vendor/fixtures/runtime-spine/scenario.json ./examples/chio-3vendor/fixtures/runtime-spine/scenario.json
 COPY fixtures/proof-room ./fixtures/proof-room
 COPY spec ./spec
 COPY wit ./wit
+# The trace validator and the conformance runner embed TLA models and
+# fixtures from this tree at compile time.
+COPY formal/tla ./formal/tla
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/workspace/target,sharing=locked \
@@ -29,32 +37,21 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
 FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:797631f9efd6957d0013f200e410478c380907eee3b469c6f80d89022df28bc7 AS proof-room-builder
 WORKDIR /workspace
 
-COPY deploy/docker/proof-room-workspace/Cargo.toml ./Cargo.toml
-COPY deploy/docker/proof-room-workspace/Cargo.lock ./Cargo.lock
-COPY crates/core/chio-core-types ./crates/core/chio-core-types
-COPY crates/economy/chio-appraisal ./crates/economy/chio-appraisal
-COPY crates/economy/chio-credit ./crates/economy/chio-credit
-COPY crates/economy/chio-underwriting ./crates/economy/chio-underwriting
-COPY crates/economy/chio-web3 ./crates/economy/chio-web3
-COPY crates/kernel/chio-runtime-proof-parity ./crates/kernel/chio-runtime-proof-parity
-COPY crates/kernel/chio-swarm-authority ./crates/kernel/chio-swarm-authority
-COPY crates/platform/chio-agent-web-interop ./crates/platform/chio-agent-web-interop
-COPY crates/platform/chio-commerce-order ./crates/platform/chio-commerce-order
-COPY crates/platform/chio-enterprise-export ./crates/platform/chio-enterprise-export
-COPY crates/platform/chio-risk-comptroller ./crates/platform/chio-risk-comptroller
-COPY crates/platform/chio-transaction-passport ./crates/platform/chio-transaction-passport
-COPY crates/platform/chio-trust-market-context ./crates/platform/chio-trust-market-context
-COPY crates/platform/chio-workflow-preflight ./crates/platform/chio-workflow-preflight
-COPY crates/trust/chio-disclosure-lineage ./crates/trust/chio-disclosure-lineage
-COPY crates/tooling/chio-spec-codegen ./crates/tooling/chio-spec-codegen
-COPY crates/tooling/chio-test-support ./crates/tooling/chio-test-support
-COPY crates/products/proof_fixture_build.rs ./crates/products/proof_fixture_build.rs
-COPY crates/products/chio-proof-room ./crates/products/chio-proof-room
-COPY spec/schemas/chio-proof-room ./spec/schemas/chio-proof-room
-COPY spec/schemas/chio-runtime ./spec/schemas/chio-runtime
-COPY spec/schemas/chio-transaction ./spec/schemas/chio-transaction
-COPY fixtures/proof-room/catalog.json ./fixtures/proof-room/catalog.json
-COPY fixtures/proof-room/first-run/single-call-authority ./fixtures/proof-room/first-run/single-call-authority
+# The proof room builds from the repository workspace. Cargo loads every
+# member manifest before it builds one package, so each workspace member root
+# is copied along with the schemas and fixtures the build reads at compile time.
+COPY Cargo.toml Cargo.lock ./
+COPY .cargo ./.cargo
+COPY crates ./crates
+COPY third_party ./third_party
+COPY bench ./bench
+COPY examples ./examples
+COPY formal ./formal
+COPY integrations ./integrations
+COPY tests ./tests
+COPY xtask ./xtask
+COPY spec ./spec
+COPY fixtures/proof-room ./fixtures/proof-room
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/workspace/target,sharing=locked \
@@ -82,7 +79,7 @@ FROM alpine:${ALPINE_VERSION}@sha256:310c62b5e7ca5b08167e4384c68db0fd2905dd9c749
 # stages below run their real command via `exec` so signals reach it directly.
 # A dedicated non-root `chio` user (UID/GID 10001, matching the sidecar/TEE
 # images) owns the runtime state directories so nothing runs as root.
-RUN apk add --no-cache ca-certificates libgcc libstdc++ libssl3 libcrypto3 tini \
+RUN apk add --no-cache ca-certificates libgcc libstdc++ tini \
  && addgroup -S -g 10001 chio \
  && adduser  -S -u 10001 -G chio -h /home/chio -s /sbin/nologin chio \
  && mkdir -p /var/lib/chio /opt/chio \
@@ -104,7 +101,7 @@ WORKDIR /opt/chio
 COPY --from=dashboard-builder --chown=chio:chio /workspace/crates/products/chio-cli/dashboard/dist ./dashboard/dist
 EXPOSE 8940
 ENTRYPOINT []
-CMD ["/bin/sh", "-lc", "exec /sbin/tini -- /usr/local/bin/chio --receipt-db /var/lib/chio/receipts.sqlite --revocation-db /var/lib/chio/revocations.sqlite --authority-db /var/lib/chio/authority.sqlite --budget-db /var/lib/chio/budgets.sqlite trust serve --listen 0.0.0.0:8940 --service-token \"${CHIO_SERVICE_TOKEN:-demo-token}\""]
+CMD ["/bin/sh", "-lc", "exec /sbin/tini -- /usr/local/bin/chio --receipt-db /var/lib/chio/receipts.sqlite --authority-db /var/lib/chio/authority.sqlite --session-db /var/lib/chio/trust-sessions.sqlite trust serve --listen 0.0.0.0:8940 --service-token \"${CHIO_SERVICE_TOKEN:-demo-control-token}\" --authority-workload-token \"${CHIO_AUTHORITY_WORKLOAD_TOKEN:-demo-workload-token}\""]
 
 FROM chio AS chio-mcp-demo
 USER root
@@ -112,10 +109,12 @@ RUN apk add --no-cache python3
 WORKDIR /opt/chio
 COPY --chown=chio:chio examples/docker/mock_mcp_server.py ./examples/mock_mcp_server.py
 COPY --chown=chio:chio examples/docker/policy.yaml ./examples/policy.yaml
+COPY --chown=root:root --chmod=0555 examples/docker/mcp_demo_entrypoint.py ./examples/mcp_demo_entrypoint.py
 USER chio:chio
 EXPOSE 8931
-ENTRYPOINT []
-CMD ["/bin/sh", "-lc", "exec /sbin/tini -- /usr/local/bin/chio --control-url \"${CHIO_CONTROL_URL:-http://chio-trust-demo:8940}\" --control-token \"${CHIO_CONTROL_TOKEN:-demo-token}\" mcp serve-http --policy /opt/chio/examples/policy.yaml --server-id wrapped-http-mock --server-name \"Wrapped HTTP Mock\" --listen 0.0.0.0:8931 --auth-token \"${CHIO_AUTH_TOKEN:-demo-token}\" -- python3 /opt/chio/examples/mock_mcp_server.py"]
+# The entrypoint requires three distinct bearer credentials in the environment
+# and passes them to the edge without exposing them on argv.
+ENTRYPOINT ["/opt/chio/examples/mcp_demo_entrypoint.py"]
 
 FROM alpine:${ALPINE_VERSION}@sha256:310c62b5e7ca5b08167e4384c68db0fd2905dd9c7493756d356e893909057601 AS chio-proof-room-quickstart
 WORKDIR /opt/chio

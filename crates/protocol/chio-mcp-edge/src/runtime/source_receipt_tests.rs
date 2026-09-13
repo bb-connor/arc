@@ -14,6 +14,10 @@ use chio_cross_protocol::routing::{
     RouteCandidateEvidence, RouteSelectionDecision, RouteSelectionEvidence,
 };
 use chio_kernel::{ChioKernel, KernelConfig, KernelError, ToolServerConnection};
+use chio_manifest::{
+    sign_manifest, RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest,
+    VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+};
 use serde_json::{json, Value};
 
 struct EchoServer;
@@ -66,6 +70,36 @@ fn mcp_target_executor_carries_source_receipt_context_into_kernel_receipt_metada
             300,
         )
         .unwrap();
+    let manifest_signer = Keypair::from_seed(&[62; 32]);
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: "srv".to_string(),
+        name: "MCP source receipt test".to_string(),
+        description: None,
+        version: "1.0.0".to_string(),
+        tools: vec![ToolDefinition {
+            name: "read_file".to_string(),
+            description: "Read a test file".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations::default(),
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: manifest_signer.public_key().to_hex(),
+    };
+    let signed = sign_manifest(&manifest, &manifest_signer).unwrap();
+    let mut manifest_registry = VerifiedManifestRegistry::default();
+    manifest_registry
+        .register_public_only(
+            signed,
+            &manifest_signer.public_key(),
+            RuntimeToolTopology::local(),
+        )
+        .unwrap();
     let execution = CrossProtocolExecutionRequest {
         origin_request_id: "acp-source-1".to_string(),
         kernel_request_id: "mcp-target-source-context".to_string(),
@@ -89,6 +123,11 @@ fn mcp_target_executor_carries_source_receipt_context_into_kernel_receipt_metada
         threshold_approval_proposal: None,
         supplemental_authorization: None,
         model_metadata: None,
+        authenticated_session_id: None,
+        security_context: None,
+        bridge_security: manifest_registry
+            .bridge_security("srv", "read_file")
+            .unwrap(),
     };
     let capability_ref = CrossProtocolCapabilityRef {
         chio_capability_id: capability.id.clone(),
@@ -130,6 +169,7 @@ fn mcp_target_executor_carries_source_receipt_context_into_kernel_receipt_metada
     let result = executor
         .execute(CrossProtocolTargetRequest {
             kernel: &kernel,
+            manifest_registry: &manifest_registry,
             execution: &execution,
             source_protocol: DiscoveryProtocol::Acp,
             bridge_id: "bridge-test",

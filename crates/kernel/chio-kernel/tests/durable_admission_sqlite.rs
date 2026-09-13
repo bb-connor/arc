@@ -32,6 +32,11 @@ use chio_kernel::{
 };
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteToolOutcomeStore};
 
+#[path = "durable_admission_sqlite/federation_context.rs"]
+mod federation_context;
+#[path = "durable_admission_sqlite/security_release.rs"]
+mod security_release;
+
 fn secure_directory(path: &std::path::Path) -> std::io::Result<()> {
     #[cfg(unix)]
     {
@@ -600,6 +605,7 @@ fn request(capability: &CapabilityToken) -> ToolCallRequest {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -620,6 +626,7 @@ fn zero_charge_request(capability: &CapabilityToken) -> ToolCallRequest {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -640,6 +647,7 @@ fn paid_request(capability: &CapabilityToken) -> ToolCallRequest {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -1167,9 +1175,10 @@ fn output_digest_delivery_contract_enforces_every_lane() -> Result<(), Box<dyn E
     // persisted Deny after a restart.
     {
         let temp = tempfile::tempdir()?;
+        secure_directory(temp.path())?;
         let database = temp.path().join("authority.db");
         let lock_root = temp.path().join("locks");
-        std::fs::create_dir(&lock_root)?;
+        create_private_directory(&lock_root)?;
         SqliteAuthorityStore::provision(&database, &lock_root)?;
         let kernel_keypair = Keypair::generate();
         let invocations = Arc::new(AtomicU64::new(0));
@@ -1318,9 +1327,10 @@ fn output_digest_delivery_contract_enforces_every_lane() -> Result<(), Box<dyn E
     // after a restart without a second capture.
     {
         let temp = tempfile::tempdir()?;
+        secure_directory(temp.path())?;
         let database = temp.path().join("authority.db");
         let lock_root = temp.path().join("locks");
-        std::fs::create_dir(&lock_root)?;
+        create_private_directory(&lock_root)?;
         SqliteAuthorityStore::provision(&database, &lock_root)?;
         let kernel_keypair = Keypair::generate();
         let invocations = Arc::new(AtomicU64::new(0));
@@ -1405,9 +1415,10 @@ fn output_digest_delivery_contract_enforces_every_lane() -> Result<(), Box<dyn E
     // execution and no money touched.
     {
         let temp = tempfile::tempdir()?;
+        secure_directory(temp.path())?;
         let database = temp.path().join("authority.db");
         let lock_root = temp.path().join("locks");
-        std::fs::create_dir(&lock_root)?;
+        create_private_directory(&lock_root)?;
         SqliteAuthorityStore::provision(&database, &lock_root)?;
         let invocations = Arc::new(AtomicU64::new(0));
         let payment_calls = Arc::new(PaymentCalls::default());
@@ -1468,9 +1479,10 @@ fn malformed_delivery_digests_are_rejected_before_dispatch() -> Result<(), Box<d
     ];
     for (digests, expected_fragment) in shapes {
         let temp = tempfile::tempdir()?;
+        secure_directory(temp.path())?;
         let database = temp.path().join("authority.db");
         let lock_root = temp.path().join("locks");
-        std::fs::create_dir(&lock_root)?;
+        create_private_directory(&lock_root)?;
         SqliteAuthorityStore::provision(&database, &lock_root)?;
         let invocations = Arc::new(AtomicU64::new(0));
         let payment_calls = Arc::new(PaymentCalls::default());
@@ -1530,9 +1542,10 @@ fn malformed_delivery_digests_are_rejected_before_dispatch() -> Result<(), Box<d
 fn delivery_marked_grant_cannot_fall_through_to_an_unmarked_sibling() -> Result<(), Box<dyn Error>>
 {
     let temp = tempfile::tempdir()?;
+    secure_directory(temp.path())?;
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
-    std::fs::create_dir(&lock_root)?;
+    create_private_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
     let invocations = Arc::new(AtomicU64::new(0));
     let payment_calls = Arc::new(PaymentCalls::default());
@@ -1583,9 +1596,10 @@ fn delivery_marked_grant_cannot_fall_through_to_an_unmarked_sibling() -> Result<
 #[test]
 fn output_digest_admission_rejects_malformed_commitments() -> Result<(), Box<dyn Error>> {
     let temp = tempfile::tempdir()?;
+    secure_directory(temp.path())?;
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
-    std::fs::create_dir(&lock_root)?;
+    create_private_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
     let invocations = Arc::new(AtomicU64::new(0));
     let payment_calls = Arc::new(PaymentCalls::default());
@@ -1683,14 +1697,16 @@ fn stream_delivery_cannot_satisfy_a_committed_output_digest() -> Result<(), Box<
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     // Learn the stream-form content hash from an unconstrained delivery.
     let stream_hash = {
         let temp = tempfile::tempdir()?;
+        secure_directory(temp.path())?;
         let database = temp.path().join("authority.db");
         let lock_root = temp.path().join("locks");
-        std::fs::create_dir(&lock_root)?;
+        create_private_directory(&lock_root)?;
         SqliteAuthorityStore::provision(&database, &lock_root)?;
         let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
         let invocations = Arc::new(AtomicU64::new(0));
@@ -1717,9 +1733,10 @@ fn stream_delivery_cannot_satisfy_a_committed_output_digest() -> Result<(), Box<
     // Commit that exact hash as the output digest: the streamed delivery
     // must still deny with a zero-charge release, not capture.
     let temp = tempfile::tempdir()?;
+    secure_directory(temp.path())?;
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
-    std::fs::create_dir(&lock_root)?;
+    create_private_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
     let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
     let invocations = Arc::new(AtomicU64::new(0));

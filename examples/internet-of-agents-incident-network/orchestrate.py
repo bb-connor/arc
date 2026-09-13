@@ -66,11 +66,11 @@ def _grant(
 ) -> dict:
     g: dict[str, Any] = {"server_id": server, "tool_name": tool, "operations": ops, "constraints": []}
     if max_invocations is not None:
-        g["maxInvocations"] = max_invocations
+        g["max_invocations"] = max_invocations
     if max_cost is not None:
-        g["maxTotalCost"] = _usd(max_cost)
+        g["max_total_cost"] = _usd(max_cost)
     if max_per_call is not None:
-        g["maxCostPerInvocation"] = _usd(max_per_call)
+        g["max_cost_per_invocation"] = _usd(max_per_call)
     return g
 
 
@@ -308,6 +308,8 @@ def main(argv: list[str] | None = None) -> int:
         _scope(
             _grant("http-sidecar-client", "process_task", ["invoke"], max_cost=500, max_per_call=500),
             _grant("http-sidecar-client", "execute", ["invoke"], max_cost=500, max_per_call=500),
+            # Deny-by-default routes behind the sidecars bind to the HTTP authority tool.
+            _grant("chio_http_authority", "authorize_http_request", ["invoke"]),
         ),
         ttl=1800,
     )

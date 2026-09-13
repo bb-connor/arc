@@ -1,4 +1,9 @@
     use super::*;
+    use chio_kernel::ToolCallRequest as KernelToolCallRequest;
+    #[path = "tests/failure_receipts.rs"]
+    mod failure_receipts;
+    #[path = "tests/pending_approval.rs"]
+    mod pending_approval;
     use chio_core::capability::scope::{Operation, ToolGrant};
     use std::{
         fs,
@@ -217,6 +222,7 @@ capabilities:
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         };
 
         let response = restarted.evaluate_tool_call(&request).await.unwrap();
@@ -425,6 +431,7 @@ capabilities:
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         };
 
         let response = kernel.evaluate_tool_call(&request).await.unwrap();
@@ -473,6 +480,7 @@ capabilities:
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         };
 
         let response = kernel.evaluate_tool_call(&request).await.unwrap();
@@ -532,6 +540,7 @@ capabilities:
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         }
     }
 

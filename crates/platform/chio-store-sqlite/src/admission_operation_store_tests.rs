@@ -46,22 +46,42 @@ use super::*;
 
 #[path = "admission_operation_store_tests/anchored_terminal.rs"]
 mod anchored_terminal;
+#[path = "admission_operation_store_tests/authority_clock.rs"]
+mod authority_clock;
 #[path = "admission_operation_store_tests/budget_atomicity.rs"]
 mod budget_atomicity;
+#[path = "admission_operation_store_tests/clock_migration.rs"]
+mod clock_migration;
 #[path = "admission_operation_store_tests/credit_authorization.rs"]
 mod credit_authorization;
 #[path = "admission_operation_store_tests/credit_exposure.rs"]
 mod credit_exposure;
+#[path = "admission_operation_store_tests/dpop_replay.rs"]
+mod dpop_replay;
+#[path = "admission_operation_store_tests/execution_nonce.rs"]
+mod execution_nonce;
 #[path = "admission_operation_store_tests/factor_assignment.rs"]
 mod factor_assignment;
+#[path = "admission_operation_store_tests/governed_approval_replay.rs"]
+mod governed_approval_replay;
 #[path = "admission_operation_store_tests/integrity.rs"]
 mod integrity;
+#[path = "admission_operation_store_tests/legacy_clock.rs"]
+pub(super) mod legacy_clock;
 #[path = "admission_operation_store_tests/obligation.rs"]
 mod obligation;
 #[path = "admission_operation_store_tests/recovery.rs"]
 mod recovery;
+#[path = "admission_operation_store_tests/retained_request.rs"]
+mod retained_request;
+#[path = "admission_operation_store_tests/runtime_replay.rs"]
+mod runtime_replay;
 #[path = "admission_operation_store_tests/schema.rs"]
 mod schema;
+#[path = "admission_operation_store_tests/security_participant_migration.rs"]
+pub(super) mod security_participant_migration;
+#[path = "admission_operation_store_tests/security_participant_state.rs"]
+pub(super) mod security_participant_state;
 #[path = "admission_operation_store_tests/threshold_approval.rs"]
 mod threshold_approval;
 use crate::{
@@ -220,6 +240,9 @@ fn provider_attempt(
 }
 
 fn now_ms() -> u64 {
+    if let Some(fixed) = chio_kernel::fixed_runtime_unix_secs_for_current_thread() {
+        return fixed.checked_mul(1_000).expect("fixed millisecond clock");
+    }
     u64::try_from(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -748,6 +771,21 @@ fn signed_terminal_projection_is_bound_to_the_durable_kernel_claimant() {
         &signer,
     )
     .expect("projection envelope");
+    let signed_bytes = envelope
+        .verify()
+        .expect("verified envelope")
+        .projection_json()
+        .to_vec();
+    let interleaved = prepared_operation(
+        &fixture.fence,
+        AdmissionOperationKind::ToolDispatch,
+        "request-interleaved-projection",
+        "capability-interleaved-projection",
+    );
+    fixture
+        .store
+        .begin(&interleaved, &fixture.fence, begun_at + 21_000)
+        .expect("later independent decision arrives before this signed projection");
     let committed = fixture
         .store
         .commit_signed_terminal_projection(&envelope)
@@ -762,6 +800,14 @@ fn signed_terminal_projection_is_bound_to_the_durable_kernel_claimant() {
             .commit_signed_terminal_projection(&envelope)
             .expect("exact signed replay"),
         committed
+    );
+    let retained_bytes: Vec<u8> = fixture.store.connection().expect("connection")
+        .query_row("SELECT projection_json FROM admission_operation_terminal_projections WHERE operation_id = ?1",
+            [operation.binding().operation_id().as_str()], |row| row.get(0))
+        .expect("retained signed projection");
+    assert_eq!(
+        retained_bytes, signed_bytes,
+        "authority must not restamp signed evidence"
     );
 
     let second_begun_at = begun_at + 30_000;

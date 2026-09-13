@@ -5,14 +5,19 @@ use std::sync::Arc;
 use chio_bedrock_converse_adapter::{
     transport, BedrockAdapter, BedrockAdapterConfig, BEDROCK_CONVERSE_API_VERSION,
 };
+use chio_core::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+    VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+};
 use chio_tool_call_fabric::{
     DenyReason, ProviderError, ProviderId, ProviderRequest, ReceiptId, Redaction, ToolResult,
     VerdictResult, DEFAULT_MAX_BUFFERED_RAW_FRAMES,
 };
 use serde_json::{json, Value};
 
-fn adapter() -> BedrockAdapter {
-    let cfg = BedrockAdapterConfig::new(
+fn raw_adapter() -> BedrockAdapter {
+    let config = BedrockAdapterConfig::new(
         "bedrock-1",
         "Bedrock Converse",
         "0.1.0",
@@ -23,7 +28,55 @@ fn adapter() -> BedrockAdapter {
     .with_assumed_role_session_arn(
         "arn:aws:sts::123456789012:assumed-role/ChioAgentRole/session-1",
     );
-    BedrockAdapter::new(cfg, Arc::new(transport::MockTransport::new())).unwrap()
+    BedrockAdapter::new(config, Arc::new(transport::MockTransport::new())).unwrap()
+}
+
+fn adapter() -> BedrockAdapter {
+    let signer = Keypair::from_seed(&[64; 32]);
+    let config = BedrockAdapterConfig::new(
+        "bedrock-1",
+        "Bedrock Converse",
+        "0.1.0",
+        signer.public_key().to_hex(),
+        "arn:aws:iam::123456789012:role/ChioAgentRole",
+        "123456789012",
+    )
+    .with_assumed_role_session_arn(
+        "arn:aws:sts::123456789012:assumed-role/ChioAgentRole/session-1",
+    );
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: config.server_id.clone(),
+        name: config.server_name.clone(),
+        description: None,
+        version: config.server_version.clone(),
+        tools: vec![ToolDefinition {
+            name: "get_weather".to_string(),
+            description: "Admitted Bedrock weather tool".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: false,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+                estimated_duration_ms: None,
+            },
+            latency_hint: None,
+            flow: Some(ToolFlowDeclaration::public_egress()),
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).unwrap();
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .unwrap();
+    BedrockAdapter::new_with_registry(config, Arc::new(transport::MockTransport::new()), &registry)
+        .unwrap()
 }
 
 fn allow_verdict() -> VerdictResult {
@@ -134,6 +187,24 @@ fn converse_batch_fixture() -> Value {
             }
         }
     })
+}
+
+#[test]
+fn raw_projection_cannot_enter_stream_evaluator() {
+    let adapter = raw_adapter();
+    let mut evaluated = false;
+
+    let error = adapter
+        .gate_converse_stream(&stream_bytes(converse_stream_fixture()), |_invocation| {
+            evaluated = true;
+            Ok(allow_verdict())
+        })
+        .expect_err("raw projection must not be execution-ready");
+
+    assert!(error
+        .to_string()
+        .contains("requires a registry-admitted security sidecar"));
+    assert!(!evaluated);
 }
 
 #[test]

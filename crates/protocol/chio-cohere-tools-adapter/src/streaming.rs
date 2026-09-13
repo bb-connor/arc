@@ -38,6 +38,14 @@ impl CohereAdapter {
                 if event == "tool-call-end" {
                     let block = tool_call_from_data(data)?;
                     let invocation = self.invocation_from_tool_call(&block)?;
+                    if !invocation.bridge_security.as_ref().is_some_and(
+                        chio_manifest::BridgeSecurityMetadata::has_registry_coordinates,
+                    ) {
+                        return Err(ProviderError::Malformed(
+                            "Cohere SSE tool-call evaluation requires a registry-admitted security sidecar"
+                                .to_string(),
+                        ));
+                    }
                     let verdict = evaluate(&invocation)?;
                     ensure_streaming_allow_no_redactions(
                         "Cohere",

@@ -357,6 +357,43 @@ pub(crate) fn validate_authority_mutation_auth(
     Ok(None)
 }
 
+pub(crate) fn validate_authority_workload_auth(
+    headers: &HeaderMap,
+    config: &TrustServiceConfig,
+) -> Result<(), Response> {
+    let service_error = match validate_service_auth(headers, &config.service_token) {
+        Ok(()) => return Ok(()),
+        Err(response) => response,
+    };
+    let Some(expected) = config.authority_workload_token.as_deref() else {
+        return Err(service_error);
+    };
+    let Some(provided) = control_bearer_token(headers) else {
+        return Err(service_error);
+    };
+    if bool::from(provided.as_bytes().ct_eq(expected.as_bytes())) {
+        Ok(())
+    } else {
+        Err(service_error)
+    }
+}
+
+pub(crate) fn validate_authority_issue_auth(
+    headers: &HeaderMap,
+    state: &TrustServiceState,
+    endpoint: &str,
+) -> Result<Option<ClusterPeerAuthContext>, Response> {
+    let has_cluster_peer_headers = headers.contains_key(CLUSTER_NODE_ID_HEADER)
+        || headers.contains_key(CLUSTER_AUTH_ISSUED_AT_HEADER)
+        || headers.contains_key(CLUSTER_AUTH_SIGNATURE_HEADER)
+        || headers.contains_key(CLUSTER_AUTH_TERM_HEADER);
+    if has_cluster_peer_headers {
+        return validate_authority_mutation_auth(headers, state, endpoint);
+    }
+    validate_authority_workload_auth(headers, &state.config)?;
+    Ok(None)
+}
+
 pub(crate) fn enforce_authority_mutation_fence(
     state: &TrustServiceState,
 ) -> Result<Option<ClusterAuthorityLeaseView>, Response> {
@@ -556,21 +593,22 @@ pub(crate) fn validate_metered_billing_reconciliation_request(
 }
 
 pub(crate) fn load_capability_authority(
-    config: &TrustServiceConfig,
+    state: &TrustServiceState,
 ) -> Result<Box<dyn CapabilityAuthority>, Response> {
-    load_capability_authority_with_lineage_mode(config, true)
+    load_capability_authority_with_lineage_mode(state, true)
 }
 
 pub(crate) fn load_capability_authority_with_deferred_lineage(
-    config: &TrustServiceConfig,
+    state: &TrustServiceState,
 ) -> Result<Box<dyn CapabilityAuthority>, Response> {
-    load_capability_authority_with_lineage_mode(config, false)
+    load_capability_authority_with_lineage_mode(state, false)
 }
 
 fn load_capability_authority_with_lineage_mode(
-    config: &TrustServiceConfig,
+    state: &TrustServiceState,
     persist_lineage_immediately: bool,
 ) -> Result<Box<dyn CapabilityAuthority>, Response> {
+    let config = &state.config;
     let wrap = |inner: Box<dyn CapabilityAuthority>| {
         if persist_lineage_immediately {
             issuance::wrap_capability_authority(
@@ -590,6 +628,19 @@ fn load_capability_authority_with_lineage_mode(
             )
         }
     };
+    if let Some(keyring) = state.authority_keyring.as_ref() {
+        keyring.ensure_bound_signing_topology().map_err(|_| {
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "witnessed capability authority is unavailable",
+            )
+        })?;
+        let authority = chio_kernel::GovernedCapabilityAuthority::new(
+            keyring.authority_signing_backend(),
+            Arc::new(chio_kernel::SystemCapabilityAuthorityClock),
+        );
+        return Ok(wrap(Box::new(authority)));
+    }
     match (
         config.authority_seed_path.as_deref(),
         config.authority_db_path.as_deref(),
@@ -614,6 +665,39 @@ fn load_capability_authority_with_lineage_mode(
             "trust control service requires --authority-seed-file or --authority-db",
         )),
     }
+}
+
+pub(crate) fn load_authority_status_for_state(
+    state: &TrustServiceState,
+) -> Result<TrustAuthorityStatus, Response> {
+    let Some(keyring) = state.authority_keyring.as_ref() else {
+        return load_authority_status(&state.config);
+    };
+    let status = keyring.authority_status().map_err(|_| {
+        plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "witnessed capability authority state is unavailable",
+        )
+    })?;
+    let generation = status.signing_epoch.checked_add(1).ok_or_else(|| {
+        plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "witnessed capability authority generation overflow",
+        )
+    })?;
+    Ok(TrustAuthorityStatus {
+        configured: true,
+        backend: Some("enterprise_keyring".to_string()),
+        public_key: Some(status.public_key.to_hex()),
+        generation: Some(generation),
+        rotated_at: status.activated_at,
+        applies_to_future_sessions_only: true,
+        trusted_public_keys: status
+            .witnessed_verification_keys
+            .into_iter()
+            .map(|key| key.to_hex())
+            .collect(),
+    })
 }
 
 pub(crate) fn load_authority_status(
@@ -698,6 +782,32 @@ pub(crate) fn rotate_authority(
             &error.to_string(),
         )),
     }
+}
+
+pub(crate) fn rotate_authority_for_state(
+    state: &TrustServiceState,
+) -> Result<TrustAuthorityStatus, Response> {
+    let Some(keyring) = state.authority_keyring.as_ref() else {
+        return rotate_authority(&state.config);
+    };
+    let seed_path = state
+        .authority_keyring_seed_path
+        .as_deref()
+        .ok_or_else(|| {
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "witnessed capability authority seed custody is unavailable",
+            )
+        })?;
+    keyring
+        .rotate_remote_authority_seed(seed_path)
+        .map_err(|_| {
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "witnessed capability authority rotation failed",
+            )
+        })?;
+    load_authority_status_for_state(state)
 }
 
 pub(crate) fn authority_status_response(

@@ -307,6 +307,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         (request, scope, agent_id, server_id)
     }
@@ -368,6 +369,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         let context = GuardContext {
             request: &request,
@@ -376,6 +378,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let verdict = guard
@@ -404,6 +407,7 @@ mod tests {
             server_id: &out_server,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
         guard
             .revalidate_before_dispatch(&out_context)
@@ -418,6 +422,7 @@ mod tests {
             server_id: &in_server,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
         let decision = guard
             .evaluate(&in_context)

@@ -3,7 +3,7 @@
 //! Each route + method pair becomes a `ToolDefinition` with an input schema
 //! derived from path, query, and body parameters.
 
-use chio_core_types::manifest::{ToolAnnotations, ToolDefinition};
+use chio_core_types::manifest::{LatencyHint, ToolAnnotations, ToolDefinition};
 use chio_http_core::HttpMethod;
 use serde_json::Value;
 
@@ -47,13 +47,12 @@ impl ManifestGenerator {
     }
 
     /// Generate `ToolDefinition` values for all operations in the spec.
-    #[must_use]
-    pub fn generate_tools(&self, spec: &OpenApiSpec) -> Vec<ToolDefinition> {
+    pub fn generate_tools(&self, spec: &OpenApiSpec) -> crate::Result<Vec<ToolDefinition>> {
         let mut tools = Vec::new();
 
         for (path, path_item) in &spec.paths {
             for (method_str, operation) in &path_item.operations {
-                let extensions = ChioExtensions::from_operation(&operation.raw);
+                let extensions = ChioExtensions::from_operation(&operation.raw)?;
 
                 // Skip operations that opt out of publishing.
                 if self.config.respect_publish_flag && !extensions.should_publish() {
@@ -75,7 +74,7 @@ impl ManifestGenerator {
             }
         }
 
-        tools
+        Ok(tools)
     }
 
     fn build_tool_definition(
@@ -129,6 +128,11 @@ impl ManifestGenerator {
             output_schema,
             pricing: None,
             annotations,
+            latency_hint: Some(match method {
+                HttpMethod::Get | HttpMethod::Head | HttpMethod::Options => LatencyHint::Fast,
+                _ => LatencyHint::Moderate,
+            }),
+            flow: extensions.flow.clone(),
         }
     }
 }
@@ -379,7 +383,9 @@ mod tests {
     fn petstore_generates_four_tools() {
         let spec = OpenApiSpec::parse(petstore_spec()).unwrap();
         let gen = ManifestGenerator::new(GeneratorConfig::default());
-        let tools = gen.generate_tools(&spec);
+        let tools = gen
+            .generate_tools(&spec)
+            .unwrap_or_else(|error| panic!("generate tools: {error}"));
 
         assert_eq!(tools.len(), 4);
 
@@ -394,7 +400,9 @@ mod tests {
     fn get_operations_are_read_only() {
         let spec = OpenApiSpec::parse(petstore_spec()).unwrap();
         let gen = ManifestGenerator::new(GeneratorConfig::default());
-        let tools = gen.generate_tools(&spec);
+        let tools = gen
+            .generate_tools(&spec)
+            .unwrap_or_else(|error| panic!("generate tools: {error}"));
 
         let list_pets = tools.iter().find(|t| t.name == "listPets").unwrap();
         assert!(list_pets.annotations.read_only);
@@ -406,7 +414,9 @@ mod tests {
     fn post_operations_have_side_effects() {
         let spec = OpenApiSpec::parse(petstore_spec()).unwrap();
         let gen = ManifestGenerator::new(GeneratorConfig::default());
-        let tools = gen.generate_tools(&spec);
+        let tools = gen
+            .generate_tools(&spec)
+            .unwrap_or_else(|error| panic!("generate tools: {error}"));
 
         let create_pet = tools.iter().find(|t| t.name == "createPet").unwrap();
         assert!(!create_pet.annotations.read_only);
@@ -418,7 +428,9 @@ mod tests {
     fn delete_operations_are_destructive() {
         let spec = OpenApiSpec::parse(petstore_spec()).unwrap();
         let gen = ManifestGenerator::new(GeneratorConfig::default());
-        let tools = gen.generate_tools(&spec);
+        let tools = gen
+            .generate_tools(&spec)
+            .unwrap_or_else(|error| panic!("generate tools: {error}"));
 
         let delete_pet = tools.iter().find(|t| t.name == "deletePet").unwrap();
         assert!(!delete_pet.annotations.read_only);
@@ -430,7 +442,9 @@ mod tests {
     fn input_schema_includes_query_params() {
         let spec = OpenApiSpec::parse(petstore_spec()).unwrap();
         let gen = ManifestGenerator::new(GeneratorConfig::default());
-        let tools = gen.generate_tools(&spec);
+        let tools = gen
+            .generate_tools(&spec)
+            .unwrap_or_else(|error| panic!("generate tools: {error}"));
 
         let list_pets = tools.iter().find(|t| t.name == "listPets").unwrap();
         let props = list_pets
@@ -445,7 +459,9 @@ mod tests {
     fn input_schema_includes_path_params_as_required() {
         let spec = OpenApiSpec::parse(petstore_spec()).unwrap();
         let gen = ManifestGenerator::new(GeneratorConfig::default());
-        let tools = gen.generate_tools(&spec);
+        let tools = gen
+            .generate_tools(&spec)
+            .unwrap_or_else(|error| panic!("generate tools: {error}"));
 
         let show_pet = tools.iter().find(|t| t.name == "showPetById").unwrap();
         let required = show_pet
@@ -461,7 +477,9 @@ mod tests {
     fn input_schema_includes_request_body() {
         let spec = OpenApiSpec::parse(petstore_spec()).unwrap();
         let gen = ManifestGenerator::new(GeneratorConfig::default());
-        let tools = gen.generate_tools(&spec);
+        let tools = gen
+            .generate_tools(&spec)
+            .unwrap_or_else(|error| panic!("generate tools: {error}"));
 
         let create_pet = tools.iter().find(|t| t.name == "createPet").unwrap();
         let props = create_pet
@@ -503,7 +521,9 @@ mod tests {
 
         let spec = OpenApiSpec::parse(input).unwrap();
         let gen = ManifestGenerator::new(GeneratorConfig::default());
-        let tools = gen.generate_tools(&spec);
+        let tools = gen
+            .generate_tools(&spec)
+            .unwrap_or_else(|error| panic!("generate tools: {error}"));
 
         let create_pet = tools.iter().find(|tool| tool.name == "createPet").unwrap();
         let props = create_pet
@@ -525,7 +545,9 @@ mod tests {
     fn output_schema_from_200_response() {
         let spec = OpenApiSpec::parse(petstore_spec()).unwrap();
         let gen = ManifestGenerator::new(GeneratorConfig::default());
-        let tools = gen.generate_tools(&spec);
+        let tools = gen
+            .generate_tools(&spec)
+            .unwrap_or_else(|error| panic!("generate tools: {error}"));
 
         let list_pets = tools.iter().find(|t| t.name == "listPets").unwrap();
         assert!(list_pets.output_schema.is_some());
@@ -549,7 +571,9 @@ mod tests {
 
         let spec = OpenApiSpec::parse(input).unwrap();
         let gen = ManifestGenerator::new(GeneratorConfig::default());
-        let tools = gen.generate_tools(&spec);
+        let tools = gen
+            .generate_tools(&spec)
+            .unwrap_or_else(|error| panic!("generate tools: {error}"));
 
         assert_eq!(tools.len(), 1);
         assert_eq!(tools[0].name, "GET /health");
@@ -579,7 +603,9 @@ mod tests {
 
         let spec = OpenApiSpec::parse(input).unwrap();
         let gen = ManifestGenerator::new(GeneratorConfig::default());
-        let tools = gen.generate_tools(&spec);
+        let tools = gen
+            .generate_tools(&spec)
+            .unwrap_or_else(|error| panic!("generate tools: {error}"));
 
         assert_eq!(tools.len(), 1);
         assert_eq!(tools[0].name, "publicEndpoint");
@@ -603,7 +629,9 @@ mod tests {
 
         let spec = OpenApiSpec::parse(input).unwrap();
         let gen = ManifestGenerator::new(GeneratorConfig::default());
-        let tools = gen.generate_tools(&spec);
+        let tools = gen
+            .generate_tools(&spec)
+            .unwrap_or_else(|error| panic!("generate tools: {error}"));
 
         assert_eq!(tools.len(), 1);
         assert!(tools[0].annotations.requires_approval);
@@ -632,7 +660,9 @@ mod tests {
 
         let spec = OpenApiSpec::parse(input).unwrap();
         let gen = ManifestGenerator::new(GeneratorConfig::default());
-        let tools = gen.generate_tools(&spec);
+        let tools = gen
+            .generate_tools(&spec)
+            .unwrap_or_else(|error| panic!("generate tools: {error}"));
 
         let tool = &tools[0];
         let props = tool
@@ -642,5 +672,65 @@ mod tests {
             .unwrap();
         assert!(props.contains_key("orgId"));
         assert!(props.contains_key("page"));
+    }
+
+    #[test]
+    fn x_chio_flow_is_retained_in_normative_tool() {
+        let flow = serde_json::json!({
+            "output_label": {"kind": "known", "owners": {}, "compartments": ["pii"]},
+            "input_clearance": {"kind": "known", "owners": {}, "compartments": ["pii"]},
+            "egress": true,
+            "declassification_purposes": ["billing"]
+        });
+        let input = serde_json::json!({
+            "openapi": "3.1.0",
+            "info": {"title": "Flow", "version": "1"},
+            "paths": {
+                "/records": {
+                    "post": {
+                        "operationId": "storeRecord",
+                        "x-chio-flow": flow,
+                        "responses": {"200": {"description": "OK"}}
+                    }
+                }
+            }
+        });
+        let spec = OpenApiSpec::from_value(input)
+            .unwrap_or_else(|error| panic!("parse flow spec: {error}"));
+        let tools = ManifestGenerator::new(GeneratorConfig::default())
+            .generate_tools(&spec)
+            .unwrap_or_else(|error| panic!("generate flow tool: {error}"));
+        assert_eq!(
+            serde_json::to_value(
+                tools[0]
+                    .flow
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("flow retained"))
+            )
+            .unwrap_or_else(|error| panic!("serialize flow: {error}")),
+            flow
+        );
+    }
+
+    #[test]
+    fn invalid_x_chio_flow_fails_generation() {
+        let input = serde_json::json!({
+            "openapi": "3.1.0",
+            "info": {"title": "Flow", "version": "1"},
+            "paths": {
+                "/records": {
+                    "post": {
+                        "operationId": "storeRecord",
+                        "x-chio-flow": {"egress": true, "unexpected": true},
+                        "responses": {"200": {"description": "OK"}}
+                    }
+                }
+            }
+        });
+        let spec = OpenApiSpec::from_value(input)
+            .unwrap_or_else(|error| panic!("parse flow spec: {error}"));
+        assert!(ManifestGenerator::new(GeneratorConfig::default())
+            .generate_tools(&spec)
+            .is_err());
     }
 }

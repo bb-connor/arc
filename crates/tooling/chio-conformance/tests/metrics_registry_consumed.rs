@@ -20,7 +20,7 @@ use chio_core::receipt::{
 };
 use chio_core::session::OperationTerminalState;
 use chio_core::{sha256_hex, Hash, Keypair};
-use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::{RuntimeToolTopology, ToolDefinition, ToolManifest, VerifiedManifestRegistry};
 use chio_metrics_spec::{
     is_registered_metric, CHIO_ANCHOR_ROUND_LATENCY_SECONDS, CHIO_FEDERATION_HOP_LATENCY_SECONDS,
     CHIO_FEDERATION_HOP_TOTAL, CHIO_FEDERATION_TRANSPORT_ACCEPT_DURATION_SECONDS,
@@ -113,7 +113,7 @@ fn mcp_target_metrics_manifest() -> ToolManifest {
 
 fn metrics_manifest_with_schema(input_schema: Value) -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "metrics-srv".to_string(),
         name: "Metrics Test Server".to_string(),
         description: Some("Metrics conformance fixture".to_string()),
@@ -124,13 +124,28 @@ fn metrics_manifest_with_schema(input_schema: Value) -> ToolManifest {
             input_schema,
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+                estimated_duration_ms: None,
+            },
             latency_hint: None,
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
         public_key: Keypair::from_seed(&[42u8; 32]).public_key().to_hex(),
     }
+}
+
+fn metrics_registry(manifest: ToolManifest) -> Result<VerifiedManifestRegistry, Box<dyn Error>> {
+    let signer = Keypair::from_seed(&[42; 32]);
+    let signed = chio_manifest::sign_manifest(&manifest, &signer)?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry.register_public_only(signed, &signer.public_key(), RuntimeToolTopology::local())?;
+    Ok(registry)
 }
 
 fn receipt_metrics_test_guard() -> Result<MutexGuard<'static, ()>, Box<dyn Error>> {
@@ -409,10 +424,8 @@ fn acp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
     let _metrics_guard = receipt_metrics_test_guard()?;
     let (kernel, issuer) = metrics_kernel();
     let agent = Keypair::generate();
-    let edge = chio_acp_edge::ChioAcpEdge::new(
-        chio_acp_edge::AcpEdgeConfig::default(),
-        vec![metrics_manifest()],
-    )?;
+    let registry = metrics_registry(metrics_manifest())?;
+    let edge = chio_acp_edge::ChioAcpEdge::new(chio_acp_edge::AcpEdgeConfig::default(), &registry)?;
     let before = chio_acp_edge::receipt_write_total(chio_acp_edge::RECEIPT_WRITE_OUTCOME_ALLOW);
     let execution = chio_acp_edge::AcpKernelExecutionContext {
         capability: capability_for_tool(&issuer, &agent)?,
@@ -440,9 +453,10 @@ fn acp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
         chio_mcp_edge::receipt_write_total(chio_mcp_edge::RECEIPT_WRITE_OUTCOME_ALLOW);
     let acp_before_target =
         chio_acp_edge::receipt_write_total(chio_acp_edge::RECEIPT_WRITE_OUTCOME_ALLOW);
+    let mcp_target_registry = metrics_registry(mcp_target_metrics_manifest())?;
     let mcp_target_edge = chio_acp_edge::ChioAcpEdge::new(
         chio_acp_edge::AcpEdgeConfig::default(),
-        vec![mcp_target_metrics_manifest()],
+        &mcp_target_registry,
     )?;
     let mcp_target_result = mcp_target_edge.invoke(
         "echo",
@@ -515,10 +529,9 @@ fn a2a_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
     let _metrics_guard = receipt_metrics_test_guard()?;
     let (kernel, issuer) = metrics_kernel();
     let agent = Keypair::generate();
-    let mut edge = chio_a2a_edge::ChioA2aEdge::new(
-        chio_a2a_edge::A2aEdgeConfig::default(),
-        vec![metrics_manifest()],
-    )?;
+    let registry = metrics_registry(metrics_manifest())?;
+    let mut edge =
+        chio_a2a_edge::ChioA2aEdge::new(chio_a2a_edge::A2aEdgeConfig::default(), &registry)?;
     let request = chio_a2a_edge::SendMessageRequest {
         message: chio_a2a_edge::A2aMessage {
             role: "user".to_string(),
@@ -556,9 +569,10 @@ fn a2a_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
         chio_mcp_edge::receipt_write_total(chio_mcp_edge::RECEIPT_WRITE_OUTCOME_ALLOW);
     let a2a_before_target =
         chio_a2a_edge::receipt_write_total(chio_a2a_edge::RECEIPT_WRITE_OUTCOME_ALLOW);
+    let mcp_target_registry = metrics_registry(mcp_target_metrics_manifest())?;
     let mut mcp_target_edge = chio_a2a_edge::ChioA2aEdge::new(
         chio_a2a_edge::A2aEdgeConfig::default(),
-        vec![mcp_target_metrics_manifest()],
+        &mcp_target_registry,
     )?;
     let mcp_target_response =
         mcp_target_edge.handle_send_message("echo", &request, &kernel, &execution)?;

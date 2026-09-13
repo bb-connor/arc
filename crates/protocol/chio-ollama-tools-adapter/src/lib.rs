@@ -28,6 +28,7 @@ pub mod transport;
 
 mod response;
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -95,12 +96,60 @@ impl OllamaAdapterConfig {
 pub struct OllamaAdapter {
     config: OllamaAdapterConfig,
     transport: Arc<dyn Transport>,
+    admitted_security: Option<BTreeMap<String, chio_manifest::BridgeSecurityMetadata>>,
 }
 
 impl OllamaAdapter {
-    /// Build a new adapter from a config and a transport handle.
+    /// Build a raw provider projection from a config and transport handle.
+    ///
+    /// This constructor has no manifest authority. Use
+    /// [`Self::new_with_registry`] before lifted calls enter an evaluator.
     pub fn new(config: OllamaAdapterConfig, transport: Arc<dyn Transport>) -> Self {
-        Self { config, transport }
+        Self {
+            config,
+            transport,
+            admitted_security: None,
+        }
+    }
+
+    /// Build an adapter bound to one verified, policy-admitted Chio server.
+    pub fn new_with_registry(
+        config: OllamaAdapterConfig,
+        transport: Arc<dyn Transport>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, OllamaAdapterError> {
+        let manifest = registry
+            .verified_manifest(&config.server_id)
+            .map(|signed| &signed.manifest)
+            .ok_or_else(|| OllamaAdapterError::RegistryManifestUnavailable {
+                server_id: config.server_id.clone(),
+            })?;
+        if manifest.name != config.server_name
+            || manifest.version != config.server_version
+            || manifest.public_key != config.public_key
+        {
+            return Err(OllamaAdapterError::ConfigManifestMismatch {
+                server_id: config.server_id.clone(),
+            });
+        }
+
+        let mut admitted_security = BTreeMap::new();
+        for tool in &manifest.tools {
+            let security = registry
+                .bridge_security(&config.server_id, &tool.name)
+                .filter(chio_manifest::BridgeSecurityMetadata::has_registry_coordinates)
+                .ok_or_else(|| OllamaAdapterError::RegistrySecurityUnavailable {
+                    server_id: config.server_id.clone(),
+                    tool_name: tool.name.clone(),
+                })?;
+            admitted_security.insert(tool.name.clone(), security);
+        }
+
+        Ok(Self {
+            config,
+            transport,
+            admitted_security: Some(admitted_security),
+        })
     }
 
     /// Provider identifier for this adapter.
@@ -131,6 +180,20 @@ impl OllamaAdapter {
             )));
         }
         Ok(())
+    }
+
+    fn bridge_security_for_tool(
+        &self,
+        tool_name: &str,
+    ) -> Result<Option<chio_manifest::BridgeSecurityMetadata>, ProviderError> {
+        let Some(bindings) = &self.admitted_security else {
+            return Ok(None);
+        };
+        bindings.get(tool_name).cloned().map(Some).ok_or_else(|| {
+            ProviderError::Malformed(format!(
+                "registry-bound Ollama lift has no admitted security sidecar for tool `{tool_name}`"
+            ))
+        })
     }
 
     /// Post a non-streaming `/api/chat` request to the Ollama daemon and lift
@@ -200,6 +263,7 @@ impl OllamaAdapter {
     ) -> Result<ToolInvocation, ProviderError> {
         self.ensure_supported_api_version()?;
         validate_tool_call(call)?;
+        let bridge_security = self.bridge_security_for_tool(&call.function.name)?;
         let arguments = canonical_json_bytes(&call.function.arguments).map_err(|error| {
             ProviderError::BadToolArgs(format!(
                 "Ollama tool_call args failed canonical JSON encoding: {error}"
@@ -219,6 +283,7 @@ impl OllamaAdapter {
                 },
                 received_at: SystemTime::now(),
             },
+            bridge_security,
         })
     }
 
@@ -290,6 +355,20 @@ pub enum OllamaAdapterError {
     /// An outbound `/api/chat` call failed at the transport layer.
     #[error(transparent)]
     Transport(#[from] chio_provider_adapter_core::http::HttpTransportError),
+    /// The configured server has no admitted signed manifest.
+    #[error("verified manifest registry has no Ollama server {server_id}")]
+    RegistryManifestUnavailable { server_id: String },
+    /// Runtime configuration must identify exactly the admitted publisher surface.
+    #[error("Ollama adapter config does not match admitted manifest for {server_id}")]
+    ConfigManifestMismatch { server_id: String },
+    /// A verified tool did not retain registry-admitted bridge metadata.
+    #[error(
+        "verified manifest registry has no admitted security sidecar for Ollama tool {server_id}/{tool_name}"
+    )]
+    RegistrySecurityUnavailable {
+        server_id: String,
+        tool_name: String,
+    },
 }
 
 fn validate_tool_call(call: &ToolCallPart) -> Result<(), ProviderError> {
@@ -370,401 +449,4 @@ fn non_empty_str<'a>(value: &'a str, field: &str) -> Result<&'a str, ProviderErr
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    fn config() -> OllamaAdapterConfig {
-        OllamaAdapterConfig::new(
-            "ollama-1",
-            "Ollama Chat",
-            "0.1.0",
-            "deadbeef",
-            "local_chio_demo",
-        )
-    }
-
-    fn config_with_api_version(api_version: &str) -> OllamaAdapterConfig {
-        let mut cfg = config();
-        cfg.api_version = api_version.to_string();
-        cfg
-    }
-
-    fn mock() -> Arc<transport::MockTransport> {
-        Arc::new(transport::MockTransport::new("mock://ollama"))
-    }
-
-    fn adapter() -> OllamaAdapter {
-        OllamaAdapter::new(config(), mock())
-    }
-
-    fn tool_call_payload() -> Value {
-        json!({
-            "message": {
-                "role": "assistant",
-                "tool_calls": [
-                    {"function": {"name": "get_weather", "arguments": {"city": "Paris"}}}
-                ]
-            }
-        })
-    }
-
-    fn tool_call_stream() -> Vec<u8> {
-        let mut ndjson = serde_json::to_vec(&tool_call_payload()).unwrap();
-        ndjson.push(b'\n');
-        ndjson
-    }
-
-    fn raw_payload(value: Value) -> ProviderRequest {
-        ProviderRequest(serde_json::to_vec(&value).unwrap())
-    }
-
-    fn allow_verdict() -> VerdictResult {
-        VerdictResult::Allow {
-            redactions: vec![],
-            receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_api_pin".into()),
-        }
-    }
-
-    fn assert_api_version_drift(error: ProviderError) {
-        match error {
-            ProviderError::Malformed(message) => {
-                assert!(message.contains("Ollama adapter supports only API version 2025-04"));
-                assert!(message.contains("configured 2024-12"));
-            }
-            other => panic!("expected Malformed API version drift, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn config_pins_api_version() {
-        let cfg = config();
-        assert_eq!(cfg.api_version, OLLAMA_API_VERSION);
-        assert_eq!(cfg.api_version, "2025-04");
-    }
-
-    #[test]
-    fn adapter_reports_provider_and_pin() {
-        let adapter = adapter();
-        assert_eq!(adapter.provider(), ProviderId::Ollama);
-        assert_eq!(adapter.api_version(), "2025-04");
-    }
-
-    #[tokio::test]
-    async fn chat_rejects_api_version_drift_before_transport_call() {
-        let mock = mock();
-        mock.push_json_response(serde_json::to_vec(&tool_call_payload()).unwrap());
-        let adapter = OllamaAdapter::new(config_with_api_version("2024-12"), mock.clone());
-
-        let err = adapter
-            .chat(b"{\"model\":\"llama3.2:1b\",\"stream\":false}")
-            .await
-            .expect_err("drifted Ollama API version must fail before transport");
-
-        assert_api_version_drift(err);
-        assert!(mock.calls().is_empty());
-    }
-
-    #[tokio::test]
-    async fn chat_stream_rejects_api_version_drift_before_transport_call() {
-        let mock = mock();
-        mock.push_response(chio_provider_adapter_core::http::HttpResponse::new(
-            200,
-            tool_call_stream(),
-            Some("application/x-ndjson".to_string()),
-        ));
-        let adapter = OllamaAdapter::new(config_with_api_version("2024-12"), mock.clone());
-
-        let err = adapter
-            .chat_stream(b"{\"stream\":true}", |_invocation| Ok(allow_verdict()))
-            .await
-            .expect_err("drifted Ollama API version must fail before stream transport");
-
-        assert_api_version_drift(err);
-        assert!(mock.calls().is_empty());
-    }
-
-    #[test]
-    fn lift_batch_rejects_api_version_drift_before_provenance_stamp() {
-        let adapter = OllamaAdapter::new(config_with_api_version("2024-12"), mock());
-
-        let err = adapter
-            .lift_batch(raw_payload(tool_call_payload()))
-            .expect_err("drifted Ollama API version must fail before provenance stamping");
-
-        assert_api_version_drift(err);
-    }
-
-    #[test]
-    fn gate_sse_stream_rejects_api_version_drift_before_evaluator() {
-        let adapter = OllamaAdapter::new(config_with_api_version("2024-12"), mock());
-        let evaluated = std::cell::Cell::new(false);
-
-        let err = adapter
-            .gate_sse_stream(&tool_call_stream(), |_invocation| {
-                evaluated.set(true);
-                Ok(allow_verdict())
-            })
-            .expect_err("drifted Ollama API version must fail before stream evaluation");
-
-        assert_api_version_drift(err);
-        assert!(!evaluated.get());
-    }
-
-    #[test]
-    fn invocation_from_tool_call_rejects_api_version_drift_before_provenance_stamp() {
-        let adapter = OllamaAdapter::new(config_with_api_version("2024-12"), mock());
-        let call = ToolCallPart::new("get_weather", json!({"city": "Paris"}));
-
-        let err = adapter
-            .invocation_from_tool_call(0, &call)
-            .expect_err("drifted Ollama API version must fail before provenance stamping");
-
-        assert_api_version_drift(err);
-    }
-
-    #[test]
-    fn lower_tool_message_rejects_api_version_drift() {
-        let adapter = OllamaAdapter::new(config_with_api_version("2024-12"), mock());
-
-        let err = adapter
-            .lower_tool_message(
-                "get_weather",
-                allow_verdict(),
-                ToolResult(b"{\"temp\":18}".to_vec()),
-            )
-            .expect_err("drifted Ollama API version must fail before lowering");
-
-        assert_api_version_drift(err);
-    }
-
-    #[tokio::test]
-    async fn chat_posts_to_api_chat_and_lifts_tool_calls() {
-        let response = json!({
-            "model": "llama3.2:1b",
-            "done": true,
-            "message": {
-                "role": "assistant",
-                "content": "",
-                "tool_calls": [
-                    {"function": {"name": "get_weather", "arguments": {"city": "Paris"}}}
-                ]
-            }
-        });
-        let mock = mock();
-        mock.push_json_response(serde_json::to_vec(&response).unwrap());
-        let adapter = OllamaAdapter::new(config(), mock.clone());
-
-        let request = serde_json::to_vec(&json!({
-            "model": "llama3.2:1b",
-            "stream": false,
-            "messages": [{"role": "user", "content": "weather in Paris?"}]
-        }))
-        .unwrap();
-        let invocations = adapter.chat(&request).await.unwrap();
-        assert_eq!(invocations.len(), 1);
-        assert_eq!(invocations[0].tool_name, "get_weather");
-        assert_eq!(invocations[0].provider, ProviderId::Ollama);
-
-        let calls = mock.calls();
-        assert_eq!(calls.len(), 1);
-        assert_eq!(calls[0].path, transport::OLLAMA_CHAT_PATH);
-        assert_eq!(calls[0].body, request);
-    }
-
-    #[tokio::test]
-    async fn chat_maps_upstream_5xx_to_provider_error() {
-        let mock = mock();
-        mock.push_response(chio_provider_adapter_core::http::HttpResponse::new(
-            503,
-            b"model not loaded".to_vec(),
-            Some("application/json".to_string()),
-        ));
-        let adapter = OllamaAdapter::new(config(), mock);
-        let error = adapter.chat(b"{}").await.unwrap_err();
-        assert!(matches!(
-            error,
-            ProviderError::Upstream5xx { status: 503, .. }
-        ));
-    }
-
-    #[tokio::test]
-    async fn chat_stream_gates_ndjson_tool_calls() {
-        let ndjson = concat!(
-            "{\"model\":\"llama3.2:1b\",\"message\":{\"role\":\"assistant\",\"content\":\"\"}}\n",
-            "{\"model\":\"llama3.2:1b\",\"done\":true,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"function\":{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Paris\"}}}]}}\n"
-        );
-        let mock = mock();
-        mock.push_response(chio_provider_adapter_core::http::HttpResponse::new(
-            200,
-            ndjson.as_bytes().to_vec(),
-            Some("application/x-ndjson".to_string()),
-        ));
-        let adapter = OllamaAdapter::new(config(), mock.clone());
-
-        let gated = adapter
-            .chat_stream(b"{\"stream\":true}", |_invocation| {
-                Ok(VerdictResult::Allow {
-                    redactions: vec![],
-                    receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_stream".into()),
-                })
-            })
-            .await
-            .unwrap();
-        assert_eq!(gated.invocations.len(), 1);
-        assert_eq!(gated.verdicts.len(), 1);
-        assert_eq!(
-            mock.calls()[0].kind,
-            chio_provider_adapter_core::http::CallKind::Ndjson
-        );
-    }
-
-    #[test]
-    fn lift_batch_extracts_tool_calls() {
-        let adapter = adapter();
-        let payload = json!({
-            "message": {
-                "role": "assistant",
-                "tool_calls": [
-                    {"function": {"name": "get_weather", "arguments": {"city": "Paris"}}}
-                ]
-            }
-        });
-        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
-        let invocations = adapter.lift_batch(raw).unwrap();
-        assert_eq!(invocations.len(), 1);
-        assert_eq!(invocations[0].tool_name, "get_weather");
-        assert_eq!(invocations[0].provider, ProviderId::Ollama);
-    }
-
-    #[test]
-    fn lift_batch_extracts_tool_calls_from_string_body_envelope() {
-        let adapter = adapter();
-        let payload = json!({
-            "body": r#"{"message":{"role":"assistant","tool_calls":[{"function":{"name":"get_weather","arguments":{"city":"Paris"}}}]}}"#
-        });
-        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
-
-        let invocations = adapter.lift_batch(raw).unwrap();
-
-        assert_eq!(invocations.len(), 1);
-        assert_eq!(invocations[0].tool_name, "get_weather");
-        assert_eq!(invocations[0].provider, ProviderId::Ollama);
-    }
-
-    #[test]
-    fn lift_batch_classifies_policy_refusal_as_content_policy() {
-        let adapter = adapter();
-        let payload = json!({
-            "done_reason": "stop",
-            "policy": "refusal"
-        });
-        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
-        let err = adapter.lift_batch(raw).unwrap_err();
-
-        assert!(matches!(err, ProviderError::ContentPolicy(_)));
-    }
-
-    #[test]
-    fn gate_sse_stream_classifies_policy_refusal_before_forwarding() {
-        let adapter = adapter();
-        let ndjson = br#"{"done":true,"done_reason":"stop","policy":"refusal"}
-"#;
-        let err = adapter
-            .gate_sse_stream(ndjson, |_invocation| {
-                Ok(VerdictResult::Allow {
-                    redactions: vec![],
-                    receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_refusal".into()),
-                })
-            })
-            .unwrap_err();
-
-        assert!(matches!(err, ProviderError::ContentPolicy(_)));
-    }
-
-    #[test]
-    fn lift_batch_rejects_tool_call_name_with_surrounding_whitespace() {
-        let adapter = adapter();
-        let payload = json!({
-            "message": {
-                "role": "assistant",
-                "tool_calls": [
-                    {"function": {"name": " get_weather ", "arguments": {"city": "Paris"}}}
-                ]
-            }
-        });
-        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
-        let err = adapter.lift_batch(raw).unwrap_err();
-
-        assert!(err.to_string().contains("surrounding whitespace"));
-    }
-
-    #[test]
-    fn lift_batch_rejects_malformed_envelope_before_outer_tool_calls() {
-        let adapter = adapter();
-        let payload = json!({
-            "body": 42,
-            "message": {
-                "role": "assistant",
-                "tool_calls": [
-                    {"function": {"name": "unsafe_outer", "arguments": {"source": "outer"}}}
-                ]
-            }
-        });
-        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
-
-        let err = adapter.lift_batch(raw).unwrap_err();
-
-        match err {
-            ProviderError::Malformed(message) => {
-                assert!(message.contains("envelope field `body`"));
-            }
-            other => panic!("expected Malformed, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn lift_batch_rejects_payload_without_tool_calls() {
-        let adapter = adapter();
-        let payload = json!({"message": {"role": "assistant", "content": "no tools"}});
-        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
-        let err = adapter.lift_batch(raw).unwrap_err();
-        match err {
-            ProviderError::Malformed(_) => {}
-            other => panic!("expected Malformed, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn lower_tool_message_allow() {
-        let adapter = adapter();
-        let verdict = VerdictResult::Allow {
-            redactions: vec![],
-            receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_demo".into()),
-        };
-        let result = ToolResult(b"{\"temp\":18}".to_vec());
-        let msg = adapter
-            .lower_tool_message("get_weather", verdict, result)
-            .unwrap();
-        assert_eq!(msg.role, "tool");
-        assert_eq!(msg.name, "get_weather");
-        assert!(msg.content.contains("\"temp\""));
-    }
-
-    #[test]
-    fn lower_allow_tool_message_helper_applies_redactions_and_canonicalizes() {
-        let msg = lower_allow_tool_message(
-            "get_weather",
-            ToolResult(br#"{"token":"secret","ok":true}"#.to_vec()),
-            &[Redaction {
-                path: "/token".to_string(),
-                replacement: "[redacted]".to_string(),
-            }],
-        )
-        .unwrap();
-
-        assert_eq!(msg.role, "tool");
-        assert_eq!(msg.name, "get_weather");
-        assert_eq!(msg.content, r#"{"ok":true,"token":"[redacted]"}"#);
-    }
-}
+mod tests;

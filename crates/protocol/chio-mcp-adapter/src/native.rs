@@ -9,8 +9,8 @@ use chio_kernel::{
     ToolServerEvent,
 };
 use chio_manifest::{
-    validate_manifest, LatencyHint, ManifestError, PricingModel, ToolDefinition, ToolManifest,
-    ToolPricing,
+    validate_manifest, LatencyHint, ManifestError, PricingModel, ToolAnnotations, ToolDefinition,
+    ToolFlowDeclaration, ToolManifest, ToolPricing, TOOL_MANIFEST_SCHEMA,
 };
 use serde_json::Value;
 
@@ -54,8 +54,15 @@ impl NativeTool {
                 input_schema,
                 output_schema: None,
                 pricing: None,
-                has_side_effects: true,
+                annotations: ToolAnnotations {
+                    read_only: false,
+                    destructive: true,
+                    idempotent: false,
+                    requires_approval: true,
+                    estimated_duration_ms: None,
+                },
                 latency_hint: None,
+                flow: None,
             },
         }
     }
@@ -65,8 +72,21 @@ impl NativeTool {
         self
     }
 
+    /// Declare the publisher-authenticated information-flow constraints for
+    /// this tool. Omitting this builder call leaves the declaration absent.
+    pub fn flow(mut self, flow: ToolFlowDeclaration) -> Self {
+        self.definition.flow = Some(flow);
+        self
+    }
+
     pub fn read_only(mut self) -> Self {
-        self.definition.has_side_effects = false;
+        self.definition.annotations = ToolAnnotations {
+            read_only: true,
+            destructive: false,
+            idempotent: false,
+            requires_approval: false,
+            estimated_duration_ms: None,
+        };
         self
     }
 
@@ -319,7 +339,7 @@ impl NativeChioServiceBuilder {
 
     pub fn build(self) -> Result<NativeChioService, ManifestError> {
         let manifest = ToolManifest {
-            schema: "chio.manifest.v1".into(),
+            schema: TOOL_MANIFEST_SCHEMA.into(),
             server_id: self.server_id,
             name: self.server_name,
             description: self.server_description,
@@ -392,6 +412,10 @@ impl ToolServerConnection for NativeChioService {
             .iter()
             .map(|tool| tool.name.clone())
             .collect()
+    }
+
+    fn tool_is_read_only(&self, tool_name: &str) -> bool {
+        self.manifest.tool_is_read_only(tool_name)
     }
 
     async fn invoke(
@@ -540,7 +564,7 @@ mod tests {
         assert_eq!(service.manifest().name, "Native Service");
         assert_eq!(service.manifest().version, "0.2.0");
         assert_eq!(service.manifest().tools.len(), 1);
-        assert!(!service.manifest().tools[0].has_side_effects);
+        assert!(service.manifest().tools[0].annotations.read_only);
         assert_eq!(
             service.manifest().tools[0].pricing.as_ref().map(|pricing| (
                 pricing.pricing_model,

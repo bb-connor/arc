@@ -600,7 +600,7 @@ class ChioClient:
         approval_token: dict[str, Any] | None = None,
         dpop_proof: dict[str, Any] | None = None,
     ) -> dict:
-        """Kernel-mediated pre-execution authorization for a tool call.
+        """Reserve a caller invocation, without authorizing external execution.
 
         Optional helper for callers that hold a full signed capability token.
         ``capability`` must be the complete signed ``CapabilityToken`` (not an
@@ -608,18 +608,12 @@ class ChioClient:
         this route and use ``evaluate_tool_call`` instead. Posts to the
         kernel-mediated ``/v1/evaluate`` route and returns
         ``{"status", "receipt", "execution_nonce"}``, where ``status`` is one of
-        ``"authorized"``, ``"deny"``, or ``"pending_approval"``.
+        ``"reserved"``, ``"deny"``, or ``"pending_approval"``.
 
-        This route is a single-phase authorization gate: it verifies the
-        capability (and any governed intent, approval token, or DPoP proof),
-        RESERVES the budget hold so concurrent authorizations cannot
-        over-subscribe, and MINTS a fresh ``execution_nonce``. It does not
-        execute the tool or settle a spend. The returned receipt is therefore a
-        reserved authorization and is intentionally non-authoritative (the hold
-        is not yet reconciled). The caller presents the minted ``execution_nonce``
-        to the real tool server, which verifies and consumes it, runs the tool,
-        and reconciles the reserved hold. This endpoint only issues nonces:
-        presenting one back here is rejected.
+        A reservation requires ``start_mediated_execution`` followed by an
+        authenticated durable executor claim before any effect. A nonce or
+        incomplete receipt is not execution permission. Legacy ``authorized``
+        responses are rejected. Unsupported credential profiles fail closed.
 
         Parameters
         ----------
@@ -648,7 +642,82 @@ class ChioClient:
             body["approval_token"] = approval_token
         if dpop_proof is not None:
             body["dpop_proof"] = dpop_proof
-        return await self._post("/v1/evaluate", body)
+        data = await self._post("/v1/evaluate", body)
+        if data.get("status") == "reserved":
+            if (
+                data.get("protocol") != "chio.caller-delivery.v1"
+                or data.get("execution_authorized") is not False
+                or data.get("start_required") is not True
+                or not isinstance(data.get("execution_nonce"), dict)
+            ):
+                raise ChioValidationError("Invalid caller reservation contract")
+        elif data.get("status") not in {"deny", "pending_approval"}:
+            raise ChioValidationError(
+                "Reservation-only authorization is unsupported; upgrade the sidecar "
+                "to authenticated caller start and delivery"
+            )
+        return data
+
+    async def start_mediated_execution(
+        self,
+        *,
+        control_token: str,
+        execution_nonce: dict[str, Any],
+        arguments: dict[str, Any],
+        credentials: dict[str, Any] | None = None,
+    ) -> dict:
+        """Commit a reservation before handing it to the trusted executor.
+
+        This method neither executes a tool nor verifies an executor claim.
+        The executor must authenticate the returned signed statement against
+        independent pins and claim it in its durable ledger before any effect.
+        A lost HTTP reply must not trigger blind execution or automatic retries.
+        Explicit recovery returns the original statement, never a new interval.
+        """
+        data = await self._post(
+            "/v1/caller/start",
+            {
+                "protocol": "chio.caller-delivery.v1",
+                "execution_nonce": execution_nonce,
+                "arguments": arguments,
+                **({"credentials": credentials} if credentials is not None else {}),
+            },
+            headers={"Authorization": f"Bearer {control_token}"},
+        )
+        if (
+            data.get("protocol") != "chio.caller-delivery.v1"
+            or data.get("status") != "dispatch_committed"
+            or not isinstance(data.get("authorization"), dict)
+        ):
+            raise ChioValidationError("Invalid authenticated caller start response")
+        return data
+
+    async def report_mediated_execution(
+        self,
+        *,
+        control_token: str,
+        authorization: dict[str, Any],
+        report: dict[str, Any],
+    ) -> dict:
+        """Deliver the executor's durably retained signed report for finalization.
+
+        Late evidence is accounting only. Retrying this method cannot authorize
+        a second execution; conflicting reports are rejected by the kernel.
+        Output is released only after the kernel's post-return guard pipeline.
+        """
+        data = await self._post(
+            "/v1/caller/report",
+            {"protocol": "chio.caller-delivery.v1", "authorization": authorization, "report": report},
+            headers={"Authorization": f"Bearer {control_token}"},
+        )
+        if (
+            data.get("protocol") != "chio.caller-delivery.v1"
+            or data.get("status") not in {"reconciled", "deny"}
+            or data.get("execution_authorized") is not False
+            or not isinstance(data.get("receipt"), dict)
+        ):
+            raise ChioValidationError("Invalid authenticated caller report response")
+        return data
 
     async def reconcile_mediated_authorization(
         self,
@@ -658,28 +727,11 @@ class ChioClient:
         arguments: dict[str, Any],
         realized_cost: dict[str, Any],
     ) -> dict:
-        """Reconcile a reserved mediated authorization at its realized cost.
-
-        Called by the TRUSTED tool server (not the controlled agent) after it
-        executes the tool that ``evaluate_tool_call_mediated`` authorized. The
-        ``/v1/reconcile`` route is gated by the sidecar-control token, so
-        ``control_token`` is sent as an ``Authorization: Bearer`` header;
-        realized cost is tool-server-reported. Present the minted
-        ``execution_nonce`` unchanged, the same ``arguments`` (which must match
-        the nonce's parameter hash), and the ``realized_cost``
-        (``{"units", "currency", "breakdown"}``, whose currency must match the
-        grant). The sidecar settles the exact reserved budget hold at
-        ``min(realized, reserved)``, frees the difference back to the grant, and
-        returns ``{"status", "receipt"}`` with the authoritative reconciled
-        receipt. The nonce is single-use: a second reconcile is rejected.
-        """
-        body = {
-            "execution_nonce": execution_nonce,
-            "arguments": arguments,
-            "realized_cost": realized_cost,
-        }
-        headers = {"Authorization": f"Bearer {control_token}"}
-        return await self._post("/v1/reconcile", body, headers=headers)
+        """Reject the obsolete unsigned-report contract before sending a request."""
+        raise ChioValidationError(
+            "Unsigned caller reconciliation is unsupported; use start_mediated_execution, "
+            "a durable authenticated executor, then report_mediated_execution"
+        )
 
     async def evaluate_http_request(
         self,

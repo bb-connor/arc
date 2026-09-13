@@ -27,10 +27,10 @@ use chio_core::{
     receipt::kinds::ToolOrigin,
     receipt::kinds::TrustLevel,
     receipt::metadata::GuardEvidence,
-    sha256_hex, Keypair,
+    sha256_hex, Keypair, PublicKey, Signature,
 };
 use chio_manifest::{
-    sign_manifest, LatencyHint, RequiredPermissions, SignedManifest,
+    migrate_legacy_manifest_v1, sign_manifest, LatencyHint, RequiredPermissions, SignedManifest,
     ToolDefinition as SignedManifestToolDefinition, ToolManifest as SignedToolManifest,
 };
 use serde_json::{json, Value};
@@ -984,7 +984,7 @@ fn capability_vector_fixture() -> Value {
 
 fn sample_signed_manifest(public_key: String, tool_names: &[&str]) -> SignedToolManifest {
     SignedToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "srv-bindings-demo".to_string(),
         name: "Bindings Demo".to_string(),
         description: Some("Manifest vector for bindings-core SDK fixtures".to_string()),
@@ -1008,20 +1008,35 @@ fn sample_signed_manifest(public_key: String, tool_names: &[&str]) -> SignedTool
                     }
                 })),
                 pricing: None,
-                has_side_effects: *tool_name == "file_write",
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: *tool_name != "file_write",
+                    destructive: *tool_name == "file_write",
+                    idempotent: false,
+                    requires_approval: *tool_name == "file_write",
+                    estimated_duration_ms: None,
+                },
                 latency_hint: Some(if *tool_name == "file_read" {
                     LatencyHint::Fast
                 } else {
                     LatencyHint::Moderate
                 }),
+                flow: Some(chio_manifest::ToolFlowDeclaration::public_egress()),
             })
             .collect(),
         server_tools: Vec::new(),
         required_permissions: Some(RequiredPermissions {
             read_paths: Some(vec!["/workspace".to_string()]),
             write_paths: Some(vec!["/workspace/output".to_string()]),
-            network_hosts: Some(vec!["api.example.com".to_string()]),
-            environment_variables: Some(vec!["CHIO_ENV".to_string()]),
+            network_destinations: Some(vec![chio_manifest::NetworkDestination::new(
+                "api.example.com",
+                443,
+            )
+            .test_unwrap("valid network destination")]),
+            environment_variables: Some(vec![chio_manifest::EnvironmentVariableName::new(
+                "CHIO_ENV",
+            )
+            .test_unwrap("valid environment variable")]),
+            native_syscall_profile: chio_manifest::NativeSyscallProfile::NativeStandardV1,
         }),
         public_key,
     }
@@ -1516,17 +1531,42 @@ fn capability_fixture_cases_round_trip_through_public_api() {
 
 #[test]
 fn manifest_fixture_cases_round_trip_through_public_api() {
-    // Read the on-disk corpus as ground truth.
+    // The on-disk corpus is the legacy v1 cross-language contract. V1 must
+    // remain verifiable as a signed historical artifact, but it must only
+    // enter the current manifest model through the explicit unsigned migration
+    // path and operator re-signing.
     let raw = std::fs::read_to_string(manifest_fixture_path()).test_unwrap("read manifest fixture");
     let fixture: Value = serde_json::from_str(&raw).test_unwrap("parse manifest fixture");
     for case in fixture["cases"].as_array().test_unwrap("cases array") {
-        let signed_manifest: SignedManifest =
-            serde_json::from_value(case["signed_manifest"].clone())
-                .test_unwrap("parse signed manifest case");
+        let envelope = &case["signed_manifest"];
+        assert!(
+            serde_json::from_value::<SignedManifest>(envelope.clone()).is_err(),
+            "legacy manifest case {} must not deserialize as strict v2",
+            case["id"]
+        );
+
+        let manifest = envelope["manifest"].clone();
+        let manifest_bytes = serde_json::to_vec(&manifest).test_unwrap("serialize legacy manifest");
+        let signer_key: PublicKey = serde_json::from_value(envelope["signer_key"].clone())
+            .test_unwrap("parse legacy manifest signer");
+        let signature: Signature = serde_json::from_value(envelope["signature"].clone())
+            .test_unwrap("parse legacy manifest signature");
+        let embedded_public_key = manifest["public_key"]
+            .as_str()
+            .and_then(|value| PublicKey::from_hex(value).ok());
+
         let expected: ManifestVerification = serde_json::from_value(case["expected"].clone())
             .test_unwrap("parse manifest expectation");
-        let actual =
-            verify_signed_manifest(&signed_manifest).test_unwrap("verify signed manifest case");
+        let actual = ManifestVerification {
+            structure_valid: migrate_legacy_manifest_v1(&manifest_bytes).is_ok(),
+            signature_valid: signer_key
+                .verify_canonical(&manifest, &signature)
+                .test_unwrap("verify legacy manifest signature"),
+            embedded_public_key_valid: embedded_public_key.is_some(),
+            embedded_public_key_matches_signer: embedded_public_key
+                .as_ref()
+                .is_some_and(|key| key == &signer_key),
+        };
         assert_eq!(actual, expected, "manifest case {}", case["id"]);
     }
 }

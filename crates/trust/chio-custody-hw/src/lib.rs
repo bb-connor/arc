@@ -36,6 +36,7 @@ pub mod capability;
 pub mod error;
 pub mod issuer;
 pub mod mint;
+pub mod mobile_challenge;
 pub mod nonce_store;
 pub mod rate_limit;
 pub mod revocation;
@@ -51,6 +52,14 @@ pub use capability::{PasskeyCapability, ScopeSet};
 pub use error::CustodyError;
 pub use issuer::{IssuerService, MintRequest, MintResponse};
 pub use mint::{sign_capability, signing_message};
+#[cfg(feature = "sqlite-store")]
+pub use mobile_challenge::SqliteMobileChallengeStore;
+pub use mobile_challenge::{
+    InMemoryMobileChallengeStore, IssuedMobileChallenge, MobileAttestationBinding,
+    MobileChallengeAuthority, MobileChallengeError, MobileChallengeSnapshot, MobileChallengeStore,
+    VerifiedMobileAttestation, VerifiedMobileAttestationEvidence,
+    DEFAULT_MOBILE_CHALLENGE_LIFETIME_SECONDS,
+};
 #[cfg(feature = "sqlite-store")]
 pub use nonce_store::SqlitePasskeyNonceStore;
 pub use nonce_store::{

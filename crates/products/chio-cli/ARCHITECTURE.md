@@ -169,7 +169,9 @@ pheromone).
   env vars, then an additional `CHIO_MCP_AUTH_TOKEN`/`CHIO_MCP_ADMIN_TOKEN`
   fallback applied in `cmd_mcp_serve_http`. `chio start`/`chio api protect`
   read a sidecar control token from `CHIO_SIDECAR_CONTROL_TOKEN`, then
-  `CHIO_API_PROTECT_CONTROL_TOKEN` (no flag). Remote MCP auth builds a
+  `CHIO_API_PROTECT_CONTROL_TOKEN` (no flag). All sidecar control requests,
+  including loopback, require that configured token as a bearer credential.
+  An absent or blank token disables control access. Remote MCP auth builds a
   default-deny SSRF egress contract over the operator's own configured auth
   URLs, capped at 3 redirects and 1 MiB.
 - `chio proof`/`chio commerce` claim verification pulls trusted signer keys

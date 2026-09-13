@@ -2,19 +2,7 @@ use super::obligation::{insert_obligation_projection, verify_obligation_projecti
 use super::*;
 
 pub(super) fn full_projection_capabilities() -> AdmissionProjectionCapabilities {
-    AdmissionProjectionCapabilities {
-        operation_terminal: true,
-        incident_terminal: true,
-        tool_outcome: true,
-        payment_terminal: true,
-        authorization_consumption: true,
-        outcome_eligibility: true,
-        observation_attempt_zero: true,
-        obligation: true,
-        channel_terminal: true,
-        credit_exposure_terminal: true,
-        economic_mutation_terminal: true,
-    }
+    AdmissionProjectionCapabilities::ALL
 }
 
 pub(super) fn validate_canonical_projection_size(
@@ -81,6 +69,9 @@ pub(super) fn insert_terminal_projection(
     canonical: &CanonicalAdmissionTerminalProjection,
     terminal_operation: &AdmissionOperationV1,
 ) -> Result<(), AdmissionOperationStoreError> {
+    runtime_participant::verify_operation(transaction, terminal_operation)?;
+    governed_approval_claim::verify_stored_operation(transaction, terminal_operation)?;
+    dpop_claim::verify_stored_operation(transaction, terminal_operation)?;
     let context = projection.context();
     let inserted = transaction
         .execute(
@@ -290,6 +281,9 @@ pub(super) fn insert_verified_terminal_projection(
 ) -> Result<(), AdmissionOperationStoreError> {
     let context = projection.context();
     let terminal_operation = projection.terminal_operation();
+    runtime_participant::verify_operation(transaction, terminal_operation)?;
+    governed_approval_claim::verify_stored_operation(transaction, terminal_operation)?;
+    dpop_claim::verify_stored_operation(transaction, terminal_operation)?;
     let manifest = AdmissionProjectionManifestV1::from_canonical_bytes(projection.manifest_json())?;
     let projection_digest = manifest.projection_digest()?;
     let inserted = transaction

@@ -152,6 +152,7 @@ fn governed_request_metadata_preserves_asserted_call_chain_and_diagnostics() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let metadata = governed_request_metadata(&request, None, 0)
@@ -231,6 +232,7 @@ fn governed_request_metadata_marks_matching_local_call_chain_evidence_as_observe
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let _scope =
         scope_governed_call_chain_receipt_evidence(Some(GovernedCallChainReceiptEvidence {
@@ -325,6 +327,7 @@ fn governed_request_metadata_marks_validated_upstream_call_chain_proof_as_verifi
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let _scope =
         scope_governed_call_chain_receipt_evidence(Some(GovernedCallChainReceiptEvidence {
@@ -403,6 +406,7 @@ fn governed_request_metadata_omits_unverified_runtime_assurance() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let metadata = governed_request_metadata(&request, None, 150)
@@ -449,6 +453,7 @@ fn governed_request_metadata_uses_verified_runtime_assurance_boundary() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let metadata =
@@ -515,6 +520,7 @@ fn governed_request_metadata_prefers_scoped_nitro_verified_record() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let _scope =
         scope_governed_runtime_attestation_receipt_record(Some(verified_runtime_attestation));
@@ -581,6 +587,7 @@ fn governed_request_metadata_rejects_mismatched_scoped_runtime_attestation_recor
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let _scope =
         scope_governed_runtime_attestation_receipt_record(Some(verified_runtime_attestation));
@@ -650,6 +657,7 @@ fn request_receipt_metadata_omits_economic_authorization_without_verified_payee_
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let extra_metadata = serde_json::json!({
         "financial": FinancialReceiptMetadata {
@@ -708,6 +716,7 @@ fn request_receipt_metadata_treats_untyped_financial_extra_metadata_as_pass_thro
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let extra_metadata = serde_json::json!({
         "financial": {

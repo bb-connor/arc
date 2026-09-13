@@ -1,0 +1,16 @@
+{
+  "schema": "chio.key-log.audit-service-config.v1",
+  "policy_path": "/etc/chio/keylog/policy.json",
+  "database_path": "/var/lib/chio-keylog/audit-a/audit.sqlite3",
+  "operator_database_path": "/var/lib/chio-keylog/audit-a/operator.sqlite3",
+  "socket_path": "/run/chio-keylog/audit-a/audit.sock",
+  "monitor_id": "a",
+  "seed_file_path": "/run/credentials/chio-keylog-audit@a.service/seed",
+  "witness_sockets": {
+    "a": "/run/chio-keylog/witness-a/witness.sock",
+    "b": "/run/chio-keylog/witness-b/witness.sock",
+    "c": "/run/chio-keylog/witness-c/witness.sock"
+  },
+  "poll_interval_millis": 5000,
+  "provision": true
+}

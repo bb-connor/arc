@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/declassification-outcome-receipt-body-v1.schema.json",
+  "title": "Chio declassification outcome receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "header",
+    "policy",
+    "grant_id",
+    "grant_hash",
+    "request_hash",
+    "event_id",
+    "from_state",
+    "to_state"
+  ],
+  "properties": {
+    "header": { "$ref": "flow-denial-receipt-body-v1.schema.json#/$defs/header" },
+    "policy": { "$ref": "flow-denial-receipt-body-v1.schema.json#/$defs/policy" },
+    "grant_id": { "$ref": "flow-denial-receipt-body-v1.schema.json#/$defs/identifier" },
+    "grant_hash": { "$ref": "flow-denial-receipt-body-v1.schema.json#/$defs/digest" },
+    "request_hash": { "$ref": "flow-denial-receipt-body-v1.schema.json#/$defs/digest" },
+    "event_id": { "$ref": "flow-denial-receipt-body-v1.schema.json#/$defs/identifier" },
+    "from_state": { "const": "consumed_pending_dispatch" },
+    "to_state": { "enum": ["released", "dispatch_failed", "outcome_unknown"] }
+  }
+}

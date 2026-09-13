@@ -1256,6 +1256,7 @@ mod tests {
         store_lease_id: &'a str,
         store_owner_epoch: u64,
         recorded_at_unix_ms: u64,
+        observed_at_unix_ms: u64,
     }
 
     #[test]
@@ -1274,9 +1275,14 @@ mod tests {
         let alternate = operation(&fence, "request-chain-b");
         let encoded = canonical_json_bytes(&alternate.to_persisted()).expect("encode alternate");
         let operation_digest = sha256_hex(&encoded);
+        let connection = Connection::open(&fixture.database).expect("tamper connection");
+        let observed_at: i64 = connection.query_row(
+            "SELECT observed_at_unix_ms FROM admission_operation_commits WHERE commit_sequence = 1",
+            [], |row| row.get(0),
+        ).expect("observed authority clock");
         let chain_digest = sha256_hex(
             &canonical_json_bytes(&TestChainEntry {
-                format: "chio.admission-operation-commit-chain.v1",
+                format: "chio.admission-operation-commit-chain.v2",
                 previous_chain_digest: GENESIS_CHAIN_DIGEST,
                 commit_sequence: 1,
                 operation_id: alternate.binding().operation_id().as_str(),
@@ -1288,11 +1294,11 @@ mod tests {
                 store_lease_id: &fence.lease_id,
                 store_owner_epoch: fence.owner_epoch,
                 recorded_at_unix_ms: recorded_at,
+                observed_at_unix_ms: u64::try_from(observed_at).expect("observed clock range"),
             })
             .expect("encode chain"),
         );
         let replay = alternate.replay_key();
-        let connection = Connection::open(&fixture.database).expect("tamper connection");
         connection
             .execute_batch(
                 r#"

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/flow-denial-receipt-body-v1.schema.json",
+  "title": "Chio flow denial receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "header",
+    "policy",
+    "request_hash",
+    "source_label_hash",
+    "destination_label_hash",
+    "guard_evidence_hash",
+    "denial_code",
+    "event_id"
+  ],
+  "properties": {
+    "header": { "$ref": "#/$defs/header" },
+    "policy": { "$ref": "#/$defs/policy" },
+    "request_hash": { "$ref": "#/$defs/digest" },
+    "source_label_hash": { "$ref": "#/$defs/digest" },
+    "destination_label_hash": { "$ref": "#/$defs/digest" },
+    "guard_evidence_hash": { "$ref": "#/$defs/digest" },
+    "denial_code": { "$ref": "#/$defs/identifier" },
+    "event_id": { "$ref": "#/$defs/identifier" }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    },
+    "digest": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+      "not": {
+        "const": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      }
+    },
+    "time": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "header": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "occurred_at_unix_ms", "tenant_id", "transition_id", "prior_receipt_ids"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "occurred_at_unix_ms": { "$ref": "#/$defs/time" },
+        "tenant_id": { "$ref": "#/$defs/identifier" },
+        "transition_id": { "$ref": "#/$defs/identifier" },
+        "prior_receipt_ids": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_version", "policy_hash"],
+      "properties": {
+        "policy_version": { "$ref": "#/$defs/identifier" },
+        "policy_hash": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

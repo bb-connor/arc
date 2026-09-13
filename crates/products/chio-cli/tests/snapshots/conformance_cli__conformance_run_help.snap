@@ -36,5 +36,9 @@ Options:
           Optional shared trust-control service base URL
       --control-token <CONTROL_TOKEN>
           Bearer token used to authenticate to the shared trust-control service. Prefer `CHIO_CONTROL_TOKEN` env over the argv form so the bearer does not leak via `ps` / `/proc/<pid>/cmdline` [env: CHIO_CONTROL_TOKEN]
+      --control-authority-public-key <CONTROL_AUTHORITY_PUBLIC_KEY>
+          Exact current public key expected from a remote capability authority [env: CHIO_CONTROL_AUTHORITY_PUBLIC_KEY=]
+      --control-authority-trusted-public-keys <CONTROL_AUTHORITY_TRUSTED_PUBLIC_KEYS>
+          Additional historical public key expected in the remote authority trust set
   -h, --help
           Print help

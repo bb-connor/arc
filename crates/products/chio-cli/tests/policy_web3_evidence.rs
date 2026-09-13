@@ -1,8 +1,4 @@
-#![allow(dead_code, unused_imports)]
-
-#[path = "../../../platform/chio-control-plane/src/policy.rs"]
-mod policy;
-
+use chio_control_plane::policy;
 use chio_test_support::prelude::*;
 
 #[test]

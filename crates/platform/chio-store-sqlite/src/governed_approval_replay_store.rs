@@ -1,7 +1,7 @@
 //! Durable replay prevention for governed approval dispatches.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::{
@@ -14,7 +14,13 @@ use rusqlite::{params, Connection, TransactionBehavior};
 
 use crate::replay_clock::{ReplayClockValidationError, StableReplayClock};
 
-const LEGACY_UNSCOPED_SUBJECT_ID: &str = "__chio_legacy_unscoped_subject__";
+mod replay_source;
+pub use replay_source::{
+    GovernedApprovalReplaySourceBinding, GovernedApprovalReplaySourceSeal,
+    GovernedApprovalReplaySourceSnapshot, SqliteGovernedApprovalReplaySource,
+};
+
+use chio_kernel::admission_operation::governed_approval_replay::LEGACY_UNSCOPED_GOVERNED_APPROVAL_SUBJECT as LEGACY_UNSCOPED_SUBJECT_ID;
 
 /// Maximum unexplained wall-clock skew accepted by the durable approval store.
 pub const MAX_GOVERNED_APPROVAL_CLOCK_SKEW_SECS: u64 = 300;
@@ -22,7 +28,7 @@ pub const MAX_GOVERNED_APPROVAL_CLOCK_SKEW_SECS: u64 = 300;
 const MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64: i64 = 300;
 
 fn configure_pooled_connection(connection: &mut Connection) -> rusqlite::Result<()> {
-    connection.execute_batch("PRAGMA busy_timeout = 5000;")
+    connection.execute_batch("PRAGMA busy_timeout = 5000; PRAGMA synchronous = FULL;")
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -97,6 +103,14 @@ impl From<r2d2::Error> for SqliteGovernedApprovalReplayStoreError {
     }
 }
 
+impl From<chio_kernel::admission_operation::AdmissionOperationStoreError>
+    for SqliteGovernedApprovalReplayStoreError
+{
+    fn from(error: chio_kernel::admission_operation::AdmissionOperationStoreError) -> Self {
+        Self::storage(error.to_string())
+    }
+}
+
 fn map_replay_clock_error(
     error: ReplayClockValidationError,
 ) -> SqliteGovernedApprovalReplayStoreError {
@@ -115,6 +129,7 @@ fn map_replay_clock_error(
 /// SQLite-backed governed approval replay store.
 pub struct SqliteGovernedApprovalReplayStore {
     pool: Pool<SqliteConnectionManager>,
+    path: Option<PathBuf>,
     capacity: usize,
     clock: StableReplayClock,
 }
@@ -141,6 +156,11 @@ impl SqliteGovernedApprovalReplayStore {
         let pool = Pool::builder().max_size(8).build(manager)?;
         let store = Self {
             pool,
+            path: Some(
+                path.to_str()
+                    .map(crate::sqlite_filesystem_path)
+                    .unwrap_or_else(|| path.to_path_buf()),
+            ),
             capacity: validate_capacity(capacity)?,
             clock: StableReplayClock::new(now_secs(), MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64),
         };
@@ -160,6 +180,7 @@ impl SqliteGovernedApprovalReplayStore {
         let pool = Pool::builder().max_size(1).build(manager)?;
         let store = Self {
             pool,
+            path: None,
             capacity: validate_capacity(capacity)?,
             clock: StableReplayClock::new(now_secs(), MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64),
         };
@@ -170,6 +191,14 @@ impl SqliteGovernedApprovalReplayStore {
 
     fn run_migrations(&self) -> Result<(), SqliteGovernedApprovalReplayStoreError> {
         let mut conn = self.pool.get()?;
+        // Do not adopt metadata or normalize journal mode on a sealed source.
+        // The later immediate-transaction check also closes the seal/open race.
+        let snapshot = conn.transaction_with_behavior(TransactionBehavior::Deferred)?;
+        if self.load_replay_source_seal_tx(&snapshot)?.is_some() {
+            snapshot.commit()?;
+            return Ok(());
+        }
+        snapshot.commit()?;
         crate::check_schema_version(
             &conn,
             GOVERNED_APPROVAL_STORE_SCHEMA_KEY,
@@ -185,6 +214,12 @@ impl SqliteGovernedApprovalReplayStore {
             "#,
         )?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        // A sealed source is read-only. Validate it before any migration,
+        // clock advance, capacity change, or attempt to repair missing objects.
+        if self.load_replay_source_seal_tx(&tx)?.is_some() {
+            tx.commit()?;
+            return Ok(());
+        }
         let entries_exist = tx.query_row(
             r#"
             SELECT EXISTS(
@@ -331,6 +366,10 @@ impl SqliteGovernedApprovalReplayStore {
     fn validate_retained_row_capacity(&self) -> Result<(), SqliteGovernedApprovalReplayStoreError> {
         let mut conn = self.pool.get()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if self.load_replay_source_seal_tx(&tx)?.is_some() {
+            tx.commit()?;
+            return Ok(());
+        }
         let high_water = tx.query_row(
             "SELECT wall_clock_high_water FROM chio_governed_approval_replay_clock WHERE singleton = 1",
             [],
@@ -440,6 +479,7 @@ impl SqliteGovernedApprovalReplayStore {
         let mut connection = Connection::open(path)?;
         configure_pooled_connection(&mut connection)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        replay_source::ensure_writable(&transaction)?;
         let actual_high_water = transaction.query_row(
             "SELECT wall_clock_high_water FROM chio_governed_approval_replay_clock WHERE singleton = 1",
             [],
@@ -499,6 +539,7 @@ impl SqliteGovernedApprovalReplayStore {
 
         let mut conn = self.pool.get()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        replay_source::ensure_writable(&tx)?;
         let high_water = tx.query_row(
             "SELECT wall_clock_high_water FROM chio_governed_approval_replay_clock WHERE singleton = 1",
             [],
@@ -593,8 +634,10 @@ impl SqliteGovernedApprovalReplayStore {
         validate_key_part("request_id", request_id)?;
         validate_key_part("intent_hash", intent_hash)?;
         validate_key_part("reservation_id", reservation_id)?;
-        let conn = self.pool.get()?;
-        let updated = conn.execute(
+        let mut conn = self.pool.get()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        replay_source::ensure_writable(&tx)?;
+        let updated = tx.execute(
             r#"
             UPDATE chio_governed_approval_replay_entries
             SET dispatch_reservation_id = NULL
@@ -605,6 +648,7 @@ impl SqliteGovernedApprovalReplayStore {
             "#,
             params![subject_id, request_id, intent_hash, reservation_id],
         )?;
+        tx.commit()?;
         Ok(updated > 0)
     }
 
@@ -619,8 +663,10 @@ impl SqliteGovernedApprovalReplayStore {
         validate_key_part("request_id", request_id)?;
         validate_key_part("intent_hash", intent_hash)?;
         validate_key_part("reservation_id", reservation_id)?;
-        let conn = self.pool.get()?;
-        let deleted = conn.execute(
+        let mut conn = self.pool.get()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        replay_source::ensure_writable(&tx)?;
+        let deleted = tx.execute(
             r#"
             DELETE FROM chio_governed_approval_replay_entries
             WHERE subject_id = ?1
@@ -630,6 +676,7 @@ impl SqliteGovernedApprovalReplayStore {
             "#,
             params![subject_id, request_id, intent_hash, reservation_id],
         )?;
+        tx.commit()?;
         Ok(deleted > 0)
     }
 }
@@ -1011,6 +1058,7 @@ mod tests {
         let manager = SqliteConnectionManager::file(&path).with_init(configure_pooled_connection);
         let advanced = SqliteGovernedApprovalReplayStore {
             pool: Pool::builder().max_size(1).build(manager).unwrap(),
+            path: Some(path.clone()),
             capacity: DEFAULT_GOVERNED_APPROVAL_REPLAY_CAPACITY,
             clock: StableReplayClock::new(jumped, MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64),
         };
