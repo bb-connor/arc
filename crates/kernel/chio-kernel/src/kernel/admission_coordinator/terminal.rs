@@ -17,6 +17,13 @@ pub(crate) struct DurableToolReturn {
 }
 
 impl DurableToolReturn {
+    pub(super) fn caller_report_digest(&self) -> Option<&str> {
+        self.raw
+            .receipt_metadata_snapshot()?
+            .get("caller_delivery")?
+            .get("report_digest")?
+            .as_str()
+    }
     pub(super) fn recovery_request(&self) -> Result<Option<ToolCallRequest>, ToolOutcomeError> {
         self.raw.recovery_request()
     }
@@ -138,6 +145,22 @@ fn record_terminal_finding_denial(
 }
 
 impl ChioKernel {
+    fn require_caller_output_release(
+        &self,
+        returned: &DurableToolReturn,
+        request: &ToolCallRequest,
+    ) -> Result<(), KernelError> {
+        if returned.caller_report_digest().is_some() {
+            self.check_revocation(&request.capability)?;
+            #[cfg(feature = "delegation")]
+            super::super::delegation::consult_revocation_view(
+                &request.capability,
+                self.revocation_view.as_ref(),
+            )?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn record_durable_tool_return(
         &self,
         admission: &mut DurableToolAdmission,
@@ -158,7 +181,11 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        if admission.operation.state() != AdmissionOperationState::DispatchCommitted {
+        if !matches!(
+            admission.operation.state(),
+            AdmissionOperationState::DispatchCommitted
+                | AdmissionOperationState::AwaitingCallerReport
+        ) {
             return Err(KernelError::DurableAdmission(format!(
                 "tool return cannot be recorded from state {:?}",
                 admission.operation.state()
@@ -198,7 +225,11 @@ impl ChioKernel {
                 }
             }
         };
-        let elapsed_millis = if fixed_runtime_unix_secs_for_current_thread().is_some() {
+        // A deterministic kernel clock may suppress locally measured duration,
+        // but it cannot rewrite elapsed time attested by the external executor.
+        let elapsed_millis = if fixed_runtime_unix_secs_for_current_thread().is_some()
+            && context.caller_delivery_evidence.is_none()
+        {
             0
         } else {
             u64::try_from(elapsed.as_millis())
@@ -291,6 +322,9 @@ impl ChioKernel {
                 .map_err(tool_outcome_error)?,
             None => raw,
         };
+        let raw = raw
+            .with_caller_delivery_evidence(context.caller_delivery_evidence.clone())
+            .map_err(tool_outcome_error)?;
         let blob = raw.canonical_blob().map_err(tool_outcome_error)?;
         let record = ToolOutcomeRecordV1::record_tool_returned(
             &admission.operation,
@@ -463,6 +497,7 @@ impl ChioKernel {
     ) -> Result<ToolCallResponse, KernelError> {
         let runtime = self.durable_runtime()?;
         let tool_return = self.load_durable_tool_return(admission)?;
+        self.require_caller_output_release(&tool_return, request)?;
         self.require_durable_security_release(admission, &tool_return.raw, &tool_return.outcome)?;
         let federation_scope = self.scope_retained_federation_return(
             admission,
@@ -767,6 +802,7 @@ impl ChioKernel {
                     },
                 )
             };
+        self.require_caller_output_release(&tool_return, request)?;
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
             verdict,
@@ -1019,6 +1055,7 @@ impl ChioKernel {
         tool_return: &DurableToolReturn,
         security_release: Option<SecurityRequestLifecycleHandle>,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.require_caller_output_release(tool_return, request)?;
         let runtime = self.durable_runtime()?;
         if admission.operation.state() != AdmissionOperationState::Finalizing {
             return Err(KernelError::DurableAdmission(format!(
@@ -1918,14 +1955,19 @@ impl ChioKernel {
                         Verdict::Allow,
                         None,
                         OperationTerminalState::Completed,
-                        self.mint_execution_nonce_for_allow(
-                            request,
-                            &request.capability,
-                            &projected_receipt,
-                        )?,
+                        if tool_return.caller_report_digest().is_some() {
+                            None
+                        } else {
+                            self.mint_execution_nonce_for_allow(
+                                request,
+                                &request.capability,
+                                &projected_receipt,
+                            )?
+                        },
                     ),
                 }
             };
+        self.require_caller_output_release(tool_return, request)?;
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
             verdict,

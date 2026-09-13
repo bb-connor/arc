@@ -139,11 +139,13 @@ impl AdmissionCallerDispatchContextV1 {
                 ))
             }
         }
-        Ok(Self {
+        let frame = Self {
             wire,
             canonical,
             digest,
-        })
+        };
+        frame.native_release_custody(operation, original)?;
+        Ok(frame)
     }
 
     #[must_use]

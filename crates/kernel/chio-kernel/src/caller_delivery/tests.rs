@@ -1,6 +1,8 @@
 use super::*;
 use crate::admission_operation::{ProviderAttemptBindingV1, StoreMutationFence};
 
+mod schema;
+
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 struct Fixture {

@@ -38,6 +38,7 @@ fn missing_current_nonce_preflight_catalog_is_not_repaired() -> AnchoredTestResu
 }
 
 pub(super) fn remove_empty_v33_nonce_preflight(connection: &Connection) -> rusqlite::Result<()> {
+    crate::admission_operation_store::tests::schema::remove_caller_wait_state(connection)?;
     assert_eq!(
         connection.query_row(
             "SELECT COUNT(*) FROM security_participant_nonce_preflight_events",

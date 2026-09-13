@@ -864,6 +864,12 @@ domain including its immutable freshness policy. Each optional authority field
 MUST be present, including an explicit `null` for an absent selection. These
 records are configuration data, not activation credentials or execution permits.
 
+Authenticated external callers use `chio.admission-authority-profile.v2`, with
+an additional `caller_executor` containing the independently selected executor
+identifier, public key and positive key epoch. That member MUST be present and
+non-null in v2 and absent in v1. Changing the current host pin cannot adopt an
+old operation, and a report cannot choose an authority profile.
+
 A trusted native security selection MUST retain its original admission even
 when the ordinary durable-admission mode excludes the call. Without a qualified
 admission store, that selection MUST fail closed; ephemeral receipts or a
@@ -1266,6 +1272,40 @@ reservations and committed decisions remain evidence, not renewed authority;
 pre-dispatch cleanup retains their immutable tombstones. This profile does not
 extend the v1 authoritative-spend qualification above.
 
+#### Authenticated caller start and delivery
+
+`chio.caller-delivery.v1` separates reservation, committed start, durable executor
+claim and historical report. Reservation responses MUST state that execution is
+not authorized. Only a signed `chio.caller-dispatch-authorization.v1` published
+after commitment of the original nonce, hold and required custody may reach the
+executor. It binds the original operation and request, capability and parameter
+digests, executor pin and epoch, provider attempt, dispatch commit, frozen private
+context digest and half-open execution interval. The signature covers the RFC
+8785 canonical authorization body including its schema field.
+
+An executor MUST verify independently configured pins and the expected invocation,
+then durably claim the original operation before any effect. Duplicate or
+uncertain delivery MUST NOT start another execution. Its signed
+`chio.caller-delivery-report.v1` binds the complete signed authorization digest,
+executor, durable claim identity, execution times, output and realized cost. The
+signature covers the RFC 8785 canonical report body including its schema field.
+Authorization and report canonical encodings MUST NOT exceed 32 KiB and 1 MiB.
+
+The kernel MUST authenticate reports against the original physical commitment
+and retained context, not repeat admission. Historical authentication after
+expiry confers no new execution permission. Current output guards, revocation
+and release requirements still apply. Raw executor output is trusted-return-path
+evidence, not agent-visible output or provider attestation. Exact duplicates may
+replay the original completion receipt; conflicting observations MUST fail closed.
+
+Committed callers awaiting evidence use a distinct nonterminal
+`awaiting_caller_report` state. They retain captured quota and required custody,
+cannot redispatch or compensate, and may advance only to original finalization.
+The existing terminal unknown-outcome state remains immutable. Unsupported
+custody profiles MUST reject before start; historical DTOs cannot reconstruct a
+live native release owner. Deployment and migration boundaries are specified in
+[Authenticated caller delivery](../docs/security/authenticated-caller-delivery.md).
+
 Before delivery, issuance MUST be durably unique for the authenticated preflight
 identity. A lost acknowledgement cannot mint another nonce. The preflight hold
 and executable hold remain distinct, and the compensated preflight hold is not
@@ -1304,6 +1344,7 @@ receipt signature. Unknown fields and unsupported schema versions fail closed.
 | `governed_transaction` | kernel | Governed-transaction intent and approval metadata. |
 | `admission_operation` | kernel | Durable admission projection, schema `chio.admission-receipt.v1` (see below). |
 | `delivery_contract` | kernel | Output-digest delivery evidence, schema `chio.delivery-contract.v1` (see below). |
+| `caller_delivery` | kernel | Authenticated historical caller observation digests, executor/claim identity and times, schema `chio.authenticated-caller-observation.v1`. No raw output. |
 | `finding_delivery` | kernel | Purchased-finding delivery overlay, schema `chio.finding.delivery.v1` (see below). |
 
 Subject and issuer attribution, streamed-output chunk metadata, and

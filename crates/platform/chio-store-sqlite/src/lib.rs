@@ -608,6 +608,17 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
         admission_operation_store::SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch(self, capture)
     }
 
+    fn capture_native_caller_invocation_and_commit_dispatch(
+        &self,
+        capture: chio_kernel::receipt_store::AdmissionNativeDispatchCapture<'_>,
+        context: &chio_kernel::admission_operation::AdmissionCallerDispatchContextV1,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetCapture,
+        chio_kernel::admission_operation::AdmissionCaptureError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::capture_native_caller_invocation_and_commit_dispatch(self, capture, context)
+    }
+
     fn load_native_dispatch_capture(
         &self,
         operation_id: &chio_kernel::admission_operation::AdmissionOperationId,

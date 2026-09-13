@@ -13,6 +13,9 @@ mod external_delivery;
 #[path = "execution_nonce_caller_execution/dispatch_context.rs"]
 mod dispatch_context;
 
+#[path = "execution_nonce_caller_execution/authenticated.rs"]
+mod authenticated;
+
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 

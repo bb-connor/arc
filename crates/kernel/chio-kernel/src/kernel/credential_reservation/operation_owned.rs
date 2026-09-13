@@ -145,6 +145,33 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
         } else {
             self
         };
+        if admission.operation().state()
+            == crate::admission_operation::AdmissionOperationState::ReadyToDispatch
+            && admission
+                .operation()
+                .provider_attempt()
+                .is_some_and(|attempt| attempt.is_caller_report())
+        {
+            // The reservation already owns its dispatch episode. Starting it
+            // must verify those exact physical claims, not release or reacquire
+            // a credential outside its selected-grant acquisition boundary.
+            if let Some(credential) = prepared.dpop_credential() {
+                prepared
+                    .kernel
+                    .verify_owned_dpop(admission, &prepared, credential, grant_index)?;
+            }
+            if prepared.kernel.governed_approval_authority.is_some() {
+                if let Some(credential) = prepared.approval_credential()? {
+                    prepared.kernel.verify_owned_governed_approval(
+                        admission,
+                        &prepared,
+                        &credential,
+                        grant_index,
+                    )?;
+                }
+            }
+            return Ok(());
+        }
         if prepared.dpop_credential.is_some() {
             prepared
                 .kernel

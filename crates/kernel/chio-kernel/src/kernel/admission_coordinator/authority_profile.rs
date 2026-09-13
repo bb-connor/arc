@@ -78,7 +78,7 @@ impl ChioKernel {
                     "runtime authority declaration panicked (fail-closed)".into(),
                 )
             })?;
-        AdmissionAuthorityProfileV1::new(AdmissionAuthoritySelectionV1 {
+        let profile = AdmissionAuthorityProfileV1::new(AdmissionAuthoritySelectionV1 {
             runtime_hook_installed: self.runtime_admission_hook.is_some(),
             swarm_admission_required: self.swarm_admission_required,
             runtime_enforces_swarm_authority: enforces_swarm,
@@ -87,7 +87,13 @@ impl ChioKernel {
             approval: self.configured_governed_approval_binding().cloned(),
             dpop: self.dpop_authority.clone(),
         })
-        .map_err(durable_store_error)
+        .map_err(durable_store_error)?;
+        match self.caller_executor.as_ref() {
+            Some(executor) => profile
+                .with_caller_executor(executor.clone())
+                .map_err(durable_store_error),
+            None => Ok(profile),
+        }
     }
 
     pub(crate) fn validate_original_authority_profile(

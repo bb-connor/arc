@@ -1232,6 +1232,20 @@ pub trait QualifiedAdmissionProjectionStore:
         )
     }
 
+    /// Atomically retain native caller release custody with the actual native
+    /// credential and budget capture. Implementations default to fail-closed.
+    fn capture_native_caller_invocation_and_commit_dispatch(
+        &self,
+        _capture: AdmissionNativeDispatchCapture<'_>,
+        _context: &crate::admission_operation::AdmissionCallerDispatchContextV1,
+    ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+        Err(
+            crate::admission_operation::AdmissionCaptureError::Unavailable(
+                "atomic native caller release capture is unsupported".into(),
+            ),
+        )
+    }
+
     /// Read the immutable native capture decision with its current operation.
     /// The read must independently verify the physical budget projection and
     /// its exact admission commitment. Historical data grants no execution or

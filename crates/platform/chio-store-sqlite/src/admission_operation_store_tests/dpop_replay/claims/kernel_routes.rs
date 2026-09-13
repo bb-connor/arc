@@ -7,6 +7,8 @@ use chio_kernel::{
 };
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+#[path = "kernel_routes/authenticated_caller.rs"]
+mod authenticated_caller;
 #[path = "kernel_routes/boundaries.rs"]
 mod boundaries;
 #[path = "kernel_routes/composition.rs"]

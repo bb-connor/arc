@@ -4,6 +4,8 @@ use chio_kernel::budget_store::{BudgetStore, InMemoryBudgetStore};
 use chio_test_support::prelude::*;
 use tower::ServiceExt;
 
+#[path = "tests/authenticated.rs"]
+mod authenticated;
 #[path = "tests/authorization.rs"]
 mod authorization;
 #[path = "../tests/mediated_boundary_tests.rs"]
@@ -679,7 +681,7 @@ async fn mediated_receipt_persistence_failure_returns_nonce_and_keeps_reservatio
     // would strand a reservation the caller can never use.
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(json["status"], "authorized");
+    assert_eq!(json["status"], "reserved");
     assert!(
         json["execution_nonce"].is_object(),
         "a persistence failure after a successful reserve must still return the nonce"
@@ -743,7 +745,7 @@ async fn mediated_receipt_persistence_success_keeps_reservation() {
     // minted nonce and the reservation is kept for a real reconcile.
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(json["status"], "authorized");
+    assert_eq!(json["status"], "reserved");
     assert!(json["execution_nonce"].is_object());
 
     let usage = budget.get_usage(&cap_id, 0).unwrap();
@@ -793,7 +795,7 @@ async fn mediated_invocation_receipt_persistence_failure_returns_nonce_and_keeps
     // invocation for a caller that never received the nonce.
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(json["status"], "authorized");
+    assert_eq!(json["status"], "reserved");
     let nonce_json = json["execution_nonce"].clone();
     assert!(
         nonce_json.is_object(),
@@ -884,7 +886,7 @@ async fn mediated_mustprepay_receipt_persistence_failure_returns_nonce_without_r
         StatusCode::OK,
         "a captured MustPrepay reserve whose receipt fails to persist must not 500"
     );
-    assert_eq!(json["status"], "authorized");
+    assert_eq!(json["status"], "reserved");
     assert!(
         json["execution_nonce"].is_object(),
         "the caller must receive the nonce the captured prepayment backs"
@@ -935,7 +937,7 @@ async fn mediated_invocation_reconcile_keeps_invocation_consumed() {
         "request_id": "invoke-reconcile",
     });
     let (_, authorized) = post_evaluate(Arc::clone(&state), &reserve_body).await;
-    assert_eq!(authorized["status"], "authorized");
+    assert_eq!(authorized["status"], "reserved");
     let nonce_json = authorized["execution_nonce"].clone();
 
     // A legitimate reconcile settles the invocation reservation: the debited
@@ -991,7 +993,7 @@ async fn reaper_forfeits_expired_invocation_reserve() {
         "request_id": "invoke-reap",
     });
     let (_, authorized) = post_evaluate(Arc::clone(&state), &reserve_body).await;
-    assert_eq!(authorized["status"], "authorized");
+    assert_eq!(authorized["status"], "reserved");
 
     // Sweep with a far-future clock: the abandoned invocation reservation is
     // past its execution-nonce TTL and is settled at its (zero-money)
@@ -1046,7 +1048,7 @@ async fn mediated_open_invocation_reserve_blocks_oversubscription() {
         "request_id": "invoke-open-1",
     });
     let (_, first) = post_evaluate(Arc::clone(&state), &first_body).await;
-    assert_eq!(first["status"], "authorized");
+    assert_eq!(first["status"], "reserved");
 
     // While the first invocation reservation is OPEN (debited, not yet
     // reconciled or reaped), a second reserve that would exceed
@@ -1271,7 +1273,7 @@ async fn reconcile_requires_sidecar_control_token() {
         "request_id": "recon-auth-gate",
     });
     let (_, authorized) = post_evaluate(Arc::clone(&state), &body).await;
-    assert_eq!(authorized["status"], "authorized");
+    assert_eq!(authorized["status"], "reserved");
     let nonce_json = authorized["execution_nonce"].clone();
 
     let reconcile_body = serde_json::json!({
@@ -1365,7 +1367,7 @@ async fn mediated_authorization_needs_no_tool_server_registration() {
         let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(
-            json["status"], "authorized",
+            json["status"], "reserved",
             "an arbitrary caller server id must authorize without any registration"
         );
         assert!(json["execution_nonce"].is_object());
@@ -1498,7 +1500,7 @@ async fn reconcile_returns_authoritative_receipt_when_persistence_fails() {
     });
     let (status, authorized) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(authorized["status"], "authorized");
+    assert_eq!(authorized["status"], "reserved");
     let nonce_json = authorized["execution_nonce"].clone();
     assert!(nonce_json.is_object());
 
@@ -1607,7 +1609,7 @@ async fn mediated_durable_hold_rejects_request_id_reuse_after_settle() {
         "request_id": "settled-reuse",
     });
     let (_, authorized) = post_evaluate(Arc::clone(&state), &body).await;
-    assert_eq!(authorized["status"], "authorized");
+    assert_eq!(authorized["status"], "reserved");
     let nonce_json = authorized["execution_nonce"].clone();
 
     let reconcile_body = serde_json::json!({
@@ -1628,7 +1630,7 @@ async fn mediated_durable_hold_rejects_request_id_reuse_after_settle() {
     let (status, replay) = post_evaluate(Arc::clone(&after), &body).await;
     assert_eq!(status, StatusCode::CONFLICT);
     assert_eq!(replay["error"], "chio_request_id_reused");
-    assert_ne!(replay["status"], "authorized");
+    assert_ne!(replay["status"], "reserved");
     assert!(
         replay["execution_nonce"].is_null(),
         "a reused settled request_id must not mint a second nonce"
@@ -1644,6 +1646,6 @@ async fn mediated_durable_hold_rejects_request_id_reuse_after_settle() {
     });
     let (status, fresh) = post_evaluate(after, &fresh_body).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(fresh["status"], "authorized");
+    assert_eq!(fresh["status"], "reserved");
     assert!(fresh["execution_nonce"].is_object());
 }

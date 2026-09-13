@@ -1,5 +1,9 @@
 use super::*;
 
+#[path = "schema/caller_wait.rs"]
+mod caller_wait;
+pub(super) use caller_wait::remove_caller_wait_state;
+
 struct SqlObligationHead {
     obligation_id: String,
     atom_digest: String,

@@ -3,6 +3,27 @@
 use super::*;
 
 impl ChioKernel {
+    /// Require the request's proof for a non-consuming preview. Credential
+    /// reservation remains a separate operation-owned dispatch step.
+    pub(crate) fn verify_required_dpop_preview(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+    ) -> Result<(), KernelError> {
+        let proof = request.dpop_proof.as_ref().ok_or_else(|| {
+            KernelError::DpopVerificationFailed(
+                "grant requires DPoP proof but none was provided".to_string(),
+            )
+        })?;
+        self.verify_dpop_for_permission_preview(
+            proof,
+            cap,
+            &request.server_id,
+            &request.tool_name,
+            &request.arguments,
+        )
+    }
+
     /// Verify a DPoP proof carried on the request against the capability.
     ///
     /// Fails closed: if no proof is present, or if the nonce store / config is

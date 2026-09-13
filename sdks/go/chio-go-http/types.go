@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: ac77b1ea6f50cff187ed7c6e86a11f3ca209bba315c4e3714c2bed30a3385cf1
+// Schema content SHA-256: f45573ca7ea29e544db29a849dc5152e47b0d2c2d3f7093dc6d28379b35e7ad2
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -328,6 +328,16 @@ const (
 // Defines values for JsonrpcResponseJsonrpc.
 const (
 	JsonrpcResponseJsonrpcN20 JsonrpcResponseJsonrpc = "2.0"
+)
+
+// Defines values for KernelCallerDeliveryReportReportSchema.
+const (
+	KernelCallerDeliveryReportReportSchemaChioCallerDeliveryReportV1 KernelCallerDeliveryReportReportSchema = "chio.caller-delivery-report.v1"
+)
+
+// Defines values for KernelCallerDispatchAuthorizationAuthorizationSchema.
+const (
+	KernelCallerDispatchAuthorizationAuthorizationSchemaChioCallerDispatchAuthorizationV1 KernelCallerDispatchAuthorizationAuthorizationSchema = "chio.caller-dispatch-authorization.v1"
 )
 
 // Defines values for KernelCapabilityListType.
@@ -3139,6 +3149,126 @@ type JsonrpcResponse1 struct {
 		Message string `json:"message"`
 	} `json:"error"`
 }
+
+// KernelCallerDeliveryReport Executor-authenticated historical observation, never a new execution permit or provider attestation. Canonical encoding is bounded to 1048576 bytes. Raw output remains on the trusted executor-to-kernel path until finalization permits release.
+type KernelCallerDeliveryReport struct {
+	Report struct {
+		AuthorizationDigest KernelCallerDispatchAuthorizationCallerDigest `json:"authorization_digest"`
+
+		// ClaimId The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+		ClaimId                  KernelCallerDispatchAuthorizationCallerIdentifier      `json:"claim_id"`
+		CompletedAtUnixMs        KernelCallerDispatchAuthorizationCallerPositiveInteger `json:"completed_at_unix_ms"`
+		ExecutionStartedAtUnixMs KernelCallerDispatchAuthorizationCallerPositiveInteger `json:"execution_started_at_unix_ms"`
+		Executor                 KernelCallerDispatchAuthorizationCallerExecutor        `json:"executor"`
+		Output                   interface{}                                            `json:"output"`
+		RealizedCost             KernelCallerDeliveryReport_Report_RealizedCost         `json:"realized_cost"`
+		Schema                   KernelCallerDeliveryReportReportSchema                 `json:"schema"`
+	} `json:"report"`
+	Signature KernelCallerDispatchAuthorizationCallerSignature `json:"signature"`
+}
+
+// KernelCallerDeliveryReportReportRealizedCost0 defines model for .
+type KernelCallerDeliveryReportReportRealizedCost0 = interface{}
+
+// KernelCallerDeliveryReportReportRealizedCost1 defines model for .
+type KernelCallerDeliveryReportReportRealizedCost1 struct {
+	Currency string `json:"currency"`
+	Units    int64  `json:"units"`
+}
+
+// KernelCallerDeliveryReport_Report_RealizedCost defines model for KernelCallerDeliveryReport.Report.RealizedCost.
+type KernelCallerDeliveryReport_Report_RealizedCost struct {
+	union json.RawMessage
+}
+
+// KernelCallerDeliveryReportReportSchema defines model for KernelCallerDeliveryReport.Report.Schema.
+type KernelCallerDeliveryReportReportSchema string
+
+// KernelCallerDispatchAuthorization A committed kernel statement, not an executor claim. Canonical encoding is bounded to 32768 bytes. The executor must independently authenticate pins and durably claim the original operation before effect.
+type KernelCallerDispatchAuthorization struct {
+	Authorization struct {
+		Committed struct {
+			// BudgetHoldId The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+			BudgetHoldId   KernelCallerDispatchAuthorizationCallerIdentifier `json:"budget_hold_id"`
+			DispatchCommit struct {
+				CommittedVersion      KernelCallerDispatchAuthorizationCallerPositiveInteger `json:"committed_version"`
+				CoordinatorLeaseEpoch KernelCallerDispatchAuthorizationCallerPositiveInteger `json:"coordinator_lease_epoch"`
+
+				// CoordinatorLeaseId The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+				CoordinatorLeaseId KernelCallerDispatchAuthorizationCallerIdentifier `json:"coordinator_lease_id"`
+				ProviderAttempt    struct {
+					// AttemptId The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+					AttemptId         KernelCallerDispatchAuthorizationCallerIdentifier      `json:"attempt_id"`
+					OperationId       KernelCallerDispatchAuthorizationCallerDigest          `json:"operation_id"`
+					TransportId       string                                                 `json:"transport_id"`
+					TransportKeyEpoch KernelCallerDispatchAuthorizationCallerPositiveInteger `json:"transport_key_epoch"`
+				} `json:"provider_attempt"`
+				StoreFence struct {
+					// LeaseId The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+					LeaseId    KernelCallerDispatchAuthorizationCallerIdentifier      `json:"lease_id"`
+					OwnerEpoch KernelCallerDispatchAuthorizationCallerPositiveInteger `json:"owner_epoch"`
+
+					// StoreUuid The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+					StoreUuid KernelCallerDispatchAuthorizationCallerIdentifier `json:"store_uuid"`
+				} `json:"store_fence"`
+			} `json:"dispatch_commit"`
+
+			// ExecutionNonceId The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+			ExecutionNonceId    KernelCallerDispatchAuthorizationCallerIdentifier `json:"execution_nonce_id"`
+			FrozenContextDigest KernelCallerDispatchAuthorizationCallerDigest     `json:"frozen_context_digest"`
+		} `json:"committed"`
+		Executor        KernelCallerDispatchAuthorizationCallerExecutor        `json:"executor"`
+		ExpiresAtUnixMs KernelCallerDispatchAuthorizationCallerPositiveInteger `json:"expires_at_unix_ms"`
+		Invocation      struct {
+			CapabilityDigest KernelCallerDispatchAuthorizationCallerDigest `json:"capability_digest"`
+
+			// CapabilityId The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+			CapabilityId       KernelCallerDispatchAuthorizationCallerIdentifier `json:"capability_id"`
+			OperationId        KernelCallerDispatchAuthorizationCallerDigest     `json:"operation_id"`
+			ParametersDigest   KernelCallerDispatchAuthorizationCallerDigest     `json:"parameters_digest"`
+			RequestBindingHash KernelCallerDispatchAuthorizationCallerDigest     `json:"request_binding_hash"`
+
+			// RequestId The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+			RequestId KernelCallerDispatchAuthorizationCallerIdentifier `json:"request_id"`
+
+			// ServerId The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+			ServerId KernelCallerDispatchAuthorizationCallerIdentifier `json:"server_id"`
+
+			// ToolName The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+			ToolName KernelCallerDispatchAuthorizationCallerIdentifier `json:"tool_name"`
+		} `json:"invocation"`
+		KernelPublicKey KernelCallerDispatchAuthorizationCallerPublicKey       `json:"kernel_public_key"`
+		NotBeforeUnixMs KernelCallerDispatchAuthorizationCallerPositiveInteger `json:"not_before_unix_ms"`
+		Schema          KernelCallerDispatchAuthorizationAuthorizationSchema   `json:"schema"`
+	} `json:"authorization"`
+	Signature KernelCallerDispatchAuthorizationCallerSignature `json:"signature"`
+}
+
+// KernelCallerDispatchAuthorizationAuthorizationSchema defines model for KernelCallerDispatchAuthorization.Authorization.Schema.
+type KernelCallerDispatchAuthorizationAuthorizationSchema string
+
+// KernelCallerDispatchAuthorizationCallerDigest defines model for KernelCallerDispatchAuthorizationCallerDigest.
+type KernelCallerDispatchAuthorizationCallerDigest = string
+
+// KernelCallerDispatchAuthorizationCallerExecutor defines model for KernelCallerDispatchAuthorizationCallerExecutor.
+type KernelCallerDispatchAuthorizationCallerExecutor struct {
+	// ExecutorId The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+	ExecutorId KernelCallerDispatchAuthorizationCallerIdentifier      `json:"executor_id"`
+	KeyEpoch   KernelCallerDispatchAuthorizationCallerPositiveInteger `json:"key_epoch"`
+	PublicKey  KernelCallerDispatchAuthorizationCallerPublicKey       `json:"public_key"`
+}
+
+// KernelCallerDispatchAuthorizationCallerIdentifier The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+type KernelCallerDispatchAuthorizationCallerIdentifier = string
+
+// KernelCallerDispatchAuthorizationCallerPositiveInteger defines model for KernelCallerDispatchAuthorizationCallerPositiveInteger.
+type KernelCallerDispatchAuthorizationCallerPositiveInteger = int64
+
+// KernelCallerDispatchAuthorizationCallerPublicKey defines model for KernelCallerDispatchAuthorizationCallerPublicKey.
+type KernelCallerDispatchAuthorizationCallerPublicKey = string
+
+// KernelCallerDispatchAuthorizationCallerSignature defines model for KernelCallerDispatchAuthorizationCallerSignature.
+type KernelCallerDispatchAuthorizationCallerSignature = string
 
 // KernelCapabilityList defines model for KernelCapabilityList.
 type KernelCapabilityList struct {
@@ -8952,6 +9082,68 @@ func (t JsonrpcResponse_Id) MarshalJSON() ([]byte, error) {
 }
 
 func (t *JsonrpcResponse_Id) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsKernelCallerDeliveryReportReportRealizedCost0 returns the union data inside the KernelCallerDeliveryReport_Report_RealizedCost as a KernelCallerDeliveryReportReportRealizedCost0
+func (t KernelCallerDeliveryReport_Report_RealizedCost) AsKernelCallerDeliveryReportReportRealizedCost0() (KernelCallerDeliveryReportReportRealizedCost0, error) {
+	var body KernelCallerDeliveryReportReportRealizedCost0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromKernelCallerDeliveryReportReportRealizedCost0 overwrites any union data inside the KernelCallerDeliveryReport_Report_RealizedCost as the provided KernelCallerDeliveryReportReportRealizedCost0
+func (t *KernelCallerDeliveryReport_Report_RealizedCost) FromKernelCallerDeliveryReportReportRealizedCost0(v KernelCallerDeliveryReportReportRealizedCost0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeKernelCallerDeliveryReportReportRealizedCost0 performs a merge with any union data inside the KernelCallerDeliveryReport_Report_RealizedCost, using the provided KernelCallerDeliveryReportReportRealizedCost0
+func (t *KernelCallerDeliveryReport_Report_RealizedCost) MergeKernelCallerDeliveryReportReportRealizedCost0(v KernelCallerDeliveryReportReportRealizedCost0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsKernelCallerDeliveryReportReportRealizedCost1 returns the union data inside the KernelCallerDeliveryReport_Report_RealizedCost as a KernelCallerDeliveryReportReportRealizedCost1
+func (t KernelCallerDeliveryReport_Report_RealizedCost) AsKernelCallerDeliveryReportReportRealizedCost1() (KernelCallerDeliveryReportReportRealizedCost1, error) {
+	var body KernelCallerDeliveryReportReportRealizedCost1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromKernelCallerDeliveryReportReportRealizedCost1 overwrites any union data inside the KernelCallerDeliveryReport_Report_RealizedCost as the provided KernelCallerDeliveryReportReportRealizedCost1
+func (t *KernelCallerDeliveryReport_Report_RealizedCost) FromKernelCallerDeliveryReportReportRealizedCost1(v KernelCallerDeliveryReportReportRealizedCost1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeKernelCallerDeliveryReportReportRealizedCost1 performs a merge with any union data inside the KernelCallerDeliveryReport_Report_RealizedCost, using the provided KernelCallerDeliveryReportReportRealizedCost1
+func (t *KernelCallerDeliveryReport_Report_RealizedCost) MergeKernelCallerDeliveryReportReportRealizedCost1(v KernelCallerDeliveryReportReportRealizedCost1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t KernelCallerDeliveryReport_Report_RealizedCost) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *KernelCallerDeliveryReport_Report_RealizedCost) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

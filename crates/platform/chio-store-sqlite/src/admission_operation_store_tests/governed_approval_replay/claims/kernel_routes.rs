@@ -6,6 +6,8 @@ use chio_kernel::{
     ChioKernel, KernelError, NestedFlowBridge, ToolCallRequest, ToolServerConnection, Verdict,
 };
 use std::sync::atomic::{AtomicUsize, Ordering};
+#[path = "kernel_routes/authenticated_caller.rs"]
+mod authenticated_caller;
 #[path = "kernel_routes/boundaries.rs"]
 mod boundaries;
 

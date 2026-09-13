@@ -323,7 +323,7 @@ impl ChioKernel {
         let dpop_required = matching_grants
             .iter()
             .any(|matching| matching.grant.dpop_required == Some(true));
-        if matches!(dispatch_mode, DispatchMode::ReserveForCaller) {
+        if dispatch_mode.caller_preparation() {
             if let Some(reason) = self.caller_reservation_profile_denial(request, dpop_required) {
                 return self.build_deny_response_with_metadata(
                     request,
@@ -335,22 +335,7 @@ impl ChioKernel {
             }
         }
         if dpop_required {
-            let verification = request.dpop_proof.as_ref().map_or_else(
-                || {
-                    Err(KernelError::DpopVerificationFailed(
-                        "grant requires DPoP proof but none was provided".to_string(),
-                    ))
-                },
-                |proof| {
-                    self.verify_dpop_for_permission_preview(
-                        proof,
-                        cap,
-                        &request.server_id,
-                        &request.tool_name,
-                        &request.arguments,
-                    )
-                },
-            );
+            let verification = self.verify_required_dpop_preview(request, cap);
             if let Err(e) = verification {
                 let msg = e.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "DPoP verification failed");
@@ -1071,11 +1056,10 @@ impl ChioKernel {
         let server = match &dispatch_mode {
             DispatchMode::CallerReport(report) => Some(report.clone()),
             DispatchMode::Kernel => self.tool_servers.get(&request.server_id).cloned(),
-            // A reservation dispatches nothing; the caller's report stands in
-            // for the server when the reconcile resumes the operation.
-            DispatchMode::ReserveForCaller => None,
+            // Preparation cannot dispatch an external effect.
+            DispatchMode::ReserveForCaller | DispatchMode::CallerStart => None,
         };
-        if server.is_none() && !matches!(dispatch_mode, DispatchMode::ReserveForCaller) {
+        if server.is_none() && !dispatch_mode.caller_preparation() {
             let error = KernelError::ToolNotRegistered(format!(
                 "server \"{}\" / tool \"{}\"",
                 request.server_id, request.tool_name
@@ -1236,11 +1220,6 @@ impl ChioKernel {
                 budget_lease_acquired,
             });
         }
-        let Some(server) = server else {
-            return Err(KernelError::Internal(
-                "dispatch reached without a resolved tool server".to_owned(),
-            ));
-        };
         if let Some(admission) = durable_admission.as_mut() {
             if let Err(error) = self.mark_durable_capture_pending(admission, now_unix_ms) {
                 let reason = error.to_string();
@@ -1698,6 +1677,19 @@ impl ChioKernel {
             Some(context)
         } else {
             None
+        };
+        if matches!(dispatch_mode, DispatchMode::CallerStart) {
+            return self.build_committed_caller_start_response(
+                request,
+                durable_admission.as_ref(),
+                matched_grant_index,
+                extra_metadata,
+            );
+        }
+        let Some(server) = server else {
+            return Err(KernelError::Internal(
+                "dispatch reached without a resolved tool server".to_owned(),
+            ));
         };
         let tool_started_at = Instant::now();
         let has_monetary = budget_mutation.charge_result().is_some();

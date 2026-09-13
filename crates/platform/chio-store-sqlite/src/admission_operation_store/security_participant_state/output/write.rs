@@ -31,6 +31,29 @@ impl SqliteAdmissionOperationStore {
             if record.intent != *intent {
                 return Err(invalid("native output retry replaced its original intent"));
             }
+            if operation
+                .provider_attempt()
+                .is_some_and(|attempt| attempt.is_native_caller_report())
+            {
+                // The kernel's observation precedes this transaction. Another
+                // owner of native mutation authority could strengthen inherited
+                // state in that interval. Verify complete current taint here,
+                // under the same write lease, before acknowledging the original
+                // caller output transition. Replay never creates a new join.
+                let current = crate::security_state::resolve_native_label_join(
+                    &tx,
+                    actual.authority.as_str(),
+                    intent.key(),
+                    intent.output_label(),
+                    intent.transition_id(),
+                )
+                .map_err(invalid)?;
+                if current != record.request {
+                    return Err(invalid(
+                        "native caller output replay no longer covers current source",
+                    ));
+                }
+            }
             return record.evidence(&actual);
         }
         let (_, generation) = crate::security_state::observe_native_flow_state(

@@ -640,6 +640,8 @@ pub struct ChioKernel {
     pub(crate) finding_pool_mutation_receipt_flush_lock: Mutex<()>,
     pub(super) price_oracle: Option<Box<dyn PriceOracle>>,
     pub(super) runtime_admission_hook: Option<Arc<dyn RuntimeAdmissionHook>>,
+    /// Independently configured, and frozen in every original admission profile.
+    pub(super) caller_executor: Option<crate::caller_delivery::CallerExecutorIdentityV1>,
     pub(super) swarm_admission_required: bool,
     pub(super) security_pre_dispatch_policy: SecurityPreDispatchPolicy,
     pub(super) security_pre_dispatch_hook: Option<Arc<dyn SecurityPreDispatchHook>>,

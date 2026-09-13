@@ -7,6 +7,19 @@ export RUST_TEST_THREADS=1
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
 
 ./scripts/run-exact-cargo-test-inventory.sh --label "native process failure and restart" --allow-filtered --expected \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_atomic_capture \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_claim_before_effect \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_durable_report \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_effect_without_report \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_output_join \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_raw_report \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_acknowledgement \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_checkpoint \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_terminal_projection \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_before_atomic_capture \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_combined_disclosure_abort_after_release \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_combined_disclosure_abort_after_report \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_output_recovery_rejects_changed_classification \
   security::adapters::tests::native_flow::support::process_recovery::baseline_before_participants \
   security::adapters::tests::native_flow::support::process_recovery::baseline_capture_before_connector \
   security::adapters::tests::native_flow::support::process_recovery::baseline_capture_transaction_rollback \

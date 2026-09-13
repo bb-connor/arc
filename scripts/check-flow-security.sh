@@ -423,6 +423,7 @@ run_exact_target --label "original security authority selection" --allow-filtere
   -- cargo test -p chio-kernel --lib kernel::tests::security_binding::
 
 run_exact_target --label "original operation authority profile" --allow-filtered --expected \
+  admission_operation::authority_profile::tests::pinned_executor_is_versioned_and_cannot_be_downgraded_or_null \
   admission_operation::authority_profile::tests::profile_codec_checks_schema_fields_and_each_selected_generation \
   admission_operation::authority_profile::tests::profile_debug_contains_no_authority_identifiers \
   admission_operation::authority_profile::tests::profile_requires_explicit_absence_and_consistent_runtime_declarations \
@@ -507,6 +508,25 @@ run_exact_target --label "live admission ownership" --allow-filtered --expected 
   -- cargo test -p chio-kernel --lib admission_operation::sequencer::tests::
 
 run_exact_target --label "native post-join policy" --allow-filtered --expected \
+  security::adapters::tests::native_flow::support::caller::denial::native_caller_changed_input_cannot_replace_original_reserved_join \
+  security::adapters::tests::native_flow::support::caller::denial::native_caller_output_refusal_revocation_and_stop_never_release_raw_delivery \
+  security::adapters::tests::native_flow::support::caller::denial::native_caller_preflight_requires_fresh_host_flow_state_before_reservation \
+  security::adapters::tests::native_flow::support::caller::native_caller_composes_local_egress_declassification_and_complete_credentials \
+  security::adapters::tests::native_flow::support::caller::native_caller_releases_only_the_authenticated_original_guarded_output \
+  security::adapters::tests::native_flow::support::caller::restart::native_caller_original_delivery_survives_restart_and_authority_expiry \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_atomic_capture \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_claim_before_effect \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_durable_report \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_effect_without_report \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_output_join \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_raw_report \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_acknowledgement \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_checkpoint \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_terminal_projection \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_before_atomic_capture \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_combined_disclosure_abort_after_release \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_combined_disclosure_abort_after_report \
+  security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_output_recovery_rejects_changed_classification \
   security::adapters::tests::native_flow::support::process_recovery::baseline_before_participants \
   security::adapters::tests::native_flow::support::process_recovery::baseline_capture_before_connector \
   security::adapters::tests::native_flow::support::process_recovery::baseline_capture_transaction_rollback \
@@ -683,6 +703,9 @@ run_exact_target --label "durable release output binding" --allow-filtered --exp
   -- cargo test -p chio-kernel --lib tool_outcome::security_release::context::tests::
 
 run_exact_target --label "frozen dispatch participant context" --allow-filtered --expected \
+  kernel::admission_coordinator::return_context::caller::tests::caller_observation_metadata_cannot_be_injected_before_dispatch \
+  kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_custody_requires_explicit_absence_and_rejects_unowned_claims \
+  kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_v3_remains_readable_but_cannot_acquire_custody_on_reissue \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_keeps_frozen_facts_without_credentials_or_return_observations \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_keeps_legacy_identity_absence_explicit \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_rejects_individually_valid_but_unadmitted_security_context \

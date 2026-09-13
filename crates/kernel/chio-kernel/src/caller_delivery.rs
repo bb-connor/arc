@@ -19,6 +19,18 @@ const MAX_AUTHORIZATION_BYTES: usize = 32 * 1024;
 const MAX_REPORT_BYTES: usize = 1024 * 1024;
 const MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 
+mod retained;
+
+/// Private retained delivery evidence. This belongs in the authority's raw
+/// return record, never in public receipt metadata or agent-visible output.
+/// Decoding this value does not establish either key's independent trust pin.
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CallerDeliveryEvidenceV1 {
+    pub authorization: SignedCallerDispatchAuthorizationV1,
+    pub report: SignedCallerDeliveryReportV1,
+}
+
 /// A trusted-host selection. Values received in a message cannot select its
 /// verifier, signing key, epoch, ledger namespace or routing destination.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -27,6 +39,16 @@ pub struct CallerExecutorIdentityV1 {
     pub executor_id: AdmissionIdentifier,
     pub public_key: PublicKey,
     pub key_epoch: u64,
+}
+
+impl CallerExecutorIdentityV1 {
+    pub(crate) fn validate(&self) -> Result<(), CallerDeliveryError> {
+        require_time(self.key_epoch)?;
+        if self.public_key.is_weak_ed25519() {
+            return Err(CallerDeliveryError::Shape);
+        }
+        Ok(())
+    }
 }
 
 /// Exact public invocation identity. Protected inputs and reusable credentials
@@ -304,7 +326,16 @@ fn validate_authorization(
         .as_ref()
         .ok_or(CallerDeliveryError::Shape)?;
     if attempt.operation_id != body.invocation.operation_id.as_str()
-        || attempt.transport_id != format!("caller-report:{}", body.invocation.server_id.as_str())
+        || attempt.transport_id
+            != format!(
+                "{}{}",
+                if attempt.is_native_caller_report() {
+                    chio_core_types::provider_attempt::ProviderAttemptBindingV1::NATIVE_CALLER_REPORT_TRANSPORT_PREFIX
+                } else {
+                    chio_core_types::provider_attempt::ProviderAttemptBindingV1::CALLER_REPORT_TRANSPORT_PREFIX
+                },
+                body.invocation.server_id.as_str()
+            )
         || attempt.transport_key_epoch != body.executor.key_epoch
     {
         return Err(CallerDeliveryError::Binding);

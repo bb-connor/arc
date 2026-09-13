@@ -7,6 +7,7 @@ use crate::dpop::authority::DpopReplayAuthorityV1;
 use serde::{Deserialize, Deserializer, Serialize};
 
 const SCHEMA: &str = "chio.admission-authority-profile.v1";
+const CALLER_SCHEMA: &str = "chio.admission-authority-profile.v2";
 
 /// Explicit selections, including absence, observed before original admission.
 /// Stable source generations and DPoP freshness policy are retained; current
@@ -42,6 +43,8 @@ where
 pub struct AdmissionAuthorityProfileV1 {
     schema: String,
     selection: AdmissionAuthoritySelectionV1,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    caller_executor: Option<crate::caller_delivery::CallerExecutorIdentityV1>,
 }
 
 #[derive(Deserialize)]
@@ -49,16 +52,27 @@ pub struct AdmissionAuthorityProfileV1 {
 struct Wire {
     schema: String,
     selection: AdmissionAuthoritySelectionV1,
+    #[serde(default, deserialize_with = "present_executor")]
+    caller_executor: Option<crate::caller_delivery::CallerExecutorIdentityV1>,
+}
+
+fn present_executor<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<crate::caller_delivery::CallerExecutorIdentityV1>, D::Error> {
+    crate::caller_delivery::CallerExecutorIdentityV1::deserialize(deserializer).map(Some)
 }
 
 impl TryFrom<Wire> for AdmissionAuthorityProfileV1 {
     type Error = AdmissionOperationStoreError;
 
     fn try_from(wire: Wire) -> Result<Self, Self::Error> {
-        if wire.schema != SCHEMA {
-            return Err(invalid("unsupported admission authority profile schema"));
+        match (wire.schema.as_str(), wire.caller_executor) {
+            (SCHEMA, None) => Self::new(wire.selection),
+            (CALLER_SCHEMA, Some(executor)) => {
+                Self::new(wire.selection)?.with_caller_executor(executor)
+            }
+            _ => Err(invalid("unsupported admission authority profile selection")),
         }
-        Self::new(wire.selection)
     }
 }
 
@@ -86,7 +100,27 @@ impl AdmissionAuthorityProfileV1 {
         Ok(Self {
             schema: SCHEMA.into(),
             selection,
+            caller_executor: None,
         })
+    }
+
+    /// Pin the trusted executor before admission. Historical v1 selections
+    /// remain unconfigured and cannot adopt a key supplied by a report.
+    pub fn with_caller_executor(
+        mut self,
+        executor: crate::caller_delivery::CallerExecutorIdentityV1,
+    ) -> Result<Self, AdmissionOperationStoreError> {
+        executor
+            .validate()
+            .map_err(|_| invalid("invalid caller executor selection"))?;
+        self.schema = CALLER_SCHEMA.into();
+        self.caller_executor = Some(executor);
+        Ok(self)
+    }
+
+    #[must_use]
+    pub fn caller_executor(&self) -> Option<&crate::caller_delivery::CallerExecutorIdentityV1> {
+        self.caller_executor.as_ref()
     }
 
     #[must_use]
@@ -106,7 +140,10 @@ impl AdmissionAuthorityProfileV1 {
 
     #[must_use]
     pub fn has_operation_owned_authority(&self) -> bool {
-        self.runtime().is_some() || self.approval().is_some() || self.dpop().is_some()
+        self.runtime().is_some()
+            || self.approval().is_some()
+            || self.dpop().is_some()
+            || self.caller_executor().is_some()
     }
 }
 

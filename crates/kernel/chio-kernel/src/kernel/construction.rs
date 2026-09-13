@@ -321,6 +321,7 @@ impl ChioKernel {
             finding_pool_mutation_receipt_flush_lock: Mutex::new(()),
             price_oracle: None,
             runtime_admission_hook: None,
+            caller_executor: None,
             swarm_admission_required: false,
             security_pre_dispatch_policy: SecurityPreDispatchPolicy::Optional,
             security_pre_dispatch_hook: None,

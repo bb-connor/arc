@@ -1210,9 +1210,12 @@ pub(crate) fn advance_budget_capture_tx(
             "combined budget capture requires a CapturePending operation",
         ));
     }
-    if native.is_some() && caller_context.is_some() {
+    let native_caller = expected
+        .provider_attempt()
+        .is_some_and(|attempt| attempt.is_native_caller_report());
+    if (native.is_some() && caller_context.is_some()) != native_caller {
         return Err(invariant(
-            "native capture cannot also select caller custody",
+            "native caller capture requires both original native and caller custody",
         ));
     }
     let mut attachments = if let Some(context) = caller_context {
@@ -1231,6 +1234,9 @@ pub(crate) fn advance_budget_capture_tx(
     };
     if let Some(native) = native {
         native.verify_owner(transaction, expected)?;
+        if let Some(context) = caller_context {
+            native.verify_caller_context(transaction, context)?;
+        }
         attachments.push(native.attachment());
     }
     let command = AdmissionOperationCommand::new(
@@ -1451,12 +1457,13 @@ pub(super) enum ParticipantMutation<'a> {
     DpopReplayClaim,
     DpopReplayRelease,
     NativeDispatchCapture(&'a VerifiedNativeCapture<'a>),
+    CallerWait(&'a caller_wait::VerifiedCallerWait<'a>),
 }
 
 impl ParticipantMutation<'_> {
     fn as_str(&self) -> &'static str {
         match self {
-            Self::CompareAndSwap | Self::NativeDispatchCapture(_) => {
+            Self::CompareAndSwap | Self::NativeDispatchCapture(_) | Self::CallerWait(_) => {
                 COMBINED_CAPTURE_OPERATION_MUTATION_KIND
             }
             Self::Update => "participant_update",
@@ -1487,6 +1494,8 @@ pub(super) fn advance_named_participant_tx(
     if updated.dispatch_commit().is_some() {
         if let ParticipantMutation::NativeDispatchCapture(native) = &commit.kind {
             native.verify_transition(transaction, expected, updated)?;
+        } else if let ParticipantMutation::CallerWait(wait) = &commit.kind {
+            wait.verify_transition(transaction, expected, updated)?;
         } else {
             security_dispatch::verify_native_security_dispatch_tx(transaction, updated)?;
         }
@@ -1495,6 +1504,7 @@ pub(super) fn advance_named_participant_tx(
         commit.kind,
         ParticipantMutation::CompareAndSwap
             | ParticipantMutation::NativeDispatchCapture(_)
+            | ParticipantMutation::CallerWait(_)
             | ParticipantMutation::RuntimeClaim
             | ParticipantMutation::GovernedApprovalClaim
             | ParticipantMutation::DpopReplayClaim
@@ -1632,7 +1642,9 @@ pub(super) fn append_named_participant_tx(
 ) -> Result<(), AdmissionOperationStoreError> {
     if matches!(
         commit.kind,
-        ParticipantMutation::CompareAndSwap | ParticipantMutation::NativeDispatchCapture(_)
+        ParticipantMutation::CompareAndSwap
+            | ParticipantMutation::NativeDispatchCapture(_)
+            | ParticipantMutation::CallerWait(_)
     ) {
         return Err(invariant(
             "compare-and-swap requires an operation version advance",

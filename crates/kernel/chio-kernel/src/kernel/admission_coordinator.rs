@@ -272,30 +272,9 @@ pub(crate) struct DurableToolAdmission {
 }
 
 /// The transport a durable dispatch binds its provider attempt to.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum DispatchTransport {
-    /// A tool server registered with this kernel.
-    KernelToolServer,
-    /// The caller's own report of an execution that happened elsewhere.
-    CallerReport,
-}
-
-pub(crate) const CALLER_REPORT_TRANSPORT_PREFIX: &str =
-    ProviderAttemptBindingV1::CALLER_REPORT_TRANSPORT_PREFIX;
-
-impl DispatchTransport {
-    pub(crate) fn transport_id(self, server_id: &str) -> String {
-        match self {
-            Self::KernelToolServer => format!("kernel-tool-server:{server_id}"),
-            Self::CallerReport => format!("{CALLER_REPORT_TRANSPORT_PREFIX}{server_id}"),
-        }
-    }
-}
-
-/// Whether a registered provider attempt binds the caller-report transport.
-pub(crate) fn is_caller_report_attempt(attempt: &ProviderAttemptBindingV1) -> bool {
-    attempt.is_caller_report()
-}
+#[path = "admission_coordinator/dispatch_transport.rs"]
+mod dispatch_transport;
+pub(crate) use dispatch_transport::{is_caller_report_attempt, DispatchTransport};
 
 impl DurableToolAdmission {
     /// The retained nonce this execution request presented, if any.
@@ -799,7 +778,26 @@ impl ChioKernel {
         let nonce_preflight_pending = nonce_participant && issued_nonce.is_none();
         let expected_operation_id = operation.binding().operation_id().as_str();
         let expected_attempt_id = format!("attempt:{expected_operation_id}");
-        let expected_transport_id = transport.transport_id(&request.server_id);
+        let expected_transport_id = if matches!(transport, DispatchTransport::CallerReport)
+            && retained_request
+                .as_ref()
+                .is_some_and(|original| original.native_security_authority_binding().is_some())
+        {
+            format!(
+                "{}{}",
+                ProviderAttemptBindingV1::NATIVE_CALLER_REPORT_TRANSPORT_PREFIX,
+                request.server_id
+            )
+        } else {
+            transport.transport_id(&request.server_id)
+        };
+        let executor_epoch = if matches!(transport, DispatchTransport::CallerReport) {
+            self.caller_executor
+                .as_ref()
+                .map(|executor| executor.key_epoch)
+        } else {
+            None
+        };
         let operation = match operation.state() {
             AdmissionOperationState::Prepared if nonce_preflight_pending => operation,
             AdmissionOperationState::Prepared => {
@@ -812,7 +810,8 @@ impl ChioKernel {
                     operation_id: expected_operation_id.to_owned(),
                     attempt_id: expected_attempt_id,
                     transport_id: expected_transport_id,
-                    transport_key_epoch: operation.coordinator_lease_epoch(),
+                    transport_key_epoch: executor_epoch
+                        .unwrap_or(operation.coordinator_lease_epoch()),
                 };
                 expected_attempt.validate().map_err(|error| {
                     KernelError::DurableAdmission(format!(
@@ -840,7 +839,10 @@ impl ChioKernel {
                 attempt.operation_id == expected_operation_id
                     && attempt.attempt_id == expected_attempt_id
                     && attempt.transport_id == expected_transport_id
-                    && attempt.transport_key_epoch <= operation.coordinator_lease_epoch()
+                    && executor_epoch.map_or(
+                        attempt.transport_key_epoch <= operation.coordinator_lease_epoch(),
+                        |epoch| attempt.transport_key_epoch == epoch,
+                    )
             }) =>
             {
                 operation

@@ -36,6 +36,13 @@ mod nonce {
     ));
 }
 
+mod caller {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_flow_caller_tests.rs"
+    ));
+}
+
 mod declassification {
     include!(concat!(
         env!("CARGO_MANIFEST_DIR"),

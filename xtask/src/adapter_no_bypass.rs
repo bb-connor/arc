@@ -285,13 +285,25 @@ const CALL_CONTRACTS: &[CallContract] = &[
     CallContract {
         path: "crates/kernel/chio-runtime-core/src/admission_hook.rs",
         function: "<ChioRuntimeAdmissionHook as RuntimeAdmissionHook>::evaluate",
-        target: "verify_swarm_authority_reference_from_store",
+        target: "self.prepare_request",
         minimum: 1,
     },
     CallContract {
         path: "crates/kernel/chio-runtime-core/src/admission_hook.rs",
         function: "<ChioRuntimeAdmissionHook as RuntimeAdmissionHook>::evaluate",
-        target: "self.store.consume_swarm_continuation",
+        target: "prepared.reserve",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/kernel/chio-runtime-core/src/admission_hook/preparation.rs",
+        function: "ChioRuntimeAdmissionHook::prepare_request",
+        target: "verify_swarm_authority_reference_from_store",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/kernel/chio-runtime-core/src/admission_hook/reservation.rs",
+        function: "PreparedHookAdmission::reserve",
+        target: "hook.store.consume_swarm_continuation",
         minimum: 1,
     },
     CallContract {
@@ -303,6 +315,12 @@ const CALL_CONTRACTS: &[CallContract] = &[
     CallContract {
         path: "crates/kernel/chio-kernel/src/kernel/validation.rs",
         function: "ChioKernel::admit_capability_budget",
+        target: "self.admit_capability_budget_for_dispatch",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/kernel/chio-kernel/src/kernel/validation/caller_budget.rs",
+        function: "ChioKernel::admit_capability_budget_for_dispatch",
         target: "budgets.try_admit_child",
         minimum: 1,
     },
@@ -1082,6 +1100,47 @@ mod tests {
         assert!(
             validate_fixture("crates/protocol/chio-acp-proxy/src/transport.rs", source).is_ok()
         );
+    }
+
+    #[test]
+    fn prepared_runtime_boundary_requires_both_entry_and_leaf_calls() {
+        let root = workspace_root().unwrap_or_else(|error| panic!("workspace root: {error}"));
+        let contracts: Vec<_> = CALL_CONTRACTS
+            .iter()
+            .filter(|contract| {
+                matches!(
+                    contract.target,
+                    "self.prepare_request"
+                        | "prepared.reserve"
+                        | "verify_swarm_authority_reference_from_store"
+                        | "hook.store.consume_swarm_continuation"
+                )
+            })
+            .collect();
+        assert_eq!(contracts.len(), 4);
+        for contract in contracts {
+            let source = fs::read_to_string(root.join(contract.path))
+                .unwrap_or_else(|error| panic!("read {}: {error}", contract.path));
+            let facts = parse_source(&source, contract.path)
+                .unwrap_or_else(|error| panic!("parse {}: {error}", contract.path));
+            assert!(
+                require_call(&facts, contract).is_ok(),
+                "{}",
+                contract.target
+            );
+            let mut missing = facts;
+            missing
+                .functions
+                .get_mut(contract.function)
+                .unwrap_or_else(|| panic!("missing {}", contract.function))
+                .calls
+                .retain(|call| call.target != contract.target);
+            assert!(
+                require_call(&missing, contract).is_err(),
+                "{}",
+                contract.target
+            );
+        }
     }
 
     #[test]

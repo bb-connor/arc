@@ -1,8 +1,7 @@
-//! Caller-executed tool calls under durable admission. A reserve keeps the
-//! executable hold and the nonce for a tool that runs outside this kernel; the
-//! reconcile resumes the same operation with the caller's report standing in
-//! for the tool server, so the return is recorded, evaluated and receipted
-//! exactly as an in-kernel dispatch.
+//! Caller execution separates preparation, committed start and authenticated
+//! return. Reservation never authorizes an effect. Legacy unsigned reports are
+//! refused when an executor is pinned; historical signed reports enter the
+//! original finalization path without repeating admission.
 
 use std::sync::{Arc, Mutex};
 
@@ -13,7 +12,35 @@ use crate::kernel::credential_reservation::DispatchCredentialReservation;
 use crate::kernel::responses::PreflightNonceSource;
 use crate::{NestedFlowBridge, ToolInvocationCost, ToolServerConnection};
 
-/// What a caller reports after executing a reserved tool call elsewhere.
+/// A reservation or receipt is never execution permission. Only `Authorized`
+/// carries the committed statement a configured durable executor can claim.
+pub enum CallerStartResponse {
+    Authorized(Box<crate::caller_delivery::SignedCallerDispatchAuthorizationV1>),
+    Denied(Box<ToolCallResponse>),
+}
+
+/// Live credential presentation for a reserved caller start. These artifacts
+/// are revalidated against the original operation-owned claims, never copied
+/// into the private return snapshot or recovered from a delivery report.
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CallerStartCredentials {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dpop_proof: Option<crate::dpop::DpopProof>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval_token: Option<chio_core::capability::governance::GovernedApprovalToken>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub approval_tokens: Vec<chio_core::capability::governance::GovernedApprovalToken>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub threshold_approval_proposal:
+        Option<chio_core::capability::governance::ThresholdApprovalProposal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declassification_grant: Option<chio_core_types::SignedDeclassificationGrant>,
+}
+
+/// The trusted executor callback's output after a committed caller start.
+/// This unsigned value is not delivery evidence until its durable executor
+/// ledger has bound and signed it as a `SignedCallerDeliveryReportV1`.
 #[derive(Debug, Clone)]
 pub struct CallerExecutionReport {
     /// The output the caller observed, recorded as the tool's return.
@@ -89,29 +116,166 @@ pub(super) struct CallerReservation<'a, 'c> {
 }
 
 impl ChioKernel {
-    /// The existing two-call caller protocol reconstructs reports from a
-    /// secret-free retained request. It cannot yet recover replay credentials
-    /// or live security-hook owners. Reject these compositions before minting
-    /// a nonce or acquiring any participant; a reservation is not a start permit.
+    /// Complete the start-side evaluation only after the original dispatch is
+    /// committed. The outer start producer signs the authorization separately;
+    /// this internal receipt and nonce are not permission to execute.
+    pub(super) fn build_committed_caller_start_response(
+        &self,
+        request: &ToolCallRequest,
+        admission: Option<&DurableToolAdmission>,
+        grant_index: usize,
+        metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let nonce = admission
+            .filter(|admission| admission.operation().dispatch_commit().is_some())
+            .and_then(DurableToolAdmission::issued_nonce)
+            .ok_or_else(|| {
+                KernelError::DurableAdmission("caller start lost its committed nonce".into())
+            })?;
+        self.build_execution_nonce_preflight_allow_response_with_metadata(
+            request,
+            current_unix_timestamp(),
+            Some(grant_index),
+            metadata,
+            "caller dispatch committed; authenticated executor claim required",
+            None,
+            PreflightNonceSource::Durable(Box::new(nonce.clone())),
+        )
+    }
+
+    /// Configure the trusted host executor before admitting calls. A supplied
+    /// report cannot choose this key. Reconfiguration refuses old operations
+    /// through their immutable authority profile.
+    pub fn set_caller_executor(
+        &mut self,
+        executor: crate::caller_delivery::CallerExecutorIdentityV1,
+    ) -> Result<(), KernelError> {
+        executor
+            .validate()
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        self.caller_executor = Some(executor);
+        Ok(())
+    }
+
+    /// Trusted host selection, never a value adopted from caller input.
+    pub fn caller_executor_identity(
+        &self,
+    ) -> Option<&crate::caller_delivery::CallerExecutorIdentityV1> {
+        self.caller_executor.as_ref()
+    }
+
+    /// Capture the original reservation before publishing execution authority.
+    /// Explicit retries recover the identical original statement and interval;
+    /// they never renew permission or dispatch a registered tool server.
+    pub fn start_caller_execution_blocking(
+        &self,
+        nonce: &SignedExecutionNonce,
+        arguments: &serde_json::Value,
+    ) -> Result<CallerStartResponse, KernelError> {
+        self.start_caller_execution_with_credentials_blocking(
+            nonce,
+            arguments,
+            CallerStartCredentials::default(),
+        )
+    }
+
+    /// Start with a fresh presentation of the originally admitted credentials.
+    /// Historical authorization recovery does not consume those credentials or
+    /// extend their validity; new starts run the shared live admission checks.
+    pub fn start_caller_execution_with_credentials_blocking(
+        &self,
+        nonce: &SignedExecutionNonce,
+        arguments: &serde_json::Value,
+        credentials: CallerStartCredentials,
+    ) -> Result<CallerStartResponse, KernelError> {
+        self.start_caller_execution_inner(nonce, arguments, credentials, None)
+    }
+
+    /// A trusted embedding supplies native identity and isolation context for
+    /// a fresh start. Caller-provided JSON cannot select this host context.
+    pub fn start_caller_execution_blocking_with_security_context(
+        &self,
+        nonce: &SignedExecutionNonce,
+        arguments: &serde_json::Value,
+        credentials: CallerStartCredentials,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<CallerStartResponse, KernelError> {
+        self.start_caller_execution_inner(nonce, arguments, credentials, Some(security_context))
+    }
+
+    fn start_caller_execution_inner(
+        &self,
+        nonce: &SignedExecutionNonce,
+        arguments: &serde_json::Value,
+        credentials: CallerStartCredentials,
+        security_context: Option<&SecurityInvocationContext>,
+    ) -> Result<CallerStartResponse, KernelError> {
+        if let Some(authorization) = self.committed_caller_authorization(nonce, arguments)? {
+            return Ok(CallerStartResponse::Authorized(Box::new(authorization)));
+        }
+        let mut request = self.caller_reserved_request(
+            &nonce.nonce.bound_to.request_id,
+            current_unix_timestamp_ms(),
+        )?;
+        request.execution_nonce = Some(nonce.clone());
+        request.dpop_proof = credentials.dpop_proof;
+        request.approval_token = credentials.approval_token;
+        request.approval_tokens = credentials.approval_tokens;
+        request.threshold_approval_proposal = credentials.threshold_approval_proposal;
+        request.declassification_grant = credentials.declassification_grant;
+        let response =
+            block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
+                &request,
+                None,
+                None,
+                None,
+                security_context,
+                EvaluationDisposition::caller_start(),
+            ))?;
+        if response.verdict != Verdict::Allow {
+            return Ok(CallerStartResponse::Denied(Box::new(response)));
+        }
+        let authorization = self
+            .committed_caller_authorization(nonce, arguments)?
+            .ok_or_else(|| {
+                KernelError::DurableAdmission("caller start did not retain a commitment".into())
+            })?;
+        Ok(CallerStartResponse::Authorized(Box::new(authorization)))
+    }
+
+    /// Credentials require authenticated start and physical operation-owned
+    /// custody. Live-only security owners and opaque extensions cannot be
+    /// reconstructed from historical request DTOs and remain fail-closed.
     pub(super) fn caller_reservation_profile_denial(
         &self,
         request: &ToolCallRequest,
         dpop_required: bool,
     ) -> Option<&'static str> {
-        if dpop_required
-            || request.dpop_proof.is_some()
-            || request.approval_token.is_some()
-            || !request.approval_tokens.is_empty()
-            || request.threshold_approval_proposal.is_some()
+        let authenticated = self.caller_executor.is_some();
+        let native = authenticated
+            && self.security_pre_dispatch_policy == SecurityPreDispatchPolicy::Enforce
+            && self
+                .native_security_authority_binding()
+                .ok()
+                .flatten()
+                .is_some();
+        if ((dpop_required || request.dpop_proof.is_some())
+            && (!authenticated || self.dpop_authority.is_none()))
+            || (request.approval_token.is_some()
+                && (!authenticated || self.governed_approval_authority.is_none()))
+            || ((!request.approval_tokens.is_empty()
+                || request.threshold_approval_proposal.is_some())
+                && !authenticated)
             || request.supplemental_authorization.is_some()
-            || request.declassification_grant.is_some()
+            || (request.declassification_grant.is_some() && !native)
         {
-            return Some("caller execution requires recoverable credential custody not supported by the two-call report protocol");
+            return Some("caller execution requires authenticated start and operation-owned credential custody");
         }
-        if self.security_pre_dispatch_hook.is_some()
-            || self.security_pre_dispatch_policy == SecurityPreDispatchPolicy::Enforce
+        if (self.security_pre_dispatch_hook.is_some()
+            || self.security_pre_dispatch_policy == SecurityPreDispatchPolicy::Enforce)
+            && !native
         {
-            return Some("caller execution requires recoverable security-hook custody not supported by the two-call report protocol");
+            return Some("caller execution requires qualified native capture and recoverable release custody");
         }
         None
     }
@@ -189,51 +353,80 @@ impl ChioKernel {
     /// first and issues the operation-bound nonce; the execution's first half
     /// then acquires the executable hold, decides cumulative approval and
     /// reserves the nonce, and the operation rests in `ReadyToDispatch` until
-    /// the caller reconciles or the nonce expires. A request presenting the
-    /// issued nonce is an approved retry of that second half. The receipt is
-    /// the reserving authorization, not a completed execution, and no tool
-    /// target has to be registered because none is dispatched.
-    /// Credential-bearing and security-hook profiles require the forthcoming
-    /// durable start/report protocol and are rejected before reservation.
+    /// an authenticated start commits it or unused permission expires. A request
+    /// presenting the issued nonce retries the same preparation. The receipt is
+    /// a reservation acknowledgement, never execution authority. No registered
+    /// tool is dispatched. Credential-bearing profiles require operation-owned
+    /// custody; live-only security owners remain unsupported for external calls.
     pub fn reserve_caller_execution_blocking(
         &self,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.reserve_caller_execution_inner(request, None)
+    }
+
+    /// Reserve against identity supplied by the trusted native host. The
+    /// reservation is still non-executable and acquires no release owner.
+    /// Without a nonce, returns only the preflight response. The host must
+    /// refresh the native flow generation after that join and present the nonce
+    /// with the refreshed context to reserve. No historical context is promoted
+    /// into current host authority by this convenience API.
+    pub fn reserve_caller_execution_blocking_with_security_context(
+        &self,
+        request: &ToolCallRequest,
+        security_context: &SecurityInvocationContext,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.reserve_caller_execution_inner(request, Some(security_context))
+    }
+
+    fn reserve_caller_execution_inner(
+        &self,
+        request: &ToolCallRequest,
+        security_context: Option<&SecurityInvocationContext>,
+    ) -> Result<ToolCallResponse, KernelError> {
         let mut execution = request.clone();
         if execution.execution_nonce.is_none() {
-            let preflight = self.reserve_caller_execution_step(&execution)?;
+            let preflight = self.reserve_caller_execution_step(&execution, security_context)?;
+            if security_context.is_some() {
+                return Ok(preflight);
+            }
             let Some(nonce) = preflight.execution_nonce.as_deref() else {
                 return Ok(preflight);
             };
             execution.execution_nonce = Some(nonce.clone());
         }
-        self.reserve_caller_execution_step(&execution)
+        self.reserve_caller_execution_step(&execution, security_context)
     }
 
     fn reserve_caller_execution_step(
         &self,
         request: &ToolCallRequest,
+        security_context: Option<&SecurityInvocationContext>,
     ) -> Result<ToolCallResponse, KernelError> {
         block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
             request,
             None,
             None,
             None,
-            None,
+            security_context,
             EvaluationDisposition::caller_reservation(),
         ))
     }
 
-    /// Reconcile a caller execution. The presented nonce names the reserved
-    /// operation, the arguments must hash to the retained action, and the
-    /// report is recorded as the tool's return before the operation completes.
-    /// A second reconcile replays the completed receipt.
+    /// Legacy unsigned reconciliation, refused when a caller executor is pinned.
+    /// This compatibility path does not authorize an external effect. New
+    /// integrations must use committed start and authenticated delivery reports.
     pub fn reconcile_caller_execution_blocking(
         &self,
         nonce: &SignedExecutionNonce,
         arguments: &serde_json::Value,
         report: CallerExecutionReport,
     ) -> Result<ToolCallResponse, KernelError> {
+        if self.caller_executor.is_some() {
+            return Err(KernelError::DurableAdmission(
+                "configured caller executor requires authenticated start and delivery; unsigned reports are not accepted".into(),
+            ));
+        }
         let mut request = self.caller_reserved_request(
             &nonce.nonce.bound_to.request_id,
             current_unix_timestamp_ms(),

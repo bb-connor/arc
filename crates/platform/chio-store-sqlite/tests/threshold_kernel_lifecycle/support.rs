@@ -45,6 +45,7 @@ pub struct Fixture {
     pub invocations: Arc<AtomicUsize>,
     /// Installs the strict execution nonce profile with this issuance lifetime.
     pub nonce_ttl_secs: Option<u64>,
+    pub caller_executor: Option<chio_kernel::caller_delivery::CallerExecutorIdentityV1>,
 }
 
 pub struct Runtime {
@@ -80,6 +81,7 @@ impl Fixture {
             requirement: Arc::new(RwLock::new(requirement)),
             invocations: Arc::new(AtomicUsize::new(0)),
             nonce_ttl_secs: None,
+            caller_executor: None,
         };
         SqliteAuthorityStore::provision(
             fixture.database(),
@@ -146,6 +148,9 @@ impl Fixture {
         )?;
         kernel.set_budget_store_handle(Arc::new(authority.budget_store()));
         kernel.set_revocation_store_handle(Arc::new(authority.revocation_store()));
+        if let Some(executor) = &self.caller_executor {
+            kernel.set_caller_executor(executor.clone())?;
+        }
         let requirement = self.requirement.clone();
         kernel.set_threshold_approval_requirement_resolver(Arc::new(
             move |_: &str, server: &str, tool: &str| {

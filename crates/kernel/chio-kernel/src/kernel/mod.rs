@@ -77,7 +77,7 @@ pub use error::{
     HotPathStage, KernelError, OverloadResource, ReplayClockDirection,
     SettlementRuntimeConfigError, StructuredErrorReport,
 };
-pub use evaluation::CallerExecutionReport;
+pub use evaluation::{CallerExecutionReport, CallerStartCredentials, CallerStartResponse};
 pub use kernel_struct::{
     ChioKernel, HotPathDeadlineConfig, HybridSigningConfig, KernelConfig, MemoryBudgetConfig,
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
@@ -140,14 +140,16 @@ const BUDGET_AUTHORITY_METADATA_KEY: &str = "budget_authority";
 const BUDGET_DENIAL_AUTHORITY_METADATA_KEY: &str = "budget_denial_authority";
 const FINANCIAL_METADATA_KEY: &str = "financial";
 const GOVERNED_TRANSACTION_METADATA_KEY: &str = "governed_transaction";
+const CALLER_DELIVERY_METADATA_KEY: &str = "caller_delivery";
 
-const RESERVED_RECEIPT_METADATA_KEYS: [&str; 6] = [
+const RESERVED_RECEIPT_METADATA_KEYS: [&str; 7] = [
     MANIFEST_SECURITY_METADATA_KEY,
     PROTOCOL_ADMISSION_METADATA_KEY,
     BUDGET_AUTHORITY_METADATA_KEY,
     BUDGET_DENIAL_AUTHORITY_METADATA_KEY,
     FINANCIAL_METADATA_KEY,
     GOVERNED_TRANSACTION_METADATA_KEY,
+    CALLER_DELIVERY_METADATA_KEY,
 ];
 
 fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {

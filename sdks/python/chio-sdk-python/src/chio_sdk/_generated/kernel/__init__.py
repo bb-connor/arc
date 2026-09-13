@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: c56ebd67862c888dd340e0ba3a14bf38d69abc45d8d02e706ed935cd512054ec
+# Schema sha256: 87aeeadf1295c6ed5c56ce7813afa5a254c07827c1029566566991a30ebeb7d7
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from .caller_delivery_report_schema import ChioSignedCallerDeliveryReport, RealizedCost, Report
+from .caller_dispatch_authorization_schema import Authorization, CallerDigest, CallerExecutor, CallerIdentifier, CallerPositiveInteger, CallerPublicKey, CallerSignature, ChioSignedCallerDispatchAuthorization, Committed, DispatchCommit, Invocation, ProviderAttempt, StoreFence
 from .capability_list_schema import ChioKernelmessageCapabilityList
 from .capability_revoked_schema import ChioKernelmessageCapabilityRevoked
 from .combined_capture_metadata_schema import ChioCombinedAdmissionCaptureMetadata, QuotaKey
@@ -19,27 +21,43 @@ from .tool_call_chunk_schema import ChioKernelmessageToolCallChunk
 from .tool_call_response_schema import ChioKernelmessageToolCallResponse, Detail, Error, Error10, Error11, Error12, Error13, Error9, Result, Result3, Result4, Result5, Result6
 
 __all__ = [
+    "Authorization",
     "BoundTo",
+    "CallerDigest",
+    "CallerExecutor",
+    "CallerIdentifier",
+    "CallerPositiveInteger",
+    "CallerPublicKey",
+    "CallerSignature",
     "ChioCombinedAdmissionCaptureMetadata",
     "ChioKernelmessageCapabilityList",
     "ChioKernelmessageCapabilityRevoked",
     "ChioKernelmessageHeartbeat",
     "ChioKernelmessageToolCallChunk",
     "ChioKernelmessageToolCallResponse",
+    "ChioSignedCallerDeliveryReport",
+    "ChioSignedCallerDispatchAuthorization",
     "ChioSignedExecutionNonce",
+    "Committed",
     "Detail",
+    "DispatchCommit",
     "Error",
     "Error10",
     "Error11",
     "Error12",
     "Error13",
     "Error9",
+    "Invocation",
     "Nonce",
+    "ProviderAttempt",
     "QuotaKey",
+    "RealizedCost",
+    "Report",
     "Result",
     "Result3",
     "Result4",
     "Result5",
     "Result6",
     "Schema",
+    "StoreFence",
 ]

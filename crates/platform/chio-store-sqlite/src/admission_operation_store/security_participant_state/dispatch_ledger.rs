@@ -34,7 +34,7 @@ fn require_operation(operation: &AdmissionOperationV1) -> Result<(), AdmissionOp
         || operation.budget_hold_id().is_none()
         || operation
             .provider_attempt()
-            .is_none_or(|attempt| attempt.is_caller_report())
+            .is_none_or(|attempt| attempt.is_caller_report() && !attempt.is_native_caller_report())
     {
         return Err(invalid(
             "native dispatch preparation requires kernel capture custody",

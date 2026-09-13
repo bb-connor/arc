@@ -42,6 +42,7 @@ use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 
 mod caller_budget;
 mod caller_dispatch_context;
+mod caller_wait;
 mod commit_chain;
 mod credit_exposure;
 #[cfg(feature = "admission-test-support")]
@@ -171,7 +172,7 @@ pub use security_participant_migration::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 33;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 34;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
@@ -468,6 +469,22 @@ impl SqliteAdmissionOperationStore {
         &self,
         capture: chio_kernel::receipt_store::AdmissionNativeDispatchCapture<'_>,
     ) -> Result<chio_kernel::AdmissionBudgetCapture, AdmissionCaptureError> {
+        self.capture_native_dispatch_inner(capture, None)
+    }
+
+    pub fn capture_native_caller_invocation_and_commit_dispatch(
+        &self,
+        capture: chio_kernel::receipt_store::AdmissionNativeDispatchCapture<'_>,
+        context: &chio_kernel::admission_operation::AdmissionCallerDispatchContextV1,
+    ) -> Result<chio_kernel::AdmissionBudgetCapture, AdmissionCaptureError> {
+        self.capture_native_dispatch_inner(capture, Some(context))
+    }
+
+    fn capture_native_dispatch_inner(
+        &self,
+        capture: chio_kernel::receipt_store::AdmissionNativeDispatchCapture<'_>,
+        caller_context: Option<&chio_kernel::admission_operation::AdmissionCallerDispatchContextV1>,
+    ) -> Result<chio_kernel::AdmissionBudgetCapture, AdmissionCaptureError> {
         let custody = capture.custody;
         #[cfg(feature = "admission-test-support")]
         let original = custody.operation;
@@ -478,7 +495,7 @@ impl SqliteAdmissionOperationStore {
                     operation: custody.operation,
                     recovery_lease: custody.lease,
                     trusted_now_unix_ms: custody.trusted_now_unix_ms,
-                    caller_context: None,
+                    caller_context,
                     native: Some(NativeCaptureBinding {
                         custody,
                         credentials: capture.credentials,
@@ -1355,6 +1372,7 @@ fn state_name(state: AdmissionOperationState) -> &'static str {
         AdmissionOperationState::ReadyToDispatch => "ready_to_dispatch",
         AdmissionOperationState::CapturePending => "capture_pending",
         AdmissionOperationState::DispatchCommitted => "dispatch_committed",
+        AdmissionOperationState::AwaitingCallerReport => "awaiting_caller_report",
         AdmissionOperationState::Finalizing => "finalizing",
         AdmissionOperationState::Completed => "completed",
         AdmissionOperationState::CompensatedBeforeDispatch => "compensated_before_dispatch",

@@ -12,6 +12,8 @@ from chio_sdk.client import ChioClient, _canonical_json, _sha256_hex
 from chio_sdk.errors import (
     ChioDeniedError,
     ChioError,
+    ChioTimeoutError,
+    ChioValidationError,
 )
 from chio_sdk.models import (
     ChioReceipt,
@@ -464,7 +466,10 @@ class TestEvaluateToolCall:
     @respx.mock
     async def test_evaluate_tool_call_mediated_returns_mediated_response(self) -> None:
         expected = {
-            "status": "authorized",
+            "status": "reserved",
+            "protocol": "chio.caller-delivery.v1",
+            "execution_authorized": False,
+            "start_required": True,
             "receipt": _make_receipt_dict(),
             "execution_nonce": {"nonce_id": "n-1", "signature": "e" * 128},
         }
@@ -484,7 +489,7 @@ class TestEvaluateToolCall:
         assert "execution_nonce" not in request_body
 
     @respx.mock
-    async def test_reconcile_mediated_authorization_posts_nonce_and_cost(self) -> None:
+    async def test_legacy_unsigned_reconciliation_is_rejected_without_http(self) -> None:
         nonce = {"nonce_id": "n-1", "signature": "e" * 128}
         arguments = {"path": "/tmp"}
         realized_cost = {"units": 30, "currency": "USD", "breakdown": None}
@@ -493,19 +498,14 @@ class TestEvaluateToolCall:
             return_value=httpx.Response(200, json=expected)
         )
         async with ChioClient(BASE) as client:
-            result = await client.reconcile_mediated_authorization(
-                control_token="ctl-secret",
-                execution_nonce=nonce,
-                arguments=arguments,
-                realized_cost=realized_cost,
-            )
-        assert result == expected
-        request = route.calls.last.request
-        assert request.headers["authorization"] == "Bearer ctl-secret"
-        body = json.loads(request.content)
-        assert body["execution_nonce"] == nonce
-        assert body["arguments"] == arguments
-        assert body["realized_cost"] == realized_cost
+            with pytest.raises(ChioValidationError, match="Unsigned caller reconciliation"):
+                await client.reconcile_mediated_authorization(
+                    control_token="ctl-secret",
+                    execution_nonce=nonce,
+                    arguments=arguments,
+                    realized_cost=realized_cost,
+                )
+        assert not route.called
 
     @respx.mock
     async def test_evaluate_tool_call_mediated_forwards_governed_and_dpop(self) -> None:
@@ -517,7 +517,10 @@ class TestEvaluateToolCall:
             return_value=httpx.Response(
                 200,
                 json={
-                    "status": "authorized",
+                    "status": "reserved",
+                    "protocol": "chio.caller-delivery.v1",
+                    "execution_authorized": False,
+                    "start_required": True,
                     "receipt": _make_receipt_dict(),
                     "execution_nonce": {"nonce_id": "n-1", "signature": "e" * 128},
                 },
@@ -696,6 +699,54 @@ class TestEvaluateToolCall:
                     parameters={"path": "/tmp"},
                 )
             assert exc_info.value.guard == "BudgetGuard"
+
+
+class TestAuthenticatedCallerDelivery:
+    @respx.mock
+    async def test_reservation_only_authorization_is_not_execution_permission(self) -> None:
+        respx.post(f"{BASE}/v1/evaluate").mock(return_value=httpx.Response(200, json={
+            "status": "authorized", "execution_nonce": {"legacy": True},
+        }))
+        async with ChioClient(BASE) as client:
+            with pytest.raises(ChioValidationError, match="Reservation-only"):
+                await client.evaluate_tool_call_mediated(
+                    capability=_make_token_dict(), tool_server="srv", tool_name="read", parameters={},
+                )
+
+    @respx.mock
+    async def test_start_and_report_are_separate_control_requests(self) -> None:
+        # These are transport fixtures, not cryptographically verified permits.
+        authorization = {"authorization": {"schema": "chio.caller-dispatch-authorization.v1"}, "signature": "test"}
+        report = {"report": {"schema": "chio.caller-delivery-report.v1"}, "signature": "test"}
+        started = {"status": "dispatch_committed", "protocol": "chio.caller-delivery.v1", "authorization": authorization}
+        completed = {"status": "reconciled", "protocol": "chio.caller-delivery.v1", "execution_authorized": False, "receipt": _make_receipt_dict()}
+        start = respx.post(f"{BASE}/v1/caller/start").mock(return_value=httpx.Response(200, json=started))
+        delivered = respx.post(f"{BASE}/v1/caller/report").mock(return_value=httpx.Response(200, json=completed))
+        async with ChioClient(BASE) as client:
+            assert await client.start_mediated_execution(
+                control_token="executor-control", execution_nonce={"nonce": "original"}, arguments={"x": 1},
+            ) == started
+            assert not delivered.called, "start cannot implicitly report or execute a tool"
+            assert await client.report_mediated_execution(
+                control_token="executor-control", authorization=authorization, report=report,
+            ) == completed
+        assert start.call_count == 1
+        assert delivered.call_count == 1
+        for route in (start, delivered):
+            request = route.calls.last.request
+            assert request.headers["authorization"] == "Bearer executor-control"
+            assert json.loads(request.content)["protocol"] == "chio.caller-delivery.v1"
+        assert json.loads(delivered.calls.last.request.content)["report"] == report
+
+    @respx.mock
+    async def test_lost_start_reply_is_not_retried(self) -> None:
+        route = respx.post(f"{BASE}/v1/caller/start").mock(side_effect=httpx.ReadTimeout("lost reply"))
+        async with ChioClient(BASE) as client:
+            with pytest.raises(ChioTimeoutError):
+                await client.start_mediated_execution(
+                    control_token="executor-control", execution_nonce={}, arguments={},
+                )
+        assert route.call_count == 1
 
 
 class TestEvaluateHttpRequest:

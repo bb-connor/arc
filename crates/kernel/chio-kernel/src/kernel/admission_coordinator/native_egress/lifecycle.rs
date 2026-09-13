@@ -54,7 +54,13 @@ impl CapturedLifecycle {
         kernel: &ChioKernel,
         admission: &DurableToolAdmission,
         request: &ToolCallRequest,
-    ) -> Result<(DurableToolReturnContext, SecurityRequestLifecycleHandle), KernelError> {
+    ) -> Result<
+        (
+            DurableToolReturnContext,
+            Option<SecurityRequestLifecycleHandle>,
+        ),
+        KernelError,
+    > {
         let original = admission
             .original_retained_request()
             .ok_or_else(|| invalid("native lifecycle lost its original request"))?;
@@ -113,6 +119,25 @@ impl CapturedLifecycle {
             .security_invocation_context
             .as_ref()
             .ok_or_else(|| invalid("native lifecycle lost frozen security context"))?;
+        if self
+            .operation
+            .provider_attempt()
+            .is_some_and(ProviderAttemptBindingV1::is_native_caller_report)
+        {
+            let frame = store_call(|| {
+                runtime.store.load_caller_dispatch_context(
+                    self.operation.binding().operation_id(),
+                    &runtime.fence,
+                    now,
+                )
+            })?
+            .ok_or_else(|| invalid("native caller handoff lost committed release custody"))?;
+            drop(_guard);
+            let restored = kernel.restore_caller_return_context(admission, &frame, now)?;
+            // No local execution or release owner is published to the caller.
+            // Only authenticated original delivery may consume durable custody.
+            return Ok((restored, None));
+        }
         let canonical = canonical_live_request(request)?;
         let dispatch = SecurityPreDispatchContext {
             request,
@@ -127,7 +152,7 @@ impl CapturedLifecycle {
             }),
             &dispatch,
         );
-        Ok((self.context, owner))
+        Ok((self.context, Some(owner)))
     }
 }
 
@@ -200,15 +225,13 @@ impl ChioKernel {
                 captured.finish(self, authority.admission, request)
             })
         });
-        result
-            .map(|(context, owner)| (context, Some(owner)))
-            .map_err(|error| {
-                if attempted {
-                    DurableDispatchCommitError::CommitUnconfirmed(error)
-                } else {
-                    rejected(error)
-                }
-            })
+        result.map_err(|error| {
+            if attempted {
+                DurableDispatchCommitError::CommitUnconfirmed(error)
+            } else {
+                rejected(error)
+            }
+        })
     }
 }
 

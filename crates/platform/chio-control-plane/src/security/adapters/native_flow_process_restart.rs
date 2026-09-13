@@ -17,7 +17,7 @@ fn retained(
         .ok_or_else(|| "original operation is absent".into())
 }
 
-fn configure_original_selection(
+pub(super) fn configure_original_selection(
     kernel: &mut ChioKernel,
     original: &RetainedToolAdmissionRequestV1,
     witness: &Witness,

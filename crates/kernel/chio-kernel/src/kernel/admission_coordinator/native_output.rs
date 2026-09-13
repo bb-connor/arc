@@ -82,14 +82,28 @@ impl NativeSecurityOutputJoinAuthority<'_> {
                 "native output observation changed identity or time",
             ));
         }
-        let intent = NativeSecurityOutputJoinRequestV1::new(
-            self.context.operation(),
-            &observed,
-            label,
-            self.context.outcome(),
-            self.context.evaluation(),
-        )
-        .map_err(durable_store_error)?;
+        let prior = if self
+            .admission
+            .operation
+            .provider_attempt()
+            .is_some_and(ProviderAttemptBindingV1::is_native_caller_report)
+        {
+            self.read_optional_history(runtime, now)?
+        } else {
+            None
+        };
+        let intent = if let Some(prior) = prior {
+            self.original_replay_intent(prior, &observed, &label)?
+        } else {
+            NativeSecurityOutputJoinRequestV1::new(
+                self.context.operation(),
+                &observed,
+                label,
+                self.context.outcome(),
+                self.context.evaluation(),
+            )
+            .map_err(durable_store_error)?
+        };
         // Never renew after classification. The physical writer must check the
         // same lease selected before the unlocked callback, even if it expired.
         let record = store_call(|| {
@@ -123,6 +137,62 @@ impl NativeSecurityOutputJoinAuthority<'_> {
             .try_borrow_mut()
             .map_err(|_| invalid("native output confirmation is borrowed"))? = Some(record);
         Ok(snapshot)
+    }
+
+    /// A crash after taint persistence must not invent a second transition at
+    /// the now-advanced flow generation or consume declassification again.
+    /// Classification and current inherited restrictions are still checked;
+    /// the physical writer then revalidates the new recovery lease while
+    /// replaying only the exact original intent, without a new mutation.
+    fn original_replay_intent(
+        &self,
+        prior: NativeSecurityOutputJoinRecordV1,
+        observed: &crate::admission_operation::NativeSecurityFlowObservationV1,
+        classified: &InformationLabel,
+    ) -> Result<NativeSecurityOutputJoinRequestV1, KernelError> {
+        prior
+            .output
+            .validate_artifacts(
+                self.context.operation(),
+                self.context.outcome(),
+                self.context.evaluation(),
+            )
+            .map_err(durable_store_error)?;
+        prior
+            .output
+            .validate_resolution(&prior.join.command, &prior.join.snapshot)
+            .map_err(durable_store_error)?;
+        if prior.join.binding != self.binding
+            || prior.join.operation_id != *self.admission.operation.binding().operation_id()
+            || prior.output.key() != observed.key()
+            || prior.output.output_label() != classified
+        {
+            return Err(invalid(
+                "native caller output replay changed its original classification or identity",
+            ));
+        }
+        let current = observed
+            .snapshot()
+            .ok_or_else(|| invalid("native caller output replay lost current flow state"))?;
+        for (current, retained) in [
+            (
+                &current.principal_label,
+                &prior.join.snapshot.principal_label,
+            ),
+            (&current.lineage_label, &prior.join.snapshot.lineage_label),
+            (&current.session_label, &prior.join.snapshot.session_label),
+        ] {
+            if current
+                .join_restrictions(retained)
+                .map_err(|_| invalid("native output labels are incompatible"))?
+                != *retained
+            {
+                return Err(invalid(
+                    "native caller output replay no longer covers current inherited restrictions",
+                ));
+            }
+        }
+        Ok(prior.output)
     }
 
     fn validate_original(
@@ -173,6 +243,15 @@ impl NativeSecurityOutputJoinAuthority<'_> {
         runtime: &DurableAdmissionRuntime,
         now: u64,
     ) -> Result<NativeSecurityOutputJoinRecordV1, KernelError> {
+        self.read_optional_history(runtime, now)?
+            .ok_or_else(|| invalid("native output readback is absent"))
+    }
+
+    fn read_optional_history(
+        &self,
+        runtime: &DurableAdmissionRuntime,
+        now: u64,
+    ) -> Result<Option<NativeSecurityOutputJoinRecordV1>, KernelError> {
         let (operation, history) = store_call(|| {
             runtime.store.load_native_security_output_join(
                 self.admission.operation.binding().operation_id(),
@@ -184,7 +263,7 @@ impl NativeSecurityOutputJoinAuthority<'_> {
         if operation != self.admission.operation {
             return Err(invalid("native output readback changed original operation"));
         }
-        history.ok_or_else(|| invalid("native output readback is absent"))
+        Ok(history)
     }
 
     fn finish(&self) -> Result<(), KernelError> {

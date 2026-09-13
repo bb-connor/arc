@@ -679,7 +679,6 @@ pub use kernel::{
 
 #[cfg(not(loom))]
 pub use kernel::evaluator::ToolEvaluator;
-pub use kernel::CallerExecutionReport;
 pub use kernel::DurableFinalizationCutpoint;
 #[cfg(feature = "admission-test-support")]
 pub use kernel::DurableFinalizationCutpointHook;
@@ -693,6 +692,7 @@ pub use kernel::NativeSecurityOutputJoinAuthority;
 pub use kernel::VerifiedNativeDispatchCredentials;
 #[cfg(feature = "admission-test-support")]
 pub use kernel::{CallerExecutionCheckpoint, CallerExecutionCheckpointHook};
+pub use kernel::{CallerExecutionReport, CallerStartCredentials, CallerStartResponse};
 
 #[cfg(not(loom))]
 /// Settlement observer surface. Re-exported so integration tests and

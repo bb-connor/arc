@@ -15,6 +15,8 @@ use chio_kernel::{
     DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 
+#[path = "mediated/authenticated.rs"]
+pub(crate) mod authenticated;
 #[path = "mediated/budget_configuration.rs"]
 mod budget_configuration;
 pub(crate) use budget_configuration::build_budget_store;
@@ -516,7 +518,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         federated_origin_kernel_id: None,
         declassification_grant: None,
     };
-    // Single-phase authorization on the shared, process-lifetime kernel: verify +
+    // Reservation on the shared, process-lifetime kernel: verify +
     // reserve the budget hold (kept open) + mint a fresh execution nonce. The
     // reserve-for-caller path never dispatches, so it does not require the
     // caller-named server to be registered; the route therefore never registers
@@ -528,8 +530,8 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         let kernel = mediation_kernel.lock().await;
         // Under durable admission the reservation is the operation's own: the
         // strict preflight issues the operation-bound nonce and the execution's
-        // first half reserves the executable hold and the nonce until the
-        // caller reconciles.
+        // first half reserves the executable hold and nonce. Only the separate
+        // authenticated start can commit them for external execution.
         let reserved = if durable_reservation {
             kernel.reserve_caller_execution_blocking(&kernel_request)
         } else {
@@ -578,13 +580,11 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             "mediated reserve receipt persistence failed; returning minted nonce to caller: {error}"
         );
     }
-    // A successful authorization is `Verdict::Allow` with an incomplete terminal
-    // state (the tool has not run) and a minted nonce. It maps to the wire
-    // status "authorized": the reserved hold enforces budget and the caller
-    // presents the minted nonce to the real tool server. This route never
-    // completes or settles a spend, so no wire status implies a completed spend.
+    // Reservation is deliberately not the old "authorized" wire status. A
+    // caller must obtain a committed statement through the trusted start route
+    // and durably claim it at the configured executor before acting.
     let status_str = match &response.verdict {
-        chio_kernel::Verdict::Allow => "authorized",
+        chio_kernel::Verdict::Allow => "reserved",
         chio_kernel::Verdict::Deny => "deny",
         chio_kernel::Verdict::PendingApproval => "pending_approval",
     };
@@ -592,6 +592,9 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         StatusCode::OK,
         axum::Json(serde_json::json!({
             "status": status_str,
+            "protocol": "chio.caller-delivery.v1",
+            "execution_authorized": false,
+            "start_required": matches!(response.verdict, chio_kernel::Verdict::Allow),
             "receipt": response.receipt,
             "execution_nonce": response.execution_nonce,
         })),

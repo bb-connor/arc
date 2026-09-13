@@ -445,6 +445,7 @@ pub struct ProtectProxy {
     /// by default, which keeps governed `MustPrepay` denied fail-closed: only a
     /// configured adapter enables prepayment.
     payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
+    caller_executor: Option<chio_kernel::caller_delivery::CallerExecutorIdentityV1>,
     threshold_approval_context_resolver: Option<Arc<dyn ThresholdApprovalContextResolver>>,
 }
 
@@ -453,8 +454,20 @@ impl ProtectProxy {
         Self {
             config,
             payment_adapter: None,
+            caller_executor: None,
             threshold_approval_context_resolver: None,
         }
+    }
+
+    /// Pin the trusted executor before admitting caller reservations. Start and
+    /// report require durable admission; requests cannot select this identity.
+    #[must_use]
+    pub fn with_caller_executor(
+        mut self,
+        executor: chio_kernel::caller_delivery::CallerExecutorIdentityV1,
+    ) -> Self {
+        self.caller_executor = Some(executor);
+        self
     }
 
     /// Install the operator's payment adapter for the kernel-mediated route.
@@ -672,6 +685,11 @@ impl ProtectProxy {
                     budget_store: Arc::new(authority.budget_store()),
                 })
             }
+            None if self.caller_executor.is_some() => {
+                return Err(ProtectError::Config(
+                    "authenticated caller execution requires a durable budget authority".into(),
+                ));
+            }
             None => None,
         };
 
@@ -787,14 +805,47 @@ impl ProtectProxy {
         // `/v1/reconcile` deny fail-closed.
         let payment_adapter = self.payment_adapter;
         let mediation_kernel = match budget_store.as_ref() {
-            Some(store) => Some(Mutex::new(build_mediation_kernel(
-                &keypair,
-                Arc::clone(store),
-                &trusted_capability_issuers,
-                Vec::new(),
-                payment_adapter,
-                durable_admission,
-            )?)),
+            Some(store) => {
+                let mut kernel = build_mediation_kernel(
+                    &keypair,
+                    Arc::clone(store),
+                    &trusted_capability_issuers,
+                    Vec::new(),
+                    payment_adapter,
+                    durable_admission,
+                )?;
+                if let Some(executor) = self.caller_executor {
+                    if !kernel.has_durable_admission_store() {
+                        return Err(ProtectError::Config(
+                            "authenticated caller execution requires durable admission".into(),
+                        ));
+                    }
+                    kernel
+                        .set_caller_executor(executor)
+                        .map_err(|error| ProtectError::Config(error.to_string()))?;
+                    if let Some(store) = revocation_store.as_ref() {
+                        // Include the configured startup revocation database in
+                        // the kernel's ancestor walk, not only the sidecar's
+                        // leaf lookup. A report cannot bypass a revoked parent
+                        // after owner restart. Revocations remain monotone.
+                        for capability_id in &revoked_capability_ids {
+                            store
+                                .revoke(capability_id)
+                                .map_err(|error| ProtectError::Config(error.to_string()))?;
+                        }
+                        kernel.set_revocation_store_handle(Arc::clone(store));
+                    }
+                    kernel
+                        .reconcile_durable_admission_startup()
+                        .map_err(|error| ProtectError::Config(error.to_string()))?;
+                }
+                Some(Mutex::new(kernel))
+            }
+            None if self.caller_executor.is_some() => {
+                return Err(ProtectError::Config(
+                    "authenticated caller execution requires a durable budget authority".into(),
+                ));
+            }
             None => None,
         };
 

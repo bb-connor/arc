@@ -132,6 +132,18 @@
       "schemaFile": "spec/schemas/chio-federation/v1/capability-lease.schema.json"
     },
     {
+      "schema": "chio.caller-dispatch-authorization.v1",
+      "artifactKind": "caller_dispatch_authorization",
+      "introducedBy": "authenticated-caller-delivery-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/caller_dispatch_authorization.schema.json"
+    },
+    {
+      "schema": "chio.caller-delivery-report.v1",
+      "artifactKind": "caller_delivery_report",
+      "introducedBy": "authenticated-caller-delivery-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/caller_delivery_report.schema.json"
+    },
+    {
       "schema": "chio.capability.v1",
       "artifactKind": "capability_token",
       "introducedBy": "schema-registry/v1/capability-token-v1",

@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS admission_operations (
     state TEXT NOT NULL CHECK (state IN (
         'prepared', 'broker_attempt_registered', 'approval_required',
         'budget_authorized', 'approval_reserved', 'ready_to_dispatch',
-        'capture_pending', 'dispatch_committed', 'finalizing', 'completed',
+        'capture_pending', 'dispatch_committed', 'awaiting_caller_report', 'finalizing', 'completed',
         'compensated_before_dispatch', 'not_accepted_after_dispatch_commit',
         'outcome_unknown_after_dispatch', 'denied_after_delivery', 'mutation_ready',
         'mutation_submitted', 'economic_mutation_applied', 'economic_mutation_not_applied'

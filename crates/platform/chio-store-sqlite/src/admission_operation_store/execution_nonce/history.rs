@@ -209,6 +209,7 @@ pub(super) fn verify(
             phases == [Phase::Cancelled] || phases == [Phase::CapturePending, Phase::Cancelled]
         }
         AdmissionOperationState::DispatchCommitted
+        | AdmissionOperationState::AwaitingCallerReport
         | AdmissionOperationState::Finalizing
         | AdmissionOperationState::Completed
         | AdmissionOperationState::NotAcceptedAfterDispatchCommit

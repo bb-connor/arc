@@ -8,6 +8,9 @@ use super::*;
 use crate::budget_store::BudgetReverseHoldRequest;
 use crate::kernel::kernel_scopes::RECEIPT_EVALUATION_SCOPE_KEY;
 
+#[path = "recovery/caller.rs"]
+mod caller;
+
 impl ChioKernel {
     pub(super) fn claim_admission_recovery(
         &self,
@@ -144,6 +147,22 @@ impl ChioKernel {
                 };
                 match operation.state() {
                     AdmissionOperationState::DispatchCommitted => {
+                        match self.retain_authenticated_caller_wait(&operation, trusted_now_unix_ms)
+                        {
+                            Ok(true) => {
+                                reconciled = reconciled.checked_add(1).ok_or_else(|| {
+                                    KernelError::DurableAdmission(
+                                        "admission recovery count overflow".into(),
+                                    )
+                                })?;
+                                continue;
+                            }
+                            Ok(false) => {}
+                            Err(error) => {
+                                deferred_failure.get_or_insert(error);
+                                continue;
+                            }
+                        }
                         if let Err(error) = self.terminalize_dispatch_committed_admission(
                             &operation,
                             trusted_now_unix_ms,

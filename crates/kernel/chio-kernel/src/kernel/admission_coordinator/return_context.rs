@@ -37,6 +37,10 @@ pub(crate) struct DurableToolReturnContext {
     pub(super) pre_invocation_guard_evidence: Vec<chio_core::receipt::metadata::GuardEvidence>,
     pub(super) security_invocation_context: Option<SecurityInvocationContext>,
     pub(super) security_release_required: bool,
+    // Set only after authenticating a returned caller report. Never frozen as
+    // pre-dispatch evidence or serialized into the caller admission snapshot.
+    pub(super) caller_delivery_evidence:
+        Option<Box<crate::caller_delivery::CallerDeliveryEvidenceV1>>,
     pub(super) federation_context: Option<FrozenFederationContext>,
     pub(super) receipt_signing_identity:
         Option<crate::tool_outcome::FrozenReceiptSigningIdentityV1>,
@@ -182,6 +186,16 @@ impl ChioKernel {
         admission: &DurableToolAdmission,
         input: DurableToolReturnContextInput<'_>,
     ) -> Result<DurableToolReturnContext, KernelError> {
+        if input
+            .extra_receipt_metadata
+            .as_ref()
+            .and_then(serde_json::Value::as_object)
+            .is_some_and(|metadata| metadata.contains_key(CALLER_DELIVERY_METADATA_KEY))
+        {
+            return Err(KernelError::InvalidReceiptMetadata(
+                "caller_delivery is reserved for authenticated post-return evidence".into(),
+            ));
+        }
         if admission.operation.state() != AdmissionOperationState::CapturePending {
             return Err(KernelError::DurableAdmission(
                 "return context must be frozen before dispatch commitment".into(),
@@ -242,6 +256,7 @@ impl ChioKernel {
             pre_invocation_guard_evidence: pre_invocation_guard_evidence.to_vec(),
             security_invocation_context: security_invocation_context.cloned(),
             security_release_required,
+            caller_delivery_evidence: None,
             federation_context: self.freeze_federation_return_context(
                 admission,
                 request,

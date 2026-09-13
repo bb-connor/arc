@@ -13,6 +13,7 @@ mod execution_nonce;
 pub mod governed_approval_claim;
 pub mod governed_approval_replay;
 mod identity;
+mod native_caller_custody;
 mod native_dispatch_ledger;
 mod native_egress;
 mod native_flow_join;
@@ -39,6 +40,7 @@ pub use caller_dispatch_context::AdmissionCallerDispatchContextV1;
 pub use capture::*;
 pub use execution_nonce::{AdmissionExecutionNonceReservationV1, OPERATION_EXECUTION_NONCE_SCHEMA};
 pub use identity::*;
+pub use native_caller_custody::{NativeCallerReleaseCustodyV1, NATIVE_CALLER_CONTEXT_SCHEMA};
 pub use native_dispatch_ledger::{
     NativeSecurityDispatchLedgerContext, NativeSecurityDispatchLedgerRecordV1,
 };
@@ -225,6 +227,10 @@ pub enum AdmissionOperationState {
     ReadyToDispatch,
     CapturePending,
     DispatchCommitted,
+    /// Captured caller dispatch with no authenticated return yet. This is
+    /// unknown delivery, not permission to dispatch or compensate. Unlike a
+    /// terminal legacy unknown tombstone it can accept the original report.
+    AwaitingCallerReport,
     Finalizing,
     Completed,
     CompensatedBeforeDispatch,
@@ -241,7 +247,7 @@ pub enum AdmissionOperationState {
 }
 
 impl AdmissionOperationState {
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 19] = [
         Self::Prepared,
         Self::BrokerAttemptRegistered,
         Self::ApprovalRequired,
@@ -250,6 +256,7 @@ impl AdmissionOperationState {
         Self::ReadyToDispatch,
         Self::CapturePending,
         Self::DispatchCommitted,
+        Self::AwaitingCallerReport,
         Self::Finalizing,
         Self::Completed,
         Self::CompensatedBeforeDispatch,
@@ -700,6 +707,13 @@ impl AdmissionOperationV1 {
         validate_positive_ijson("coordinator_lease_epoch", self.coordinator_lease_epoch)?;
         self.binding.validate()?;
         self.attachments.validate()?;
+        if self.state == AdmissionOperationState::AwaitingCallerReport
+            && self.caller_dispatch_context_digest().is_none()
+        {
+            return Err(AdmissionOperationError::MissingParticipantAttachment {
+                field: "caller_dispatch_context_digest",
+            });
+        }
         if self.caller_dispatch_context_digest().is_some()
             && !self
                 .provider_attempt()
@@ -708,7 +722,17 @@ impl AdmissionOperationV1 {
             return Err(AdmissionOperationError::ProviderAttemptBindingMismatch);
         }
         if let Some(attempt) = self.provider_attempt() {
-            if self.native_dispatch_ledger_digest().is_some() && attempt.is_caller_report() {
+            if self.native_dispatch_ledger_digest().is_some()
+                && attempt.is_caller_report()
+                && (!attempt.is_native_caller_report()
+                    || self.caller_dispatch_context_digest().is_none())
+            {
+                return Err(AdmissionOperationError::ProviderAttemptBindingMismatch);
+            }
+            if attempt.is_native_caller_report()
+                && self.caller_dispatch_context_digest().is_some()
+                && self.native_dispatch_ledger_digest().is_none()
+            {
                 return Err(AdmissionOperationError::ProviderAttemptBindingMismatch);
             }
             attempt

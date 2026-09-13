@@ -169,6 +169,17 @@ impl ChioKernel {
             || operation.provider_attempt().is_none_or(|attempt| {
                 attempt.transport_id
                     != DispatchTransport::KernelToolServer.transport_id(&request.server_id)
+                    && !(attempt.is_native_caller_report()
+                        && attempt.transport_id
+                            == format!(
+                                "{}{}",
+                                ProviderAttemptBindingV1::NATIVE_CALLER_REPORT_TRANSPORT_PREFIX,
+                                request.server_id
+                            )
+                        && original
+                            .authority_profile()
+                            .and_then(|profile| profile.caller_executor())
+                            .is_some())
             })
             || original.authority_profile().is_none()
             || self.security_pre_dispatch_policy != SecurityPreDispatchPolicy::Enforce

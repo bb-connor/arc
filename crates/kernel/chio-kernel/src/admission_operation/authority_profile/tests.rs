@@ -130,3 +130,38 @@ fn profile_debug_contains_no_authority_identifiers() {
         assert!(!debug.contains(private));
     }
 }
+
+#[test]
+fn pinned_executor_is_versioned_and_cannot_be_downgraded_or_null(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let legacy = profile();
+    let before = chio_core::canonical::canonical_json_bytes(&legacy)?;
+    let executor = crate::caller_delivery::CallerExecutorIdentityV1 {
+        executor_id: AdmissionIdentifier::try_new("executor_id", "executor")?,
+        public_key: chio_core::crypto::Keypair::generate().public_key(),
+        key_epoch: 42,
+    };
+    let pinned = legacy.clone().with_caller_executor(executor.clone())?;
+    assert_eq!(pinned.caller_executor(), Some(&executor));
+    assert_eq!(before, chio_core::canonical::canonical_json_bytes(&legacy)?);
+    let value = serde_json::to_value(&pinned)?;
+    assert_eq!(value["schema"], CALLER_SCHEMA);
+    assert_eq!(pinned, serde_json::from_value(value.clone())?);
+    for (schema, selection) in [
+        (SCHEMA, serde_json::to_value(executor)?),
+        (SCHEMA, serde_json::Value::Null),
+        (CALLER_SCHEMA, serde_json::Value::Null),
+    ] {
+        let mut invalid = value.clone();
+        invalid["schema"] = schema.into();
+        invalid["caller_executor"] = selection;
+        assert!(serde_json::from_value::<AdmissionAuthorityProfileV1>(invalid).is_err());
+    }
+    let mut missing = value;
+    missing
+        .as_object_mut()
+        .ok_or("profile object")?
+        .remove("caller_executor");
+    assert!(serde_json::from_value::<AdmissionAuthorityProfileV1>(missing).is_err());
+    Ok(())
+}

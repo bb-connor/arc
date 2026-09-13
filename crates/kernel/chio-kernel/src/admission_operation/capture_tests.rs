@@ -199,6 +199,85 @@ fn native_dispatch_attachment_with_nonce_never_accepts_caller_custody(
     Ok(())
 }
 
+#[test]
+fn native_caller_requires_both_capture_attachments_before_waiting(
+) -> Result<(), AdmissionOperationError> {
+    let mut operation = capture_pending_operation_with_nonce(true);
+    for attachment in &mut operation.attachments.0 {
+        if let AdmissionAttachment::BrokerAttempt(attempt) = attachment {
+            attempt.transport_id = format!(
+                "{}server",
+                ProviderAttemptBindingV1::NATIVE_CALLER_REPORT_TRANSPORT_PREFIX
+            );
+        }
+    }
+    operation.validate()?;
+    let native = AdmissionAttachment::NativeDispatchLedgerDigest(digest(
+        "native_dispatch_ledger_digest",
+        COMMIT_DIGEST,
+    ));
+    let caller = AdmissionAttachment::CallerDispatchContextDigest(digest(
+        "caller_dispatch_context_digest",
+        REQUEST_HASH,
+    ));
+    for attachments in [vec![native.clone()], vec![caller.clone()]] {
+        let command = AdmissionOperationCommand::new(
+            operation.binding.operation_id.clone(),
+            operation.version,
+            recovery_lease(&operation),
+            attachments,
+            Some(AdmissionOperationState::DispatchCommitted),
+            None,
+            None,
+        )?;
+        assert!(matches!(
+            operation.apply_command(&command, 1_000),
+            Err(AdmissionOperationError::ProviderAttemptBindingMismatch)
+        ));
+    }
+    let captured = operation
+        .apply_command(
+            &AdmissionOperationCommand::new(
+                operation.binding.operation_id.clone(),
+                operation.version,
+                recovery_lease(&operation),
+                vec![native, caller],
+                Some(AdmissionOperationState::DispatchCommitted),
+                None,
+                None,
+            )?,
+            1_000,
+        )?
+        .into_operation();
+    let waiting = captured
+        .apply_command(
+            &AdmissionOperationCommand::new(
+                captured.binding.operation_id.clone(),
+                captured.version,
+                recovery_lease(&captured),
+                vec![],
+                Some(AdmissionOperationState::AwaitingCallerReport),
+                None,
+                None,
+            )?,
+            1_001,
+        )?
+        .into_operation();
+    assert_eq!(
+        waiting.native_dispatch_ledger_digest(),
+        captured.native_dispatch_ledger_digest()
+    );
+    assert_eq!(
+        waiting.caller_dispatch_context_digest(),
+        captured.caller_dispatch_context_digest()
+    );
+    assert_eq!(
+        AdmissionOperationV1::from_persisted(waiting.to_persisted())?,
+        waiting
+    );
+    Ok(())
+}
+
 fn identifier(field: &'static str, value: &str) -> AdmissionIdentifier {
     AdmissionIdentifier::try_new(field, value).expect("test identifier must be valid")
 }

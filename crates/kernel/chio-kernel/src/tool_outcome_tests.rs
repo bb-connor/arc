@@ -406,6 +406,7 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
     reverse.insert("a".to_owned(), json!(1));
     let operation_id = AdmissionOperationId::from_persisted(sha("op")).unwrap();
     let raw = RawInvocationOutcomeV1 {
+        caller_delivery_evidence: None,
         schema: RAW_INVOCATION_OUTCOME_SCHEMA,
         operation_id: operation_id.clone(),
         request_id: id("req"),

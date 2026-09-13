@@ -20,6 +20,33 @@ impl NativeSecurityFlowJoinAuthority<'_> {
             .map_err(durable_store_error)?;
             self.with_join_custody(|runtime, lease, now| {
                 let operation = &self.admission.operation;
+                if self.resumes_native_caller() {
+                    let (current, history) = store_call(|| {
+                        runtime.store.load_native_security_input_join(
+                            operation.binding().operation_id(),
+                            &runtime.fence,
+                            now,
+                        )
+                    })?
+                    .ok_or_else(|| invalid("native caller input operation is absent"))?;
+                    let history =
+                        history.ok_or_else(|| invalid("native caller input custody is absent"))?;
+                    if current != *operation
+                        || history.input != input
+                        || history.join.binding != self.binding
+                        || history.join.operation_id != *operation.binding().operation_id()
+                    {
+                        return Err(invalid(
+                            "native caller start changed its original classified input custody",
+                        ));
+                    }
+                    history.validate().map_err(durable_store_error)?;
+                    let snapshot = history.join.snapshot.clone();
+                    self.confirm(history.join)?;
+                    // Original input custody precedes the reserved hold. A
+                    // caller start may verify it, never create another join.
+                    return Ok(snapshot);
+                }
                 let acknowledged = store_call(|| {
                     runtime.store.join_native_security_input(
                         operation,

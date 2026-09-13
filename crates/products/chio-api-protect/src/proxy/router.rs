@@ -40,6 +40,8 @@ pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
     // `/v1/evaluate`. It sits behind the reconcile control gate so only a caller
     // presenting the sidecar-control token can reconcile.
     let reconcile_routes = Router::new()
+        .route("/v1/caller/start", post(mediated::authenticated::start))
+        .route("/v1/caller/report", post(mediated::authenticated::report))
         .route("/v1/reconcile", post(mediated::sidecar_reconcile_handler))
         .route_layer(middleware::from_fn_with_state(
             Arc::clone(&state),

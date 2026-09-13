@@ -6,7 +6,7 @@ const CLAIM_KINDS: &str = ",\n            'dpop_replay_claim', 'dpop_replay_rele
 const CLAIM_CONTEXT: &str = "\n        OR (mutation_kind IN ('dpop_replay_claim', 'dpop_replay_release')\n            AND recovery_claim_digest IS NOT NULL\n            AND participant_digest IS NOT NULL)";
 
 pub(super) fn predecessor_admission_schema() -> String {
-    ADMISSION_OPERATION_SCHEMA
+    super::migration_v34::predecessor_schema()
         .replace(CLAIM_KINDS, "")
         .replace(CLAIM_CONTEXT, "")
 }

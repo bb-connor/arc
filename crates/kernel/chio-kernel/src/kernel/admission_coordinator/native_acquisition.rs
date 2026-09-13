@@ -36,6 +36,15 @@ impl fmt::Debug for NativeSecurityFlowJoinAuthority<'_> {
 }
 
 impl NativeSecurityFlowJoinAuthority<'_> {
+    fn resumes_native_caller(&self) -> bool {
+        self.admission.operation.state() == AdmissionOperationState::ReadyToDispatch
+            && self
+                .admission
+                .operation
+                .provider_attempt()
+                .is_some_and(ProviderAttemptBindingV1::is_native_caller_report)
+    }
+
     pub fn binding(&self) -> &NativeSecurityAuthorityBindingV1 {
         &self.binding
     }
@@ -89,6 +98,11 @@ impl NativeSecurityFlowJoinAuthority<'_> {
     }
 
     fn join_once(&self, command: FlowJoinRequest) -> Result<FlowStateSnapshot, KernelError> {
+        if self.resumes_native_caller() {
+            return Err(invalid(
+                "native caller start requires its original classified input custody",
+            ));
+        }
         self.with_join_custody(|runtime, lease, now| {
             let operation = &self.admission.operation;
             // Contain panics inside the sequencer, then read durable evidence even
@@ -249,8 +263,18 @@ impl ChioKernel {
             original.ok_or_else(|| invalid("native preparation requires original request"))?;
         let context =
             context.ok_or_else(|| invalid("native preparation requires trusted context"))?;
+        let caller_resume = admission.operation.state() == AdmissionOperationState::ReadyToDispatch
+            && admission
+                .operation
+                .provider_attempt()
+                .is_some_and(ProviderAttemptBindingV1::is_native_caller_report)
+            && original
+                .authority_profile()
+                .and_then(|profile| profile.caller_executor())
+                .is_some();
         if original.authority_profile().is_none()
-            || admission.operation.state() != AdmissionOperationState::BrokerAttemptRegistered
+            || (admission.operation.state() != AdmissionOperationState::BrokerAttemptRegistered
+                && !caller_resume)
             || admission.operation.dispatch_commit().is_some()
             || self.security_pre_dispatch_policy != SecurityPreDispatchPolicy::Enforce
         {

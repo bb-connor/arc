@@ -30,7 +30,10 @@ pub const RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA: &str =
     "chio.raw-invocation-outcome-with-security-release.v1";
 pub const RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA: &str =
     "chio.raw-invocation-outcome-with-signing-identity.v1";
+pub const RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA: &str =
+    "chio.raw-invocation-outcome-with-caller-delivery.v1";
 
+mod caller_delivery;
 mod receipt_signing;
 pub use receipt_signing::FrozenReceiptSigningIdentityV1;
 pub const TOOL_OUTCOME_SCHEMA: &str = "chio.tool-outcome.v1";
@@ -384,6 +387,8 @@ pub struct RawInvocationOutcomeV1 {
     security_release_required: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     receipt_signing_identity: Option<FrozenReceiptSigningIdentityV1>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    caller_delivery_evidence: Option<Box<crate::caller_delivery::CallerDeliveryEvidenceV1>>,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -419,6 +424,10 @@ pub struct PersistedRawInvocationOutcomeV1 {
     /// Public selection frozen before dispatch, not live signing authority.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receipt_signing_identity: Option<FrozenReceiptSigningIdentityV1>,
+    /// Private signed evidence, authenticated again against original pins when
+    /// qualifying durable native caller release. This is not public metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caller_delivery_evidence: Option<Box<crate::caller_delivery::CallerDeliveryEvidenceV1>>,
 }
 
 // Raw returns can contain credentials, tool output and private treaty evidence.
@@ -570,6 +579,7 @@ impl RawInvocationOutcomeV1 {
             federation_context_json: None,
             security_release_required: None,
             receipt_signing_identity: None,
+            caller_delivery_evidence: None,
         };
         raw.canonical_blob()?;
         Ok(raw)
@@ -602,14 +612,23 @@ impl RawInvocationOutcomeV1 {
             federation_context_json: self.federation_context_json.clone(),
             security_release_required: self.security_release_required,
             receipt_signing_identity: self.receipt_signing_identity.clone(),
+            caller_delivery_evidence: self.caller_delivery_evidence.clone(),
         }
     }
 
     pub fn from_persisted(
         value: PersistedRawInvocationOutcomeV1,
     ) -> Result<Self, ToolOutcomeError> {
+        let caller_schema = value.schema == RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA;
+        if caller_schema != value.caller_delivery_evidence.is_some() {
+            return Err(ToolOutcomeError::Invalid("raw.caller_delivery_schema"));
+        }
         let schema = match (
-            value.schema.as_str(),
+            if caller_schema {
+                RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA
+            } else {
+                value.schema.as_str()
+            },
             value.request_canonical_json.is_some(),
             value.security_invocation_context.is_some(),
             value.federation_context_json.is_some(),
@@ -655,7 +674,11 @@ impl RawInvocationOutcomeV1 {
             return Err(ToolOutcomeError::Invalid("raw.schema"));
         }
         let raw = Self {
-            schema,
+            schema: if caller_schema {
+                RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA
+            } else {
+                schema
+            },
             operation_id: value.operation_id,
             request_id: value.request_id,
             dispatch_operation_version: value.dispatch_operation_version,
@@ -676,6 +699,7 @@ impl RawInvocationOutcomeV1 {
             federation_context_json: value.federation_context_json,
             security_release_required: value.security_release_required,
             receipt_signing_identity: value.receipt_signing_identity,
+            caller_delivery_evidence: value.caller_delivery_evidence,
         };
         raw.canonical_blob()?;
         Ok(raw)
@@ -703,15 +727,23 @@ impl RawInvocationOutcomeV1 {
         maximum: usize,
     ) -> Result<CanonicalInvocationBlobV1, ToolOutcomeError> {
         match (&self.receipt_signing_identity, self.schema) {
-            (Some(identity), RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA)
-                if self.request_canonical_json.is_some() =>
-            {
+            (
+                Some(identity),
+                RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA
+                | RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA,
+            ) if self.request_canonical_json.is_some() => {
                 identity.validate()?;
                 self.requires_security_release()?;
             }
-            (None, schema) if schema != RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA => {}
+            (None, schema)
+                if !matches!(
+                    schema,
+                    RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA
+                        | RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA
+                ) => {}
             _ => return Err(ToolOutcomeError::Invalid("raw.receipt_signing_schema")),
         }
+        self.validate_caller_delivery_evidence()?;
         positive(
             "raw.dispatch_operation_version",
             self.dispatch_operation_version,

@@ -18,6 +18,9 @@ mod outcome_unknown;
 #[path = "delegated_share/pending.rs"]
 mod pending;
 
+#[path = "delegated_share/authenticated.rs"]
+mod authenticated;
+
 struct Siblings {
     parent: CapabilityToken,
     first: CapabilityToken,

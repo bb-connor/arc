@@ -204,6 +204,33 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         AdmissionAttachment::NativeDispatchLedgerDigest(self.ledger.clone())
     }
 
+    pub(crate) fn verify_caller_context(
+        &self,
+        tx: &Transaction<'_>,
+        frame: &chio_kernel::admission_operation::AdmissionCallerDispatchContextV1,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.verify_owner(tx, &self.operation)?;
+        let original = retained_request::load_retained_request_tx(tx, &self.operation)?
+            .ok_or_else(|| invalid("native caller capture lost original request"))?;
+        let custody = frame
+            .native_release_custody(&self.operation, &original)?
+            .ok_or_else(|| invalid("native caller capture lost release custody"))?;
+        let ledger = storage::load(tx, self.operation.binding().operation_id().as_str())?
+            .ok_or_else(|| invalid("native caller capture lost ledger"))?;
+        if custody.ledger_digest() != &self.ledger
+            || custody.ledger_bytes() != ledger.bytes()?
+            || custody.security_context() != &ledger.context
+            || custody.valid_until_unix_ms() <= self.observed_at
+        {
+            return Err(invalid(
+                "native caller release frame differs from physical capture",
+            ));
+        }
+        // An interval ending here must be valid in every original participant,
+        // including credential, policy, lease, capability and nonce deadlines.
+        self.validate_time(custody.valid_until_unix_ms() - 1)
+    }
+
     pub(crate) fn verify_transition(
         &self,
         tx: &Transaction<'_>,

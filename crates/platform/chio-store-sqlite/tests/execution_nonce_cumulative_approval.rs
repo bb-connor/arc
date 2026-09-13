@@ -14,6 +14,9 @@ use chio_kernel::threshold_approval::ThresholdApprovalCollectorState;
 use chio_kernel::{ToolCallRequest, ToolCallResponse, Verdict};
 use support::*;
 
+#[path = "execution_nonce_cumulative_approval/authenticated.rs"]
+mod authenticated;
+
 fn nonce_fixture(nonce_ttl_secs: u64) -> TestResult<Fixture> {
     let mut fixture = Fixture::new()?;
     fixture.nonce_ttl_secs = Some(nonce_ttl_secs);

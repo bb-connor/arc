@@ -1,6 +1,7 @@
 use super::*;
 use rusqlite::{params, Connection, Transaction};
 
+mod caller_resume;
 mod cumulative_model;
 mod event_projection;
 mod model;
@@ -213,6 +214,16 @@ impl SqliteBudgetStore {
                 return Err(BudgetStoreError::Invariant(format!(
                     "budget event_id `{event_id}` was reused for a different mutation"
                 )));
+            }
+            if let Some(AuthorizationParticipant::Executable(binding)) = binding {
+                if let Some(decision) =
+                    self.resume_approved_caller_hold(&transaction, &existing, binding)?
+                {
+                    // The original operation and its approved hold already
+                    // exist. Revalidation is read-only and creates no event.
+                    transaction.rollback()?;
+                    return Ok((decision, Some(binding.operation.clone())));
+                }
             }
             let decision = self.authorization_decision_from_event(&transaction, &existing)?;
             let operation = self.bind_authorization_to_admission(

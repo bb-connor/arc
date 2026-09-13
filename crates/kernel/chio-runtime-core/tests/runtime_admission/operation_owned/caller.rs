@@ -6,6 +6,9 @@ use chio_kernel::admission_operation::AdmissionOperationStore;
 use chio_kernel::execution_nonce::{ExecutionNonceConfig, InMemoryExecutionNonceStore};
 use chio_kernel::CallerExecutionReport;
 
+#[path = "caller/authenticated.rs"]
+mod authenticated;
+
 fn nonce_config(kernel: &mut ChioKernel) {
     let config = ExecutionNonceConfig {
         nonce_ttl_secs: 30,

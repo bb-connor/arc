@@ -24,7 +24,7 @@ mod nested_flow_grant_selection;
 use native_capture_checkpoint::{NativeCaptureCheckpointContext, NativeCaptureCheckpointOutcome};
 mod sync_evaluation_wrapper;
 
-pub use caller_execution::CallerExecutionReport;
+pub use caller_execution::{CallerExecutionReport, CallerStartCredentials, CallerStartResponse};
 
 /// Disposition of the pre-execution budget hold when a strict-nonce preflight
 /// is reached (nonce required, no nonce presented on the request).
@@ -64,6 +64,8 @@ pub(crate) enum DispatchMode {
     /// Resume a caller-reserved operation with the caller's report standing in
     /// for the tool server.
     CallerReport(std::sync::Arc<dyn crate::ToolServerConnection>),
+    /// Capture the original participants, then stop before any external effect.
+    CallerStart,
 }
 
 /// What an evaluation does at its two decision points: the strict-nonce
@@ -109,9 +111,20 @@ impl EvaluationDisposition {
             dispatch: DispatchMode::CallerReport(report),
         }
     }
+
+    pub(crate) fn caller_start() -> Self {
+        Self {
+            preflight_hold: PreflightHoldDisposition::ReverseForRetry,
+            dispatch: DispatchMode::CallerStart,
+        }
+    }
 }
 
 impl DispatchMode {
+    pub(super) fn caller_preparation(&self) -> bool {
+        matches!(self, Self::ReserveForCaller | Self::CallerStart)
+    }
+
     pub(crate) fn caller_executed(&self) -> bool {
         !matches!(self, Self::Kernel)
     }

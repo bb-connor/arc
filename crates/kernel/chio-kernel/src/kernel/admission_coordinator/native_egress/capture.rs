@@ -117,6 +117,34 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
         let lease = self
             .kernel
             .claim_admission_recovery(self.admission.operation(), now)?;
+        let valid_until = credentials_until
+            .min(lease.untrusted_claim().expires_at_unix_ms())
+            .min(lifecycle::policy_deadline(policy_json)?);
+        let caller_frame = if self
+            .admission
+            .operation()
+            .provider_attempt()
+            .is_some_and(ProviderAttemptBindingV1::is_native_caller_report)
+        {
+            let context = frozen
+                .as_ref()
+                .ok_or_else(|| invalid("native caller requires frozen return custody"))?;
+            let custody = crate::admission_operation::NativeCallerReleaseCustodyV1::prepare(
+                &prepared.original,
+                ledger,
+                &prepared.context,
+                valid_until,
+            )
+            .map_err(durable_store_error)?;
+            self.kernel.frame_caller_return_context_with_native(
+                self.admission,
+                context,
+                now,
+                Some(custody),
+            )?
+        } else {
+            None
+        };
         let charge = self
             .budget
             .durable_hold_result_mut()
@@ -131,25 +159,38 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
         };
         let expected_request = request.clone();
         let capture = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            runtime.store.capture_native_invocation_and_commit_dispatch(
-                crate::receipt_store::AdmissionNativeDispatchCapture {
-                    custody: prepared.command_context(&lease, now),
-                    request,
-                    credentials: &proof,
-                    ledger,
-                    policy_json,
-                },
-            )
+            let capture = crate::receipt_store::AdmissionNativeDispatchCapture {
+                custody: prepared.command_context(&lease, now),
+                request,
+                credentials: &proof,
+                ledger,
+                policy_json,
+            };
+            if let Some(frame) = caller_frame.as_ref() {
+                runtime
+                    .store
+                    .capture_native_caller_invocation_and_commit_dispatch(capture, frame)
+            } else {
+                runtime
+                    .store
+                    .capture_native_invocation_and_commit_dispatch(capture)
+            }
         }))
         .map_err(|_| invalid("native capture callback panicked; commitment is unconfirmed"))?
         .map_err(|error| invalid(&error.to_string()))?;
+        let mut attachments = vec![AdmissionAttachment::NativeDispatchLedgerDigest(
+            ledger.record_digest.clone(),
+        )];
+        if let Some(frame) = caller_frame.as_ref() {
+            attachments.push(AdmissionAttachment::CallerDispatchContextDigest(
+                frame.digest().clone(),
+            ));
+        }
         let command = AdmissionOperationCommand::new(
             self.admission.operation().binding().operation_id().clone(),
             self.admission.operation().version(),
             lease,
-            vec![AdmissionAttachment::NativeDispatchLedgerDigest(
-                ledger.record_digest.clone(),
-            )],
+            attachments,
             Some(AdmissionOperationState::DispatchCommitted),
             None,
             None,
@@ -196,14 +237,6 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
             ));
         }
         if let Some(context) = frozen {
-            let valid_until = credentials_until
-                .min(
-                    command
-                        .recovery_lease()
-                        .untrusted_claim()
-                        .expires_at_unix_ms(),
-                )
-                .min(lifecycle::policy_deadline(policy_json)?);
             self.captured_lifecycle = Some(lifecycle::CapturedLifecycle {
                 context,
                 operation: expected.clone(),

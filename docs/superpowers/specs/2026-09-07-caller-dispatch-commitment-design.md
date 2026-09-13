@@ -1,18 +1,21 @@
 # Caller dispatch commitment and delivery recovery
 
-Status: private storage framing, typed frozen return-component capture and
-readback, retained federation evidence, and opt-in operation-owned runtime
-custody with explicit activation are implemented. The complete durable kernel
-snapshot, credential/security-hook custody and external handshake remain
-required. Composed runtime and bounded process-loss tests provide evidence,
-not full profile qualification. This document preserves
+Status: the authenticated start/report handshake, private v4 caller snapshot,
+physical runtime/approval/DPoP custody, durable executor claiming and historical
+finalization are implemented. The original lost-report regression now executes
+through that handshake; a separate reservation-only negative calibration retains
+the reproduced bad outcome. Current qualification and unsupported native caller
+custody are tracked in [launch status](../../security/launch-status.md) and the
+[public contract](../../security/authenticated-caller-delivery.md). Historical
+checkpoints below describe their original implementation boundaries, not current
+claims. This document preserves
 the full security roadmap and resolves a missing caller-execution boundary.
 It is not a release qualification or a new exception to admission ordering.
 
-## Reproduced contract failure
+## Original reproduced contract failure
 
-The sidecar and Python SDK describe reserve, external execution, then report.
-The current kernel reserves the operation-owned nonce in `ReadyToDispatch` and
+The original sidecar and Python SDK described reserve, external execution, then report.
+That kernel reserved the operation-owned nonce in `ReadyToDispatch` and
 captures invocation quota only while reconciling the report. Startup recovery
 can compensate an expired Ready reservation without knowing whether the external
 executor has already acted.
@@ -27,13 +30,16 @@ also obtains an allowed reservation for a second operation under the same
 one-invocation capability. It requires one captured invocation, denial of that
 second call and an outcome-unknown dispatch terminal for the first operation.
 
-This is a trusted-caller contract counterexample, not a qualified external
+This was a trusted-caller contract counterexample, not a qualified external
 transport, process-kill test or demonstrated remote exploit. The fixture reads
 nonce provenance from the authority directly. Its explicit ignore names the
-missing dispatch-start handshake; running it with `--ignored` currently fails
+missing dispatch-start handshake; running it with `--ignored` originally failed
 at the intended quota/admission assertion: `((0, 0), Allow)` instead of
 `((0, 1), Deny)`. It must become an executed passing gate after
-the complete handshake replaces reservation-only external execution.
+the complete handshake replaces reservation-only external execution. The test
+is now enabled and exercises kernel commitment plus a real durable executor.
+`reservation_only_effect_reproduces_the_original_refund_counterexample` keeps
+the original invalid reservation-as-permission behavior as a negative control.
 
 ## Required lifecycle
 

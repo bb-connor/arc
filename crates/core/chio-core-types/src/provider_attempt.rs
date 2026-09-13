@@ -127,10 +127,22 @@ impl ProviderAttemptBindingV1 {
     /// under a kernel-issued nonce, rather than by a kernel-owned tool server.
     pub const CALLER_REPORT_TRANSPORT_PREFIX: &str = "caller-report:";
 
+    /// Native caller delivery has a separate structural namespace. This tag
+    /// is not authority: capture must also prove the originally pinned executor
+    /// and physically retained native release custody.
+    pub const NATIVE_CALLER_REPORT_TRANSPORT_PREFIX: &str = "native-caller-report:v1:";
+
     #[must_use]
     pub fn is_caller_report(&self) -> bool {
         self.transport_id
             .starts_with(Self::CALLER_REPORT_TRANSPORT_PREFIX)
+            || self.is_native_caller_report()
+    }
+
+    #[must_use]
+    pub fn is_native_caller_report(&self) -> bool {
+        self.transport_id
+            .starts_with(Self::NATIVE_CALLER_REPORT_TRANSPORT_PREFIX)
     }
 
     pub fn validate(&self) -> Result<(), ProviderAttemptValidationError> {

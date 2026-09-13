@@ -347,7 +347,7 @@ fn require_exact_operation(
     Ok(())
 }
 
-fn custody_call<T>(
+pub(super) fn custody_call<T>(
     call: impl FnOnce() -> Result<T, crate::admission_operation::AdmissionOperationStoreError>,
 ) -> Result<T, KernelError> {
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(call))

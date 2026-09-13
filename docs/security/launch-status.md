@@ -20,7 +20,7 @@ merge or release approval.
 | M0 | Consolidated for implementation | Keep this index current; no independent cleanup campaign | Requirement and review maps below |
 | M1 | Complete: implementation and local acceptance | Keep closed absent a demonstrated regression; confinement remains explicitly deferred | [Acceptance closeout](#m1-local-acceptance-closeout), [qualification deferral](#m1-confined-process-qualification-deferral) |
 | M2 | Complete: local native failure/restart safety acceptance | Proceed to M3; missing release custody still blocks output and readiness | [Acceptance closeout](#m2-local-acceptance-closeout), [cutpoints and downstream contract](native-restart-safety.md) |
-| M3 | Partial: physical caller snapshot and authenticated executor ledger; kernel start and historical delivery integration missing | Commit before publishing start; reconcile late reports without reopening admission; preserve counterexample until that handshake passes | [Current implementation and remaining work](../superpowers/specs/2026-09-07-caller-dispatch-commitment-design.md#m3-caller-custody-and-executor-ledger-checkpoint-2026-09-12) |
+| M3 | Authenticated start, durable executor delivery and historical finalization implemented; qualification and native caller custody remain open | Qualify the composed custody and public contracts; retain explicit unsupported-profile denials | [Caller contract and compatibility boundary](authenticated-caller-delivery.md) |
 | M4 | Consumer qualification incomplete | Inventory positive supported paths and required startup denials after M1-M3 | [Original requirement ledger](launch-plan.md#requirement-ledger) |
 | M5 | Swarm is a Disabled-profile integration smoke | Bind issued capability identities, shared budget and enforced cage | [Swarm limitations](../../examples/reference-swarm/README.md) |
 | M6 | Components present, integrated topology unqualified | Compose keyring, broker, cage and receipts; designated runner needed | Enterprise ledger and original plan |
@@ -32,6 +32,45 @@ merge or release approval.
 
 ## M3 implementation checkpoint
 
+The kernel now publishes a signed start authorization only after the original
+hold, nonce and caller context are committed and physically read back. The
+original authority profile pins the executor identity and key epoch. Explicit
+start retries recover the exact statement and its original interval, never a
+renewed permission. The executor ledger commits its claim before effect and
+persists its signed report before publication; an uncertain effect is not replayed.
+
+Authenticated reports enter original finalization without re-admission, including
+after capability and nonce expiry. Startup preserves capture in the nonterminal
+`AwaitingCallerReport` state. Existing terminal unknown outcomes remain immutable.
+Duplicate reports replay original completion; conflicting reports and current
+revocation cannot release output. The original ignored lost-report counterexample
+is now an executed handshake regression, with its bad-outcome calibration retained
+as a separate reservation-only negative control.
+
+Physical runtime, DPoP and governed-approval custody use the original episodes;
+credential replay cannot acquire replacement claims. Cumulative approval resumes
+the approved hold without replaying its superseded initial event or appending a
+new authorization event. Monetary settlement remains bound to the original hold.
+SQLite v34 adds the waiting state through a constrained parent-table migration;
+disposable populated fixtures preserve original rows, commits, leases and foreign
+keys. No populated operator store has been migrated.
+
+The sidecar control routes, Python transport helpers and canonical wire schemas
+use the explicit start contract. Reserve-only clients no longer receive
+`status: "authorized"`; the SDK refuses its old unsigned-report helper before
+HTTP. See [authenticated caller delivery](authenticated-caller-delivery.md) for
+pinning, durable provisioning, protocol negotiation and migration requirements.
+
+M3 is not yet complete. Native release-owner and declassification caller custody
+remain required by explicit scope decision, and their implementation is undergoing
+qualification. They have not been deferred. Supplemental authorization and the
+combined threshold-approval/credit-exposure resume profile still fail closed. Those
+limits are not native qualification or an approved scope reduction. Local regression
+results below are being refreshed for the composed implementation; earlier
+component results must not be presented as its qualification.
+
+### Historical component checkpoint (before start/report integration)
+
 Caller snapshot v4 now checks physical original claim episodes rather than
 trusting their digests alone. The real sealed/activated runtime path retains the
 original reservation and revalidates it without reacquiring a claim. The
@@ -39,7 +78,7 @@ authenticated message codecs and private executor SQLite ledger are implemented
 as components, with explicit separation between live execution permission and
 late historical evidence.
 
-These components do not close the milestone. The kernel does not yet issue a
+At that checkpoint these components did not close the milestone. The kernel did not yet issue a
 start authorization, authenticate an executor report into historical finalization,
 or enable the new contract in sidecar/SDK clients. Credential/native caller
 profiles still fail closed. The existing lost-report/expiry counterexample is
@@ -218,11 +257,11 @@ admission coordinator and fenced authoritative store, not a decoded receipt.
 | --- | --- | --- | --- |
 | Ordinary `evaluate_tool_call*` | Installed runtime, credentials and selected security lifecycle | Coordinator/store; output guards and current security release | In-process local/egress and required credential/use profiles pass; confinement deferred |
 | Nested `evaluate_tool_call_operation_with_nested_flow_client*` | Same participants, plus nested/session binding | Same original-operation owners; nested return finalization | Explicit proof-bearing sync/async profiles pass; confinement deferred |
-| Nonce-required ordinary/nested | Operation-owned nonce and authenticated delivery identity | Durable nonce plus admission owner; uncertain outcomes retain accounting | Native preflight, dispatch and replay pass; caller-report transport remains unsupported |
+| Nonce-required ordinary/nested | Operation-owned nonce and authenticated delivery identity | Durable nonce plus admission owner; uncertain outcomes retain accounting | Native preflight, dispatch and replay pass; this ordinary path cannot adopt unsigned caller reports |
 | Governed ordinary/nested | Exact request-bound approval quorum and replay custody | Exact fenced claim disposition; expiry checked before capture | Combined runtime/approval/DPoP with nonce and declassification pass; confinement deferred |
 | Native-flow security-context entrypoints | Original native binding, full-source join, policy, egress/use custody and live capture authority | Private original owner and current output policy, not historical capture | Host opt-in and prior source lifecycle selection required; default and diagnostic checkpoint stay closed; confinement deferred |
 | Brokered invocation | Broker attempt, delegated parent/family quotas, witnessed identity and confined connector | Broker and admission original-operation reconciliation | Integrated enterprise topology unqualified; no direct fallback permitted |
-| Caller `reserve_caller_execution_blocking` / `reconcile_caller_execution_blocking` | Nonce/caller identity and complete authenticated start/delivery contract | Executor durable claim plus original admission owner | Start handshake missing; credential/security profiles explicitly denied; lost-report counterexample open |
+| Authenticated caller reservation / start / report | Independently configured executor, original nonce, captured hold and physical caller custody | Durable executor claim plus signed historical report into original finalization | Handshake and lost-report regression implemented; required native release/declassification custody is being qualified; legacy unsigned reports cannot enter the authenticated profile |
 
 ## Dependency-ordered review packages
 

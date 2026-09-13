@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 2c1471c0ca5c0ee6fdd4e6218c019d003a1668ac250e87e32a527a3ea12b4c6d
+// Schema SHA: 9e307e6daa51395f15c9766f881fd70541e224eebe89a05139195be154d9b493
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -1245,6 +1245,104 @@ export namespace Jsonrpc_Response {
   } & {
     [k: string]: unknown;
   };
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/caller_delivery_report.schema.json
+export namespace Kernel_CallerDeliveryReport {
+  /**
+   * Executor-authenticated historical observation, never a new execution permit or provider attestation. Canonical encoding is bounded to 1048576 bytes. Raw output remains on the trusted executor-to-kernel path until finalization permits release.
+   */
+  export interface ChioSignedCallerDeliveryReport {
+    report: {
+      schema: "chio.caller-delivery-report.v1";
+      authorization_digest: string;
+      executor: CallerExecutor;
+      /**
+       * The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+       */
+      claim_id: string;
+      execution_started_at_unix_ms: number;
+      completed_at_unix_ms: number;
+      output: unknown;
+      realized_cost: null | {
+        units: number;
+        currency: string;
+      };
+    };
+    signature: string;
+  }
+  export interface CallerExecutor {
+    /**
+     * The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+     */
+    executor_id: string;
+    public_key: string;
+    key_epoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/caller_dispatch_authorization.schema.json
+export namespace Kernel_CallerDispatchAuthorization {
+  export type CallerPublicKey = string;
+  /**
+   * The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+   */
+  export type CallerIdentifier = string;
+  export type CallerPositiveInteger = number;
+  export type CallerDigest = string;
+  export type CallerSignature = string;
+
+  /**
+   * A committed kernel statement, not an executor claim. Canonical encoding is bounded to 32768 bytes. The executor must independently authenticate pins and durably claim the original operation before effect.
+   */
+  export interface ChioSignedCallerDispatchAuthorization {
+    authorization: {
+      schema: "chio.caller-dispatch-authorization.v1";
+      kernel_public_key: CallerPublicKey;
+      executor: CallerExecutor;
+      invocation: {
+        operation_id: CallerDigest;
+        request_id: CallerIdentifier;
+        request_binding_hash: CallerDigest;
+        capability_id: CallerIdentifier;
+        capability_digest: CallerDigest;
+        server_id: CallerIdentifier;
+        tool_name: CallerIdentifier;
+        parameters_digest: CallerDigest;
+      };
+      committed: {
+        execution_nonce_id: CallerIdentifier;
+        budget_hold_id: CallerIdentifier;
+        frozen_context_digest: CallerDigest;
+        dispatch_commit: {
+          committed_version: CallerPositiveInteger;
+          coordinator_lease_id: CallerIdentifier;
+          coordinator_lease_epoch: CallerPositiveInteger;
+          store_fence: {
+            store_uuid: CallerIdentifier;
+            lease_id: CallerIdentifier;
+            owner_epoch: CallerPositiveInteger;
+          };
+          provider_attempt: {
+            operation_id: CallerDigest;
+            attempt_id: CallerIdentifier;
+            transport_id: string;
+            transport_key_epoch: CallerPositiveInteger;
+          };
+        };
+      };
+      not_before_unix_ms: CallerPositiveInteger;
+      expires_at_unix_ms: CallerPositiveInteger;
+    };
+    signature: CallerSignature;
+  }
+  export interface CallerExecutor {
+    executor_id: CallerIdentifier;
+    public_key: CallerPublicKey;
+    key_epoch: CallerPositiveInteger;
+  }
 }
 
 // -----------------------------------------------------------------------------

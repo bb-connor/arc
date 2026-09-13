@@ -5,6 +5,7 @@ use chio_kernel::admission_operation::AdmissionOperationV1;
 
 pub(crate) enum NonceBudgetPhase {
     Authorized,
+    Captured,
     Released,
 }
 
@@ -44,6 +45,7 @@ pub(crate) fn verify_nonce_budget_phase_tx(
     }
     let valid = match phase {
         NonceBudgetPhase::Authorized => hold.invocation_state == BudgetInvocationState::Authorized,
+        NonceBudgetPhase::Captured => hold.invocation_state == BudgetInvocationState::Captured,
         NonceBudgetPhase::Released => {
             hold.invocation_state == BudgetInvocationState::Reversed
                 && hold.remaining_exposure == 0

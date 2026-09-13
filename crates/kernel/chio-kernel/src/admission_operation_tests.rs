@@ -1763,6 +1763,9 @@ fn transition_matrix_is_exhaustive() {
     }
 }
 
+#[path = "admission_operation_tests/caller_wait.rs"]
+mod caller_wait;
+
 #[test]
 fn dispatch_commit_version_follows_the_configured_state_path() {
     let tool = AdmissionParticipantRequirements {

@@ -684,6 +684,20 @@ pub trait AdmissionOperationStore: Send + Sync {
         trusted_now_unix_ms: u64,
     ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError>;
 
+    /// Record unknown caller delivery while retaining its original capture.
+    /// Implementations must atomically verify the nonce, captured composite
+    /// hold, caller context and original executor selection. This port never
+    /// refunds participants or creates execution authority.
+    fn await_caller_report(
+        &self,
+        _command: &AdmissionOperationCommand,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Invariant(
+            "store does not support authenticated caller wait custody".into(),
+        ))
+    }
+
     /// Persist a structurally checked claim. The returned value remains
     /// untrusted until `QualifiedAdmissionOperationStore::claim_recovery`
     /// rechecks it through this store.

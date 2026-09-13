@@ -21,10 +21,10 @@ async fn mediated_authorization_reserves_hold_and_mints_non_authoritative_receip
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
 
-    // Single-phase authorization: wire status "authorized", a minted nonce
+    // Reservation only: wire status "reserved", a minted nonce
     // object, and a non-authoritative reserved receipt. The route never
     // dispatches, never consumes a nonce, never settles a spend.
-    assert_eq!(json["status"], "authorized");
+    assert_eq!(json["status"], "reserved");
     assert!(
         json["execution_nonce"].is_object(),
         "authorization must mint an execution nonce object"
@@ -92,7 +92,7 @@ async fn mediated_durable_reuse_guard_rejects_reused_request_id_across_capabilit
     });
     let (status_a, json_a) = post_evaluate(Arc::clone(&state_before), &body_a).await;
     assert_eq!(status_a, StatusCode::OK, "{json_a}");
-    assert_eq!(json_a["status"], "authorized");
+    assert_eq!(json_a["status"], "reserved");
 
     // Simulate a restart: a fresh sidecar state (empty minted-request-id
     // window and approval replay cache) over the SAME durable budget store, so
@@ -123,7 +123,7 @@ async fn mediated_durable_reuse_guard_rejects_reused_request_id_across_capabilit
     });
     let (status_fresh, json_fresh) = post_evaluate(Arc::clone(&state_after), &body_fresh).await;
     assert_eq!(status_fresh, StatusCode::OK, "{json_fresh}");
-    assert_eq!(json_fresh["status"], "authorized");
+    assert_eq!(json_fresh["status"], "reserved");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -147,7 +147,7 @@ async fn mediated_reserved_hold_blocks_oversubscription() {
 
     // First authorization reserves the hold.
     let (_, first) = post_evaluate(Arc::clone(&state), &body).await;
-    assert_eq!(first["status"], "authorized");
+    assert_eq!(first["status"], "reserved");
 
     // Because the reserved hold is NOT reversed, a second
     // authorization for the same fully-reserved grant is DENIED. Sequential
@@ -186,7 +186,7 @@ async fn mediated_revoked_capability_is_rejected() {
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     // A revoked capability is rejected fail-closed rather than authorized.
     assert_eq!(status, StatusCode::FORBIDDEN);
-    assert_ne!(json["status"], "authorized");
+    assert_ne!(json["status"], "reserved");
     assert_eq!(json["error"], "chio_capability_revoked");
 
     // The revoked capability never reaches the kernel, so no hold is placed.
@@ -295,7 +295,7 @@ async fn mediated_revoked_delegation_ancestor_rejects_delegated_child() {
     // A delegated child of a revoked ancestor is rejected fail-closed before
     // the kernel, exactly as a revoked leaf is.
     assert_eq!(status, StatusCode::FORBIDDEN);
-    assert_ne!(json["status"], "authorized");
+    assert_ne!(json["status"], "reserved");
     assert_eq!(json["error"], "chio_capability_revoked");
 
     // The severed child never reserved a hold under its own id.
@@ -380,7 +380,7 @@ async fn mediated_authorization_admits_caller_named_server_id() {
     });
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(json["status"], "authorized");
+    assert_eq!(json["status"], "reserved");
     assert!(json["execution_nonce"].is_object());
     assert_eq!(json["receipt"]["decision"]["verdict"], "incomplete");
 }
@@ -413,7 +413,7 @@ async fn mediated_trusts_configured_external_capability_issuers() {
         "parameters": {}
     });
     let (_, json) = post_evaluate(trusting_state, &body).await;
-    assert_eq!(json["status"], "authorized");
+    assert_eq!(json["status"], "reserved");
     assert!(json["execution_nonce"].is_object());
 
     // Control: without the configured issuer the same capability is denied,
@@ -488,7 +488,7 @@ async fn mediated_governed_capability_requires_intent_and_approval() {
     });
     let (_, authorized) = post_evaluate(Arc::clone(&state), &governed_body).await;
     assert_eq!(
-        authorized["status"], "authorized",
+        authorized["status"], "reserved",
         "a governed grant with a valid intent and approval must be authorized"
     );
     assert!(authorized["execution_nonce"].is_object());
@@ -535,7 +535,7 @@ async fn mediated_governed_mustprepay_authorizes_with_payment_adapter() {
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
-        json["status"], "authorized",
+        json["status"], "reserved",
         "a configured payment adapter must let an approved governed MustPrepay authorize"
     );
     assert!(
@@ -626,7 +626,7 @@ async fn mediated_dpop_capability_requires_valid_proof() {
     });
     let (_, authorized) = post_evaluate(Arc::clone(&state), &dpop_body).await;
     assert_eq!(
-        authorized["status"], "authorized",
+        authorized["status"], "reserved",
         "a valid DPoP proof must authorize the dpop_required grant"
     );
     assert!(authorized["execution_nonce"].is_object());
@@ -660,7 +660,7 @@ async fn mediated_dpop_proof_replay_is_rejected_across_requests() {
     });
     let (_, first) = post_evaluate(Arc::clone(&state), &first_body).await;
     assert_eq!(
-        first["status"], "authorized",
+        first["status"], "reserved",
         "the first presentation of a valid DPoP proof must authorize"
     );
 
@@ -699,14 +699,14 @@ async fn mediated_reused_request_id_is_conflict() {
     });
     let (status, first) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(first["status"], "authorized");
+    assert_eq!(first["status"], "reserved");
 
     // Reusing the caller-supplied request_id is rejected fail-closed with 409
     // before authorizing, so it cannot collapse into an idempotent no-op
     // reservation that defeats the over-subscription guard.
     let (status, second) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::CONFLICT);
-    assert_ne!(second["status"], "authorized");
+    assert_ne!(second["status"], "reserved");
     assert_eq!(second["error"], "chio_request_id_reused");
 }
 
@@ -741,7 +741,7 @@ async fn mediated_authorization_requires_hold_capable_budget_store() {
     // unreconcilable reserved nonce.
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
     assert_eq!(json["error"], "chio_mediation_requires_local_budget_store");
-    assert_ne!(json["status"], "authorized");
+    assert_ne!(json["status"], "reserved");
     assert!(
         json["execution_nonce"].is_null(),
         "a fail-closed rejection must not mint a reserved nonce"
@@ -777,7 +777,7 @@ async fn mediated_authorization_requires_reconcile_control_token() {
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
     assert_eq!(json["error"], "chio_mediation_requires_reconcile_token");
-    assert_ne!(json["status"], "authorized");
+    assert_ne!(json["status"], "reserved");
     assert!(
         json["execution_nonce"].is_null(),
         "a fail-closed rejection must not mint a reserved nonce"
@@ -819,7 +819,7 @@ async fn mediated_authorization_rejects_blank_reconcile_control_token() {
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
     assert_eq!(json["error"], "chio_mediation_requires_reconcile_token");
-    assert_ne!(json["status"], "authorized");
+    assert_ne!(json["status"], "reserved");
     assert!(
         json["execution_nonce"].is_null(),
         "a fail-closed rejection must not mint a reserved nonce"
@@ -901,7 +901,7 @@ async fn mediated_durable_hold_rejects_request_id_reuse_across_restart() {
     });
     let (status, authorized) = post_evaluate(Arc::clone(&before), &body).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(authorized["status"], "authorized");
+    assert_eq!(authorized["status"], "reserved");
 
     // Restart: a fresh ProxyState with an EMPTY in-memory window, sharing only
     // the durable budget store. The seeded sidecar signer survives, so the
@@ -915,7 +915,7 @@ async fn mediated_durable_hold_rejects_request_id_reuse_across_restart() {
     // nonce against the same open reservation.
     let (status, replay) = post_evaluate(Arc::clone(&after), &body).await;
     assert_eq!(status, StatusCode::CONFLICT);
-    assert_ne!(replay["status"], "authorized");
+    assert_ne!(replay["status"], "reserved");
     assert!(
         replay["execution_nonce"].is_null(),
         "no second nonce is minted against the open hold"
@@ -933,7 +933,7 @@ async fn mediated_durable_hold_rejects_request_id_reuse_across_restart() {
     });
     let (status, fresh) = post_evaluate(after, &fresh_body).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(fresh["status"], "authorized");
+    assert_eq!(fresh["status"], "reserved");
     assert!(fresh["execution_nonce"].is_object());
 }
 
@@ -961,7 +961,7 @@ async fn reconcile_settles_reserved_hold_and_frees_budget() {
         "request_id": "recon-reserve",
     });
     let (_, authorized) = post_evaluate(Arc::clone(&state), &body).await;
-    assert_eq!(authorized["status"], "authorized");
+    assert_eq!(authorized["status"], "reserved");
     let nonce_json = authorized["execution_nonce"].clone();
     assert!(nonce_json.is_object());
 
@@ -1004,7 +1004,7 @@ async fn reconcile_settles_reserved_hold_and_frees_budget() {
     });
     let (_, after) = post_evaluate(Arc::clone(&state), &after_body).await;
     assert_eq!(
-        after["status"], "authorized",
+        after["status"], "reserved",
         "the budget freed by reconcile must admit a new authorization"
     );
 }
@@ -1104,7 +1104,7 @@ async fn reaper_forfeits_expired_hold_at_worst_case() {
         "request_id": "reap-reserve",
     });
     let (_, authorized) = post_evaluate(Arc::clone(&state), &reserve_body).await;
-    assert_eq!(authorized["status"], "authorized");
+    assert_eq!(authorized["status"], "reserved");
 
     // The whole grant is reserved: a second authorization is blocked.
     let blocked_body = serde_json::json!({
@@ -1212,7 +1212,7 @@ async fn mediated_authorization_works_with_both_control_url_and_budget_db() {
     let (status, authorized) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
-        authorized["status"], "authorized",
+        authorized["status"], "reserved",
         "both configured must authorize via the local hold-capable store"
     );
     let nonce_json = authorized["execution_nonce"].clone();
@@ -1277,7 +1277,7 @@ async fn durable_mediation_reserves_the_operation_and_settles_the_caller_report(
     });
     let (status, authorized) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK, "{authorized}");
-    assert_eq!(authorized["status"], "authorized", "{authorized}");
+    assert_eq!(authorized["status"], "reserved", "{authorized}");
     assert_eq!(
         authorized["receipt"]["metadata"]["execution_nonce"]["hold_disposition"],
         "reserved"

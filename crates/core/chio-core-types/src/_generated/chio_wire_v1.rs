@@ -18682,6 +18682,2430 @@ pub mod jsonrpc_response {
         }
     }
 }
+pub mod kernel_caller_delivery_report {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`CallerDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CallerDigest(::std::string::String);
+    impl ::std::ops::Deref for CallerDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CallerDigest> for ::std::string::String {
+        fn from(value: CallerDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CallerDigest> for CallerDigest {
+        fn from(value: &CallerDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CallerDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CallerDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for CallerDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for CallerDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CallerDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`CallerExecutor`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "executor_id",
+    ///    "key_epoch",
+    ///    "public_key"
+    ///  ],
+    ///  "properties": {
+    ///    "executor_id": {
+    ///      "$ref": "#/$defs/callerIdentifier"
+    ///    },
+    ///    "key_epoch": {
+    ///      "$ref": "#/$defs/callerPositiveInteger"
+    ///    },
+    ///    "public_key": {
+    ///      "$ref": "#/$defs/callerPublicKey"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CallerExecutor {
+        pub executor_id: CallerIdentifier,
+        pub key_epoch: CallerPositiveInteger,
+        pub public_key: CallerPublicKey,
+    }
+    impl ::std::convert::From<&CallerExecutor> for CallerExecutor {
+        fn from(value: &CallerExecutor) -> Self {
+            value.clone()
+        }
+    }
+    ///The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CallerIdentifier(::std::string::String);
+    impl ::std::ops::Deref for CallerIdentifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CallerIdentifier> for ::std::string::String {
+        fn from(value: CallerIdentifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CallerIdentifier> for CallerIdentifier {
+        fn from(value: &CallerIdentifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CallerIdentifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CallerIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for CallerIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for CallerIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CallerIdentifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`CallerPositiveInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct CallerPositiveInteger(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for CallerPositiveInteger {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CallerPositiveInteger> for ::std::num::NonZeroU64 {
+        fn from(value: CallerPositiveInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CallerPositiveInteger> for CallerPositiveInteger {
+        fn from(value: &CallerPositiveInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for CallerPositiveInteger {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for CallerPositiveInteger {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CallerPositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for CallerPositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for CallerPositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for CallerPositiveInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`CallerPublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CallerPublicKey(::std::string::String);
+    impl ::std::ops::Deref for CallerPublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CallerPublicKey> for ::std::string::String {
+        fn from(value: CallerPublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CallerPublicKey> for CallerPublicKey {
+        fn from(value: &CallerPublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CallerPublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CallerPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for CallerPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for CallerPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CallerPublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`CallerSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CallerSignature(::std::string::String);
+    impl ::std::ops::Deref for CallerSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CallerSignature> for ::std::string::String {
+        fn from(value: CallerSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CallerSignature> for CallerSignature {
+        fn from(value: &CallerSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CallerSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CallerSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for CallerSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for CallerSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CallerSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Executor-authenticated historical observation, never a new execution permit or provider attestation. Canonical encoding is bounded to 1048576 bytes. Raw output remains on the trusted executor-to-kernel path until finalization permits release.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/caller_delivery_report.schema.json",
+    ///  "title": "Chio signed caller delivery report",
+    ///  "description": "Executor-authenticated historical observation, never a new execution permit or provider attestation. Canonical encoding is bounded to 1048576 bytes. Raw output remains on the trusted executor-to-kernel path until finalization permits release.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "report",
+    ///    "signature"
+    ///  ],
+    ///  "properties": {
+    ///    "report": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "authorization_digest",
+    ///        "claim_id",
+    ///        "completed_at_unix_ms",
+    ///        "execution_started_at_unix_ms",
+    ///        "executor",
+    ///        "output",
+    ///        "realized_cost",
+    ///        "schema"
+    ///      ],
+    ///      "properties": {
+    ///        "authorization_digest": {
+    ///          "type": "string",
+    ///          "pattern": "^[0-9a-f]{64}$"
+    ///        },
+    ///        "claim_id": {
+    ///          "description": "The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.",
+    ///          "type": "string",
+    ///          "maxLength": 512,
+    ///          "minLength": 1
+    ///        },
+    ///        "completed_at_unix_ms": {
+    ///          "type": "integer",
+    ///          "maximum": 9007199254740991.0,
+    ///          "minimum": 1.0
+    ///        },
+    ///        "execution_started_at_unix_ms": {
+    ///          "type": "integer",
+    ///          "maximum": 9007199254740991.0,
+    ///          "minimum": 1.0
+    ///        },
+    ///        "executor": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "executor_id",
+    ///            "key_epoch",
+    ///            "public_key"
+    ///          ],
+    ///          "properties": {
+    ///            "executor_id": {
+    ///              "$ref": "#/$defs/callerIdentifier"
+    ///            },
+    ///            "key_epoch": {
+    ///              "$ref": "#/$defs/callerPositiveInteger"
+    ///            },
+    ///            "public_key": {
+    ///              "$ref": "#/$defs/callerPublicKey"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "output": {},
+    ///        "realized_cost": {
+    ///          "anyOf": [
+    ///            {
+    ///              "type": "null"
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "currency",
+    ///                "units"
+    ///              ],
+    ///              "properties": {
+    ///                "currency": {
+    ///                  "type": "string",
+    ///                  "maxLength": 64,
+    ///                  "minLength": 1
+    ///                },
+    ///                "units": {
+    ///                  "type": "integer",
+    ///                  "maximum": 9007199254740991.0,
+    ///                  "minimum": 0.0
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          ]
+    ///        },
+    ///        "schema": {
+    ///          "const": "chio.caller-delivery-report.v1"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "signature": {
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedCallerDeliveryReport {
+        pub report: ChioSignedCallerDeliveryReportReport,
+        pub signature: ChioSignedCallerDeliveryReportSignature,
+    }
+    impl ::std::convert::From<&ChioSignedCallerDeliveryReport> for ChioSignedCallerDeliveryReport {
+        fn from(value: &ChioSignedCallerDeliveryReport) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedCallerDeliveryReportReport`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "authorization_digest",
+    ///    "claim_id",
+    ///    "completed_at_unix_ms",
+    ///    "execution_started_at_unix_ms",
+    ///    "executor",
+    ///    "output",
+    ///    "realized_cost",
+    ///    "schema"
+    ///  ],
+    ///  "properties": {
+    ///    "authorization_digest": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "claim_id": {
+    ///      "description": "The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.",
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1
+    ///    },
+    ///    "completed_at_unix_ms": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "execution_started_at_unix_ms": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "executor": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "executor_id",
+    ///        "key_epoch",
+    ///        "public_key"
+    ///      ],
+    ///      "properties": {
+    ///        "executor_id": {
+    ///          "$ref": "#/$defs/callerIdentifier"
+    ///        },
+    ///        "key_epoch": {
+    ///          "$ref": "#/$defs/callerPositiveInteger"
+    ///        },
+    ///        "public_key": {
+    ///          "$ref": "#/$defs/callerPublicKey"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "output": {},
+    ///    "realized_cost": {
+    ///      "anyOf": [
+    ///        {
+    ///          "type": "null"
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "currency",
+    ///            "units"
+    ///          ],
+    ///          "properties": {
+    ///            "currency": {
+    ///              "type": "string",
+    ///              "maxLength": 64,
+    ///              "minLength": 1
+    ///            },
+    ///            "units": {
+    ///              "type": "integer",
+    ///              "maximum": 9007199254740991.0,
+    ///              "minimum": 0.0
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.caller-delivery-report.v1"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedCallerDeliveryReportReport {
+        pub authorization_digest: ChioSignedCallerDeliveryReportReportAuthorizationDigest,
+        ///The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+        pub claim_id: ChioSignedCallerDeliveryReportReportClaimId,
+        pub completed_at_unix_ms: ::std::num::NonZeroU64,
+        pub execution_started_at_unix_ms: ::std::num::NonZeroU64,
+        pub executor: ChioSignedCallerDeliveryReportReportExecutor,
+        pub output: ::serde_json::Value,
+        pub realized_cost: ::std::option::Option<ChioSignedCallerDeliveryReportReportRealizedCost>,
+        pub schema: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&ChioSignedCallerDeliveryReportReport>
+        for ChioSignedCallerDeliveryReportReport
+    {
+        fn from(value: &ChioSignedCallerDeliveryReportReport) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedCallerDeliveryReportReportAuthorizationDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedCallerDeliveryReportReportAuthorizationDigest(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedCallerDeliveryReportReportAuthorizationDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedCallerDeliveryReportReportAuthorizationDigest>
+        for ::std::string::String
+    {
+        fn from(value: ChioSignedCallerDeliveryReportReportAuthorizationDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedCallerDeliveryReportReportAuthorizationDigest>
+        for ChioSignedCallerDeliveryReportReportAuthorizationDigest
+    {
+        fn from(value: &ChioSignedCallerDeliveryReportReportAuthorizationDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedCallerDeliveryReportReportAuthorizationDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedCallerDeliveryReportReportAuthorizationDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedCallerDeliveryReportReportAuthorizationDigest
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedCallerDeliveryReportReportAuthorizationDigest
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedCallerDeliveryReportReportAuthorizationDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedCallerDeliveryReportReportClaimId(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedCallerDeliveryReportReportClaimId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedCallerDeliveryReportReportClaimId> for ::std::string::String {
+        fn from(value: ChioSignedCallerDeliveryReportReportClaimId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedCallerDeliveryReportReportClaimId>
+        for ChioSignedCallerDeliveryReportReportClaimId
+    {
+        fn from(value: &ChioSignedCallerDeliveryReportReportClaimId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedCallerDeliveryReportReportClaimId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedCallerDeliveryReportReportClaimId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedCallerDeliveryReportReportClaimId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedCallerDeliveryReportReportClaimId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedCallerDeliveryReportReportClaimId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedCallerDeliveryReportReportExecutor`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "executor_id",
+    ///    "key_epoch",
+    ///    "public_key"
+    ///  ],
+    ///  "properties": {
+    ///    "executor_id": {
+    ///      "$ref": "#/$defs/callerIdentifier"
+    ///    },
+    ///    "key_epoch": {
+    ///      "$ref": "#/$defs/callerPositiveInteger"
+    ///    },
+    ///    "public_key": {
+    ///      "$ref": "#/$defs/callerPublicKey"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedCallerDeliveryReportReportExecutor {
+        pub executor_id: CallerIdentifier,
+        pub key_epoch: CallerPositiveInteger,
+        pub public_key: CallerPublicKey,
+    }
+    impl ::std::convert::From<&ChioSignedCallerDeliveryReportReportExecutor>
+        for ChioSignedCallerDeliveryReportReportExecutor
+    {
+        fn from(value: &ChioSignedCallerDeliveryReportReportExecutor) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedCallerDeliveryReportReportRealizedCost`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "currency",
+    ///    "units"
+    ///  ],
+    ///  "properties": {
+    ///    "currency": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "minLength": 1
+    ///    },
+    ///    "units": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 0.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedCallerDeliveryReportReportRealizedCost {
+        pub currency: ChioSignedCallerDeliveryReportReportRealizedCostCurrency,
+        pub units: i64,
+    }
+    impl ::std::convert::From<&ChioSignedCallerDeliveryReportReportRealizedCost>
+        for ChioSignedCallerDeliveryReportReportRealizedCost
+    {
+        fn from(value: &ChioSignedCallerDeliveryReportReportRealizedCost) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedCallerDeliveryReportReportRealizedCostCurrency`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedCallerDeliveryReportReportRealizedCostCurrency(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedCallerDeliveryReportReportRealizedCostCurrency {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedCallerDeliveryReportReportRealizedCostCurrency>
+        for ::std::string::String
+    {
+        fn from(value: ChioSignedCallerDeliveryReportReportRealizedCostCurrency) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedCallerDeliveryReportReportRealizedCostCurrency>
+        for ChioSignedCallerDeliveryReportReportRealizedCostCurrency
+    {
+        fn from(value: &ChioSignedCallerDeliveryReportReportRealizedCostCurrency) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedCallerDeliveryReportReportRealizedCostCurrency {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedCallerDeliveryReportReportRealizedCostCurrency {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedCallerDeliveryReportReportRealizedCostCurrency
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedCallerDeliveryReportReportRealizedCostCurrency
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedCallerDeliveryReportReportRealizedCostCurrency {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedCallerDeliveryReportSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedCallerDeliveryReportSignature(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedCallerDeliveryReportSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioSignedCallerDeliveryReportSignature> for ::std::string::String {
+        fn from(value: ChioSignedCallerDeliveryReportSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioSignedCallerDeliveryReportSignature>
+        for ChioSignedCallerDeliveryReportSignature
+    {
+        fn from(value: &ChioSignedCallerDeliveryReportSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedCallerDeliveryReportSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedCallerDeliveryReportSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioSignedCallerDeliveryReportSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioSignedCallerDeliveryReportSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedCallerDeliveryReportSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+}
+pub mod kernel_caller_dispatch_authorization {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`CallerDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CallerDigest(::std::string::String);
+    impl ::std::ops::Deref for CallerDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CallerDigest> for ::std::string::String {
+        fn from(value: CallerDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CallerDigest> for CallerDigest {
+        fn from(value: &CallerDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CallerDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CallerDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for CallerDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for CallerDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CallerDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`CallerExecutor`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "executor_id",
+    ///    "key_epoch",
+    ///    "public_key"
+    ///  ],
+    ///  "properties": {
+    ///    "executor_id": {
+    ///      "$ref": "#/$defs/callerIdentifier"
+    ///    },
+    ///    "key_epoch": {
+    ///      "$ref": "#/$defs/callerPositiveInteger"
+    ///    },
+    ///    "public_key": {
+    ///      "$ref": "#/$defs/callerPublicKey"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CallerExecutor {
+        pub executor_id: CallerIdentifier,
+        pub key_epoch: CallerPositiveInteger,
+        pub public_key: CallerPublicKey,
+    }
+    impl ::std::convert::From<&CallerExecutor> for CallerExecutor {
+        fn from(value: &CallerExecutor) -> Self {
+            value.clone()
+        }
+    }
+    ///The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.",
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CallerIdentifier(::std::string::String);
+    impl ::std::ops::Deref for CallerIdentifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CallerIdentifier> for ::std::string::String {
+        fn from(value: CallerIdentifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CallerIdentifier> for CallerIdentifier {
+        fn from(value: &CallerIdentifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CallerIdentifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CallerIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for CallerIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for CallerIdentifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CallerIdentifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`CallerPositiveInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct CallerPositiveInteger(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for CallerPositiveInteger {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CallerPositiveInteger> for ::std::num::NonZeroU64 {
+        fn from(value: CallerPositiveInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CallerPositiveInteger> for CallerPositiveInteger {
+        fn from(value: &CallerPositiveInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for CallerPositiveInteger {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for CallerPositiveInteger {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CallerPositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for CallerPositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for CallerPositiveInteger {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for CallerPositiveInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`CallerPublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CallerPublicKey(::std::string::String);
+    impl ::std::ops::Deref for CallerPublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CallerPublicKey> for ::std::string::String {
+        fn from(value: CallerPublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CallerPublicKey> for CallerPublicKey {
+        fn from(value: &CallerPublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CallerPublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CallerPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for CallerPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for CallerPublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CallerPublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`CallerSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CallerSignature(::std::string::String);
+    impl ::std::ops::Deref for CallerSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CallerSignature> for ::std::string::String {
+        fn from(value: CallerSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CallerSignature> for CallerSignature {
+        fn from(value: &CallerSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CallerSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CallerSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for CallerSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for CallerSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CallerSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A committed kernel statement, not an executor claim. Canonical encoding is bounded to 32768 bytes. The executor must independently authenticate pins and durably claim the original operation before effect.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/caller_dispatch_authorization.schema.json",
+    ///  "title": "Chio signed caller dispatch authorization",
+    ///  "description": "A committed kernel statement, not an executor claim. Canonical encoding is bounded to 32768 bytes. The executor must independently authenticate pins and durably claim the original operation before effect.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "authorization",
+    ///    "signature"
+    ///  ],
+    ///  "properties": {
+    ///    "authorization": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "committed",
+    ///        "executor",
+    ///        "expires_at_unix_ms",
+    ///        "invocation",
+    ///        "kernel_public_key",
+    ///        "not_before_unix_ms",
+    ///        "schema"
+    ///      ],
+    ///      "properties": {
+    ///        "committed": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "budget_hold_id",
+    ///            "dispatch_commit",
+    ///            "execution_nonce_id",
+    ///            "frozen_context_digest"
+    ///          ],
+    ///          "properties": {
+    ///            "budget_hold_id": {
+    ///              "$ref": "#/$defs/callerIdentifier"
+    ///            },
+    ///            "dispatch_commit": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "committed_version",
+    ///                "coordinator_lease_epoch",
+    ///                "coordinator_lease_id",
+    ///                "provider_attempt",
+    ///                "store_fence"
+    ///              ],
+    ///              "properties": {
+    ///                "committed_version": {
+    ///                  "$ref": "#/$defs/callerPositiveInteger"
+    ///                },
+    ///                "coordinator_lease_epoch": {
+    ///                  "$ref": "#/$defs/callerPositiveInteger"
+    ///                },
+    ///                "coordinator_lease_id": {
+    ///                  "$ref": "#/$defs/callerIdentifier"
+    ///                },
+    ///                "provider_attempt": {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "attempt_id",
+    ///                    "operation_id",
+    ///                    "transport_id",
+    ///                    "transport_key_epoch"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "attempt_id": {
+    ///                      "$ref": "#/$defs/callerIdentifier"
+    ///                    },
+    ///                    "operation_id": {
+    ///                      "$ref": "#/$defs/callerDigest"
+    ///                    },
+    ///                    "transport_id": {
+    ///                      "type": "string",
+    ///                      "maxLength": 512,
+    ///                      "minLength": 15,
+    ///                      "pattern": "^(caller-report:|native-caller-report:v1:)"
+    ///                    },
+    ///                    "transport_key_epoch": {
+    ///                      "$ref": "#/$defs/callerPositiveInteger"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                "store_fence": {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "lease_id",
+    ///                    "owner_epoch",
+    ///                    "store_uuid"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "lease_id": {
+    ///                      "$ref": "#/$defs/callerIdentifier"
+    ///                    },
+    ///                    "owner_epoch": {
+    ///                      "$ref": "#/$defs/callerPositiveInteger"
+    ///                    },
+    ///                    "store_uuid": {
+    ///                      "$ref": "#/$defs/callerIdentifier"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            "execution_nonce_id": {
+    ///              "$ref": "#/$defs/callerIdentifier"
+    ///            },
+    ///            "frozen_context_digest": {
+    ///              "$ref": "#/$defs/callerDigest"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "executor": {
+    ///          "$ref": "#/$defs/callerExecutor"
+    ///        },
+    ///        "expires_at_unix_ms": {
+    ///          "$ref": "#/$defs/callerPositiveInteger"
+    ///        },
+    ///        "invocation": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "capability_digest",
+    ///            "capability_id",
+    ///            "operation_id",
+    ///            "parameters_digest",
+    ///            "request_binding_hash",
+    ///            "request_id",
+    ///            "server_id",
+    ///            "tool_name"
+    ///          ],
+    ///          "properties": {
+    ///            "capability_digest": {
+    ///              "$ref": "#/$defs/callerDigest"
+    ///            },
+    ///            "capability_id": {
+    ///              "$ref": "#/$defs/callerIdentifier"
+    ///            },
+    ///            "operation_id": {
+    ///              "$ref": "#/$defs/callerDigest"
+    ///            },
+    ///            "parameters_digest": {
+    ///              "$ref": "#/$defs/callerDigest"
+    ///            },
+    ///            "request_binding_hash": {
+    ///              "$ref": "#/$defs/callerDigest"
+    ///            },
+    ///            "request_id": {
+    ///              "$ref": "#/$defs/callerIdentifier"
+    ///            },
+    ///            "server_id": {
+    ///              "$ref": "#/$defs/callerIdentifier"
+    ///            },
+    ///            "tool_name": {
+    ///              "$ref": "#/$defs/callerIdentifier"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "kernel_public_key": {
+    ///          "$ref": "#/$defs/callerPublicKey"
+    ///        },
+    ///        "not_before_unix_ms": {
+    ///          "$ref": "#/$defs/callerPositiveInteger"
+    ///        },
+    ///        "schema": {
+    ///          "const": "chio.caller-dispatch-authorization.v1"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "signature": {
+    ///      "$ref": "#/$defs/callerSignature"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedCallerDispatchAuthorization {
+        pub authorization: ChioSignedCallerDispatchAuthorizationAuthorization,
+        pub signature: CallerSignature,
+    }
+    impl ::std::convert::From<&ChioSignedCallerDispatchAuthorization>
+        for ChioSignedCallerDispatchAuthorization
+    {
+        fn from(value: &ChioSignedCallerDispatchAuthorization) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedCallerDispatchAuthorizationAuthorization`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "committed",
+    ///    "executor",
+    ///    "expires_at_unix_ms",
+    ///    "invocation",
+    ///    "kernel_public_key",
+    ///    "not_before_unix_ms",
+    ///    "schema"
+    ///  ],
+    ///  "properties": {
+    ///    "committed": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "budget_hold_id",
+    ///        "dispatch_commit",
+    ///        "execution_nonce_id",
+    ///        "frozen_context_digest"
+    ///      ],
+    ///      "properties": {
+    ///        "budget_hold_id": {
+    ///          "$ref": "#/$defs/callerIdentifier"
+    ///        },
+    ///        "dispatch_commit": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "committed_version",
+    ///            "coordinator_lease_epoch",
+    ///            "coordinator_lease_id",
+    ///            "provider_attempt",
+    ///            "store_fence"
+    ///          ],
+    ///          "properties": {
+    ///            "committed_version": {
+    ///              "$ref": "#/$defs/callerPositiveInteger"
+    ///            },
+    ///            "coordinator_lease_epoch": {
+    ///              "$ref": "#/$defs/callerPositiveInteger"
+    ///            },
+    ///            "coordinator_lease_id": {
+    ///              "$ref": "#/$defs/callerIdentifier"
+    ///            },
+    ///            "provider_attempt": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "attempt_id",
+    ///                "operation_id",
+    ///                "transport_id",
+    ///                "transport_key_epoch"
+    ///              ],
+    ///              "properties": {
+    ///                "attempt_id": {
+    ///                  "$ref": "#/$defs/callerIdentifier"
+    ///                },
+    ///                "operation_id": {
+    ///                  "$ref": "#/$defs/callerDigest"
+    ///                },
+    ///                "transport_id": {
+    ///                  "type": "string",
+    ///                  "maxLength": 512,
+    ///                  "minLength": 15,
+    ///                  "pattern": "^(caller-report:|native-caller-report:v1:)"
+    ///                },
+    ///                "transport_key_epoch": {
+    ///                  "$ref": "#/$defs/callerPositiveInteger"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            "store_fence": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "lease_id",
+    ///                "owner_epoch",
+    ///                "store_uuid"
+    ///              ],
+    ///              "properties": {
+    ///                "lease_id": {
+    ///                  "$ref": "#/$defs/callerIdentifier"
+    ///                },
+    ///                "owner_epoch": {
+    ///                  "$ref": "#/$defs/callerPositiveInteger"
+    ///                },
+    ///                "store_uuid": {
+    ///                  "$ref": "#/$defs/callerIdentifier"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "execution_nonce_id": {
+    ///          "$ref": "#/$defs/callerIdentifier"
+    ///        },
+    ///        "frozen_context_digest": {
+    ///          "$ref": "#/$defs/callerDigest"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "executor": {
+    ///      "$ref": "#/$defs/callerExecutor"
+    ///    },
+    ///    "expires_at_unix_ms": {
+    ///      "$ref": "#/$defs/callerPositiveInteger"
+    ///    },
+    ///    "invocation": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "capability_digest",
+    ///        "capability_id",
+    ///        "operation_id",
+    ///        "parameters_digest",
+    ///        "request_binding_hash",
+    ///        "request_id",
+    ///        "server_id",
+    ///        "tool_name"
+    ///      ],
+    ///      "properties": {
+    ///        "capability_digest": {
+    ///          "$ref": "#/$defs/callerDigest"
+    ///        },
+    ///        "capability_id": {
+    ///          "$ref": "#/$defs/callerIdentifier"
+    ///        },
+    ///        "operation_id": {
+    ///          "$ref": "#/$defs/callerDigest"
+    ///        },
+    ///        "parameters_digest": {
+    ///          "$ref": "#/$defs/callerDigest"
+    ///        },
+    ///        "request_binding_hash": {
+    ///          "$ref": "#/$defs/callerDigest"
+    ///        },
+    ///        "request_id": {
+    ///          "$ref": "#/$defs/callerIdentifier"
+    ///        },
+    ///        "server_id": {
+    ///          "$ref": "#/$defs/callerIdentifier"
+    ///        },
+    ///        "tool_name": {
+    ///          "$ref": "#/$defs/callerIdentifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "kernel_public_key": {
+    ///      "$ref": "#/$defs/callerPublicKey"
+    ///    },
+    ///    "not_before_unix_ms": {
+    ///      "$ref": "#/$defs/callerPositiveInteger"
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.caller-dispatch-authorization.v1"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedCallerDispatchAuthorizationAuthorization {
+        pub committed: ChioSignedCallerDispatchAuthorizationAuthorizationCommitted,
+        pub executor: CallerExecutor,
+        pub expires_at_unix_ms: CallerPositiveInteger,
+        pub invocation: ChioSignedCallerDispatchAuthorizationAuthorizationInvocation,
+        pub kernel_public_key: CallerPublicKey,
+        pub not_before_unix_ms: CallerPositiveInteger,
+        pub schema: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&ChioSignedCallerDispatchAuthorizationAuthorization>
+        for ChioSignedCallerDispatchAuthorizationAuthorization
+    {
+        fn from(value: &ChioSignedCallerDispatchAuthorizationAuthorization) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedCallerDispatchAuthorizationAuthorizationCommitted`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "budget_hold_id",
+    ///    "dispatch_commit",
+    ///    "execution_nonce_id",
+    ///    "frozen_context_digest"
+    ///  ],
+    ///  "properties": {
+    ///    "budget_hold_id": {
+    ///      "$ref": "#/$defs/callerIdentifier"
+    ///    },
+    ///    "dispatch_commit": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "committed_version",
+    ///        "coordinator_lease_epoch",
+    ///        "coordinator_lease_id",
+    ///        "provider_attempt",
+    ///        "store_fence"
+    ///      ],
+    ///      "properties": {
+    ///        "committed_version": {
+    ///          "$ref": "#/$defs/callerPositiveInteger"
+    ///        },
+    ///        "coordinator_lease_epoch": {
+    ///          "$ref": "#/$defs/callerPositiveInteger"
+    ///        },
+    ///        "coordinator_lease_id": {
+    ///          "$ref": "#/$defs/callerIdentifier"
+    ///        },
+    ///        "provider_attempt": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "attempt_id",
+    ///            "operation_id",
+    ///            "transport_id",
+    ///            "transport_key_epoch"
+    ///          ],
+    ///          "properties": {
+    ///            "attempt_id": {
+    ///              "$ref": "#/$defs/callerIdentifier"
+    ///            },
+    ///            "operation_id": {
+    ///              "$ref": "#/$defs/callerDigest"
+    ///            },
+    ///            "transport_id": {
+    ///              "type": "string",
+    ///              "maxLength": 512,
+    ///              "minLength": 15,
+    ///              "pattern": "^(caller-report:|native-caller-report:v1:)"
+    ///            },
+    ///            "transport_key_epoch": {
+    ///              "$ref": "#/$defs/callerPositiveInteger"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "store_fence": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "lease_id",
+    ///            "owner_epoch",
+    ///            "store_uuid"
+    ///          ],
+    ///          "properties": {
+    ///            "lease_id": {
+    ///              "$ref": "#/$defs/callerIdentifier"
+    ///            },
+    ///            "owner_epoch": {
+    ///              "$ref": "#/$defs/callerPositiveInteger"
+    ///            },
+    ///            "store_uuid": {
+    ///              "$ref": "#/$defs/callerIdentifier"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "execution_nonce_id": {
+    ///      "$ref": "#/$defs/callerIdentifier"
+    ///    },
+    ///    "frozen_context_digest": {
+    ///      "$ref": "#/$defs/callerDigest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedCallerDispatchAuthorizationAuthorizationCommitted {
+        pub budget_hold_id: CallerIdentifier,
+        pub dispatch_commit:
+            ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommit,
+        pub execution_nonce_id: CallerIdentifier,
+        pub frozen_context_digest: CallerDigest,
+    }
+    impl ::std::convert::From<&ChioSignedCallerDispatchAuthorizationAuthorizationCommitted>
+        for ChioSignedCallerDispatchAuthorizationAuthorizationCommitted
+    {
+        fn from(value: &ChioSignedCallerDispatchAuthorizationAuthorizationCommitted) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommit`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "committed_version",
+    ///    "coordinator_lease_epoch",
+    ///    "coordinator_lease_id",
+    ///    "provider_attempt",
+    ///    "store_fence"
+    ///  ],
+    ///  "properties": {
+    ///    "committed_version": {
+    ///      "$ref": "#/$defs/callerPositiveInteger"
+    ///    },
+    ///    "coordinator_lease_epoch": {
+    ///      "$ref": "#/$defs/callerPositiveInteger"
+    ///    },
+    ///    "coordinator_lease_id": {
+    ///      "$ref": "#/$defs/callerIdentifier"
+    ///    },
+    ///    "provider_attempt": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "attempt_id",
+    ///        "operation_id",
+    ///        "transport_id",
+    ///        "transport_key_epoch"
+    ///      ],
+    ///      "properties": {
+    ///        "attempt_id": {
+    ///          "$ref": "#/$defs/callerIdentifier"
+    ///        },
+    ///        "operation_id": {
+    ///          "$ref": "#/$defs/callerDigest"
+    ///        },
+    ///        "transport_id": {
+    ///          "type": "string",
+    ///          "maxLength": 512,
+    ///          "minLength": 15,
+    ///          "pattern": "^(caller-report:|native-caller-report:v1:)"
+    ///        },
+    ///        "transport_key_epoch": {
+    ///          "$ref": "#/$defs/callerPositiveInteger"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "store_fence": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "lease_id",
+    ///        "owner_epoch",
+    ///        "store_uuid"
+    ///      ],
+    ///      "properties": {
+    ///        "lease_id": {
+    ///          "$ref": "#/$defs/callerIdentifier"
+    ///        },
+    ///        "owner_epoch": {
+    ///          "$ref": "#/$defs/callerPositiveInteger"
+    ///        },
+    ///        "store_uuid": {
+    ///          "$ref": "#/$defs/callerIdentifier"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommit {
+        pub committed_version: CallerPositiveInteger,
+        pub coordinator_lease_epoch: CallerPositiveInteger,
+        pub coordinator_lease_id: CallerIdentifier,
+        pub provider_attempt: ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttempt,
+        pub store_fence: ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitStoreFence,
+    }
+    impl
+        ::std::convert::From<
+            &ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommit,
+        > for ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommit
+    {
+        fn from(
+            value: &ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommit,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttempt`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "attempt_id",
+    ///    "operation_id",
+    ///    "transport_id",
+    ///    "transport_key_epoch"
+    ///  ],
+    ///  "properties": {
+    ///    "attempt_id": {
+    ///      "$ref": "#/$defs/callerIdentifier"
+    ///    },
+    ///    "operation_id": {
+    ///      "$ref": "#/$defs/callerDigest"
+    ///    },
+    ///    "transport_id": {
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 15,
+    ///      "pattern": "^(caller-report:|native-caller-report:v1:)"
+    ///    },
+    ///    "transport_key_epoch": {
+    ///      "$ref": "#/$defs/callerPositiveInteger"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttempt {
+        pub attempt_id: CallerIdentifier,
+        pub operation_id: CallerDigest,
+        pub transport_id: ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttemptTransportId,
+        pub transport_key_epoch: CallerPositiveInteger,
+    }
+    impl ::std::convert::From<
+        &ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttempt,
+    >
+    for ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttempt {
+        fn from(
+            value: &ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttempt,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttemptTransportId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 15,
+    ///  "pattern": "^(caller-report:|native-caller-report:v1:)"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttemptTransportId(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref
+    for ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttemptTransportId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<
+        ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttemptTransportId,
+    > for ::std::string::String {
+        fn from(
+            value: ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttemptTransportId,
+        ) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<
+        &ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttemptTransportId,
+    >
+    for ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttemptTransportId {
+        fn from(
+            value: &ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttemptTransportId,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr
+    for ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttemptTransportId {
+        type Err = self::error::ConversionError;
+        fn from_str(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 15usize {
+                return Err("shorter than 15 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+            {
+                ::regress::Regex::new("^(caller-report:|native-caller-report:v1:)")
+                    .unwrap()
+            });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^(caller-report:|native-caller-report:v1:)\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+    for ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttemptTransportId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &str,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+    for ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttemptTransportId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+    for ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttemptTransportId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+    for ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttemptTransportId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitStoreFence`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "lease_id",
+    ///    "owner_epoch",
+    ///    "store_uuid"
+    ///  ],
+    ///  "properties": {
+    ///    "lease_id": {
+    ///      "$ref": "#/$defs/callerIdentifier"
+    ///    },
+    ///    "owner_epoch": {
+    ///      "$ref": "#/$defs/callerPositiveInteger"
+    ///    },
+    ///    "store_uuid": {
+    ///      "$ref": "#/$defs/callerIdentifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitStoreFence {
+        pub lease_id: CallerIdentifier,
+        pub owner_epoch: CallerPositiveInteger,
+        pub store_uuid: CallerIdentifier,
+    }
+    impl
+        ::std::convert::From<
+            &ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitStoreFence,
+        > for ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitStoreFence
+    {
+        fn from(
+            value: &ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitStoreFence,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedCallerDispatchAuthorizationAuthorizationInvocation`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "capability_digest",
+    ///    "capability_id",
+    ///    "operation_id",
+    ///    "parameters_digest",
+    ///    "request_binding_hash",
+    ///    "request_id",
+    ///    "server_id",
+    ///    "tool_name"
+    ///  ],
+    ///  "properties": {
+    ///    "capability_digest": {
+    ///      "$ref": "#/$defs/callerDigest"
+    ///    },
+    ///    "capability_id": {
+    ///      "$ref": "#/$defs/callerIdentifier"
+    ///    },
+    ///    "operation_id": {
+    ///      "$ref": "#/$defs/callerDigest"
+    ///    },
+    ///    "parameters_digest": {
+    ///      "$ref": "#/$defs/callerDigest"
+    ///    },
+    ///    "request_binding_hash": {
+    ///      "$ref": "#/$defs/callerDigest"
+    ///    },
+    ///    "request_id": {
+    ///      "$ref": "#/$defs/callerIdentifier"
+    ///    },
+    ///    "server_id": {
+    ///      "$ref": "#/$defs/callerIdentifier"
+    ///    },
+    ///    "tool_name": {
+    ///      "$ref": "#/$defs/callerIdentifier"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedCallerDispatchAuthorizationAuthorizationInvocation {
+        pub capability_digest: CallerDigest,
+        pub capability_id: CallerIdentifier,
+        pub operation_id: CallerDigest,
+        pub parameters_digest: CallerDigest,
+        pub request_binding_hash: CallerDigest,
+        pub request_id: CallerIdentifier,
+        pub server_id: CallerIdentifier,
+        pub tool_name: CallerIdentifier,
+    }
+    impl ::std::convert::From<&ChioSignedCallerDispatchAuthorizationAuthorizationInvocation>
+        for ChioSignedCallerDispatchAuthorizationAuthorizationInvocation
+    {
+        fn from(value: &ChioSignedCallerDispatchAuthorizationAuthorizationInvocation) -> Self {
+            value.clone()
+        }
+    }
+}
 pub mod kernel_capability_list {
     /// Error types.
     pub mod error {

@@ -22,6 +22,13 @@ mod races {
     ));
 }
 
+mod caller {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_flow_caller_process_tests.rs"
+    ));
+}
+
 #[derive(Clone, Copy)]
 enum RecoveryMode {
     Serial,
@@ -104,7 +111,7 @@ impl Point {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Witness {
+pub(super) struct Witness {
     directory: PathBuf,
     signer: String,
     binding: NativeSecurityAuthorityBindingV1,
@@ -112,6 +119,26 @@ struct Witness {
     context: SecurityInvocationContext,
     fence: chio_core_types::StoreMutationFence,
     declassification_signer: Option<String>,
+}
+
+pub(super) fn caller_restart_witness(fixture: &Fixture, disclosure: Option<&Keypair>) -> Witness {
+    Witness {
+        directory: fixture._directory.path().to_path_buf(),
+        signer: fixture.signer.seed_hex(),
+        binding: fixture.binding.clone(),
+        request: fixture.request.clone(),
+        context: fixture.context.clone(),
+        fence: fixture.authority.mutation_fence(),
+        declassification_signer: disclosure.map(Keypair::seed_hex),
+    }
+}
+
+pub(super) fn configure_caller_restart(
+    kernel: &mut ChioKernel,
+    original: &chio_kernel::admission_operation::RetainedToolAdmissionRequestV1,
+    witness: &Witness,
+) -> TestResult {
+    restart::configure_original_selection(kernel, original, witness)
 }
 
 struct ProcessHook {

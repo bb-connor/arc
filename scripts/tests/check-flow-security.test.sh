@@ -87,10 +87,10 @@ def parse(source: str) -> dict[str, tuple[bool, list[str], list[str]]]:
 expected_counts = {
     "live admission ownership": 5,
     "frozen federation context": 13,
-    "frozen dispatch participant context": 27,
+    "frozen dispatch participant context": 30,
     "durable caller participant persistence": 3,
     "native compiled catalog identity": 2,
-    "native post-join policy": 114,
+    "native post-join policy": 133,
     "native declassification row semantics": 1,
     "native declassification issuer window": 1,
     "public nested credential custody": 5,
@@ -120,7 +120,7 @@ expected_counts = {
     "native dispatch attachment contracts": 4,
     "native flow observation contracts": 3,
     "original security authority selection": 22,
-    "original operation authority profile": 7,
+    "original operation authority profile": 8,
     "runtime profile non-upgrade": 1,
     "native authority admission integration": 12,
     "physical dispatch hold ownership": 3,
@@ -323,7 +323,7 @@ def validate(calls: dict[str, tuple[bool, list[str], list[str]]]) -> None:
 source = Path(sys.argv[1]).read_text(encoding="utf-8")
 validate(parse(source))
 
-# The standalone M2 gate must name exactly the process/race subset of the
+# The standalone restart gate must name exactly the M2/M3 process/race subset of the
 # composed native gate, not a smaller passing filter.
 restart_source = Path("scripts/check-native-restart-safety.sh").read_text(encoding="utf-8")
 restart_lines = [line for line in restart_source.replace("\\\n", " ").splitlines()
@@ -336,7 +336,7 @@ restart_expected = restart_tokens[restart_tokens.index("--expected") + 1:restart
 restart_prefix = "security::adapters::tests::native_flow::support::process_recovery::"
 native_process = [name for name in parse(source)["native post-join policy"][1]
                   if name.startswith(restart_prefix)]
-if len(restart_expected) != 34 or sorted(restart_expected) != sorted(native_process):
+if len(restart_expected) != 47 or sorted(restart_expected) != sorted(native_process):
     raise SystemExit("native restart and composed flow inventories disagree")
 if restart_tokens[restart_separator + 1:] != [
     "cargo", "test", "-p", "chio-control-plane", "--lib", "--locked", restart_prefix,

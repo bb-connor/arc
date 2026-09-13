@@ -16,6 +16,14 @@ use chio_kernel::dpop::authority::DpopReplayAuthorityV1;
 mod native_security;
 
 impl AdmissionOperationStore for SqliteAdmissionOperationStore {
+    fn await_caller_report(
+        &self,
+        command: &AdmissionOperationCommand,
+        trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
+        self.retain_caller_wait(command, trusted_now_unix_ms)
+    }
+
     fn observe_native_security_flow(
         &self,
         binding: &chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1,
@@ -419,6 +427,14 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         let result = load_by_operation_id_tx(&transaction, operation_id)?
             .map(|stored| {
                 stored.verify_decision_time(trusted_now_unix_ms)?;
+                if stored.operation.dispatch_commit().is_some() {
+                    crate::budget_store::verify_nonce_budget_phase_tx(
+                        &transaction,
+                        &stored.operation,
+                        crate::budget_store::NonceBudgetPhase::Captured,
+                    )
+                    .map_err(|error| invariant(error.to_string()))?;
+                }
                 caller_dispatch_context::load(&transaction, &stored.operation)
             })
             .transpose()?
@@ -978,7 +994,9 @@ fn recoverable_page(
     limit: usize,
 ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
     let state_predicate = match rows {
-        RecoverableRows::Active => "state <> 'approval_required'",
+        // A committed caller waits for authenticated external evidence. It has
+        // no timer-driven recovery action and must not occupy an active page.
+        RecoverableRows::Active => "state NOT IN ('approval_required', 'awaiting_caller_report')",
         RecoverableRows::ExpiredParked => "state = 'approval_required'",
     };
     let sql = format!(

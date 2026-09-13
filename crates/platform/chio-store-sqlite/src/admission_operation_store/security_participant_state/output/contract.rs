@@ -14,7 +14,7 @@ pub(super) fn require_original(
         || operation.native_dispatch_ledger_digest().is_none()
         || operation
             .provider_attempt()
-            .is_none_or(|attempt| attempt.is_caller_report())
+            .is_none_or(|attempt| attempt.is_caller_report() && !attempt.is_native_caller_report())
     {
         return Err(invalid(
             "native output requires original kernel-owned capture",
@@ -48,6 +48,29 @@ pub(super) fn require_original(
         intent,
         require_payload,
     )? {
+        if operation
+            .provider_attempt()
+            .is_some_and(|attempt| attempt.is_native_caller_report())
+        {
+            let frame = super::super::super::caller_dispatch_context::load(connection, operation)?
+                .ok_or_else(|| invalid("native caller output lost physical release custody"))?;
+            let nonce =
+                super::super::super::execution_nonce::verify_reservation(connection, operation)?
+                    .ok_or_else(|| invalid("native caller output lost physical nonce issuance"))?;
+            let custody = raw
+                .caller_delivery_evidence
+                .as_ref()
+                .ok_or_else(|| {
+                    invalid("native caller output requires private signed delivery evidence")
+                })?
+                .validate_native_original(operation, &original, &nonce, &frame)
+                .map_err(invalid)?;
+            if raw.security_invocation_context.as_ref() != Some(custody.security_context()) {
+                return Err(invalid(
+                    "native caller output changed its frozen release identity",
+                ));
+            }
+        }
         original.validate_native_security_context(
             raw.security_invocation_context
                 .as_ref()

@@ -58,7 +58,11 @@ impl RawInvocationOutcomeV1 {
         }
         self.requires_security_release()?;
         self.receipt_signing_identity = Some(identity);
-        self.schema = RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA;
+        self.schema = if self.caller_delivery_evidence.is_some() {
+            RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA
+        } else {
+            RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA
+        };
         self.canonical_blob()?;
         Ok(self)
     }

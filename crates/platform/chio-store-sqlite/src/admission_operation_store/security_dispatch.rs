@@ -2,10 +2,9 @@
 //! lower-level capture route or historical native join/egress acknowledgements.
 use super::*;
 
-/// Native custody is not yet a qualified dispatch participant. Keep this check
-/// at the physical transaction boundary until the dispatch ledger, credential
-/// dispositions, recovery and explicit activation are implemented together.
-/// Merely finding an egress commitment must never satisfy this requirement.
+/// Generic capture cannot satisfy native participant custody. Only the private,
+/// transaction-bound native capture port may advance that dispatch. Historical
+/// joins, egress commitments and caller wait evidence never grant fresh capture.
 pub(crate) fn verify_native_security_dispatch_tx(
     connection: &Connection,
     operation: &AdmissionOperationV1,

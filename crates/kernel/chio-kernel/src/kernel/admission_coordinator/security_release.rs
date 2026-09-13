@@ -8,6 +8,9 @@ use crate::tool_outcome::{
     AcknowledgedSecurityReleaseV1, SecurityReleaseArtifacts, SecurityReleaseRecordV1,
 };
 
+#[path = "security_release/native_caller.rs"]
+mod native_caller;
+
 pub(super) struct DurableSecurityReleaseInput<'a> {
     pub admission: &'a DurableToolAdmission,
     pub raw: &'a RawInvocationOutcomeV1,
@@ -104,7 +107,11 @@ impl ChioKernel {
                 ))
             };
         }
-        let permit = permit.ok_or_else(|| {
+        let permit = match permit {
+            Some(permit) => Some(permit),
+            None => self.recover_native_caller_release_owner(input.admission, input.raw)?,
+        }
+        .ok_or_else(|| {
             recovery_required(
                 "the original release owner is unavailable; fresh admission cannot replace it",
             )

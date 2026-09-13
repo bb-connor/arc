@@ -20,6 +20,41 @@ mod participants;
 mod custody;
 
 #[test]
+fn caller_observation_metadata_cannot_be_injected_before_dispatch() -> TestResult {
+    let fixture = fixture()?;
+    let request = fixture
+        .admission
+        .original_retained_request()
+        .ok_or("original")?
+        .request_for_revalidation();
+    let metadata = serde_json::json!({"caller_delivery": {"report_digest": "a".repeat(64)}});
+    assert!(matches!(
+        reject_reserved_receipt_metadata(Some(&metadata)),
+        Err(KernelError::InvalidReceiptMetadata(_))
+    ));
+    let result = fixture.kernel.freeze_durable_tool_return_context(
+        &fixture.admission,
+        DurableToolReturnContextInput {
+            request,
+            matched_grant_index: 0,
+            extra_receipt_metadata: Some(metadata),
+            pre_invocation_guard_evidence: &[],
+            verified_payee_binding: None,
+            verified_purchase: None,
+            verified_recovery: None,
+            trusted_now_unix_ms: current_unix_timestamp_ms(),
+            security_invocation_context: None,
+            security_release_required: false,
+        },
+    );
+    assert!(matches!(
+        result,
+        Err(KernelError::InvalidReceiptMetadata(_))
+    ));
+    Ok(())
+}
+
+#[test]
 fn caller_return_codec_keeps_frozen_facts_without_credentials_or_return_observations() -> TestResult
 {
     let mut fixture = fixture()?;

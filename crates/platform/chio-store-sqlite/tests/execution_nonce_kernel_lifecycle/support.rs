@@ -60,6 +60,9 @@ pub struct Fixture {
     /// When set, the process aborts the moment finalization reaches this
     /// cutpoint. Only the child process of a crash test sets it.
     pub finalization_cutpoint: Option<DurableFinalizationCutpoint>,
+    pub caller_executor: Option<chio_kernel::caller_delivery::CallerExecutorIdentityV1>,
+    /// Real durable fixed-price local-credit rail, never external currency.
+    pub local_payment_rail: bool,
 }
 
 pub struct Runtime {
@@ -95,6 +98,8 @@ impl Fixture {
             nonce_enabled: true,
             tool_server: None,
             finalization_cutpoint: None,
+            caller_executor: None,
+            local_payment_rail: false,
         };
         SqliteAuthorityStore::provision(
             fixture.database(),
@@ -122,6 +127,8 @@ impl Fixture {
             nonce_enabled: true,
             tool_server: None,
             finalization_cutpoint: None,
+            caller_executor: None,
+            local_payment_rail: false,
         })
     }
 
@@ -192,6 +199,16 @@ impl Fixture {
                     std::process::abort();
                 }
             }));
+        }
+        if let Some(executor) = &self.caller_executor {
+            kernel.set_caller_executor(executor.clone())?;
+        }
+        if self.local_payment_rail {
+            kernel.set_payment_adapter(Box::new(
+                chio_store_sqlite::SqliteFindingOperatorPaymentAdapter::open(
+                    self.directory.path().join("local-payments.db"),
+                )?,
+            ));
         }
         if reconcile {
             kernel.reconcile_durable_admission_startup()?;

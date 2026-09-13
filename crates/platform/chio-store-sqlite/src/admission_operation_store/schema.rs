@@ -17,6 +17,12 @@ mod migration_v30;
 mod migration_v31;
 mod migration_v32;
 mod migration_v33;
+mod migration_v34;
+
+#[cfg(test)]
+pub(crate) fn pre_caller_wait_schema_fixture() -> String {
+    migration_v34::predecessor_schema()
+}
 
 #[cfg(test)]
 pub(crate) fn pre_dpop_claim_schema_fixture() -> String {
@@ -118,7 +124,10 @@ fn migrate_schema(
     if on_disk < 32 {
         migration_v32::verify_pre_migration_schema(&transaction, on_disk)?;
     }
-    migration_v33::verify_pre_migration_schema(&transaction, on_disk)?;
+    if on_disk < 33 {
+        migration_v33::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    migration_v34::verify_pre_migration_schema(&transaction, on_disk)?;
     if on_disk < 18 && table_exists(&transaction, "admission_operations")? {
         // The legacy report-after-effect contract could refund an executed
         // caller as pre-dispatch compensation. A refunded terminal is not
@@ -154,6 +163,7 @@ fn migrate_schema(
     if matches!(on_disk, 2 | 3) {
         migrate_terminal_record_kinds(&transaction)?;
     }
+    migration_v34::migrate(&transaction, on_disk)?;
     migration_v17::migrate_commit_observation_clock(&transaction)?;
     migration_v20::migrate_commit_kinds(&transaction)?;
     if on_disk < 21 {
@@ -237,7 +247,7 @@ fn migrate_schema(
 }
 
 fn table_exists(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     table_name: &str,
 ) -> Result<bool, AdmissionOperationStoreError> {
     transaction
@@ -566,6 +576,20 @@ fn verify_admission_operation_schema(
     connection: &Connection,
     version: i32,
 ) -> Result<(), AdmissionOperationStoreError> {
+    let expected = expected_admission_operation_schema(version)?;
+    if admission_operation_schema_catalog(connection)?
+        != admission_operation_schema_catalog(&expected)?
+    {
+        return Err(invariant(
+            "admission operation schema differs from the canonical definition",
+        ));
+    }
+    Ok(())
+}
+
+fn expected_admission_operation_schema(
+    version: i32,
+) -> Result<Connection, AdmissionOperationStoreError> {
     let expected = Connection::open_in_memory().map_err(sqlite_error)?;
     expected
         .execute_batch(&if version < 20 {
@@ -574,6 +598,8 @@ fn verify_admission_operation_schema(
             migration_v23::predecessor_admission_schema()
         } else if version < 26 {
             migration_v26::predecessor_admission_schema()
+        } else if version < 34 {
+            migration_v34::predecessor_schema()
         } else {
             ADMISSION_OPERATION_SCHEMA.to_owned()
         })
@@ -659,14 +685,7 @@ fn verify_admission_operation_schema(
             .execute_batch(super::security_participant_state::nonce_preflight::sql())
             .map_err(sqlite_error)?;
     }
-    if admission_operation_schema_catalog(connection)?
-        != admission_operation_schema_catalog(&expected)?
-    {
-        return Err(invariant(
-            "admission operation schema differs from the canonical definition",
-        ));
-    }
-    Ok(())
+    Ok(expected)
 }
 
 fn verify_admission_operation_data_invariants(
