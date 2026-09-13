@@ -872,6 +872,8 @@ def inline_macros(document: dict[str, Any]) -> list[tuple[str, str]]:
             components["buyer_proof_package_verify"],
         ),
         ("PSSustainedSeconds", integer(sustained["seconds"])),
+        ("PSSustainedConcurrency", integer(sustained["concurrency"])),
+        ("PSSustainedBottleneck", sustained_bottleneck_phrase(sustained)),
         ("PSSustainedCalls", integer(sustained["calls"])),
         ("PSSustainedCallsPerSecond", fixed(sustained["callsPerSecond"], 1)),
         ("PSSustainedDispatchCount", integer(sustained["dispatchCount"])),
@@ -886,6 +888,34 @@ def inline_macros(document: dict[str, Any]) -> list[tuple[str, str]]:
         ("PSThreatCaseCount", integer(negative["cases"])),
     ]
 
+
+
+# The sweep classifies what holds throughput at its peak. The paper reads the
+# classification inline, after "the sweep reports what holds it there:", so each
+# one renders as a lowercase noun phrase with no trailing period. An
+# unrecognised classification is an error rather than a passthrough, because a
+# bare identifier in the middle of a sentence is worse than a failed build.
+SUSTAINED_BOTTLENECK_PHRASES = {
+    "host_cpu": "the host's cores",
+    "serialized": "a serialized stage in the path",
+    "contended": "contention on the receipt store",
+    "undetermined_sweep_truncated": "no ceiling the sweep reached",
+}
+
+
+def sustained_bottleneck_phrase(sustained: dict) -> str:
+    bottleneck = sustained.get("bottleneck")
+    if not isinstance(bottleneck, dict):
+        raise SystemExit("the sustained-load result names no bottleneck")
+    classification = bottleneck.get("classification")
+    phrase = SUSTAINED_BOTTLENECK_PHRASES.get(classification)
+    if phrase is None:
+        raise SystemExit(
+            f"the sustained-load result carries an unrecognised bottleneck "
+            f"classification {classification!r}; add its phrase before the paper "
+            f"can print it"
+        )
+    return phrase
 
 def render_inline(document: dict[str, Any]) -> str:
     return "".join(
