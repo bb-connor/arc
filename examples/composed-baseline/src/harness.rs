@@ -1,7 +1,8 @@
 //! Driving one case through the composed receiver.
 
 use crate::receiver::{
-    AdmissionOutcome, BaselineProfile, ComposedReceiver, DurabilityMode, ReceiverError,
+    AdmissionOutcome, BaselineProfile, ComposedReceiver, DurabilityMode, PrivateProfile,
+    ReceiverError,
 };
 use crate::receiver_state::ReceiverState;
 use crate::request::ComposedEnvelope;
@@ -17,19 +18,20 @@ use std::path::{Path, PathBuf};
 pub enum StateVariant {
     /// The vendor as provisioned.
     Default,
-    /// The vendor pinned one key for both the counterparty's channel and its
-    /// policy engine.
+    /// The vendor's trust bundle carries one key for both the counterparty's
+    /// SVID and its authorization server.
     CollapsedKeys,
     /// The vendor's own agreement record rates the counterparty self-asserted
     /// rather than attested.
     DowngradedAssurance,
-    /// A different vendor that pinned the same counterparty keys and
-    /// provisioned the same agreement identifier.
+    /// A different vendor that installed the same trust bundle and provisioned
+    /// the same agreement identifier.
     SecondReceiver,
     /// The vendor's own record for the live agreement has moved to a later
-    /// version. Nothing else about the record changes: it is not retired, the
-    /// participants, actions and ceilings are the ones the decision was issued
-    /// under, and the only altered fact is the version the receiver now holds.
+    /// version, which took effect a moment ago. Nothing else about the record
+    /// changes: it is not retired, the participants, actions and ceilings are
+    /// the ones the credential was issued under, and the only altered facts are
+    /// the version the receiver now holds and when it took effect.
     AgreementVersionAdvanced,
 }
 
@@ -75,6 +77,10 @@ pub struct Runner<'a> {
     pub keys: &'a Keys,
     pub profile: BaselineProfile,
     pub durability: DurabilityMode,
+    /// Names an operator agreed to read out of a slot the formats leave open.
+    /// Neither wiring carries one; a runner that does is measuring what such an
+    /// agreement buys.
+    pub private_profile: Option<PrivateProfile>,
     root: PathBuf,
     sequence: Cell<u64>,
 }
@@ -90,9 +96,16 @@ impl<'a> Runner<'a> {
             keys,
             profile,
             durability,
+            private_profile: None,
             root: root.to_path_buf(),
             sequence: Cell::new(0),
         }
+    }
+
+    /// The same wiring, with an operator's private profile installed.
+    pub fn with_private_profile(mut self, private_profile: PrivateProfile) -> Self {
+        self.private_profile = Some(private_profile);
+        self
     }
 
     pub fn state(&self, variant: StateVariant) -> ReceiverState {
@@ -106,10 +119,12 @@ impl<'a> Runner<'a> {
             StateVariant::AgreementVersionAdvanced => {
                 if let Some(agreement) = state.agreements.get_mut(scenario::AGREEMENT) {
                     agreement.version += 1;
+                    agreement.version_effective_at_unix_ms = scenario::NOW_MS - 1_000;
                 }
             }
             StateVariant::SecondReceiver => {
                 state.receiver_id = scenario::OTHER_VENDOR.to_string();
+                state.receiver_uri = scenario::OTHER_VENDOR_URI.to_string();
             }
             StateVariant::Default | StateVariant::CollapsedKeys => {}
         }
@@ -122,12 +137,17 @@ impl<'a> Runner<'a> {
         let next = self.sequence.get() + 1;
         self.sequence.set(next);
         let path = self.root.join(format!(
-            "baseline-{}-{}-{next}.sqlite",
+            "baseline-{}-{}-{}{next}.sqlite",
             self.profile.as_str(),
             match self.durability {
                 DurabilityMode::BeforeDispatch => "before",
                 DurabilityMode::AfterDispatch => "after",
-            }
+            },
+            if self.private_profile.is_some() {
+                "private-"
+            } else {
+                ""
+            },
         ));
         BaselineStore::open(&path).map_err(|error| error.to_string())
     }
@@ -149,6 +169,7 @@ impl<'a> Runner<'a> {
             durability: self.durability,
             signing_key: &self.keys.vendor_decision,
             store,
+            private_profile: self.private_profile,
         };
         receiver.admit(envelope, now_unix_ms, &mut sink)
     }

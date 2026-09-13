@@ -48,8 +48,8 @@ pub struct MeasurementResult {
     pub checks_latency: LatencySummary,
     /// The durable replay claims alone: one insert under the composed wiring,
     /// two under the hardened wiring. The difference between the two is the
-    /// cost of claiming the authorization's own identifier, measured rather
-    /// than inferred from two whole-path medians.
+    /// cost of claiming the credential's own identifier, measured rather than
+    /// inferred from two whole-path medians.
     pub claim_latency: LatencySummary,
     pub store_bytes_before: u64,
     pub store_bytes_after: u64,
@@ -180,7 +180,6 @@ pub fn measure(
     let request_wire_bytes = envelopes
         .first()
         .ok_or_else(|| "no envelopes were built".to_string())?
-        .request
         .wire_bytes()
         .map_err(|error| error.to_string())?;
 

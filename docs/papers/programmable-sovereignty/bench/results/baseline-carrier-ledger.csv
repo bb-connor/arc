@@ -1,0 +1,47 @@
+fact,state,slot,attested_by,invention_step
+treaty_scope_sha256,absent,a vendor-prefixed key in the tool call's metadata,caller,"a vendor-prefixed key in the tool call's metadata, or a key in the message's metadata map"
+treaty_scope_sha256,absent,a vendor-prefixed key in the tool call's metadata,caller,"a name agreed bilaterally, since the reserved prefixes belong to the protocol and the rest is vendor space"
+treaty_scope_sha256,absent,a vendor-prefixed key in the tool call's metadata,caller,a rule in the receiver that reads the key and compares it against its own record
+treaty_scope_sha256,absent,a vendor-prefixed key in the tool call's metadata,caller,"acceptance that the value is attested by the caller, because no signature in the set covers the message body"
+ladder_intersection_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+ladder_intersection_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+ladder_intersection_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+ladder_intersection_sha256,absent,a private claim of the issued token,issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+admission_report_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+admission_report_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+admission_report_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+admission_report_sha256,absent,a private claim of the issued token,issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+consistency_model,absent,a private claim of the issued token,issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+consistency_model,absent,a private claim of the issued token,issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+consistency_model,absent,a private claim of the issued token,issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+consistency_model,absent,a private claim of the issued token,issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+request_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+request_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+request_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+request_sha256,absent,a private claim of the issued token,issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+outcome_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+outcome_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+outcome_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+outcome_sha256,absent,a private claim of the issued token,issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+local_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+local_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+local_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+local_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+remote_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+remote_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+remote_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+remote_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+continuation_sha256,without_receiver_reference,"a private claim of the issued token, over a value the receiver minted",issuing_authorization_server,"a call before the call, since no method in the set returns a value for a caller to carry into its exchange"
+continuation_sha256,without_receiver_reference,"a private claim of the issued token, over a value the receiver minted",issuing_authorization_server,"a way to consume the value exactly once, which no specification in the set provides for any identifier it defines"
+lineage_bundle_sha256,without_receiver_reference,"a private claim of the issued token, or the message's reference list",issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+lineage_bundle_sha256,without_receiver_reference,"a private claim of the issued token, or the message's reference list",issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+lineage_bundle_sha256,without_receiver_reference,"a private claim of the issued token, or the message's reference list",issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+lineage_bundle_sha256,without_receiver_reference,"a private claim of the issued token, or the message's reference list",issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+lease_refs,without_receiver_reference,"a private claim of the issued token, naming a lease the receiver registered",issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+lease_refs,without_receiver_reference,"a private claim of the issued token, naming a lease the receiver registered",issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+lease_refs,without_receiver_reference,"a private claim of the issued token, naming a lease the receiver registered",issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+lease_refs,without_receiver_reference,"a private claim of the issued token, naming a lease the receiver registered",issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+invented-key-unread,witness,"the caller carries the version it decided under in a vendor-prefixed key of the tool call's metadata, against a receiver that never agreed to read that name",composed,dispatched
+invented-key-unread,witness,"the caller carries the version it decided under in a vendor-prefixed key of the tool call's metadata, against a receiver that never agreed to read that name",hardened,dispatched
+invented-key-read-honest-caller,witness,"the same key, now one the receiver has agreed to read and compare, with the caller reporting the version it actually decided under",hardened_private_profile,private.agreement_version_mismatch
+invented-key-value-chosen-by-caller,witness,"the same key and the same rule, with the caller asserting the version the receiver holds while sending the call it prepared under the previous one",hardened_private_profile,dispatched

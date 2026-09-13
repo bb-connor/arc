@@ -42,9 +42,12 @@ SAMPLES="${CHIO_BENCH_SAMPLES:-100}"
 WARMUPS="${CHIO_BENCH_WARMUPS:-2}"
 CRITERION_SAMPLES="${CHIO_CRITERION_SAMPLES:-100}"
 SUSTAINED_SECONDS="${CHIO_SUSTAINED_SECONDS:-60}"
+SUSTAINED_SWEEP_SECONDS="${CHIO_SUSTAINED_SWEEP_SECONDS:-5}"
+# Empty lets the load generator derive its ladder from the core count.
+SUSTAINED_CONCURRENCY="${CHIO_SUSTAINED_CONCURRENCY:-}"
 MAX_LOAD="${CHIO_BENCH_MAX_LOAD:-4.0}"
 
-case "$SAMPLES:$WARMUPS:$CRITERION_SAMPLES:$SUSTAINED_SECONDS" in
+case "$SAMPLES:$WARMUPS:$CRITERION_SAMPLES:$SUSTAINED_SECONDS:$SUSTAINED_SWEEP_SECONDS" in
   *[!0-9:]*)
     echo "benchmark sample, warmup, and duration settings must be nonnegative integers" >&2
     exit 2
@@ -52,6 +55,15 @@ case "$SAMPLES:$WARMUPS:$CRITERION_SAMPLES:$SUSTAINED_SECONDS" in
 esac
 if [[ "$SAMPLES" -lt 2 || "$CRITERION_SAMPLES" -lt 10 || "$SUSTAINED_SECONDS" -lt 1 ]]; then
   echo "CHIO_BENCH_SAMPLES must be at least 2, CHIO_CRITERION_SAMPLES at least 10, and CHIO_SUSTAINED_SECONDS at least 1" >&2
+  exit 2
+fi
+if [[ "$SUSTAINED_SWEEP_SECONDS" -lt 1 ]]; then
+  echo "CHIO_SUSTAINED_SWEEP_SECONDS must be at least 1" >&2
+  exit 2
+fi
+if [[ -n "$SUSTAINED_CONCURRENCY" \
+  && ! "$SUSTAINED_CONCURRENCY" =~ ^[1-9][0-9]*(,[1-9][0-9]*)*$ ]]; then
+  echo "CHIO_SUSTAINED_CONCURRENCY must be a comma separated list of positive integers: $SUSTAINED_CONCURRENCY" >&2
   exit 2
 fi
 if [[ ! "$MAX_LOAD" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
@@ -214,6 +226,12 @@ fi
   printf 'end_to_end_warmups=%s\n' "$WARMUPS"
   printf 'criterion_samples=%s\n' "$CRITERION_SAMPLES"
   printf 'sustained_seconds=%s\n' "$SUSTAINED_SECONDS"
+  printf 'sustained_sweep_seconds=%s\n' "$SUSTAINED_SWEEP_SECONDS"
+  if [[ -n "$SUSTAINED_CONCURRENCY" ]]; then
+    printf 'sustained_concurrency=%s\n' "$SUSTAINED_CONCURRENCY"
+  else
+    printf 'sustained_concurrency=derived from the core count\n'
+  fi
   printf 'runtime_stores=SQLite\n'
 } > "$ENVIRONMENT"
 
@@ -405,12 +423,22 @@ negative_elapsed_ns=$((negative_end_ns - negative_start_ns))
 
 # ---- Sustained load --------------------------------------------------------
 
+# The generator keeps one throwaway receipt store per call in flight and
+# clears each phase before the next, so WORK_DIR needs room for the widest
+# phase rather than the whole run.
+SUSTAINED_ARGS=(
+  --seconds "$SUSTAINED_SECONDS"
+  --sweep-seconds "$SUSTAINED_SWEEP_SECONDS"
+  --store-dir "$WORK_DIR/sustained-stores"
+  --out "$SUSTAINED_RAW"
+)
+if [[ -n "$SUSTAINED_CONCURRENCY" ]]; then
+  SUSTAINED_ARGS+=(--concurrency "$SUSTAINED_CONCURRENCY")
+fi
 if ! (
   cd "$SOURCE"
   CARGO_TARGET_DIR="$TARGET_DIR" cargo run --release -p chio-runtime-core \
-    --example treaty_sustained_load -- \
-    --seconds "$SUSTAINED_SECONDS" \
-    --out "$SUSTAINED_RAW"
+    --example treaty_sustained_load -- "${SUSTAINED_ARGS[@]}"
 ) > "$SUSTAINED_LOG" 2>&1; then
   echo "sustained-load run failed; see $SUSTAINED_LOG" >&2
   exit 1
@@ -521,14 +549,48 @@ def bootstrap_ci(values):
     return percentile(means, alpha), percentile(means, 1.0 - alpha)
 
 
+def bootstrap_median_ci(ordered):
+    """Percentile bootstrap interval for the median of `ordered`."""
+    rng = random.Random(BOOTSTRAP_SEED)
+    count = len(ordered)
+    medians = sorted(
+        percentile(sorted(rng.choices(ordered, k=count)), 0.50)
+        for _ in range(BOOTSTRAP_RESAMPLES)
+    )
+    alpha = (1.0 - CONFIDENCE) / 2.0
+    return percentile(medians, alpha), percentile(medians, 1.0 - alpha)
+
+
+def median_interval_gaps(node, location="$"):
+    """Names every reported median that is missing the interval beside it."""
+    gaps = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key.startswith("p50_") and not key.startswith("p50_ci_"):
+                unit = key[len("p50_") :]
+                for bound in ("low", "high"):
+                    needed = f"p50_ci_{bound}_{unit}"
+                    beside = node.get(needed)
+                    if not isinstance(beside, (int, float)) or isinstance(beside, bool):
+                        gaps.append(f"{location}.{key} has no {needed}")
+            gaps.extend(median_interval_gaps(value, f"{location}.{key}"))
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            gaps.extend(median_interval_gaps(value, f"{location}[{index}]"))
+    return gaps
+
+
 def summarize(values, unit):
     if len(values) < 2:
         raise SystemExit("a summary needs at least two observations")
     ordered = sorted(values)
     low, high = bootstrap_ci(ordered)
+    median_low, median_high = bootstrap_median_ci(ordered)
     return {
         "samples": len(ordered),
         f"p50_{unit}": percentile(ordered, 0.50),
+        f"p50_ci_low_{unit}": median_low,
+        f"p50_ci_high_{unit}": median_high,
         f"p99_{unit}": percentile(ordered, 0.99),
         f"mean_{unit}": mean(ordered),
         f"std_{unit}": sample_std(ordered),
@@ -602,12 +664,15 @@ def batch_mean_component(name, note):
         for elapsed_ns, iterations in zip(times, iters)
     )
     iterations = [int(value) for value in iters]
+    median_low, median_high = bootstrap_median_ci(batch_means_us)
     return {
         "component": name,
         "kind": "batch_mean",
         "note": note,
         "samples": len(batch_means_us),
         "p50_us": percentile(batch_means_us, 0.50),
+        "p50_ci_low_us": median_low,
+        "p50_ci_high_us": median_high,
         "max_us": batch_means_us[-1],
         "min_us": batch_means_us[0],
         "mean_us": estimate(estimates, estimates_path, "mean", "point_estimate") / 1000.0,
@@ -667,6 +732,48 @@ threat_cases = len(threat_fixture["cases"])
 assumptions = len(threat_fixture["assumptions"])
 negative_ms = int(negative_elapsed_ns) / 1_000_000.0
 
+
+def nonnegative_int(document, key, source):
+    value = document.get(key) if isinstance(document, dict) else None
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise SystemExit(f"{source} lacks a nonnegative integer {key}")
+    return value
+
+
+def positive_int(document, key, source):
+    value = nonnegative_int(document, key, source)
+    if value < 1:
+        raise SystemExit(f"{source} lacks a positive {key}")
+    return value
+
+
+def positive_number(document, key, source):
+    value = document.get(key) if isinstance(document, dict) else None
+    if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
+        raise SystemExit(f"{source} lacks a positive {key}")
+    return float(value)
+
+
+def load_phase(document, label):
+    """Accepts one held phase only when it admitted and dispatched every call
+    it offered at the number of calls it claims to have held in flight."""
+    if not isinstance(document, dict):
+        raise SystemExit(f"{label} is not a phase record")
+    concurrency = positive_int(document, "concurrency", label)
+    calls = positive_int(document, "calls", label)
+    positive_number(document, "calls_per_second", label)
+    positive_number(document, "elapsed_seconds", label)
+    if nonnegative_int(document, "dispatch_count", label) != calls:
+        raise SystemExit(f"{label} did not dispatch exactly once per call")
+    if nonnegative_int(document, "denials", label) != 0:
+        raise SystemExit(f"{label} recorded a denial")
+    if nonnegative_int(document, "in_flight_peak", label) != concurrency:
+        raise SystemExit(
+            f"{label} offered {concurrency} calls in flight and never held that many"
+        )
+    return document
+
+
 sustained_source = pathlib.Path(sustained_raw)
 sustained_raw_document = load_json(sustained_source)
 for key in (
@@ -677,12 +784,10 @@ for key in (
     "receipt_store_bytes_before",
     "receipt_store_bytes_after",
 ):
-    value = sustained_raw_document.get(key)
-    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
-        raise SystemExit(f"{sustained_source} lacks a nonnegative integer {key}")
-calls_per_second = sustained_raw_document.get("calls_per_second")
-if not isinstance(calls_per_second, (int, float)) or calls_per_second <= 0:
-    raise SystemExit(f"{sustained_source} lacks a positive calls_per_second")
+    nonnegative_int(sustained_raw_document, key, sustained_source)
+calls_per_second = positive_number(
+    sustained_raw_document, "calls_per_second", sustained_source
+)
 if sustained_raw_document["seconds"] != int(sustained_seconds):
     raise SystemExit(
         f"{sustained_source} ran for {sustained_raw_document['seconds']} s, "
@@ -698,15 +803,62 @@ bytes_before = sustained_raw_document["receipt_store_bytes_before"]
 bytes_after = sustained_raw_document["receipt_store_bytes_after"]
 if bytes_after < bytes_before:
     raise SystemExit("sustained load receipt store shrank")
+
+concurrency = positive_int(sustained_raw_document, "concurrency", sustained_source)
+cores = positive_int(sustained_raw_document, "cores", sustained_source)
+held_in_flight = nonnegative_int(
+    sustained_raw_document, "in_flight_peak", sustained_source
+)
+if held_in_flight != concurrency:
+    raise SystemExit(
+        f"{sustained_source} offered {concurrency} calls in flight and never held that many"
+    )
+hold = load_phase(sustained_raw_document.get("hold"), f"{sustained_source} hold")
+if hold["concurrency"] != concurrency or hold["calls"] != sustained_raw_document["calls"]:
+    raise SystemExit(f"{sustained_source} headline figures disagree with its hold phase")
+sweep_document = sustained_raw_document.get("sweep")
+if not isinstance(sweep_document, list) or not sweep_document:
+    raise SystemExit(f"{sustained_source} holds no concurrency sweep")
+sweep = [
+    load_phase(point, f"{sustained_source} sweep point {index}")
+    for index, point in enumerate(sweep_document)
+]
+swept = {point["concurrency"] for point in sweep}
+if 1 not in swept:
+    raise SystemExit(f"{sustained_source} swept no one-call-in-flight baseline")
+if len(swept) < 2:
+    raise SystemExit(
+        f"{sustained_source} swept a single concurrency, so no knee can be visible"
+    )
+bottleneck = sustained_raw_document.get("bottleneck")
+if not isinstance(bottleneck, dict) or not isinstance(
+    bottleneck.get("classification"), str
+):
+    raise SystemExit(f"{sustained_source} names no bottleneck")
+if bottleneck.get("peak_concurrency") != concurrency:
+    raise SystemExit(
+        f"{sustained_source} held a concurrency its sweep did not select as the peak"
+    )
+sustained_statistics = sustained_raw_document.get("statistics")
+if not isinstance(sustained_statistics, dict):
+    raise SystemExit(f"{sustained_source} records no statistical method")
+
 sustained = {
     "seconds": sustained_raw_document["seconds"],
     "calls": sustained_raw_document["calls"],
     "callsPerSecond": float(calls_per_second),
+    "concurrency": concurrency,
+    "inFlightPeak": held_in_flight,
+    "cores": cores,
     "dispatchCount": sustained_raw_document["dispatch_count"],
     "denials": sustained_raw_document["denials"],
     "receiptStoreBytesBefore": bytes_before,
     "receiptStoreBytesAfter": bytes_after,
     "receiptStoreGrowthKiB": (bytes_after - bytes_before) / 1024.0,
+    "bottleneck": bottleneck,
+    "hold": hold,
+    "sweep": sweep,
+    "statistics": sustained_statistics,
 }
 
 environment = load_json(pathlib.Path(environment_json))
@@ -719,6 +871,8 @@ with open(component_csv, "w", newline="", encoding="utf-8") as component_file:
             "kind",
             "samples",
             "p50_us",
+            "p50_ci_low_us",
+            "p50_ci_high_us",
             "p99_us",
             "max_us",
             "mean_us",
@@ -735,6 +889,8 @@ with open(component_csv, "w", newline="", encoding="utf-8") as component_file:
                 component["kind"],
                 component["samples"],
                 f'{component["p50_us"]:.3f}',
+                f'{component["p50_ci_low_us"]:.3f}',
+                f'{component["p50_ci_high_us"]:.3f}',
                 f'{component["p99_us"]:.3f}' if "p99_us" in component else "",
                 f'{component["max_us"]:.3f}',
                 f'{component["mean_us"]:.3f}',
@@ -751,6 +907,8 @@ with open(component_csv, "w", newline="", encoding="utf-8") as component_file:
                 "workflow",
                 summary["samples"],
                 f'{summary["p50_ms"] * 1000.0:.3f}',
+                f'{summary["p50_ci_low_ms"] * 1000.0:.3f}',
+                f'{summary["p50_ci_high_ms"] * 1000.0:.3f}',
                 f'{summary["p99_ms"] * 1000.0:.3f}',
                 f'{summary["max_ms"] * 1000.0:.3f}',
                 f'{summary["mean_ms"] * 1000.0:.3f}',
@@ -762,7 +920,7 @@ with open(component_csv, "w", newline="", encoding="utf-8") as component_file:
         )
 
 document = {
-    "schema": "chio.programmable-sovereignty.bilateral-admission-results.v2",
+    "schema": "chio.programmable-sovereignty.bilateral-admission-results.v3",
     "commit": source_commit,
     "worktreeDirty": source_dirty == "true",
     "benchmarkInputTreeSha256": benchmark_input_tree_sha256,
@@ -779,14 +937,19 @@ document = {
         "percentile": "linear interpolation between order statistics",
         "confidence": CONFIDENCE,
         "bootstrap": {
-            "statistic": "mean",
+            "statistics": ["mean", "median"],
             "resamples": BOOTSTRAP_RESAMPLES,
             "seed": BOOTSTRAP_SEED,
-            "appliesTo": ["paths", "per_invocation components"],
+            "appliesTo": [
+                "paths",
+                "per_invocation components",
+                "batch_mean component medians",
+            ],
         },
         "batchMean": (
             "Criterion estimates.json mean point estimate, standard deviation, "
-            "and confidence interval; p50 and max are over Criterion batch means"
+            "and confidence interval; p50 and max are over Criterion batch "
+            "means, and the p50 interval is a percentile bootstrap over them"
         ),
     },
     "paths": path_summaries,
@@ -799,24 +962,28 @@ document = {
     },
     "proofPackageBytes": proof_package_bytes,
 }
+sustained_document = {
+    "schema": "chio.programmable-sovereignty.sustained-load-results.v2",
+    "commit": source_commit,
+    "worktreeDirty": source_dirty == "true",
+    "benchmarkInputTreeSha256": sustained_input_tree_sha256,
+    "profile": "release",
+    **sustained,
+}
+
+for name, published in ((result_json, document), (sustained_json, sustained_document)):
+    gaps = median_interval_gaps(published)
+    if gaps:
+        raise SystemExit(
+            f"{name} reports a median with no interval beside it: " + "; ".join(gaps)
+        )
+
 pathlib.Path(result_json).write_text(
     json.dumps(document, indent=2, sort_keys=True) + "\n",
     encoding="utf-8",
 )
 pathlib.Path(sustained_json).write_text(
-    json.dumps(
-        {
-            "schema": "chio.programmable-sovereignty.sustained-load-results.v1",
-            "commit": source_commit,
-            "worktreeDirty": source_dirty == "true",
-            "benchmarkInputTreeSha256": sustained_input_tree_sha256,
-            "profile": "release",
-            **sustained,
-        },
-        indent=2,
-        sort_keys=True,
-    )
-    + "\n",
+    json.dumps(sustained_document, indent=2, sort_keys=True) + "\n",
     encoding="utf-8",
 )
 PY

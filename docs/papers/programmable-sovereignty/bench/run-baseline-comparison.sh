@@ -5,15 +5,20 @@ set -euo pipefail
 # receiver, over the same two corpora.
 #
 # The alternative is the strongest thing a competent engineer assembles today
-# out of parts that already exist: a tool-call server, a caller identity
-# authenticated by a key pinned out of band (a federated workload-identity
-# trust bundle without the issuance mechanism, since the property at stake is
-# peer authentication), a policy engine that evaluates a local rule set and
-# signs its decision, and a receiver-side replay table keyed by a request
-# identifier. It lives in examples/composed-baseline, outside this workspace,
+# out of formats that already ship: a tool call as the Model Context Protocol
+# defines it, carried in a message as the A2A protocol defines it, from a
+# workload whose identity is a SPIFFE verifiable identity document, with a
+# delegated credential an OAuth 2.0 token exchange issued, and a receiver-side
+# replay table. It lives in examples/composed-baseline, outside this workspace,
 # with its own lockfile, and it signs and canonicalizes with the same Chio
 # crate the receiver under comparison uses, so a latency difference between the
 # two is a difference in what they check.
+#
+# The request shape is not ours, and that is the point of building it this way:
+# the corpora check every field an admissible call serializes against an
+# inventory of the documents that define those fields, so a claim about what
+# the alternative cannot carry is a claim about published specifications rather
+# than about a schema in this repository.
 #
 # Two wirings of those parts run over the same code: `composed`, each part used
 # the way it documents itself, and `hardened`, the same parts with every
@@ -129,6 +134,7 @@ RESULT_JSON="$RESULT_DIR/baseline-comparison.json"
 BASELINE_JSON="$RESULT_DIR/baseline-composed.json"
 NEGATIVE_CSV="$RESULT_DIR/baseline-negative-matrix.csv"
 SUBSTITUTION_CSV="$RESULT_DIR/baseline-substitution-matrix.csv"
+CARRIER_CSV="$RESULT_DIR/baseline-carrier-ledger.csv"
 INLINE="$RESULT_DIR/baseline-inline.tex"
 ENVIRONMENT="$RESULT_DIR/baseline-environment.txt"
 ENVIRONMENT_JSON="$RESULT_DIR/baseline-environment.json"
@@ -329,7 +335,7 @@ fi
 # ---- Comparison ------------------------------------------------------------
 
 python3 - "$RESULT_JSON" "$BASELINE_JSON" "$CHIO_RESULT" "$NEGATIVE_CORPUS" \
-  "$ENVIRONMENT_JSON" "$NEGATIVE_CSV" "$SUBSTITUTION_CSV" "$INLINE" \
+  "$ENVIRONMENT_JSON" "$NEGATIVE_CSV" "$SUBSTITUTION_CSV" "$CARRIER_CSV" "$INLINE" \
   "$SOURCE_COMMIT" "$SOURCE_DIRTY" "$BENCHMARK_INPUT_TREE_SHA256" <<'PY'
 import csv
 import json
@@ -344,11 +350,12 @@ import sys
     environment_json,
     negative_csv,
     substitution_csv,
+    carrier_csv,
     inline_out,
     source_commit,
     source_dirty,
     benchmark_input_tree_sha256,
-) = sys.argv[1:12]
+) = sys.argv[1:13]
 
 
 def load(path):
@@ -401,31 +408,108 @@ def rows_of(field):
     return [row for row in rows if field_of(row) == field]
 
 
+# A field with no carrier cannot be noticed: there is nothing to substitute. If
+# one ever is, the corpus is reporting a denial it cannot have produced.
+for row in rows:
+    carried = row["basis"] != "not_carried"
+    if carried != ("carrier" in row):
+        raise SystemExit(
+            f"{row['chio_field']} disagrees with itself about whether it is carried"
+        )
+    if not carried and (row["noticed_composed"] or row["noticed_hardened"]):
+        raise SystemExit(f"{row['chio_field']} has no carrier and is reported as noticed")
+
 # A field has no carrier only when every row for it has none: the ordered signer
 # list is a second row of a field that is carried, and counting rows as fields
-# would report one carrier too few.
+# would report one carrier too few. Every field is then one of three kinds by
+# what carries it, and separately either noticed or not by what the run drove.
 not_carried_fields = sorted(
     field
     for field in distinct_fields
     if all(row["basis"] == "not_carried" for row in rows_of(field))
 )
-carried_never_compared_fields = sorted(
+carried_without_reference_fields = sorted(
     field
     for field in distinct_fields
     if field not in not_carried_fields
-    and any(row["basis"] == "carried_never_compared" for row in rows_of(field))
+    and any(
+        row["basis"] == "carried_without_receiver_reference" for row in rows_of(field)
+    )
 )
+resolvable_fields = sorted(
+    field
+    for field in distinct_fields
+    if field not in not_carried_fields and field not in carried_without_reference_fields
+)
+partition = (
+    len(not_carried_fields)
+    + len(carried_without_reference_fields)
+    + len(resolvable_fields)
+)
+if partition != SUBSTITUTION_FIELDS:
+    raise SystemExit(
+        f"the {SUBSTITUTION_FIELDS} binding fields do not partition into resolvable, "
+        f"carried-without-a-receiver-reference and not-carried: {partition} accounted for"
+    )
+
 noticed_fields = sorted(
     field
     for field in distinct_fields
     if any(row["noticed_composed"] or row["noticed_hardened"] for row in rows_of(field))
 )
-partition = len(not_carried_fields) + len(carried_never_compared_fields) + len(noticed_fields)
-if partition != SUBSTITUTION_FIELDS:
+unnoticed_carried_fields = sorted(
+    field
+    for field in distinct_fields
+    if field not in not_carried_fields and field not in noticed_fields
+)
+
+# --- fail closed on the carrier ledger --------------------------------------
+
+# A fact belongs in the ledger when nothing the receiver can resolve carries it:
+# either no field in the set holds it, or one does and the receiver has nothing
+# of its own to compare it against. Being noticed is a different question, and a
+# window the hardened wiring refuses against a constant it holds is still a
+# window no reference resolves.
+ledger = baseline["carrierLedger"]
+ledger_facts = {entry["fact"] for entry in ledger["entries"]}
+accounted = set(not_carried_fields) | set(carried_without_reference_fields)
+missing_from_ledger = sorted(accounted - ledger_facts)
+if missing_from_ledger:
     raise SystemExit(
-        f"the {SUBSTITUTION_FIELDS} binding fields do not partition into noticed, "
-        f"carried-and-never-compared and not-carried: {partition} accounted for"
+        "the carrier ledger does not say what an operator would have to invent for: "
+        + ", ".join(missing_from_ledger)
     )
+for entry in ledger["entries"]:
+    if entry["fact"] not in accounted:
+        raise SystemExit(
+            f"the carrier ledger accounts for {entry['fact']}, which the substitution "
+            "corpus found a receiver-resolvable carrier for"
+        )
+    if not entry["invention"]:
+        raise SystemExit(f"{entry['fact']} names no work an operator would have to do")
+
+witnesses = {witness["witness_id"]: witness for witness in ledger["witnesses"]}
+EXPECTED_WITNESSES = {
+    # An agreed name the receiver does not read changes nothing.
+    "invented-key-unread": True,
+    # The same name, read, refuses a caller that reports a stale view.
+    "invented-key-read-honest-caller": False,
+    # And admits the caller that asserts the value the receiver holds.
+    "invented-key-value-chosen-by-caller": True,
+}
+for witness_id, expected_dispatch in EXPECTED_WITNESSES.items():
+    witness = witnesses.get(witness_id)
+    if witness is None:
+        raise SystemExit(f"the carrier ledger did not drive {witness_id}")
+    if not witness["observations"]:
+        raise SystemExit(f"{witness_id} recorded no observation")
+    for observation in witness["observations"]:
+        if observation["observed"]["dispatched"] != expected_dispatch:
+            raise SystemExit(
+                f"{witness_id} under {observation['wiring']} "
+                f"{'dispatched' if observation['observed']['dispatched'] else 'denied'}, "
+                "which is not what the invention ledger reports"
+            )
 
 null_case = next(
     entry
@@ -723,28 +807,81 @@ with pathlib.Path(substitution_csv).open("w", encoding="utf-8", newline="") as h
     writer.writerow(
         [
             "chio_field",
-            "baseline_carrier",
+            "carrier_document",
+            "carrier_field",
+            "carrier_section",
+            "attested_by",
             "basis",
             "noticed_composed",
             "noticed_hardened",
+            "substitution",
             "composed_code",
-            "consistent_composed_code",
+            "hardened_code",
         ]
     )
     for row in rows:
-        composed = row.get("composed") or {}
-        consistent = row.get("consistent_composed") or {}
-        writer.writerow(
-            [
-                row["chio_field"],
-                row.get("baseline_carrier", ""),
-                row["basis"],
-                row["noticed_composed"],
-                row["noticed_hardened"],
-                composed.get("denial_code", ""),
-                consistent.get("denial_code", ""),
-            ]
-        )
+        carrier = row.get("carrier") or {}
+        if not row["variants"]:
+            writer.writerow(
+                [
+                    row["chio_field"],
+                    carrier.get("document", ""),
+                    carrier.get("field", ""),
+                    carrier.get("section", ""),
+                    carrier.get("attested_by", ""),
+                    row["basis"],
+                    row["noticed_composed"],
+                    row["noticed_hardened"],
+                    "",
+                    "",
+                    "",
+                ]
+            )
+            continue
+        for variant in row["variants"]:
+            writer.writerow(
+                [
+                    row["chio_field"],
+                    carrier.get("document", ""),
+                    carrier.get("field", ""),
+                    carrier.get("section", ""),
+                    carrier.get("attested_by", ""),
+                    row["basis"],
+                    row["noticed_composed"],
+                    row["noticed_hardened"],
+                    variant["label"],
+                    variant["composed"].get("denial_code", ""),
+                    variant["hardened"].get("denial_code", ""),
+                ]
+            )
+
+with pathlib.Path(carrier_csv).open("w", encoding="utf-8", newline="") as handle:
+    writer = csv.writer(handle)
+    writer.writerow(["fact", "state", "slot", "attested_by", "invention_step"])
+    for entry in ledger["entries"]:
+        for step in entry["invention"]:
+            writer.writerow(
+                [
+                    entry["fact"],
+                    entry["state"],
+                    entry["slot"],
+                    entry["attested_by"],
+                    step,
+                ]
+            )
+    for witness in ledger["witnesses"]:
+        for observation in witness["observations"]:
+            writer.writerow(
+                [
+                    witness["witness_id"],
+                    "witness",
+                    witness["description"],
+                    observation["wiring"],
+                    "dispatched"
+                    if observation["observed"]["dispatched"]
+                    else observation["observed"].get("denial_code", "denied"),
+                ]
+            )
 
 document = {
     "schema": "chio.programmable-sovereignty.baseline-comparison.v1",
@@ -780,10 +917,19 @@ document = {
         "notCarriedRows": len(not_carried),
         "notCarriedFields": len(not_carried_fields),
         "noticedFields": len(noticed_fields),
-        "carriedNeverComparedFields": len(carried_never_compared_fields),
+        "carriedWithoutReceiverReferenceFields": len(carried_without_reference_fields),
+        "resolvableFields": len(resolvable_fields),
+        "unnoticedCarriedFields": len(unnoticed_carried_fields),
         "notCarriedFieldNames": not_carried_fields,
-        "carriedNeverComparedFieldNames": carried_never_compared_fields,
+        "carriedWithoutReceiverReferenceFieldNames": carried_without_reference_fields,
+        "resolvableFieldNames": resolvable_fields,
         "entries": rows,
+    },
+    "carrierLedger": ledger,
+    "specifications": {
+        "documents": baseline["baseline"]["documents"],
+        "requestFields": len(baseline["baseline"]["requestFields"]),
+        "freeFormSlots": baseline["baseline"]["freeFormSlots"],
     },
     "properties": properties,
     "propertySummary": {
@@ -916,6 +1062,21 @@ document = {
             "by the durable writes: two under the composed wiring, three under "
             "the hardened one"
         ),
+        "specifications": (
+            "every field an admissible call serializes is a field one of the "
+            "listed documents defines, or one of the slots they declare "
+            "free-form; the corpora check the serialized call against that "
+            "inventory, so what the alternative cannot carry is a fact about "
+            "those documents and not about a schema in this repository"
+        ),
+        "carrierLedger": (
+            "for every binding field with no carrier, or none the receiver can "
+            "resolve, the slot a value would have to travel in, whose signature "
+            "covers that slot, and the work an operator would have to do. Three "
+            "witnesses drive the invention rather than describing it: an agreed "
+            "name the receiver does not read, the same name once it does, and "
+            "the same name with the caller choosing the value"
+        ),
         "propertyVerdicts": (
             "derived from cases the run drove, not asserted: a property fails "
             "only when a driven case dispatched a call the property forbids"
@@ -938,6 +1099,14 @@ pathlib.Path(result_json).write_text(
 
 macros = [
     ("PSBaseParts", str(len(baseline["baseline"]["parts"]))),
+    ("PSBaseDocuments", str(len(baseline["baseline"]["documents"]))),
+    ("PSBaseRequestFields", str(len(baseline["baseline"]["requestFields"]))),
+    ("PSBaseFreeFormSlots", str(len(baseline["baseline"]["freeFormSlots"]))),
+    ("PSBaseDenialCodes", str(len(baseline["baseline"]["denialCodes"]))),
+    (
+        "PSBaseDenialSteps",
+        str(max(entry["step"] for entry in baseline["baseline"]["denialCodes"])),
+    ),
     ("PSBaseChioThreatIds", str(len(corpus_threats))),
     ("PSBaseNegativeCases", str(len(negative))),
     ("PSBaseNegativeDriven", str(len(driven))),
@@ -955,7 +1124,15 @@ macros = [
     ("PSBaseSubstNotCarriedRows", str(len(not_carried))),
     ("PSBaseSubstNotCarriedFields", str(len(not_carried_fields))),
     ("PSBaseSubstNoticedFields", str(len(noticed_fields))),
-    ("PSBaseSubstCarriedNeverComparedFields", str(len(carried_never_compared_fields))),
+    ("PSBaseSubstCarriedWithoutReferenceFields", str(len(carried_without_reference_fields))),
+    ("PSBaseSubstResolvableFields", str(len(resolvable_fields))),
+    ("PSBaseSubstUnnoticedCarriedFields", str(len(unnoticed_carried_fields))),
+    ("PSBaseCarrierLedgerFacts", str(len(ledger["entries"]))),
+    ("PSBaseInventionWitnesses", str(len(ledger["witnesses"]))),
+    (
+        "PSBaseInventionSteps",
+        str(max(len(entry["invention"]) for entry in ledger["entries"])),
+    ),
     ("PSBasePropsHoldComposed", str(property_count("composed", "holds"))),
     ("PSBasePropsWeakComposed", str(property_count("composed", "holds_weakened"))),
     ("PSBasePropsFailComposed", str(property_count("composed", "fails"))),

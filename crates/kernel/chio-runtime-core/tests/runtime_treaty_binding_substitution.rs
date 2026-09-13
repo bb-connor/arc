@@ -5,10 +5,13 @@
 //! exactly one binding field with a well-formed but different value, re-signs
 //! the statement with both participant keys so the envelope stays
 //! cryptographically valid over the substituted bytes, and drives the result
-//! through the pre-dispatch admission hook. A rejection case asserts the exact
-//! failure code, that no verified federation material reached dispatch, and
-//! that the continuation the statement named is still unconsumed afterwards,
-//! which is what shows the substituted call never dispatched a tool.
+//! through a kernel whose only registered tool server counts the invocations
+//! it receives. A rejection case asserts the exact failure code, that the
+//! dispatch counter is still zero, that no verified federation material
+//! reached dispatch, and that the continuation the statement named is still
+//! unconsumed afterwards. An admitted case asserts the counter reads exactly
+//! one, which is what makes zero on the rejection cases a measurement rather
+//! than an absence.
 //!
 //! Ten fields are compared on every cross-organization admission. Four are
 //! compared only when the admission resolves the artifact they bind, and those
@@ -23,6 +26,9 @@
 //! `runtime_treaty_predicate_substitution.rs`.
 
 mod support;
+
+#[path = "support/dispatch_counter.rs"]
+mod dispatch_counter;
 
 use base64::Engine as _;
 use chio_core_types::capability::{
@@ -42,7 +48,7 @@ use chio_federation::bilateral_dsse::{
     DsseEnvelope, DsseSignature, GovernanceReceiptRef, HashRecord, Keyid, PolicyEvaluationSummary,
     PolicyVerdict, TreatyBindingRef, PAYLOAD_TYPE_IN_TOTO,
 };
-use chio_kernel::{RuntimeAdmissionContext, RuntimeAdmissionHook, ToolCallRequest};
+use chio_kernel::{RuntimeAdmissionHook, ToolCallRequest};
 use chio_runtime_core::{
     bilateral_dsse_consistency_model, bilateral_invocation_binding_sha256,
     compute_ladder_intersection, governance_ladder_manifest_sha256, ladder_intersection_sha256,
@@ -112,14 +118,9 @@ fn substituting_admission_report_digest_is_admitted() -> TestResult {
         binding.admission_report_sha256 = substituted_digest(&binding.admission_report_sha256);
     })?;
 
-    assert!(
-        run.substituted.allowed,
-        "admission_report_sha256 is not compared, so the substitution must still admit: {:?}",
-        run.substituted.failure_code
-    );
-    assert!(
-        run.substituted.verified_treaty_material,
-        "an admitted cross-organization dispatch must carry verified treaty material"
+    assert_admitted_with_single_dispatch(
+        &run.substituted,
+        "admission_report_sha256 is not compared, so the substitution must still admit",
     );
     assert_eq!(
         run.baseline_after.failure_code.as_deref(),
@@ -266,12 +267,10 @@ fn lineage_bundle_digest_is_not_compared_without_a_resolved_bundle() -> TestResu
     let run = substitute_and_admit_with(Evidence::RecordOnly, |binding| {
         binding.lineage_bundle_sha256 = substituted_digest(&binding.lineage_bundle_sha256);
     })?;
-    assert!(
-        run.substituted.allowed,
-        "lineage_bundle_sha256 is compared only against a resolved lineage bundle: {:?}",
-        run.substituted.failure_code
+    assert_admitted_with_single_dispatch(
+        &run.substituted,
+        "lineage_bundle_sha256 is compared only against a resolved lineage bundle",
     );
-    assert!(run.substituted.verified_treaty_material);
     Ok(())
 }
 
@@ -340,13 +339,12 @@ fn substituting_the_uncompared_field_alongside_a_compared_one_is_rejected() -> T
 #[test]
 fn unsubstituted_binding_is_admitted_and_consumes_its_continuation() -> TestResult {
     let run = substitute_and_admit(|_| {})?;
-    assert!(
-        run.substituted.allowed,
-        "the unsubstituted bundle must admit: {:?}",
-        run.substituted.failure_code
-    );
-    assert!(run.substituted.verified_treaty_material);
+    assert_admitted_with_single_dispatch(&run.substituted, "the unsubstituted bundle must admit");
     assert!(!run.baseline_after.allowed);
+    assert_eq!(
+        run.baseline_after.dispatches, 0,
+        "the replayed continuation must leave the dispatch counter at zero"
+    );
     assert_eq!(
         run.baseline_after.failure_code.as_deref(),
         Some(CONTINUATION_REPLAY)
@@ -362,6 +360,12 @@ struct DecisionSummary {
     allowed: bool,
     failure_code: Option<String>,
     verified_treaty_material: bool,
+    /// How many times the kernel dispatched to the registered tool server
+    /// while evaluating this request.
+    dispatches: u64,
+    /// The kernel's denial reason, which a gate outside runtime admission can
+    /// set without setting a runtime failure code.
+    reason: Option<String>,
 }
 
 struct SubstitutionRun {
@@ -377,11 +381,16 @@ fn assert_rejected_without_dispatch(run: &SubstitutionRun, expected_code: &str) 
     assert_eq!(
         run.substituted.failure_code.as_deref(),
         Some(expected_code),
-        "unexpected failure code for the substituted statement"
+        "unexpected failure code for the substituted statement: {:?}",
+        run.substituted.reason
     );
     assert!(
         !run.substituted.verified_treaty_material,
         "a denied admission must hand no verified treaty material to dispatch"
+    );
+    assert_eq!(
+        run.substituted.dispatches, 0,
+        "a denied admission must leave the tool server dispatch counter at zero"
     );
     assert!(
         run.baseline_after.allowed,
@@ -391,8 +400,21 @@ fn assert_rejected_without_dispatch(run: &SubstitutionRun, expected_code: &str) 
     );
 }
 
-/// Which artifacts the action class makes the admission resolve. The paper's
-/// refund example is [`Evidence::LineageAndRecord`].
+/// An admitted cross-organization statement reaches the tool, and reaches it
+/// once.
+fn assert_admitted_with_single_dispatch(summary: &DecisionSummary, context: &str) {
+    assert!(summary.allowed, "{context}: {:?}", summary.failure_code);
+    assert!(
+        summary.verified_treaty_material,
+        "an admitted cross-organization dispatch must carry verified treaty material"
+    );
+    assert_eq!(
+        summary.dispatches, 1,
+        "an admitted statement must dispatch to the tool server exactly once"
+    );
+}
+
+/// Which artifacts the action class makes the admission resolve.
 #[derive(Clone, Copy)]
 enum Evidence {
     /// The class names the receipt lineage bundle and the invocation record,
@@ -442,20 +464,22 @@ fn substitute_and_admit_with(
         &substituted_envelope,
     )?;
 
-    let hook = allowing_hook(store)?;
+    let hook = std::sync::Arc::new(dispatch_counter::TreatyMaterialRecorder::new(Box::new(
+        allowing_hook(store)?,
+    )));
     let substituted_request = treaty_request(
         arguments.clone(),
         bundle_sha256.clone(),
         treaty_context(&fixture, SUBSTITUTED_DSSE_ID, &substituted_sha256),
     )?;
-    let substituted = summarize(hook.evaluate(&admission_context(&substituted_request))?);
+    let substituted = summarize(&hook, &substituted_request)?;
 
     let baseline_request = treaty_request(
         arguments,
         bundle_sha256,
         treaty_context(&fixture, BASELINE_DSSE_ID, &fixture.envelope_sha256),
     )?;
-    let baseline_after = summarize(hook.evaluate(&admission_context(&baseline_request))?);
+    let baseline_after = summarize(&hook, &baseline_request)?;
 
     Ok(SubstitutionRun {
         substituted,
@@ -463,25 +487,34 @@ fn substitute_and_admit_with(
     })
 }
 
-fn summarize(decision: chio_kernel::RuntimeAdmissionDecision) -> DecisionSummary {
-    let metadata = decision.metadata.clone().unwrap_or(serde_json::Value::Null);
-    DecisionSummary {
-        allowed: decision.allowed,
-        failure_code: metadata["chio_runtime"]["failure_code"]
-            .as_str()
-            .map(std::string::ToString::to_string),
-        verified_treaty_material: decision.has_verified_treaty_material(),
-    }
+/// Drive one request through a kernel whose only tool server counts its own
+/// invocations, so the decision and the dispatch it did or did not cause are
+/// read from the same run.
+fn summarize(
+    hook: &std::sync::Arc<dispatch_counter::TreatyMaterialRecorder>,
+    request: &ToolCallRequest,
+) -> Result<DecisionSummary, Box<dyn std::error::Error>> {
+    let outcome = dispatch_counter::dispatch_through_kernel(
+        std::sync::Arc::clone(hook) as std::sync::Arc<dyn RuntimeAdmissionHook>,
+        request,
+        &dispatch_target(),
+    )?;
+    Ok(DecisionSummary {
+        allowed: outcome.allowed,
+        failure_code: outcome.failure_code,
+        verified_treaty_material: hook.verified_treaty_material(),
+        dispatches: outcome.dispatches,
+        reason: outcome.reason,
+    })
 }
 
-fn admission_context(request: &ToolCallRequest) -> RuntimeAdmissionContext<'_> {
-    RuntimeAdmissionContext {
-        request,
-        extra_metadata: None,
-        now_unix_secs: 1_800_000_001,
+fn dispatch_target() -> dispatch_counter::KernelDispatchTarget<'static> {
+    dispatch_counter::KernelDispatchTarget {
+        local_kernel_id: "kernel.vendor-b",
+        origin_kernel_id: Some("kernel.buyer"),
+        server_id: "vendor-ledger",
+        tool_name: "close_account",
         now_unix_ms: 1_800_000_001_000,
-        matched_grant_index: Some(0),
-        local_kernel_id: "kernel.vendor-b".to_string(),
     }
 }
 
@@ -605,8 +638,8 @@ fn treaty_fixture(evidence: Evidence) -> Result<TreatyFixture, Box<dyn std::erro
         "kernel.vendor-b",
         treaty_action_class("receipt_backed", true, "totally_ordered", evidence_required),
     );
-    let signer_a = Keypair::generate();
-    let signer_b = Keypair::generate();
+    let signer_a = dispatch_counter::origin_kernel_keypair();
+    let signer_b = dispatch_counter::receiver_kernel_keypair();
     let mut treaty_scope = treaty_scope();
     treaty_scope.participant_public_keys = vec![signer_a.public_key(), signer_b.public_key()];
     treaty_scope.ladder_manifest_sha256s = vec![
@@ -902,7 +935,7 @@ fn bundle() -> RuntimeAdmissionBundle {
 }
 
 fn capability(capability_id: &str) -> Result<CapabilityToken, Box<dyn std::error::Error>> {
-    let issuer = Keypair::generate();
+    let issuer = dispatch_counter::receiver_kernel_keypair();
     let subject = Keypair::generate();
     Ok(CapabilityToken::sign(
         CapabilityTokenBody {
@@ -991,7 +1024,8 @@ fn allowing_hook(
     Ok(ChioRuntimeAdmissionHook::new(profile(), store)
         .with_runtime_trust_input(signed_trust, trusted_keys(&verifier))
         .with_pheromone_query_report(signed_query_report)
-        .with_runtime_pheromone_policy(signed_policy, signed_weights))
+        .with_runtime_pheromone_policy(signed_policy, signed_weights)
+        .with_fixed_now_unix_ms(1_800_000_001_000))
 }
 
 fn trusted_keys(verifier: &Keypair) -> Vec<RuntimeTrustedVerifierKey> {

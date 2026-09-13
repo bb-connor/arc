@@ -1,9 +1,9 @@
 {
   "cargo": "1.94.1",
-  "commit": "884fd7894d14b763fbabce67f1b188c5274cbfa5",
+  "commit": "cc81f239a656ef63211634bbfcb58b04065546a9",
   "cores": 12,
   "cpuModel": "Neoverse-N1",
-  "loadAverage1m": 10.89,
+  "loadAverage1m": 15.55,
   "memoryGiB": 46.94236373901367,
   "os": "Linux 6.17.0-1020-oracle aarch64",
   "rustc": "1.94.1",

@@ -14,15 +14,19 @@
 //! Each exercised leaf is then substituted for real: the value is replaced
 //! with a well-formed value of the same JSON type, the statement is re-signed
 //! by both participant keys so the envelope stays cryptographically valid over
-//! the substituted bytes, and the result is driven through the pre-dispatch
-//! admission hook. The observed outcome must equal the declared one. Denials
-//! additionally assert that no verified federation material reached dispatch
-//! and that the continuation the statement named is still unconsumed.
+//! the substituted bytes, and the result is driven through a kernel whose only
+//! registered tool server counts the invocations it receives. The observed
+//! outcome must equal the declared one. Denials additionally assert that the
+//! dispatch counter reads zero, that no verified federation material reached
+//! dispatch, and that the continuation the statement named is still
+//! unconsumed; admissions assert the counter reads exactly one, which is what
+//! makes zero on a denial a measurement rather than an absence.
 //!
 //! Two leaves are bounded rather than compared for equality: the lease expiry
-//! against the receiver's clock, and the lease issuer against the agreement's
-//! participant set. Both carry a second declared value outside the bound, so
-//! the corpus records the domain rather than pretending it is an equality.
+//! against the presentation window the receiver resolved for the lease issuer,
+//! and the lease issuer against the agreement's participant set. Both carry a
+//! second declared value on the other side of the bound, so the corpus records
+//! the domain rather than pretending it is an equality.
 //!
 //! A leaf the receiver compares against nothing is not therefore a leaf whose
 //! value is free. Each such leaf declares the shape the wire form still
@@ -48,6 +52,9 @@
 
 mod support;
 
+#[path = "support/dispatch_counter.rs"]
+mod dispatch_counter;
+
 use base64::Engine as _;
 use chio_core_types::capability::{
     governance::GovernedTransactionIntent,
@@ -67,7 +74,7 @@ use chio_federation::bilateral_dsse::{
     HashRecord, KernelIdentity, Keyid, PolicyEvaluationSummary, PolicyVerdict, StatementSubject,
     SubjectDigest, TreatyBindingRef, PAYLOAD_TYPE_IN_TOTO,
 };
-use chio_kernel::{RuntimeAdmissionContext, RuntimeAdmissionHook, ToolCallRequest};
+use chio_kernel::{RuntimeAdmissionHook, ToolCallRequest};
 use chio_runtime_core::{
     bilateral_dsse_consistency_model, bilateral_invocation_binding_sha256,
     compute_ladder_intersection, governance_ladder_manifest_sha256, ladder_intersection_sha256,
@@ -417,14 +424,13 @@ const FIELD_RULES: &[FieldRule] = &[
     with_probe(
         "predicate/capability_lease_ref/expires_at_unix_ms",
         Comparison::ReceiverDomain(
-            "the instants strictly later than the receiver's clock: any of them is admitted, \
-             and no value is required",
+            "the instants inside the presentation window the receiver resolved for the lease \
+             issuer: a lease may end early, so the second declared value, one millisecond \
+             inside the window, is admitted, while the generated value, one millisecond past \
+             the window's end, is not",
         ),
-        Outcome::Admitted,
-        (
-            MutationSpec::Literal("1"),
-            Outcome::Denied(UNVERIFIED_EVIDENCE),
-        ),
+        Outcome::Denied(UNVERIFIED_EVIDENCE),
+        (MutationSpec::Literal("1800003599999"), Outcome::Admitted),
     ),
     absent(
         "predicate/capability_lease_ref/scope_digest/alg",
@@ -1346,8 +1352,16 @@ fn the_unsubstituted_statement_is_admitted_and_consumes_its_continuation() -> Te
     );
     assert!(run.substituted.verified_treaty_material);
     assert_eq!(
+        run.substituted.dispatches, 1,
+        "the unsubstituted statement must dispatch to the tool exactly once"
+    );
+    assert_eq!(
         run.baseline_after.failure_code.as_deref(),
         Some(CONTINUATION_REPLAY)
+    );
+    assert_eq!(
+        run.baseline_after.dispatches, 0,
+        "the replayed continuation must leave the dispatch counter at zero"
     );
 
     let without_lineage = admit_with(Evidence::RecordOnly, &[])?;
@@ -1355,6 +1369,10 @@ fn the_unsubstituted_statement_is_admitted_and_consumes_its_continuation() -> Te
         without_lineage.substituted.allowed,
         "the unsubstituted statement must admit without a lineage bundle too: {:?}",
         without_lineage.substituted.failure_code
+    );
+    assert_eq!(
+        without_lineage.substituted.dispatches, 1,
+        "the unsubstituted statement must dispatch without a lineage bundle too"
     );
     Ok(())
 }
@@ -1370,6 +1388,10 @@ fn assert_outcome(run: &SubstitutionRun, expected: Outcome, path: &str, label: &
             assert!(
                 run.substituted.verified_treaty_material,
                 "{path} ({label}) was admitted without verified treaty material"
+            );
+            assert_eq!(
+                run.substituted.dispatches, 1,
+                "{path} ({label}) was admitted, so it must have dispatched to the tool exactly once"
             );
             assert_eq!(
                 run.baseline_after.failure_code.as_deref(),
@@ -1391,10 +1413,14 @@ fn assert_outcome(run: &SubstitutionRun, expected: Outcome, path: &str, label: &
                 !run.substituted.verified_treaty_material,
                 "{path} ({label}) was denied but handed verified treaty material to dispatch"
             );
+            assert_eq!(
+                run.substituted.dispatches, 0,
+                "{path} ({label}) was denied, so the tool server dispatch counter must read zero"
+            );
             assert!(
                 run.baseline_after.allowed,
-                "{path} ({label}) was denied, so it must not have consumed the continuation: {:?}",
-                run.baseline_after.failure_code
+                "{path} ({label}) was denied, so it must not have consumed the continuation: {:?} {:?}",
+                run.baseline_after.failure_code, run.baseline_after.reason
             );
         }
     }
@@ -1601,6 +1627,12 @@ struct DecisionSummary {
     allowed: bool,
     failure_code: Option<String>,
     verified_treaty_material: bool,
+    /// How many times the kernel dispatched to the registered tool server
+    /// while evaluating this request.
+    dispatches: u64,
+    /// The kernel's denial reason, which a gate outside runtime admission can
+    /// set without setting a runtime failure code.
+    reason: Option<String>,
 }
 
 struct SubstitutionRun {
@@ -1662,20 +1694,22 @@ fn admit_with_insertions(
         &substituted_envelope,
     )?;
 
-    let hook = allowing_hook(store)?;
+    let hook = std::sync::Arc::new(dispatch_counter::TreatyMaterialRecorder::new(Box::new(
+        allowing_hook(store)?,
+    )));
     let substituted_request = treaty_request(
         arguments.clone(),
         bundle_sha256.clone(),
         treaty_context(&fixture, SUBSTITUTED_DSSE_ID, &substituted_sha256),
     )?;
-    let substituted = summarize(hook.evaluate(&admission_context(&substituted_request))?);
+    let substituted = summarize(&hook, &substituted_request)?;
 
     let baseline_request = treaty_request(
         arguments,
         bundle_sha256,
         treaty_context(&fixture, BASELINE_DSSE_ID, &fixture.envelope_sha256),
     )?;
-    let baseline_after = summarize(hook.evaluate(&admission_context(&baseline_request))?);
+    let baseline_after = summarize(&hook, &baseline_request)?;
 
     Ok(SubstitutionRun {
         substituted,
@@ -1683,25 +1717,34 @@ fn admit_with_insertions(
     })
 }
 
-fn summarize(decision: chio_kernel::RuntimeAdmissionDecision) -> DecisionSummary {
-    let metadata = decision.metadata.clone().unwrap_or(Value::Null);
-    DecisionSummary {
-        allowed: decision.allowed,
-        failure_code: metadata["chio_runtime"]["failure_code"]
-            .as_str()
-            .map(std::string::ToString::to_string),
-        verified_treaty_material: decision.has_verified_treaty_material(),
-    }
+/// Drive one request through a kernel whose only tool server counts its own
+/// invocations, so the decision and the dispatch it did or did not cause are
+/// read from the same run.
+fn summarize(
+    hook: &std::sync::Arc<dispatch_counter::TreatyMaterialRecorder>,
+    request: &ToolCallRequest,
+) -> Result<DecisionSummary, BoxError> {
+    let outcome = dispatch_counter::dispatch_through_kernel(
+        std::sync::Arc::clone(hook) as std::sync::Arc<dyn RuntimeAdmissionHook>,
+        request,
+        &dispatch_target(),
+    )?;
+    Ok(DecisionSummary {
+        allowed: outcome.allowed,
+        failure_code: outcome.failure_code,
+        verified_treaty_material: hook.verified_treaty_material(),
+        dispatches: outcome.dispatches,
+        reason: outcome.reason,
+    })
 }
 
-fn admission_context(request: &ToolCallRequest) -> RuntimeAdmissionContext<'_> {
-    RuntimeAdmissionContext {
-        request,
-        extra_metadata: None,
-        now_unix_secs: 1_800_000_001,
+fn dispatch_target() -> dispatch_counter::KernelDispatchTarget<'static> {
+    dispatch_counter::KernelDispatchTarget {
+        local_kernel_id: "kernel.vendor-b",
+        origin_kernel_id: Some("kernel.buyer"),
+        server_id: "vendor-ledger",
+        tool_name: "close_account",
         now_unix_ms: 1_800_000_001_000,
-        matched_grant_index: Some(0),
-        local_kernel_id: "kernel.vendor-b".to_string(),
     }
 }
 
@@ -1929,8 +1972,8 @@ fn treaty_fixture(evidence: Evidence) -> Result<TreatyFixture, BoxError> {
         "kernel.vendor-b",
         treaty_action_class("receipt_backed", true, "totally_ordered", evidence_required),
     );
-    let signer_a = Keypair::generate();
-    let signer_b = Keypair::generate();
+    let signer_a = dispatch_counter::origin_kernel_keypair();
+    let signer_b = dispatch_counter::receiver_kernel_keypair();
     let mut treaty_scope = treaty_scope();
     treaty_scope.participant_public_keys = vec![signer_a.public_key(), signer_b.public_key()];
     treaty_scope.ladder_manifest_sha256s = vec![
@@ -2226,7 +2269,7 @@ fn bundle() -> RuntimeAdmissionBundle {
 }
 
 fn capability(capability_id: &str) -> Result<CapabilityToken, BoxError> {
-    let issuer = Keypair::generate();
+    let issuer = dispatch_counter::receiver_kernel_keypair();
     let subject = Keypair::generate();
     Ok(CapabilityToken::sign(
         CapabilityTokenBody {
@@ -2315,7 +2358,8 @@ fn allowing_hook(
     Ok(ChioRuntimeAdmissionHook::new(profile(), store)
         .with_runtime_trust_input(signed_trust, trusted_keys(&verifier))
         .with_pheromone_query_report(signed_query_report)
-        .with_runtime_pheromone_policy(signed_policy, signed_weights))
+        .with_runtime_pheromone_policy(signed_policy, signed_weights)
+        .with_fixed_now_unix_ms(1_800_000_001_000))
 }
 
 fn trusted_keys(verifier: &Keypair) -> Vec<RuntimeTrustedVerifierKey> {

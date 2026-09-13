@@ -2,7 +2,7 @@
 //!
 //! A property's verdict is derived from cases the run actually drove, not
 //! asserted. `holds` is true only when every case the property rests on denied
-//! (or admitted, for the null case) under that profile.
+//! (or admitted, for the null case) under that wiring.
 
 use crate::negative::NegativeResult;
 use serde::Serialize;
@@ -57,93 +57,87 @@ fn require(results: &[NegativeResult], case_id: &str, hardened: bool) -> Result<
     })
 }
 
+/// Whether any of the named cases dispatched under this wiring.
+fn any_dispatched(
+    results: &[NegativeResult],
+    case_ids: &[&str],
+    hardened: bool,
+) -> Result<bool, String> {
+    let mut dispatched = false;
+    for case_id in case_ids {
+        dispatched |= require(results, case_id, hardened)?;
+    }
+    Ok(dispatched)
+}
+
+const ADMISSION_BINDING_WITNESSES: &[&str] = &[
+    "asserted-version-matches-receiver-record",
+    "arguments-differ-from-authorized-call",
+    "token-replay-under-fresh-message-id",
+    "wrong-live-agreement",
+    "superseded-agreement",
+];
+
+const RECEIVER_LOCALITY_WITNESSES: &[&str] = &[
+    "request-supplied-assurance-attribute",
+    "request-supplied-approval-object",
+];
+
 pub fn evaluate(results: &[NegativeResult]) -> Result<Vec<PropertyResult>, String> {
     let mut properties = Vec::new();
 
-    // Admission binding. The property has a conjunct no wiring of these parts
+    // Admission binding. The property has a conjunct no wiring of these formats
     // can satisfy: the presented evidence must equal what the receiver computed
-    // for this request from its own state, and for most of the facts at stake
-    // the composed request carries nothing to compare. The witness that
-    // dispatches under both wirings is the agreement version, which the request
-    // has no field for. The other three witnesses separate the wirings.
-    let version_composed = require(results, "agreement-version-advanced-in-flight", false)?;
-    let version_hardened = require(results, "agreement-version-advanced-in-flight", true)?;
-    let replay_composed = require(
-        results,
-        "authorization-replay-under-fresh-identifier",
-        false,
-    )?;
-    let replay_hardened = require(results, "authorization-replay-under-fresh-identifier", true)?;
-    let wrong_agreement_composed = require(results, "wrong-live-agreement", false)?;
-    let wrong_agreement_hardened = require(results, "wrong-live-agreement", true)?;
-    let superseded_composed = require(results, "superseded-agreement", false)?;
+    // for this call from its own state, and every value that reaches this
+    // receiver was minted by the caller or by the caller's own authorization
+    // server.
     properties.push(PropertyResult {
         property: "admission binding",
         statement: "if the receiver dispatches, every binding field of the presented evidence equals the value the receiver computed for this request from its own state, and the continuation it names was unconsumed",
-        composed: if version_composed
-            || replay_composed
-            || wrong_agreement_composed
-            || superseded_composed
-        {
+        composed: if any_dispatched(results, ADMISSION_BINDING_WITNESSES, false)? {
             Verdict::Fails
         } else {
             Verdict::HoldsWeakened
         },
-        hardened: if version_hardened || replay_hardened || wrong_agreement_hardened {
+        hardened: if any_dispatched(results, ADMISSION_BINDING_WITNESSES, true)? {
             Verdict::Fails
         } else {
             Verdict::HoldsWeakened
         },
-        step: "no step. The fields the composed receiver does check resolve identifiers in its own tables (steps 1, 16 and 24) or recompute a digest from the request (step 15); none is a comparison against a value the receiver computed for this call before it arrived",
-        weakened_to: Some("the request is bound to its own arguments, to a caller the receiver pinned, to an agreement identifier and an approval identifier that resolve in the receiver's own tables; nothing binds it to the state of the records it resolved against at the moment the authorization was issued"),
-        witnesses: vec![
-            "agreement-version-advanced-in-flight",
-            "authorization-replay-under-fresh-identifier",
-            "wrong-live-agreement",
-            "superseded-agreement",
-        ],
-        note: "This is the one property the composition cannot reach by hardening, and the reason is structural rather than a missing check: ten of the sixteen substitution rows, covering nine of the fifteen binding fields, have no carrier in the composed request at all, so for those facts there is nothing to compare. The witness that stands under both wirings is the agreement version: the receiver holds one, the request pins none, and no operator check can compare a value the request does not carry. The hardened wiring does close the other three witnesses, one of them incidentally: it denies the wrong-live-agreement case because the approval record it resolves names the other agreement, and moving the approval would remove that denial.",
+        step: "no step. The fields the composed receiver does check resolve identifiers in its own tables (steps 20, 26 and 30), compare a claim against the channel or against another claim (steps 16 to 19), or compare a claim against a clock (step 14); the one comparison against a receiver-held record is step 24, and the value it compares was chosen by the caller",
+        weakened_to: Some("the call is bound to a workload the receiver's trust bundle names, to a credential issued for this receiver by an issuer it pinned, and to an agreement identifier and an approval identifier that resolve in the receiver's own tables; nothing binds it to the state of those records at the moment the authority was granted, and nothing binds the credential to the call it arrived with"),
+        witnesses: ADMISSION_BINDING_WITNESSES.to_vec(),
+        note: "This is the one property the composition cannot reach by hardening, and the reason is structural. Eight of the fifteen binding fields have no field anywhere in the set, so for those facts there is nothing to compare. For the two that come closest, the hardened wiring does write the comparison: it refuses a retired agreement, and it refuses a credential whose scope asserts a version other than the one the receiver holds. Both comparisons are against values the caller's own authorization server minted, so an adversary asserts the version the receiver holds and passes, which is the case that dispatches under both wirings. The carrier ledger drives the same move once more with the operator's own invented field, and it ends the same way.",
     });
 
     // Receiver locality.
-    let smuggled_attribute_composed =
-        require(results, "request-supplied-assurance-attribute", false)?;
-    let smuggled_attribute_hardened =
-        require(results, "request-supplied-assurance-attribute", true)?;
-    let smuggled_approval_composed = require(results, "request-supplied-approval-object", false)?;
-    let smuggled_approval_hardened = require(results, "request-supplied-approval-object", true)?;
     properties.push(PropertyResult {
         property: "receiver locality",
         statement: "the roots, pins, agreements, tables and registries used to decide a request are a function of the receiver's state before the request arrived, and are independent of the request's content",
-        composed: if smuggled_attribute_composed || smuggled_approval_composed {
+        composed: if any_dispatched(results, RECEIVER_LOCALITY_WITNESSES, false)? {
             Verdict::Fails
         } else {
             Verdict::Holds
         },
-        hardened: if smuggled_attribute_hardened || smuggled_approval_hardened {
+        hardened: if any_dispatched(results, RECEIVER_LOCALITY_WITNESSES, true)? {
             Verdict::Fails
         } else {
             Verdict::Holds
         },
-        step: "step 20, where the policy context is assembled",
+        step: "step 25, where the policy context is assembled",
         weakened_to: None,
-        witnesses: vec!["request-supplied-assurance-attribute", "request-supplied-approval-object"],
-        note: "The composed wiring fails this and it is not a defect in any component. Handing the incoming request to the policy engine as its evaluation context is the documented way to call a policy decision point, and it is what makes the decision a function of the request. The hardened wiring refuses any context attribute whose name the receiver owns, which is a name denylist of exactly the kind Chio uses, and it then holds. The same three components yield either outcome and nothing in the composition records which one an operator deployed.",
+        witnesses: RECEIVER_LOCALITY_WITNESSES.to_vec(),
+        note: "The composed wiring fails this and it is not a defect in any part. A message carries a metadata map for additional context, and handing the incoming request to the policy engine as its evaluation context is the documented way to call a policy decision point. The hardened wiring refuses any supplied attribute whose name the receiver owns, in every slot the formats leave open, which is a name denylist of exactly the kind Chio uses, and it then holds. The same parts yield either outcome and nothing in the composition records which one an operator deployed.",
     });
 
     // Single use. Evaluated per wiring, because the two wirings key their
     // replay tables by different values.
-    let request_id_replay_composed = require(results, "request-id-replay", false)?;
-    let request_id_replay_hardened = require(results, "request-id-replay", true)?;
-    let authorization_replay_composed = require(
-        results,
-        "authorization-replay-under-fresh-identifier",
-        false,
-    )?;
-    let authorization_replay_hardened =
-        require(results, "authorization-replay-under-fresh-identifier", true)?;
-    let single_use = |identifier_replayed: bool, authorization_replayed: bool| {
-        if !authorization_replayed && !identifier_replayed {
+    let message_replay_composed = require(results, "message-id-replay", false)?;
+    let message_replay_hardened = require(results, "message-id-replay", true)?;
+    let token_replay_composed = require(results, "token-replay-under-fresh-message-id", false)?;
+    let token_replay_hardened = require(results, "token-replay-under-fresh-message-id", true)?;
+    let single_use = |identifier_replayed: bool, credential_replayed: bool| {
+        if !credential_replayed && !identifier_replayed {
             Verdict::Holds
         } else if !identifier_replayed {
             Verdict::HoldsWeakened
@@ -154,12 +148,12 @@ pub fn evaluate(results: &[NegativeResult]) -> Result<Vec<PropertyResult>, Strin
     properties.push(PropertyResult {
         property: "single use",
         statement: "for a continuation identifier c, at most one admission ever reaches dispatch with c bound to it",
-        composed: single_use(request_id_replay_composed, authorization_replay_composed),
-        hardened: single_use(request_id_replay_hardened, authorization_replay_hardened),
-        step: "step 4 under both wirings, and step 7 under the hardened wiring: single-row inserts on a primary key",
-        weakened_to: Some("under the composed wiring, at most one dispatch per request identifier, where the identifier is chosen by the caller, and the authorization itself is reusable until it expires"),
-        note: "The mechanism is identical to Chio's under either wiring, and what separates them is whose value it is keyed by. The composed table is keyed by a value the caller chooses outside the signed bytes, so the caller picks a new one and presents the same authorization again. The hardened wiring claims a second row on the identifier inside the signed bytes, and the authorization is then single-use as stated. What no wiring of these parts reaches is receiver-side minting: the identifier that is made single-use is one the signer chose, so the signer decides how many authorizations exist, where a Chio continuation is minted by the receiver before the request and named by the statement.",
-        witnesses: vec!["request-id-replay", "authorization-replay-under-fresh-identifier"],
+        composed: single_use(message_replay_composed, token_replay_composed),
+        hardened: single_use(message_replay_hardened, token_replay_hardened),
+        step: "step 6 under both wirings, and step 11 under the hardened wiring: single-row inserts on a primary key",
+        weakened_to: Some("under the composed wiring, at most one dispatch per message identifier, where the identifier is created by the caller, and the credential itself is reusable until it expires"),
+        note: "The mechanism is identical to Chio's under either wiring, and what separates them is whose value it is keyed by. The composed table is keyed by an identifier the message creator chose, so the caller picks a new one and presents the same credential again. The hardened wiring claims a second row on the token identifier, and the credential is then single-use as stated. What no wiring reaches is receiver-side minting: the identifiers made single-use are the caller's and the issuer's. The composition does carry two identifiers the receiver minted, a task and an MCP request state, and the task-handle case shows what they bound, which was nothing.",
+        witnesses: vec!["message-id-replay", "token-replay-under-fresh-message-id"],
     });
 
     // Audience binding.
@@ -178,10 +172,10 @@ pub fn evaluate(results: &[NegativeResult]) -> Result<Vec<PropertyResult>, Strin
         } else {
             Verdict::Holds
         },
-        step: "step 17 under both wirings, and step 12 as well under the hardened wiring",
+        step: "step 16 under both wirings, and step 21 as well",
         weakened_to: None,
         witnesses: vec!["cross-receiver-presentation"],
-        note: "The composition holds this outright and it is not a differentiator. A receiver that resolves the agreement the decision names is reading a participant list, and a receiver absent from that list is not a party to what it just resolved; the hardened wiring closes the same hole a second time with an audience field. The driven case is a second receiver holding the same pins and the same agreement record, so it satisfies two of the statement's three conjuncts by construction and the composition has no receipt, which is the third. What it establishes is narrower than the statement and is the operational fact: the same bytes are not accepted unchanged at a second receiver.",
+        note: "The composition holds this outright and it is not a differentiator, which is worth saying in the composition's favour: the audience of a credential is required rather than optional in this set, since a workload identity token without an audience is rejected and a protected resource must establish that a token was issued for it. A second route closes it again, because resolving an agreement means reading a participant list. The driven case is a second receiver holding the same trust bundle and the same agreement record, so it satisfies two of the statement's three conjuncts by construction and the composition has no receipt, which is the third.",
     });
 
     Ok(properties)

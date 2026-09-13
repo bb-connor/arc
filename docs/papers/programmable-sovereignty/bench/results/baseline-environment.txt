@@ -1,10 +1,10 @@
-884fd7894d14b763fbabce67f1b188c5274cbfa5
+cc81f239a656ef63211634bbfcb58b04065546a9
 worktree=dirty
 cpu_model=Neoverse-N1
 cores=12
 memory_bytes=50403979264
 os=Linux 6.17.0-1020-oracle aarch64
-load_average_1m=10.89
+load_average_1m=15.55
 max_load_average_1m=64
 toolchain_pin=1.94.1
 rustc 1.94.1 (e408947bf 2026-03-25)
@@ -52,10 +52,10 @@ Vulnerability Tsa:                       Not affected
 Vulnerability Tsx async abort:           Not affected
 Vulnerability Vmscape:                   Not affected
 MemTotal:       49222636 kB
-MemFree:         2784092 kB
-MemAvailable:   37699868 kB
+MemFree:         9334808 kB
+MemAvailable:   43461988 kB
 profile=release
 baseline_calls=2000
 baseline_warmup=50
 baseline_store=SQLite WAL synchronous=FULL
-benchmark_input_tree_sha256=4c6d45e66b15c581a386b5342a1e2bc348d9597106346a1ef57fa19fbebeff0b
+benchmark_input_tree_sha256=ae4b5fef089f0d2d55978e6f524a2e795e6a2ee51bca12ea2353f7bfa4623696
