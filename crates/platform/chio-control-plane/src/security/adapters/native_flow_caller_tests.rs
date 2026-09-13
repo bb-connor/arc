@@ -91,6 +91,14 @@ fn exercise_delivery(
         key_epoch: 41,
     };
     fixture.kernel.set_caller_executor(executor.clone())?;
+    // Provision the independently owned executor before entering any signed
+    // execution interval. Host setup is not part of the authorized handoff.
+    let ledger = SqliteCallerExecutionLedger::provision(
+        &fixture._directory.path().join("executor.db"),
+        executor.clone(),
+        4,
+    )?;
+    let effects = AtomicUsize::new(0);
     let operation_id = super::nonce::execution::issue(&mut fixture)?;
     let reserved = fixture
         .kernel
@@ -118,21 +126,6 @@ fn exercise_delivery(
         authorization.authorization.invocation.operation_id,
         operation_id
     );
-    let store = fixture.authority.admission_operation_store();
-    let captured = store
-        .load_by_operation_id(&operation_id)?
-        .ok_or("captured operation")?;
-    assert_eq!(captured.state(), AdmissionOperationState::DispatchCommitted);
-    assert!(captured.native_dispatch_ledger_digest().is_some());
-    assert!(captured.caller_dispatch_context_digest().is_some());
-    assert_captured_quota(&fixture)?;
-    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
-    let ledger = SqliteCallerExecutionLedger::provision(
-        &fixture._directory.path().join("executor.db"),
-        executor.clone(),
-        4,
-    )?;
-    let effects = AtomicUsize::new(0);
     let report = ledger.execute_once(
         &authorization,
         &fixture.signer.public_key(),
@@ -146,6 +139,18 @@ fn exercise_delivery(
             })
         },
     )?;
+    // The executor changes only its separate ledger, not kernel admission.
+    // Verify the original capture before report reconciliation, without spending
+    // the signed execution interval on expensive retained-history diagnostics.
+    let store = fixture.authority.admission_operation_store();
+    let captured = store
+        .load_by_operation_id(&operation_id)?
+        .ok_or("captured operation")?;
+    assert_eq!(captured.state(), AdmissionOperationState::DispatchCommitted);
+    assert!(captured.native_dispatch_ledger_digest().is_some());
+    assert!(captured.caller_dispatch_context_digest().is_some());
+    assert_captured_quota(&fixture)?;
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     drop(store);
     #[cfg(unix)]
     let mut _clock = None;

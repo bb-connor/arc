@@ -811,6 +811,81 @@ mod tests {
         assert!(error
             .to_string()
             .contains("failed peer capability re-validation"));
+        assert!(!error.to_string().contains(&record.session_id));
+    }
+
+    #[test]
+    fn restored_authorization_matches_the_handshake_without_upgrading_legacy_sessions() {
+        use chio_core::capability::features::{
+            CapabilityNegotiation, CHIO_CAPABILITIES_SCHEMA, OPAQUE_SUPPLEMENTAL_AUTHORIZATION,
+        };
+        use chio_mcp_adapter::edge::authorization::{
+            authorization_capabilities, negotiate_authorization_capabilities,
+        };
+
+        let supported = authorization_capabilities();
+        let mut restricted = supported.clone();
+        restricted
+            .features
+            .insert(OPAQUE_SUPPLEMENTAL_AUTHORIZATION.to_string(), false);
+        let mut future = supported.clone();
+        future.features.insert("future_authority".to_string(), true);
+        for advertised in [None, Some(supported), Some(restricted), Some(future)] {
+            let mut record = sample_resume_record();
+            record.initialize_params = json!({"capabilities": {"roots": {"listChanged": true}}});
+            if let Some(profile) = advertised {
+                record.initialize_params["capabilities"]["experimental"] =
+                    json!({"chioAuthorization": profile});
+            }
+            record.peer_capabilities =
+                parse_remote_session_peer_capabilities(&record.initialize_params);
+            record.peer_capabilities.authorization = Some(
+                negotiate_authorization_capabilities(&record.initialize_params)
+                    .expect("negotiate original handshake"),
+            );
+            assert_eq!(
+                validate_restored_peer_capabilities(&record).expect("restore exact negotiation"),
+                record.peer_capabilities
+            );
+            assert!(!record
+                .peer_capabilities
+                .authorization
+                .as_ref()
+                .unwrap()
+                .supports("future_authority"));
+
+            for feature in [OPAQUE_SUPPLEMENTAL_AUTHORIZATION, "future_authority"] {
+                let mut substituted = record.clone();
+                let profile = substituted.peer_capabilities.authorization.as_mut().unwrap();
+                let enabled = profile.supports(feature);
+                profile.features.insert(feature.to_string(), !enabled);
+                let error = validate_restored_peer_capabilities(&substituted)
+                    .expect_err("changed negotiated feature must not restore");
+                assert!(!error.to_string().contains(&record.session_id));
+            }
+
+            // Older peers could advertise an extension without negotiating it.
+            // Retaining their absent profile must not turn it into authority.
+            record.peer_capabilities.authorization = None;
+            let legacy = validate_restored_peer_capabilities(&record).expect("restore legacy");
+            assert!(legacy.authorization.is_none());
+        }
+
+        for malformed in [
+            Value::Null,
+            json!({"schema": "wrong", "features": {}}),
+            json!({"schema": CHIO_CAPABILITIES_SCHEMA, "features": {"bad feature": true}}),
+        ] {
+            let mut record = sample_resume_record();
+            record.initialize_params = json!({
+                "capabilities": {"experimental": {"chioAuthorization": malformed}}
+            });
+            record.peer_capabilities.authorization = Some(CapabilityNegotiation::v1_default());
+            let error = validate_restored_peer_capabilities(&record)
+                .expect_err("malformed retained negotiation must not become legacy");
+            assert!(error.to_string().contains("invalid authorization negotiation"));
+            assert!(!error.to_string().contains(&record.session_id));
+        }
     }
 
     #[test]

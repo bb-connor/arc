@@ -467,6 +467,7 @@ impl RemoteSessionFactory {
             Some(stored) if stored == auth_mode_fingerprint => {}
             _ => return Ok(None),
         }
+        let restored_peer_capabilities = validate_restored_peer_capabilities(record)?;
         let issuance_policy = loaded_policy.issuance_policy.clone();
         let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
         let (upstream_server, upstream_notification_source) = if self.config.shared_hosted_owner {
@@ -521,7 +522,6 @@ impl RemoteSessionFactory {
         )));
 
         let agent_public_key = PublicKey::from_hex(&record.agent_id)?;
-        let restored_peer_capabilities = validate_restored_peer_capabilities(record)?;
         let issued_capabilities = match record.policy_fingerprint.as_deref() {
             Some(stored)
                 if stored == policy_fingerprint

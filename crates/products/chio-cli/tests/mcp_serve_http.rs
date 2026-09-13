@@ -2538,7 +2538,7 @@ fn mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls(
     let session_db_path = dir.join("remote-session-state.sqlite3");
 
     let (session_id, protocol_version) = {
-        let _server = spawn_http_server_with_session_lifecycle_tuning(
+        let mut server = spawn_http_server_with_session_lifecycle_tuning(
             &dir,
             listen,
             token,
@@ -2552,7 +2552,8 @@ fn mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls(
             .build()
             .expect("build reqwest client");
         let base_url = format!("http://{listen}");
-        wait_for_server(&client, &base_url);
+        wait_for_server_result(&client, &base_url, &mut server)
+            .expect("start ready-session MCP server");
 
         let (session_id, protocol_version) = initialize_session(&client, &base_url, token);
         let trust_status =
@@ -2563,7 +2564,7 @@ fn mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls(
         (session_id, protocol_version)
     };
 
-    let _server = spawn_http_server_with_session_lifecycle_tuning(
+    let mut server = spawn_http_server_with_session_lifecycle_tuning(
         &dir,
         listen,
         token,
@@ -2577,7 +2578,8 @@ fn mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls(
         .build()
         .expect("build reqwest client");
     let base_url = format!("http://{listen}");
-    wait_for_server(&client, &base_url);
+    wait_for_server_result(&client, &base_url, &mut server)
+        .expect("restart ready-session MCP server");
 
     let trust_status = get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
@@ -2628,7 +2630,7 @@ fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() 
     let policy_path = write_policy_with_tools(&dir, &["echo_json", "sampled_echo"]);
 
     let (session_id, protocol_version) = {
-        let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+        let mut server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
             &dir,
             &policy_path,
             listen,
@@ -2644,12 +2646,13 @@ fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() 
             .build()
             .expect("build reqwest client");
         let base_url = format!("http://{listen}");
-        wait_for_server(&client, &base_url);
+        wait_for_server_result(&client, &base_url, &mut server)
+            .expect("start policy-restoration MCP server");
         initialize_session(&client, &base_url, token)
     };
 
     let policy_path = write_policy_with_tools(&dir, &["sampled_echo"]);
-    let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+    let mut server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
         &dir,
         &policy_path,
         listen,
@@ -2665,7 +2668,8 @@ fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() 
         .build()
         .expect("build reqwest client");
     let base_url = format!("http://{listen}");
-    wait_for_server(&client, &base_url);
+    wait_for_server_result(&client, &base_url, &mut server)
+        .expect("restart policy-restoration MCP server");
 
     let trust_status = get_admin_session_trust(&client, &base_url, EDGE_ADMIN_TOKEN, &session_id);
     assert_eq!(trust_status.status(), reqwest::StatusCode::OK);

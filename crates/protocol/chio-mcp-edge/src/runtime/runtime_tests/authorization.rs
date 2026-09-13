@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(test)]
 mod authorization_projection {
     include!(concat!(
         env!("CARGO_MANIFEST_DIR"),
