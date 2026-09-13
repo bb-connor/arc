@@ -1,6 +1,6 @@
 # Security launch: current execution status
 
-Updated 2026-09-12. This is the short working index for the accepted
+Updated 2026-09-13. This is the short working index for the accepted
 [execution plan](launch-execution-plan.md), not another qualification campaign.
 Candidate: `/tmp/arc-security-launch`, `security/launch-integration`, base HEAD
 `8b9f9243905dfa61acac82d83438684940777fe3`. The accumulated 722-path checkpoint
@@ -10,8 +10,9 @@ was committed and pushed as `7e54c14a60` to
 M2's native failure/restart safety acceptance is committed as
 `13fa4585d2a87eebf45d643638c4c6e145ac3cea` under the existing fail-closed release
 contract. Earlier hashes below identify historical checkpoints, not the current
-candidate. M3 implementation is in progress on the same branch. This is not
-merge or release approval.
+candidate. M3's authenticated and native caller implementation is committed and
+pushed as `90a77c37e50419cdba91b2898213c26d3ea5ae21` on the same branch. Its local
+acceptance is complete. This is not merge or release approval.
 
 ## Milestone control
 
@@ -20,7 +21,7 @@ merge or release approval.
 | M0 | Consolidated for implementation | Keep this index current; no independent cleanup campaign | Requirement and review maps below |
 | M1 | Complete: implementation and local acceptance | Keep closed absent a demonstrated regression; confinement remains explicitly deferred | [Acceptance closeout](#m1-local-acceptance-closeout), [qualification deferral](#m1-confined-process-qualification-deferral) |
 | M2 | Complete: local native failure/restart safety acceptance | Proceed to M3; missing release custody still blocks output and readiness | [Acceptance closeout](#m2-local-acceptance-closeout), [cutpoints and downstream contract](native-restart-safety.md) |
-| M3 | Authenticated start, durable executor delivery and historical finalization implemented; qualification and native caller custody remain open | Qualify the composed custody and public contracts; retain explicit unsupported-profile denials | [Caller contract and compatibility boundary](authenticated-caller-delivery.md) |
+| M3 | Complete: local authenticated start, durable delivery and native caller custody acceptance | Proceed to M4; retain explicit unsupported-profile denials and separate release gates | [Acceptance closeout](#m3-local-acceptance-closeout), [caller contract](authenticated-caller-delivery.md) |
 | M4 | Consumer qualification incomplete | Inventory positive supported paths and required startup denials after M1-M3 | [Original requirement ledger](launch-plan.md#requirement-ledger) |
 | M5 | Swarm is a Disabled-profile integration smoke | Bind issued capability identities, shared budget and enforced cage | [Swarm limitations](../../examples/reference-swarm/README.md) |
 | M6 | Components present, integrated topology unqualified | Compose keyring, broker, cage and receipts; designated runner needed | Enterprise ledger and original plan |
@@ -30,7 +31,7 @@ merge or release approval.
 | M10 | Not release qualified | Local gates, audits, authorized exact-candidate hosted and publication steps | Candidate lacks passing exact-head hosted qualification |
 | M11 | Not started | Authorized observed pilot and signed promotion stages | [Numeric operator contract](active-defense-rollout.md) |
 
-## M3 implementation checkpoint
+## M3 local acceptance closeout
 
 The kernel now publishes a signed start authorization only after the original
 hold, nonce and caller context are committed and physically read back. The
@@ -61,13 +62,54 @@ use the explicit start contract. Reserve-only clients no longer receive
 HTTP. See [authenticated caller delivery](authenticated-caller-delivery.md) for
 pinning, durable provisioning, protocol negotiation and migration requirements.
 
-M3 is not yet complete. Native release-owner and declassification caller custody
-remain required by explicit scope decision, and their implementation is undergoing
-qualification. They have not been deferred. Supplemental authorization and the
-combined threshold-approval/credit-exposure resume profile still fail closed. Those
-limits are not native qualification or an approved scope reduction. Local regression
-results below are being refreshed for the composed implementation; earlier
-component results must not be presented as its qualification.
+Native release-owner and declassification caller custody are implemented and
+locally qualified on Linux/aarch64, not deferred. Private v5 frames bind the original native ledger,
+security context and execution deadline to the actual atomic caller/native
+capture. Recovery authenticates original signed delivery before constructing a
+release-only owner. It never reconstructs an ordinary M2 native live owner or
+creates another execution authorization interval.
+
+The native matrix covers local, egress and declassification profiles, both alone
+and composed with runtime, DPoP and approval custody. Reopened owners reconcile
+late original reports after capability and nonce expiry. Real child aborts cover
+atomic capture, executor claim/effect/report, raw return, output join, release
+acknowledgement/checkpoint and terminal projection. Tests verify independent
+effect counts, original signatures and operation identity, captured accounting,
+declassification use and output withholding. The changed-classification negative
+requires the original-join mismatch, not an earlier classifier-shape error.
+
+| Local gate for the M3 implementation | Result | Evidence |
+| --- | --- | --- |
+| `bash scripts/check-authenticated-caller-delivery.sh` | 61 exact tests: 33 caller lifecycle, nine executor ledger, 19 native caller | `/tmp/chio-m3-final-exact-acceptance.log` |
+| Kernel and API-protect libraries | 1,433 kernel and 210 API-protect tests | `/tmp/chio-m3-final-kernel-api-regressions.log` |
+| Strict workspace/all-target Clippy | Passed with warnings denied | `/tmp/chio-m3-final-workspace-clippy-qualified.log` |
+| Formatting, file hygiene and exact-inventory contracts | Passed; no limit or allowlist widened | `/tmp/chio-m3-final-source-gates.log` |
+| Mediation and formal source bindings | Adapter contracts and 225 source bindings match; coverage remains 58 rows / 168 artifacts | `/tmp/chio-m3-source-closeout.log` |
+| Wire generation and SDK checks | Four generation checks, 179 Python tests, Go tests and TypeScript typecheck passed | `/tmp/chio-m3-native-schema-check.log`, `/tmp/chio-m3-python-native-schema.log`, `/tmp/chio-m3-go-native-schema.log`, `/tmp/chio-m3-typescript-native-schema.log` |
+
+All named test counts above passed with zero failed or ignored cases. The AST
+graph refresh also completed. Matching formal source hashes remain review anchors,
+not a new proof of authenticated caller recovery; the live drop-guard model
+explicitly excludes that recovery protocol.
+
+The immediately preceding broader regression build also passed 84 migration
+tests, 87 runtime-admission tests, 15 durable SQLite admission tests, 25 release
+recovery tests, nine cumulative-approval tests and 17 nonce-lifecycle tests
+(`/tmp/chio-m3-current-caller-integrations.log`,
+`/tmp/chio-m3-current-core-regressions.log`,
+`/tmp/chio-m3-current-credential-regressions.log`). These supplement the final
+M3 gate; they do not stand in for completed full-workspace qualification.
+
+Supplemental authorization and the combined threshold-approval/credit-exposure
+resume profile remain explicitly unsupported and fail closed. No new deferral of
+native caller custody was taken. Full-workspace testing and the refreshed normal
+workspace build remain in progress, not passing evidence
+(`/tmp/chio-m3-final-workspace-tests-resumed.log`,
+`/tmp/chio-m3-final-workspace-build-qualified.log`). Exact-head hosted qualification
+is not complete: controller run `34736189135` failed its source/controller
+authorization step and skipped capture. No workflow bypass, populated operator
+migration, merge, publication or deployment is authorized by this closeout.
+M1's confinement deferral is unchanged. Proceed to M4's consumer-boundary work.
 
 ### Historical component checkpoint (before start/report integration)
 

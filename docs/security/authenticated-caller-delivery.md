@@ -60,9 +60,9 @@ retry a lost start reply. Use a trusted executor with the durable Rust ledger.
   authorities. Start re-presents credentials and validates their existing claims;
   report recovery never reconstructs signed credentials from a DTO. The return
   snapshot and its physical histories must retain the original dispatch episode.
-- Native release-owner and declassification custody remain required in M3 by
-  explicit scope decision. Their implementation is undergoing qualification,
-  not deferred. The trusted native host must supply the original security context
+- Native release-owner and declassification custody are included in M3's completed
+  local acceptance, not deferred. The trusted native host must supply the original
+  security context
   through the Rust reservation/start entrypoints; public request data cannot
   select that identity. The native caller frame binds actual native capture and
   release custody. A report cannot manufacture an ordinary `NativeReleaseOwner`.

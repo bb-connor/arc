@@ -3,7 +3,8 @@
 Status: accepted for local execution on 2026-09-10. M0 is consolidated. M1's
 implementation and local acceptance are complete under the explicit confinement
 qualification deferral below. M2's native failure/restart safety acceptance is
-locally complete under the existing fail-closed release contract. M3 is active.
+locally complete under the existing fail-closed release contract. M3's local
+authenticated and native caller custody acceptance is complete; M4 is next.
 See [current execution status](launch-status.md).
 On 2026-09-11 the
 user authorized committing, pushing and maintaining the accumulated work as a PR,
@@ -322,13 +323,14 @@ qualification follows from these local tests. Proceed to M3.
 
 ## M3. Finish authenticated caller start and delivery
 
-Current implementation: kernel commitment, durable executor claim/report,
-historical finalization, the enabled lost-report regression, credential/runtime
-custody and public sidecar/SDK/schema integration are implemented. Qualification
-and required native caller custody are tracked in
-[launch status](launch-status.md#m3-implementation-checkpoint). The requirements
-below remain the acceptance contract; unsupported profiles are not silently
-counted as completed functionality.
+Local acceptance completed on 2026-09-13: kernel commitment, durable executor
+claim/report, historical finalization, the enabled lost-report regression,
+credential/runtime and native release/declassification custody, and public
+sidecar/SDK/schema integration are implemented. The exact 61-test milestone gate
+and broader verification boundaries are recorded in
+[launch status](launch-status.md#m3-local-acceptance-closeout). The requirements
+below remain the acceptance contract; explicitly unsupported profiles are not
+counted as supported functionality. This is not release qualification.
 
 Primary owners: kernel `evaluation/caller_execution.rs`, caller context and nonce
 coordinators, SQLite caller-context capture/outcome stores, sidecar control routes,
