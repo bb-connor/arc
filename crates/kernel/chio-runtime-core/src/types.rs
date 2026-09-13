@@ -265,6 +265,224 @@ pub struct CrossKernelContinuation {
     pub expires_at_unix_ms: u64,
 }
 
+/// Origin of one interval that bounds when a co-signed statement may be
+/// presented to this receiver.
+///
+/// Every variant names a record the receiver resolves from its own store, never
+/// a validity a counterparty wrote into the statement. The window is rebuilt
+/// from the records resolved for the call being decided, so a record the
+/// receiver stops resolving between calls drops out of the intersection and
+/// closes the window for the counterparties that record bound.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PresentationIntervalSource {
+    /// Validity of the treaty scope, which binds every participant.
+    TreatyScope,
+    /// Validity of the capability lease record the admission bundle names.
+    CapabilityLease,
+    /// Validity of the governance receipt record the admission bundle names.
+    GovernanceReceipt,
+}
+
+impl PresentationIntervalSource {
+    /// Label used in rejection detail.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::TreatyScope => "treaty scope",
+            Self::CapabilityLease => "capability lease",
+            Self::GovernanceReceipt => "governance receipt",
+        }
+    }
+}
+
+/// One half-open interval `[not_before_unix_ms, not_after_unix_ms)` the
+/// receiver resolved for itself, together with the counterparties it binds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedPresentationInterval {
+    source: PresentationIntervalSource,
+    counterparty_kernel_ids: Vec<String>,
+    not_before_unix_ms: u64,
+    not_after_unix_ms: u64,
+}
+
+impl ResolvedPresentationInterval {
+    /// Rejects an interval that binds nobody and an interval that is already
+    /// empty: a record the receiver cannot read a live interval out of must not
+    /// enter the intersection at all.
+    pub fn new(
+        source: PresentationIntervalSource,
+        counterparty_kernel_ids: Vec<String>,
+        not_before_unix_ms: u64,
+        not_after_unix_ms: u64,
+    ) -> Result<Self, PresentationWindowError> {
+        if counterparty_kernel_ids.is_empty() {
+            return Err(PresentationWindowError::BindsNoCounterparty(source));
+        }
+        if not_before_unix_ms >= not_after_unix_ms {
+            return Err(PresentationWindowError::EmptyInterval(source));
+        }
+        Ok(Self {
+            source,
+            counterparty_kernel_ids,
+            not_before_unix_ms,
+            not_after_unix_ms,
+        })
+    }
+
+    fn binds(&self, kernel_id: &str) -> bool {
+        self.counterparty_kernel_ids
+            .iter()
+            .any(|counterparty| counterparty == kernel_id)
+    }
+}
+
+/// The window in which a co-signed statement may be presented to this receiver:
+/// the intersection of the intervals the receiver resolved for the call being
+/// decided.
+///
+/// The window is receiver-owned in both directions. A validity a counterparty
+/// wrote into the statement may end earlier than the window but never later, so
+/// widening it takes a change to a record the receiver holds rather than a
+/// change to the statement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PresentationWindow {
+    not_before_unix_ms: u64,
+    not_after_unix_ms: u64,
+    intervals: Vec<ResolvedPresentationInterval>,
+}
+
+impl PresentationWindow {
+    /// Intersects the resolved intervals, failing closed when none were
+    /// resolved and when the intersection is empty.
+    pub fn intersect(
+        intervals: Vec<ResolvedPresentationInterval>,
+    ) -> Result<Self, PresentationWindowError> {
+        if intervals.is_empty() {
+            return Err(PresentationWindowError::NothingResolved);
+        }
+        let mut not_before_unix_ms = 0;
+        let mut not_after_unix_ms = u64::MAX;
+        for interval in &intervals {
+            not_before_unix_ms = not_before_unix_ms.max(interval.not_before_unix_ms);
+            not_after_unix_ms = not_after_unix_ms.min(interval.not_after_unix_ms);
+        }
+        if not_before_unix_ms >= not_after_unix_ms {
+            return Err(PresentationWindowError::Closed {
+                not_before_unix_ms,
+                not_after_unix_ms,
+            });
+        }
+        Ok(Self {
+            not_before_unix_ms,
+            not_after_unix_ms,
+            intervals,
+        })
+    }
+
+    /// The window as it stands for one counterparty: the intersection of the
+    /// intervals that bind it, and only if every required source resolved for
+    /// it. Withdrawing one counterparty's record between calls removes its
+    /// interval here and nowhere else, so a required record that stops
+    /// resolving closes that counterparty's window and leaves every other
+    /// counterparty's window where it was.
+    pub fn for_counterparty(
+        &self,
+        kernel_id: &str,
+        required: &[PresentationIntervalSource],
+    ) -> Result<Self, PresentationWindowError> {
+        let intervals: Vec<ResolvedPresentationInterval> = self
+            .intervals
+            .iter()
+            .filter(|interval| interval.binds(kernel_id))
+            .cloned()
+            .collect();
+        for source in required {
+            if !intervals.iter().any(|interval| interval.source == *source) {
+                return Err(PresentationWindowError::Unresolved {
+                    source: *source,
+                    counterparty_kernel_id: kernel_id.to_string(),
+                });
+            }
+        }
+        Self::intersect(intervals)
+    }
+
+    /// Whether a validity the statement carries stays inside this window. The
+    /// receiver owns the upper bound, so an expiry at the window's own end is
+    /// admitted and one millisecond past it is not.
+    pub const fn admits_expiry(&self, expires_at_unix_ms: u64) -> bool {
+        expires_at_unix_ms > self.not_before_unix_ms && expires_at_unix_ms <= self.not_after_unix_ms
+    }
+
+    /// First instant of the window.
+    pub const fn not_before_unix_ms(&self) -> u64 {
+        self.not_before_unix_ms
+    }
+
+    /// First instant past the window.
+    pub const fn not_after_unix_ms(&self) -> u64 {
+        self.not_after_unix_ms
+    }
+}
+
+/// Why a presentation window could not be built, or could not be built for one
+/// counterparty.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PresentationWindowError {
+    /// The receiver resolved no interval at all.
+    NothingResolved,
+    /// A resolved record carried an empty interval.
+    EmptyInterval(PresentationIntervalSource),
+    /// A resolved record named no counterparty.
+    BindsNoCounterparty(PresentationIntervalSource),
+    /// A record the receiver requires for one counterparty did not resolve on
+    /// this call.
+    Unresolved {
+        source: PresentationIntervalSource,
+        counterparty_kernel_id: String,
+    },
+    /// The resolved intervals do not overlap.
+    Closed {
+        not_before_unix_ms: u64,
+        not_after_unix_ms: u64,
+    },
+}
+
+impl std::fmt::Display for PresentationWindowError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NothingResolved => {
+                write!(formatter, "the receiver resolved no interval for this call")
+            }
+            Self::EmptyInterval(source) => {
+                write!(formatter, "the {} interval is empty", source.as_str())
+            }
+            Self::BindsNoCounterparty(source) => write!(
+                formatter,
+                "the {} interval binds no counterparty",
+                source.as_str()
+            ),
+            Self::Unresolved {
+                source,
+                counterparty_kernel_id,
+            } => write!(
+                formatter,
+                "the receiver resolved no {} interval for the counterparty {counterparty_kernel_id}",
+                source.as_str()
+            ),
+            Self::Closed {
+                not_before_unix_ms,
+                not_after_unix_ms,
+            } => write!(
+                formatter,
+                "the resolved intervals do not overlap (not before {not_before_unix_ms}, not after {not_after_unix_ms})"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for PresentationWindowError {}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReceiptLineageStatement {
@@ -995,4 +1213,151 @@ pub struct RuntimeOpsStatusReport {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_failure_code: Option<String>,
     pub checks: Vec<String>,
+}
+
+#[cfg(test)]
+mod presentation_window_tests {
+    use super::{
+        PresentationIntervalSource, PresentationWindow, PresentationWindowError,
+        ResolvedPresentationInterval,
+    };
+
+    const AGREEMENT: PresentationIntervalSource = PresentationIntervalSource::TreatyScope;
+    const LEASE: PresentationIntervalSource = PresentationIntervalSource::CapabilityLease;
+    const GOVERNANCE: PresentationIntervalSource = PresentationIntervalSource::GovernanceReceipt;
+
+    type TestResult = Result<(), PresentationWindowError>;
+
+    fn interval(
+        source: PresentationIntervalSource,
+        counterparties: &[&str],
+        not_before_unix_ms: u64,
+        not_after_unix_ms: u64,
+    ) -> Result<ResolvedPresentationInterval, PresentationWindowError> {
+        ResolvedPresentationInterval::new(
+            source,
+            counterparties
+                .iter()
+                .map(|counterparty| (*counterparty).to_string())
+                .collect(),
+            not_before_unix_ms,
+            not_after_unix_ms,
+        )
+    }
+
+    #[test]
+    fn the_window_is_the_intersection_of_the_resolved_intervals() -> TestResult {
+        let window = PresentationWindow::intersect(vec![
+            interval(AGREEMENT, &["kernel.a", "kernel.b"], 100, 900)?,
+            interval(LEASE, &["kernel.a"], 200, 800)?,
+            interval(GOVERNANCE, &["kernel.b"], 150, 700)?,
+        ])?;
+
+        assert_eq!(window.not_before_unix_ms(), 200);
+        assert_eq!(window.not_after_unix_ms(), 700);
+        Ok(())
+    }
+
+    #[test]
+    fn a_receiver_that_resolved_nothing_has_no_window() {
+        assert_eq!(
+            PresentationWindow::intersect(Vec::new()),
+            Err(PresentationWindowError::NothingResolved)
+        );
+    }
+
+    #[test]
+    fn intervals_that_do_not_overlap_close_the_window() -> TestResult {
+        let outcome = PresentationWindow::intersect(vec![
+            interval(AGREEMENT, &["kernel.a"], 100, 400)?,
+            interval(LEASE, &["kernel.a"], 500, 900)?,
+        ]);
+
+        assert_eq!(
+            outcome,
+            Err(PresentationWindowError::Closed {
+                not_before_unix_ms: 500,
+                not_after_unix_ms: 400,
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_record_the_receiver_cannot_read_an_interval_out_of_is_refused() {
+        assert_eq!(
+            interval(LEASE, &["kernel.a"], 900, 900),
+            Err(PresentationWindowError::EmptyInterval(LEASE))
+        );
+        assert_eq!(
+            interval(LEASE, &[], 100, 900),
+            Err(PresentationWindowError::BindsNoCounterparty(LEASE))
+        );
+    }
+
+    #[test]
+    fn each_counterparty_gets_the_intervals_resolved_for_it() -> TestResult {
+        let window = PresentationWindow::intersect(vec![
+            interval(AGREEMENT, &["kernel.a", "kernel.b"], 100, 900)?,
+            interval(LEASE, &["kernel.a"], 100, 500)?,
+        ])?;
+
+        assert_eq!(
+            window
+                .for_counterparty("kernel.a", &[AGREEMENT])?
+                .not_after_unix_ms(),
+            500
+        );
+        assert_eq!(
+            window
+                .for_counterparty("kernel.b", &[AGREEMENT])?
+                .not_after_unix_ms(),
+            900
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn withdrawing_one_counterparty_record_closes_that_counterparty_alone() -> TestResult {
+        let required = &[AGREEMENT, LEASE];
+        let agreement = interval(AGREEMENT, &["kernel.a", "kernel.b"], 100, 900)?;
+
+        let first_call = PresentationWindow::intersect(vec![
+            agreement.clone(),
+            interval(LEASE, &["kernel.a"], 100, 900)?,
+            interval(LEASE, &["kernel.b"], 100, 900)?,
+        ])?;
+        assert!(first_call
+            .for_counterparty("kernel.a", required)?
+            .admits_expiry(900));
+
+        let second_call = PresentationWindow::intersect(vec![
+            agreement,
+            interval(LEASE, &["kernel.b"], 100, 900)?,
+        ])?;
+        assert_eq!(
+            second_call.for_counterparty("kernel.a", required),
+            Err(PresentationWindowError::Unresolved {
+                source: LEASE,
+                counterparty_kernel_id: "kernel.a".to_string(),
+            })
+        );
+        assert!(second_call
+            .for_counterparty("kernel.b", required)?
+            .admits_expiry(900));
+        Ok(())
+    }
+
+    #[test]
+    fn the_window_owns_the_upper_bound_of_any_validity_presented_to_it() -> TestResult {
+        let window =
+            PresentationWindow::intersect(vec![interval(AGREEMENT, &["kernel.a"], 100, 900)?])?;
+
+        assert!(!window.admits_expiry(100));
+        assert!(window.admits_expiry(101));
+        assert!(window.admits_expiry(900));
+        assert!(!window.admits_expiry(901));
+        assert!(!window.admits_expiry(u64::MAX));
+        Ok(())
+    }
 }

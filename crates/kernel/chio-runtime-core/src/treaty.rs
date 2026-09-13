@@ -647,10 +647,17 @@ pub fn evaluate_cross_boundary_admission(
 fn required_evidence_for_action(action: &LadderIntersectionActionClass) -> Vec<String> {
     let mut required = action.evidence_required.clone();
     let co_sign = ladder_co_sign_mode(&action.co_sign).ok();
-    if co_sign == Some("bilateral_required")
-        && !required
-            .iter()
-            .any(|evidence| evidence == "bilateral_invocation")
+    // Both modes that produce a two-signature envelope force the invocation
+    // record into the required-evidence set. A class co-signed
+    // `bilateral_if_cross_org` that forced nothing would admit a cross-boundary
+    // call with no statement resolved and no continuation consumed, which is the
+    // opposite of what its name says and of what the specification requires.
+    if matches!(
+        co_sign,
+        Some("bilateral_required") | Some("bilateral_if_cross_org")
+    ) && !required
+        .iter()
+        .any(|evidence| evidence == "bilateral_invocation")
     {
         required.push("bilateral_invocation".to_string());
     }
@@ -749,13 +756,14 @@ fn is_supported_cross_boundary_admission_report_schema(schema: &str) -> bool {
         CHIO_FEDERATION_CROSS_BOUNDARY_ADMISSION_REPORT_SCHEMA
     )
 }
-fn ladder_mode_rank(mode: &str) -> Result<u8, ChioRuntimeError> {
+/// Ranks a ladder mode from `observation` (0) to `maintenance` (4); other spellings are rejected.
+pub fn ladder_mode_rank(mode: &str) -> Result<u8, ChioRuntimeError> {
     match mode {
         "observation" => Ok(0),
         "guarded" => Ok(1),
         "receipt_backed" => Ok(2),
         "partition_contingency" => Ok(3),
-        "maintenance" | "quorum_required" => Ok(4),
+        "maintenance" => Ok(4),
         _ => rejected(
             "chio_ladder_invalid_mode",
             "governance ladder mode is not supported",
@@ -767,7 +775,7 @@ pub fn bilateral_dsse_consistency_model(model: &str) -> Result<&'static str, Chi
         "crdt_commutative" | "crdt-commutative" => Ok("crdt-commutative"),
         "totally_ordered" | "totally-ordered" => Ok("totally-ordered"),
         "single_kernel" | "single-kernel" => Ok("single-kernel"),
-        "quorum_required" | "quorum-required" => Ok("quorum-required"),
+        "quorum-required" => Ok("quorum-required"),
         _ => rejected(
             "chio_ladder_invalid_consistency_model",
             "governance ladder consistency model is not supported",
@@ -782,7 +790,7 @@ pub fn ladder_co_sign_mode(mode: &str) -> Result<&'static str, ChioRuntimeError>
         "none" => Ok("none"),
         "bilateral_if_cross_org" => Ok("bilateral_if_cross_org"),
         "bilateral_required" => Ok("bilateral_required"),
-        "n_of_m" | "quorum_required" => Ok("n_of_m"),
+        "n_of_m" => Ok("n_of_m"),
         _ => rejected(
             "chio_ladder_invalid_cosign_mode",
             "governance ladder co-sign mode is not supported",
@@ -1068,4 +1076,31 @@ pub(crate) fn validate_receipt_lineage_bundle(
         &bundle.leaf_receipt_sha256,
         "receipt_lineage_bundle_invalid_leaf_hash",
     )
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn ladder_mode_rank_agrees_with_federation_on_every_spelling() {
+        for mode in [
+            "observation",
+            "guarded",
+            "receipt_backed",
+            "partition_contingency",
+            "maintenance",
+            "quorum_required",
+            "quorum-required",
+            "receipt-backed",
+            "partition-contingency",
+            "Maintenance",
+            "maintenance ",
+            "",
+        ] {
+            assert_eq!(
+                super::ladder_mode_rank(mode).ok(),
+                chio_federation::treaty::ladder_mode_rank(mode).ok(),
+                "{mode:?}"
+            );
+        }
+    }
 }

@@ -1,0 +1,15 @@
+{
+  "benchmarkInputTreeSha256": "77b5f1cf952b015feffb0f0adafb3d17c00b5a906d6103e5ee64d3326a898231",
+  "calls": 3543,
+  "callsPerSecond": 59.03988395277983,
+  "commit": "a7f48978523e74e045446419fcd6c117e2b1be84",
+  "denials": 0,
+  "dispatchCount": 3543,
+  "profile": "release",
+  "receiptStoreBytesAfter": 43212952,
+  "receiptStoreBytesBefore": 1188736,
+  "receiptStoreGrowthKiB": 41039.2734375,
+  "schema": "chio.programmable-sovereignty.sustained-load-results.v1",
+  "seconds": 60,
+  "worktreeDirty": false
+}

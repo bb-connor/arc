@@ -48,6 +48,8 @@ root_modules = [
   "formal/lean4/Chio/Chio/Treaty/IntersectionLegacy.lean",
   "formal/lean4/Chio/Chio/Treaty/BridgeEquivalence.lean",
   "formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean",
+  "formal/lean4/Chio/Chio/Treaty/ReceiptPredicate.lean",
+  "formal/lean4/Chio/Chio/Treaty/PredicateShape.lean",
 ]
 
 gate_commands = [
@@ -160,7 +162,7 @@ required_property_ids = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "
 property_matrix = [
   "P1|capability attenuation|lean_root_imported,differential_test,rust_projection,aeneas_equivalence,public_kani|spec.capability_monotonicity,proof.scope_subset_of_grants_subset,proof.reduced_budget_is_subset,proof.added_constraint_is_subset,proof.generated_optional_u32_cap_is_subset_preserves_parent_cap,proof.generated_ledger_apply_eq_model",
   "P2|presented revocation coverage|lean_root_imported,audited_storage_assumption,audited_transport_assumption,sqlite_projection,aeneas_equivalence,distributed_apalache,rust_trace_projection|proof.revoke_marks_capability_revoked,proof.checkRevocation_revoked_token_errors,proof.evalToolCall_revoked_token_never_allows,proof.revocationSnapshot_revoked_token_denies,proof.revocationSnapshot_revoked_ancestor_denies,proof.generated_revocation_snapshot_denies_eq_model",
-  "P3|fail-closed evaluation|lean_root_imported,rust_core,audited_subprocess_assumption,audited_wasm_engine_assumption,public_kani,adapter_no_bypass,aeneas_equivalence|proof.evalToolCall_total,proof.evalToolCall_invalid_signature_denies,proof.evalToolCall_out_of_scope_denies,proof.admitSession_invalid_dpop_rejects,proof.governedApproval_required_without_token_fails,proof.dpop_required_missing_proof_rejects,proof.dpop_required_invalid_proof_rejects,proof.guardPipeline_deny_dominates,proof.guardPipeline_error_dominates,proof.wasm_guest_output_confinement,proof.wasm_no_allow_amplification,proof.wasm_resource_exhaustion_fail_closed,proof.wasm_advisory_mode_nonblocking,proof.delegation_max_depth_failure_denies,proof.generated_time_window_valid_eq_model,proof.generated_budget_commit_eq_model,proof.generated_guard_step_allows_eq_model,proof.delivery_contract.settlement_admission_sound,proof.delivery_contract.denied_after_delivery_no_settlement,treaty.predicate.unsupported_denies,treaty.predicate.runtime_policy_exact,treaty.syntactic.decision_exact,treaty.bridge.refinement_on_iff",
+  "P3|fail-closed evaluation|lean_root_imported,rust_core,audited_subprocess_assumption,audited_wasm_engine_assumption,public_kani,adapter_no_bypass,aeneas_equivalence|proof.evalToolCall_total,proof.evalToolCall_invalid_signature_denies,proof.evalToolCall_out_of_scope_denies,proof.admitSession_invalid_dpop_rejects,proof.governedApproval_required_without_token_fails,proof.dpop_required_missing_proof_rejects,proof.dpop_required_invalid_proof_rejects,proof.guardPipeline_deny_dominates,proof.guardPipeline_error_dominates,proof.wasm_guest_output_confinement,proof.wasm_no_allow_amplification,proof.wasm_resource_exhaustion_fail_closed,proof.wasm_advisory_mode_nonblocking,proof.delegation_max_depth_failure_denies,proof.generated_time_window_valid_eq_model,proof.generated_budget_commit_eq_model,proof.generated_guard_step_allows_eq_model,proof.delivery_contract.settlement_admission_sound,proof.delivery_contract.denied_after_delivery_no_settlement,treaty.predicate.unsupported_denies,treaty.predicate.runtime_policy_exact,treaty.syntactic.decision_exact,treaty.bridge.refinement_on_iff,treaty.predicate.contains_unsupported_denies,treaty.predicate.contains_undefined_denies,treaty.predicate.unsupported_atom_anywhere_denies,treaty.predicate.undefined_atom_anywhere_denies",
   "P4|receipt integrity|lean_root_imported,symbolic_crypto,audited_crypto_assumption,receipt_totality,aeneas_equivalence,public_kani,differential_test|proof.canonical_inj,proof.receipt_id_input_collision_resistant,proof.receipt_id_collision_resistant,proof.membership_proof_sound,proof.stepFold_eq_applyProof,proof.stepFold_membership_sound_if_geometry_agrees,proof.boundedWalkGeometry_decodes,proof.bounded_stepFold_sound,proof.generated_inclusion_step_eq_model,proof.receipt_sign_then_verify,proof.receipt_immutability,proof.receiptFieldsCoupled_preserves_all_fields,proof.generated_receipt_fields_coupled_eq_model",
   "P5|presented delegation-chain semantic validity|lean_root_imported,sqlite_projection|proof.delegation_chain_integrity,proof.delegation_step_allow_requires_attenuation,proof.delegation_step_allow_requires_subject_continuity,proof.delegation_step_allow_requires_expiry_monotonicity,proof.delegation_revoked_ancestor_denies,proof.delegation_max_depth_failure_denies",
   "P6|local parent-link soundness|lean_root_imported,audited_storage_assumption|proof.observed_parent_edge_sound",
@@ -1129,11 +1131,11 @@ rust_symbols = [
   "validate_bilateral_invocation",
   "ladder_mode_rank",
 ]
-normalized_sha256 = "9f3149a8446fe5cf11274ac9888c647a0e1c3ff31d0c539bab8b8a8b743dfb8f"
+normalized_sha256 = "1fb1ab8c0485bfc3d0d248b9d9688574638e6a0d0ca6b7012ffa69b80635853c"
 symbol_sha256 = [
   { symbol = "validate_treaty_scope", sha256 = "43adb46fce2bfe544198af880bc5c27a73592c2a3bdbee6d3ad8e6d165802f9f" },
   { symbol = "validate_ladder_intersection", sha256 = "5a5dc7971541a51646ea60c3537eeec205e80ca109f1023a2fb0fe0cde4da55e" },
   { symbol = "evaluate_cross_boundary_admission", sha256 = "795aef7bb414a97c294fe58ae87a08143bec41d7fad21ad3aedf794ab5058843" },
   { symbol = "validate_bilateral_invocation", sha256 = "404dddde3595e23e82ae0f39ca360fc2a7258a5c359b7d54f94e293c2d78a366" },
-  { symbol = "ladder_mode_rank", sha256 = "ecbc5b9bdb536b61e574baf0b04f4f2eb3dcaec54242520f3a3a834c4e7c5c95" },
+  { symbol = "ladder_mode_rank", sha256 = "5debfc5b933f56a1b118c212be6e2cc59d91fce5b5af6e3fdbd196eddc3834a6" },
 ]

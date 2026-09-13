@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-07-26",
+  "generatedAt": "2026-09-12",
   "implementationRelation": "independent Rust differential testing, not extraction or refinement",
   "leanToolchain": "leanprover/lean4:v4.28.0",
   "modelBoundary": "bounded receipt predicates and supplied finite domains",
   "paper": "Receiver-Owned Bilateral Admission for Cross-Organization Agent Tool Calls",
   "schema": "chio.programmable-sovereignty.theorem-inventory.v1",
-  "targetVenue": "USENIX Security 2027 Cycle 1",
+  "targetVenue": "USENIX Security 2027 (submission cycle to be confirmed)",
   "theorems": [
     {
       "axioms": [

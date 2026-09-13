@@ -212,6 +212,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "bilateral_dsse_verify"
+path = "fuzz_targets/bilateral_dsse_verify.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "finding_worker_protocol"
 path = "fuzz_targets/finding_worker_protocol.rs"
 test = false

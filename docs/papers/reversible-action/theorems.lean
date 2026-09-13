@@ -1,70 +1,63 @@
 /-
   Draft theorem statements for the reversible-action paper.
 
-  This file is a PLANNING ARTIFACT. It is NOT registered in any lakefile and is
-  NOT part of the production proof root. The point of the file is to commit
-  candidate theorem statements to bytes so the rfl-gate question can be
-  inspected on the page rather than on a slide.
+  This file is a PLANNING ARTIFACT. It is not registered in any lakefile and
+  is not part of the proof root (`formal/lean4/Chio`). It is checked by hand
+  with `lake env lean` from `formal/lean4/Chio` against the syntactic treaty
+  model in `Chio.Treaty.Intersection`, `Chio.Treaty.PredicateLang` and
+  `Chio.Treaty.BridgeEquivalence`:
+  constitutions are `SyntacticConstitution`, admission inputs are
+  `AdmissionView`, and `BackwardRefines new old domain` is refinement on an
+  explicit finite domain.
 
-  Companion paper directory: papers/reversible-action/.
+      cd formal/lean4/Chio && lake env lean \
+        ../../../docs/papers/reversible-action/theorems.lean
 
-  Relationship to the parent paper:
-    The amendment side of the parent paper conditions enactment at the type
-    level on a `BackwardRefines` witness carried inside `ConstitutionalDelta`.
-    The response side, in the parent construction, is left to the admission
-    predicate; no positive type-level invariant is imposed on enforcement
-    acts. The candidate construction below lifts the response side to a
-    similar discipline: an executive action carries a positive TTL and an
-    optional rollback receipt, and the trajectory of constitutions induced
-    by a sequence of TTL-bounded amendments is the object of the candidate
-    composition theorem.
+  Companion paper directory: docs/papers/reversible-action/.
 
-  rfl-gate verdict (recorded in README.md):
-    - Candidate 1 (`bounded_executive_action_carries_ttl_and_rollback_slot`)
-      is provably `rfl` after destructuring the witness. It is the response-
-      side analog of `amendment_admissible_iff_backward_refinement` and
-      inherits the same definitional-restatement criticism.
-    - Candidate 2 (`rollback_closes_or_ttl_window_active`) is `rfl` under the
-      current `closedAt` definition.
-    - Candidate 3 (`ttl_bounded_amendment_chain_preserves_essential`)
-      composes the parent paper's `essential_preserved_chain` over a
-      sequence of TTL-bounded amendments. The proof is induction on the
-      chain, with the TTL-positivity invariant entering as a guard on each
-      step. Plausibly non-`rfl` in the same sense that
-      `essential_preserved_chain` itself is non-`rfl` (it discharges with
-      `induction` and step witnesses, not with `rfl`).
-    - Candidate 4 (`rollback_receipt_preserves_admission_under_refinement`)
-      is structurally non-`rfl`: it requires a denotation of receipt
-      admissibility under a SyntacticConstitution (which exists in
-      PredicateLang.lean) and reasons about a NEW receipt produced by the
-      rollback executor closing the receipt chain initiated by the amend-
-      ment receipt. The proof requires the sample-list machinery from
-      PredicateLang and a discharge over the predicate denotation. The
-      conclusion is the load-bearing claim that a rollback that fires
-      under the post-amendment constitution carries the same admission
-      decision as the corresponding rollback under the pre-amendment
-      constitution, given BackwardRefines.
+  Relationship to the parent substrate:
+    The amendment side conditions enactment at the type level on a
+    `BackwardRefines` witness carried inside `ConstitutionalDelta`. The
+    response side is left to the admission predicate; no positive
+    type-level invariant is imposed on enforcement acts. The construction
+    below lifts the response side to a similar discipline: an executive
+    action carries a positive TTL and an optional rollback receipt, and the
+    trajectory of constitutions induced by a sequence of TTL-bounded
+    amendments is the object of the composition theorem.
 
-  The rfl-gate check flags candidates 1 and 2 as definitional restatements, so
-  they are retained only as bridges (the same role
-  `amendment_admissible_iff_backward_refinement` plays in the parent paper).
-  The headline candidate for this paper is Candidate 3, with Candidate 4 as
-  the supporting load-bearing reduction.
+  Status of each declaration (none is closed by `sorry`):
+    - `bounded_executive_action_carries_ttl_and_rollback_slot`: projection
+      of the `ttlPositive` field; definitional bridge.
+    - `rollback_closes_or_ttl_window_active`: case split on the TTL window;
+      definitional bridge.
+    - `ttl_bounded_amendment_chain_preserves_baseline` (headline): proved
+      pointwise per amendment by a case split on `activeAt` and composition
+      of the two refinement hypotheses on the shared finite domain.
+    - `rollback_admission_composes_with_refinement`: one hypothesis
+      discharge; the content is the `GlobalSynBackwardRefines` premise.
+    - `closure_to_syntactic_admission_bridge`: instance of the proof-root
+      theorem `Chio.Treaty.PredicateLang.bridge_pointwise`
+      (`formal/theorem-inventory.json` id `treaty.bridge.pointwise`).
+    - `destructive_action_requires_bilateral_admission`: instance of the
+      proof-root theorem
+      `Chio.Treaty.treaty_admission_iff_predicate_intersection`.
 -/
 
 import Chio.Treaty.Intersection
 import Chio.Treaty.PredicateLang
+import Chio.Treaty.BridgeEquivalence
 
 set_option autoImplicit false
 
 namespace Chio.ReversibleAction
 
 open Chio.Treaty
-open Chio.Treaty.PredicateLang
 
 /-! ## Substrate -/
 
-abbrev ReceiptId := Chio.Treaty.ReceiptId
+/-- Opaque receipt identifier carried by executive-action and rollback
+    receipts. -/
+abbrev ReceiptId := String
 
 /-- Duration of an executive action's authorized window, in seconds. -/
 abbrev Duration := Nat
@@ -132,27 +125,27 @@ def ExecutiveAction.closedAt (act : ExecutiveAction) (t : Instant) : Prop :=
   (∃ rb : RollbackReceipt, act.rollback = some rb ∧ rb.rolledBackAt ≤ t)
     ∨ act.expiresAt ≤ t
 
-/-! ## Definitional bridges (recorded as `rfl`) -/
+/-! ## Definitional bridges -/
 
 /--
   Candidate 1. The type-level invariant that a witness carries positive TTL.
 
-  rfl-gate verdict: this is `rfl` by projection on `ttlPositive`. It is the
-  response-side analog of `amendment_admissible_iff_backward_refinement`
-  and carries the same criticism: it restates a constructor precondition
-  as a property of outputs. It is retained as a definitional bridge,
-  documenting the type-level discipline, NOT as the headline theorem.
+  This discharges by projection on `ttlPositive`. It is the response-side
+  analog of `amendment_admissible_iff_backward_refinement` and carries the
+  same criticism: it restates a constructor precondition as a property of
+  outputs. It is retained as a definitional bridge documenting the
+  type-level discipline, not as the headline theorem.
 -/
 theorem bounded_executive_action_carries_ttl_and_rollback_slot
     (act : ExecutiveAction) :
     0 < act.ttl := act.ttlPositive
 
 /--
-  Candidate 2. The definitional version of "every action is either closed
-  by a rollback receipt or remains in its TTL window".
+  Candidate 2. Every action is either closed at `t` or still inside its TTL
+  window at `t`.
 
-  rfl-gate verdict: `rfl` by case analysis on `act.rollback` and unfolding
-  `closedAt`. Retained as a definitional bridge.
+  This discharges by a case split on `act.expiresAt ≤ t`; the rollback arm
+  of `closedAt` is never needed. Retained as a definitional bridge.
 -/
 theorem rollback_closes_or_ttl_window_active
     (act : ExecutiveAction) (t : Instant) :
@@ -161,7 +154,7 @@ theorem rollback_closes_or_ttl_window_active
   · exact Or.inl (Or.inr h)
   · exact Or.inr (Nat.lt_of_not_le h)
 
-/-! ## Candidate 3: load-bearing composition (plausibly non-`rfl`) -/
+/-! ## Candidate 3: load-bearing composition -/
 
 /--
   A TTL-bounded amendment: a `ConstitutionalDelta` paired with a positive
@@ -187,132 +180,122 @@ def TtlBoundedAmendment.activeAt (a : TtlBoundedAmendment) (t : Instant) :
 
 /--
   Candidate 3. The TTL-bounded amendment chain preserves backward
-  refinement against a baseline constitution at every time point.
+  refinement against a baseline constitution, on one explicit finite
+  admission domain, at every time point.
+
+  `BackwardRefines new old domain` is the substrate's domain-scoped
+  refinement: every view in `domain` admitted by `new` is admitted by
+  `old`. The statement is finite-domain, matching the witness a checked
+  `ConstitutionalDelta` carries; it says nothing about views outside
+  `domain`.
 
   Proof shape: pointwise over `a ∈ chain` (a universally quantified
   conclusion, not an induction over an evolving state). For each `a`,
   case-split on whether `t` falls inside or outside `a`'s TTL window.
-  Outside the window, `a.activeAt t = a.delta.old`, and the conclusion
-  is the post-expiry hypothesis `h_chain_base a` applied directly.
-  Inside the window, `a.activeAt t = a.delta.new`, and the conclusion
-  composes the per-step witness `h_chain_refines a` with `h_chain_base
-  a` through transitivity of `BackwardRefines`.
+  Outside the window, `a.activeAt t = a.delta.old`, and the conclusion is
+  the post-expiry hypothesis `h_chain_base a` applied directly. Inside the
+  window, `a.activeAt t = a.delta.new`, and a view admitted by
+  `a.delta.new` is admitted by `a.delta.old` (`h_chain_refines a`) and
+  hence by the baseline (`h_chain_base a`).
 
   The hypothesis `h_chain_base` is the `BackwardRefines a.delta.old
-  baseline` form (each step's pre-amendment constitution backward-
-  refines the baseline). An equality form (`a.delta.old = baseline`)
-  would collapse the post-expiry arm to reflexivity; the refinement
-  form keeps both arms substantive.
-
-  Status: `sorry`. The discharge requires `BackwardRefines.trans` on
-  the in-window arm and an `unfold activeAt; split_ifs` case split.
+  baseline domain` form (each step's pre-amendment constitution
+  backward-refines the baseline). An equality form (`a.delta.old =
+  baseline`) would collapse the post-expiry arm to reflexivity; the
+  refinement form keeps both arms substantive.
 -/
 theorem ttl_bounded_amendment_chain_preserves_baseline
     (baseline : Constitution)
     (chain : List TtlBoundedAmendment)
+    (domain : List AdmissionView)
     (h_chain_base :
-      ∀ a ∈ chain, BackwardRefines a.delta.old baseline)
+      ∀ a ∈ chain, BackwardRefines a.delta.old baseline domain)
     (h_chain_refines :
-      ∀ a ∈ chain, BackwardRefines a.delta.new a.delta.old)
+      ∀ a ∈ chain, BackwardRefines a.delta.new a.delta.old domain)
     (t : Instant) :
     ∀ a ∈ chain,
-      BackwardRefines (a.activeAt t) baseline := by
-  sorry
+      BackwardRefines (a.activeAt t) baseline domain := by
+  intro a ha
+  unfold TtlBoundedAmendment.activeAt
+  split
+  · exact h_chain_base a ha
+  · intro view hMember hNew
+    exact h_chain_base a ha view hMember (h_chain_refines a ha view hMember hNew)
 
 /-! ## Candidate 4: rollback receipt admissibility under refinement -/
 
 /--
-  An executive action emits a receipt id; the rollback that closes the
-  action emits another receipt id. The pair (`enactmentReceiptId`,
-  `rollbackReceiptId`) is the load-bearing structural object. A receipt
-  log under a polity admits both ids iff the polity's predicates accept
-  the canonical body of each.
+  An executive action is admitted on one admission view; the rollback that
+  closes the action is admitted on another. The pair (`enactmentView`,
+  `rollbackView`) is the load-bearing structural object. A polity admits
+  each iff its constitution's predicates accept that view.
 -/
 structure ActionReceiptPair where
-  enactmentReceiptId : ReceiptId
-  rollbackReceiptId : ReceiptId
+  enactmentView : AdmissionView
+  rollbackView : AdmissionView
   deriving Repr, BEq, DecidableEq, Inhabited
 
 /--
   Candidate 4. A rollback receipt admitted under the post-amendment
-  syntactic constitution remains admitted under the pre-amendment
-  syntactic constitution, given the syntactic refinement witness.
+  constitution remains admitted under the pre-amendment constitution,
+  given the global refinement premise.
 
-  Non-`rfl`: the proof consumes `h_refines` as a function applied to the
-  rollback receipt id (a single hypothesis discharge, not a structural
-  unfold of the goal). The hypothesis form here is the syntactic
-  refinement over `admits`, which is decidable on `SyntacticConstitution`
-  per `PredicateLang.lean`.
+  The proof consumes `h_refines` as a function applied to the rollback
+  view (a single hypothesis discharge, not a structural unfold of the
+  goal). The premise is `GlobalSynBackwardRefines`, the unrestricted form;
+  a checked `ConstitutionalDelta` carries only the domain-scoped
+  `BackwardRefines`, so composing this reduction with Candidate 3 requires
+  `pair.rollbackView` to lie in that delta's domain.
 -/
 theorem rollback_admission_composes_with_refinement
     (pair : ActionReceiptPair)
-    (cOld cNew : SyntacticConstitution)
-    (h_refines : ∀ rid : ReceiptId,
-      admits cNew rid = true -> admits cOld rid = true)
+    (cOld cNew : Constitution)
+    (h_refines : PredicateLang.GlobalSynBackwardRefines cNew cOld)
     (h_new_admits_rollback :
-      admits cNew pair.rollbackReceiptId = true) :
-    admits cOld pair.rollbackReceiptId = true :=
-  h_refines pair.rollbackReceiptId h_new_admits_rollback
+      PredicateLang.admits cNew pair.rollbackView = true) :
+    PredicateLang.admits cOld pair.rollbackView = true :=
+  h_refines pair.rollbackView h_new_admits_rollback
 
 /--
-  Closure-to-syntactic bridge (stub). Mechanical composition of
-  Candidate 3 with Candidate 4 requires a bridge from
-  `BackwardRefines` over `Constitution` (opaque `ReceiptId -> Bool`
-  closures) to the receipt-id-level admission entailment over
-  `SyntacticConstitution` (the decidable `admits` predicate). The
-  bridge factors through `denote` from `PredicateLang.lean`: a syntactic
-  constitution `c` induces a closure constitution whose admission of
-  `rid` reduces to `admits c rid = true`.
-
-  Status: `sorry`. The proof obligation lives in the parent paper's
-  `PredicateLang.lean` (the soundness theorem connecting `denote` and
-  the closure-based `BackwardRefines`). This file states the bridge to
-  make Candidate 3 and Candidate 4 mechanically composable; the
-  discharge is inherited from the parent substrate.
+  Closure-to-syntactic bridge. Admission under the closure representation
+  of a syntactic constitution agrees pointwise with the decidable `admits`
+  predicate. This is an instance of the proof-root theorem
+  `Chio.Treaty.PredicateLang.bridge_pointwise`; it is restated here only so
+  that Candidates 3 and 4 can be read against the closure model the
+  substrate keeps under `Chio.Treaty.Legacy`.
 -/
 theorem closure_to_syntactic_admission_bridge
-    (cClosure : Constitution)
-    (cSyntactic : SyntacticConstitution)
-    (h_denote_agrees :
-      ∀ rid : ReceiptId,
-        constitutionAllows cClosure rid = true ↔
-          admits cSyntactic rid = true)
-    (rid : ReceiptId) :
-    constitutionAllows cClosure rid = true ↔
-      admits cSyntactic rid = true :=
-  h_denote_agrees rid
+    (c : Constitution) (view : AdmissionView) :
+    Chio.Treaty.Legacy.constitutionAllows (PredicateLang.toClosure c) view =
+      PredicateLang.admits c view :=
+  PredicateLang.bridge_pointwise c view
 
 /-! ## Candidate 5: bilateral admission of destructive variants -/
 
 /--
-  A bilateral envelope binds two receipt ids (one per signer polity) to
-  a destructive action. The substrate already encodes this via the
-  parent paper's `treaty_admission_iff_predicate_intersection`; the
-  candidate below names the response-side specialization.
+  A bilateral envelope binds one admission view to a destructive action
+  under a bilateral treaty. The substrate already encodes bilateral
+  admission via the proof-root theorem
+  `treaty_admission_iff_predicate_intersection`; the candidate below names
+  the response-side specialization.
 -/
 structure BilateralEnvelope where
-  receiptId : ReceiptId
+  view : AdmissionView
   treaty : BilateralTreaty
   actionKind : ActionKind
   destructiveWitness : actionKind.destructive = true
 
 /--
-  Candidate 5. A destructive action admits only if both the device
-  polity and the operator polity admit the corresponding receipt. This
-  is `treaty_admission_iff_predicate_intersection` specialized to the
-  destructive `ActionKind` subclass.
-
-  rfl-gate verdict: this discharges by applying the parent theorem and
-  case-splitting on `actionKind`. NOT `rfl`, but also NOT novel: the
-  novelty is the typed envelope, not the underlying theorem.
-
-  Status: `sorry`. The substantive content is the `ActionKind`-to-
-  polity-predicate bridge.
+  Candidate 5. A destructive action admits only if both the device polity
+  and the operator polity admit the corresponding view. This is
+  `treaty_admission_iff_predicate_intersection` specialized to the
+  destructive `ActionKind` subclass; the novelty is the typed envelope, not
+  the underlying theorem.
 -/
 theorem destructive_action_requires_bilateral_admission
     (env : BilateralEnvelope) :
-    treatyAdmits env.treaty env.receiptId = true ↔
-      treatyPredicateIntersection env.treaty env.receiptId = true := by
-  exact treaty_admission_iff_predicate_intersection env.treaty env.receiptId
+    treatyAdmits env.treaty env.view = true ↔
+      treatyPredicateIntersection env.treaty env.view = true :=
+  treaty_admission_iff_predicate_intersection env.treaty env.view
 
 end Chio.ReversibleAction

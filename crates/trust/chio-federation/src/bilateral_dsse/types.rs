@@ -88,7 +88,7 @@ impl Keyid {
 
 /// In-toto Statement `subject` entry: the receipt body that the bilateral
 /// co-signature attests. The digest is the SHA-256 of the canonical-JSON
-/// encoding of the receipt body, hex-lowercase per spec §7 step 7.
+/// encoding of the receipt body, hex-lowercase per spec §7 step 19.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StatementSubject {
@@ -164,19 +164,19 @@ pub struct BilateralPredicate {
 
 /// Capability lease reference, per spec §5 (`capability_lease_ref`).
 /// Carries the lease id, issuing kernel, and an absolute Unix-ms
-/// expiry that the §7 step 14 verifier compares against the verifier's
+/// expiry that the §7 step 21 verifier compares against the verifier's
 /// pinned-epoch wall clock.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct CapabilityLeaseRef {
-    /// Globally-unique lease id. The verifier (step 14) MUST resolve
+    /// Globally-unique lease id. The verifier (step 21) MUST resolve
     /// this against a trusted lease registry; an unresolvable id
     /// fails-closed with `capability.lease_expired_or_unknown`.
     pub lease_id: String,
     /// `did:chio` identifier of the kernel that minted the lease. Step
     /// 14 verifies the resolved registry record's issuer matches.
     pub issuer: String,
-    /// Absolute lease expiry in Unix milliseconds. Step 14 enforces
+    /// Absolute lease expiry in Unix milliseconds. Step 21 enforces
     /// `expires_at_unix_ms > pinned_epoch.now`; a non-strictly-greater
     /// value is rejected as expired.
     pub expires_at_unix_ms: u64,
@@ -202,7 +202,7 @@ pub struct HashRecord {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct PolicyVerdict {
-    /// `"allow"` or `"deny"`. Step 13 of the §7 verifier requires the
+    /// `"allow"` or `"deny"`. Step 20 of the §7 verifier requires the
     /// two kernels' verdicts to be equal.
     pub verdict: String,
     /// Identifier of the policy that produced the verdict.
@@ -226,7 +226,7 @@ pub struct PolicyEvaluationSummary {
     /// Joint disposition; spec §5 line 213 says it MUST equal `"allow"`
     /// only when both verdicts are `"allow"`. Optional on the wire so
     /// callers that haven't computed it can still emit a predicate;
-    /// the §7 step 13 verifier still cross-checks the two
+    /// the §7 step 20 verifier still cross-checks the two
     /// `server_*_verdict` strings directly.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub joint_disposition: Option<String>,
@@ -234,11 +234,11 @@ pub struct PolicyEvaluationSummary {
 
 /// Governance receipt reference, per spec §5 (`governance_receipt_ref`).
 /// REQUIRED when the action-class is declared `receipt-backed` in the
-/// local ladder manifest (§7 step 15).
+/// local ladder manifest (§7 step 22).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct GovernanceReceiptRef {
-    /// Globally-unique receipt id. The verifier (step 15) resolves
+    /// Globally-unique receipt id. The verifier (step 22) resolves
     /// this against a governance receipt store.
     pub receipt_id: String,
     /// `did:chio` identifier of the kernel that issued the receipt.

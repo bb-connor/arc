@@ -1,0 +1,61 @@
+cc81f239a656ef63211634bbfcb58b04065546a9
+worktree=dirty
+cpu_model=Neoverse-N1
+cores=12
+memory_bytes=50403979264
+os=Linux 6.17.0-1020-oracle aarch64
+load_average_1m=15.55
+max_load_average_1m=64
+toolchain_pin=1.94.1
+rustc 1.94.1 (e408947bf 2026-03-25)
+binary: rustc
+commit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1
+commit-date: 2026-03-25
+host: aarch64-unknown-linux-gnu
+release: 1.94.1
+LLVM version: 21.1.8
+cargo 1.94.1 (29ea6fb6a 2026-03-24)
+Linux workstation 6.17.0-1020-oracle #20-Ubuntu SMP Sat Jul 25 00:52:17 UTC 2026 aarch64 aarch64 aarch64 GNU/Linux
+Architecture:                            aarch64
+CPU op-mode(s):                          32-bit, 64-bit
+Byte Order:                              Little Endian
+CPU(s):                                  12
+On-line CPU(s) list:                     0-11
+Vendor ID:                               ARM
+Model name:                              Neoverse-N1
+Model:                                   1
+Thread(s) per core:                      1
+Core(s) per socket:                      12
+Socket(s):                               1
+Stepping:                                r3p1
+BogoMIPS:                                50.00
+Flags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-11
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Ghostwrite:                Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Old microcode:             Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; CSV2, BHB
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Not affected
+MemTotal:       49222636 kB
+MemFree:         9334808 kB
+MemAvailable:   43461988 kB
+profile=release
+baseline_calls=2000
+baseline_warmup=50
+baseline_store=SQLite WAL synchronous=FULL
+benchmark_input_tree_sha256=ae4b5fef089f0d2d55978e6f524a2e795e6a2ee51bca12ea2353f7bfa4623696

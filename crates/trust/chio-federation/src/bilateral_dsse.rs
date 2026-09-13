@@ -46,6 +46,8 @@ use crate::bilateral::{BilateralCoSigningError, BilateralCoSigningProtocol, Dsse
 mod builder;
 #[path = "bilateral_dsse/policy.rs"]
 mod policy;
+#[path = "bilateral_dsse/preimage.rs"]
+mod preimage;
 #[path = "bilateral_dsse/sign.rs"]
 mod sign;
 #[path = "bilateral_dsse/types.rs"]
@@ -67,6 +69,7 @@ pub use self::builder::{
 pub use self::policy::{
     require_policy_evaluation_allow_admission, validate_policy_evaluation_summary,
 };
+pub use self::preimage::{reconstruct_dsse_pae, DssePreimageBinding};
 pub use self::sign::{
     sign_chio_bilateral_dsse_envelope, sign_chio_bilateral_dsse_envelope_with_cosigner,
     sign_dsse_envelope, sign_dsse_envelope_full, sign_dsse_envelope_with_cosigner,

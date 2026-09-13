@@ -1,3 +1,8 @@
+use chio_federation::bilateral::RejectionCode;
+
+/// Verification failures. `Display` renders the diagnostic detail, which
+/// names presented and expected values and stays local to the verifier;
+/// only the stable code reaches an exported report.
 #[derive(Debug, thiserror::Error)]
 pub enum ChioPackageError {
     #[error("canonical JSON failed: {0}")]
@@ -12,6 +17,11 @@ pub enum ChioPackageError {
     Governance(String),
     #[error("federation verification failed: {0}")]
     Federation(String),
+    /// A bilateral verifier rejected an envelope. The code is the part of
+    /// the rejection that crosses the protocol surface; `detail` is the
+    /// verifier's rendered diagnostic and is never exported.
+    #[error("federation verification failed: {detail}")]
+    FederationRejected { code: RejectionCode, detail: String },
     #[error("selective disclosure verification failed: {0}")]
     SelectiveDisclosure(String),
     #[error("trusted issuer registry failed: {0}")]

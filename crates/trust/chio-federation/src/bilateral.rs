@@ -83,6 +83,56 @@ impl CoSigningBody {
     }
 }
 
+/// Rebuild the canonical [`CoSigningBody`] a peer asked to have signed from
+/// the content those bytes carry, and refuse anything that does not rebuild
+/// byte-for-byte.
+///
+/// A kernel's co-signing key also signs receipts and DSSE statements, and the
+/// three preimage families are separated by structure alone. A signer that
+/// signs bytes it has not parsed is therefore a signing oracle for every other
+/// preimage its key covers: a peer can present the canonical receipt signing
+/// preimage of a receipt it invented, attributed to the co-signing kernel, and
+/// walk away with that kernel's signature over it. The accept side closes that
+/// by parsing the bytes as the content this profile expects, re-deriving the
+/// canonical encoding from the receipt they carry, and signing only on an
+/// exact match.
+///
+/// # Errors
+///
+/// Fails closed when the bytes are not a [`CoSigningBody`], when the body
+/// carries another schema tag or another pair of kernel ids, when the embedded
+/// receipt does not parse, or when the re-derived canonical bytes differ from
+/// the bytes presented.
+pub fn reconstruct_cosigning_body(
+    signed_bytes: &[u8],
+    org_a_kernel_id: &str,
+    org_b_kernel_id: &str,
+) -> Result<CoSigningBody, BilateralCoSigningError> {
+    let presented: CoSigningBody = serde_json::from_slice(signed_bytes).map_err(|e| {
+        BilateralCoSigningError::CanonicalJson(format!(
+            "presented bytes are not a bilateral co-signing body: {e}"
+        ))
+    })?;
+    if presented.schema != BILATERAL_COSIGNING_SCHEMA {
+        return Err(BilateralCoSigningError::UnsupportedSchema(presented.schema));
+    }
+    if presented.org_a_kernel_id != org_a_kernel_id || presented.org_b_kernel_id != org_b_kernel_id
+    {
+        return Err(BilateralCoSigningError::PeerIdentityMismatch);
+    }
+    let receipt: ChioReceipt =
+        serde_json::from_str(&presented.receipt_canonical_json).map_err(|e| {
+            BilateralCoSigningError::CanonicalJson(format!(
+                "co-signing body does not carry a receipt: {e}"
+            ))
+        })?;
+    let rebuilt = CoSigningBody::from_receipt(&receipt, org_a_kernel_id, org_b_kernel_id)?;
+    if rebuilt.canonical_bytes()? != signed_bytes {
+        return Err(BilateralCoSigningError::ReceiptMismatch);
+    }
+    Ok(presented)
+}
+
 /// A receipt co-signed by two kernels across a federation boundary.
 ///
 /// * `body` -- the underlying `ChioReceipt` that both kernels agreed on.
@@ -314,52 +364,198 @@ pub enum BilateralCoSigningError {
     ReceiptMismatch,
 }
 
+/// Error returned when a string is not one of the [`RejectionCode`]s.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("unknown rejection code")]
+pub struct UnknownRejectionCode;
+
+macro_rules! rejection_codes {
+    ($( $(#[$meta:meta])* $variant:ident => $code:literal ),+ $(,)?) => {
+        /// The closed set of codes a bilateral verifier or the co-signing
+        /// protocol can reject with (specification section 7.1).
+        ///
+        /// The code is the only part of a rejection that crosses the
+        /// protocol surface: it names the check that failed and carries no
+        /// presented or expected value. The diagnostic detail that
+        /// [`BilateralCoSigningError`] and
+        /// [`crate::bilateral_verifier::VerifierError`] render through
+        /// `Display` is for local logs and must not be copied into a signed
+        /// or exported artifact.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+        pub enum RejectionCode {
+            $( $(#[$meta])* $variant, )+
+        }
+
+        impl RejectionCode {
+            /// Every code, in specification order.
+            pub const ALL: &'static [RejectionCode] = &[ $( RejectionCode::$variant, )+ ];
+
+            /// The dotted code string, exactly as the specification lists it.
+            #[must_use]
+            pub const fn as_str(self) -> &'static str {
+                match self { $( RejectionCode::$variant => $code, )+ }
+            }
+        }
+
+        impl std::str::FromStr for RejectionCode {
+            type Err = UnknownRejectionCode;
+
+            fn from_str(code: &str) -> Result<Self, Self::Err> {
+                match code {
+                    $( $code => Ok(RejectionCode::$variant), )+
+                    _ => Err(UnknownRejectionCode),
+                }
+            }
+        }
+    };
+}
+
+rejection_codes! {
+    /// Wrong `payloadType`, a wrong signature count, an undecodable
+    /// payload, a duplicate signature keyid, or two pinned keys that are
+    /// not distinct.
+    DsseMalformed => "dsse.malformed",
+    /// The payload is not parseable JSON or is not canonical JSON.
+    StatementMalformed => "statement.malformed",
+    /// `_type` is not the in-toto Statement v1 type, or the subject count
+    /// is not one.
+    StatementSchemaInvalid => "statement.schema_invalid",
+    /// `predicateType` is not `chio.bilateral-cosign-invocation.v1`.
+    PredicateTypeUnrecognised => "predicate.type_unrecognised",
+    /// The predicate fails the body schema or a strict rule.
+    PredicateSchemaInvalid => "predicate.schema_invalid",
+    /// The receipt is not resolvable, its signature is invalid, or the
+    /// subject does not match the resolved receipt body.
+    SubjectDigestMismatch => "subject.digest_mismatch",
+    /// A kernel id is not pinned or its declared fingerprint disagrees
+    /// with the pin.
+    PeerUnpinnedOrKeyidMismatch => "peer.unpinned_or_keyid_mismatch",
+    /// A pinned passport is not active at the pinned epoch height.
+    PeerRevokedAtEpoch => "peer.revoked_at_epoch",
+    /// `tool_server_a`'s signature is absent, undecodable, or invalid.
+    SignatureServerAInvalid => "signature.server_a_invalid",
+    /// `tool_server_b`'s signature is absent, undecodable, or invalid.
+    SignatureServerBInvalid => "signature.server_b_invalid",
+    /// The verdicts disagree, a verdict is unknown, or the joint
+    /// disposition is inconsistent.
+    PolicyVerdictDisagreement => "policy.verdict_disagreement",
+    /// The capability lease is missing, unknown, mismatched, or expired.
+    CapabilityLeaseExpiredOrUnknown => "capability.lease_expired_or_unknown",
+    /// A receipt-backed action class lacks a resolvable governance
+    /// receipt.
+    GovernanceReceiptRequiredMissing => "governance.receipt_required_missing",
+    /// A pinned peer has no ladder manifest reference.
+    LadderManifestMissing => "ladder.manifest_missing",
+    /// A pinned peer's ladder manifest reference is not fresh.
+    LadderManifestStale => "ladder.manifest_stale",
+    /// `tool_name` is not in the verifier's action-class table.
+    GovernanceUnknownActionClass => "governance.unknown_action_class",
+    /// The two signer keys or keyids are identical.
+    SignerIndependenceRequired => "signer.independence_required",
+    /// Canonical-JSON encoding failed for a reason no more specific code
+    /// covers.
+    CanonicalJsonInvalid => "canonical_json.invalid",
+    /// The co-signing peer is not a trusted federation peer.
+    PeerUnknown => "peer.unknown",
+    /// The co-signing peer's rotation window has lapsed.
+    PeerExpired => "peer.expired",
+    /// The co-signing transport failed.
+    TransportFailed => "transport.failed",
+    /// The co-signing peer rejected the request.
+    PeerRejected => "peer.rejected",
+    /// The co-signing request schema is unsupported.
+    SchemaUnsupported => "schema.unsupported",
+    /// The bilateral receipt's peer identity does not match the pinned
+    /// peers.
+    PeerIdentityMismatch => "peer.identity_mismatch",
+}
+
+impl std::fmt::Display for RejectionCode {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl Serialize for RejectionCode {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for RejectionCode {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        String::deserialize(deserializer)?
+            .parse()
+            .map_err(serde::de::Error::custom)
+    }
+}
+
 impl BilateralCoSigningError {
-    /// Stable diagnostic code for wire-profile and signer failures.
+    /// The rejection code, the only part of this error that may cross the
+    /// protocol surface. `Display` keeps the diagnostic detail for local
+    /// logs.
     #[must_use]
-    pub fn code(&self) -> &'static str {
+    pub fn redacted(&self) -> RejectionCode {
         match self {
-            Self::CanonicalJson(message) if message.starts_with("dsse.malformed:") => {
-                "dsse.malformed"
-            }
-            Self::CanonicalJson(message) if message.starts_with("payload base64:") => {
-                "dsse.malformed"
-            }
-            Self::CanonicalJson(message) if message.starts_with("statement.malformed:") => {
-                "statement.malformed"
-            }
-            Self::CanonicalJson(message) if message.starts_with("payload json:") => {
-                "statement.malformed"
-            }
-            Self::CanonicalJson(message) if message.starts_with("statement.schema_invalid:") => {
-                "statement.schema_invalid"
-            }
-            Self::CanonicalJson(message) if message.starts_with("predicate.type_unrecognised:") => {
-                "predicate.type_unrecognised"
-            }
-            Self::CanonicalJson(message)
-                if message.contains("requires independent Org A and Org B signer keys") =>
-            {
-                "signer.independence_required"
-            }
-            Self::CanonicalJson(message) if message.starts_with("predicate.schema_invalid:") => {
-                "predicate.schema_invalid"
-            }
-            Self::CanonicalJson(message) if message.starts_with("subject.digest_mismatch:") => {
-                "subject.digest_mismatch"
-            }
-            Self::CanonicalJson(_) => "canonical_json.invalid",
-            Self::OrgASignatureInvalid => "signature.server_a_invalid",
-            Self::OrgBSignatureInvalid => "signature.server_b_invalid",
-            Self::UnknownPeer(_) => "peer.unknown",
-            Self::PeerExpired(_) => "peer.expired",
-            Self::TransportFailure(_) => "transport.failed",
-            Self::PeerRejected(_) => "peer.rejected",
-            Self::UnsupportedSchema(_) => "schema.unsupported",
-            Self::PeerIdentityMismatch => "peer.identity_mismatch",
-            Self::ReceiptMismatch => "subject.digest_mismatch",
+            Self::CanonicalJson(message) => canonical_json_rejection_code(message),
+            Self::OrgASignatureInvalid => RejectionCode::SignatureServerAInvalid,
+            Self::OrgBSignatureInvalid => RejectionCode::SignatureServerBInvalid,
+            Self::UnknownPeer(_) => RejectionCode::PeerUnknown,
+            Self::PeerExpired(_) => RejectionCode::PeerExpired,
+            Self::TransportFailure(_) => RejectionCode::TransportFailed,
+            Self::PeerRejected(_) => RejectionCode::PeerRejected,
+            Self::UnsupportedSchema(_) => RejectionCode::SchemaUnsupported,
+            Self::PeerIdentityMismatch => RejectionCode::PeerIdentityMismatch,
+            Self::ReceiptMismatch => RejectionCode::SubjectDigestMismatch,
         }
     }
+
+    /// The dotted string of [`Self::redacted`]. Stable across releases.
+    #[must_use]
+    pub fn code(&self) -> &'static str {
+        self.redacted().as_str()
+    }
+}
+
+/// Envelope-layer failures share the `CanonicalJson` variant; the message
+/// prefix written by the envelope verifier and signer names the check that
+/// failed and selects the code. The signer-independence phrase is tested
+/// first, so a message that carries both it and a prefix keeps the
+/// independence code the negative corpus names. A message that matches
+/// neither falls closed to `canonical_json.invalid`.
+fn canonical_json_rejection_code(message: &str) -> RejectionCode {
+    const PREFIXES: &[(&str, RejectionCode)] = &[
+        ("dsse.malformed:", RejectionCode::DsseMalformed),
+        ("payload base64:", RejectionCode::DsseMalformed),
+        ("statement.malformed:", RejectionCode::StatementMalformed),
+        ("payload json:", RejectionCode::StatementMalformed),
+        (
+            "statement.schema_invalid:",
+            RejectionCode::StatementSchemaInvalid,
+        ),
+        (
+            "predicate.type_unrecognised:",
+            RejectionCode::PredicateTypeUnrecognised,
+        ),
+        (
+            "predicate.schema_invalid:",
+            RejectionCode::PredicateSchemaInvalid,
+        ),
+        (
+            "subject.digest_mismatch:",
+            RejectionCode::SubjectDigestMismatch,
+        ),
+    ];
+    if message.contains("requires independent Org A and Org B signer keys") {
+        return RejectionCode::SignerIndependenceRequired;
+    }
+    if let Some((_, code)) = PREFIXES
+        .iter()
+        .find(|(prefix, _)| message.starts_with(prefix))
+    {
+        return *code;
+    }
+    RejectionCode::CanonicalJsonInvalid
 }
 
 /// Trait implemented by an object that can obtain a co-signature from a
@@ -375,8 +571,12 @@ pub trait BilateralCoSigningProtocol: Send + Sync {
     ) -> Result<CoSigningResponse, BilateralCoSigningError>;
 
     /// Request a DSSE PAE co-signature for the bilateral invocation
-    /// envelope. Implementations should verify Org B's signature over
-    /// `request.pae_bytes` before returning Org A's signature.
+    /// envelope. Implementations MUST verify Org B's signature over
+    /// `request.pae_bytes` and reconstruct those bytes as a DSSE
+    /// pre-authentication encoding naming both kernels (see
+    /// [`crate::bilateral_dsse::reconstruct_dsse_pae`]) before returning Org
+    /// A's signature. Signing bytes that have not been reconstructed makes the
+    /// origin key an oracle for every other preimage family it covers.
     fn request_dsse_cosignature(
         &self,
         request: &DsseCoSigningRequest,
@@ -487,6 +687,21 @@ impl BilateralCoSigningProtocol for InProcessCoSigner {
         {
             return Err(BilateralCoSigningError::OrgBSignatureInvalid);
         }
+        // Recompute and refuse, the same discipline `request_cosignature`
+        // applies by taking the receipt rather than its preimage: the origin
+        // key also signs receipts, so signing unreconstructed bytes would let
+        // any peer it co-signs for choose which preimage family it obtains a
+        // signature over.
+        let origin_public_key = self.origin_keypair.public_key();
+        crate::bilateral_dsse::reconstruct_dsse_pae(
+            &request.pae_bytes,
+            crate::bilateral_dsse::DssePreimageBinding {
+                org_a_kernel_id: &self.origin_kernel_id,
+                org_a_public_key: &origin_public_key,
+                org_b_kernel_id: &request.org_b_kernel_id,
+                org_b_public_key: &self.tool_host_public_key,
+            },
+        )?;
 
         let backend = Ed25519Backend::new(self.origin_keypair.clone());
         let signature = backend
@@ -664,7 +879,7 @@ pub struct LocalBilateralInvocationFixtureRequest<'a> {
     pub timestamp_unix_ms: u64,
     /// §5 predicate extensions; the §7 verifier requires
     /// `capability_lease_ref` and `policy_evaluation_summary` to be
-    /// present, otherwise verification fails-closed at step 13/14.
+    /// present, otherwise verification fails-closed at step 20/21.
     pub predicate_extensions: crate::bilateral_dsse::BilateralPredicateExtensions,
     /// Cosigner driving the dual-signed-receipt hop. Production
     /// kernels supply a `BilateralCoSigningProtocol` over an mTLS-backed

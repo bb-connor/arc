@@ -976,3 +976,86 @@ fn archived_peer_checkpoint_winner_is_authenticated_before_adoption(
     let _ = fs::remove_file(archive);
     Ok(())
 }
+
+/// A point load audits the checkpoint chain, and that audit reads the
+/// checkpoint rows and then the projection rows those rows imply. Both reads
+/// must land on one database snapshot. When they do not, a checkpoint committed
+/// between them leaves a projection row whose source row the audit never saw,
+/// and a healthy store reports drift it does not have. The reader below runs
+/// while the writer commits checkpoints underneath it, so a per-statement
+/// snapshot surfaces as a conflict rather than as a missing receipt.
+#[test]
+fn concurrent_point_loads_do_not_see_projection_drift_while_checkpoints_commit() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Barrier;
+    use std::thread;
+
+    let path = unique_db_path("chio-receipts-checkpoint-audit-race");
+    let store = Arc::new(SqliteReceiptStore::open(&path).test_unwrap());
+    let keypair = receipt_test_keypair();
+
+    let seeded = 40u64;
+    for index in 0..seeded {
+        store
+            .append_chio_receipt_returning_seq(&sample_receipt_with_keypair(
+                &format!("audit-race-seed-{index}"),
+                index + 1,
+                &keypair,
+            ))
+            .test_unwrap();
+    }
+    store.flush_receipt_writes().test_unwrap();
+    store
+        .create_next_receipt_checkpoint(4, &keypair)
+        .test_unwrap();
+
+    let stop = Arc::new(AtomicBool::new(false));
+    let reader_count = 4usize;
+    let barrier = Arc::new(Barrier::new(reader_count + 1));
+    let mut readers = Vec::new();
+    for _ in 0..reader_count {
+        let store = Arc::clone(&store);
+        let stop = Arc::clone(&stop);
+        let barrier = Arc::clone(&barrier);
+        readers.push(thread::spawn(move || {
+            barrier.wait();
+            let mut failures = Vec::new();
+            while !stop.load(Ordering::Relaxed) {
+                if let Err(error) = store.load_chio_receipt("audit-race-seed-0") {
+                    failures.push(error.to_string());
+                    break;
+                }
+            }
+            failures
+        }));
+    }
+
+    barrier.wait();
+    for round in 0..12u64 {
+        for index in 0..8u64 {
+            store
+                .append_chio_receipt_returning_seq(&sample_receipt_with_keypair(
+                    &format!("audit-race-{round}-{index}"),
+                    seeded + round * 8 + index + 1,
+                    &keypair,
+                ))
+                .test_unwrap();
+        }
+        store.flush_receipt_writes().test_unwrap();
+        store
+            .create_next_receipt_checkpoint(4, &keypair)
+            .test_unwrap();
+    }
+    stop.store(true, Ordering::Relaxed);
+
+    let mut failures = Vec::new();
+    for reader in readers {
+        failures.extend(reader.join().test_unwrap());
+    }
+    assert!(
+        failures.is_empty(),
+        "a point load failed while checkpoints were committing: {failures:?}"
+    );
+
+    let _ = fs::remove_file(path);
+}

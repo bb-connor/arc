@@ -681,7 +681,7 @@ and an adversarial corpus case behind each row.
 - **A coliseum.** [`chio-arena`](crates/core/chio-arena) runs scenarios against a real kernel,
   mutates and co-evolves adversary populations against the guard pipeline, and promotes the
   failures into the corpus.
-- **Fuzzing.** 28 fuzz targets run under ClusterFuzzLite on every pull request and in batch, with
+- **Fuzzing.** 29 fuzz targets run under ClusterFuzzLite on every pull request and in batch, with
   crash triage and corpus sync as separate workflows. See [`fuzz`](fuzz).
 - **Timing leaks.** dudect harnesses check constant-time behavior for signature-byte equality
   and scope subset checks. See [`tests/dudect`](crates/kernel/chio-kernel-core/tests/dudect).
@@ -730,7 +730,7 @@ assumptions each one relies on are in the [claim registry](docs/reference/CLAIM_
 
 | Lane | What it does | Where |
 | --- | --- | --- |
-| **Lean 4** | 149 catalogued declarations, one cryptographic axiom, thirteen registered assumptions, and no placeholders. `lake build` and `sorry` hygiene run on every pull request. | [`formal/lean4`](formal/lean4) |
+| **Lean 4** | 170 catalogued declarations, one cryptographic axiom, sixteen registered assumptions, and no placeholders. `lake build` and `sorry` hygiene run on every pull request. | [`formal/lean4`](formal/lean4) |
 | **Aeneas extraction** | Safe Rust from the kernel core and the economy is extracted through Charon and Aeneas into Lean, and every generated decision helper is proved equivalent to the handwritten model before the model theorems apply. | [`formal/aeneas`](formal/aeneas), [`formal_aeneas.rs`](crates/kernel/chio-kernel-core/src/formal_aeneas.rs) |
 | **Hashed mirrors** | 57 registered mirrors over 171 bindings hash the named Rust items and the Lean and TLA+ modules they correspond to. Drift on either side fails the gate. | [`formal/MAPPING.md`](formal/MAPPING.md) |
 | **Creusot contracts** | Contracts on the core verify, resolve, evaluate, subset, and sign symbols, required for strict CI. | [`creusot-contracts.toml`](formal/rust-verification/creusot-contracts.toml) |

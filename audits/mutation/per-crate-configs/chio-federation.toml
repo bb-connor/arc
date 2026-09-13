@@ -1,0 +1,36 @@
+# Per-run config for the chio-federation mutation baseline.
+# Same examine and exclude scope as the workspace .cargo/mutants.toml lane
+# entry, with additional_cargo_test_args scoped to the chio-federation
+# package so the oracle is the crate's own test suite. This matches the
+# mutants-pr lane, which runs the per-crate config with
+# `--test-workspace false`; the hosted nightly sweep remains the
+# authoritative workspace-scope measurement.
+
+additional_cargo_test_args = ["--package", "chio-federation"]
+timeout_multiplier = 3.0
+minimum_test_timeout = 60
+
+examine_globs = [
+    "crates/trust/chio-federation/src/bilateral.rs",
+    "crates/trust/chio-federation/src/bilateral_dsse.rs",
+    "crates/trust/chio-federation/src/bilateral_dsse/builder.rs",
+    "crates/trust/chio-federation/src/bilateral_dsse/policy.rs",
+    "crates/trust/chio-federation/src/bilateral_dsse/sign.rs",
+    "crates/trust/chio-federation/src/bilateral_dsse/types.rs",
+    "crates/trust/chio-federation/src/bilateral_dsse/typestate_handlers.rs",
+    "crates/trust/chio-federation/src/bilateral_dsse/verify.rs",
+    "crates/trust/chio-federation/src/bilateral_verifier.rs",
+    "crates/trust/chio-federation/src/bilateral_verifier/*.rs",
+    "crates/trust/chio-federation/src/treaty.rs",
+]
+
+exclude_globs = [
+    "**/tests.rs",
+    "**/test_*.rs",
+    "**/*_test.rs",
+    "**/tests/**",
+    "**/benches/**",
+    "**/build.rs",
+    "**/fuzz.rs",
+    "crates/trust/chio-federation/src/_generated/**",
+]

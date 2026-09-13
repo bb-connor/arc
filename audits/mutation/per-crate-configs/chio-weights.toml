@@ -1,16 +1,16 @@
 # Per-run override config for chio-weights mutation baseline.
 #
-# chio-weights is NOT one of the six canonical trust-boundary crates
+# chio-weights is NOT one of the canonical trust-boundary crates
 # enumerated in `releases.toml [trust_boundary_crates]` (those are
 # chio-policy, chio-credentials, chio-attest-verify, chio-kernel-core,
-# chio-guards, chio-anchor). The crate is the model-card trust-boundary
-# surface (signed weights cards, cosign bundle helper, kernel binding
-# refusal, chio bind --card) and IS a trust-boundary surface: a malformed
-# `weights_hash`, an out-of-set
+# chio-guards, chio-anchor, chio-federation, chio-runtime-core). The crate
+# is the model-card trust-boundary surface (signed weights cards, cosign
+# bundle helper, kernel binding refusal, chio bind --card) and IS a
+# trust-boundary surface: a malformed `weights_hash`, an out-of-set
 # capability scope, or a banned tool intersection MUST cause the
 # kernel to refuse a provider bind. Mutation kill on this crate is
 # therefore the right honest signal even though the crate is not in
-# the canonical six.
+# the canonical set.
 #
 # This config mirrors `chio-policy.toml` and `chio-attest-verify.toml`
 # in shape:

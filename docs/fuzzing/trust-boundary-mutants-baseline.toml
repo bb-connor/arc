@@ -13,3 +13,9 @@ unviable_total = 67
 timeout_total = 1
 measured_kill_rate_excluding_unviable = 30.7
 baseline_status = "aggregate complete from existing per-crate baselines; mixed full sweeps and bounded shards"
+
+[lane]
+# Crates registered in the mutation lane after this baseline was measured.
+# They carry no measured entry until their first full nightly sweep is
+# recorded; the aggregate above remains the six-crate measurement.
+unmeasured_crates = ["chio-federation", "chio-runtime-core"]

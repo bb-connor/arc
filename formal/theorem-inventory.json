@@ -1303,6 +1303,39 @@
       "notes": "Bounded bilateral DSSE accept-set model showing acceptance is exactly issuer-key trust, kernel-key trust, and fail-closed predicate satisfaction over the admission projection. Signature verification remains abstracted."
     },
     {
+      "id": "treaty.bilateral_accept.accept_monotone_in_issuer_store",
+      "leanName": "Chio.Treaty.BilateralAccept.accept_monotone_in_issuer_store",
+      "file": "formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Definitional corollary of the accept definition: extending the issuer key set while holding the kernel key set fixed preserves acceptance of every accepted envelope."
+    },
+    {
+      "id": "treaty.bilateral_accept.accept_conj_scope_decompose",
+      "leanName": "Chio.Treaty.BilateralAccept.accept_conj_scope_decompose",
+      "file": "formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Definitional corollary of the accept definition: an accepted envelope whose scope is a conjunction has both key ids in the trust store and both conjuncts denoting true on the same admission projection."
+    },
+    {
+      "id": "treaty.bilateral_accept.accept_requires_issuer_key",
+      "leanName": "Chio.Treaty.BilateralAccept.accept_requires_issuer_key",
+      "file": "formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Definitional corollary of the accept definition: an envelope whose issuer key id is outside the trust store is rejected regardless of kernel key and scope."
+    },
+    {
       "id": "proof.essential_preserved_chain",
       "leanName": "Chio.Treaty.PredicateLang.essential_preserved_chain",
       "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
@@ -1355,7 +1388,7 @@
       "claimClass": "bounded_model",
       "status": "proved",
       "mapsTo": ["P3"],
-      "notes": "Any predicate containing unsupported syntax denies before Boolean evaluation, including under unrestricted negation."
+      "notes": "A predicate rejected by the `supported` check denies before Boolean evaluation, including under unrestricted negation. The occurrence form, denial whenever an unsupported atom appears anywhere in the tree, is `contains_unsupported_denies`."
     },
     {
       "id": "treaty.predicate.undefined_denies",
@@ -1444,6 +1477,94 @@
       "status": "proved",
       "mapsTo": ["P3"],
       "notes": "A signer outside the treaty participant list fails the modeled signer gate."
+    },
+    {
+      "id": "treaty.predicate.supported_structural",
+      "leanName": "Chio.Treaty.PredicateLang.containsUnsupported_eq_not_supported",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "By induction over the predicate syntax, `supported` is false exactly when an unsupported atom occurs anywhere in the tree. The proof unfolds every arm of `supported`, including `top`, `bot`, and `disj`."
+    },
+    {
+      "id": "treaty.predicate.defined_structural",
+      "leanName": "Chio.Treaty.PredicateLang.containsUndefined_eq_not_defined",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "By induction over the predicate syntax, `defined` is false exactly when an atom the projected input cannot interpret occurs anywhere in the tree. The proof unfolds every arm of `defined`, including `top`, `bot`, and `disj`."
+    },
+    {
+      "id": "treaty.predicate.contains_unsupported_denies",
+      "leanName": "Chio.Treaty.PredicateLang.contains_unsupported_denies",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "A predicate in which an unsupported atom occurs anywhere, at any depth and under any connective, denies on every admission view before Boolean evaluation."
+    },
+    {
+      "id": "treaty.predicate.contains_undefined_denies",
+      "leanName": "Chio.Treaty.PredicateLang.contains_undefined_denies",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "A predicate in which an atom the projected input cannot interpret occurs anywhere, at any depth and under any connective, denies on that admission view before Boolean evaluation."
+    },
+    {
+      "id": "treaty.predicate.supported_atoms_exact",
+      "leanName": "Chio.Treaty.PredicateLang.supported_eq_all_atoms",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "`supported` equals the conjunction of `supportedAtom` over the left-to-right atom list collected from the predicate."
+    },
+    {
+      "id": "treaty.predicate.defined_atoms_exact",
+      "leanName": "Chio.Treaty.PredicateLang.defined_eq_all_atoms",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "`defined` equals the conjunction of `atomDefined` over the left-to-right atom list collected from the predicate."
+    },
+    {
+      "id": "treaty.predicate.unsupported_atom_anywhere_denies",
+      "leanName": "Chio.Treaty.PredicateLang.unsupported_atom_anywhere_denies",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Membership of an `unsupported` tag in the collected atom list of a predicate forces denial on every admission view."
+    },
+    {
+      "id": "treaty.predicate.undefined_atom_anywhere_denies",
+      "leanName": "Chio.Treaty.PredicateLang.undefined_atom_anywhere_denies",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateLang.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Membership of an atom that is undefined for the admission view in the collected atom list of a predicate forces denial on that view."
     },
     {
       "id": "treaty.bridge.fragment_completeness",
@@ -1699,6 +1820,83 @@
       "notes": "A checked syntactic delta establishes closure refinement only on the exact supplied domain."
     },
     {
+      "id": "treaty.receipt_predicate.finite_refinement_sound",
+      "leanName": "Chio.Treaty.ReceiptPredicate.finite_refinement_sound",
+      "file": "formal/lean4/Chio/Chio/Treaty/ReceiptPredicate.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "A successful finite refinement check implies that every receipt in the supplied finite domain admitted by the new constitution is admitted by the old one. The claim is scoped to that domain; the Rust receipt-predicate evaluator is related by differential testing only, not by extraction or refinement."
+    },
+    {
+      "id": "treaty.receipt_predicate.finite_refinement_exact",
+      "leanName": "Chio.Treaty.ReceiptPredicate.finite_refinement_exact",
+      "file": "formal/lean4/Chio/Chio/Treaty/ReceiptPredicate.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The Boolean refinement checker is equivalent to the finite-domain admission implication over the supplied receipt domain. No claim is made outside that domain; the Rust receipt-predicate evaluator is differential evidence only."
+    },
+    {
+      "id": "treaty.shape.of_receipt_injective",
+      "leanName": "Chio.Treaty.PredicateShape.ofReceipt_injective",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateShape.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The connective-preserving lift of an injective atom map from the receipt predicate syntax into the admission predicate syntax is injective. The two languages are related by connective shape only; no denotation-agreeing atom injection with a receipt-to-view map exists, as documented in the module."
+    },
+    {
+      "id": "treaty.shape.eval_agrees",
+      "leanName": "Chio.Treaty.PredicateShape.eval_ofReceipt",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateShape.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Plain Boolean evaluation of the lifted predicate agrees with receipt evaluation whenever the mapped atoms agree pointwise on the given admission view and receipt. The proof unfolds `ReceiptPredicate.evaluate` at every connective."
+    },
+    {
+      "id": "treaty.shape.denote_agrees_on_supported_fragment",
+      "leanName": "Chio.Treaty.PredicateShape.denote_ofReceipt",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateShape.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Fail-closed denotation of the lifted predicate agrees with receipt evaluation when every mapped atom is supported, defined on the view, and agrees with its receipt atom. Outside that fragment the fail-closed layer has no receipt-side counterpart and no agreement is claimed."
+    },
+    {
+      "id": "treaty.shape.unsupported_image_denies",
+      "leanName": "Chio.Treaty.PredicateShape.denote_ofReceipt_unsupported",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateShape.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "If any atom occurring in a receipt predicate maps to an unsupported tag, the lifted predicate denies on every admission view."
+    },
+    {
+      "id": "treaty.shape.undefined_image_denies",
+      "leanName": "Chio.Treaty.PredicateShape.denote_ofReceipt_undefined",
+      "file": "formal/lean4/Chio/Chio/Treaty/PredicateShape.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "If any atom occurring in a receipt predicate maps to a tag the admission view cannot interpret, the lifted predicate denies on that view."
+    },
+    {
       "id": "proof.finding_status_epoch_advance_is_strict",
       "leanName": "Chio.Proofs.FindingStatusFreshness.epoch_advance_is_strict",
       "file": "formal/lean4/Chio/Chio/Proofs/FindingStatusFreshness.lean",
@@ -1741,6 +1939,149 @@
       "status": "proved",
       "mapsTo": ["P10"],
       "notes": "A local retracted observation cannot be cleared by a contradictory non-inclusion proof in the bounded decision model."
+    },
+    {
+      "id": "treaty.admission_binding.fields_enumerated",
+      "leanName": "Chio.Treaty.AdmissionBinding.mem_allFields",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Every leaf of the bilateral statement wire type appears in the enumeration the classification quantifies over."
+    },
+    {
+      "id": "treaty.admission_binding.fields_enumerated_once",
+      "leanName": "Chio.Treaty.AdmissionBinding.allFields_nodup",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The leaf enumeration lists each leaf of the bilateral statement exactly once."
+    },
+    {
+      "id": "treaty.admission_binding.field_count",
+      "leanName": "Chio.Treaty.AdmissionBinding.allFields_length",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The bilateral statement carries fifty-five leaves in the enumerated model, which is the cardinality the substitution corpus exercises."
+    },
+    {
+      "id": "treaty.admission_binding.classification_trichotomy",
+      "leanName": "Chio.Treaty.AdmissionBinding.classification_trichotomy",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Comparison-set completeness over the leaves this call's statement carries: every such leaf is compared against something the receiver holds, or constrained only against the statement itself, or compared against nothing the receiver holds, and exactly one of the three. The third branch is the residual and does not claim the leaf is unconstrained, because the statement gate still enforces its declared shape."
+    },
+    {
+      "id": "treaty.admission_binding.absent_leaves_are_refused_or_merely_optional",
+      "leanName": "Chio.Treaty.AdmissionBinding.absent_leaves_are_refused_or_merely_optional",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The leaves this call's statement does not carry split into two kinds: two the strict profile refuses outright, and four the wire type marks optional and this call omits, which another strict statement may carry."
+    },
+    {
+      "id": "treaty.admission_binding.classification_census",
+      "leanName": "Chio.Treaty.AdmissionBinding.classification_census",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The census the companion document's counts must agree with: twenty-three leaves compared for equality, two against a receiver-held domain, thirteen constrained only against the statement, eleven compared against nothing the receiver holds, two refused by the profile, four optional and omitted, forty-nine carried by this call, and fifty-three that a strict statement may carry."
+    },
+    {
+      "id": "treaty.admission_binding.accept_decomposition",
+      "leanName": "Chio.Treaty.AdmissionBinding.accept_iff_gate_and_comparisons_hold",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Accept-set decomposition in the model: the modeled receiver accepts exactly when the statement gate holds, every equality-bound leaf carries its receiver-held value, and every domain-bound leaf lies in its receiver-held set. The gate is named rather than absorbed into the comparison set, so the biconditional does not claim that leaf agreement alone admits."
+    },
+    {
+      "id": "treaty.admission_binding.accept_implies_binding",
+      "leanName": "Chio.Treaty.AdmissionBinding.accept_implies_binding",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Admission binding over the equality-bound leaves of the model: an accepted statement carries, at each of them, the value the receiver already held."
+    },
+    {
+      "id": "treaty.admission_binding.accept_implies_domain_membership",
+      "leanName": "Chio.Treaty.AdmissionBinding.accept_implies_domain_membership",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The weaker half of the binding claim, for the two leaves bound to a receiver-held domain rather than to a value: an accepted statement carries a value inside the domain and nothing more. The lease expiry and the lease issuer are of this kind."
+    },
+    {
+      "id": "treaty.admission_binding.disagreement_denies",
+      "leanName": "Chio.Treaty.AdmissionBinding.disagreement_denies",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Fail-closed contrapositive: one equality-bound leaf that disagrees with the receiver-held value denies, whatever the rest of the statement carries."
+    },
+    {
+      "id": "treaty.admission_binding.value_outside_domain_denies",
+      "leanName": "Chio.Treaty.AdmissionBinding.value_outside_domain_denies",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Fail-closed contrapositive for the domain-bound leaves: a value outside the receiver-held set denies."
+    },
+    {
+      "id": "treaty.admission_binding.accept_determined_by_gate_and_compared_leaves",
+      "leanName": "Chio.Treaty.AdmissionBinding.accept_determined_by_gate_and_compared_leaves",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Acceptance in the model is a function of the statement gate and the compared leaves alone, which is the completeness claim in its strongest form."
+    },
+    {
+      "id": "treaty.admission_binding.residual_substitution_preserves_acceptance",
+      "leanName": "Chio.Treaty.AdmissionBinding.residual_substitution_preserves_acceptance",
+      "file": "formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The residual: replacing a leaf the classification compares against nothing the receiver holds leaves the modeled decision unchanged, provided the statement gate's verdict does not move. That proviso is what each residual leaf's declared shape enforces."
     }
   ]
 }
