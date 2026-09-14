@@ -81,6 +81,16 @@ Storage uses FULL-synchronous SQLite transactions and readback. Files must be
 owned, regular, mode 0600 and singly linked; the immediate parent must be an
 owned mode-0700 directory. Symlink files are denied. Limits of 64 retained claims
 and 16 MiB of object bytes deny additional evidence without evicting old claims.
+Each pending claim reserves 4096 bytes for its canonical decision envelope;
+unrelated evidence cannot consume that space. Decision storage consumes the
+reservation in the same transaction. This bound covers the fixed decision
+grammar and is enforced before any reservation is released.
+
+Custody schema v2 adds these reservations. Only the exact known v1 table layout
+can migrate; its original hashes and decisions remain unchanged. Migration
+reserves space for every pending legacy claim and rolls back without rewriting
+the database if capacity is insufficient. Unknown layouts fail closed. This is
+the example custody schema, unrelated to native store-version reconciliation.
 These are finite experiment limits, not trial capacity or the kernel's retention
 implementation. Host administrators, filesystem availability and backups remain
 trusted; there is no clone/rollback protection or remote access service here.

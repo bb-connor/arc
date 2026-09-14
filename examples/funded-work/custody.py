@@ -14,6 +14,14 @@ import artifacts as p
 
 CAPACITY_BYTES = 16 * 1024 * 1024
 MAX_CLAIMS = 64
+DECISION_BYTES = 4096
+SCHEMA_V1 = {
+    'identity': 'CREATE TABLE identity (pin TEXT PRIMARY KEY)',
+    'objects': 'CREATE TABLE objects (digest TEXT PRIMARY KEY, data BLOB NOT NULL)',
+    'claims': 'CREATE TABLE claims (allocation TEXT PRIMARY KEY, submission TEXT NOT NULL)',
+    'decisions': 'CREATE TABLE decisions (allocation TEXT PRIMARY KEY REFERENCES claims(allocation), digest TEXT NOT NULL)',
+}
+SCHEMA_V2 = {**SCHEMA_V1, 'claims': 'CREATE TABLE claims (allocation TEXT PRIMARY KEY, submission TEXT NOT NULL, decision_reserved INTEGER NOT NULL DEFAULT 0)'}
 
 
 class Custody:
@@ -44,16 +52,26 @@ class Custody:
             self.db.execute('PRAGMA synchronous=FULL')
             self.db.execute('PRAGMA journal_mode=DELETE')
             self.db.execute('PRAGMA trusted_schema=OFF')
+            self.db.execute('PRAGMA foreign_keys=ON')
             self.db.execute('BEGIN IMMEDIATE')
             if created:
-                self.db.execute('CREATE TABLE identity (pin TEXT PRIMARY KEY)')
+                for sql in SCHEMA_V2.values():
+                    self.db.execute(sql)
                 self.db.execute('INSERT INTO identity VALUES (?)', (pin,))
-                self.db.execute('CREATE TABLE objects (digest TEXT PRIMARY KEY, data BLOB NOT NULL)')
-                self.db.execute('CREATE TABLE claims (allocation TEXT PRIMARY KEY, submission TEXT NOT NULL)')
-                self.db.execute('CREATE TABLE decisions (allocation TEXT PRIMARY KEY REFERENCES claims(allocation), digest TEXT NOT NULL)')
-                self.db.execute('PRAGMA user_version=1')
-            p.require(self.db.execute('PRAGMA user_version').fetchone()[0] == 1, "unsupported custody schema")
+                self.db.execute('PRAGMA user_version=2')
+            version = self.db.execute('PRAGMA user_version').fetchone()[0]
+            p.require(version in (1, 2), 'unsupported custody schema')
+            layout = dict(self.db.execute("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"))
+            p.require(layout == (SCHEMA_V1 if version == 1 else SCHEMA_V2), 'unknown custody schema lineage')
             p.require(self.db.execute('SELECT pin FROM identity').fetchall() == [(pin,)], "custody identity changed")
+            p.require(not self.db.execute('PRAGMA foreign_key_check').fetchall(), 'orphan custody decision')
+            if version == 1:
+                self.db.execute('ALTER TABLE claims ADD COLUMN decision_reserved INTEGER NOT NULL DEFAULT 0')
+                self.db.execute('UPDATE claims SET decision_reserved=? WHERE allocation NOT IN (SELECT allocation FROM decisions)', (DECISION_BYTES,))
+                self.db.execute('PRAGMA user_version=2')
+            invalid = self.db.execute('SELECT 1 FROM claims c LEFT JOIN decisions d ON c.allocation=d.allocation WHERE c.decision_reserved != CASE WHEN d.allocation IS NULL THEN ? ELSE 0 END', (DECISION_BYTES,)).fetchone()
+            p.require(invalid is None, 'custody decision reservation changed')
+            self._budget(0)
             self.db.commit()
             if created:
                 directory = os.open(self.path.parent, os.O_RDONLY | os.O_DIRECTORY)
@@ -85,10 +103,14 @@ class Custody:
         if self.db.execute('SELECT 1 FROM objects WHERE digest=?', (digest,)).fetchone():
             p.require(self.get(digest) == data, "custody object changed")
         else:
-            size = self.db.execute('SELECT COALESCE(SUM(length(data)),0) FROM objects').fetchone()[0]
-            p.require(size + len(data) <= CAPACITY_BYTES, "custody capacity exhausted")
+            self._budget(len(data))
             self.db.execute('INSERT INTO objects VALUES (?,?)', (digest, data))
         return digest
+
+    def _budget(self, additional):
+        size = self.db.execute('SELECT COALESCE(SUM(length(data)),0) FROM objects').fetchone()[0]
+        reserved = self.db.execute('SELECT COALESCE(SUM(decision_reserved),0) FROM claims').fetchone()[0]
+        p.require(size + reserved + additional <= CAPACITY_BYTES, 'custody capacity exhausted')
 
     def retain(self, agreement, source, output, key):
         p.require(key.public_key().public_bytes_raw().hex() == self.pin == agreement['custodianKey'], "wrong custodian")
@@ -118,14 +140,17 @@ class Custody:
                 return
             count = self.db.execute('SELECT COUNT(*) FROM claims').fetchone()[0]
             p.require(count < MAX_CLAIMS, "custody claim capacity exhausted")
+            self.db.execute('INSERT INTO claims VALUES (?,?,?)', (allocation, digest, DECISION_BYTES))
+            self._budget(0)
             self._put(encoded)
-            self.db.execute('INSERT INTO claims VALUES (?,?)', (allocation, digest))
 
     def decision(self, allocation):
         row = self.db.execute('SELECT digest FROM decisions WHERE allocation=?', (allocation,)).fetchone()
         return None if row is None else p.load(self.get(row[0]))
 
     def record_decision(self, allocation, submission, decision):
+        encoded = p.canonical(decision)
+        p.require(len(encoded) <= DECISION_BYTES, 'decision exceeds reserved profile bound')
         with self.db:
             self.db.execute('BEGIN IMMEDIATE')
             row = self.db.execute('SELECT submission FROM claims WHERE allocation=?', (allocation,)).fetchone()
@@ -134,7 +159,8 @@ class Custody:
             if original is not None:
                 p.require(p.canonical(original) == p.canonical(decision), "conflicting financial decision")
             else:
-                digest = self._put(p.canonical(decision))
+                self.db.execute('UPDATE claims SET decision_reserved=0 WHERE allocation=?', (allocation,))
+                digest = self._put(encoded)
                 self.db.execute('INSERT INTO decisions VALUES (?,?)', (allocation, digest))
         p.require(self.decision(allocation) == decision, "decision readback failed")
         return decision

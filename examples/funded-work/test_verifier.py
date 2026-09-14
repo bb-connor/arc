@@ -32,6 +32,25 @@ class VerifierFixture:
 
 
 class VerifierTests(VerifierFixture, unittest.TestCase):
+    def test_new_evidence_cannot_starve_an_already_retained_claim_decision(self):
+        original = self.submit()
+        with Custody(self.path, self.pins['custodian']) as store:
+            store.bind_submission(ALLOCATION, original)
+            sequence = 0
+            # Fill with real custody requests, first large, then progressively small.
+            for size in (65000, 32000, 16000, 8000, 4000, 2000, 1000, 100, 1):
+                while True:
+                    sequence += 1
+                    data = str(sequence).encode() + b'x' * size
+                    try:
+                        store.retain(self.a['body'], INPUT, data, keys()[3])
+                    except p.ProtocolError as error:
+                        self.assertIn('capacity exhausted', str(error))
+                        break
+        result = self.run_verifier(original)
+        self.assertTrue(result['body']['accepted'])
+        self.assertEqual(self.run_verifier(original), result)
+
     def test_checker_source_substitution_cannot_issue_a_decision(self):
         submission = self.submit()
         original = p.BUYER
