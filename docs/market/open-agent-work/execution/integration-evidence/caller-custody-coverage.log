@@ -1,0 +1,2 @@
+proof-coverage: wrote docs/formal/COVERAGE.md and target/formal/coverage.json (59 rows, 173 artifacts)
+proof-coverage: 59 rows and 173 artifacts match

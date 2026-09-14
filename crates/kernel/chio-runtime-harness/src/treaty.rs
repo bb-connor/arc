@@ -356,6 +356,38 @@ pub(crate) fn insert_runtime_loopback_treaty_context(
             ))
         })?;
     if let Some((envelope_id, _envelope_sha256, envelope)) = bilateral_dsse.as_ref() {
+        (|| -> Result<(), Box<dyn std::error::Error>> {
+            // Activate records from this locally constructed fixture, not the
+            // envelope supplied by a caller under test.
+            let (statement, _) = envelope.decode_statement()?;
+            if let Some(lease) = statement.predicate.capability_lease_ref {
+                hook_store.insert_treaty_runtime_artifact(
+                    "capability_lease",
+                    &lease.lease_id.clone(),
+                    &chio_runtime_core::RuntimeTreatyLeaseRecord {
+                        lease,
+                        valid_from_unix_ms: issued_at_unix_ms,
+                    },
+                )?;
+            }
+            if let Some(receipt) = statement.predicate.governance_receipt_ref {
+                hook_store.insert_treaty_runtime_artifact(
+                    "governance_receipt",
+                    &receipt.receipt_id.clone(),
+                    &chio_runtime_core::RuntimeTreatyGovernanceRecord {
+                        receipt,
+                        valid_from_unix_ms: issued_at_unix_ms,
+                        valid_until_unix_ms: expires_at_unix_ms,
+                    },
+                )?;
+            }
+            Ok(())
+        })()
+        .map_err(|error| {
+            RuntimeLoopbackError::message(format!(
+                "runtime loopback presentation activation: {error}"
+            ))
+        })?;
         hook_store
             .insert_treaty_runtime_artifact("bilateral_dsse_envelope", envelope_id, envelope)
             .map_err(|error| {

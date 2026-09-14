@@ -17,6 +17,9 @@ pub use types::*;
 mod journal;
 pub use journal::*;
 
+mod unknown_release;
+pub use unknown_release::*;
+
 /// Trait for executing payments against an external rail.
 pub trait PaymentAdapter: Send + Sync {
     fn rail_id(&self) -> &'static str {

@@ -82,6 +82,25 @@ fn migrate_schema(
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
+    // Research v10 and native security v10 have different histories. No
+    // pre-v35 native predecessor owns this namespace, even when it is empty.
+    let future_release: bool = transaction
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema
+         WHERE lower(name) GLOB 'unknown_payment_release_*'
+            OR lower(tbl_name) GLOB 'unknown_payment_release_*')",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if future_release {
+        return Err(invariant(
+            "pre-v35 unknown payment release history requires separate reconciliation",
+        ));
+    }
+    if on_disk == 34 {
+        verify_admission_operation_invariants_at_version(&transaction, 34)?;
+    }
     if on_disk < 19 {
         migration_v19::verify_pre_migration_schema(&transaction, on_disk)?;
     }
@@ -127,7 +146,9 @@ fn migrate_schema(
     if on_disk < 33 {
         migration_v33::verify_pre_migration_schema(&transaction, on_disk)?;
     }
-    migration_v34::verify_pre_migration_schema(&transaction, on_disk)?;
+    if on_disk < 34 {
+        migration_v34::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
     if on_disk < 18 && table_exists(&transaction, "admission_operations")? {
         // The legacy report-after-effect contract could refund an executed
         // caller as pre-dispatch compensation. A refunded terminal is not
@@ -180,6 +201,9 @@ fn migrate_schema(
     }
     transaction
         .execute_batch(ADMISSION_OPERATION_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(UNKNOWN_PAYMENT_RELEASE_SCHEMA)
         .map_err(sqlite_error)?;
     transaction
         .execute_batch(include_str!("../admission_operation_nonce.sql"))
@@ -552,7 +576,17 @@ fn migrate_admission_commit_channel_reservation_kind(
 pub(crate) fn verify_admission_operation_invariants(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
-    verify_admission_operation_schema(connection, ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)?;
+    verify_admission_operation_invariants_at_version(
+        connection,
+        ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
+    )
+}
+
+fn verify_admission_operation_invariants_at_version(
+    connection: &Connection,
+    version: i32,
+) -> Result<(), AdmissionOperationStoreError> {
+    verify_admission_operation_schema(connection, version)?;
 
     verify_admission_operation_data_invariants(connection)?;
     super::runtime_participant::verify_all(connection)?;
@@ -683,6 +717,11 @@ fn expected_admission_operation_schema(
     if version >= 33 {
         expected
             .execute_batch(super::security_participant_state::nonce_preflight::sql())
+            .map_err(sqlite_error)?;
+    }
+    if version >= 35 {
+        expected
+            .execute_batch(UNKNOWN_PAYMENT_RELEASE_SCHEMA)
             .map_err(sqlite_error)?;
     }
     Ok(expected)
@@ -864,6 +903,10 @@ fn verify_admission_operation_data_invariants(
     super::retained_request::verify_retained_request_ownership(connection)?;
     super::caller_dispatch_context::verify_ownership(connection)?;
     super::execution_nonce::verify_ownership(connection)?;
+    if table_exists(connection, "unknown_payment_release_records")? {
+        super::unknown_release::verify_invariants(connection)
+            .map_err(|error| invariant(error.to_string()))?;
+    }
     super::credit_exposure::verify_credit_exposure_account_invariants(connection)
 }
 
@@ -958,6 +1001,8 @@ fn admission_operation_schema_catalog(
                OR lower(tbl_name) GLOB 'security_participant_output*'
                OR lower(name) GLOB 'admission_operation_native_dispatch*'
                OR lower(tbl_name) GLOB 'admission_operation_native_dispatch*'
+               OR lower(name) GLOB 'unknown_payment_release_*'
+               OR lower(tbl_name) GLOB 'unknown_payment_release_*'
             ORDER BY type, name, tbl_name
             "#,
         )

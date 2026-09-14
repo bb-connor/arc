@@ -87,6 +87,9 @@ pub enum PaymentReleaseAuthorityKind {
     PreDispatchNoEffect,
     TransportNotAccepted,
     ContractualZeroCharge,
+    /// A new jointly authorized payment decision after a historical unknown.
+    /// This is not evidence that execution had no effect.
+    MutuallyAgreedUnknown,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

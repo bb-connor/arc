@@ -33,6 +33,23 @@ pub(in crate::admission_operation_store::tests) fn remove_caller_wait_state(
 }
 
 fn rebuild_predecessor(connection: &Connection) -> rusqlite::Result<()> {
+    let has_release: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name = 'unknown_payment_release_records')",
+        [],
+        |row| row.get(0),
+    )?;
+    if has_release {
+        assert_eq!(
+            connection.query_row(
+                "SELECT COUNT(*) FROM unknown_payment_release_records",
+                [],
+                |row| row.get::<_, i64>(0)
+            )?,
+            0,
+            "predecessor fixture cannot discard monetary successor history"
+        );
+        connection.execute_batch("DROP TABLE unknown_payment_release_records")?;
+    }
     assert_eq!(
         connection.query_row(
             "SELECT COUNT(*) FROM admission_operations WHERE state = 'awaiting_caller_report'",
@@ -137,7 +154,7 @@ fn populated_v33_caller_wait_upgrade_preserves_original_rows_and_commit_chain() 
         rows(&connection, "admission_operation_commits")?,
         before_commits
     );
-    assert_eq!(connection.query_row("SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'", [], |row| row.get::<_, i64>(0))?, 34);
+    assert_eq!(connection.query_row("SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'", [], |row| row.get::<_, i64>(0))?, i64::from(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION));
     let bad_foreign_key: bool = connection.query_row(
         "SELECT EXISTS(SELECT 1 FROM pragma_foreign_key_check)",
         [],

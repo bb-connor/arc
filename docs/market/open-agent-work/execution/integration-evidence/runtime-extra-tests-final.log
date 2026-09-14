@@ -1,0 +1,64 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-runtime-core)
+    Finished `test` profile [unoptimized] target(s) in 17.39s
+     Running tests/runtime_agreement_context_scan.rs (target/debug/deps/runtime_agreement_context_scan-98d97096c8c65c26)
+
+running 12 tests
+test a_nested_agreement_context_without_trust_material_is_not_refused_as_smuggled ... ok
+test swarm_context_deeper_than_the_scan_bound_is_refused ... ok
+test swarm_context_refuses_a_trust_root_nested_below_the_agreement_object ... ok
+test swarm_context_refuses_a_trust_root_outside_the_agreement_object ... ok
+test swarm_context_refuses_dynamic_trust_nested_below_the_agreement_object ... ok
+test treaty_context_deeper_than_the_scan_bound_is_refused ... ok
+test treaty_context_refuses_a_trust_root_inside_an_array ... ok
+test treaty_context_refuses_a_trust_root_nested_below_the_agreement_object ... ok
+test treaty_context_refuses_a_trust_root_outside_the_agreement_object ... ok
+test treaty_context_refuses_dynamic_trust_nested_below_the_agreement_object ... ok
+test treaty_context_reports_a_smuggled_trust_root_ahead_of_dynamic_trust ... ok
+test treaty_context_wider_than_the_scan_bound_is_refused ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/runtime_treaty_binding_substitution.rs (target/debug/deps/runtime_treaty_binding_substitution-9d5af97311e57d69)
+
+running 37 tests
+test activation_start_is_inclusive ... ok
+test empty_governance_window_denies_before_dispatch_after_store_reopen ... ok
+test expired_governance_denies_before_dispatch_after_store_reopen ... ok
+test expired_lease_denies_before_dispatch_after_store_reopen ... ok
+test future_governance_denies_before_dispatch_after_store_reopen ... ok
+test future_lease_denies_before_dispatch_after_store_reopen ... ok
+test lease_cannot_outlast_its_resolved_continuation ... ok
+test lineage_bundle_digest_is_not_compared_without_a_resolved_bundle ... ok
+test matching_invalid_scope_algorithm_denies ... ok
+test matching_invalid_scope_digest_denies ... ok
+test matching_scoped_lease_admits_once ... ok
+test missing_governance_denies_before_dispatch_after_store_reopen ... ok
+test missing_lease_denies_before_dispatch_after_store_reopen ... ok
+test outcome_digest_is_compared_through_the_forced_invocation_record ... ok
+test receipt_digests_are_compared_through_the_forced_invocation_record ... ok
+test reordering_signer_kernel_ids_is_rejected_before_dispatch ... ok
+test revoked_governance_denies_before_dispatch_after_store_reopen ... ok
+test revoked_lease_denies_before_dispatch_after_store_reopen ... ok
+test scope_cannot_be_omitted_from_a_scoped_lease ... ok
+test substituting_action_class_id_is_rejected_before_dispatch ... ok
+test substituting_admission_report_digest_is_admitted ... ok
+test substituting_admission_report_digest_with_a_non_hex_value_is_rejected ... ok
+test substituting_consistency_model_is_rejected_before_dispatch ... ok
+test substituting_continuation_digest_is_rejected_before_dispatch ... ok
+test substituting_governance_refs_is_rejected_before_dispatch ... ok
+test substituting_ladder_intersection_digest_is_rejected_before_dispatch ... ok
+test substituting_lease_refs_is_rejected_before_dispatch ... ok
+test substituting_lineage_bundle_digest_is_rejected_before_dispatch ... ok
+test substituting_local_receipt_digest_is_rejected_before_dispatch ... ok
+test substituting_outcome_digest_is_rejected_before_dispatch ... ok
+test substituting_remote_receipt_digest_is_rejected_before_dispatch ... ok
+test substituting_request_digest_is_rejected_before_dispatch ... ok
+test substituting_signer_kernel_ids_is_rejected_before_dispatch ... ok
+test substituting_the_uncompared_field_alongside_a_compared_one_is_rejected ... ok
+test substituting_treaty_id_is_rejected_before_dispatch ... ok
+test substituting_treaty_scope_digest_is_rejected_before_dispatch ... ok
+test unsubstituted_binding_is_admitted_and_consumes_its_continuation ... ok
+
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.03s
+

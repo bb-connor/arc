@@ -663,6 +663,26 @@ pub(crate) fn verify_checkpoint_chain_integrity(
 pub(crate) fn verify_checkpoint_chain_integrity_with_frontier(
     connection: &Connection,
 ) -> Result<(Option<KernelCheckpoint>, CheckpointChainFrontier), ReceiptStoreError> {
+    // The checkpoint scan and the projection reads that follow it must observe
+    // one database snapshot. In WAL mode an autocommit connection takes a fresh
+    // snapshot per statement, and the scan is O(N) signature and Merkle work, so
+    // a writer that commits a checkpoint in between leaves a projection row
+    // whose source row this pass never saw, and the audit reports drift the
+    // database does not have. A deferred transaction pins the snapshot on its
+    // first read and keeps this a reader, taking no write lock. A caller that
+    // already holds a transaction has pinned one, and SQLite refuses to nest.
+    if connection.is_autocommit() {
+        let tx = connection.unchecked_transaction()?;
+        let verified = verify_checkpoint_chain_integrity_on_one_snapshot(&tx)?;
+        tx.commit()?;
+        return Ok(verified);
+    }
+    verify_checkpoint_chain_integrity_on_one_snapshot(connection)
+}
+
+fn verify_checkpoint_chain_integrity_on_one_snapshot(
+    connection: &Connection,
+) -> Result<(Option<KernelCheckpoint>, CheckpointChainFrontier), ReceiptStoreError> {
     let rows = load_all_persisted_checkpoint_rows(connection)?;
     let mut latest = None;
     let mut expected_head_ids = BTreeSet::new();

@@ -48,6 +48,8 @@ root_modules = [
   "formal/lean4/Chio/Chio/Treaty/IntersectionLegacy.lean",
   "formal/lean4/Chio/Chio/Treaty/BridgeEquivalence.lean",
   "formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean",
+  "formal/lean4/Chio/Chio/Treaty/ReceiptPredicate.lean",
+  "formal/lean4/Chio/Chio/Treaty/PredicateShape.lean",
 ]
 
 gate_commands = [
@@ -160,7 +162,7 @@ required_property_ids = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "
 property_matrix = [
   "P1|capability attenuation|lean_root_imported,differential_test,rust_projection,aeneas_equivalence,public_kani|spec.capability_monotonicity,proof.scope_subset_of_grants_subset,proof.reduced_budget_is_subset,proof.added_constraint_is_subset,proof.generated_optional_u32_cap_is_subset_preserves_parent_cap,proof.generated_ledger_apply_eq_model",
   "P2|presented revocation coverage|lean_root_imported,audited_storage_assumption,audited_transport_assumption,sqlite_projection,aeneas_equivalence,distributed_apalache,rust_trace_projection|proof.revoke_marks_capability_revoked,proof.checkRevocation_revoked_token_errors,proof.evalToolCall_revoked_token_never_allows,proof.revocationSnapshot_revoked_token_denies,proof.revocationSnapshot_revoked_ancestor_denies,proof.generated_revocation_snapshot_denies_eq_model",
-  "P3|fail-closed evaluation|lean_root_imported,rust_core,audited_subprocess_assumption,audited_wasm_engine_assumption,public_kani,adapter_no_bypass,aeneas_equivalence|proof.evalToolCall_total,proof.evalToolCall_invalid_signature_denies,proof.evalToolCall_out_of_scope_denies,proof.admitSession_invalid_dpop_rejects,proof.governedApproval_required_without_token_fails,proof.dpop_required_missing_proof_rejects,proof.dpop_required_invalid_proof_rejects,proof.guardPipeline_deny_dominates,proof.guardPipeline_error_dominates,proof.wasm_guest_output_confinement,proof.wasm_no_allow_amplification,proof.wasm_resource_exhaustion_fail_closed,proof.wasm_advisory_mode_nonblocking,proof.delegation_max_depth_failure_denies,proof.generated_time_window_valid_eq_model,proof.generated_budget_commit_eq_model,proof.generated_guard_step_allows_eq_model,proof.delivery_contract.settlement_admission_sound,proof.delivery_contract.denied_after_delivery_no_settlement,treaty.predicate.unsupported_denies,treaty.predicate.runtime_policy_exact,treaty.syntactic.decision_exact,treaty.bridge.refinement_on_iff",
+  "P3|fail-closed evaluation|lean_root_imported,rust_core,audited_subprocess_assumption,audited_wasm_engine_assumption,public_kani,adapter_no_bypass,aeneas_equivalence|proof.evalToolCall_total,proof.evalToolCall_invalid_signature_denies,proof.evalToolCall_out_of_scope_denies,proof.admitSession_invalid_dpop_rejects,proof.governedApproval_required_without_token_fails,proof.dpop_required_missing_proof_rejects,proof.dpop_required_invalid_proof_rejects,proof.guardPipeline_deny_dominates,proof.guardPipeline_error_dominates,proof.wasm_guest_output_confinement,proof.wasm_no_allow_amplification,proof.wasm_resource_exhaustion_fail_closed,proof.wasm_advisory_mode_nonblocking,proof.delegation_max_depth_failure_denies,proof.generated_time_window_valid_eq_model,proof.generated_budget_commit_eq_model,proof.generated_guard_step_allows_eq_model,proof.delivery_contract.settlement_admission_sound,proof.delivery_contract.denied_after_delivery_no_settlement,treaty.predicate.unsupported_denies,treaty.predicate.runtime_policy_exact,treaty.syntactic.decision_exact,treaty.bridge.refinement_on_iff,treaty.predicate.contains_unsupported_denies,treaty.predicate.contains_undefined_denies,treaty.predicate.unsupported_atom_anywhere_denies,treaty.predicate.undefined_atom_anywhere_denies",
   "P4|receipt integrity|lean_root_imported,symbolic_crypto,audited_crypto_assumption,receipt_totality,aeneas_equivalence,public_kani,differential_test|proof.canonical_inj,proof.receipt_id_input_collision_resistant,proof.receipt_id_collision_resistant,proof.membership_proof_sound,proof.stepFold_eq_applyProof,proof.stepFold_membership_sound_if_geometry_agrees,proof.boundedWalkGeometry_decodes,proof.bounded_stepFold_sound,proof.generated_inclusion_step_eq_model,proof.receipt_sign_then_verify,proof.receipt_immutability,proof.receiptFieldsCoupled_preserves_all_fields,proof.generated_receipt_fields_coupled_eq_model",
   "P5|presented delegation-chain semantic validity|lean_root_imported,sqlite_projection|proof.delegation_chain_integrity,proof.delegation_step_allow_requires_attenuation,proof.delegation_step_allow_requires_subject_continuity,proof.delegation_step_allow_requires_expiry_monotonicity,proof.delegation_revoked_ancestor_denies,proof.delegation_max_depth_failure_denies",
   "P6|local parent-link soundness|lean_root_imported,audited_storage_assumption|proof.observed_parent_edge_sound",
@@ -1364,13 +1366,13 @@ rust_symbols = [
   "validate_bilateral_invocation",
   "ladder_mode_rank",
 ]
-normalized_sha256 = "9f3149a8446fe5cf11274ac9888c647a0e1c3ff31d0c539bab8b8a8b743dfb8f"
+normalized_sha256 = "1fb1ab8c0485bfc3d0d248b9d9688574638e6a0d0ca6b7012ffa69b80635853c"
 symbol_sha256 = [
   { symbol = "validate_treaty_scope", sha256 = "43adb46fce2bfe544198af880bc5c27a73592c2a3bdbee6d3ad8e6d165802f9f" },
   { symbol = "validate_ladder_intersection", sha256 = "5a5dc7971541a51646ea60c3537eeec205e80ca109f1023a2fb0fe0cde4da55e" },
   { symbol = "evaluate_cross_boundary_admission", sha256 = "795aef7bb414a97c294fe58ae87a08143bec41d7fad21ad3aedf794ab5058843" },
   { symbol = "validate_bilateral_invocation", sha256 = "404dddde3595e23e82ae0f39ca360fc2a7258a5c359b7d54f94e293c2d78a366" },
-  { symbol = "ladder_mode_rank", sha256 = "ecbc5b9bdb536b61e574baf0b04f4f2eb3dcaec54242520f3a3a834c4e7c5c95" },
+  { symbol = "ladder_mode_rank", sha256 = "5debfc5b933f56a1b118c212be6e2cc59d91fce5b5af6e3fdbd196eddc3834a6" },
 ]
 
 [[mirror]]
@@ -1540,10 +1542,10 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs"
 rust_symbols = ["ChioKernel::capture_and_commit_durable_dispatch","ChioKernel::begin_durable_tool_admission_for_transport","ChioKernel::native_security_authority_binding","immutable_tool_admission_request_hash"]
-normalized_sha256 = "bb012ee8411235ca06840ddf54f0d3eda142b3e4e45d849ec26ebd73a41fe295"
+normalized_sha256 = "42b8d8885628c32bbe662759de1b3a8cabcf2a9e4b6a639a013bf6431d2a6d5b"
 symbol_sha256 = [
   { symbol = "ChioKernel::capture_and_commit_durable_dispatch", sha256 = "ac0418a5e900801b2d8c2ead9661992b0dcfed6e2d5a99b5e3a0b02a56724432" },
-  { symbol = "ChioKernel::begin_durable_tool_admission_for_transport", sha256 = "0d670fe209b8fd166e514028c0e666196c4609f0bcf46e32283d91f57966fa35" },
+  { symbol = "ChioKernel::begin_durable_tool_admission_for_transport", sha256 = "8723f03db46461c3030818c7fcb19a877ef2296c3db90ea27a01b34704538696" },
   { symbol = "ChioKernel::native_security_authority_binding", sha256 = "db50adade9669310b59adce0cd240a97fa3daa22ed31d8cb4278576b74cefcb2" },
   { symbol = "immutable_tool_admission_request_hash", sha256 = "2223fc6166bfa3bee87a1917c2cac027781b898493de814f27cd7cb2371d06a0" },
 ]
@@ -1633,9 +1635,9 @@ rust_symbols = [
   "verify_treaty_reference_from_store",
   "verified_federation_treaty_material",
 ]
-normalized_sha256 = "fd61a97b3395f06059c08113711a0839c2798dcab568e79671c2c8ecaaff2d56"
+normalized_sha256 = "c8df5df1712529f1440b50db13c798fc8728668dace2df92b162cecb463a8b4d"
 symbol_sha256 = [
-  { symbol = "verify_treaty_reference_from_store", sha256 = "e71446c0287c6b3de2e50be22a1420a3e348c20b71ee102a1fc957c359d9714b" },
+  { symbol = "verify_treaty_reference_from_store", sha256 = "acd85fcc1970b5233de32e14b0eee6f199d33d99d67bc8c0a21bf19961a9d94c" },
   { symbol = "verified_federation_treaty_material", sha256 = "b5a7d2ce9e60e0784975f26ab061dee234760f7f87e6a98166b770441395b472" },
 ]
 
@@ -1815,12 +1817,12 @@ rust_symbols = [
   "ChioKernel::validate_completed_durable_receipt",
   "ChioKernel::finalize_durable_tool_return_with_security_release",
 ]
-normalized_sha256 = "de27ffc404d9cb9c4e38738ee42fca7c8bea44a3b0d0f4c7be03f759dcb34a5d"
+normalized_sha256 = "3704f5ae3eadf6d87bcb82578d144b44569c1ef6d6c024fbdc009a336d5c89c3"
 symbol_sha256 = [
-  { symbol = "ChioKernel::record_durable_tool_return", sha256 = "a3bca6bae252fc37d8430d3c85ec7431218f67e6e054dc9fe8e26c5b0ac9c759" },
-  { symbol = "ChioKernel::completed_durable_tool_response", sha256 = "39b044f60ca214f69de7a7ec49d1d728eb0c3a1338033ee732334f0701c39bb4" },
+  { symbol = "ChioKernel::record_durable_tool_return", sha256 = "3beb0aedea4eb11504d03b0ed1e41b93152948af10ee22964a8098179f2533db" },
+  { symbol = "ChioKernel::completed_durable_tool_response", sha256 = "9635c85a7b1250ebb0babe0dcfb65b39f2d605a5ca9e801540c8329ed151543f" },
   { symbol = "ChioKernel::validate_completed_durable_receipt", sha256 = "b521c72598c8defec14bea2070cab3f4361b0bf5f573515ae55171559313c7f5" },
-  { symbol = "ChioKernel::finalize_durable_tool_return_with_security_release", sha256 = "7ee132b32289b0d2bc78b6c48abfb488636ac300e8fa79f4002b23ec03a81d30" },
+  { symbol = "ChioKernel::finalize_durable_tool_return_with_security_release", sha256 = "816adaed19eed28988f4a9254c3063458b32b94f92ae6eabc2b691a9e1a1a2ea" },
 ]
 
 [[mirror]]
@@ -3143,13 +3145,13 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs"
 rust_symbols = ["initialize_admission_operation_schema","migrate_schema","verify_admission_operation_invariants","verify_admission_operation_schema","admission_operation_schema_catalog"]
-normalized_sha256 = "04b32b0a1eb7c9e244aac97d37211e850cee5ae09ce917e2e5bed057d37741eb"
+normalized_sha256 = "1fd6f8c8c4c47f816fa15d6a0904ca9e70b7acbf686da789694dc758af215f47"
 symbol_sha256 = [
   { symbol = "initialize_admission_operation_schema", sha256 = "3300140793f096b312bb38b8f914f620cf13e0e75b65ec2fac5c469079e6e69b" },
-  { symbol = "migrate_schema", sha256 = "e0520ade609fc41dd7b0dbd8b75efafa1cc85af0dd5692d26827616836c6769d" },
-  { symbol = "verify_admission_operation_invariants", sha256 = "35ae1f8e27d97ac182859265b4ca263555ad3afecd5506830d963b4b008d3820" },
+  { symbol = "migrate_schema", sha256 = "e1273f920bee888f09f467630f27b27f4a0db92cc0ff875ea60c2e9b8a24b297" },
+  { symbol = "verify_admission_operation_invariants", sha256 = "206720f61b65a7b72ecb82e35859919dabc074a4cf215a63a884f25e3a89220a" },
   { symbol = "verify_admission_operation_schema", sha256 = "a668153da33e6b5518dd1de6053bf6e8de089238180a476ccc776ca27db6db5c" },
-  { symbol = "admission_operation_schema_catalog", sha256 = "faa1b327ae9c2b13074be7478289bb6ad38918b49fb49e324a69ca989ae78655" },
+  { symbol = "admission_operation_schema_catalog", sha256 = "2f4e6c00f515983b4f28db3905d3bcb61197ea638dc3971f6313ff73cb91e77a" },
 ]
 
 [[mirror]]
@@ -3158,9 +3160,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/schema.rs"
 rust_symbols = ["recorded_version", "digest_version", "expected", "verify_version"]
-normalized_sha256 = "d6296abd0c3f8e0f8739f15a98f41ab0864495231343d440bea18fb82c6a23f1"
+normalized_sha256 = "191622c3098b95347e21cb2da0b5d9486e32444f65a0c6457bf0e998363d1951"
 symbol_sha256 = [
-  { symbol = "recorded_version", sha256 = "939215376e1419c6e963b01743774423abe28a8d21bc5408e62bbd6ab581b10c" },
+  { symbol = "recorded_version", sha256 = "0c4f8d87939cd70e45941434fa38788d49cf235fa1911ab33c2a1d12b5411c50" },
   { symbol = "digest_version", sha256 = "7c870a429ee25a6915150d2fc96ddecf7fade1a327d91a8b1b6c21c52240e6d0" },
   { symbol = "expected", sha256 = "8d0bba92e02cdf38e31e65bf91585b85a95fc1759ab5b7c6194082a05515b886" },
   { symbol = "verify_version", sha256 = "5f57ebc4e2f4bb9253efdd59a285f66510f338253a22e4ed1cf290f78186a993" },
@@ -3172,9 +3174,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store.rs"
 rust_symbols = ["ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION","SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch"]
-normalized_sha256 = "e3f1a7b630442f72b404a8d6637ac20ff84252afd3fcccf14c1228b8523e0f38"
+normalized_sha256 = "304fd57f61830c34dd5cd2c0e0859316a32754f8145a11f7bb8fb182b88f8bd5"
 symbol_sha256 = [
-  { symbol = "ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION", sha256 = "eaad73f8208c1738f7553ecea638dc7b3daf2f17ac80931733cdd812592861ba" },
+  { symbol = "ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION", sha256 = "9fc6b239e4c45cd811f73626e73c289ddcd00aa3fbc9d77cd034018675fc5bce" },
   { symbol = "SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch", sha256 = "deaac50e9990fa4ae3b07274654b432549acbfd8ce86cd2b0a6cd1b4a6fea160" },
 ]
 
@@ -3184,9 +3186,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs"
 rust_symbols = ["GLOBAL_COMMIT_SCHEMA","budget_event_reference_digest"]
-normalized_sha256 = "17128ec115a2f545f9f509c7f5df77d78a0e5c5d1e4d34d6a816f93dc0013e6a"
+normalized_sha256 = "3dc17d54e689f2a6e33726a5638788678d29e924e458ed0e215234b9dbefc637"
 symbol_sha256 = [
-  { symbol = "GLOBAL_COMMIT_SCHEMA", sha256 = "aaa6745ab7a26cc1808bc348daf062f0064b3410a72d8ba9ffe329a61931571d" },
+  { symbol = "GLOBAL_COMMIT_SCHEMA", sha256 = "db94e7d46a9dba3670085eb45cae2a0722246506a9ce2d4f66a7d17b1fa4cef4" },
   { symbol = "budget_event_reference_digest", sha256 = "4b3a4210201b80e3b8f384bc041d173aa01edf63d81cc1ccfb229a8ea1340ee0" },
 ]
 
@@ -3196,9 +3198,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/schema_migration.rs"
 rust_symbols = ["migrate_previous_global_commit_schema"]
-normalized_sha256 = "5f40f2e42133be8fbe81c6a8e4a11a16e0c722ba521f1ce7bba9d2b855aa2db5"
+normalized_sha256 = "c53dd4b958b5990b388866011d3ce768fe5e7ec2ffbaf336421d008795547090"
 symbol_sha256 = [
-  { symbol = "migrate_previous_global_commit_schema", sha256 = "8d10787409c484bb6afc2a084d1afd2a2ff8b673297812344fe35229582c416b" },
+  { symbol = "migrate_previous_global_commit_schema", sha256 = "d469a51e2cc1f563dfd6440be4c11d990a093cc1bb6e5182fafc65eb6232baa8" },
 ]
 
 [[mirror]]
@@ -3207,9 +3209,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/projection_reference.rs"
 rust_symbols = ["projection_reference_digest"]
-normalized_sha256 = "f3ca157f184747328096a02e67bfdff6c5e2abb2fa87536c54b3b13f08fbe633"
+normalized_sha256 = "64146e6c667753101161f50ab139857e50cec5e9a631f11af5505dfc2566a201"
 symbol_sha256 = [
-  { symbol = "projection_reference_digest", sha256 = "cba29201112ab5a2a81d9b10c24f7b30f753f60c7f14ffb21e394fb4dc3ee499" },
+  { symbol = "projection_reference_digest", sha256 = "d862a50da3261dc7d1f8eea8c813a7eefe51aa30c6085b7ffe4151adf4cb8f69" },
 ]
 
 # Native capture entries track source drift only. The lifecycle model does not
@@ -3381,11 +3383,11 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/custody.rs"
 rust_symbols = ["History::push", "History::finish", "ChioKernel::read_caller_participant_custody"]
-normalized_sha256 = "cda028484eb6530672f5c551e22d0715e6544ff28613ccbec45a7af9081dda41"
+normalized_sha256 = "e16fec43ace09ea6baf9918830ba5ec7a558910a02bc3b95675f2728942ad60f"
 symbol_sha256 = [
   { symbol = "History::push", sha256 = "13786a2599e977de0059224c421d9181466864e7e9236493218ec76add2692a4" },
   { symbol = "History::finish", sha256 = "392fa867b4267f0cffd35324b705580b27e5f8f73b0d4928bfcb9dadbb94ddf4" },
-  { symbol = "ChioKernel::read_caller_participant_custody", sha256 = "794cdda161a9becfa595ce1098d38784d211642e0085ee9a5f39b10e08858628" },
+  { symbol = "ChioKernel::read_caller_participant_custody", sha256 = "02aa4a185e2d546ccb2990912dbd1b57aefaea0fea069876d2278628f66597cf" },
 ]
 
 [[mirror]]

@@ -1,0 +1,22 @@
+{
+  "scenario": "child-after-review",
+  "parent": {
+    "reviews": 1,
+    "jobs": 1,
+    "payments": {
+      "released": 1
+    }
+  },
+  "child": {
+    "reviews": 1,
+    "jobs": 1,
+    "payments": {
+      "released": 1
+    }
+  },
+  "buyerSpent": 0,
+  "delegateSpent": 0,
+  "parentReplayed": false,
+  "concurrentParentRecoveries": 4,
+  "concurrentChildRecoveries": 4
+}

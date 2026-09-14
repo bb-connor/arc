@@ -9,6 +9,7 @@ use crate::trust_bundle::*;
 use crate::validation::*;
 use chio_core_types::crypto::Keypair;
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_federation::bilateral::RejectionCode;
 use chio_governance::authorization::SignedGovernanceReceipt;
 use chio_governance::lease::SignedCapabilityLease;
 use chio_selective_disclosure::{
@@ -647,4 +648,208 @@ fn wrong_verifier_context_nonce_fails_and_report_keeps_prior_checks() {
         .checks
         .iter()
         .any(|check| check.code == "trust.bbs_issuer"));
+}
+
+// ---------------------------------------------------------------------------
+// Rejection surface: the exported report carries a code, not a diagnostic
+// ---------------------------------------------------------------------------
+
+const TAMPERED_FINGERPRINT: &str =
+    "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
+
+fn proof_package_from_fixture() -> ChioProofPackage {
+    proof_package_from_json(include_str!(
+        "../../../../examples/chio-3vendor/fixtures/buyer-auditor-proof-package.json"
+    ))
+    .expect("package fixture parses")
+}
+
+/// Move a tool receipt's timestamp without re-signing. The receipt keeps
+/// the id its workflow step and co-signed envelope name, so the tamper
+/// survives the workflow link checks and is caught by the bilateral
+/// verifier.
+fn tamper_tool_receipt_timestamp(package: &mut ChioProofPackage) -> String {
+    let receipt = &mut package.tool_receipts[0];
+    receipt.timestamp += 1;
+    receipt.id.clone()
+}
+
+/// Every hexadecimal run in the package long enough to be a digest, a key,
+/// or a key fingerprint.
+fn package_secrets(package: &ChioProofPackage) -> Vec<String> {
+    let json = package_json(package).expect("package serialises");
+    let mut secrets = Vec::new();
+    let mut run = String::new();
+    for character in json.chars().chain(std::iter::once('\n')) {
+        if character.is_ascii_digit() || ('a'..='f').contains(&character) {
+            run.push(character);
+            continue;
+        }
+        if run.len() >= 48 {
+            secrets.push(std::mem::take(&mut run));
+        } else {
+            run.clear();
+        }
+    }
+    secrets.sort();
+    secrets.dedup();
+    assert!(
+        secrets.len() > 4,
+        "fixture should carry several digests and fingerprints"
+    );
+    secrets
+}
+
+#[test]
+fn tampered_package_report_carries_the_code_and_no_package_data() {
+    let mut package = proof_package_from_fixture();
+    let original_receipt_id = tamper_tool_receipt_timestamp(&mut package);
+    let trust_bundle = trust_bundle_from_fixture().expect("trust bundle parses");
+    let context = verification_context_from_fixture();
+
+    let error = verify_package(&package, &trust_bundle, &context).expect_err("tamper is rejected");
+    let local = error.to_string();
+    assert!(
+        local.starts_with("federation verification failed: subject.digest_mismatch:"),
+        "the tamper should be caught by the bilateral verifier: {local}"
+    );
+
+    let report = verify_package_report(&package, &trust_bundle, &context);
+    assert!(!report.accepted);
+    let failure = report
+        .failure
+        .as_ref()
+        .expect("rejection carries a failure");
+    // A struct literal pins the whole failure object, so no field can carry a
+    // digest, a fingerprint, or a policy verdict.
+    assert_eq!(
+        *failure,
+        VerifierFailure {
+            code: "subject.digest_mismatch".to_string(),
+            phase: "federation".to_string(),
+            detail: WITHHELD_FAILURE_DETAIL.to_string(),
+        }
+    );
+    assert!(failure.code.parse::<RejectionCode>().is_ok());
+
+    let exported = report_json(&report).expect("report serialises");
+    assert!(exported.contains(&failure.code));
+    assert!(!exported.contains(&original_receipt_id));
+    let mut secrets = package_secrets(&package);
+    secrets.push(original_receipt_id);
+    for secret in secrets {
+        assert!(
+            !exported.contains(&secret),
+            "exported report leaks a package digest or fingerprint: {secret}"
+        );
+    }
+}
+
+#[test]
+fn every_failure_exports_its_code_and_withholds_its_diagnostic() {
+    let leak = "presented b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c                 expected 7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730                 verdict deny";
+    let mut errors = vec![
+        ChioPackageError::Canonical(leak.to_string()),
+        ChioPackageError::UnsupportedSchema(leak.to_string()),
+        ChioPackageError::UnsupportedClaim(leak.to_string()),
+        ChioPackageError::Workflow(leak.to_string()),
+        ChioPackageError::Governance(leak.to_string()),
+        ChioPackageError::Federation(leak.to_string()),
+        ChioPackageError::SelectiveDisclosure(leak.to_string()),
+        ChioPackageError::SelectiveDisclosure(format!("proof nonce {leak}")),
+        ChioPackageError::TrustedIssuer(leak.to_string()),
+        ChioPackageError::TrustBundle(leak.to_string()),
+        ChioPackageError::WorkflowIntersection(leak.to_string()),
+        ChioPackageError::LeaseScopeBinding(leak.to_string()),
+        ChioPackageError::VerificationContext(leak.to_string()),
+        ChioPackageError::Inconsistent(leak.to_string()),
+        ChioPackageError::Json(leak.to_string()),
+    ];
+    errors.extend(
+        RejectionCode::ALL
+            .iter()
+            .map(|code| ChioPackageError::FederationRejected {
+                code: *code,
+                detail: leak.to_string(),
+            }),
+    );
+
+    for error in &errors {
+        let failure = VerifierFailure::from_error(error);
+        assert!(
+            error.to_string().contains(leak),
+            "the local diagnostic must keep the detail"
+        );
+        assert_eq!(failure.detail, WITHHELD_FAILURE_DETAIL);
+        assert!(!failure.code.is_empty() && !failure.phase.is_empty());
+        let exported = serde_json::to_string(&failure).expect("failure serialises");
+        assert!(
+            !exported.contains(leak),
+            "exported failure leaks the diagnostic for {}",
+            failure.code
+        );
+        for fragment in ["b5bb9d80", "7d865e95", "presented", "expected"] {
+            assert!(
+                !exported.contains(fragment),
+                "exported failure leaks {fragment}"
+            );
+        }
+        assert!(!failure.detail.contains("deny"));
+    }
+
+    for code in RejectionCode::ALL {
+        let failure = VerifierFailure::from_error(&ChioPackageError::FederationRejected {
+            code: *code,
+            detail: leak.to_string(),
+        });
+        assert_eq!(failure.code, code.as_str());
+        assert_eq!(failure.phase, "federation");
+    }
+}
+
+#[test]
+fn every_rejected_stage_exports_the_same_withheld_detail() {
+    let trust_bundle = trust_bundle_from_fixture().expect("trust bundle parses");
+    let context = verification_context_from_fixture();
+
+    let mut untrusted_issuer = proof_package_from_fixture();
+    untrusted_issuer
+        .selective_disclosure_proof
+        .issuer_fingerprint = TAMPERED_FINGERPRINT.to_string();
+    let mut unsupported_schema = proof_package_from_fixture();
+    unsupported_schema.schema = "chio.attest.proof-package.v99".to_string();
+
+    for (package, expected_code, expected_phase, leaked) in [
+        (
+            untrusted_issuer,
+            "trust.bbs_issuer",
+            "trust",
+            TAMPERED_FINGERPRINT,
+        ),
+        (
+            unsupported_schema,
+            "package.schema",
+            "package",
+            "chio.attest.proof-package.v99",
+        ),
+    ] {
+        let error =
+            verify_package(&package, &trust_bundle, &context).expect_err("tamper is rejected");
+        assert!(
+            error.to_string().contains(leaked),
+            "the local diagnostic should still name the presented value"
+        );
+
+        let report = verify_package_report(&package, &trust_bundle, &context);
+        let failure = report
+            .failure
+            .as_ref()
+            .expect("rejection carries a failure");
+        assert_eq!(failure.code, expected_code);
+        assert_eq!(failure.phase, expected_phase);
+        assert_eq!(failure.detail, WITHHELD_FAILURE_DETAIL);
+        assert!(!report_json(&report)
+            .expect("report serialises")
+            .contains(leaked));
+    }
 }

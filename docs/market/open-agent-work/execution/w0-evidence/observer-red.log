@@ -1,0 +1,28 @@
+test_authorization_requires_exact_observed_deployment_claim_and_window (test_verifier.ObserverBindingTests.test_authorization_requires_exact_observed_deployment_claim_and_window) ... ERROR
+test_conflicting_submission_cannot_replace_retained_claim (test_verifier.ObserverBindingTests.test_conflicting_submission_cannot_replace_retained_claim) ... ok
+test_false_authentication_observation_is_signed_rejection (test_verifier.ObserverBindingTests.test_false_authentication_observation_is_signed_rejection) ... ok
+test_malformed_output_is_rejection_and_not_success (test_verifier.ObserverBindingTests.test_malformed_output_is_rejection_and_not_success) ... ok
+test_provider_custodian_verifier_and_allocation_substitutions_deny (test_verifier.ObserverBindingTests.test_provider_custodian_verifier_and_allocation_substitutions_deny) ... ok
+test_real_predicate_accepts_and_decision_survives_reopen (test_verifier.ObserverBindingTests.test_real_predicate_accepts_and_decision_survives_reopen) ... ok
+test_unavailable_custody_does_not_sign_a_financial_decision (test_verifier.ObserverBindingTests.test_unavailable_custody_does_not_sign_a_financial_decision) ... ok
+test_validly_signed_decision_cannot_change_any_financial_or_work_binding (test_verifier.ObserverBindingTests.test_validly_signed_decision_cannot_change_any_financial_or_work_binding) ... ok
+test_conflicting_submission_cannot_replace_retained_claim (test_verifier.VerifierTests.test_conflicting_submission_cannot_replace_retained_claim) ... ok
+test_false_authentication_observation_is_signed_rejection (test_verifier.VerifierTests.test_false_authentication_observation_is_signed_rejection) ... ok
+test_malformed_output_is_rejection_and_not_success (test_verifier.VerifierTests.test_malformed_output_is_rejection_and_not_success) ... ok
+test_provider_custodian_verifier_and_allocation_substitutions_deny (test_verifier.VerifierTests.test_provider_custodian_verifier_and_allocation_substitutions_deny) ... ok
+test_real_predicate_accepts_and_decision_survives_reopen (test_verifier.VerifierTests.test_real_predicate_accepts_and_decision_survives_reopen) ... ok
+test_unavailable_custody_does_not_sign_a_financial_decision (test_verifier.VerifierTests.test_unavailable_custody_does_not_sign_a_financial_decision) ... ok
+test_validly_signed_decision_cannot_change_any_financial_or_work_binding (test_verifier.VerifierTests.test_validly_signed_decision_cannot_change_any_financial_or_work_binding) ... ok
+
+======================================================================
+ERROR: test_authorization_requires_exact_observed_deployment_claim_and_window (test_verifier.ObserverBindingTests.test_authorization_requires_exact_observed_deployment_claim_and_window)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_verifier.py", line 123, in test_authorization_requires_exact_observed_deployment_claim_and_window
+    from verifier import authorize
+ImportError: cannot import name 'authorize' from 'verifier' (/home/connor/backbay/arc-funded-work/examples/funded-work/verifier.py)
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.737s
+
+FAILED (errors=1)

@@ -1,0 +1,60 @@
+✖ real W0 accepted has exact retained authority and balances (1.740448ms)
+✖ real W0 rejected has exact retained authority and balances (0.458602ms)
+✖ real W0 missing-custody has exact retained authority and balances (0.433723ms)
+✖ real W0 child has exact retained authority and balances (0.498643ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 0
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 98.376886
+
+✖ failing tests:
+
+test at contracts/scripts/work-claim-w0.test.mjs:15:3
+✖ real W0 accepted has exact retained authority and balances (1.740448ms)
+  Error: canonical W0 custody-to-payment integration is not implemented
+      at runW0 (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-w0.mjs:2:9)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-w0.test.mjs:18:28)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.start (node:internal/test_runner/test:1177:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+
+test at contracts/scripts/work-claim-w0.test.mjs:15:3
+✖ real W0 rejected has exact retained authority and balances (0.458602ms)
+  Error: canonical W0 custody-to-payment integration is not implemented
+      at runW0 (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-w0.mjs:2:9)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-w0.test.mjs:18:28)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+
+test at contracts/scripts/work-claim-w0.test.mjs:15:3
+✖ real W0 missing-custody has exact retained authority and balances (0.433723ms)
+  Error: canonical W0 custody-to-payment integration is not implemented
+      at runW0 (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-w0.mjs:2:9)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-w0.test.mjs:18:28)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7)
+
+test at contracts/scripts/work-claim-w0.test.mjs:15:3
+✖ real W0 child has exact retained authority and balances (0.498643ms)
+  Error: canonical W0 custody-to-payment integration is not implemented
+      at runW0 (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-w0.mjs:2:9)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-w0.test.mjs:18:28)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7)

@@ -1,0 +1,14 @@
+test_nonce_index_corruption_is_not_trusted_over_original_signed_record (test_rail_journal.JournalTests.test_nonce_index_corruption_is_not_trusted_over_original_signed_record) ... FAIL
+
+======================================================================
+FAIL: test_nonce_index_corruption_is_not_trusted_over_original_signed_record (test_rail_journal.JournalTests.test_nonce_index_corruption_is_not_trusted_over_original_signed_record)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_rail_journal.py", line 132, in test_nonce_index_corruption_is_not_trusted_over_original_signed_record
+    with self.assertRaises(p.ProtocolError):
+AssertionError: ProtocolError not raised
+
+----------------------------------------------------------------------
+Ran 1 test in 0.030s
+
+FAILED (failures=1)

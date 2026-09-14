@@ -4,6 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 export CARGO_INCREMENTAL=0
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
+# Match the native/flow gates: permission-sensitive startup fixtures must not
+# inherit group-writable ancestry from the invoking shell.
+umask 022
 
 # The whole target is an exact inventory. Adding, removing, ignoring or renaming
 # an acceptance case requires reviewing this gate, not merely changing a filter.

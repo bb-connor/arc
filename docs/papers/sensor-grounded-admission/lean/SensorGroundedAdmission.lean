@@ -2,10 +2,13 @@
   Sensor-grounded admission: structural distinguishability of admission
   under attested healthy vs. attested degraded substrate state.
 
-  This file is the paper-local mechanization of the four theorems named
-  in `papers/sensor-grounded-admission/theorems.lean`. It is intended
-  to be promoted into `formal/lean4/Chio/Chio/Treaty/` once the
-  authoring decision is final; until then it lives beside the paper.
+  This file is the paper-local mechanization of the four theorems the paper
+  names. It is not imported by `Chio.lean`, not built by `lake build`, not
+  listed in `formal/proof-manifest.toml`, and not in
+  `formal/theorem-inventory.json`. It is checked by hand from
+  `formal/lean4/Chio` with `lake env lean` against the current toolchain
+  (`lean-toolchain`, v4.28.0). The imports below name the substrate modules
+  the model sits beside; no declaration from them is used.
 
   The four theorems:
 
@@ -44,7 +47,7 @@ set_option autoImplicit false
 
 namespace Chio.Treaty.SensorAttestation
 
-/-- Receipt identifier, mirroring the parent file. -/
+/-- Opaque receipt identifier. -/
 abbrev ReceiptId := String
 
 /-- Provider identifier on the kernel's sensing posture. -/

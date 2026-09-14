@@ -1,0 +1,44 @@
+[
+  {
+    "path": "sdks/python/chio-adapter-base/src/chio_adapter_base/security.py",
+    "preservedSourceSha256": "e4ad63fd2af96170cb98cfc025af205ad53649dbe29dadd6b400233ef250b234",
+    "candidateSha256": "e4ad63fd2af96170cb98cfc025af205ad53649dbe29dadd6b400233ef250b234",
+    "byteIdentical": true
+  },
+  {
+    "path": "sdks/python/chio-hermes/src/chio_hermes/executors.py",
+    "preservedSourceSha256": "c7ad6f8d19a33c96e14c1d84312ef77b1c4d52c1bdd494be18b48358d481c726",
+    "candidateSha256": "c7ad6f8d19a33c96e14c1d84312ef77b1c4d52c1bdd494be18b48358d481c726",
+    "byteIdentical": true
+  },
+  {
+    "path": "sdks/python/chio-adapter-base/tests/test_git_hooks.py",
+    "preservedSourceSha256": "84bf4beeaf603ff00c5af6077e550939ab8c4dba2b0f6ddea1f92b9eff900251",
+    "candidateSha256": "84bf4beeaf603ff00c5af6077e550939ab8c4dba2b0f6ddea1f92b9eff900251",
+    "byteIdentical": true
+  },
+  {
+    "path": "sdks/python/chio-hermes/tests/test_git_commit_hooks.py",
+    "preservedSourceSha256": "3797156dfbfb8c1a64d9c3c0640cc48e9e558a7e8320efc56ddc9e2eb4c61178",
+    "candidateSha256": "3797156dfbfb8c1a64d9c3c0640cc48e9e558a7e8320efc56ddc9e2eb4c61178",
+    "byteIdentical": true
+  },
+  {
+    "path": "sdks/python/chio-adapter-base/tests/test_security.py",
+    "preservedSourceSha256": "94828db44fb68e01b64ddd26fbcfdf9631485206fbaf249537b0c3203028c5f8",
+    "candidateSha256": "94828db44fb68e01b64ddd26fbcfdf9631485206fbaf249537b0c3203028c5f8",
+    "byteIdentical": true
+  },
+  {
+    "path": "sdks/python/chio-hermes/tests/test_security_fixes.py",
+    "preservedSourceSha256": "035ebcaac79429b8d5bfda801270283609c26a0e385aa933d1fef94e8bfbe819",
+    "candidateSha256": "035ebcaac79429b8d5bfda801270283609c26a0e385aa933d1fef94e8bfbe819",
+    "byteIdentical": true
+  },
+  {
+    "path": "examples/composed-baseline/src/bin/run_composed_baseline.rs",
+    "preservedSourceSha256": "91e3a7ead5fa0e20387ede0fad62adee1eeef46b7ad6706761791038c49ef40b",
+    "candidateSha256": "91e3a7ead5fa0e20387ede0fad62adee1eeef46b7ad6706761791038c49ef40b",
+    "byteIdentical": true
+  }
+]

@@ -4,15 +4,18 @@
 //! bidirectional QUIC RPC (categorically NOT gossip: an in-flight statement must
 //! not leak to non-parties). Org A's accept-time gate 403-rejects any unadmitted
 //! Org B; past the gate, Org A verifies `org_b_signature` over the exact
-//! `pae_bytes` against Org B's pinned passport key AND binds the authenticated
-//! `EndpointId` to the claimed `org_b_kernel_id`. Only then does Org A co-sign the
-//! SAME opaque bytes (never re-derived). On any failure it answers with a typed
-//! error and NEVER signs.
+//! `pae_bytes` against Org B's pinned passport key, binds the authenticated
+//! `EndpointId` to the claimed `org_b_kernel_id`, and reconstructs `pae_bytes` as
+//! the DSSE pre-authentication encoding of an in-toto statement naming both
+//! kernels. Only then does it co-sign those same bytes. On any failure it answers
+//! with a typed error and NEVER signs.
 //!
 //! This example drives the crate's real client (`IrohBilateralCoSigner`) against
 //! the real server handler (`BilateralCoSignHandler`): a full co-sign whose
-//! response verifies over `pae_bytes`, and an Org B that claims a different kernel
-//! id than it authenticated as, refused without a signature.
+//! response verifies over `pae_bytes`, an Org B that claims a different kernel id
+//! than it authenticated as, and an Org B that asks for a signature over the
+//! canonical signing preimage of a receipt it invented. The last two are refused
+//! without a signature.
 //!
 //! Run: `cargo run -p chio-federation-transport-iroh --example bilateral_cosign`
 
@@ -23,6 +26,18 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core_types::canonical_json_bytes;
+use chio_core_types::receipt::body::prepare_receipt_body_for_signing;
+use chio_core_types::receipt::body::ChioReceipt;
+use chio_core_types::receipt::body::ChioReceiptBody;
+use chio_core_types::receipt::decision::Decision;
+use chio_core_types::receipt::decision::ToolCallAction;
+use chio_core_types::receipt::kinds::BoundaryClass;
+use chio_core_types::receipt::kinds::ReceiptKind;
+use chio_core_types::receipt::kinds::RedactionMode;
+use chio_core_types::receipt::kinds::ToolOrigin;
+use chio_core_types::receipt::kinds::TrustLevel;
+use chio_core_types::receipt::metadata::ActorRef;
+use chio_core_types::receipt::signing::ChioReceiptSigningBody;
 use chio_core_types::sha256_hex;
 use chio_core_types::Keypair;
 use chio_core_types::PublicKey;
@@ -30,6 +45,12 @@ use chio_federation::bilateral::BilateralCoSigningError;
 use chio_federation::bilateral::DsseCoSigningRequest;
 use chio_federation::bilateral::DsseCoSigningResponse;
 use chio_federation::bilateral::BILATERAL_DSSE_COSIGNING_SCHEMA;
+use chio_federation::bilateral_dsse::build_predicate;
+use chio_federation::bilateral_dsse::build_statement;
+use chio_federation::bilateral_dsse::pae;
+use chio_federation::bilateral_dsse::KernelIdentity;
+use chio_federation::bilateral_dsse::Keyid;
+use chio_federation::bilateral_dsse::PAYLOAD_TYPE_IN_TOTO;
 use chio_federation_transport_iroh::admission::DirectoryGate;
 use chio_federation_transport_iroh::identity::transport_endorsement_preimage;
 use chio_federation_transport_iroh::identity::TransportDirectoryBundleBody;
@@ -194,6 +215,72 @@ fn pinned_org_b(org_b: &Peer) -> Arc<dyn PinnedPassportKeys> {
     Arc::new(keys)
 }
 
+/// The receipt Org B signs before it asks for a co-signature, and the body it
+/// is built from.
+fn host_receipt(host: &Keypair) -> Result<ChioReceipt, Box<dyn Error>> {
+    Ok(ChioReceipt::sign(receipt_body(host.public_key())?, host)?)
+}
+
+fn receipt_body(kernel_key: PublicKey) -> Result<ChioReceiptBody, Box<dyn Error>> {
+    Ok(ChioReceiptBody {
+        id: "invoke-bilateral-cosign".to_string(),
+        timestamp: NOW / 1_000,
+        capability_id: "cap-bilateral-cosign".to_string(),
+        tool_server: "vendor-ledger".to_string(),
+        tool_name: "close_account".to_string(),
+        action: ToolCallAction::from_parameters(serde_json::json!({ "record": "ledger-7" }))?,
+        decision: Some(Decision::Allow),
+        receipt_kind: ReceiptKind::MediatedDecision,
+        boundary_class: BoundaryClass::Prevent,
+        observation_outcome: None,
+        tool_origin: ToolOrigin::CallerExecuted,
+        redaction_mode: RedactionMode::None,
+        actor_chain: vec![ActorRef {
+            actor_id: "agent:example/bilateral-cosign".to_string(),
+            actor_kind: Some("agent".to_string()),
+        }],
+        content_hash: "4".repeat(64),
+        policy_hash: "policy-bilateral-cosign".to_string(),
+        evidence: Vec::new(),
+        metadata: None,
+        trust_level: TrustLevel::default(),
+        tenant_id: None,
+        kernel_key,
+        bbs_projection_version: None,
+    })
+}
+
+/// The DSSE pre-authentication encoding of the in-toto statement the producer
+/// path builds for this pair of kernels: the preimage Org A reconstructs before
+/// it will co-sign.
+fn dsse_pae_preimage(org_a: &Peer, org_b: &Peer) -> Result<Vec<u8>, Box<dyn Error>> {
+    let receipt = host_receipt(&org_b.passport)?;
+    let identity = |peer: &Peer| KernelIdentity {
+        kernel_id: peer.kernel_id.clone(),
+        passport_key_fingerprint: Keyid::from_public_key(&peer.passport.public_key()),
+        alg: "ed25519".to_string(),
+    };
+    let predicate = build_predicate(
+        &receipt,
+        identity(org_a),
+        identity(org_b),
+        &receipt.tool_name,
+        NOW,
+    )?;
+    Ok(pae(
+        PAYLOAD_TYPE_IN_TOTO,
+        &build_statement(&receipt, predicate)?.canonical_bytes()?,
+    ))
+}
+
+/// The canonical signing preimage of a receipt attributed to `kernel_key`: the
+/// bytes a co-signing kernel must never sign for a peer, because its signature
+/// over them is a receipt that kernel never issued.
+fn receipt_signing_preimage(kernel_key: PublicKey) -> Result<Vec<u8>, Box<dyn Error>> {
+    let body = prepare_receipt_body_for_signing(receipt_body(kernel_key)?)?;
+    Ok(canonical_json_bytes(&ChioReceiptSigningBody::from(&body))?)
+}
+
 async fn cosign_with_timeout(
     cosigner: &IrohBilateralCoSigner,
     request: &DsseCoSigningRequest,
@@ -219,7 +306,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let cosigner = spawn_org_b(&org_b, ORG_A, addr).await?;
 
     // ---- 1. A full co-sign: the response verifies over the exact pae_bytes ---
-    let pae_bytes = b"DSSEv1 opaque bilateral pae preimage".to_vec();
+    let pae_bytes = dsse_pae_preimage(&org_a, &org_b)?;
     let request = DsseCoSigningRequest::new(
         ORG_A.to_string(),
         org_b.kernel_id.clone(),
@@ -278,13 +365,41 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
+    // ---- 3. Org B asks for a signature over a receipt preimage --------------
+    let forged_preimage = receipt_signing_preimage(org_a_public.clone())?;
+    let forged_request = DsseCoSigningRequest::new(
+        ORG_A.to_string(),
+        org_b.kernel_id.clone(),
+        forged_preimage.clone(),
+        org_b.passport.sign(&forged_preimage),
+    );
+    println!("\nOrg B asks for a signature over a receipt it attributed to {ORG_A}:");
+    let forgery_rejected = match cosign_with_timeout(&cosigner, &forged_request).await {
+        Ok(Err(error)) => {
+            println!("  -> refused without signing: {error}");
+            true
+        }
+        Ok(Ok(_response)) => {
+            println!("  -> UNEXPECTEDLY signed a receipt preimage");
+            false
+        }
+        Err(error) => {
+            println!("  -> {error}");
+            false
+        }
+    };
+
     router.shutdown().await.ok();
 
     println!("\nfail-closed summary:");
     println!("  co-signature verifies over pae_bytes:        {cosign_ok}");
     println!("  spoofed org_b refused without a signature:   {spoof_rejected}");
-    if cosign_ok && spoof_rejected {
-        println!("\nOK: Org A co-signs the exact bytes only for the authenticated counterparty.");
+    println!("  receipt preimage refused without a signature:{forgery_rejected}");
+    if cosign_ok && spoof_rejected && forgery_rejected {
+        println!(
+            "\nOK: Org A co-signs only bytes it reconstructed, and only for the authenticated \
+             counterparty."
+        );
         Ok(())
     } else {
         Err("bilateral co-sign invariant violated".into())

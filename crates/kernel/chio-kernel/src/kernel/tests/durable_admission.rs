@@ -26,6 +26,8 @@ mod dpop_acquisition;
 mod federation_context;
 #[path = "durable_admission/governed_acquisition.rs"]
 mod governed_acquisition;
+#[path = "durable_admission/checked_output.rs"]
+mod checked_output;
 #[path = "durable_admission/monetary.rs"]
 mod monetary;
 #[path = "durable_admission/native_acquisition.rs"]
@@ -408,6 +410,13 @@ impl ReceiptStore for TestAdmissionOperationStore {
             .ok_or_else(|| ReceiptStoreError::Conflict("terminal replay is absent".to_owned()))?;
         if let AdmissionTerminalProjection::Completed(completed) = projection {
             state.receipt = Some(completed.receipt.receipt().clone());
+        }
+        if let AdmissionTerminalProjection::DeniedAfterDelivery { evidence, .. } = projection {
+            if let crate::admission_operation::AdmissionReceiptOrIncident::Receipt(receipt) =
+                evidence.as_ref()
+            {
+                state.receipt = Some(receipt.receipt().clone());
+            }
         }
         state.operation = Some(updated.clone());
         state.claim = None;

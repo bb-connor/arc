@@ -1,0 +1,157 @@
+[
+  {
+    "scenario": "normal",
+    "beforeRecovery": null,
+    "reviews": 1,
+    "payments": {
+      "captured": 1
+    },
+    "buyerExpenses": 1,
+    "workExecuted": true,
+    "buyerVerified": true,
+    "localCreditSettled": true,
+    "externalFundsTransferred": false
+  },
+  {
+    "scenario": "after-settlement-sigkill",
+    "beforeRecovery": {
+      "reviews": 1,
+      "payments": {
+        "captured": 1
+      },
+      "buyerExpenses": 0
+    },
+    "reviews": 1,
+    "payments": {
+      "captured": 1
+    },
+    "buyerExpenses": 1,
+    "workExecuted": true,
+    "buyerVerified": true,
+    "localCreditSettled": true,
+    "externalFundsTransferred": false
+  },
+  {
+    "scenario": "after-capture-sigkill",
+    "beforeRecovery": {
+      "reviews": 1,
+      "payments": {
+        "captured": 1
+      },
+      "buyerExpenses": 0
+    },
+    "reviews": 1,
+    "payments": {
+      "captured": 1
+    },
+    "buyerExpenses": 1,
+    "workExecuted": true,
+    "buyerVerified": true,
+    "localCreditSettled": true,
+    "externalFundsTransferred": false
+  },
+  {
+    "scenario": "buyer-after-check-sigkill",
+    "beforeRecovery": {
+      "reviews": 1,
+      "payments": {
+        "captured": 1
+      },
+      "buyerExpenses": 0
+    },
+    "reviews": 1,
+    "payments": {
+      "captured": 1
+    },
+    "buyerExpenses": 1,
+    "workExecuted": true,
+    "buyerVerified": true,
+    "localCreditSettled": true,
+    "externalFundsTransferred": false
+  },
+  {
+    "scenario": "after-review-sigkill",
+    "reviews": 1,
+    "payments": {
+      "held": 1
+    },
+    "buyerExpenses": 0,
+    "retriedWork": false,
+    "firstError": "tool server error: A2A remote request failed: http://127.0.0.1:33207/rpc: Network Error: Unexpected EOF",
+    "recoveryError": "unknown field `projection`, expected one of `schema`, `agreementSha256`, `acceptedBidSha256`, `receipt`, `checkpoint`, `inclusion`"
+  },
+  {
+    "scenario": "corrupt-report",
+    "reviews": 1,
+    "payments": {
+      "released": 1
+    },
+    "buyerExpenses": 0,
+    "reviewRejected": true,
+    "available": 1000,
+    "reserved": 0,
+    "spent": 0,
+    "releasedReservations": 1,
+    "crashExit": null
+  },
+  {
+    "scenario": "corrupt-after-release-sigkill",
+    "reviews": 1,
+    "payments": {
+      "released": 1
+    },
+    "buyerExpenses": 0,
+    "reviewRejected": true,
+    "available": 1000,
+    "reserved": 0,
+    "spent": 0,
+    "releasedReservations": 1,
+    "crashExit": 137
+  },
+  {
+    "scenario": "corrupt-after-denial-sigkill",
+    "reviews": 1,
+    "payments": {
+      "released": 1
+    },
+    "buyerExpenses": 0,
+    "reviewRejected": true,
+    "available": 1000,
+    "reserved": 0,
+    "spent": 0,
+    "releasedReservations": 1,
+    "crashExit": 137
+  },
+  {
+    "scenario": "buyer-after-rejection-check-sigkill",
+    "reviews": 1,
+    "payments": {
+      "released": 1
+    },
+    "buyerExpenses": 0,
+    "reviewRejected": true,
+    "available": 1000,
+    "reserved": 0,
+    "spent": 0,
+    "releasedReservations": 1,
+    "crashExit": 137
+  },
+  {
+    "scenario": "ingress-denials",
+    "denials": 2,
+    "reviews": 0,
+    "payments": {},
+    "buyerExpenses": 0
+  },
+  {
+    "scenario": "two-jobs",
+    "reviews": 2,
+    "payments": {
+      "captured": 2
+    },
+    "buyerExpenses": 2,
+    "available": 800,
+    "spent": 200,
+    "reserved": 0
+  }
+]

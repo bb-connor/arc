@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS authority_global_commits (
     commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     projection_kind TEXT NOT NULL CHECK (
-        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status', 'runtime_replay_migration', 'governed_approval_replay_migration', 'dpop_replay_migration', 'security_participant_migration', 'security_participant_state', 'security_participant_egress', 'native_dispatch_ledger', 'security_participant_output', 'security_participant_nonce_preflight')
+        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status', 'runtime_replay_migration', 'governed_approval_replay_migration', 'dpop_replay_migration', 'security_participant_migration', 'security_participant_state', 'security_participant_egress', 'native_dispatch_ledger', 'security_participant_output', 'security_participant_nonce_preflight', 'payment_resolution')
     ),
     projection_key TEXT NOT NULL,
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence >= 0),
@@ -1153,6 +1153,61 @@ pub(crate) fn budget_event_reference_digest(
     })
 }
 
+fn payment_resolution_reference_digest(
+    connection: &Connection,
+    operation_id: &str,
+    sequence: u64,
+) -> Result<String, SqliteServingOwnerError> {
+    let (bytes, stored): (Vec<u8>, String) = connection.query_row(
+        "SELECT record_json,record_digest FROM unknown_payment_release_records WHERE operation_id=?1 AND sequence=?2",
+        params![operation_id, sqlite_u64(sequence, "payment resolution sequence")?],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    ).optional()?.ok_or_else(|| invalid("payment resolution projection is absent"))?;
+    if bytes.is_empty() || bytes.len() > 1024 * 1024 || sha256_hex(&bytes) != stored {
+        return Err(invalid("payment resolution projection digest is invalid"));
+    }
+    Ok(stored)
+}
+
+fn verify_payment_resolution_coverage(
+    connection: &Connection,
+) -> Result<(), SqliteServingOwnerError> {
+    let exists: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='unknown_payment_release_records')", [], |row| row.get(0))?;
+    if !exists {
+        let orphaned: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM authority_global_commits WHERE projection_kind='payment_resolution')", [], |row| row.get(0))?;
+        return if orphaned {
+            Err(invalid("payment resolution table is absent"))
+        } else {
+            Ok(())
+        };
+    }
+    let invalid_coverage: bool = connection.query_row(
+        r#"
+        SELECT EXISTS(SELECT 1 FROM unknown_payment_release_records AS local
+            WHERE (SELECT COUNT(*) FROM authority_global_commits AS global
+                WHERE global.projection_kind='payment_resolution'
+                AND global.mutation_kind='unknown_payment_release'
+                AND global.projection_key=local.operation_id
+                AND global.projection_sequence=local.sequence
+                AND global.projection_reference_digest=local.record_digest) <> 1)
+        OR EXISTS(SELECT 1 FROM authority_global_commits AS global
+            WHERE global.projection_kind='payment_resolution' AND
+            (global.mutation_kind <> 'unknown_payment_release' OR NOT EXISTS(
+                SELECT 1 FROM unknown_payment_release_records AS local
+                WHERE local.operation_id=global.projection_key
+                AND local.sequence=global.projection_sequence)))
+        "#,
+        [],
+        |row| row.get(0),
+    )?;
+    if invalid_coverage {
+        return Err(invalid("payment resolution global coverage is not exact"));
+    }
+    Ok(())
+}
+
 fn payment_journal_reference_digest(
     connection: &Connection,
     operation_id: &str,
@@ -1718,6 +1773,7 @@ fn verify_global_projection_coverage(
     verify_channel_release_projection_coverage(connection)?;
     verify_finding_challenge_projection_coverage(connection)?;
     verify_finding_status_projection_coverage(connection)?;
+    verify_payment_resolution_coverage(connection)?;
     let incomplete = connection.query_row(
         r#"
         SELECT

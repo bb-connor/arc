@@ -1,0 +1,14 @@
+
+running 9 tests
+test artifact_reuse_inflates_counting_metrics_but_cannot_refill_a_protected_job ... ok
+test checked_repair_exchange_binds_delivery_to_atomic_local_credit_settlement ... ok
+test git_publication_recovers_the_bound_commit_without_reconstructing_dispatch_permits ... ok
+test independent_receiver_processes_recover_completed_graph_outputs_without_repeating_effects ... ok
+test isolated_couriers_cannot_read_receiver_keys_and_preserve_graph_recovery ... ok
+test outcome_gates_match_under_substitution_reissue_crash_and_kernel_dispatch ... ok
+test portable_artifact_checking_rejects_buggy_signed_work_without_claiming_private_history ... ok
+test receiver_checking_rejects_a_dishonest_attestation_and_accepts_unsigned_valid_work ... ok
+test repaired_repository_sources_require_observed_effects_before_publication ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 337.07s
+

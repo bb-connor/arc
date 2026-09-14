@@ -1420,3 +1420,59 @@ fn applied_assignment_result_requires_the_exact_participant_head() -> AnchoredTe
     .is_err());
     Ok(())
 }
+
+#[test]
+fn v34_release_schema_migration_preserves_existing_admission_history() -> AnchoredTestResult {
+    let Fixture {
+        _temp,
+        database,
+        lock_root,
+        authority,
+        store,
+        fence,
+    } = fixture();
+    let operation = prepared_operation(
+        &fence,
+        AdmissionOperationKind::ToolDispatch,
+        "release-migration-request",
+        "release-migration-capability",
+    );
+    store.begin(&operation, &fence, now_ms())?;
+    drop(store);
+    drop(authority);
+    let db = Connection::open(&database)?;
+    let original: String = db.query_row(
+        "SELECT chain_digest FROM authority_global_commits ORDER BY commit_sequence DESC LIMIT 1",
+        [],
+        |r| r.get(0),
+    )?;
+    db.execute_batch("DROP TABLE unknown_payment_release_records; UPDATE chio_store_schema_versions SET version=34 WHERE store_key='admission_operation';")?;
+    drop(db);
+    SqliteAuthorityStore::provision(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    assert_eq!(
+        authority
+            .admission_operation_store()
+            .load_by_operation_id(operation.binding().operation_id())?,
+        Some(operation)
+    );
+    let db = Connection::open(&database)?;
+    assert_eq!(
+        db.query_row(
+            "SELECT version FROM chio_store_schema_versions WHERE store_key='admission_operation'",
+            [],
+            |r| r.get::<_, i64>(0)
+        )?,
+        i64::from(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
+    );
+    assert_eq!(
+        db.query_row(
+            "SELECT COUNT(*) FROM unknown_payment_release_records",
+            [],
+            |r| r.get::<_, i64>(0)
+        )?,
+        0
+    );
+    assert_eq!(db.query_row("SELECT chain_digest FROM authority_global_commits ORDER BY commit_sequence DESC LIMIT 1", [], |r| r.get::<_, String>(0))?, original);
+    Ok(())
+}

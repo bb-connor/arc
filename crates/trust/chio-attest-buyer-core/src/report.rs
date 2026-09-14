@@ -40,12 +40,35 @@ pub struct VerifierCheck {
     pub detail: Option<String>,
 }
 
+/// Written into every rejected report in place of the verifier's rendered
+/// diagnostic. The report is hashed into the buyer attestation packet and
+/// leaves the verifier, so it carries the stable code and this fixed
+/// phrase; the digests, fingerprints, and verdicts that the local error
+/// names stay with the local error.
+pub const WITHHELD_FAILURE_DETAIL: &str = "diagnostic detail is local to the verifier";
+
+/// The rejection that ends a report. `code` names the check that failed
+/// and `phase` the stage that owns it; both are drawn from closed sets.
+/// `detail` is always [`WITHHELD_FAILURE_DETAIL`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct VerifierFailure {
     pub code: String,
     pub phase: String,
     pub detail: String,
+}
+
+impl VerifierFailure {
+    /// Reduce a verification failure to what may leave the verifier. The
+    /// rendered diagnostic stays with `error`.
+    #[must_use]
+    pub fn from_error(error: &ChioPackageError) -> Self {
+        Self {
+            code: failure_code(error).to_string(),
+            phase: failure_phase(error).to_string(),
+            detail: WITHHELD_FAILURE_DETAIL.to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -269,7 +292,10 @@ fn verify_package_inner(
                 base: &verifier_config,
             },
         )
-        .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
+        .map_err(|error| ChioPackageError::FederationRejected {
+            code: error.redacted(),
+            detail: error.to_string(),
+        })?;
         if verified.joint_verdict != "allow" {
             return Err(ChioPackageError::Federation(format!(
                 "bilateral envelope policy verdict {:?} is not allow",
@@ -364,16 +390,17 @@ fn rejected_report(
         revocation_epoch_height: Some(trust_bundle.revocation_epoch_height()),
         accepted: false,
         checks,
-        failure: Some(VerifierFailure {
-            code: failure_code(error).to_string(),
-            phase: failure_phase(error).to_string(),
-            detail: error.to_string(),
-        }),
+        failure: Some(VerifierFailure::from_error(error)),
     }
 }
 
+/// The stable code for a failure. Every arm returns a fixed string: a
+/// bilateral rejection surfaces its own specification code, and every
+/// other stage its category. Nothing the package presented reaches this
+/// value.
 fn failure_code(error: &ChioPackageError) -> &'static str {
     match error {
+        ChioPackageError::FederationRejected { code, .. } => code.as_str(),
         ChioPackageError::Canonical(_) => "canonical_json",
         ChioPackageError::UnsupportedSchema(_) => "package.schema",
         ChioPackageError::UnsupportedClaim(_) => "package.claim",
@@ -407,7 +434,9 @@ fn failure_phase(error: &ChioPackageError) -> &'static str {
         | ChioPackageError::WorkflowIntersection(_)
         | ChioPackageError::LeaseScopeBinding(_) => "workflow",
         ChioPackageError::Governance(_) => "governance",
-        ChioPackageError::Federation(_) => "federation",
+        ChioPackageError::Federation(_) | ChioPackageError::FederationRejected { .. } => {
+            "federation"
+        }
         ChioPackageError::SelectiveDisclosure(_) => "bbs",
     }
 }

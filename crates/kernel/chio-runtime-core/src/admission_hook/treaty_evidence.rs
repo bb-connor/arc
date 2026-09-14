@@ -170,6 +170,8 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
                 ladder_intersection_sha256: &treaty_ref.ladder_intersection_sha256,
                 consistency_model,
                 continuation_sha256,
+                continuation,
+                now_unix_ms,
             };
             let invocation_binding_sha256 = verify_bilateral_invocation_evidence(
                 invocation,
@@ -190,8 +192,11 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
                     .map(|action| action.consistency_model.as_str())
                     .unwrap_or("totally-ordered"),
                 continuation_sha256,
+                continuation,
+                now_unix_ms,
             };
             verify_treaty_dsse_evidence(
+                store,
                 envelope,
                 &treaty_evidence,
                 lineage_bundle.as_ref(),
@@ -407,6 +412,8 @@ pub(super) struct TreatyEvidenceReview<'a> {
     pub(super) ladder_intersection_sha256: &'a str,
     pub(super) consistency_model: &'a str,
     pub(super) continuation_sha256: &'a str,
+    pub(super) continuation: &'a CrossKernelContinuation,
+    pub(super) now_unix_ms: u64,
 }
 
 fn verify_bilateral_invocation_evidence(

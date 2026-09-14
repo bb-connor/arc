@@ -1,0 +1,271 @@
+{
+  "scenarios": [
+    {
+      "scenario": "normal",
+      "beforeRecovery": null,
+      "reviews": 1,
+      "payments": {
+        "captured": 1
+      },
+      "buyerExpenses": 1,
+      "workExecuted": true,
+      "buyerVerified": true,
+      "localCreditSettled": true,
+      "externalFundsTransferred": false
+    },
+    {
+      "scenario": "after-settlement-sigkill",
+      "beforeRecovery": {
+        "reviews": 1,
+        "payments": {
+          "captured": 1
+        },
+        "buyerExpenses": 0
+      },
+      "reviews": 1,
+      "payments": {
+        "captured": 1
+      },
+      "buyerExpenses": 1,
+      "workExecuted": true,
+      "buyerVerified": true,
+      "localCreditSettled": true,
+      "externalFundsTransferred": false
+    },
+    {
+      "scenario": "after-capture-sigkill",
+      "beforeRecovery": {
+        "reviews": 1,
+        "payments": {
+          "captured": 1
+        },
+        "buyerExpenses": 0
+      },
+      "reviews": 1,
+      "payments": {
+        "captured": 1
+      },
+      "buyerExpenses": 1,
+      "workExecuted": true,
+      "buyerVerified": true,
+      "localCreditSettled": true,
+      "externalFundsTransferred": false
+    },
+    {
+      "scenario": "buyer-after-check-sigkill",
+      "beforeRecovery": {
+        "reviews": 1,
+        "payments": {
+          "captured": 1
+        },
+        "buyerExpenses": 0
+      },
+      "reviews": 1,
+      "payments": {
+        "captured": 1
+      },
+      "buyerExpenses": 1,
+      "workExecuted": true,
+      "buyerVerified": true,
+      "localCreditSettled": true,
+      "externalFundsTransferred": false
+    },
+    {
+      "scenario": "after-review-sigkill",
+      "reviews": 1,
+      "payments": {
+        "held": 1
+      },
+      "buyerExpenses": 0,
+      "reserved": 100,
+      "incidentVerified": true,
+      "immutableOperationJournalAndBudget": true,
+      "concurrentBuyers": 4,
+      "offlineReplay": true,
+      "buyerCrashBeforeRetention": false,
+      "paymentResolved": false,
+      "automaticReplay": false,
+      "signedIncidentDenials": 10
+    },
+    {
+      "scenario": "before-review-sigkill",
+      "reviews": 0,
+      "payments": {
+        "held": 1
+      },
+      "buyerExpenses": 0,
+      "reserved": 100,
+      "incidentVerified": true,
+      "immutableOperationJournalAndBudget": true,
+      "concurrentBuyers": 4,
+      "offlineReplay": true,
+      "buyerCrashBeforeRetention": false,
+      "paymentResolved": false,
+      "automaticReplay": false,
+      "signedIncidentDenials": 10
+    },
+    {
+      "scenario": "buyer-after-incident-check-sigkill",
+      "reviews": 1,
+      "payments": {
+        "held": 1
+      },
+      "buyerExpenses": 0,
+      "reserved": 100,
+      "incidentVerified": true,
+      "immutableOperationJournalAndBudget": true,
+      "concurrentBuyers": 4,
+      "offlineReplay": true,
+      "buyerCrashBeforeRetention": true,
+      "paymentResolved": false,
+      "automaticReplay": false,
+      "signedIncidentDenials": 10
+    },
+    {
+      "scenario": "corrupt-report",
+      "reviews": 1,
+      "payments": {
+        "released": 1
+      },
+      "buyerExpenses": 0,
+      "reviewRejected": true,
+      "available": 1000,
+      "reserved": 0,
+      "spent": 0,
+      "releasedReservations": 1,
+      "crashExit": null
+    },
+    {
+      "scenario": "corrupt-after-release-sigkill",
+      "reviews": 1,
+      "payments": {
+        "released": 1
+      },
+      "buyerExpenses": 0,
+      "reviewRejected": true,
+      "available": 1000,
+      "reserved": 0,
+      "spent": 0,
+      "releasedReservations": 1,
+      "crashExit": 137
+    },
+    {
+      "scenario": "corrupt-after-denial-sigkill",
+      "reviews": 1,
+      "payments": {
+        "released": 1
+      },
+      "buyerExpenses": 0,
+      "reviewRejected": true,
+      "available": 1000,
+      "reserved": 0,
+      "spent": 0,
+      "releasedReservations": 1,
+      "crashExit": 137
+    },
+    {
+      "scenario": "buyer-after-rejection-check-sigkill",
+      "reviews": 1,
+      "payments": {
+        "released": 1
+      },
+      "buyerExpenses": 0,
+      "reviewRejected": true,
+      "available": 1000,
+      "reserved": 0,
+      "spent": 0,
+      "releasedReservations": 1,
+      "crashExit": 137
+    },
+    {
+      "scenario": "ingress-denials",
+      "denials": 2,
+      "reviews": 0,
+      "payments": {},
+      "buyerExpenses": 0
+    },
+    {
+      "scenario": "two-jobs",
+      "reviews": 2,
+      "payments": {
+        "captured": 2
+      },
+      "buyerExpenses": 2,
+      "available": 800,
+      "spent": 200,
+      "reserved": 0
+    },
+    {
+      "scenario": "after-accept-sigkill",
+      "acceptanceEvents": 1,
+      "reviews": 1,
+      "payments": {
+        "captured": 1
+      },
+      "buyerExpenses": 1
+    },
+    {
+      "scenario": "before-accept-send-sigkill",
+      "reviews": 0,
+      "payments": {},
+      "buyerExpenses": 0,
+      "reserved": 100,
+      "automaticReplay": false,
+      "buyerState": "attempted"
+    },
+    {
+      "scenario": "before-work-send-sigkill",
+      "reviews": 0,
+      "payments": {},
+      "buyerExpenses": 0,
+      "reserved": 100,
+      "automaticReplay": false,
+      "buyerState": "accepted"
+    },
+    {
+      "scenario": "unicode-wire",
+      "reviews": 1,
+      "payments": {
+        "captured": 1
+      },
+      "buyerExpenses": 1,
+      "unicodeCanonicalization": true
+    },
+    {
+      "scenario": "concurrent-expense-recovery",
+      "reviews": 1,
+      "payments": {
+        "captured": 1
+      },
+      "buyerExpenses": 1,
+      "concurrentBuyers": 4
+    },
+    {
+      "scenario": "transport-denials",
+      "denials": 13,
+      "beforeRepair": {
+        "reviews": 0,
+        "payments": {},
+        "buyerExpenses": 0
+      },
+      "afterRepair": {
+        "reviews": 1,
+        "payments": {
+          "captured": 1
+        },
+        "buyerExpenses": 1
+      },
+      "plaintextBackend": "private Unix socket"
+    }
+  ],
+  "passed": 19,
+  "buyerImplementation": "Python",
+  "providerImplementation": "Rust",
+  "separateImplementations": true,
+  "independentAuthors": false,
+  "independentOperators": false,
+  "externalFundsTransferred": false,
+  "transport": "TLS 1.3",
+  "negotiationCredential": "proof of possession",
+  "enrollment": "provider-signed and locally activated"
+}

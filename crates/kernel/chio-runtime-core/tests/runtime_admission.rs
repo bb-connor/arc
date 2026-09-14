@@ -57,6 +57,9 @@ use std::io;
 use chio_runtime_core::ChioRuntimeError;
 
 mod support;
+
+#[path = "support/treaty_presentation.rs"]
+mod treaty_presentation;
 use support::treaty::{treaty_action_class, treaty_manifest, treaty_scope};
 
 #[path = "runtime_admission/swarm_request_support.rs"]
@@ -1795,36 +1798,7 @@ fn kernel_hook_uses_configured_runtime_policy_to_deny() -> Result<(), Box<dyn st
     bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
     let bundle_hash = runtime_admission_bundle_sha256(&bundle)?;
     store.insert_bundle(bundle)?;
-    store.insert_treaty_runtime_artifact(
-        "treaty_scope",
-        &fixture.treaty_scope.treaty_id,
-        &fixture.treaty_scope,
-    )?;
-    store.insert_treaty_runtime_artifact(
-        "ladder_intersection",
-        &fixture.ladder_intersection.intersection_id,
-        &fixture.ladder_intersection,
-    )?;
-    store.insert_treaty_runtime_artifact(
-        "cross_kernel_continuation",
-        &fixture.continuation.continuation_id,
-        &fixture.continuation,
-    )?;
-    store.insert_treaty_runtime_artifact(
-        "receipt_lineage_bundle",
-        &fixture.lineage_bundle.bundle_id,
-        &fixture.lineage_bundle,
-    )?;
-    store.insert_treaty_runtime_artifact(
-        "bilateral_invocation",
-        &fixture.bilateral_invocation.invocation_id,
-        &fixture.bilateral_invocation,
-    )?;
-    store.insert_treaty_runtime_artifact(
-        "bilateral_dsse_envelope",
-        &fixture.bilateral_dsse_id,
-        &fixture.bilateral_dsse,
-    )?;
+    insert_in_memory_treaty_runtime_fixture(&store, &fixture)?;
     let request = treaty_runtime_request(args, bundle_hash, treaty_runtime_context(&fixture))?;
 
     let verifier = Keypair::generate();
@@ -2269,6 +2243,13 @@ fn insert_treaty_runtime_fixture(
     store: &SqliteRuntimeOrchestrationStore,
     fixture: &TreatyRuntimeFixture,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let (lease, governance) = treaty_presentation::records(&fixture.bilateral_dsse)?;
+    store.insert_treaty_runtime_artifact("capability_lease", &lease.lease.lease_id, &lease)?;
+    store.insert_treaty_runtime_artifact(
+        "governance_receipt",
+        &governance.receipt.receipt_id,
+        &governance,
+    )?;
     store.insert_treaty_runtime_artifact(
         "treaty_scope",
         &fixture.treaty_scope.treaty_id,
@@ -2306,6 +2287,13 @@ fn insert_in_memory_treaty_runtime_fixture(
     store: &InMemoryRuntimeAdmissionStore,
     fixture: &TreatyRuntimeFixture,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let (lease, governance) = treaty_presentation::records(&fixture.bilateral_dsse)?;
+    store.insert_treaty_runtime_artifact("capability_lease", &lease.lease.lease_id, &lease)?;
+    store.insert_treaty_runtime_artifact(
+        "governance_receipt",
+        &governance.receipt.receipt_id,
+        &governance,
+    )?;
     store.insert_treaty_runtime_artifact(
         "treaty_scope",
         &fixture.treaty_scope.treaty_id,
@@ -2688,4 +2676,59 @@ fn runtime_swarm_bundle(
     }
 
     Ok(bundle)
+}
+#[test]
+fn treaty_record_revocation_is_rechecked_after_admission() -> Result<(), Box<dyn std::error::Error>>
+{
+    for (kind, id) in [
+        ("capability_lease_revocation", "lease-live-1"),
+        ("governance_receipt_revocation", "gov-live-1"),
+    ] {
+        let store = InMemoryRuntimeAdmissionStore::new();
+        let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
+        let fixture = treaty_runtime_fixture()?;
+        let mut admission_bundle = bundle();
+        admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
+        let bundle_hash = runtime_admission_bundle_sha256(&admission_bundle)?;
+        store.insert_bundle(admission_bundle)?;
+        insert_in_memory_treaty_runtime_fixture(&store, &fixture)?;
+        let request = treaty_runtime_request(args, bundle_hash, treaty_runtime_context(&fixture))?;
+        let hook = allowing_policy_hook(store.clone())?;
+        let first = hook.evaluate(&RuntimeAdmissionContext {
+            request: &request,
+            extra_metadata: None,
+            now_unix_secs: 1_800_000_001,
+            now_unix_ms: 1_800_000_001_000,
+            matched_grant_index: Some(0),
+            local_kernel_id: "kernel.vendor-b".to_string(),
+        })?;
+        assert!(first.allowed, "{first:?}");
+        let metadata = first.metadata.ok_or("missing admitted metadata")?;
+        let context = RuntimeAdmissionRevalidationContext {
+            request: &request,
+            admission_metadata: Some(&metadata),
+            now_unix_secs: 1_800_000_001,
+            now_unix_ms: 1_800_000_001_000,
+            matched_grant_index: Some(0),
+            local_kernel_id: "kernel.vendor-b".to_string(),
+        };
+        hook.revalidate_before_dispatch(&context)?;
+        store.insert_treaty_runtime_artifact(
+            kind,
+            id,
+            &serde_json::json!({"reason": "revoked during admission"}),
+        )?;
+        let error = hook
+            .revalidate_before_dispatch(&context)
+            .err()
+            .ok_or("revoked record survived revalidation")?;
+        assert!(
+            error
+                .to_string()
+                .contains("chio_treaty_unverified_required_evidence"),
+            "{error}"
+        );
+        hook.release_reserved(&metadata)?;
+    }
+    Ok(())
 }

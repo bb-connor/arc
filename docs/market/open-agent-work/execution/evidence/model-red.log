@@ -1,0 +1,21 @@
+test_funding_model (unittest.loader._FailedTest.test_funding_model) ... ERROR
+
+======================================================================
+ERROR: test_funding_model (unittest.loader._FailedTest.test_funding_model)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_funding_model
+Traceback (most recent call last):
+  File "/home/connor/.local/share/mise/installs/python/3.13.13/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/home/connor/.local/share/mise/installs/python/3.13.13/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work-model/test_funding_model.py", line 4, in <module>
+    from funding_model import AllocationAuthority, Claim
+ModuleNotFoundError: No module named 'funding_model'
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (errors=1)

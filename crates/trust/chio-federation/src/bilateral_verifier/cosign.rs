@@ -516,7 +516,7 @@ pub fn verify_bilateral_cosign_invocation(
 
     let (statement, _) = envelope.decode_statement().map_err(map_bilateral_error)?;
 
-    // ---- Step 3: in-toto v1 schema -------------------------------------
+    // ---- Steps 4-5: in-toto v1 schema; exactly one subject -------------
     if statement.statement_type != STATEMENT_TYPE_V1 {
         return Err(VerifierError::StatementSchemaInvalid(format!(
             "_type {:?} is not {:?}",
@@ -538,20 +538,20 @@ pub fn verify_bilateral_cosign_invocation(
         )));
     }
 
-    // ---- Step 4: predicateType is recognised ---------------------------
+    // ---- Step 3: predicateType is recognised ---------------------------
     if statement.predicate_type != PREDICATE_TYPE_BILATERAL {
         return Err(VerifierError::PredicateTypeUnrecognised(
             statement.predicate_type.clone(),
         ));
     }
 
-    // ---- Step 5: predicate body schema (subset of §5) ------------------
+    // ---- Step 11 subset: predicate body schema (subset of §5) ----------
     validate_predicate_required_fields(&statement.predicate)?;
 
-    // ---- Step 6: bind pred ---------------------------------------------
+    // ---- Bind pred -----------------------------------------------------
     let pred = &statement.predicate;
 
-    // ---- Step 8: peer pinning ------------------------------------------
+    // ---- Steps 6-7: peer pinning ---------------------------------------
     // Peer-pin lookup is the minimum local lookup needed before signature
     // authentication: it provides the trusted public keys for DSSE
     // verification. Receipt, revocation, lease, and governance stores are
@@ -589,11 +589,11 @@ pub fn verify_bilateral_cosign_invocation(
         )));
     }
 
-    // ---- Steps 10-12: DSSE signature authentication -------------------
+    // ---- Steps 8-14: envelope layer, DSSE signature authentication -----
     verify_dsse_envelope(envelope, &pinned_a.public_key, &pinned_b.public_key)
         .map_err(map_bilateral_error)?;
 
-    // ---- Step 9: revocation at pinned epoch ----------------------------
+    // ---- Step 16: revocation at pinned epoch ---------------------------
     if !config
         .revocation_oracle
         .is_active_at_epoch(&pinned_a.fingerprint(), config.pinned_epoch.epoch_height)
@@ -613,7 +613,8 @@ pub fn verify_bilateral_cosign_invocation(
         )));
     }
 
-    // ---- Step 7: subject digest = sha256(canonical_json(resolve_receipt.body()))
+    // ---- Step 17: resolve the receipt; step 19: subject digest =
+    // sha256(canonical_json(resolve_receipt.body()))
     // Subject-digest store work is deferred until after DSSE authentication
     // so invalid signatures cannot force receipt-store reads.
     let resolved_receipt = config
@@ -621,7 +622,7 @@ pub fn verify_bilateral_cosign_invocation(
         .resolve(&pred.invocation_id)
         .ok_or_else(|| {
             VerifierError::SubjectDigestMismatch(format!(
-                "invocation_id {:?} not resolvable in ReceiptStore (fail-closed per §7 step 7)",
+                "invocation_id {:?} not resolvable in ReceiptStore (fail-closed per §7 step 17)",
                 pred.invocation_id
             ))
         })?;
@@ -679,10 +680,10 @@ pub fn verify_bilateral_cosign_invocation(
         )));
     }
 
-    // ---- Step 13: verdict agreement ------------------------------------
+    // ---- Step 20: verdict agreement ------------------------------------
     let summary = pred.policy_evaluation_summary.as_ref().ok_or_else(|| {
         VerifierError::PolicyVerdictDisagreement(
-            "predicate is missing policy_evaluation_summary (required for §7 step 13)".to_string(),
+            "predicate is missing policy_evaluation_summary (required for §7 step 20)".to_string(),
         )
     })?;
     validate_policy_verdict(&summary.server_a_verdict, "server_a_verdict")?;
@@ -704,10 +705,10 @@ pub fn verify_bilateral_cosign_invocation(
     }
     let joint_verdict = summary.server_a_verdict.verdict.clone();
 
-    // ---- Step 14: capability lease resolution + expiry -----------------
+    // ---- Step 21: capability lease resolution + expiry -----------------
     let lease_ref = pred.capability_lease_ref.as_ref().ok_or_else(|| {
         VerifierError::CapabilityLeaseExpiredOrUnknown(
-            "predicate is missing capability_lease_ref (required for §7 step 14)".to_string(),
+            "predicate is missing capability_lease_ref (required for §7 step 21)".to_string(),
         )
     })?;
     let resolved_lease = config
@@ -743,7 +744,7 @@ pub fn verify_bilateral_cosign_invocation(
     // registry record's `scope_digest_hex` must BOTH be present and
     // agree. Treating one-sided presence as "skip validation" lets an
     // envelope claim a specific scope digest while the trusted
-    // registry never confirms that scope (or vice versa); step 14
+    // registry never confirms that scope (or vice versa); step 21
     // would silently accept an unbound or differently-scoped lease.
     // Fail-closed on any mismatch in presence or value.
     match (&lease_ref.scope_digest, &resolved_lease.scope_digest_hex) {
@@ -775,13 +776,13 @@ pub fn verify_bilateral_cosign_invocation(
         }
         (None, None) => {
             // Both sides explicitly omit scope-digest binding; the
-            // lease is unscoped on both ends and step 14 accepts it
+            // lease is unscoped on both ends and step 21 accepts it
             // on id+issuer+expiry alone. Unscoped leases are a valid
             // current configuration permitted by the spec.
         }
     }
 
-    // ---- Step 15: governance receipt for receipt-backed classes -------
+    // ---- Step 22: governance receipt for receipt-backed classes --------
     //
     // Fail-closed action-class invariant: an unknown `tool_name` is
     // rejected with `governance.unknown_action_class` so a misspelled
@@ -838,7 +839,7 @@ pub fn verify_bilateral_cosign_invocation(
         }
     };
 
-    // ---- Step 16: consistency anchor reconciliation -------------------
+    // ---- Step 24: consistency anchor reconciliation --------------------
     //
     // The signature-slice profile deliberately supports only
     // `crdt-commutative`. `verify_dsse_envelope` rejects
@@ -852,7 +853,7 @@ pub fn verify_bilateral_cosign_invocation(
         )));
     }
 
-    // ---- Step 17: success ---------------------------------------------
+    // ---- Step 26: success ----------------------------------------------
     Ok(VerifiedBilateralCoSignInvocation {
         statement,
         resolved_receipt,

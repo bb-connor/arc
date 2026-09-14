@@ -42,11 +42,19 @@ no request-controlled identity or silent ephemeral replacement is permitted.
 
 ## Direct Rust construction and factory sites
 
+The funded-work integration candidate adds C30-C35 and D087-D091 below.
+Their profiles are source-reviewed; combined execution qualification is tracked
+in the [integration report](../market/open-agent-work/execution/14-native-integration-results.md).
+The earlier M4 acceptance counts in this document describe the selected security
+input. The combined caller inventory adds the v34 waiting-operation migration
+case and now contains 34 caller/store cases. Native funding remains gated on
+the combined report, independently of those historical M4 results.
+
 Paths are relative to the repository. The physical-source audit found the 29
 sites below. This includes constructor wrappers, not just direct `new` calls.
 Included test fragments are retained visibly rather than misclassified as
 production. The same physical-source gate now pins 86 dispatch/caller references
-(D001-D086) as well as these 29 construction references. This is an exact source
+(D001-D091) as well as these 35 construction references. This is an exact source
 inventory, not Rust macro expansion or a semantic proof of all network effects.
 
 | ID | Exact path and symbol | Role / selected profile | Acceptance owner and current state |
@@ -80,6 +88,12 @@ inventory, not Rust macro expansion or a semantic proof of all network effects.
 | C27 | `crates/protocol/chio-acp-edge/src/fuzz.rs::make_kernel` | Fuzz harness | Adversarial parser/edge input; not production authority |
 | C28 | `crates/platform/chio-control-plane/src/security/adapters/native_flow_test_support.rs::open_kernel` | Included test fixture | Included by native-flow tests under `cfg(test)`; M3 native host acceptance fixture |
 | C29 | `crates/platform/chio-control-plane/src/security/event_consumer_parts/part_06.inc::build_real_adapter_runtime` | Included test fixture | Event-consumer test composition; not a separate public factory |
+| C30 | `crates/kernel/chio-runtime-core/benches/fixtures/admission_scaling_fixture.rs::AdmissionScalingFixture::new` (D087) | Fixed-clock admission scaling benchmark | Configured runtime hook, pinned peer and local counted connector. A benchmark fixture does not qualify an operator deployment. |
+| C31 | `crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_allow_fixture.rs::TreatyPredispatchAllowFixture::new` (D088) | Fixed-clock treaty allow benchmark | Configured runtime evidence and co-signer, local counted connector and receipt store; no native flow/confinement claim. |
+| C32 | `crates/kernel/chio-runtime-core/examples/outcome_artifact_workflow.rs::kernel` (D089) | Local outcome-artifact experiment | Fresh receiver-issued capabilities and signed SQLite receipts; durable artifact/effect consumption is evaluated separately. Explicit ephemeral revocation is an experiment boundary. |
+| C33 | `crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs::run_receiver` (D090) | Controlled two-process federation experiment | Configured peer/CA pins, receiver-owned admission state and local connector; no independent-operator or general native confinement claim. |
+| C34 | `examples/federated-work/src/provider.rs::serve_transport` | Public-only local paid-work provider | Signed manifest registry, configured publisher pin, durable admission and original payment holds. A2A owns dispatch. Rust/Python/HTTPS and crash suites qualify the bounded example; optional worker isolation is separate from native flow. |
+| C35 | `examples/outcome-ledger-comparison/src/workload.rs::configured_kernel` (D091) | Local comparison experiment | Fresh signed receiver capabilities and SQLite receipts; no declassification grant. Composed/outcome checks are separate from native security qualification. |
 
 Remote construction is gated by the public factory's
 `RemoteSessionFactory::new`, before C04/C05. Its new
@@ -136,7 +150,7 @@ the acceptance report separates those results from historical runs and hosted CI
 | P07 | API-protect `proxy/mediated/authenticated.rs::{start,report}` and caller routes in `proxy/mediated.rs`; native Rust `start_caller_execution_blocking_with_security_context` | Trusted executor pin and durable ledger, original nonce/credentials and exact signed delivery. Reservation alone never permits execution. Native release/declassification remain Rust-host-owned, not transport-local. | Final exact M3: 33 caller/store, 9 executor-ledger and 19 native-custody cases passed. Full Python client and hosted role-separation suites also passed. |
 | P08 | Browser `evaluate_pure` / wasm facade; mobile `evaluate`; C ABI `chio_kernel_evaluate_json` / `chio_kernel_verify_capability_with_context_json`; `chio-bindings-ffi` invariant exports | Portable verification, not native dispatch. Unsupported approval/proposal/intent extensions and unauthenticated witness profiles reject. Browser wasm and mobile FFI packaging are distinct from native unit execution. | Exact portable denials; browser 27, mobile 31 and C++ FFI 23 component tests passed. C ABI, installed external CMake consumer, five explicit live C++ protocol tests and pinned Drogon library/example/live gates also passed. |
 | P09 | `VerifiedManifestRegistry`, `migrate_legacy_manifest_v1`, `ToolDefinition`, `NetworkDestination::new` | v2 uses only `latency_hint`; v1 migration returns an unsigned result and requires trusted re-signing. Registry identity, host-selected policy/topology and nonzero destination ports remain authoritative. | Exact signed manifest corpus, all four wire lanes and the flow registry gate. |
-| P10 | D001-D009, D045-D058 and D076-D079 plus C11-C25 | Arena/load/proof/replay/example hosts are explicit harness or ordinary profiles. Operator purchase execution uses configured signer/buyer pins and durable domain storage. Pure policy probes have no connector effect. These rows do not claim M5 swarm confinement, M6 enterprise topology, M9 packages or M11 public hosted production. | Workspace component suites plus their domain/proof gates; no new production deployment claim. |
+| P10 | D001-D009, D045-D058, D076-D079 and D087-D091 plus C11-C25 and C30-C35 | Arena/load/proof/replay/example hosts are explicit harness or ordinary profiles. Operator purchase execution uses configured signer/buyer pins and durable domain storage. Pure policy probes have no connector effect. These rows do not claim M5 swarm confinement, M6 enterprise topology, M9 packages or M11 public hosted production. | Workspace component suites plus their domain/proof gates; no new production deployment claim. |
 
 Raw `ToolServerConnection` / `HttpDispatcher` implementations are effect ports,
 not secure invocation APIs for agents. A trusted host can call its own network or

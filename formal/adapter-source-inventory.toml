@@ -245,6 +245,49 @@ references = 1
 # Exact physical dispatch/caller references. D IDs include policy probes and
 # harnesses, which are classified separately from production execution hosts.
 
+# Research harnesses and the bounded funded-work example, reviewed during M4 integration.
+[[constructor_sites]]
+id = "C30"
+path = "crates/kernel/chio-runtime-core/benches/fixtures/admission_scaling_fixture.rs"
+symbol = "AdmissionScalingFixture::new"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C31"
+path = "crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_allow_fixture.rs"
+symbol = "TreatyPredispatchAllowFixture::new"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C32"
+path = "crates/kernel/chio-runtime-core/examples/outcome_artifact_workflow.rs"
+symbol = "kernel"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C33"
+path = "crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs"
+symbol = "run_receiver"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C34"
+path = "examples/federated-work/src/provider.rs"
+symbol = "serve_transport"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C35"
+path = "examples/outcome-ledger-comparison/src/workload.rs"
+symbol = "configured_kernel"
+target = "ChioKernel::new"
+references = 1
+
 [[dispatch_sites]]
 id = "D001"
 path = "bench/chio-loadgen/src/stack.rs"
@@ -845,4 +888,39 @@ id = "D086"
 path = "crates/products/chio-api-protect/src/proxy/mediated.rs"
 symbol = "sidecar_evaluate_tool_call_mediated_handler"
 target = ".reserve_caller_execution_blocking"
+references = 1
+
+[[dispatch_sites]]
+id = "D087"
+path = "crates/kernel/chio-runtime-core/benches/fixtures/admission_scaling_fixture.rs"
+symbol = "AdmissionScalingFixture::evaluate_once"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D088"
+path = "crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_allow_fixture.rs"
+symbol = "TreatyPredispatchAllowFixture::evaluate_once"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D089"
+path = "crates/kernel/chio-runtime-core/examples/outcome_artifact_workflow.rs"
+symbol = "invoke"
+target = ".evaluate_tool_call_blocking"
+references = 1
+
+[[dispatch_sites]]
+id = "D090"
+path = "crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs"
+symbol = "Receiver::call"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D091"
+path = "examples/outcome-ledger-comparison/src/workload.rs"
+symbol = "invoke_authorized"
+target = ".evaluate_tool_call_blocking"
 references = 1

@@ -1,0 +1,214 @@
+.FFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+______ test_hardened_commit_creates_commit_without_executing_hooks[plain] ______
+
+tmp_path = PosixPath('/tmp/pytest-of-connor/pytest-131/test_hardened_commit_creates_c0')
+shape = 'plain'
+
+    @pytest.mark.parametrize("shape", ["plain", "no_verify", "config", "config_many", "config_env"])
+    def test_hardened_commit_creates_commit_without_executing_hooks(tmp_path: Path, shape: str) -> None:
+        env = prepare_repository(tmp_path)
+        hooks = str(tmp_path / "owned-hooks")
+        prefix = {
+            "plain": [],
+            "no_verify": [],
+            "config": ["-c", f"core.hooksPath={hooks}"],
+            "config_many": ["-c", "core.hooksPath=/dev/null", "-c", f"core.hooksPath={hooks}"],
+            "config_env": ["--config-env=core.hooksPath=HOOK_TEST_PATH"],
+        }[shape]
+        env["HOOK_TEST_PATH"] = hooks
+        argv = ["git", *prefix, "commit", "--allow-empty", "-m", "test: hardened commit"]
+        if shape == "no_verify":
+            argv.append("--no-verify")
+        hardened = harden_git_argv(argv)
+        assert harden_git_argv(hardened) == hardened
+        subprocess.run(hardened, cwd=tmp_path, env=env, check=True, capture_output=True, timeout=10)
+        commit = subprocess.run(
+            ["git", "log", "-1", "--format=%s"],
+            cwd=tmp_path,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert commit.stdout.strip() == "test: hardened commit"
+        for name in HOOKS:
+>           assert not (tmp_path / f"{name}.observed").exists(), name
+E           AssertionError: prepare-commit-msg
+E           assert not True
+E            +  where True = exists()
+E            +    where exists = (PosixPath('/tmp/pytest-of-connor/pytest-131/test_hardened_commit_creates_c0') / 'prepare-commit-msg.observed').exists
+
+tests/test_git_hooks.py:87: AssertionError
+____ test_hardened_commit_creates_commit_without_executing_hooks[no_verify] ____
+
+tmp_path = PosixPath('/tmp/pytest-of-connor/pytest-131/test_hardened_commit_creates_c1')
+shape = 'no_verify'
+
+    @pytest.mark.parametrize("shape", ["plain", "no_verify", "config", "config_many", "config_env"])
+    def test_hardened_commit_creates_commit_without_executing_hooks(tmp_path: Path, shape: str) -> None:
+        env = prepare_repository(tmp_path)
+        hooks = str(tmp_path / "owned-hooks")
+        prefix = {
+            "plain": [],
+            "no_verify": [],
+            "config": ["-c", f"core.hooksPath={hooks}"],
+            "config_many": ["-c", "core.hooksPath=/dev/null", "-c", f"core.hooksPath={hooks}"],
+            "config_env": ["--config-env=core.hooksPath=HOOK_TEST_PATH"],
+        }[shape]
+        env["HOOK_TEST_PATH"] = hooks
+        argv = ["git", *prefix, "commit", "--allow-empty", "-m", "test: hardened commit"]
+        if shape == "no_verify":
+            argv.append("--no-verify")
+        hardened = harden_git_argv(argv)
+        assert harden_git_argv(hardened) == hardened
+        subprocess.run(hardened, cwd=tmp_path, env=env, check=True, capture_output=True, timeout=10)
+        commit = subprocess.run(
+            ["git", "log", "-1", "--format=%s"],
+            cwd=tmp_path,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert commit.stdout.strip() == "test: hardened commit"
+        for name in HOOKS:
+>           assert not (tmp_path / f"{name}.observed").exists(), name
+E           AssertionError: prepare-commit-msg
+E           assert not True
+E            +  where True = exists()
+E            +    where exists = (PosixPath('/tmp/pytest-of-connor/pytest-131/test_hardened_commit_creates_c1') / 'prepare-commit-msg.observed').exists
+
+tests/test_git_hooks.py:87: AssertionError
+_____ test_hardened_commit_creates_commit_without_executing_hooks[config] ______
+
+tmp_path = PosixPath('/tmp/pytest-of-connor/pytest-131/test_hardened_commit_creates_c2')
+shape = 'config'
+
+    @pytest.mark.parametrize("shape", ["plain", "no_verify", "config", "config_many", "config_env"])
+    def test_hardened_commit_creates_commit_without_executing_hooks(tmp_path: Path, shape: str) -> None:
+        env = prepare_repository(tmp_path)
+        hooks = str(tmp_path / "owned-hooks")
+        prefix = {
+            "plain": [],
+            "no_verify": [],
+            "config": ["-c", f"core.hooksPath={hooks}"],
+            "config_many": ["-c", "core.hooksPath=/dev/null", "-c", f"core.hooksPath={hooks}"],
+            "config_env": ["--config-env=core.hooksPath=HOOK_TEST_PATH"],
+        }[shape]
+        env["HOOK_TEST_PATH"] = hooks
+        argv = ["git", *prefix, "commit", "--allow-empty", "-m", "test: hardened commit"]
+        if shape == "no_verify":
+            argv.append("--no-verify")
+        hardened = harden_git_argv(argv)
+        assert harden_git_argv(hardened) == hardened
+        subprocess.run(hardened, cwd=tmp_path, env=env, check=True, capture_output=True, timeout=10)
+        commit = subprocess.run(
+            ["git", "log", "-1", "--format=%s"],
+            cwd=tmp_path,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert commit.stdout.strip() == "test: hardened commit"
+        for name in HOOKS:
+>           assert not (tmp_path / f"{name}.observed").exists(), name
+E           AssertionError: prepare-commit-msg
+E           assert not True
+E            +  where True = exists()
+E            +    where exists = (PosixPath('/tmp/pytest-of-connor/pytest-131/test_hardened_commit_creates_c2') / 'prepare-commit-msg.observed').exists
+
+tests/test_git_hooks.py:87: AssertionError
+___ test_hardened_commit_creates_commit_without_executing_hooks[config_many] ___
+
+tmp_path = PosixPath('/tmp/pytest-of-connor/pytest-131/test_hardened_commit_creates_c3')
+shape = 'config_many'
+
+    @pytest.mark.parametrize("shape", ["plain", "no_verify", "config", "config_many", "config_env"])
+    def test_hardened_commit_creates_commit_without_executing_hooks(tmp_path: Path, shape: str) -> None:
+        env = prepare_repository(tmp_path)
+        hooks = str(tmp_path / "owned-hooks")
+        prefix = {
+            "plain": [],
+            "no_verify": [],
+            "config": ["-c", f"core.hooksPath={hooks}"],
+            "config_many": ["-c", "core.hooksPath=/dev/null", "-c", f"core.hooksPath={hooks}"],
+            "config_env": ["--config-env=core.hooksPath=HOOK_TEST_PATH"],
+        }[shape]
+        env["HOOK_TEST_PATH"] = hooks
+        argv = ["git", *prefix, "commit", "--allow-empty", "-m", "test: hardened commit"]
+        if shape == "no_verify":
+            argv.append("--no-verify")
+        hardened = harden_git_argv(argv)
+        assert harden_git_argv(hardened) == hardened
+        subprocess.run(hardened, cwd=tmp_path, env=env, check=True, capture_output=True, timeout=10)
+        commit = subprocess.run(
+            ["git", "log", "-1", "--format=%s"],
+            cwd=tmp_path,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert commit.stdout.strip() == "test: hardened commit"
+        for name in HOOKS:
+>           assert not (tmp_path / f"{name}.observed").exists(), name
+E           AssertionError: prepare-commit-msg
+E           assert not True
+E            +  where True = exists()
+E            +    where exists = (PosixPath('/tmp/pytest-of-connor/pytest-131/test_hardened_commit_creates_c3') / 'prepare-commit-msg.observed').exists
+
+tests/test_git_hooks.py:87: AssertionError
+___ test_hardened_commit_creates_commit_without_executing_hooks[config_env] ____
+
+tmp_path = PosixPath('/tmp/pytest-of-connor/pytest-131/test_hardened_commit_creates_c4')
+shape = 'config_env'
+
+    @pytest.mark.parametrize("shape", ["plain", "no_verify", "config", "config_many", "config_env"])
+    def test_hardened_commit_creates_commit_without_executing_hooks(tmp_path: Path, shape: str) -> None:
+        env = prepare_repository(tmp_path)
+        hooks = str(tmp_path / "owned-hooks")
+        prefix = {
+            "plain": [],
+            "no_verify": [],
+            "config": ["-c", f"core.hooksPath={hooks}"],
+            "config_many": ["-c", "core.hooksPath=/dev/null", "-c", f"core.hooksPath={hooks}"],
+            "config_env": ["--config-env=core.hooksPath=HOOK_TEST_PATH"],
+        }[shape]
+        env["HOOK_TEST_PATH"] = hooks
+        argv = ["git", *prefix, "commit", "--allow-empty", "-m", "test: hardened commit"]
+        if shape == "no_verify":
+            argv.append("--no-verify")
+        hardened = harden_git_argv(argv)
+        assert harden_git_argv(hardened) == hardened
+        subprocess.run(hardened, cwd=tmp_path, env=env, check=True, capture_output=True, timeout=10)
+        commit = subprocess.run(
+            ["git", "log", "-1", "--format=%s"],
+            cwd=tmp_path,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert commit.stdout.strip() == "test: hardened commit"
+        for name in HOOKS:
+>           assert not (tmp_path / f"{name}.observed").exists(), name
+E           AssertionError: prepare-commit-msg
+E           assert not True
+E            +  where True = exists()
+E            +    where exists = (PosixPath('/tmp/pytest-of-connor/pytest-131/test_hardened_commit_creates_c4') / 'prepare-commit-msg.observed').exists
+
+tests/test_git_hooks.py:87: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_git_hooks.py::test_hardened_commit_creates_commit_without_executing_hooks[plain]
+FAILED tests/test_git_hooks.py::test_hardened_commit_creates_commit_without_executing_hooks[no_verify]
+FAILED tests/test_git_hooks.py::test_hardened_commit_creates_commit_without_executing_hooks[config]
+FAILED tests/test_git_hooks.py::test_hardened_commit_creates_commit_without_executing_hooks[config_many]
+FAILED tests/test_git_hooks.py::test_hardened_commit_creates_commit_without_executing_hooks[config_env]
+5 failed, 1 passed in 0.32s

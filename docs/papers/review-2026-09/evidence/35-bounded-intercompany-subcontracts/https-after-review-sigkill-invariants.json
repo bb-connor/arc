@@ -1,0 +1,17 @@
+{
+  "scenario": "after-review-sigkill",
+  "reviews": 1,
+  "payments": {
+    "held": 1
+  },
+  "buyerExpenses": 0,
+  "reserved": 100,
+  "incidentVerified": true,
+  "immutableOperationJournalAndBudget": true,
+  "concurrentBuyers": 4,
+  "offlineReplay": true,
+  "buyerCrashBeforeRetention": false,
+  "paymentResolved": false,
+  "automaticReplay": false,
+  "signedIncidentDenials": 10
+}

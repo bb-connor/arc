@@ -1,0 +1,46 @@
+test_byte_capacity_denies_without_evicting_prior_custody (test_custody.CustodyTests.test_byte_capacity_denies_without_evicting_prior_custody) ... ok
+test_failed_custody_does_not_issue_a_receipt (test_custody.CustodyTests.test_failed_custody_does_not_issue_a_receipt) ... ok
+test_full_v1_migration_denies_without_erasing_or_rewriting_evidence (test_custody.CustodyTests.test_full_v1_migration_denies_without_erasing_or_rewriting_evidence) ... FAIL
+test_known_populated_v1_migrates_with_pending_decision_reserve (test_custody.CustodyTests.test_known_populated_v1_migrates_with_pending_decision_reserve) ... FAIL
+test_missing_or_tampered_bytes_fail (test_custody.CustodyTests.test_missing_or_tampered_bytes_fail) ... ok
+test_oversized_decision_does_not_consume_reserved_capacity (test_custody.CustodyTests.test_oversized_decision_does_not_consume_reserved_capacity) ... FAIL
+test_retained_bytes_and_receipt_survive_reopen (test_custody.CustodyTests.test_retained_bytes_and_receipt_survive_reopen) ... ok
+test_unknown_v1_layout_is_denied_without_reinterpreting_rows (test_custody.CustodyTests.test_unknown_v1_layout_is_denied_without_reinterpreting_rows) ... FAIL
+test_unsafe_paths_modes_and_changed_identity_fail (test_custody.CustodyTests.test_unsafe_paths_modes_and_changed_identity_fail) ... ok
+
+======================================================================
+FAIL: test_full_v1_migration_denies_without_erasing_or_rewriting_evidence (test_custody.CustodyTests.test_full_v1_migration_denies_without_erasing_or_rewriting_evidence)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_custody.py", line 61, in test_full_v1_migration_denies_without_erasing_or_rewriting_evidence
+    with self.assertRaises(p.ProtocolError):
+AssertionError: ProtocolError not raised
+
+======================================================================
+FAIL: test_known_populated_v1_migrates_with_pending_decision_reserve (test_custody.CustodyTests.test_known_populated_v1_migrates_with_pending_decision_reserve)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_custody.py", line 42, in test_known_populated_v1_migrates_with_pending_decision_reserve
+    self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0], 2)
+AssertionError: 1 != 2
+
+======================================================================
+FAIL: test_oversized_decision_does_not_consume_reserved_capacity (test_custody.CustodyTests.test_oversized_decision_does_not_consume_reserved_capacity)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_custody.py", line 70, in test_oversized_decision_does_not_consume_reserved_capacity
+    with self.assertRaises(p.ProtocolError):
+AssertionError: ProtocolError not raised
+
+======================================================================
+FAIL: test_unknown_v1_layout_is_denied_without_reinterpreting_rows (test_custody.CustodyTests.test_unknown_v1_layout_is_denied_without_reinterpreting_rows)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_custody.py", line 48, in test_unknown_v1_layout_is_denied_without_reinterpreting_rows
+    with self.assertRaises(p.ProtocolError):
+AssertionError: ProtocolError not raised
+
+----------------------------------------------------------------------
+Ran 9 tests in 3.090s
+
+FAILED (failures=4)

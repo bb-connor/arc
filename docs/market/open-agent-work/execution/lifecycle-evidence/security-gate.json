@@ -1,0 +1,9 @@
+{
+  "capturedUtc": "2026-09-14T14:36:10.443905+00:00",
+  "head": "f1b88451527b2dec7314114b3b1e91cf101312cf",
+  "worktreeStatus": "M docs/security/consumer-support.md\n M docs/security/launch-execution-plan.md\n M docs/security/launch-status.md\n M docs/security/m4-consumer-qualification.md\n M docs/security/m4-local-acceptance.md",
+  "acceptanceOpening": "# M4 local consumer-boundary acceptance\n\nStatus: all required local execution gates, final documentation review and source\ngraph refresh passed on 2026-09-14 UTC. Commit/push closeout remains in progress. The\nhosted MSRV serial-profile job is still running; its previously observed failure\nis not yet resolved. Local acceptance is not all-PR success, merge approval or\nrelease authorization.\n\nThe repaired Rust/SDK/schema/dependency source is\n`8738bdfd7be8c43a0543ca0ce468541529c47add`. Later CI and proof-report repairs\nchange verification inputs only; their separate qualification is recorded below.\nCurrent results include 45 exact M4 cases, 61 exact M3 cases, all 69 flow\ninventories, 17,187 workspace tests, normal build, strict all-target Clippy,\nsupported compatibility/portable profiles, four-language consumers and explicit\nC++/FFI/live/Drogon acceptance. The 48 existing workspace ignores are unchanged;\nno required M4 test is ignored. Earlier failed runs and their repairs remain\nrecorded below, but do not replace these current passing gates.",
+  "acceptanceSha256": "69a17e6df095e349cd2638be11ce3c6cfe41e0f23d4eb7f4b45aa177a3a61a0b",
+  "selectedForIntegration": false,
+  "reason": "Local acceptance now reports all required local gates passed, but closeout documentation remains uncommitted and hosted MSRV qualification is in progress. No exact-head hosted/review qualification inferred."
+}

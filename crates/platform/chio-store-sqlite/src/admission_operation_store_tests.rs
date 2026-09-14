@@ -78,6 +78,8 @@ mod retained_request;
 mod runtime_replay;
 #[path = "admission_operation_store_tests/schema.rs"]
 mod schema;
+#[path = "admission_operation_store_tests/schema_v35.rs"]
+mod schema_v35;
 #[path = "admission_operation_store_tests/security_participant_migration.rs"]
 pub(super) mod security_participant_migration;
 #[path = "admission_operation_store_tests/security_participant_state.rs"]
@@ -296,6 +298,16 @@ fn finalizing_tool_operation(
     capability_id: &str,
     begun_at: u64,
 ) -> AdmissionOperationV1 {
+    tool_operation_before_terminal(fixture, request_id, capability_id, begun_at, true)
+}
+
+fn tool_operation_before_terminal(
+    fixture: &Fixture,
+    request_id: &str,
+    capability_id: &str,
+    begun_at: u64,
+    finalizing: bool,
+) -> AdmissionOperationV1 {
     let mut operation = prepared_operation(
         &fixture.fence,
         AdmissionOperationKind::ToolDispatch,
@@ -332,7 +344,11 @@ fn finalizing_tool_operation(
             ))],
         ),
     ];
-    for (index, (next_state, attachments)) in transitions.into_iter().enumerate() {
+    for (index, (next_state, attachments)) in transitions
+        .into_iter()
+        .take(if finalizing { 6 } else { 5 })
+        .enumerate()
+    {
         let at = begun_at + 1 + u64::try_from(index).expect("transition index") * 2;
         let recovery = claim(fixture, &operation, "projection-worker", at);
         operation = fixture

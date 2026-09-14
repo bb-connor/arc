@@ -1,0 +1,102 @@
+# Roadmap: From Two Conference Drafts to One Foundational Paper
+
+## Amendment, September 2026: phases 0 through 3 are executed
+
+Phases 0 through 3 were carried out on the branch `paper/roadmap-phase-0-1`, in
+fourteen commits from `84f2d3eaff` to `c76f19a062`. `12-execution-record.md`
+gives the item-by-item account with the commit that delivered each, the
+before-and-after measurements, and the status of every finding.
+
+- **Phase 0.** All four items, at `84f2d3eaff`.
+- **Phase 1.** Nine of ten items, at `84f2d3eaff` and `44170f9213`, measured at
+  `4338338e08`, re-measured on a clean tree at `6e6e2f88f2` and pinned at
+  `c76f19a062`. Item 1.10 was not done: continuation release in the JSON and
+  in-memory admission stores still ignores the admission id.
+- **Phase 2.** Six of seven items. Item 2.1 ran as three processes on one host
+  rather than on two, so the two-host experiment is still outstanding and the
+  paper says so; item 2.4 landed without the precedence test; item 2.5 covers
+  the in-process verifier and the exported buyer report but not the iroh
+  co-sign lane's refusal reply; item 2.6, the bounded model of the durable
+  admission operation, was not done.
+- **Phase 3.** Done, at `a7f4897852`, rebuilt at `b13ceda988`.
+- **Phase 4.** Not executed.
+
+Two statements below no longer hold. Phase 3's "The paper is new" now reads:
+the paper exists, at `docs/papers/evidence-crosses`, with the title, spine,
+named primitive, section plan, length and non-anonymized authorship this phase
+prescribes, and with every quantity read from a measurement macro. And the
+closing paragraph remains true of the review itself, but the execution that
+followed it did modify papers, spec and source files, and did rebuild the
+artifact at a new pin; it still did not run the two-host experiment.
+
+Of the success criteria: the artifact check runs in CI on every commit touching
+the covered paths and is green. The rubric in
+`06-foundational-paper-benchmark.md` was not re-scored against the new paper,
+and the six flip conditions in `07-simulated-pc-reviews.md` were not
+individually re-checked, though the one they share, a demonstration across an
+organization boundary, is addressed only in the reduced, single-host form.
+
+Prioritized actions derived from every wave of this review. Each item names the findings it resolves, the evidence class it produces in the claim registry's vocabulary, and a rough effort (S: days, M: one to two weeks, L: a month or more). Items within a phase are ordered by dependency. Nothing here changes protocol semantics; items that touch code are consistency and evidence repairs.
+
+## Phase 0: stop the bleeding (S, before anything else)
+
+| # | Action | Resolves | Effort |
+| --- | --- | --- | --- |
+| 0.1 | Freeze P2. Mark `docs/papers/bilateral-receipt-admission/` retired in its README and in a new `docs/papers/README.md` family index; do not circulate the PDF. | XREF-09, XREF-10, the whole `03-p2-claim-audit.md` | S |
+| 0.2 | Decide the measurement machine for P1 and stop mixing runs. Either the Linux Neoverse host (the prose) or the MacBook Pro (the files). Record the decision in the claim ledger. | BENCH1-01, BENCH1-02 | S |
+| 0.3 | Update the venue metadata in four places (`paper-usenix.tex`, `README.md`, `supplementary/README.md`, `artifact-manifest.json`) to the real status; the stated Cycle 1 deadline has passed. | BENCH1-15, XREF-23 | S |
+| 0.4 | Add a family README under `docs/papers/` naming, for each paper: status (active, retired, planning), which theorems it cites, and which of those are in the proof root versus paper-local. | XREF-10, XREF-19 | S |
+
+## Phase 1: make P1's evidence record true (S to M)
+
+| # | Action | Resolves | Evidence class | Effort |
+| --- | --- | --- | --- | --- |
+| 1.1 | Re-run `bench/run-bilateral-admission.sh` and `bench/run-replay-corpus.sh` on the chosen machine under the toolchain `rust-toolchain.toml` pins; retain the Criterion estimates and log; extend the script to record CPU model, core count, and memory on both Linux and Darwin. | BENCH1-02, BENCH1-05, BENCH1-16 | experimentally measured | S |
+| 1.2 | Generate the claim ledger's measurement block from `bilateral-admission.json` in the same script that writes the inline macros; rebuild both PDFs in place; re-pin the artifact at that commit including `Cargo.lock` and `rust-toolchain.toml`. Add a consistency step to `generate-programmable-sovereignty-artifact.py --check` that asserts the inline macro strings occur in `pdftotext` of the pinned PDF and in the ledger. Run `--check` in CI on every commit touching the covered paths. | BENCH1-03, BENCH1-04, BENCH1-06, IMPL1-04, IMPL1-05, PROSE-07 | reproducibility | S |
+| 1.3 | Add an allow-path fixture to `benches/cross_boundary_admission.rs` (allow summary, real dispatch to the counting tool server, counter equals iterations) and report it beside the denial. Describe the denial fixture as a policy-summary early exit that still writes a signed SQLite denial receipt and does not verify signatures. Add a sustained-load run (calls per second over N seconds with store growth). | BENCH1 verifier note 1, BENCH1-09, BENCH1-10, IMPL1-11 | experimentally measured | S to M |
+| 1.4 | Report mean, standard deviation, and a 95 percent confidence interval; rename p99 to max for n of 30 or raise sample counts (the workflow costs 2.4 s per run, so 100 runs is minutes); switch the deny and append benches to per-invocation timing. | BENCH1-07, BENCH1-08 | experimentally measured | S |
+| 1.5 | Rewrite section 5: name `verify_treaty_dsse_evidence`, `verify_chio_bilateral_dsse_envelope`, and `VerifiedFederationTreatyMaterial::verify` as the pre-dispatch verifiers with exactly what each checks; move peer pins, manifest freshness, revocation epoch, and receipt-store checks to the offline buyer verifier; cite `VerifierError::code` and `BilateralCoSigningError::code` for the failures each owns; describe the continuation as consumed at admission and released on pre-dispatch denial; say the admission-report digest is bound (substituted), not compared; put budget after the hook. | IMPL1-03, IMPL1-07 to IMPL1-10, IMPL1-12, XREF-15, HARN-07 | production-enforced | S |
+| 1.6 | State the matrix's real split of surfaces (hook 5, strict operational verifier 3, envelope verifier 6, partial verifier 3, pure validators 3), or retarget PS-TH-01..03 and PS-TH-13/14/19 to the surfaces the paper claims; add `cargo test -p chio-kernel federation_cosign` and the chio-conformance c2 and b4 suites to the manifest's behavioral tests; widen PS-T06 to include the federation crate's integration tests. | IMPL1-02, IMPL1-13, HARN-12, HARN-13, HARN verifier note 4 | production-enforced | S |
+| 1.7 | Resolve the ladder-mode naming split: name the fifth mode `maintenance` everywhere (P1 section 3, Lean `TrustMode`, runtime-core alias documented or removed), reconcile the co-sign vocabulary between runtime-core and federation, and add one differential test asserting all three rank functions agree on every input. | IMPL1-01, FORM-11, XREF-07, IMPL1 verifier note 1 | differentially aligned | S |
+| 1.8 | Bring the spec to the code: one predicate URI until the WG accepts the canonical one; exactly two signatures; add the three code-only codes and mark the two spec-only codes reserved; reorder the algorithm; fix the `PredicateTypeUnrecognised` doc comment; amend `CHIO_LADDER.md` 6.3 rule 4 to the fail-closed behavior. Have the paper cite the spec section and version. | XREF-11, XREF-12 | claim gate | S |
+| 1.9 | Register `Treaty/ReceiptPredicate.lean` in `formal/proof-manifest.toml` root modules, add PS-F01 and PS-F02 and the three `BilateralAccept` corollaries to `formal/theorem-inventory.json`, add `evaluate`, `admits`, `refinesOn` to the Lean mutation allowlist; register the federated-origin-classification assumption in `formal/assumptions.toml`; cite registry ids in the assumptions table (`ASSUME-OS-CLOCK`, `ASSUME-SQLITE-ATOMICITY` single-row, `ASSUME-SUBPROCESS-ISOLATION`, the float scope of `ASSUME-CANONICAL-JSON`). | FORM-10, FORM-18, HARN-05, HARN-20 | lean_root_imported, audited_assumption | S |
+| 1.10 | Fix the JSON runtime admission store so release is scoped by admission id as in SQLite, or document the difference. | IMPL1 verifier note 4 | production-enforced | S |
+
+## Phase 2: build what the thesis needs (M to L)
+
+| # | Action | Resolves | Evidence class | Effort |
+| --- | --- | --- | --- | --- |
+| 2.1 | **The two-host experiment.** Two separately administered kernels on two hosts with disjoint stores, trusted issuers, and keys, over the existing iroh bilateral and revocation lanes; drive the 20-case negative corpus over the wire with the receiver's dispatch counter asserted zero; measure admitted and denied latency end to end; measure revoke-to-first-deny at the connected peer and time-to-deny after one cut link against the freshness bound. Retain environment files for both hosts. This is the one experiment every candidate thesis needs and none has; without it the paper says cross-organization admission was exercised only in-process. | PC reviews (all six flip conditions), judges' synthesis, IMPL2-28, SOSP W10 | executable demonstration, experimentally measured | M to L |
+| 2.2 | **Security definitions and reductions on paper.** Admission binding, receiver locality, single use, audience binding; each argued from Ed25519 EUF-CMA, SHA-256 collision resistance, JCS injectivity (the single Lean axiom), and single-row SQLite atomicity, tied to `ASSUME-*` ids; a drop-a-field, exhibit-the-attack table over the fifteen `TreatyBindingRef` fields naming the code that fires. This replaces P1's vacuous security objective and P2's fictional gates, and costs no code. | S&P W2, USENIX W2, CCS W10, the P2 blockers | claim gate | M |
+| 2.3 | Prove one structural fail-closed theorem in `PredicateLang.lean` by induction over `Predicate` (an undefined or unsupported atom anywhere denotes false), closing mutation survivors #1005 to #1009; dispose #1010 as equivalent. Relate the two bounded predicate languages by an injection with a denotation-agreement theorem. | FORM-08, FORM-13, FORM-16 | lean_root_imported | S to M |
+| 2.4 | Add the cheapest missing harnesses on the treaty path: a libFuzzer target over `verify_chio_bilateral_dsse_envelope`; a `cargo-mutants` shard over `bilateral_dsse/verify.rs`, `bilateral_verifier/cosign.rs`, and `admission_hook/dsse.rs`; a Loom or crash-reopen test for continuation consumption; a precedence test asserting the gate order with two simultaneous faults. | HARN-09, HARN-17, HARN-22 | runtime qualification | M |
+| 2.5 | Separate the stable rejection code from the diagnostic message at the protocol surface, so that only `VerifierError::code` crosses the boundary and the message stays in logs; then, and only then, an error-oracle argument can be written over the real 16-code set. | IMPL2-07, PROSE-11, PROSE-25, HARN-10 | production-enforced | S |
+| 2.6 | Bounded model of the durable admission operation (the 18-state record from prepared through denied-after-delivery) so that "durable before dispatch" is a checked property rather than a drop-injection corpus. | judges' second priority | distributed_apalache | M |
+| 2.7 | Fix or delete `docs/papers/reversible-action/theorems.lean` (it does not elaborate against the proof root; its headline theorem is `sorry`); promote `sensor-grounded-admission/lean/` into the proof root or mark it paper-local; correct the sensor manifest's module path. | FORM-14, XREF-19 | lean_root_imported | S |
+
+## Phase 3: write the paper (M)
+
+The paper is new. Reusing P1's sections would carry the hedging register and the evidence-surface organization into the new document; reusing P2's would carry the fictions. Take P1's facts and claim discipline, P2's shape, and the thesis panel's spine.
+
+| Element | Decision |
+| --- | --- |
+| Title | Working title from the judge panel: "Evidence Crosses, Authority Does Not: Receiver-Owned Admission of Agent Tool Calls Within and Across Organizations". Do not put "operating system" or "kernel for agents" in the title; keep "kernel" as the component's name and define its boundary in section 2 as the tool servers whose transport the kernel owns, with the agent process explicitly untrusted and unconfined under `ASSUME-SUBPROCESS-ISOLATION`. |
+| First paragraph | The refund scenario, carried through the whole paper as the worked example. First sentence: an agent that reaches a tool directly holds whatever authority the surrounding process holds and leaves whatever record that process chooses to keep, and a second organization asked to act on that agent's behalf has nothing to check but the sender's word. Second sentence states the rule. |
+| Named primitive | The receipt, in two forms (local kernel-signed content-addressed receipt; co-signed receipt whose subject is the digest of a receipt the receiver already holds). The syscall is admission. The envelope is a pointer, not a bearer credential. |
+| Section plan | (1) the rule and, as the second paragraph, the end-to-end placement argument: alignment and monitors change how often the kernel says no; the receiver decides; the receipt is what an auditor reads. (2) threat model and trusted base with the assumptions table, once. (3) the receipt, with the budget hold taken before dispatch and denials as receipts of the same shape, so permission, proof, and price are one object; claim nothing beyond that about commerce. (4) the admission operation, durable before dispatch, with `ReceiptBeforeAllow` and `PostAdmissionDropGuard` as abstraction anchors. (5) cross-organization admission as the same operation: receiver-owned resolution, request-borne trust rejected, the strict two-key verifier in its real order with the real codes, continuation consumed once before dispatch and released only on pre-dispatch denial, treaty material bound into the new receipt, then the peer co-signature. (6) security: the four definitions and reductions, then revocation as a per-origin monotone signed clock with fail-closed freshness, safety unconditional and liveness under `ASSUME-GOSSIP-FAIRNESS-PARTITION-BOUND`. (7) the formal estate as layered, mirror-hashed tripwires with survivors disclosed. (8) evaluation: the two-host experiment first, then revoke-to-deny, then local admission cost decomposition and cross-language offline receipt verification, all on declared hosts. (9) limitations, once. |
+| Length | Eight to ten pages, under 5,000 words, one real envelope, one real denial receipt, one figure that draws the mechanism (the receipt and its pointers), at most one latency table. |
+| Omit | The finite-domain Lean theorem and the definitional accept-set theorem (one sentence pointing at the inventory); the Rust-versus-Rust differential suite; the ten-row Criterion table; the buyer-workflow seconds; BBS; anchor lanes; the macOS stub; polity, constitution, and sovereignty vocabulary; research questions; contribution bullets; crate and file names; sibling-paper deferrals; "structural", "load-bearing", "by construction". |
+| Must not claim | Anything in the claim registry's disallowed list; "five rejection codes"; "signatures verified first"; "quorum-required" as a ladder mode; two keys as two organizations; Lean verifying Rust; any benchmark number until 1.1 and 1.2 are done; public append-only or non-repudiation semantics for checkpoints; "no shared kernel" unless 2.1 has run. |
+| Related work | Add trust management and delegation (PolicyMaker and KeyNote, SDSI and SPKI, Macaroons, Biscuit, UCAN and ZCAP-LD, RFC 8693, SPIFFE federation, Kerberos cross-realm) and agent protocols (MCP, A2A, x402, AP2); keep SCITT and COSE receipts, Cedar, seL4 and capability systems; derive from the citations rather than positioning against them. |
+| Merges from P2 | The build-versus-admission provenance sentence; the SCITT contrast; rejection codes as protocol surface with signed denials; the attack table format; the Ed25519-authoritative policy stance. Each rewritten against the code. |
+| Anonymity | Decide. The project is public; a double-blind submission that names it violates the policy. For a whitepaper, put real authors and the repository URL in. |
+
+Success criteria before circulation: every rubric criterion in `06-foundational-paper-benchmark.md` at 4 or better; `generate-programmable-sovereignty-artifact.py --check` green in CI; each of the six flip conditions in `07-simulated-pc-reviews.md` addressed or explicitly declined in the limitations; a reader who deletes the repository can still implement the construction from the text.
+
+## Phase 4: family cleanup (S to M)
+
+Regenerate P2's bibliography from P1's for shared keys and verify the P2-only entries (one identifier resolves to a different paper); prune the 47 and 48 uncited entries; rename the P1 directory to match its title or restore the title to match the directory; qualify the delegated-emergency-authority decidability claim to the finite domain; stagger sibling submissions to venues where the parent is citable by its real title. (PROSE-05, PROSE-17, PROSE-30, XREF-22, XREF-23)
+
+## What this review did not do
+
+It did not modify any paper, spec, or source file. It did not run the two-host experiment. It did not rebuild the artifact at a new pin. It did not evaluate the four sibling papers beyond their relationship to P1 and P2. The completeness critic's additional checks, if any, are appended to `findings.json` and noted in `00-method-and-scope.md`.

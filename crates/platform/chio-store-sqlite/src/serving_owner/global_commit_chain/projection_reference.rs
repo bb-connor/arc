@@ -67,6 +67,7 @@ pub(super) fn projection_reference_digest(
             .ok_or_else(|| invalid("admission projection reference is absent")),
         "budget" => budget_event_reference_digest(connection, key, sequence),
         "payment" => payment_journal_reference_digest(connection, key, sequence),
+        "payment_resolution" => payment_resolution_reference_digest(connection, key, sequence),
         "revocation" => revocation_reference_digest(connection, key, sequence),
         "frost" => connection
             .query_row(

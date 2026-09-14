@@ -1,0 +1,324 @@
+diff --git a/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/custody.rs b/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/custody.rs
+index e768c19789..fc822fa8aa 100644
+--- a/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/custody.rs
++++ b/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/custody.rs
+@@ -170,6 +170,22 @@ impl ChioKernel {
+                 "caller custody omitted its selected runtime authority",
+             ));
+         }
++        // A configured credential source alone does not require a claim. Use
++        // the original aggregate grant requirement, never a later selection.
++        if admission
++            .original_retained_request()
++            .is_some_and(|request| {
++                request.matching_grants_require_dpop()
++                    && request
++                        .authority_profile()
++                        .is_some_and(|profile| profile.dpop().is_some())
++            })
++            && operation.dpop_replay_ledger_digest().is_none()
++        {
++            return Err(invalid(
++                "caller custody omitted its selected DPoP authority",
++            ));
++        }
+         if operation.runtime_participant_ledger_digest().is_none()
+             && operation.governed_approval_ledger_digest().is_none()
+             && operation.dpop_replay_ledger_digest().is_none()
+diff --git a/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests.rs b/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests.rs
+index baedecc95c..b65f6b4521 100644
+--- a/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests.rs
++++ b/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests.rs
+@@ -18,6 +18,8 @@ mod participants;
+ 
+ #[path = "tests/custody.rs"]
+ mod custody;
++#[path = "tests/selected_custody.rs"]
++mod selected_custody;
+ 
+ #[test]
+ fn caller_observation_metadata_cannot_be_injected_before_dispatch() -> TestResult {
+diff --git a/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests/fixture.rs b/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests/fixture.rs
+index 5a5cde6f52..f55be46b60 100644
+--- a/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests/fixture.rs
++++ b/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests/fixture.rs
+@@ -3,10 +3,10 @@
+ 
+ use super::*;
+ use crate::admission_operation::{
+-    immutable_tool_request_hash, qualify_recovery_claim_for_test,
+-    AdmissionExecutionNonceReservationV1, AdmissionOperationBindingInputV1, AdmissionOperationKind,
+-    AdmissionParticipantRequirements, AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
+-    UntrustedAdmissionRecoveryClaim,
++    immutable_tool_request_hash_with_profile, qualify_recovery_claim_for_test,
++    AdmissionAuthorityProfileV1, AdmissionExecutionNonceReservationV1,
++    AdmissionOperationBindingInputV1, AdmissionOperationKind, AdmissionParticipantRequirements,
++    AdmissionRequestBindingV1, AuthenticatedRequestNamespace, UntrustedAdmissionRecoveryClaim,
+ };
+ use crate::execution_nonce::ExecutionNonceConfig;
+ use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
+@@ -49,6 +49,38 @@ fn advance(
+ }
+ 
+ pub(super) fn fixture() -> TestResult<Fixture> {
++    let (kernel, admission, request, now) = caller_admission_with_profile(None, false)?;
++    let nonce = request.execution_nonce.clone().ok_or("caller nonce")?;
++    let frozen = kernel.freeze_durable_tool_return_context(
++        &admission,
++        DurableToolReturnContextInput {
++            request: &request,
++            matched_grant_index: 0,
++            extra_receipt_metadata: None,
++            pre_invocation_guard_evidence: &[],
++            verified_payee_binding: None,
++            verified_purchase: None,
++            verified_recovery: None,
++            trusted_now_unix_ms: now,
++            security_invocation_context: None,
++            security_release_required: false,
++        },
++    )?;
++    let frame = kernel
++        .frame_caller_return_context(&admission, &frozen, now)?
++        .ok_or("caller model frame")?;
++    Ok(Fixture {
++        kernel,
++        admission,
++        frame,
++        nonce,
++    })
++}
++
++pub(super) fn caller_admission_with_profile(
++    profile: Option<&AdmissionAuthorityProfileV1>,
++    dpop_required: bool,
++) -> TestResult<(ChioKernel, DurableToolAdmission, ToolCallRequest, u64)> {
+     let key = chio_core::Keypair::generate();
+     let kernel = ChioKernel::new(KernelConfig {
+         keypair: key.clone(),
+@@ -80,7 +112,7 @@ pub(super) fn fixture() -> TestResult<Fixture> {
+                 max_invocations: Some(1),
+                 max_cost_per_invocation: None,
+                 max_total_cost: None,
+-                dpop_required: None,
++                dpop_required: dpop_required.then_some(true),
+             }],
+             ..ChioScope::default()
+         },
+@@ -98,7 +130,13 @@ pub(super) fn fixture() -> TestResult<Fixture> {
+         &request.arguments,
+         None,
+     )?;
+-    let original = RetainedToolAdmissionRequestV1::from_admission(&request, &matching, &[], None)?;
++    let original = RetainedToolAdmissionRequestV1::from_admission_with_profile(
++        &request,
++        &matching,
++        &[],
++        None,
++        profile,
++    )?;
+     let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
+         kind: AdmissionOperationKind::ToolDispatch,
+         namespace: AuthenticatedRequestNamespace::for_local_system(identifier(
+@@ -112,7 +150,7 @@ pub(super) fn fixture() -> TestResult<Fixture> {
+             sha256_hex(&canonical_json_bytes(&request.capability)?),
+         )?,
+         request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
+-            immutable_tool_request_hash(&request, &matching, &[], None)?,
++            immutable_tool_request_hash_with_profile(&request, &matching, &[], None, profile)?,
+             AdmissionDigest::try_new(
+                 "action",
+                 sha256_hex(&canonical_json_bytes(&request.arguments)?),
+@@ -129,6 +167,7 @@ pub(super) fn fixture() -> TestResult<Fixture> {
+     })?;
+     let now = current_unix_timestamp_ms();
+     let mut operation = AdmissionOperationV1::prepare(binding, 1)?;
++    original.validate_binding(operation.binding())?;
+     let nonce = AdmissionExecutionNonceReservationV1::mint_for_operation(
+         &operation,
+         &original,
+@@ -184,28 +223,5 @@ pub(super) fn fixture() -> TestResult<Fixture> {
+         issued_nonce: Some(nonce.clone()),
+         nonce_preflight: None,
+     };
+-    let frozen = kernel.freeze_durable_tool_return_context(
+-        &admission,
+-        DurableToolReturnContextInput {
+-            request: &request,
+-            matched_grant_index: 0,
+-            extra_receipt_metadata: None,
+-            pre_invocation_guard_evidence: &[],
+-            verified_payee_binding: None,
+-            verified_purchase: None,
+-            verified_recovery: None,
+-            trusted_now_unix_ms: now,
+-            security_invocation_context: None,
+-            security_release_required: false,
+-        },
+-    )?;
+-    let frame = kernel
+-        .frame_caller_return_context(&admission, &frozen, now)?
+-        .ok_or("caller model frame")?;
+-    Ok(Fixture {
+-        kernel,
+-        admission,
+-        frame,
+-        nonce: nonce.signed_nonce().clone(),
+-    })
++    Ok((kernel, admission, request, now))
+ }
+diff --git a/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests/selected_custody.rs b/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests/selected_custody.rs
+new file mode 100644
+index 0000000000..a3a8164e47
+--- /dev/null
++++ b/crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests/selected_custody.rs
+@@ -0,0 +1,115 @@
++//! In-memory capture rejects missing selected participants before publishing a
++//! caller snapshot. These models do not claim physical ledger provenance.
++
++use super::*;
++use crate::admission_operation::governed_approval_claim::GovernedApprovalAuthorityBindingV1;
++use crate::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1;
++use crate::admission_operation::{AdmissionAuthorityProfileV1, AdmissionAuthoritySelectionV1};
++use crate::dpop::authority::{DpopReplayAuthorityInputV1, DpopReplayAuthorityV1};
++
++fn identifier(value: &str) -> TestResult<AdmissionIdentifier> {
++    Ok(AdmissionIdentifier::try_new("authority", value)?)
++}
++
++fn selection() -> AdmissionAuthoritySelectionV1 {
++    AdmissionAuthoritySelectionV1 {
++        runtime_hook_installed: false,
++        swarm_admission_required: false,
++        runtime_enforces_swarm_authority: false,
++        runtime_requires_dispatch_revalidation: false,
++        runtime: None,
++        approval: None,
++        dpop: None,
++    }
++}
++
++fn require_missing_custody_denial(
++    selection: AdmissionAuthoritySelectionV1,
++    family: &str,
++    dpop_required: bool,
++) -> TestResult {
++    let profile = AdmissionAuthorityProfileV1::new(selection)?;
++    let (kernel, admission, _, now) =
++        super::fixture::caller_admission_with_profile(Some(&profile), dpop_required)?;
++    let error = match kernel.read_caller_participant_custody(&admission, 0, now) {
++        Ok(_) => {
++            return Err(
++                format!("published caller snapshot without selected {family} custody").into(),
++            )
++        }
++        Err(error) => error,
++    };
++    assert!(
++        error
++            .to_string()
++            .contains(&format!("omitted its selected {family} authority")),
++        "expected missing-custody denial, received {error}"
++    );
++    Ok(())
++}
++
++#[test]
++fn caller_snapshot_rejects_missing_selected_runtime_custody() -> TestResult {
++    let mut selected = selection();
++    selected.runtime_hook_installed = true;
++    selected.runtime_requires_dispatch_revalidation = true;
++    selected.runtime = Some(RuntimeParticipantAuthorityBindingV1::new(
++        identifier("runtime")?,
++        identifier("runtime-generation")?,
++    ));
++    require_missing_custody_denial(selected, "runtime", false)
++}
++
++#[test]
++fn caller_snapshot_allows_configured_but_unused_approval_authority() -> TestResult {
++    let mut selected = selection();
++    selected.approval = Some(GovernedApprovalAuthorityBindingV1::new(
++        identifier("approval")?,
++        identifier("approval-generation")?,
++    ));
++    require_absent_custody(Some(&AdmissionAuthorityProfileV1::new(selected)?))
++}
++
++fn dpop_selection() -> TestResult<AdmissionAuthoritySelectionV1> {
++    let mut selected = selection();
++    selected.dpop = Some(DpopReplayAuthorityV1::new(DpopReplayAuthorityInputV1 {
++        destination_store_uuid: identifier("11111111-1111-4111-8111-111111111111")?,
++        dpop_authority_id: identifier("dpop")?,
++        expectation_id: AdmissionDigest::try_new("dpop generation", "a".repeat(64))?,
++        proof_ttl_secs: 60,
++        max_clock_skew_secs: 30,
++    })?);
++    Ok(selected)
++}
++
++#[test]
++fn caller_snapshot_rejects_missing_required_dpop_custody() -> TestResult {
++    require_missing_custody_denial(dpop_selection()?, "DPoP", true)
++}
++
++#[test]
++fn caller_snapshot_allows_configured_but_unused_dpop_authority() -> TestResult {
++    require_absent_custody(Some(&AdmissionAuthorityProfileV1::new(dpop_selection()?)?))
++}
++
++fn require_absent_custody(profile: Option<&AdmissionAuthorityProfileV1>) -> TestResult {
++    let (kernel, admission, _, now) =
++        super::fixture::caller_admission_with_profile(profile, false)?;
++    let snapshot = kernel.read_caller_participant_custody(&admission, 0, now)?;
++    assert_eq!(
++        serde_json::to_value(snapshot)?,
++        serde_json::json!({
++            "runtime": null, "approval": null, "dpop": null
++        })
++    );
++    Ok(())
++}
++
++#[test]
++fn caller_snapshot_preserves_genuinely_unselected_and_legacy_custody_absence() -> TestResult {
++    let explicit_absence = AdmissionAuthorityProfileV1::new(selection())?;
++    for profile in [None, Some(&explicit_absence)] {
++        require_absent_custody(profile)?;
++    }
++    Ok(())
++}
+diff --git a/formal/proof-manifest.toml b/formal/proof-manifest.toml
+index c9aa2b4adc..2bd0a78413 100644
+--- a/formal/proof-manifest.toml
++++ b/formal/proof-manifest.toml
+@@ -3383,11 +3383,11 @@ model_kind = "tla"
+ relationship = "abstraction_anchor"
+ rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/custody.rs"
+ rust_symbols = ["History::push", "History::finish", "ChioKernel::read_caller_participant_custody"]
+-normalized_sha256 = "cda028484eb6530672f5c551e22d0715e6544ff28613ccbec45a7af9081dda41"
++normalized_sha256 = "e16fec43ace09ea6baf9918830ba5ec7a558910a02bc3b95675f2728942ad60f"
+ symbol_sha256 = [
+   { symbol = "History::push", sha256 = "13786a2599e977de0059224c421d9181466864e7e9236493218ec76add2692a4" },
+   { symbol = "History::finish", sha256 = "392fa867b4267f0cffd35324b705580b27e5f8f73b0d4928bfcb9dadbb94ddf4" },
+-  { symbol = "ChioKernel::read_caller_participant_custody", sha256 = "794cdda161a9becfa595ce1098d38784d211642e0085ee9a5f39b10e08858628" },
++  { symbol = "ChioKernel::read_caller_participant_custody", sha256 = "02aa4a185e2d546ccb2990912dbd1b57aefaea0fea069876d2278628f66597cf" },
+ ]
+ 
+ [[mirror]]
+diff --git a/scripts/check-flow-security.sh b/scripts/check-flow-security.sh
+index 3675fe13be..dcd4fd17ae 100755
+--- a/scripts/check-flow-security.sh
++++ b/scripts/check-flow-security.sh
+@@ -704,6 +704,11 @@ run_exact_target --label "durable release output binding" --allow-filtered --exp
+   -- cargo test -p chio-kernel --lib tool_outcome::security_release::context::tests::
+ 
+ run_exact_target --label "frozen dispatch participant context" --allow-filtered --expected \
++  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_allows_configured_but_unused_approval_authority \
++  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_allows_configured_but_unused_dpop_authority \
++  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_preserves_genuinely_unselected_and_legacy_custody_absence \
++  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_rejects_missing_required_dpop_custody \
++  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_rejects_missing_selected_runtime_custody \
+   kernel::admission_coordinator::return_context::caller::tests::caller_observation_metadata_cannot_be_injected_before_dispatch \
+   kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_custody_requires_explicit_absence_and_rejects_unowned_claims \
+   kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_v3_remains_readable_but_cannot_acquire_custody_on_reissue \

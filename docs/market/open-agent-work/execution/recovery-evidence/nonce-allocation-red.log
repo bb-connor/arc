@@ -1,0 +1,14 @@
+test_new_preparation_cannot_reuse_a_corrupted_nonce_index (test_rail_journal.JournalTests.test_new_preparation_cannot_reuse_a_corrupted_nonce_index) ... FAIL
+
+======================================================================
+FAIL: test_new_preparation_cannot_reuse_a_corrupted_nonce_index (test_rail_journal.JournalTests.test_new_preparation_cannot_reuse_a_corrupted_nonce_index)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_rail_journal.py", line 142, in test_new_preparation_cannot_reuse_a_corrupted_nonce_index
+    with self.assertRaises(p.ProtocolError):
+AssertionError: ProtocolError not raised
+
+----------------------------------------------------------------------
+Ran 1 test in 0.033s
+
+FAILED (failures=1)

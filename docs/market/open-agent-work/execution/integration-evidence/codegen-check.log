@@ -1,0 +1,7 @@
+codegen rust: /home/connor/backbay/arc-funded-integration/crates/core/chio-core-types/src/_generated/chio_wire_v1.rs and /home/connor/backbay/arc-funded-integration/crates/core/chio-core-types/src/_generated/mod.rs in sync (4380524 bytes total); 4 state-machine outputs in sync
+codegen python: /home/connor/backbay/arc-funded-integration/sdks/python/chio-sdk-python/src/chio_sdk/_generated in sync (141 schema files, 154 python files)
+codegen ts: /home/connor/backbay/arc-funded-integration/sdks/typescript/packages/conformance/src/_generated/index.ts in sync (300265 bytes, 141 schemas, schema-sha 38ea5b1a436af1ed)
+regen-types.sh: bundled 494 schemas into chio-wire-v1.openapi.json
+regen-types.sh: invoking oapi-codegen v2.4.1
+regen-types.sh: wrote /home/connor/backbay/arc-funded-integration/sdks/go/chio-go-http/types.go
+codegen go: /home/connor/backbay/arc-funded-integration/sdks/go/chio-go-http/types.go in sync with committed bytes

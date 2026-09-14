@@ -904,7 +904,8 @@ pub trait Guard: Send + Sync {
     }
 
     /// Validate the exact output after the tool returns and before it can be
-    /// released or committed as a durable tool return. Stateful guards use
+    /// released. Raw durable returns are retained before this check so a
+    /// rejected result can be finalized without repeating execution. Stateful guards use
     /// this seam to bind an admission decision to the value actually read.
     fn validate_output_before_release(
         &self,
@@ -917,6 +918,20 @@ pub trait Guard: Send + Sync {
     /// Return true when output validation binds the exact released value and
     /// therefore must run after every configured output transform.
     fn requires_exact_released_output(&self, _ctx: &GuardContext) -> bool {
+        false
+    }
+
+    /// Opt this request into a checked-output contract: a returned output
+    /// rejected by this guard earns zero charge. This is trusted pricing
+    /// authority, not an inference from an ordinary security denial. The
+    /// configured policy must bind the agreement and checker. The kernel
+    /// requires durable coverage and a reversible payment hold, retains the
+    /// executed invocation, and withholds the rejected output. Composite
+    /// guards must explicitly implement the contract for their children.
+    /// Digest, Finding purchase and recovery contracts cannot be combined
+    /// with this profile. Errors and panics in guards that do not opt in
+    /// retain their existing fail-closed behavior.
+    fn output_rejection_is_zero_charge(&self, _ctx: &GuardContext) -> bool {
         false
     }
 }

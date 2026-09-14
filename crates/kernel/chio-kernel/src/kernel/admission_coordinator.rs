@@ -65,6 +65,8 @@ pub use native_egress::NativeSecurityDispatchCaptureAuthority;
 pub use native_egress::NativeSecurityEgressCheckpointHook;
 pub use native_egress::{AcquiredNativeSecurityEgress, PreparedNativeSecurityEgress};
 pub use runtime_acquisition::RuntimeParticipantClaimAuthority;
+#[path = "admission_coordinator/outcome_authority.rs"]
+mod outcome_authority;
 #[path = "admission_coordinator/security_release.rs"]
 mod security_release;
 #[path = "admission_coordinator/terminal.rs"]
@@ -193,25 +195,6 @@ impl DurableAdmissionRuntime {
             lease_epoch: self.fence.owner_epoch,
         }
     }
-
-    fn qualified_terminal_records(
-        &self,
-        operation: &AdmissionOperationV1,
-    ) -> Result<(ToolOutcomeRecordV1, PostReturnEvaluationRecordV1), ToolOutcomeError> {
-        let unavailable =
-            || ToolOutcomeError::ReleaseAuthorityUnavailable("durable terminal outcome store");
-        let outcome = self
-            .outcome_store
-            .lookup_by_operation(operation.binding().operation_id())
-            .map_err(|_| unavailable())?
-            .ok_or_else(unavailable)?;
-        let evaluation = self
-            .outcome_store
-            .lookup_post_return_evaluation(operation.binding().operation_id())
-            .map_err(|_| unavailable())?
-            .ok_or_else(unavailable)?;
-        Ok((outcome, evaluation))
-    }
 }
 
 #[cfg(feature = "finding-market")]
@@ -231,26 +214,6 @@ impl ChioKernel {
             return Err(crate::finding_pool::FindingPoolLedgerError::StartupAlreadyReconciled);
         }
         Ok(())
-    }
-}
-
-impl QualifiedDurableOutcomeAuthority for DurableAdmissionRuntime {
-    fn verify_terminal_outcome(
-        &self,
-        operation: &AdmissionOperationV1,
-        context: &AdmissionProjectionContext,
-    ) -> Result<ToolOutcomeTerminalEvidenceV1, ToolOutcomeError> {
-        let (outcome, evaluation) = self.qualified_terminal_records(operation)?;
-        ToolOutcomeTerminalEvidenceV1::from_records(operation, context, &outcome, &evaluation)
-    }
-
-    fn verify_contractual_zero_charge(
-        &self,
-        operation: &AdmissionOperationV1,
-        context: &AdmissionProjectionContext,
-    ) -> Result<VerifiedContractualZeroCharge, ToolOutcomeError> {
-        let (outcome, evaluation) = self.qualified_terminal_records(operation)?;
-        VerifiedContractualZeroCharge::from_records(operation, context, &outcome, &evaluation)
     }
 }
 
@@ -503,7 +466,28 @@ impl ChioKernel {
         // Only a grant that can serve this request may force the structured path. An
         // unrelated cumulative grant elsewhere in the capability must not withdraw an
         // otherwise exempt call.
-        let requires_structured_admission = aggregate_quota.is_some()
+        let mut checked_output_required = false;
+        for matching in matching_grants {
+            checked_output_required |= self.has_checked_output_contract(request, matching.index)?;
+        }
+        if checked_output_required
+            && matching_grants.iter().any(|matching| {
+                matching.grant.constraints.iter().any(|constraint| {
+                    matches!(
+                        constraint,
+                        Constraint::OutputDigestSha256(_)
+                            | Constraint::RequireFindingPurchase(_)
+                            | Constraint::RequireFindingRecovery(_)
+                    )
+                })
+            })
+        {
+            return Err(KernelError::DurableAdmission(
+                "checked-output pricing cannot combine with digest, Finding purchase or recovery contracts".to_owned(),
+            ));
+        }
+        let requires_structured_admission = checked_output_required
+            || aggregate_quota.is_some()
             || request.supplemental_authorization.is_some()
             || cumulative_matching_grant_count != 0
             || recovery_matching_grant_count != 0
@@ -589,6 +573,13 @@ impl ChioKernel {
             {
                 return Err(KernelError::DurableAdmission(
                     "output-digest delivery requires a reversible-hold payment rail".to_owned(),
+                ));
+            }
+            if checked_output_required
+                && adapter.rail_mode() != Some(crate::payment::PaymentRailMode::ReversibleHold)
+            {
+                return Err(KernelError::DurableAdmission(
+                    "checked-output pricing requires a reversible-hold payment rail".to_owned(),
                 ));
             }
         }

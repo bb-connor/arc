@@ -1,0 +1,11 @@
+{
+  "additionalCharge": 100,
+  "binarySha256": "e12a105c76c975141dba4f7aa4389e2cdc2d7666df9a73e67ce31b82fa05b751",
+  "heldProviderKernelKey": false,
+  "meaning": "Historical pre-permit binary and owned three-party fixture; current receiver denial tests bypass client preflight.",
+  "peers": {
+    "buyer": "fc54a7cdadbd417af9397df9a81172a8aabf18ae2706a3fe4cb50a7ab3ae0673",
+    "provider": "e2f07627d9f2df76505133fd2f5a206a8d8e96469550ff5c2ae6723f2a886b2f"
+  },
+  "sourceSnapshotPackaged": false
+}

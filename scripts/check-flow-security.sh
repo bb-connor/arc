@@ -704,6 +704,11 @@ run_exact_target --label "durable release output binding" --allow-filtered --exp
   -- cargo test -p chio-kernel --lib tool_outcome::security_release::context::tests::
 
 run_exact_target --label "frozen dispatch participant context" --allow-filtered --expected \
+  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_allows_configured_but_unused_approval_authority \
+  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_allows_configured_but_unused_dpop_authority \
+  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_preserves_genuinely_unselected_and_legacy_custody_absence \
+  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_rejects_missing_required_dpop_custody \
+  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_rejects_missing_selected_runtime_custody \
   kernel::admission_coordinator::return_context::caller::tests::caller_observation_metadata_cannot_be_injected_before_dispatch \
   kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_custody_requires_explicit_absence_and_rejects_unowned_claims \
   kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_v3_remains_readable_but_cannot_acquire_custody_on_reissue \

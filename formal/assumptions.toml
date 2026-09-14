@@ -18,6 +18,7 @@ required_assumption_ids = [
   "ASSUME-WASM-ENGINE",
   "ASSUME-FINDING-STATUS-OPERATOR-COMPLETENESS",
   "ASSUME-FINDING-SELLER-TOOL-SERVER",
+  "ASSUME-FEDERATED-ORIGIN-CLASSIFICATION",
 ]
 
 assumptions = [
@@ -36,6 +37,7 @@ assumptions = [
   "ASSUME-WASM-ENGINE|audited_platform|Wasmtime is assumed to enforce its documented i32 return, trap, fuel-metering, memory-limiter, and in-process sandbox semantics for untrusted guest code.|P3",
   "ASSUME-FINDING-STATUS-OPERATOR-COMPLETENESS|audited_service|The qualified cognition-market profile verifies authentic fresh status-feed state but assumes the external status operator inserts every required retraction into that feed.|P4,P7,P10",
   "ASSUME-FINDING-SELLER-TOOL-SERVER|audited_service|The qualified cognition-market profile binds kernel-observed seller output bytes and receipts but assumes the seller tool server performs any claimed effect outside Chio's observation boundary.|P3,P6,P10",
+  "ASSUME-FEDERATED-ORIGIN-CLASSIFICATION|audited_platform|The receiving edge sets the federated-origin classification on each request from transport-authenticated peer identity. A request whose origin is misclassified as local bypasses treaty admission, so classification is trusted alongside the kernel.|P3",
 ]
 
 # Retiring an assumption requires named model evidence and a concrete

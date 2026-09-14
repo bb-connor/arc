@@ -30,7 +30,7 @@ that crate instead of this one directly.
 - `proof_package::{ChioProofPackage, proof_package_from_json, package_json, package_sha256}`
 - `trust_bundle::{ChioVerifierTrustBundle, ChioVerifierTrustBundleDocument, verifier_trust_bundle_from_json, verifier_trust_bundle_json, verifier_trust_bundle_document_sha256}`
 - `context::{ChioVerificationContext, verification_context_from_json, verification_context_json, verification_context_sha256}`
-- `report::{VerifierReport, verify_package, verify_package_report, report_json, verifier_report_from_json}` - `verify_package` returns `Err` on the first failed check; `verify_package_report` always returns a report.
+- `report::{VerifierReport, VerifierCheck, VerifierFailure, WITHHELD_FAILURE_DETAIL, verify_package, verify_package_report, report_json, verifier_report_from_json}` - `verify_package` returns `Err` on the first failed check; `verify_package_report` always returns a report.
 - `issuer::{TrustedIssuerRegistry, TrustedIssuerRegistryDocument, trusted_issuer_registry_from_json, trusted_issuer_registry_json}`
 - `revocation::{ChioRevocationCheckpoint, ChioPinnedRevocationEpoch, ChioRevocationMaterial, SignedChioRevocationCheckpoint}`
 - `claims::{ChioProofClaims, PeerLadderBinding, VendorKeyBinding, WorkflowIntersectionArtifact, LeaseScopeBindingArtifact}`

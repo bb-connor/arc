@@ -1,0 +1,182 @@
+\section{Evaluation}
+\label{sec:eval}
+
+Local measurements ran on one machine: \PSHostCores{} \PSHostCpuModel{} cores,
+\PSHostMemoryGiB{} GiB, \PSHostOs{}, compiler \PSRustcVersion{} at the pinned
+toolchain. Percentiles interpolate between order statistics; each interval
+below is a percentile bootstrap interval for its median.
+These timings come from retained runs predating the new lease and governance
+activation checks; they are not latency measurements of the revised hook.
+
+\paragraph{Two kernels in separate processes.}
+Two kernels ran as separate operating-system processes, each with its own keys,
+stores, agreements, and receipt log, a third process driving calls over
+\PSFedTransport{}; the topology record reports \PSFedHosts{} hosts.
+The co-signing and revocation hops are the shipped lanes unchanged; the request
+hop uses a transport defined for this experiment, since no shipped lane carries
+a tool call. Admitted calls: \PSFedAllowSampleCount{}
+calls, p50 \PSFedAllowPFiftyMs{} ms, interval \PSFedAllowCiLowMs{} to
+\PSFedAllowCiHighMs{} ms, p99 \PSFedAllowPNinetyNineMs{} ms at the driver, each
+costing \PSFedCosignConnections{} co-signing connections, counted by the
+receiver. The round trip is the receiver's decision plus the co-signing hops it
+makes back to the origin after dispatching, inside its
+\PSFedReceiverEvalPFiftyMs{} ms median evaluation window; minting the per-call
+evidence costs \PSFedEvidencePrepPFiftyMs{} ms more, outside it.
+
+Denied calls: \PSFedDenyCases{} scenarios over the wire,
+\PSFedDenySampleCount{} calls, p50 \PSFedDenyPFiftyMs{} ms, p99
+\PSFedDenyPNinetyNineMs{} ms. They return \code{chio_treaty_missing_scope},
+\code{chio_treaty_scope_hash_mismatch},
+\code{chio_treaty_missing_intersection},
+\code{chio_treaty_intersection_mismatch},
+\code{chio_treaty_missing_required_evidence},
+\code{request_smuggled_trust_root}, and
+\code{request_smuggled_dynamic_trust}. In every one the receiver's dispatch
+counter stayed zero. \PSFedAbsorbedCount{} calls were retried and excluded, denied on a snapshot aged
+past the \PSFreshnessMs{} ms freshness window against an origin publishing
+every \PSEpochTickMs{} ms.
+
+Revoking at the origin and measuring to the receiver's first denial took
+\PSFedRevokeToDenyMs{} ms at the median over \PSFedRevokeRepeats{} repeats,
+interval \PSFedRevokeCiLowMs{} to \PSFedRevokeCiHighMs{} ms, a median of
+\PSFedRevokeCallsMedian{} calls. With the link cut the receiver serves until its
+snapshot leaves the freshness window and then denies, \PSFedCutToDenyMs{} ms at
+the median over \PSFedCutRepeats{} repeats, interval \PSFedCutCiLowMs{} to
+\PSFedCutCiHighMs{} ms, a median of \PSFedCutCallsMedian{} calls, counting a
+denial only once it persists for three further calls. On
+\PSFedRevokeAmbiguousReleases{} of \PSFedRevokeDenialRecords{} revoke records
+and \PSFedCutAmbiguousReleases{} of \PSFedCutDenialRecords{} cut records the
+denial also reports an unconfirmed pre-dispatch cleanup: the budget unwind
+rather than the continuation release Section~\ref{sec:admission} orders,
+reporting a budget hold it cannot find, an invariant violation we do not
+explain. No call dispatched.
+
+\paragraph{What admission costs locally.}
+\begin{table}[!tb]
+\centering
+\small
+\caption{Local cost decomposition. The first two rows are complete kernel paths measured per invocation with both kernels in one process; the rest are components.}
+\label{tab:local}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Path or component & p50 & p99 or max & samples \\
+\midrule
+Admitted call, both kernels in one process & \PSPredispatchAllowPFiftyMs{} ms & \PSPredispatchAllowPNinetyNineMs{} ms & \PSPredispatchAllowSampleCount{} \\
+Refused before dispatch & \PSPredispatchDenyPFiftyMs{} ms & \PSPredispatchDenyPNinetyNineMs{} ms & \PSPredispatchDenySampleCount{} \\
+Receipt append to the store & \PSReceiptAppendPFiftyUs{} us & \PSReceiptAppendPNinetyNineUs{} us & \PSReceiptAppendSampleCount{} \\
+Receipt signing & \PSReceiptSignPFiftyUs{} us & \PSReceiptSignMaxUs{} us & \PSReceiptSignSampleCount{} \\
+Receipt verification & \PSReceiptVerifyPFiftyUs{} us & \PSReceiptVerifyMaxUs{} us & \PSReceiptVerifySampleCount{} \\
+Inbound two-signature statement verification & \PSBilateralVerifyPFiftyUs{} us & \PSBilateralVerifyMaxUs{} us & \PSBilateralVerifySampleCount{} \\
+Cross-boundary admission decision & \PSCrossBoundaryPFiftyUs{} us & \PSCrossBoundaryMaxUs{} us & \PSCrossBoundarySampleCount{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The shape of Table~\ref{tab:local} is the result: the cryptography is not the
+expense. Appending the receipt durably costs
+\fpeval{round(\PSReceiptAppendPFiftyUs/\PSBilateralVerifyPFiftyUs,1)} times what
+verifying the inbound statement costs and
+\fpeval{round(\PSReceiptAppendPFiftyUs/\PSCrossBoundaryPFiftyUs,0)} times the
+receiver's decision over already resolved evidence, where the comparisons of
+Table~\ref{tab:subst} run. Durability dominates, the price of
+Section~\ref{sec:admission}'s ordering. The refusal row is a lower bound: its
+fixture refuses on a unanimous deny verdict, an early exit reaching neither
+those comparisons nor the signature checks. The retained sustained run admitted
+\PSSustainedCalls{} calls in \PSSustainedSeconds{} s at
+\PSSustainedCallsPerSecond{} per second, with \PSSustainedDenials{} denials
+and \fpeval{round(\PSSustainedReceiptStoreGrowthKiB/1024,1)}\,MiB of
+receipt-store growth. Its artifact does not record offered concurrency or a
+completed sweep, so these numbers do not establish saturation or maximum
+capacity. The newer concurrent driver requires a fresh retained run.
+
+The negative corpus is \PSThreatCaseCount{} in-process cases, each asserting a
+refused decision and its code: \PSThreatDispatchCaseCount{} through the
+dispatch-capable hook and \PSThreatVerifierCaseCount{} against the verifier,
+alongside \PSBilateralReplayCases{} bilateral and \PSGenericReplayCases{}
+generic replay cases.
+
+\paragraph{What a composition of existing parts reaches.}
+\begin{table}[!tb]
+\centering
+\small
+\caption{A receiver composed from \PSBaseParts{} formats this project did not author, driven under two wirings against the threat table of this paper, case by case where the composition has an analogue. One call is a Model Context Protocol \code{tools/call} \cite{mcp} inside an A2A message \cite{a2a}, presented over a channel authenticated by the peer's SPIFFE X509-SVID \cite{spiffe} and carrying the access token of an RFC 8693 exchange \cite{rfc8693}, a JWT \cite{rfc7519} in compact JWS \cite{rfc7515} whose scope takes its syntax from OAuth 2.0 \cite{rfc6749}. \PSBaseDocuments{} published documents define every one of the \PSBaseRequestFields{} fields on the wire, and a test walks every byte an admissible call serializes and fails on any path none of them defines. \emph{Composed} wires each part the way its own document does; \emph{hardened} adds the deployment checks implemented in this artifact, among them a denylist over the context names the receiver owns, a second replay table over the credential's own identifier, a bound on the window the issuer minted, and a comparison of the acting party against the workload the channel authenticated. It is the wiring we wrote, not a bound on the wiring an operator could write. Admissions are over the \PSBaseNegativeAttacks{} attacks the corpus drives, as \PSBaseNegativeDistinctDrives{} distinct experiments. Chio's own record is at most \PSBaseStorageRatioUpperBound{} times heavier per call, a bound rather than a measurement, since the two stores are read by two procedures, and its side is read from the run above rather than re-measured here.}
+\label{tab:baseline}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Property of Section~\ref{sec:security} & Composed & Hardened \\
+\midrule
+Admission binding & fails & fails \\
+Receiver locality & fails & holds \\
+Single use & holds, weakened & holds \\
+Audience binding & holds & holds \\
+\midrule
+Attacks admitted & \PSBaseComposedAdmits{} & \PSBaseHardenedAdmits{} \\
+Durable bytes per call & \PSBaseBytesPerCall{} & \PSBaseHardenedBytesPerCall{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[!tb]
+\centering
+\scriptsize
+\caption{Explicit carriers in the selected caller-issued profile. These counts describe its schema and configured checks, not all encodings the cited standards permit. The metadata witnesses show that unread metadata has no effect and that a receiver can compare a supplied version with its own record. Supplying the matching version is not by itself an authorization attack.}
+\label{tab:carriers}
+\begin{tabular}{@{}rp{4.9cm}p{3.3cm}p{5.1cm}@{}}
+\toprule
+Facts & Where a value travels & Attested by & What making it resolvable takes \\
+\midrule
+\PSBaseSubstResolvableFields{} & a scope value, the tool name beside it, an argument of the tool, and \code{sub} with \code{act.sub} over SPIFFE identifiers & the caller's authorization server, or the caller & nothing: the receiver already resolves them \\
+\PSBaseSubstCarriedWithoutReferenceFields{} & a task identifier and a reference list in the message body; the token's \code{exp} and \code{nbf} & the caller, in bytes no signature in the set covers; the issuer, against a clock & a receiver-owned authorization record and an authenticated handle; OAuth permits this deployment \\
+\PSBaseSubstNotCarriedFields{} & no explicit field in this selected profile & nobody & application claims or a receiver-owned lookup profile \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:baseline} prices what an operator adds;
+Table~\ref{tab:carriers} says the explicit fields this profile omits. Hardening closes
+\PSBaseClosedByHardening{} attacks and carries \PSBasePropsHoldHardened{} of the
+four properties, and \PSBaseHardenedAdmits{} attacks survive it. The field ledger describes this profile, whose authorization server is
+controlled by the caller. It does not bound OAuth, JWT, or A2A: OAuth permits a
+receiver-owned issuer and opaque token lookup, and JWT permits application
+claims. A regression using the unchanged receiver and token types installs a
+separate receiver-owned issuer. Receiver issuance admits once; replay under a
+new message identifier and a caller-signed replacement both deny. This
+counterexample establishes issuer-placement flexibility, not complete binding
+or crash-recovery parity for the treaty protocol.
+
+An independent opaque-handle ledger and Chio's experimental effect slots
+receive identical evidence, owner rules, verifiers, SQLite durability and
+effect sinks. They match in sixteen cases, six state transitions, eight-process
+races and four kill boundaries per gate. Both publish once and reject
+replacement agents; uncertain post-claim effects remain unknown.
+Both also publish a checked Git-hook repair. An offline auditor rejects signed
+buggy source and accepts unsigned repairs without proving publication history.
+A three-receiver archival graph matches in eleven scenarios and six attacks,
+with twenty process kills. Namespaces isolate roles; the host and operator
+remain trusted. No integration-cost advantage is established.
+
+A separate work profile connects a Python buyer, Rust provider and isolated
+Python procurement worker to a Rust specialist over HTTPS. Four distinct keys
+separate agents from kernel issuers. Buyer-approved authentication declarations
+alone cross to the specialist. Its kernel requires a provider-signed permit
+for the exact child job; a delegated key alone cannot buy another job.
+Both verifiers check nested delivery evidence. After a parent crash, agreed
+release can restore the buyer's credit while the specialist remains paid.
+These local-credit observations establish neither atomic settlement across
+companies nor independently operated deployment.
+
+\paragraph{Verification by someone who was not there.}
+The \PSProofPackageKiB{} KiB evidence package for the refund workflow verifies
+every receipt, statement, lease, and governance record in it with no kernel
+access, in \fpeval{round(\PSBuyerVerifyPFiftyUs/1000,1)}\,ms at the median over
+\PSBuyerVerifySampleCount{} runs. A frozen corpus of
+\PSVectorCaseCount{} receipt cases holds \PSVectorLanguages{} independent
+implementations to the same canonical body bytes and verdict.
+
+\paragraph{Reproduction.}
+The retained benchmark runs include per-host commit and environment records,
+raw samples and generated numeric macros checked against those artifacts.
+The historical composition benchmark records timings only with a clean input
+tree and an unloaded host. The newer outcome-gate experiment retains source
+hashes, input artifacts, receiver snapshots and test logs from an uncommitted
+local tree; it makes no timing claim.

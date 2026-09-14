@@ -1,0 +1,539 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.45
+   Compiling unicode-ident v1.0.24
+   Compiling serde_core v1.0.228
+   Compiling serde v1.0.228
+   Compiling cfg-if v1.0.4
+   Compiling libc v0.2.189
+   Compiling syn v2.0.117
+   Compiling version_check v0.9.5
+   Compiling getrandom v0.2.17
+   Compiling typenum v1.20.0
+   Compiling rand_core v0.6.4
+   Compiling generic-array v0.14.7
+   Compiling subtle v2.6.1
+   Compiling itoa v1.0.17
+   Compiling memchr v2.8.0
+   Compiling const-oid v0.9.6
+   Compiling smallvec v1.15.1
+   Compiling zmij v1.0.21
+   Compiling synstructure v0.13.2
+   Compiling cpufeatures v0.2.17
+   Compiling stable_deref_trait v1.2.1
+   Compiling serde_json v1.0.149
+   Compiling base64ct v1.8.3
+   Compiling jobserver v0.1.34
+   Compiling serde_derive v1.0.228
+   Compiling zeroize_derive v1.5.0
+   Compiling displaydoc v0.2.5
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.8.1
+   Compiling zerofrom v0.1.6
+   Compiling zerovec-derive v0.11.2
+   Compiling yoke v0.8.1
+   Compiling shlex v1.3.0
+   Compiling writeable v0.6.2
+   Compiling litemap v0.8.1
+   Compiling find-msvc-tools v0.1.9
+   Compiling cc v1.2.57
+   Compiling zerovec v0.11.5
+   Compiling zeroize v1.9.0
+   Compiling tinystr v0.8.2
+   Compiling icu_locale_core v2.1.1
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling block-padding v0.3.3
+   Compiling sha2 v0.10.9
+   Compiling inout v0.1.4
+   Compiling cipher v0.4.4
+   Compiling hmac v0.12.1
+   Compiling potential_utf v0.1.4
+   Compiling zerotrie v0.2.3
+   Compiling der_derive v0.7.3
+   Compiling pem-rfc7468 v0.7.0
+   Compiling icu_normalizer_data v2.1.1
+   Compiling percent-encoding v2.3.2
+   Compiling flagset v0.4.7
+   Compiling icu_properties_data v2.1.2
+   Compiling icu_provider v2.1.1
+   Compiling icu_collections v2.1.1
+   Compiling salsa20 v0.10.2
+   Compiling der v0.7.10
+   Compiling pbkdf2 v0.12.2
+   Compiling icu_normalizer v2.1.1
+   Compiling scrypt v0.11.0
+   Compiling icu_properties v2.1.2
+   Compiling aes v0.8.4
+   Compiling cbc v0.1.2
+   Compiling thiserror v1.0.69
+   Compiling spki v0.7.3
+   Compiling idna_adapter v1.2.1
+   Compiling pkcs5 v0.7.1
+   Compiling utf8_iter v1.0.4
+   Compiling idna v1.1.0
+   Compiling form_urlencoded v1.2.2
+   Compiling pkcs8 v0.10.2
+   Compiling thiserror-impl v1.0.69
+   Compiling semver v1.0.27
+   Compiling url v2.5.8
+   Compiling rustc_version v0.4.1
+   Compiling signature v2.2.0
+   Compiling hex v0.4.3
+   Compiling bytes v1.11.1
+   Compiling curve25519-dalek v4.1.3
+   Compiling once_cell v1.21.4
+   Compiling autocfg v1.5.0
+   Compiling libm v0.2.16
+   Compiling ryu v1.0.23
+   Compiling num-traits v0.2.19
+   Compiling ed25519 v2.2.3
+   Compiling base64 v0.22.1
+   Compiling ed25519-dalek v2.2.0
+   Compiling chio-security-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-security-types)
+   Compiling log v0.4.29
+   Compiling pin-project-lite v0.2.17
+   Compiling either v1.15.0
+   Compiling zerocopy v0.8.42
+   Compiling zerocopy-derive v0.8.42
+   Compiling unicode-xid v0.2.6
+   Compiling thiserror v2.0.18
+   Compiling base16ct v0.2.0
+   Compiling thiserror-impl v2.0.18
+   Compiling dunce v1.0.5
+   Compiling parking_lot_core v0.9.12
+   Compiling scopeguard v1.2.0
+   Compiling lock_api v0.4.14
+   Compiling paste v1.0.15
+   Compiling equivalent v1.0.2
+   Compiling unicode-segmentation v1.13.2
+   Compiling convert_case v0.10.0
+   Compiling parking_lot v0.12.5
+   Compiling ruint-macro v1.2.1
+   Compiling derive_more-impl v2.1.1
+   Compiling tracing-core v0.1.36
+   Compiling ring v0.17.14
+   Compiling bitflags v2.11.0
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling derive_more v2.1.1
+   Compiling cmake v0.1.58
+   Compiling tracing-attributes v0.1.31
+   Compiling futures-core v0.3.32
+   Compiling fs_extra v1.3.0
+   Compiling aws-lc-sys v0.39.1
+   Compiling tracing v0.1.44
+   Compiling num-integer v0.1.46
+   Compiling untrusted v0.9.0
+   Compiling heapless v0.7.17
+   Compiling spin v0.9.9
+   Compiling byteorder v1.5.0
+   Compiling radium v0.7.0
+   Compiling regex-syntax v0.8.10
+   Compiling hash32 v0.2.1
+   Compiling lazy_static v1.5.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling aho-corasick v1.1.4
+   Compiling tap v1.0.1
+   Compiling aws-lc-rs v1.16.2
+   Compiling futures-sink v0.3.32
+   Compiling wyz v0.5.1
+   Compiling regex-automata v0.4.14
+   Compiling chio-listing v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-listing)
+   Compiling cobs v0.3.0
+   Compiling rs_merkle v1.5.0
+   Compiling rustls-pki-types v1.14.0
+   Compiling keccak v0.1.6
+   Compiling errno v0.3.14
+   Compiling litrs v1.0.0
+   Compiling funty v2.0.0
+   Compiling bitvec v1.0.1
+   Compiling document-features v0.2.12
+   Compiling chio-fiscal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fiscal)
+   Compiling signal-hook-registry v1.4.8
+   Compiling sha3 v0.10.8
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-revocation-oracle)
+   Compiling postcard v1.1.3
+   Compiling futures-channel v0.3.32
+   Compiling ruint v1.20.0
+   Compiling serdect v0.2.0
+   Compiling itertools v0.14.0
+   Compiling tokio-macros v2.6.1
+   Compiling visibility v0.1.1
+   Compiling derive-getters v0.5.0
+   Compiling mio v1.1.1
+   Compiling socket2 v0.6.3
+   Compiling const-hex v1.18.1
+   Compiling foldhash v0.2.0
+   Compiling untrusted v0.7.1
+   Compiling heck v0.5.0
+   Compiling rustc-hash v2.1.1
+   Compiling allocator-api2 v0.2.21
+   Compiling pkg-config v0.3.32
+   Compiling vcpkg v0.2.15
+   Compiling ident_case v1.0.1
+   Compiling const-crc32-nostd v1.3.1
+   Compiling strsim v0.11.1
+   Compiling frost-core v3.0.0
+   Compiling alloy-primitives v1.5.7
+   Compiling tokio v1.50.0
+   Compiling ff v0.13.1
+   Compiling http v1.4.0
+   Compiling futures-macro v0.3.32
+   Compiling futures-io v0.3.32
+   Compiling getrandom v0.3.4
+   Compiling futures-task v0.3.32
+   Compiling slab v0.4.12
+   Compiling getrandom v0.4.2
+   Compiling rand_core v0.10.1
+   Compiling futures-util v0.3.32
+   Compiling group v0.13.0
+   Compiling frost-rerandomized v3.0.0
+   Compiling chio-finding v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-finding)
+   Compiling chio-governance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone)
+   Compiling rustls v0.23.37
+   Compiling chio-open-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-open-market)
+   Compiling frost-ed25519 v3.0.0
+   Compiling chio-appraisal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-appraisal)
+   Compiling sec1 v0.7.3
+   Compiling hkdf v0.12.4
+   Compiling crypto-bigint v0.5.5
+   Compiling hybrid-array v0.4.11
+   Compiling proc-macro-error-attr2 v2.0.0
+   Compiling chio-metrics-spec v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-metrics-spec)
+   Compiling bs58 v0.5.1
+   Compiling chio-did v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-did)
+   Compiling elliptic-curve v0.13.8
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation)
+   Compiling proc-macro-error2 v2.0.1
+   Compiling chio-underwriting v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-underwriting)
+   Compiling http-body v1.0.1
+   Compiling chio-fincred v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fincred)
+   Compiling num-bigint v0.4.6
+   Compiling httparse v1.10.1
+   Compiling fnv v1.0.7
+   Compiling chio-credit v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-credit)
+   Compiling cmov v0.5.3
+   Compiling try-lock v0.2.5
+   Compiling tower-service v0.3.3
+   Compiling want v0.3.1
+   Compiling ctutils v0.4.2
+   Compiling block-buffer v0.12.0
+   Compiling crypto-common v0.2.2
+   Compiling regex v1.12.3
+   Compiling rand_chacha v0.3.1
+   Compiling num-iter v0.1.45
+   Compiling unicase v2.9.0
+   Compiling powerfmt v0.2.0
+   Compiling anyhow v1.0.103
+   Compiling pin-utils v0.1.0
+   Compiling time-core v0.1.8
+   Compiling num-conv v0.2.0
+   Compiling winnow v0.7.15
+   Compiling atomic-waker v1.1.2
+   Compiling hyper v1.8.1
+   Compiling time-macros v0.2.27
+   Compiling deranged v0.5.8
+   Compiling chio-web3 v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-market)
+   Compiling rustls-webpki v0.103.13
+   Compiling mime_guess v2.0.5
+   Compiling rand v0.8.6
+   Compiling darling_core v0.20.11
+   Compiling openssl-sys v0.9.114
+   Compiling sync_wrapper v1.0.2
+   Compiling base64 v0.21.7
+   Compiling openssl-probe v0.2.1
+   Compiling tower-layer v0.3.3
+   Compiling rustix v1.1.4
+   Compiling ipnet v2.12.0
+   Compiling hyper-util v0.1.20
+   Compiling alloy-sol-type-parser v1.5.7
+   Compiling tower v0.5.3
+   Compiling rustls-native-certs v0.8.3
+   Compiling darling_macro v0.20.11
+   Compiling tokio-rustls v0.26.4
+   Compiling chio-autonomy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-autonomy)
+   Compiling time v0.3.47
+   Compiling tokio-util v0.7.18
+   Compiling hashbrown v0.16.1
+   Compiling minimal-lexical v0.2.1
+   Compiling linux-raw-sys v0.12.1
+   Compiling iri-string v0.7.10
+   Compiling const-oid v0.10.2
+   Compiling iana-time-zone v0.1.65
+   Compiling mime v0.3.17
+   Compiling chrono v0.4.44
+   Compiling tower-http v0.6.8
+   Compiling digest v0.11.2
+   Compiling nom v7.1.3
+   Compiling chio-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core)
+   Compiling darling v0.20.11
+   Compiling alloy-json-abi v1.5.7
+   Compiling hyper-rustls v0.27.7
+   Compiling rustls-platform-verifier v0.6.2
+   Compiling http-body-util v0.1.3
+   Compiling darling_core v0.23.0
+   Compiling syn-solidity v1.5.7
+   Compiling serde_urlencoded v0.7.1
+   Compiling macro-string v0.1.4
+   Compiling hashbrown v0.17.0
+   Compiling tinyvec_macros v0.1.1
+   Compiling crossbeam-utils v0.8.21
+   Compiling rustversion v1.0.22
+   Compiling indexmap v2.14.1
+   Compiling tinyvec v1.11.0
+   Compiling darling_macro v0.23.0
+   Compiling alloy-sol-macro-input v1.5.7
+   Compiling reqwest v0.13.2
+   Compiling prost-derive v0.14.3
+   Compiling derive_builder_core v0.20.2
+   Compiling rusticata-macros v4.1.0
+   Compiling chacha20 v0.10.2
+   Compiling ordered-float v2.10.1
+   Compiling rfc6979 v0.4.0
+   Compiling asn1-rs-derive v0.5.1
+   Compiling asn1-rs-impl v0.2.0
+   Compiling ref-cast v1.0.25
+   Compiling fastrand v2.3.0
+   Compiling num-bigint-dig v0.8.6
+   Compiling data-encoding v2.11.0
+   Compiling tempfile v3.27.0
+   Compiling asn1-rs v0.6.2
+   Compiling prost v0.14.3
+   Compiling ecdsa v0.16.9
+   Compiling serde-value v0.7.0
+   Compiling rand v0.10.1
+   Compiling derive_builder_macro v0.20.2
+   Compiling darling v0.23.0
+   Compiling alloy-sol-macro-expander v1.5.7
+   Compiling unicode-normalization v0.1.25
+   Compiling primeorder v0.13.6
+   Compiling inout v0.2.2
+   Compiling libsqlite3-sys v0.37.0
+   Compiling const_format_proc_macros v0.2.34
+   Compiling itertools v0.10.5
+   Compiling pem v3.0.6
+   Compiling universal-hash v0.5.1
+   Compiling ref-cast-impl v1.0.25
+   Compiling pin-project-internal v1.1.11
+   Compiling ahash v0.8.12
+   Compiling cpufeatures v0.3.0
+   Compiling foreign-types-shared v0.1.1
+   Compiling opaque-debug v0.3.1
+   Compiling oid-registry v0.7.1
+   Compiling openssl v0.10.78
+   Compiling bit-vec v0.8.0
+   Compiling pastey v0.1.1
+   Compiling same-file v1.0.6
+   Compiling walkdir v2.5.0
+   Compiling bit-set v0.8.0
+   Compiling base64urlsafedata v0.5.2
+   Compiling pin-project v1.1.11
+   Compiling poly1305 v0.8.0
+   Compiling sha2 v0.11.0
+   Compiling foreign-types v0.3.2
+   Compiling alloy-sol-macro v1.5.7
+   Compiling const_format v0.2.35
+   Compiling cipher v0.5.2
+   Compiling olpc-cjson v0.1.4
+   Compiling serde_with_macros v3.18.0
+   Compiling derive_builder v0.20.2
+   Compiling uuid v1.22.0
+   Compiling prost-types v0.14.3
+   Compiling hmac v0.13.0
+   Compiling phc v0.6.1
+   Compiling num-rational v0.4.2
+   Compiling getset v0.1.6
+   Compiling futures-executor v0.3.32
+   Compiling strum_macros v0.27.2
+   Compiling snafu-derive v0.8.9
+   Compiling half v2.7.1
+   Compiling num-complex v0.4.6
+   Compiling pkcs1 v0.7.5
+   Compiling aead v0.5.2
+   Compiling serde_plain v1.0.2
+   Compiling prost-reflect-derive v0.16.0
+   Compiling openssl-macros v0.1.1
+   Compiling async-trait v0.1.89
+   Compiling tls_codec_derive v0.4.2
+   Compiling bstr v1.12.1
+   Compiling serde_path_to_error v0.1.20
+   Compiling unicode-general-category v1.1.0
+   Compiling webauthn-attestation-ca v0.5.2
+   Compiling strum v0.27.2
+   Compiling borrow-or-share v0.2.4
+   Compiling dyn-clone v1.0.20
+   Compiling ciborium-io v0.2.2
+   Compiling ciborium-ll v0.2.2
+   Compiling fluent-uri v0.4.1
+   Compiling oci-spec v0.9.0
+   Compiling tls_codec v0.4.2
+   Compiling oauth2 v5.0.0
+   Compiling globset v0.4.18
+   Compiling prost-reflect v0.16.3
+   Compiling num v0.4.3
+   Compiling rsa v0.9.10
+   Compiling snafu v0.8.9
+   Compiling futures v0.3.32
+   Compiling password-hash v0.6.1
+   Compiling pbkdf2 v0.13.0
+   Compiling serde_with v3.18.0
+   Compiling alloy-sol-types v1.5.7
+   Compiling salsa20 v0.11.0
+   Compiling p256 v0.13.2
+   Compiling p384 v0.13.1
+   Compiling der-parser v9.0.0
+   Compiling hashlink v0.11.0
+   Compiling jsonwebtoken v10.4.0
+   Compiling secp256k1-sys v0.11.0
+   Compiling sha1 v0.10.6
+   Compiling serde_spanned v0.6.9
+   Compiling toml_datetime v0.6.11
+   Compiling sigstore-protobuf-specs-derive v0.0.1
+   Compiling async-recursion v1.1.1
+   Compiling http-auth v0.1.10
+   Compiling fallible-iterator v0.3.0
+   Compiling webauthn-rs-core v0.5.2
+   Compiling micromap v0.3.0
+   Compiling vsimd v0.8.0
+   Compiling half v1.8.3
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling outref v0.5.2
+   Compiling ryu-js v1.0.3
+   Compiling typed-path v0.9.3
+   Compiling crc32fast v1.5.0
+   Compiling toml_write v0.1.2
+   Compiling serde_json_canonicalizer v0.3.2
+   Compiling toml_edit v0.22.27
+   Compiling uuid-simd v0.8.0
+   Compiling rusqlite v0.39.0
+   Compiling tough v0.22.0
+   Compiling referencing v0.46.0
+   Compiling serde_cbor_2 v0.12.0-dev
+   Compiling oci-client v0.17.0
+   Compiling sigstore_protobuf_specs v0.5.1
+   Compiling x509-cert v0.2.5
+   Compiling x509-parser v0.16.0
+   Compiling openidconnect v4.0.1
+   Compiling alloy-core v1.5.7
+   Compiling scrypt v0.12.0
+   Compiling fraction v0.15.3
+   Compiling ciborium v0.2.2
+   Compiling crypto_secretbox v0.1.1
+   Compiling webauthn-rs-proto v0.5.2
+   Compiling fancy-regex v0.17.0
+   Compiling matchers v0.2.0
+   Compiling sharded-slab v0.1.7
+   Compiling tracing-log v0.2.0
+   Compiling webbrowser v1.2.2
+   Compiling email_address v0.2.9
+   Compiling serde_repr v0.1.20
+   Compiling thread_local v1.1.9
+   Compiling hex-literal v1.1.0
+   Compiling adler2 v2.0.1
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-verify)
+   Compiling num-cmp v0.1.0
+   Compiling signature v3.0.0
+   Compiling bytecount v0.6.9
+   Compiling nu-ansi-term v0.50.3
+   Compiling simd-adler32 v0.3.8
+   Compiling jsonschema v0.46.0
+   Compiling miniz_oxide v0.8.9
+   Compiling tracing-subscriber v0.3.23
+   Compiling sigstore v0.14.0
+   Compiling alloy v1.8.3
+   Compiling toml v0.8.23
+   Compiling chio-egress-contract v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-egress-contract)
+   Compiling simple_asn1 v0.6.4
+   Compiling rand_core v0.9.5
+   Compiling webpki-roots v1.0.6
+   Compiling webpki-roots v0.26.11
+   Compiling jsonwebtoken v9.3.1
+   Compiling flate2 v1.1.9
+   Compiling chio-web3-bindings v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3-bindings)
+   Compiling secp256k1 v0.31.1
+   Compiling webauthn-rs v0.5.2
+   Compiling chio-manifest v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-manifest)
+   Compiling coset v0.4.2
+   Compiling chio-sqlite-file-identity v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-sqlite-file-identity)
+   Compiling arc-swap v1.9.1
+   Compiling chio-data-guards-redactors-default v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-data-guards/redactors/default)
+   Compiling chio-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-lineage)
+   Compiling hashbrown v0.14.5
+   Compiling dashmap v6.1.0
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-weights)
+   Compiling chio-log-redact v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-log-redact)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-custody-hw)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-settle)
+   Compiling ureq v2.12.1
+   Compiling rand_chacha v0.9.0
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-link)
+   Compiling lru v0.18.2
+   Compiling chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-swarm-authority)
+   Compiling chio-supervisor v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-supervisor)
+   Compiling crossbeam-epoch v0.9.20
+   Compiling chio-bounded v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-bounded)
+   Compiling rand v0.9.2
+   Compiling pairing v0.23.0
+   Compiling arrayref v0.3.9
+   Compiling bls12_381_plus v0.8.13
+   Compiling chio-workflow-preflight v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-workflow-preflight)
+   Compiling rayon-core v1.13.0
+   Compiling chio-workflow v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-workflow)
+   Compiling affinidi-bbs v0.1.0
+   Compiling crossbeam-deque v0.8.6
+   Compiling generator v0.8.8
+   Compiling chio-disclosure-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-disclosure-lineage)
+   Compiling anstyle v1.0.14
+   Compiling plotters-backend v0.3.7
+   Compiling cfg_aliases v0.2.1
+   Compiling clap_lex v1.1.0
+   Compiling clap_builder v4.6.0
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling chio-selective-disclosure v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-selective-disclosure)
+   Compiling nix v0.31.2
+   Compiling plotters-svg v0.3.7
+   Compiling scheduled-thread-pool v0.2.7
+   Compiling wait-timeout v0.2.1
+   Compiling cast v0.3.0
+   Compiling quick-error v1.2.3
+   Compiling rusty-fork v0.3.1
+   Compiling criterion-plot v0.5.0
+   Compiling rayon v1.11.0
+   Compiling r2d2 v0.8.10
+   Compiling plotters v0.3.7
+   Compiling chio-attest-buyer-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-buyer-core)
+   Compiling clap v4.6.0
+   Compiling rand_xorshift v0.4.0
+   Compiling chacha20 v0.9.1
+   Compiling tinytemplate v1.2.1
+   Compiling is-terminal v0.4.17
+   Compiling oorandom v11.1.5
+   Compiling anes v0.1.6
+   Compiling unarray v0.1.4
+   Compiling scoped-tls v1.0.1
+   Compiling loom v0.7.2
+   Compiling proptest v1.10.0
+   Compiling chio-federation-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation-authority)
+   Compiling criterion v0.5.1
+   Compiling chacha20poly1305 v0.10.1
+   Compiling r2d2_sqlite v0.33.0
+   Compiling chio-quarantine v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-quarantine)
+   Compiling chio-test-support v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-test-support)
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 4m 57s
+     Running unittests src/lib.rs (target/debug/deps/chio_store_sqlite-5a6ec1936384c61e)
+
+running 1 test
+test admission_operation_store::tests::schema::fresh_provision_creates_the_operation_schema_after_serving_lease_schema ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1655 filtered out; finished in 1.70s
+

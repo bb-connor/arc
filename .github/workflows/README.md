@@ -55,7 +55,7 @@ run-always aggregator exists. Real proof work must upload the configured
 per-attempt execution marker; a successful no-op must not upload that marker.
 
 The separate [`mutants.yml`](./mutants.yml) workflow also has a path-scoped PR
-lane for six trust-boundary crates. It remains advisory until the evidence
+lane for eight trust-boundary crates. It remains advisory until the evidence
 ratchet in `releases.toml` activates blocking posture.
 
 [`apalache-safety.yml`](./apalache-safety.yml) checks the distributed

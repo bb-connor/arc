@@ -6,6 +6,85 @@ use chio_credit::obligation::{
 };
 
 #[test]
+fn signed_unknown_projection_binds_incident_contents_after_resigning(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let source = finalizing_tool_operation_with(AdmissionParticipantRequirements {
+        broker_attempt: true,
+        budget_capture: true,
+        ..AdmissionParticipantRequirements::NONE
+    });
+    let context = projection_context(&source);
+    let key = Keypair::generate();
+    let incident = AdmissionIncident::from_verified(
+        &source,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        identifier("incident_id", "retained-incident"),
+        digest("incident_digest", POLICY_HASH),
+    )?;
+    let projection = AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
+        context,
+        incident: Box::new(incident),
+    };
+    let valid = SignedAdmissionTerminalProjectionV1::from_verified(
+        &source,
+        &projection,
+        &full_projection_capabilities(),
+        &key,
+    )?;
+    valid.verify()?;
+    for mutation in 0..4 {
+        let mut wire = serde_json::to_value(&valid)?;
+        let body = &mut wire["body"];
+        let mut projection: serde_json::Value = serde_json::from_slice(
+            &STANDARD.decode(
+                body["projection_json"]
+                    .as_str()
+                    .ok_or("projection encoding")?,
+            )?,
+        )?;
+        let mut incident = projection["incident"].clone();
+        match mutation {
+            0 => incident["binding"]["request_binding_hash"] = serde_json::json!("a".repeat(64)),
+            1 => {
+                incident["binding"]["retained_dispatch_commit"]["store_fence"]["owner_epoch"] =
+                    serde_json::json!(99)
+            }
+            2 => incident["record_id"] = serde_json::json!("another-incident"),
+            _ => incident["record_digest"] = serde_json::json!("b".repeat(64)),
+        }
+        // Three substitutions update both carriers. The fourth changes only the
+        // manifest record, exposing a second independently signed representation.
+        if mutation != 3 {
+            projection["incident"] = incident.clone();
+        }
+        let record = serde_json::json!({"kind":"incident", "record_id":incident["record_id"],
+            "record_digest":sha256_hex(&canonical_json_bytes(&incident)?)});
+        let manifest = serde_json::json!({"schema":"chio.admission-projection-manifest.v1",
+            "projection_body_digest":sha256_hex(&canonical_json_bytes(&projection)?), "records":[record.clone()]});
+        body["projection_json"] =
+            serde_json::json!(STANDARD.encode(canonical_json_bytes(&projection)?));
+        body["manifest_json"] =
+            serde_json::json!(STANDARD.encode(canonical_json_bytes(&manifest)?));
+        let mut exported = record;
+        exported["canonical_json"] =
+            serde_json::json!(STANDARD.encode(canonical_json_bytes(&incident)?));
+        body["records"] = serde_json::json!([exported]);
+        body["terminal_operation"]["terminal_replay"]["incident"]["projection_digest"] =
+            serde_json::json!(sha256_hex(&canonical_json_bytes(&manifest)?));
+        let mut preimage = b"chio.signed-admission-terminal-projection.v1\0".to_vec();
+        preimage.extend_from_slice(&canonical_json_bytes(body)?);
+        wire["signature"] = serde_json::to_value(key.sign(&preimage))?;
+        let altered: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(wire)?;
+        assert!(
+            altered.verify().is_err(),
+            "accepted incident substitution {mutation}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn completed_projection_cannot_omit_required_atomic_sidecars() {
     let requirements = AdmissionParticipantRequirements {
         broker_attempt: true,

@@ -170,6 +170,22 @@ impl ChioKernel {
                 "caller custody omitted its selected runtime authority",
             ));
         }
+        // A configured credential source alone does not require a claim. Use
+        // the original aggregate grant requirement, never a later selection.
+        if admission
+            .original_retained_request()
+            .is_some_and(|request| {
+                request.matching_grants_require_dpop()
+                    && request
+                        .authority_profile()
+                        .is_some_and(|profile| profile.dpop().is_some())
+            })
+            && operation.dpop_replay_ledger_digest().is_none()
+        {
+            return Err(invalid(
+                "caller custody omitted its selected DPoP authority",
+            ));
+        }
         if operation.runtime_participant_ledger_digest().is_none()
             && operation.governed_approval_ledger_digest().is_none()
             && operation.dpop_replay_ledger_digest().is_none()
