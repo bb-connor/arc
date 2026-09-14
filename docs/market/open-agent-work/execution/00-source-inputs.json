@@ -21276,11 +21276,11 @@
     },
     {
       "path": "docs/papers/review-2026-09/evidence/30-recoverable-checked-output-rejections/paid-corrupt-report-public.json",
-      "selected": false,
+      "selected": true,
       "tracked": false,
       "sha256": "dc0b7e661d56b3a4f356e522b6c1153115fdc46f41bdf252ba2a1d1deae8c806",
       "mode": "0o664",
-      "exclusion_reason": "Historical campaign outside the reproduced report-35 baseline; preserved in source checkout."
+      "selection_reason": "Direct retained artifact dependency discovered by Python ProtocolTests.setUpClass."
     },
     {
       "path": "docs/papers/review-2026-09/evidence/30-recoverable-checked-output-rejections/paid-corrupt-report-verification.json",
@@ -21300,11 +21300,11 @@
     },
     {
       "path": "docs/papers/review-2026-09/evidence/30-recoverable-checked-output-rejections/paid-normal-public.json",
-      "selected": false,
+      "selected": true,
       "tracked": false,
       "sha256": "c0eba01214c0b021ea4cb502e8cc0c2922e31de42f361f5b791fa22d52add899",
       "mode": "0o664",
-      "exclusion_reason": "Historical campaign outside the reproduced report-35 baseline; preserved in source checkout."
+      "selection_reason": "Direct retained artifact dependency discovered by Python ProtocolTests.setUpClass."
     },
     {
       "path": "docs/papers/review-2026-09/evidence/30-recoverable-checked-output-rejections/paid-normal-verification.json",
