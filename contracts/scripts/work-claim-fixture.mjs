@@ -129,5 +129,10 @@ export async function fixture(t, { testToken = false } = {}) {
       chainId: 31337, verifyingContract: await escrow.getAddress() }, decisionTypes, body);
     return [body.allocationId, body.decisionDigest, body.accepted, signature];
   }
-  return { ...actors, actors, rpc, provider, escrow, token, terms, start, now, at, fund, sign, submit, deploy, authorizeChecked };
+  async function signRawCall(actor, data, overrides = {}) {
+    return wallet(actor).signTransaction({ type: 2, chainId: 31337, to: await escrow.getAddress(),
+      data, value: 0, nonce: await provider.getTransactionCount(actor.address, 'pending'),
+      gasLimit: 1000000, maxFeePerGas: 2000000000, maxPriorityFeePerGas: 1000000000, ...overrides });
+  }
+  return { ...actors, actors, rpc, provider, escrow, token, terms, start, now, at, fund, sign, submit, deploy, authorizeChecked, signRawCall };
 }

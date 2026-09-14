@@ -14,7 +14,7 @@ const binary = process.env.CHIO_W0_BINARY ?? path.join(root, 'target/debug/chio-
 const fixtureScript = path.join(root, 'examples/funded-work/fixture.py');
 const stringify = (value) => JSON.stringify(value, (_, v) => typeof v === 'bigint' ? String(v) : v, 2);
 
-export async function runW0(scenario, directory) {
+export async function runW0(scenario, directory, { payment } = {}) {
   assert.equal(mutation, '', 'W0 requires the unmodified claim contract');
   assert.ok(['accepted', 'rejected', 'missing-custody', 'child'].includes(scenario));
   const state = path.resolve(directory);
@@ -23,6 +23,7 @@ export async function runW0(scenario, directory) {
   const cleanups = [];
   const receipts = [];
   let serial = 0;
+  let recovery;
   function command(command, request, allowFailure = false) {
     const args = ['-B', fixtureScript, command, state];
     if (request) {
@@ -139,7 +140,14 @@ export async function runW0(scenario, directory) {
           observations.push(await observe('parent_refunded'));
         }
         await f.at(30);
-        await record('earned_payment_after_deadlines', f.escrow.connect(seller).withdrawPayment(allocation));
+        if (payment) {
+          const result = await payment({ f, allocation, seller, agreement: prepared.agreement });
+          assert.equal(result.receipt.status, 1);
+          receipts.push({ label: 'recovered_earned_payment', receipt: result.receipt.toJSON() });
+          recovery = result.recovery;
+        } else {
+          await record('earned_payment_after_deadlines', f.escrow.connect(seller).withdrawPayment(allocation));
+        }
       }
     }
     observations.push(await observe('financial_terminal'));
@@ -170,6 +178,7 @@ export async function runW0(scenario, directory) {
       input: fs.readFileSync(source, 'utf8'), output, submission: submitted.submission,
       observationForVerifier: observed, certificate, evmCertificate, verifierFailure,
       providerCheckerMs, observations, receipts, runtimeCodeKeccak256: codeHash,
+      ...(recovery ? { recovery } : {}),
       accounting: { escrowFunded: funded, paid: recordedPaid, refunded: recordedRefunded, remaining: funded - withdrawn },
       escrowEvents: (await f.provider.getLogs({ address: escrowAddress, fromBlock: 0 })).map((log) => log.toJSON()),
       tokenEvents: logs.map((log) => log.toJSON()),

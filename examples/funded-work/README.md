@@ -6,6 +6,11 @@ escrow on a private chain. It implements the artifact-only subset of the
 [F1 design](../../docs/market/open-agent-work/execution/02-contract-draft.md).
 Read [PROFILE.md](PROFILE.md) for exact encodings and trust boundaries.
 
+The [rail recovery experiment](RECOVERY.md) now persists an exact signed
+transaction before broadcast and recovers it across actual worker SIGKILL.
+It preserves operation and nonce ownership and treats unavailable or changed
+chain observations as uncertainty. Native financial recovery remains separate.
+
 Four executable cases cover correct work/payment, wrong work/rejection/refund,
 unavailable custody/timeout, and a 60-unit child claim paid after the unsubmitted
 100-unit parent refunds. The child uses the intermediary's own funds. No native
