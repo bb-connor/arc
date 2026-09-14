@@ -10,7 +10,7 @@ The complete model suite passes 18 tests; the combined Node suite passes 143
 checks, including all 118 model trace representatives. The independent private
 chain reproduction retains an unpaid child claim through parent refund and
 then pays the child. Task 3 remains gated on a qualified Security M4 checkpoint;
-Task 4 native integration is not started. This is not vertical-slice completion.
+Task 4 native integration is not started. The independent [artifact/custody sub-slice](2026-09-14-funded-work-artifacts.md) now joins actual Rust W0 output, Python verification and retained local custody to private-chain payment, rejection/refund and child withdrawal. Its example-local profiles do not qualify native Finding facets or public-chain finality. This is not vertical-slice completion.
 
 **Architecture:** Prototype an experimental claim escrow separately from existing `ChioEscrow`. Fund immutable work terms, commit a timely result, arbitrate through a pinned F1 verifier, and preserve accepted withdrawals. Connect the rail to native admission only after an isolated paper/Security M4 integration is reviewed and qualified for the selected surface.
 

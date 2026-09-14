@@ -4,7 +4,22 @@ Refreshed 2026-09-14 during the claim-escrow execution. The independent model,
 contract, trace replay and financial reproduction are implemented. Native
 funding admission remains gated on a qualified Security M4 source.
 
-## Observed source
+## Latest refresh after funded W0 execution
+
+On 2026-09-14 the security worktree and draft PR #1117 both identify
+`6bb648b613b44ff5aaf1853768f2747bff166077`. The worktree is clean and the
+PR remains open, draft and blocked. The M4 acceptance report still states that
+qualification is in progress and M4 cannot close on current evidence. This
+refresh is read-only; no hosted-check or review-thread qualification is inferred.
+
+The independent [funded W0 result](08-funded-w0-results.md) now supplies actual
+Rust-produced work, Python artifact verification, reopened local SQLite custody
+and exact canonical-digest EVM authorization. It remains one host with mock
+tokens and trusted private-chain reads. Native admission, Finding facets,
+unknown-payment correlation and parent process loss remain unimplemented here.
+No integration base was selected or merge attempted.
+
+## Earlier observed source
 
 Draft [PR #1117](https://github.com/bb-connor/arc/pull/1117) is open and blocked,
 head `8738bdfd7be8c43a0543ca0ce468541529c47add`, base
