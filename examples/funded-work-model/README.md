@@ -4,13 +4,17 @@ This executable model isolates one question: can two receivers rely on the
 same payer-local balance? It is an explanatory artifact for
 [Open Agent Work](../../docs/market/open-agent-work/README.md).
 
+The directory now also contains the [claim state model](claim_model.py) and
+[bounded explorer](claim_explorer.py). The original six allocation tests remain
+unchanged; the full command below now runs 18 tests across both stages.
+
 Run from the repository root with Python 3.10 or newer:
 
 ```sh
 python3 -B -m unittest discover -s examples/funded-work-model -p 'test_*.py' -v
 ```
 
-Six tests pass. The four planned cases cover forked promises, exclusive
+The six original allocation tests pass. The four planned cases cover forked promises, exclusive
 allocation, exact replay and all 24 serial permutations of four bounded
 claims. Two additional cases reject invalid monetary values without mutation.
 The retained red run failed to import the absent implementation before it was
@@ -75,3 +79,45 @@ terminals, no signatures, no real funding and no implementation-level
 concurrency proof. The [escrow characterization](../../docs/market/open-agent-work/execution/01-escrow-fit.md)
 tests real contract bytecode separately; it does not convert this model into
 a settlement protocol.
+
+## Funded claim state exploration
+
+The second model records real model cash movements independently of its state
+enum: Funded, Submitted, Payable, Paid, Rejected, TimedOut and Refunded. Its
+source deposits are fixed; returned cash is reported as refunded rather than
+implicitly redeposited. Original execution uncertainty survives financial
+resolution. Failed transfers model atomic transaction reverts.
+
+`Terms` fixes source, recipient, verifier, amount and four deadlines.
+`ClaimLedger` supports fund, submit, decide, expire, pay and refund. All
+arguments are trusted model inputs, not parsed or signed wire data. It has no
+chain fork/finality, crash-persistent custody, arbitrary verifier faults or
+proof that a checker is useful.
+
+```sh
+python3 -B examples/funded-work-model/claim_explorer.py --output /tmp/claim-traces.json
+cmp examples/funded-work-model/claim-traces.json /tmp/claim-traces.json
+python3 -B examples/funded-work-model/claim_explorer.py --broken-expiry --output /tmp/claim-counterexample.json
+```
+
+The ordinary exploration exhausts the reachable finite graph for two already
+funded jobs (3 and 2 units), a fixed actor/commitment/decision alphabet and nine
+monotonic timestamps. It visits 5,508 states and 132,192 transitions, checking
+source conservation, nonnegative balances, terminal/transfer agreement,
+no refund of accepted work, immutable uncertainty and no mutation on denial.
+The funding and transfer-failure boundaries are separately exercised by unit
+tests; they are not all transitions in this finite graph.
+
+The broken-expiry driver exits 1 with the short financial trace `submit ->
+accept -> timeout refund`. It changes the explorer's copied state only; no
+production contract or normal model switch weakens the real implementation.
+
+The retained [trace corpus](claim-traces.json) selects 118 financial-edge
+representatives with their shortest discovered prefixes. The
+[bytecode replay suite](../../contracts/scripts/work-claim-model.test.mjs)
+checks each against an independent Solidity implementation and actual token
+balances. It does not run all 132,192 model transitions against the contract.
+Regenerate and compare the corpus whenever the model or explorer changes.
+
+The [claim-escrow report](../../docs/market/open-agent-work/execution/05-claim-escrow-results.md)
+records the new result and the remaining native integration requirements.
