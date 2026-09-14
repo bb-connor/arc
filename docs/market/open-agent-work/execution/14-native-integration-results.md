@@ -372,3 +372,7 @@ a fresh store cannot discard the anti-reuse history.
 
 This interface review adds no native funding implementation or public finality
 claim. It makes the next admission tests concrete after Task 3 closes.
+
+The subsequent [process merge rehearsal](16-process-sync-rehearsal.md) records
+the exact committed integration head and the latest clean process input. It
+found one generated coverage conflict; process adoption remains a separate gate.
