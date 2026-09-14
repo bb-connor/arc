@@ -282,7 +282,7 @@ impl SqliteAuthorityStore {
                     "authority store content does not match its relocation seal".to_string(),
                 ));
             }
-            finish_export(&connection, &database_path)?;
+            finish_export(&connection, &database_path, &expected_database)?;
             return Ok(seal);
         }
         let seal = RelocationSeal {
@@ -334,8 +334,7 @@ impl SqliteAuthorityStore {
                 "sqlite relocation export commit outcome is unknown: {error}"
             ))
         })?;
-        finish_export(&connection, &database_path)?;
-        validate_database_identity(&database_path, &expected_database)?;
+        finish_export(&connection, &database_path, &expected_database)?;
         Ok(seal)
     }
 
@@ -550,7 +549,11 @@ fn remove_previous_lock_artifacts(
 }
 
 /// SQLite reports a busy checkpoint as a result row, not an execution error.
-fn finish_export(connection: &Connection, database: &Path) -> Result<(), SqliteServingOwnerError> {
+fn finish_export(
+    connection: &Connection,
+    database: &Path,
+    expected: &fs::Metadata,
+) -> Result<(), SqliteServingOwnerError> {
     let busy: i64 =
         connection.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))?;
     if busy != 0 {
@@ -560,5 +563,39 @@ fn finish_export(connection: &Connection, database: &Path) -> Result<(), SqliteS
     }
     File::open(database)?.sync_all()?;
     File::open(database_parent(database))?.sync_all()?;
+    validate_database_identity(database, expected)?;
     Ok(())
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resumed_export_finalization_refuses_a_replaced_database_inode(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let database = directory.path().join("authority.db");
+        let connection = Connection::open(&database)?;
+        connection.execute_batch(
+            "CREATE TABLE retained(value INTEGER); INSERT INTO retained VALUES(1);",
+        )?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&database, fs::Permissions::from_mode(0o600))?;
+        }
+        let expected = fs::metadata(&database)?;
+        finish_export(&connection, &database, &expected)?;
+        let original = directory.path().join("original.db");
+        fs::rename(&database, &original)?;
+        fs::copy(&original, &database)?;
+        let refused = finish_export(&connection, &database, &expected);
+        assert!(
+            matches!(refused, Err(SqliteServingOwnerError::Invalid(ref reason)) if reason.contains("identity changed")),
+            "{refused:?}"
+        );
+        assert_eq!(fs::read(&database)?, fs::read(&original)?);
+        Ok(())
+    }
 }

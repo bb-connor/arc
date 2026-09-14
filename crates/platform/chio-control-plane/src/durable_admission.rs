@@ -110,8 +110,9 @@ impl DurableAdmissionRuntime {
         )?)
     }
 
-    /// Re-anchor an exported copy at `path`. The kernel seed and identity
-    /// files beside the database move with it and are verified on the next open.
+    /// Re-anchor an exported copy at `path` after validating local seed custody.
+    /// This unchecked API does not authenticate an external relocation seal;
+    /// callers requiring that guarantee must use `import_relocation_checked`.
     pub fn import_relocation(path: &Path) -> Result<RelocationImport, CliError> {
         if path
             .to_str()
@@ -122,15 +123,16 @@ impl DurableAdmissionRuntime {
             ));
         }
         SqliteAuthorityStore::ensure_serving_supported()?;
+        let metadata = fs::symlink_metadata(path)?;
+        if !metadata.is_file() {
+            return Err(CliError::cli_other_error(
+                "relocated authority must be a regular file",
+            ));
+        }
+        crate::load_existing_authority_keypair(&durable_admission_kernel_seed_path(path)?)?;
         let lock_root = durable_admission_lock_root(path)?;
         create_private_directory(&lock_root)?;
         let imported = SqliteAuthorityStore::import_relocated(path, &lock_root)?;
-        let seed = durable_admission_kernel_seed_path(path)?;
-        if !seed.is_file() {
-            return Err(CliError::cli_other_error(
-                "the durable admission kernel seed did not move with its database".to_string(),
-            ));
-        }
         Ok(imported)
     }
 
@@ -1194,6 +1196,88 @@ fn write_durable_admission_kernel_identity(path: &Path, public_key: &str) -> Res
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn unchecked_relocation_validates_seed_before_any_import_mutation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let temp = tempfile::tempdir()?;
+        let original = temp.path().join("original");
+        fs::create_dir(&original)?;
+        fs::set_permissions(&original, fs::Permissions::from_mode(0o700))?;
+        let database = original.join("authority.db");
+        drop(DurableAdmissionRuntime::open(&database)?);
+        DurableAdmissionRuntime::export_relocation(&database)?;
+        for variant in ["missing", "directory", "symlink", "broad", "malformed"] {
+            let destination = temp.path().join(variant);
+            fs::create_dir(&destination)?;
+            fs::set_permissions(&destination, fs::Permissions::from_mode(0o700))?;
+            let copied = destination.join("authority.db");
+            fs::copy(&database, &copied)?;
+            let seed = durable_admission_kernel_seed_path(&copied)?;
+            match variant {
+                "missing" => {}
+                "directory" => fs::create_dir(&seed)?,
+                "symlink" => symlink(durable_admission_kernel_seed_path(&database)?, &seed)?,
+                "broad" | "malformed" => {
+                    fs::copy(durable_admission_kernel_seed_path(&database)?, &seed)?;
+                    if variant == "broad" {
+                        fs::set_permissions(&seed, fs::Permissions::from_mode(0o644))?;
+                    } else {
+                        fs::write(&seed, b"bad seed")?;
+                    }
+                }
+                _ => unreachable!(),
+            }
+            let before = fs::read(&copied)?;
+            assert!(
+                DurableAdmissionRuntime::import_relocation(&copied).is_err(),
+                "{variant}"
+            );
+            assert!(fs::read(&copied)? == before, "{variant} mutated authority");
+            assert!(
+                !durable_admission_lock_root(&copied)?.exists(),
+                "{variant} created locks"
+            );
+        }
+        for variant in ["missing-database", "directory-database", "symlink-database"] {
+            let destination = temp.path().join(variant);
+            fs::create_dir(&destination)?;
+            fs::set_permissions(&destination, fs::Permissions::from_mode(0o700))?;
+            let copied = destination.join("authority.db");
+            fs::copy(
+                durable_admission_kernel_seed_path(&database)?,
+                durable_admission_kernel_seed_path(&copied)?,
+            )?;
+            match variant {
+                "missing-database" => {}
+                "directory-database" => fs::create_dir(&copied)?,
+                "symlink-database" => symlink(&database, &copied)?,
+                _ => unreachable!(),
+            }
+            let original_bytes = fs::read(&database)?;
+            assert!(DurableAdmissionRuntime::import_relocation(&copied).is_err());
+            assert!(fs::read(&database)? == original_bytes);
+            assert!(!durable_admission_lock_root(&copied)?.exists());
+        }
+        let destination = temp.path().join("valid");
+        fs::create_dir(&destination)?;
+        fs::set_permissions(&destination, fs::Permissions::from_mode(0o700))?;
+        let copied = destination.join("authority.db");
+        fs::copy(&database, &copied)?;
+        fs::copy(
+            durable_admission_kernel_seed_path(&database)?,
+            durable_admission_kernel_seed_path(&copied)?,
+        )?;
+        let imported = DurableAdmissionRuntime::import_relocation(&copied)?;
+        assert_eq!(
+            DurableAdmissionRuntime::import_relocation(&copied)?,
+            imported
+        );
+        drop(DurableAdmissionRuntime::open(&copied)?);
+        Ok(())
+    }
 
     #[test]
     fn durable_admission_rejects_split_local_participant_databases() -> Result<(), CliError> {

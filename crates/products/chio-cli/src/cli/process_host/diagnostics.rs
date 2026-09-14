@@ -164,19 +164,18 @@ pub(super) fn status(path: &Path) -> Result<(), CliError> {
     let observer = Observer::open(path)?;
     let snapshot = observer.run_status()?;
     observer.directory.validate_path_identity()?;
-    println!(
-        "{}",
-        serde_json::json!({
-            "schema": "chio.process.status.v1",
-            "abi": {
-                "serving": chio_process::PROCESS_ABI,
-                "host": observer.record.abi,
-                "written_by": observer.record.written_by,
-            },
-            "host_lock_held": observer.host_lock_held,
-            "run": snapshot,
-        })
-    );
+    let output = serde_json::json!({
+        "schema": "chio.process.status.v1",
+        "abi": {
+            "serving": chio_process::PROCESS_ABI,
+            "host": observer.record.abi,
+            "written_by": observer.record.written_by,
+        },
+        "host_lock_held": observer.host_lock_held,
+        "run": snapshot,
+    });
+    drop(observer);
+    println!("{output}");
     Ok(())
 }
 
@@ -211,6 +210,9 @@ pub(super) fn application_state(
         ));
     }
     observer.directory.validate_path_identity()?;
+    drop(reader);
+    drop(database);
+    drop(observer);
     println!(
         "{}",
         serde_json::json!({"schema": "chio.process.application-state.v1",
@@ -239,6 +241,7 @@ pub(super) fn logs(path: &Path, process: &str, attempt: u32) -> Result<(), CliEr
         output.insert(stream.to_owned(), serde_json::Value::String(text));
     }
     observer.directory.validate_path_identity()?;
+    drop(observer);
     println!(
         "{}",
         serde_json::json!({

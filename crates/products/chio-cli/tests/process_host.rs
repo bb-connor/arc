@@ -7,6 +7,28 @@ use chio_core_types::receipt::body::ChioReceipt;
 
 #[test]
 #[cfg(target_os = "linux")]
+fn process_administration_preserves_files_and_releases_diagnostic_locks(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/administration.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(())
+}
+
+#[test]
+#[cfg(target_os = "linux")]
 fn process_runner_preserves_completion_and_launch_error_identity(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");

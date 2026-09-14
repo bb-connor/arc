@@ -349,6 +349,12 @@ impl Lease {
         if std::fs::metadata(directory.path())?.permissions().mode() & 0o077 != 0 {
             return Err(error("state directory must be private (0700)"));
         }
+        if initializing
+            && std::fs::read_dir(directory.path())?
+                .any(|entry| entry.map_or(true, |entry| entry.file_name() != "host.lock"))
+        {
+            return Err(error("initialization requires an empty state directory"));
+        }
         let file = OpenOptions::new()
             .read(true)
             .write(true)

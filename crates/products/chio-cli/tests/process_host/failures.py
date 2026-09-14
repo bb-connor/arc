@@ -2,6 +2,7 @@
 
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -46,15 +47,31 @@ def worker():
         write(directory / "spawn.json", spawned)
         assert spawned["verdict"] == "allow"
         child = spawned["output"]["value"]["process"]
+        if data.get("join_after_failure"):
+            # The committed runner row is the barrier, not an estimated delay.
+            with sqlite3.connect(directory / "host/runner.db") as db:
+                deadline = time.monotonic() + 15
+                while db.execute(
+                    "SELECT state FROM run_workers WHERE process=?", (child,)
+                ).fetchone() != ("failed",):
+                    assert time.monotonic() < deadline
+                    time.sleep(0.01)
         joined = client.invoke(
             "join-failing-child",
             "chio-process",
             "wait_children",
             {"children": [child]},
         )
-        assert (
-            joined["verdict"] == "allow" and not joined["output"]["value"]["complete"]
-        )
+        if data.get("join_after_failure"):
+            assert (
+                joined["verdict"] == "deny"
+                and "child worker failed" in joined["reason"]
+            )
+        else:
+            assert (
+                joined["verdict"] == "allow"
+                and not joined["output"]["value"]["complete"]
+            )
         write(
             directory / "join.json", {"child": child, "spawn": spawned, "join": joined}
         )
@@ -200,6 +217,36 @@ capabilities:
         ]
     write(directory / "plan.json", plan)
     return plan
+
+
+def live_parent_failed_child(binary, directory):
+    plan = prepare(binary, directory, policy="continue_independent", adaptive=True)
+    plan["max_parallel"] = 2
+    plan["workers"][0]["input"]["join_after_failure"] = True
+    write(directory / "plan.json", plan)
+    report = run(binary, directory)
+    records = states(report)
+    assert (directory / "join.json").exists(), (
+        report,
+        invoke(
+            binary,
+            "process",
+            "logs",
+            "--state",
+            directory / "host",
+            "--process",
+            "parent",
+            "--attempt",
+            "1",
+        ),
+    )
+    child = json.loads((directory / "join.json").read_text())["child"]
+    assert records[child]["state"] == "failed" and records[child]["attempts"] == 1
+    assert records["parent"]["state"] == "failed"
+    assert records["parent"]["outcome"] == "dependency_failed"
+    assert records["parent"]["attempts"] == records["parent"]["suspensions"] == 1
+    assert records["dependent"]["attempts"] == 0
+    assert states(run(binary, directory)) == records
 
 
 def run(binary, directory):
@@ -401,6 +448,7 @@ def main(binary):
     )
 
     directory = root / "cancelled"
+    live_parent_failed_child(binary, root / "live-parent-failed-child")
     prepare(binary, directory, policy="continue_independent", cancel=True)
     report = states(run(binary, directory))
     assert report["first"]["outcome"] == "process_cancelled"

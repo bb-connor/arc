@@ -189,6 +189,13 @@ child is therefore failed, and its pending dependents cannot launch. Completed
 and active workers are not reclassified by dependency propagation. A child's
 submission parent alone is not a completion dependency.
 
+A live parent calling `wait_children` for an already failed child records the
+join before receiving the `child worker failed` denial. If that parent then
+exits 75, the runner records one suspension and terminalizes it as
+`failed`/`dependency_failed` on the next dependency pass. It is not relaunched,
+and its unstarted dependents spend no attempt. A parent that handles the denial
+and continues remains active until its own observed exit.
+
 The run still exits unsuccessfully and reports `complete: false` if any worker
 failed, even when every independent worker completed. Status and the report
 retain individual outcomes and attempt counts. Restarting the same plan keeps

@@ -298,7 +298,10 @@ the host's own socket. After abrupt host death, choose a fresh socket path;
 the host never deletes an existing path to make startup succeed. Stop the host
 before issuing a new connection descriptor with the new socket path. Keep the
 same state directory, process id and logical operation keys when recovering.
-Credential rotation preserves operation identity.
+Issuing a credential adds a descriptor and leaves existing credentials valid.
+To rotate credentials, stop the host, revoke the process's old credentials,
+then issue a replacement with `process credential`. Both issuance and rotation
+preserve operation identity; revocation does not erase retained tool outcomes.
 
 Successful durable operations recover their original signed receipts and
 outputs. If the host dies after an external effect but before recording its

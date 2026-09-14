@@ -152,6 +152,34 @@ fn abandon(db: &Connection) -> Result<(), CliError> {
 }
 
 fn reconcile(db: &Connection, parent: &File) -> Result<(), CliError> {
+    // Hold the journal's write lock across lookup and retirement. Only a
+    // positively absent, validated pre-credential intent may be forgotten.
+    let transaction =
+        rusqlite::Transaction::new_unchecked(db, rusqlite::TransactionBehavior::Immediate)
+            .map_err(error)?;
+    let abandoned = transaction
+        .prepare(
+            "SELECT singleton,name FROM run_socket_leases WHERE singleton>1 ORDER BY singleton",
+        )
+        .map_err(error)?
+        .query_map([], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(error)?;
+    for (index, name) in abandoned {
+        validate_name(&name)?;
+        if entry(parent, &name)?.is_none() {
+            transaction
+                .execute(
+                    "DELETE FROM run_socket_leases WHERE singleton=?1 AND name=?2",
+                    params![index, name],
+                )
+                .map_err(error)?;
+        }
+    }
+    transaction.commit().map_err(error)?;
     let Some(record) = record(db)? else {
         return Ok(());
     };
@@ -468,7 +496,52 @@ mod tests {
                 params![index, format!("chio-worker-{index:032x}")],
             )?;
         }
+        let _endpoint = Endpoint::prepare(&db)?;
+        assert_eq!(
+            db.query_row("SELECT COUNT(*) FROM run_socket_leases", [], |row| row
+                .get::<_, i64>(0))?,
+            1
+        );
+        // Foreign objects, including symlinks, are never unlinked or retired.
+        let foreign = tempfile::Builder::new()
+            .prefix("chio-worker-")
+            .tempdir_in("/tmp")?;
+        let name = format!("chio-worker-{}", uuid::Uuid::new_v4().simple());
+        let alias = Path::new("/tmp").join(&name);
+        std::os::unix::fs::symlink(foreign.path(), &alias)?;
+        db.execute(
+            "INSERT INTO run_socket_leases(singleton,name) VALUES(2,?1)",
+            [&name],
+        )?;
+        reconcile(&db, &parent()?)?;
+        assert!(alias.symlink_metadata()?.file_type().is_symlink());
+        assert_eq!(
+            db.query_row(
+                "SELECT COUNT(*) FROM run_socket_leases WHERE singleton=2",
+                [],
+                |row| row.get::<_, i64>(0)
+            )?,
+            1
+        );
+        std::fs::remove_file(&alias)?;
+        reconcile(&db, &parent()?)?;
+        assert_eq!(
+            db.query_row("SELECT COUNT(*) FROM run_socket_leases", [], |row| row
+                .get::<_, i64>(0))?,
+            0
+        );
         let endpoint = Endpoint::prepare(&db)?;
+        let mut retained = Vec::new();
+        for index in 2..=9 {
+            let name = format!("chio-worker-{}", uuid::Uuid::new_v4().simple());
+            let alias = Path::new("/tmp").join(&name);
+            symlink(endpoint.path.parent().ok_or("parent")?, &alias)?;
+            db.execute(
+                "INSERT INTO run_socket_leases(singleton,name) VALUES(?1,?2)",
+                params![index, name],
+            )?;
+            retained.push(alias);
+        }
         db.execute("UPDATE run_socket_leases SET directory_device=NULL,directory_inode=NULL WHERE singleton=1", [])?;
         assert!(Endpoint::prepare(&db).is_err());
         assert!(endpoint.path.parent().ok_or("parent")?.exists());
@@ -477,7 +550,35 @@ mod tests {
                 .get::<_, i64>(0))?,
             9
         );
+        for alias in retained {
+            std::fs::remove_file(alias)?;
+        }
         std::fs::remove_dir(endpoint.path.parent().ok_or("parent")?)?;
+        Ok(())
+    }
+
+    #[test]
+    fn abandoned_invalid_names_and_lookup_errors_retain_journal_rows() -> TestResult {
+        let db = Connection::open_in_memory()?;
+        let endpoint = Endpoint::prepare(&db)?;
+        endpoint.cleanup(&db)?;
+        db.execute(
+            "INSERT INTO run_socket_leases(singleton,name) VALUES(2,'../foreign')",
+            [],
+        )?;
+        assert!(reconcile(&db, &parent()?).is_err());
+        let count = || -> rusqlite::Result<i64> {
+            db.query_row("SELECT COUNT(*) FROM run_socket_leases", [], |row| {
+                row.get(0)
+            })
+        };
+        assert_eq!(count()?, 1);
+        let name = format!("chio-worker-{}", uuid::Uuid::new_v4().simple());
+        db.execute("UPDATE run_socket_leases SET name=?1", [&name])?;
+        assert!(reconcile(&db, &File::open("/dev/null")?).is_err());
+        assert_eq!(count()?, 1);
+        reconcile(&db, &parent()?)?;
+        assert_eq!(count()?, 0);
         Ok(())
     }
 }

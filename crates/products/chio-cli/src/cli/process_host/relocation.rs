@@ -28,7 +28,7 @@ const CHECKPOINTED: [&str; 4] = ["receipts.db", "process.db", "mailboxes.db", "r
 /// checkpointing and the manifest itself.
 const EXCLUDED: [&str; 2] = ["host.lock", MANIFEST];
 const EXCLUDED_DIRECTORIES: [&str; 1] = ["run-sockets"];
-const EXCLUDED_SUFFIXES: [&str; 3] = ["-wal", "-shm", ".tmp"];
+const SQLITE_SIDECARS: [&str; 2] = ["-wal", "-shm"];
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -49,7 +49,7 @@ pub(super) fn export(state: &Path) -> Result<(), CliError> {
     super::state::require_abi(&record.abi, "host state")?;
     // Reject unreadable files and symlinks before retiring a usable authority.
     // Retirement itself is resumable if a later write or the host fails.
-    digests(&directory)?;
+    digests(&directory, false)?;
     let runner = directory.join("runner.db");
     if runner.try_exists()? {
         let db = Connection::open_with_flags(
@@ -82,7 +82,7 @@ pub(super) fn export(state: &Path) -> Result<(), CliError> {
         }
     }
     let seal = DurableAdmissionRuntime::export_relocation(&directory.join("authority.db"))?;
-    let files = digests(&directory)?;
+    let files = digests(&directory, true)?;
     let manifest = Manifest {
         schema: SCHEMA.to_owned(),
         abi: record.abi,
@@ -124,7 +124,15 @@ pub(super) fn import(state: &Path) -> Result<(), CliError> {
     // replacement must be retryable. The database still has to match its
     // exported bytes until commit; application files must match on every try.
     let verify_files = |all: bool| -> Result<(), CliError> {
-        let actual = digests(&directory)?;
+        let actual = digests(&directory, true)?;
+        let authoritative = |name: &&String| !name.starts_with("authority.db.locks/");
+        if actual
+            .keys()
+            .filter(authoritative)
+            .ne(manifest.files.keys().filter(authoritative))
+        {
+            return Err(error("relocated file set differs from its manifest"));
+        }
         for (name, expected) in &manifest.files {
             if name.starts_with("authority.db.locks/") || (!all && name == "authority.db") {
                 continue;
@@ -182,7 +190,7 @@ fn checkpoint(path: &Path) -> Result<(), CliError> {
 
 /// SHA-256 of every regular file that travels with the directory, keyed by
 /// its slash-separated relative path.
-fn digests(directory: &Path) -> Result<BTreeMap<String, String>, CliError> {
+fn digests(directory: &Path, sealed: bool) -> Result<BTreeMap<String, String>, CliError> {
     let mut files = BTreeMap::new();
     let mut pending = vec![directory.to_path_buf()];
     while let Some(current) = pending.pop() {
@@ -205,13 +213,26 @@ fn digests(directory: &Path) -> Result<BTreeMap<String, String>, CliError> {
                         relative(directory, &path)?
                     )));
                 }
+                return Err(error(format!(
+                    "host state contains a nonregular file: {}",
+                    relative(directory, &path)?
+                )));
+            }
+            if current == directory && EXCLUDED.contains(&name.as_str()) {
                 continue;
             }
-            if (current == directory && EXCLUDED.contains(&name.as_str()))
-                || EXCLUDED_SUFFIXES
-                    .iter()
-                    .any(|suffix| name.ends_with(suffix))
+            if let Some(database) = SQLITE_SIDECARS
+                .iter()
+                .find_map(|suffix| name.strip_suffix(suffix))
             {
+                let known = current == directory
+                    && (database == "authority.db" || CHECKPOINTED.contains(&database));
+                if !known || (sealed && name.ends_with("-wal") && entry.metadata()?.len() != 0) {
+                    return Err(error(format!(
+                        "unverified SQLite sidecar: {}",
+                        relative(directory, &path)?
+                    )));
+                }
                 continue;
             }
             files.insert(relative(directory, &path)?, digest(&path)?);
