@@ -684,7 +684,9 @@ pub(super) fn verify_payment_terminal_source<'a>(
         if !requires_payment {
             return Ok(());
         }
-        let journal = crate::budget_store::load_payment_journal(
+        // This terminal attests the authorization at the original unknown
+        // outcome. A separately committed release successor cannot rewrite it.
+        let journal = crate::budget_store::load_original_payment_journal(
             transaction,
             operation.binding().operation_id().as_str(),
         )

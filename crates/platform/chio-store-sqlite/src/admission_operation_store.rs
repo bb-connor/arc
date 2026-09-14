@@ -49,6 +49,7 @@ mod projection;
 mod schema;
 mod store;
 mod threshold_approval;
+pub(crate) mod unknown_release;
 
 use commit_chain::append_operation_commit;
 pub(crate) use commit_chain::{
@@ -93,7 +94,7 @@ pub(crate) use schema::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 9;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 10;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
@@ -169,6 +170,19 @@ impl DurableObligationV1 {
 }
 
 impl SqliteAdmissionOperationStore {
+    /// Export an already committed unknown outcome under the supplied local key.
+    /// This reads the qualified store and never reopens the operation or moves money.
+    /// Receivers must pin the expected signer and bind the exported request locally.
+    pub fn export_outcome_unknown_projection(
+        &self,
+        operation_id: &AdmissionOperationId,
+        signer: &chio_core::crypto::Keypair,
+    ) -> Result<SignedAdmissionTerminalProjectionV1, AdmissionOperationStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        projection::export_outcome_unknown_projection(&transaction, operation_id, signer)
+    }
+
     pub(crate) fn open_alongside(
         connection: Arc<Mutex<Connection>>,
         serving_owner: Arc<SqliteServingOwner>,
@@ -948,7 +962,7 @@ fn decode_row(raw: RawOperationRow) -> Result<StoredOperation, AdmissionOperatio
 }
 
 fn load_by_operation_id_tx(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     operation_id: &AdmissionOperationId,
 ) -> Result<Option<StoredOperation>, AdmissionOperationStoreError> {
     let raw = transaction

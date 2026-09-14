@@ -524,6 +524,8 @@ pub(crate) fn verify_admission_operation_invariants(
     }
     drop(rows);
     drop(statement);
+    super::unknown_release::verify_invariants(connection)
+        .map_err(|error| invariant(error.to_string()))?;
     super::credit_exposure::verify_credit_exposure_account_invariants(connection)
 }
 
@@ -645,6 +647,8 @@ fn admission_operation_schema_catalog(
                OR tbl_name GLOB 'obligation_*'
                OR name GLOB 'credit_exposure_*'
                OR tbl_name GLOB 'credit_exposure_*'
+               OR name GLOB 'unknown_payment_release_*'
+               OR tbl_name GLOB 'unknown_payment_release_*'
             ORDER BY type, name, tbl_name
             "#,
         )

@@ -1,0 +1,54 @@
+\section{Limitations and related work}
+
+The cross-organization run of Section~\ref{sec:eval} put the two kernels in
+separate processes on one host, not on two separately administered machines.
+That removes the shared address space, store, and key material, which are what
+the claim is about; the shared operating system and clock source remain. The
+rule does not depend on that experiment; the strength of the demonstration
+does.
+
+Section~\ref{sec:eval}'s alternative is one construction of those formats on one
+corpus: what it measures is what an operator must add, not a bound on what the
+parts reach.
+Continuation consumption is at-most-once, so a crash between consume and
+dispatch loses the call rather than repeating it: right for a refund, an
+avoidable retry for an idempotent read. The chain closes in the kernel for one
+hop: the next continuation in a longer chain is minted outside it.
+Denial paths below the verifier still return a rendered detail alongside the
+code. Receipts batch into
+Merkle checkpoints in the RFC 6962 shape \cite{rfc6962} with offline inclusion
+proofs, and that is the whole claim: local audit evidence with verifiable
+inclusion, not a public log, and with no anti-equivocation a kernel signing two
+contradictory checkpoints is detectable only by someone holding both.
+
+\paragraph{Related work.}
+Receiver-rooted policy and attenuated delegation are established by trust
+management \cite{spki,keynote}, proof-carrying authorization \cite{bauer2002},
+end-to-end authorization \cite{howell2000}, and macaroons \cite{macaroons}.
+Modern capability formats \cite{ucan,biscuit} also support application-defined
+restrictions. These systems are relevant alternatives; their different wire
+shapes do not imply that they cannot express a Chio admission policy.
+Authenticated Workflows \cite{authenticatedworkflows2026} also uses signed
+completion attestations to enforce workflow dependencies. Chaining outcome
+evidence alone is therefore not our novelty claim.
+
+CapLease \cite{caplease2026} studies repeated agent actions under freshly issued
+tokens. Its equally stateful server-ledger baseline obtains the same replay
+protection under matched centralized assumptions. Durable authorization state
+and an idempotent effect sink therefore belong in our comparison, not only
+token identifiers. Signatures and DSSE \cite{dsse,intoto} establish authorship
+and binding, while transparency systems \cite{rfc6962,scitt} address publication
+and equivocation under additional assumptions.
+
+\paragraph{The result still needed.}
+Local re-execution checks a source repair without its producer's attestation,
+but cannot prove private publication history. The matched ledger reproduces
+these guarantees. Neither artifact validity nor signatures establish scarce
+work or Sybil resistance.
+Contingent payment additionally requires fair exchange~\cite{zkcp2017}; a hash
+lock does not verify a hidden repair.
+Useful execution across independently administered receivers, with fewer
+recovery interventions or less application-specific security code than an
+equally provisioned alternative, remains unmeasured. Finite checking does not
+establish arbitrary correctness. Signatures do not make dishonest receivers'
+external-effect claims true.

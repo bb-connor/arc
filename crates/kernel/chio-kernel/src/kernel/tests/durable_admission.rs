@@ -14,6 +14,8 @@ use crate::tool_outcome::{
     ToolOutcomeStoreError,
 };
 
+#[path = "durable_admission/checked_output.rs"]
+mod checked_output;
 #[path = "durable_admission/monetary.rs"]
 mod monetary;
 #[path = "durable_admission/receipt_projection.rs"]
@@ -128,7 +130,12 @@ fn finding_memory_lineage_requires_a_durable_terminal_projection() {
         make_scope(vec![make_grant("memory-server", "write")]),
         300,
     );
-    let mut request = make_request("finding-memory-durable", &capability, "write", "memory-server");
+    let mut request = make_request(
+        "finding-memory-durable",
+        &capability,
+        "write",
+        "memory-server",
+    );
     request.arguments[crate::memory_provenance::FINDING_DELIVERY_RECEIPT_ID_ARGUMENT] =
         serde_json::json!("delivery-receipt");
     let matching = resolve_required_matching_grants(
@@ -140,14 +147,12 @@ fn finding_memory_lineage_requires_a_durable_terminal_projection() {
     )
     .expect("matching Finding memory grant");
 
-    let error = match kernel.begin_durable_tool_admission(
-        &request,
-        &matching,
-        current_unix_timestamp_ms(),
-    ) {
-        Ok(_) => panic!("Finding memory lineage used an ephemeral terminal"),
-        Err(error) => error,
-    };
+    let error =
+        match kernel.begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
+        {
+            Ok(_) => panic!("Finding memory lineage used an ephemeral terminal"),
+            Err(error) => error,
+        };
     assert!(error
         .to_string()
         .contains("no qualified admission operation store"));
@@ -443,7 +448,11 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         not_after_unix_ms: u64,
         limit: usize,
     ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
-        let store_fence = self.fence.lock().expect("test admission fence lock").clone();
+        let store_fence = self
+            .fence
+            .lock()
+            .expect("test admission fence lock")
+            .clone();
         let state = self.state.lock().expect("test admission state lock");
         // Mirror the durable store's recovery contract: an operation still under a
         // live recovery lease held by the serving fence is being actively driven
@@ -453,9 +462,7 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
             .operation
             .iter()
             .filter(|operation| !operation.state().is_terminal())
-            .filter(|operation| {
-                operation.state() != AdmissionOperationState::ApprovalRequired
-            })
+            .filter(|operation| operation.state() != AdmissionOperationState::ApprovalRequired)
             .filter(|operation| {
                 !state.claim.as_ref().is_some_and(|claim| {
                     claim.operation_id() == operation.binding().operation_id()
@@ -541,6 +548,13 @@ impl ReceiptStore for TestAdmissionOperationStore {
             .ok_or_else(|| ReceiptStoreError::Conflict("terminal replay is absent".to_owned()))?;
         if let AdmissionTerminalProjection::Completed(completed) = projection {
             state.receipt = Some(completed.receipt.receipt().clone());
+        }
+        if let AdmissionTerminalProjection::DeniedAfterDelivery { evidence, .. } = projection {
+            if let crate::admission_operation::AdmissionReceiptOrIncident::Receipt(receipt) =
+                evidence.as_ref()
+            {
+                state.receipt = Some(receipt.receipt().clone());
+            }
         }
         state.operation = Some(updated.clone());
         state.claim = None;

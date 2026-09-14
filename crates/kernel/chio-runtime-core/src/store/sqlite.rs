@@ -10,6 +10,7 @@ mod admission_replay;
 mod evidence_artifacts;
 mod health_summaries;
 mod leases_scheduler;
+mod outcome_continuation;
 mod runs_steps;
 mod schema_migrations;
 mod swarm_authority_bundles;

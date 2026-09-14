@@ -1308,7 +1308,16 @@ pub enum DeliveryDenialReason {
     /// The purchased Finding was no longer live at the terminal release
     /// boundary after the provider returned.
     FindingStatusChanged,
+    /// A trusted checked-output pricing guard rejected the returned work.
+    OutputGuardRejected,
 }
+
+/// Stable receipt reason for a checked-output pricing rejection.
+pub const OUTPUT_GUARD_REJECTION_REASON: &str =
+    "returned output failed the agreed zero-charge check";
+/// Public redaction preimage for rejected work with no committed output digest.
+pub const OUTPUT_GUARD_REJECTION_REDACTION_DOMAIN: &[u8] =
+    b"chio.output-guard-rejection.redacted.v1\0";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "terminal", rename_all = "snake_case")]

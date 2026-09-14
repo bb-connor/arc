@@ -39,7 +39,8 @@ mod joint_guard;
 mod model;
 mod payment_journal;
 pub(crate) use payment_journal::{
-    advance_payment_journal, insert_payment_journal, load_payment_journal,
+    advance_payment_journal, insert_payment_journal, load_original_payment_journal,
+    load_payment_journal,
 };
 mod reaper;
 mod replication;

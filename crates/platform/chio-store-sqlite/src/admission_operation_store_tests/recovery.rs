@@ -1,6 +1,77 @@
 use super::*;
 
 #[test]
+fn unknown_projection_export_is_qualified_read_only_and_exact() -> AnchoredTestResult {
+    let fixture = fixture();
+    let at = now_ms();
+    let operation =
+        tool_operation_before_terminal(&fixture, "export-unknown", "export-unknown-cap", at, false);
+    let key = Keypair::generate();
+    let id = operation.binding().operation_id();
+    assert!(fixture
+        .store
+        .export_outcome_unknown_projection(id, &key)
+        .is_err());
+    let context = unknown_projection(&fixture, &operation, "unused", 'c', at + 20)
+        .context()
+        .clone();
+    let projection =
+        chio_kernel::admission_operation::verified_outcome_unknown_after_dispatch_projection(
+            &operation, context,
+        )?;
+    fixture.store.commit_terminal_projection(&projection)?;
+    let before = fixture
+        .store
+        .load_by_operation_id(id)?
+        .ok_or("missing terminal")?;
+    let exported = fixture.store.export_outcome_unknown_projection(id, &key)?;
+    assert_eq!(exported.verify()?.terminal_operation(), &before);
+    assert_eq!(exported.verify()?.signer_key(), &key.public_key());
+    assert_eq!(
+        exported,
+        fixture.store.export_outcome_unknown_projection(id, &key)?
+    );
+    assert_eq!(
+        fixture.store.load_by_operation_id(id)?,
+        Some(before.clone())
+    );
+    assert!(fixture
+        .store
+        .claim_recovery(
+            id,
+            before.version(),
+            &identifier("claimant", "reopen"),
+            at + 30,
+            at + 1000,
+            &fixture.fence
+        )
+        .is_err());
+    assert_eq!(
+        fixture
+            .store
+            .commit_terminal_projection(&projection)?
+            .replay,
+        before.terminal_replay().ok_or("missing replay")?.clone()
+    );
+
+    // The export must read the retained projection, not merely synthesize a
+    // plausible signed incident from the operation row after sidecar corruption.
+    let db = Connection::open(&fixture.database)?;
+    assert!(db.execute("UPDATE admission_operation_terminal_projections SET manifest_json=x'7b7d' WHERE operation_id=?",
+        [id.as_str()]).is_err());
+    // Deliberately corrupt only this temporary fixture beneath the immutable-row
+    // trigger to exercise read-time qualification of damaged storage.
+    db.execute_batch("DROP TRIGGER admission_operation_terminal_projections_immutable")?;
+    db.execute("UPDATE admission_operation_terminal_projections SET manifest_json=x'7b7d' WHERE operation_id=?",
+        [id.as_str()])?;
+    assert!(fixture
+        .store
+        .export_outcome_unknown_projection(id, &key)
+        .is_err());
+    Ok(())
+}
+
+#[test]
 fn recovery_claims_are_bounded_fenced_and_time_monotonic() {
     let fixture = fixture();
     let first = prepared_operation(

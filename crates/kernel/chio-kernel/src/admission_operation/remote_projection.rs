@@ -192,6 +192,22 @@ struct UntrustedDeniedAfterDeliveryProjectionV1 {
     observer_work: Option<UntrustedObservationAttemptZeroV1>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UntrustedIncidentV1 {
+    binding: AdmissionExactProjectionBindingV1,
+    record_id: AdmissionIdentifier,
+    record_digest: AdmissionDigest,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UntrustedUnknownProjectionV1 {
+    terminal: AdmissionOperationState,
+    context: AdmissionProjectionContext,
+    incident: UntrustedIncidentV1,
+}
+
 impl SignedAdmissionTerminalProjectionV1 {
     pub fn from_verified(
         source_operation: &AdmissionOperationV1,
@@ -310,6 +326,36 @@ impl SignedAdmissionTerminalProjectionV1 {
         )?;
         let records = validate_records(&self.body.records, &manifest)?;
         validate_record_set(&source_operation, terminal_operation.state(), &records)?;
+        if terminal_operation.state() == AdmissionOperationState::OutcomeUnknownAfterDispatch {
+            // A signature and self-consistent manifest alone do not establish that
+            // the incident belongs to this dispatch. Bind its typed contents too.
+            let unknown: UntrustedUnknownProjectionV1 =
+                serde_json::from_slice(&projection_json).map_err(|_| mismatch())?;
+            unknown.incident.binding.validate_against(
+                &source_operation,
+                &self.body.context,
+                AdmissionOperationState::OutcomeUnknownAfterDispatch,
+            )?;
+            let incident_bytes = canonical_json_bytes(&unknown.incident)
+                .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?;
+            let record = records.first().ok_or_else(mismatch)?;
+            let Some(AdmissionTerminalReplay::Incident { incident_id, .. }) =
+                terminal_operation.terminal_replay()
+            else {
+                return Err(mismatch());
+            };
+            if unknown.terminal != AdmissionOperationState::OutcomeUnknownAfterDispatch
+                || unknown.context != self.body.context
+                || records.len() != 1
+                || record.canonical_json != incident_bytes
+                || record.record_id != unknown.incident.record_id
+                || incident_id != &unknown.incident.record_id
+                || self.body.authorization_consumption.is_some()
+                || self.body.observer.is_some()
+            {
+                return Err(mismatch());
+            }
+        }
         validate_receipt_record(
             &records,
             &source_operation,
@@ -1190,6 +1236,18 @@ fn validate_denied_receipt_reason_and_delivery_metadata(
         .as_ref()
         .and_then(serde_json::Value::as_object)
         .ok_or_else(mismatch)?;
+    if reason == DeliveryDenialReason::OutputGuardRejected {
+        if guard != "checked_output"
+            || decision_reason != OUTPUT_GUARD_REJECTION_REASON
+            || receipt.content_hash
+                != chio_core::crypto::sha256_hex(OUTPUT_GUARD_REJECTION_REDACTION_DOMAIN)
+            || metadata.contains_key(DELIVERY_CONTRACT_METADATA_KEY)
+            || metadata.contains_key(FINDING_DELIVERY_METADATA_KEY)
+        {
+            return Err(mismatch());
+        }
+        return Ok(());
+    }
     let delivery: DeliveryContract = metadata
         .get(DELIVERY_CONTRACT_METADATA_KEY)
         .cloned()
@@ -1259,6 +1317,7 @@ fn validate_denied_receipt_reason_and_delivery_metadata(
                         && finding.status_proof.is_some()
                 })
         }
+        DeliveryDenialReason::OutputGuardRejected => false,
     };
     if !valid {
         return Err(mismatch());
@@ -1435,6 +1494,50 @@ mod tests {
             Err(AdmissionOperationError::TerminalProjectionBindingMismatch),
             "the projection reason must match the signed guard"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn checked_output_projection_reason_requires_its_redaction_and_no_delivery_overlay(
+    ) -> Result<(), AdmissionOperationError> {
+        let key = Keypair::generate();
+        let template = digest_denial_receipt(OUTPUT_GUARD_REJECTION_REASON, "checked_output")?;
+        let mut body = template.body();
+        body.kernel_key = key.public_key();
+        body.content_hash = chio_core::crypto::sha256_hex(OUTPUT_GUARD_REJECTION_REDACTION_DOMAIN);
+        body.metadata = Some(serde_json::json!({}));
+        let sign = |body| {
+            ChioReceipt::sign(body, &key)
+                .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))
+        };
+        let valid = sign(body.clone())?;
+        validate_denied_receipt_reason_and_delivery_metadata(
+            &valid,
+            DeliveryDenialReason::OutputGuardRejected,
+        )?;
+        for mutation in 0..4 {
+            let mut wrong = body.clone();
+            match mutation {
+                0 => wrong.content_hash = OBSERVED_DELIVERY_DIGEST.into(),
+                1 => {
+                    wrong.decision = Some(Decision::Deny {
+                        reason: "ordinary rejection".into(),
+                        guard: "checked_output".into(),
+                    })
+                }
+                2 => wrong.metadata = template.metadata.clone(),
+                _ => wrong.decision = Some(Decision::Allow),
+            }
+            let wrong = sign(wrong)?;
+            assert!(wrong
+                .verify_signature()
+                .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?);
+            assert!(validate_denied_receipt_reason_and_delivery_metadata(
+                &wrong,
+                DeliveryDenialReason::OutputGuardRejected
+            )
+            .is_err());
+        }
         Ok(())
     }
 

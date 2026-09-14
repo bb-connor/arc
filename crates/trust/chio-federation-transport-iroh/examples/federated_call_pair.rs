@@ -3617,6 +3617,30 @@ impl Receiver {
             &invocation.invocation_id,
             &invocation,
         )?;
+        // Activate records from this locally constructed fixture, not the
+        // envelope supplied by a caller under test.
+        let (statement, _) = dsse.decode_statement()?;
+        if let Some(lease) = statement.predicate.capability_lease_ref {
+            self.store.insert_treaty_runtime_artifact(
+                "capability_lease",
+                &lease.lease_id.clone(),
+                &chio_runtime_core::RuntimeTreatyLeaseRecord {
+                    lease,
+                    valid_from_unix_ms: treaty.issued_at_unix_ms,
+                },
+            )?;
+        }
+        if let Some(receipt) = statement.predicate.governance_receipt_ref {
+            self.store.insert_treaty_runtime_artifact(
+                "governance_receipt",
+                &receipt.receipt_id.clone(),
+                &chio_runtime_core::RuntimeTreatyGovernanceRecord {
+                    receipt,
+                    valid_from_unix_ms: treaty.issued_at_unix_ms,
+                    valid_until_unix_ms: treaty.expires_at_unix_ms,
+                },
+            )?;
+        }
         self.store
             .insert_treaty_runtime_artifact("bilateral_dsse_envelope", &dsse_id, &dsse)?;
 

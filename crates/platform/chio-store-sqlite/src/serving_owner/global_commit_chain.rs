@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS authority_global_commits (
     commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     projection_kind TEXT NOT NULL CHECK (
-        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status')
+        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status', 'payment_resolution')
     ),
     projection_key TEXT NOT NULL,
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence >= 0),
@@ -229,16 +229,17 @@ pub(crate) fn initialize_global_commit_schema(
 fn migrate_previous_global_commit_schema(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
-    let previous_schema = GLOBAL_COMMIT_SCHEMA.replace(", 'finding_status'", "");
-    let legacy_schema = previous_schema.replace(", 'finding_challenge'", "");
-    let expected_previous = Connection::open_in_memory()?;
-    expected_previous.execute_batch(&previous_schema)?;
-    let expected_legacy = Connection::open_in_memory()?;
-    expected_legacy.execute_batch(&legacy_schema)?;
+    let previous_schema = GLOBAL_COMMIT_SCHEMA.replace(", 'payment_resolution'", "");
+    let legacy_schema = previous_schema.replace(", 'finding_status'", "");
+    let older_schema = legacy_schema.replace(", 'finding_challenge'", "");
     let actual = global_schema_catalog(connection)?;
-    if actual != global_schema_catalog(&expected_previous)?
-        && actual != global_schema_catalog(&expected_legacy)?
-    {
+    let mut recognized = false;
+    for schema in [previous_schema, legacy_schema, older_schema] {
+        let expected = Connection::open_in_memory()?;
+        expected.execute_batch(&schema)?;
+        recognized |= actual == global_schema_catalog(&expected)?;
+    }
+    if !recognized {
         return Err(invalid("global authority commit schema is not canonical"));
     }
     let transaction = connection.unchecked_transaction()?;
@@ -927,6 +928,7 @@ fn projection_reference_digest(
             .ok_or_else(|| invalid("admission projection reference is absent")),
         "budget" => budget_event_reference_digest(connection, key, sequence),
         "payment" => payment_journal_reference_digest(connection, key, sequence),
+        "payment_resolution" => payment_resolution_reference_digest(connection, key, sequence),
         "revocation" => revocation_reference_digest(connection, key, sequence),
         "frost" => connection
             .query_row(
@@ -1281,6 +1283,61 @@ fn budget_event_reference_digest(
         format: "chio.sqlite-authority-budget-event-reference.v1",
         tables: snapshots,
     })
+}
+
+fn payment_resolution_reference_digest(
+    connection: &Connection,
+    operation_id: &str,
+    sequence: u64,
+) -> Result<String, SqliteServingOwnerError> {
+    let (bytes, stored): (Vec<u8>, String) = connection.query_row(
+        "SELECT record_json,record_digest FROM unknown_payment_release_records WHERE operation_id=?1 AND sequence=?2",
+        params![operation_id, sqlite_u64(sequence, "payment resolution sequence")?],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    ).optional()?.ok_or_else(|| invalid("payment resolution projection is absent"))?;
+    if bytes.is_empty() || bytes.len() > 1024 * 1024 || sha256_hex(&bytes) != stored {
+        return Err(invalid("payment resolution projection digest is invalid"));
+    }
+    Ok(stored)
+}
+
+fn verify_payment_resolution_coverage(
+    connection: &Connection,
+) -> Result<(), SqliteServingOwnerError> {
+    let exists: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='unknown_payment_release_records')", [], |row| row.get(0))?;
+    if !exists {
+        let orphaned: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM authority_global_commits WHERE projection_kind='payment_resolution')", [], |row| row.get(0))?;
+        return if orphaned {
+            Err(invalid("payment resolution table is absent"))
+        } else {
+            Ok(())
+        };
+    }
+    let invalid_coverage: bool = connection.query_row(
+        r#"
+        SELECT EXISTS(SELECT 1 FROM unknown_payment_release_records AS local
+            WHERE (SELECT COUNT(*) FROM authority_global_commits AS global
+                WHERE global.projection_kind='payment_resolution'
+                AND global.mutation_kind='unknown_payment_release'
+                AND global.projection_key=local.operation_id
+                AND global.projection_sequence=local.sequence
+                AND global.projection_reference_digest=local.record_digest) <> 1)
+        OR EXISTS(SELECT 1 FROM authority_global_commits AS global
+            WHERE global.projection_kind='payment_resolution' AND
+            (global.mutation_kind <> 'unknown_payment_release' OR NOT EXISTS(
+                SELECT 1 FROM unknown_payment_release_records AS local
+                WHERE local.operation_id=global.projection_key
+                AND local.sequence=global.projection_sequence)))
+        "#,
+        [],
+        |row| row.get(0),
+    )?;
+    if invalid_coverage {
+        return Err(invalid("payment resolution global coverage is not exact"));
+    }
+    Ok(())
 }
 
 fn payment_journal_reference_digest(
@@ -1836,6 +1893,7 @@ fn verify_global_projection_coverage(
     verify_channel_release_projection_coverage(connection)?;
     verify_finding_challenge_projection_coverage(connection)?;
     verify_finding_status_projection_coverage(connection)?;
+    verify_payment_resolution_coverage(connection)?;
     let incomplete = connection.query_row(
         r#"
         SELECT
@@ -2669,11 +2727,32 @@ mod tests {
     fn immediately_previous_global_schema_migrates_to_finding_status_kind(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let connection = Connection::open_in_memory()?;
-        let previous_schema = GLOBAL_COMMIT_SCHEMA.replace(", 'finding_status'", "");
+        let previous_schema = GLOBAL_COMMIT_SCHEMA
+            .replace(", 'payment_resolution'", "")
+            .replace(", 'finding_status'", "");
         connection.execute_batch(&previous_schema)?;
         assert!(verify_global_commit_schema(&connection).is_err());
         initialize_global_commit_schema(&connection)?;
         verify_global_commit_schema(&connection)?;
+        Ok(())
+    }
+
+    #[test]
+    fn previous_global_schemas_migrate_to_payment_resolution_kind(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let prior = GLOBAL_COMMIT_SCHEMA.replace(", 'payment_resolution'", "");
+        for schema in [
+            prior.clone(),
+            prior.replace(", 'finding_status'", ""),
+            prior
+                .replace(", 'finding_status'", "")
+                .replace(", 'finding_challenge'", ""),
+        ] {
+            let connection = Connection::open_in_memory()?;
+            connection.execute_batch(&schema)?;
+            initialize_global_commit_schema(&connection)?;
+            verify_global_commit_schema(&connection)?;
+        }
         Ok(())
     }
 

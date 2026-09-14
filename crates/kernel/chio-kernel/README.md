@@ -66,6 +66,22 @@ Standalone surfaces:
   read-scope-bounded receipt queries and reporting.
 - `settlement_observer` - post-signing settlement hook invocation.
 
+For work priced on a successful output check, a trusted guard can implement
+`output_rejection_is_zero_charge`. This opts the request into a durable
+checked-output contract and requires a reversible hold for monetary calls.
+The host must bind the agreement and checker through its configured policy.
+Digest, Finding purchase and recovery contracts cannot be combined with this
+profile. The default is false; an ordinary security rejection does not authorize
+release of a payment hold.
+
+The kernel retains the raw tool return before output evaluation. A contracted
+rejection resolves durably before release, emits a signed `DeniedAfterDelivery`
+receipt with zero charge and a redaction content binding, and never releases
+the rejected payload. Recovery preserves a resolved rejection even if the
+checker later allows the result. An unrecorded dispatch remains uncertain,
+retains its holds and is never automatically re-executed. Ordinary output-guard
+errors retain their fail-closed behavior and can leave finalization pending.
+
 Also re-exports the economic and governance artifact types from
 `chio_core::{credit, governance, listing, market, open_market, underwriting}`
 at the crate root, so an embedder does not need a direct `chio-core`

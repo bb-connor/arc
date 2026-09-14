@@ -564,6 +564,55 @@ fn load_terminal_projection_tx(
         .map_err(sqlite_error)
 }
 
+pub(super) fn export_outcome_unknown_projection(
+    transaction: &Transaction<'_>,
+    operation_id: &AdmissionOperationId,
+    signer: &chio_core::crypto::Keypair,
+) -> Result<SignedAdmissionTerminalProjectionV1, AdmissionOperationStoreError> {
+    // Loading verifies the committed operation, projection, records and participants.
+    let stored = load_by_operation_id_tx(transaction, operation_id)?
+        .ok_or(AdmissionOperationStoreError::NotFound)?;
+    if stored.operation.state() != AdmissionOperationState::OutcomeUnknownAfterDispatch {
+        return Err(invariant(
+            "only a committed unknown outcome can be exported here",
+        ));
+    }
+    let retained = load_terminal_projection_tx(transaction, operation_id)?
+        .ok_or_else(|| invariant("unknown outcome lacks its terminal projection"))?;
+    let body: StoredTerminalProjectionBody = serde_json::from_slice(&retained.projection_json)
+        .map_err(|error| invariant(error.to_string()))?;
+    // Reconstruct only this single, deterministic predecessor. Nothing is written.
+    // Exact replay below must reproduce every byte of the existing projection.
+    let mut source = stored.operation.to_persisted();
+    source.state = AdmissionOperationState::DispatchCommitted;
+    source.dispatch_state = chio_kernel::admission_operation::AdmissionDispatchState::Committed;
+    source.version = source
+        .version
+        .checked_sub(1)
+        .ok_or_else(|| invariant("unknown outcome version underflow"))?;
+    source.terminal_replay = None;
+    let source = AdmissionOperationV1::from_persisted(source)?;
+    let projection =
+        chio_kernel::admission_operation::verified_outcome_unknown_after_dispatch_projection(
+            &source,
+            body.context,
+        )?;
+    let canonical = projection.canonical_projection()?;
+    verify_exact_terminal_replay(transaction, &stored.operation, &projection, &canonical)?;
+    let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
+        &source,
+        &projection,
+        &full_projection_capabilities(),
+        signer,
+    )?;
+    if envelope.verify()?.terminal_operation() != &stored.operation {
+        return Err(invariant(
+            "export differs from the retained unknown operation",
+        ));
+    }
+    Ok(envelope)
+}
+
 pub(super) fn verify_exact_terminal_replay(
     transaction: &Transaction<'_>,
     operation: &AdmissionOperationV1,
@@ -1230,6 +1279,7 @@ fn verify_stored_denied_record_shape(
                     | "envelope_malformed"
                     | "media_type_mismatch"
                     | "finding_status_changed"
+                    | "output_guard_rejected"
             )
         )
         || body
