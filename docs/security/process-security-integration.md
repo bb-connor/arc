@@ -1,0 +1,257 @@
+# Process and security integration execution plan
+
+> **For agentic workers:** Use superpowers:subagent-driven-development or
+> superpowers:executing-plans to execute the tasks with review checkpoints.
+
+**Goal:** Preserve the existing process capabilities, reconcile them with the
+locally accepted M4 security implementation, qualify the combined foundation,
+merge eligible dependency-complete changes, then execute M5 using that foundation.
+
+**Architecture:** `chio-process` owns durable logical process identity,
+checkpoints, authenticated worker transport and supervision. The existing kernel
+and its qualified durable authority continue to own dispatch, captured budgets,
+revocation, receipts and uncertain outcomes. M5 composes these components; neither
+a second worker runtime nor a replacement admission coordinator is introduced.
+
+**Tech stack:** Rust 1.94.1, SQLite, Tokio, native MCP, Python/JavaScript worker
+SDKs, and the existing Linux enforcement and GitHub qualification machinery.
+
+**Spec:** [Security execution plan](launch-execution-plan.md), especially its
+working rules, M2-M4 preservation requirements and complete M5 acceptance. The
+user approved this integration-before-M5 order on 2026-09-14.
+
+## Global constraints
+
+- Preserve all M4 source and accepted security behavior from
+  `5d1a9ec0d900bd03ce55de903919d972be852d79`.
+- Retain the complete process ancestry through PR #1155 at
+  `2e84f121273df7f205cc218739b86e93c91bdc37`, including #1131 and #1153/#1154.
+  Retention does not mean every inherited application is a launch prerequisite.
+- Work only in `/tmp/arc-security-launch`, on `integration/process-security-m4`.
+  Keep `security/launch-integration` and all other worktrees intact. Do not force
+  push, reset user changes, delete valuable features, or silently close old PRs.
+- Fail closed; use canonical JSON for signed artifacts; no new unsafe code
+  without necessity and review; deny unwrap/expect; no em dashes; conventional
+  commits. Prefer small state-transition helpers over duplicated lifecycle logic.
+- Unknown external effects are never retried merely because a worker, container
+  attachment, logging operation or cleanup operation failed.
+- One implementation owner and one Cargo owner at a time for this worktree.
+  Use `umask 022`, `CARGO_INCREMENTAL=0`, `RUST_TEST_THREADS=1`, and no custom
+  `RUST_MIN_STACK`. Preserve failures as evidence and fix their owning boundary.
+- Never turn an unresolved review thread into a proven bug or a resolved fix
+  without checking the actual combined source and regression evidence.
+- Merge only after the applicable exact-head tests, required checks and review
+  gates pass. User authorization to integrate does not authorize bypassing branch
+  protection, repinning trusted execution controllers, publishing or deploying.
+- The M1 confinement deferral is not an M5 waiver. Container worker isolation and
+  a process-journal call ceiling do not replace native tool confinement or the
+  kernel's shared aggregate authority.
+
+## Starting evidence
+
+Read-only preflight found 76 open PRs and 67 drafts. Process work begins at #1098;
+#1099 adds authenticated workers and #1104 adds native supervision. #1131 bridges
+the process stack to an older security checkpoint. The current security branch
+is 32 commits beyond their shared base `8b9f9243905dfa61acac82d83438684940777fe3`.
+The merge probe found 13 conflicting paths for #1131, and 14 through #1154.
+The existing reference-swarm baseline has three passing tests and remains
+integration-only. No current combined implementation or merge is qualified.
+
+## Task 1: Reconcile the complete process ancestry with M4
+
+**Files:** All inherited process changes from the pinned #1155 head. Resolve
+conflicts in `.github/workflows/cflite_pr.yml`, kernel `admission_coordinator.rs`,
+`tests.rs`, `validation.rs`, `receipt_store.rs`, `runtime.rs`, SQLite
+`admission_operation_store.rs`, `admission_operation_store/store.rs`,
+`budget_store/composite/transitions/capture.rs`, `lib.rs`, `serving_owner.rs`,
+`tool_outcome_store.rs`, `docs/formal/COVERAGE.md`, and
+`scripts/check-rust-file-hygiene.py`. Paths are relative to their existing crate
+directories. Resolve any additional compiler-proven interface drift at its owner.
+
+**Interfaces:** Preserve current M4 admission commands, runtime replay custody,
+caller delivery, retained security contexts and signed terminal projections.
+Restore the process branch's signed ancestor verification, process journal,
+worker protocols, process ABI v2, recovery claims and capability digest dispatch
+attribution. Both complete parent histories must remain reachable.
+
+- [ ] Inspect the three-way changes at each conflict, including auto-merged
+  admission/terminal code. Record which invariant each resolution preserves.
+- [ ] Begin the non-destructive merge and inspect unresolved paths:
+
+  ```sh
+  git merge --no-ff --no-commit 2e84f121273df7f205cc218739b86e93c91bdc37
+  git diff --name-only --diff-filter=U
+  ```
+
+- [ ] Resolve with `apply_patch`, retaining both behaviors, not blanket ours or
+  theirs. For generated proof coverage, merge its source inventories and
+  regenerate with `cargo xtask gen proof-coverage` after compilation.
+- [ ] Capture the first combined compilation failures, then repair precisely the
+  incompatible interfaces. Do not disable features, guards or tests to compile:
+
+  ```sh
+  cargo check --locked -p chio-process --features worker-server,mailboxes
+  cargo check --locked -p chio-cli
+  cargo test --locked -p chio-kernel-core --test signed_lineage
+  cargo test --locked -p chio-process --features worker-server,mailboxes
+  ```
+
+- [ ] Verify no conflict markers, whitespace errors or lost ancestry. Commit the
+  reconciliation as `feat(process): reconcile durable hosting with M4 security`.
+  The commit is an integration checkpoint, not full qualification.
+- [ ] Review the conflict resolutions and changed security interfaces against
+  both parents before proceeding to behavior repairs.
+
+## Task 2: Preserve truthful worker and container terminal outcomes
+
+**Files:** `crates/products/chio-cli/src/cli/process_host/runner/{mod,child,
+container,journal,plan}.rs`, adjacent focused modules when separating actual
+completion from diagnostics, `crates/products/chio-cli/tests/process_host/`,
+`sdks/python/chio-process/src/chio_process/container.py`, its tests, and the
+existing process runner/container contract documents.
+
+**Interfaces:** The existing `Outcome`, `Completion`, `Journal::finish`, container
+ownership records and credential revocation remain the authority. Separate an
+observed worker exit from log retention and pending cleanup without declaring
+the run exportable while an owned container may remain alive.
+
+- [ ] Add failing table-driven native/Python tests for `created` with exit code
+  zero, a failed start attachment, live/unknown container states, successful
+  exit with failed log retention, and successful exit with failed cleanup.
+  Literal expectations: never-started is not completed; durable observed success
+  survives diagnostic failure; unresolved ownership blocks replacement/export.
+- [ ] Add an interruption regression where an already-observed completion and
+  termination are simultaneously ready; consume known completions before
+  recording interruption for unfinished workers.
+- [ ] Validate immutable plan commands and working directories before charging
+  attempts. Preserve the configured attempt deadline during bootstrap writes;
+  do not spend a separate fixed five-second startup budget.
+- [ ] Run each new regression red against inherited code, implement its smallest
+  state transition, rerun green, then run the native process-host and Python
+  container suites. Use real journal persistence and filesystem faults. Engine
+  doubles may model unavailable Docker responses but must not replace the code
+  deciding completion or ownership.
+- [ ] Commit and independently review. Real Docker host-loss qualification stays
+  explicitly required for the container profile, separate from unit tests.
+
+## Task 3: Close process lineage and retained-response integrity gaps
+
+**Files:** `crates/kernel/chio-process/src/lib.rs`, focused process tests,
+`crates/kernel/chio-kernel-core/tests/signed_lineage.rs`,
+`xtask/src/adapter_no_bypass.rs`,
+`crates/products/chio-cli/src/cli/process_response_verify.rs`, its tests and the
+Python process SDK's verification documentation.
+
+**Interfaces:** Existing kernel signed-denial APIs and canonical capability
+lineage verification; `ProcessRuntime` stable request identities; the CLI's
+independent retained-response verification. Do not create a second receipt or
+dispatch authority.
+
+- [ ] Reproduce missing signed denials for invalid/revoked/expired process
+  lineage. Route attempts to the owning kernel denial boundary while retaining
+  exact ancestor snapshots and preventing dispatch or output release.
+- [ ] Add negative lineage cases with missing Delegate permission, invalid link
+  times, repeated identities and mismatched signed root. Assert the specific
+  owning refusal, not a generic error from an unrelated malformed fixture.
+- [ ] Update the no-bypass contract to the actual shared evidence verifier and
+  execute its behavioral/source-graph checker.
+- [ ] Add retained-response attempt-two/three positive bindings and wrong request
+  identity/attempt negatives. Share the existing bounded-attempt contract through
+  a public narrowly documented constant or identity helper instead of duplicating
+  a literal upper limit in the CLI.
+- [ ] Clarify Python normalization versus direct retained JSON verification.
+  Preserve original signed receipts and never retry on verification failure.
+- [ ] Run red/green regression cycles, focused suites and strict Clippy; commit
+  and review the complete integrity repair.
+
+## Task 4: Reconcile the remaining inherited review findings
+
+**Files:** The committed review-disposition record beside this plan, and only the
+source/tests owned by verified findings in the process/security integration.
+
+**Interfaces:** Each finding maps to its original PR/thread, exact current
+source, violated invariant, regression and disposition. Review text alone is
+not sufficient to mark a repair complete or discard valuable functionality.
+
+- [ ] Enumerate the inherited process PRs by actual ancestry and load their
+  review threads. Include #1117's still-open findings in the combined audit.
+- [ ] For each finding, record fixed-with-evidence, reproduced-and-repaired,
+  technically-inapplicable-with-reason, or unresolved. Prior fixes remain fixes;
+  do not redo them merely because the old thread is unresolved.
+- [ ] Repair reproduced security, recovery, correctness and validation defects
+  through focused TDD tasks, grouping only closely related changes. Preserve
+  supported adapters, process ABI handling, mailbox semantics and resource bounds.
+- [ ] Reply in the original thread with exact committed evidence after review.
+  No cosmetic cleanup or unverified claim may conceal an unresolved invariant.
+
+## Task 5: Qualify the combined foundation
+
+**Files:** Existing process/security CI inventories, evidence scripts, proof
+source inventories and qualification documentation. Dependencies change only
+when a reproduced build/audit failure requires a scoped reviewed correction.
+
+**Interfaces:** One exact candidate and its effective feature graph. Source
+qualification and actual native enforcement remain separately named evidence.
+
+- [ ] Run the complete workspace gate, process worker/mailbox features, native
+  process-host recovery, independent response verification, Python/Node SDK
+  tests, signed lineage and M1-M4 exact security inventories. Keep logs tied to
+  exact source and compiler identity, including failures and retries.
+
+  ```sh
+  cargo build --locked --workspace
+  cargo test --locked --workspace
+  cargo clippy --locked --workspace -- -D warnings
+  cargo fmt --all -- --check
+  cargo test --locked -p chio-process --features worker-server,mailboxes
+  cargo test --locked -p chio-cli --test process_host
+  cargo test --locked -p chio-cli --test process_response_verify
+  ```
+
+- [ ] Check dependency advisories and required audits without adding unreviewed
+  exemptions. Reconcile changed manifest fuzz selection and generated coverage.
+- [ ] Run `graphify update .` after the final code changes. Obtain a broad
+  independent review of reconciliation, repairs and remaining dispositions.
+- [ ] Acquire actual supported native/container qualification only through an
+  authorized route. Do not modify trusted-source pins or privilege boundaries
+  under the guise of repairing ordinary CI.
+
+## Task 6: Integrate qualified dependency-complete changes
+
+**Files:** Git/PR metadata and an exact-head qualification record.
+
+**Interfaces:** Current #1117 security foundation and the reconciled process
+candidate; no unrelated product or historical omnibus PR is pulled in.
+
+- [ ] Push the reviewed candidate and create or update a clearly based
+  integration PR preserving both ancestries and linking superseded review slices.
+- [ ] Reconcile local, remote and PR head SHA, required terminal CI attempts,
+  unresolved threads and actual review decisions. Re-run after any source/base
+  change. Green stacked checks against an old parent do not qualify the new base.
+- [ ] Merge only dependency-complete qualified changes using protected normal
+  merge controls. If required checks or new operator authority block merge,
+  report the exact boundary without bypassing it or declaring integration done.
+- [ ] Confirm resulting main ancestry and current CI. Close historical slices
+  only after proving their functionality and fixes are present in merged source.
+
+## Task 7: Execute M5 on the integrated process foundation
+
+**Files:** `examples/reference-swarm`, existing process host/runtime wiring,
+runtime authority stores, independent evidence verification and the authorized
+M5 qualification operation. This task retains every requirement of M5 in
+`launch-execution-plan.md`; it is not replaced by the process demos.
+
+- [ ] Bind actual persistent process capabilities and authenticated workers into
+  the signed task graph. Install verifier-owned live swarm/runtime authority and
+  require swarm admission on the selected edges.
+- [ ] Use the real durable aggregate budget and single-use continuation custody.
+  The process journal's logical-call ceiling remains a separate upper bound.
+- [ ] Launch real Enforced tools with signed manifests and trusted evidence;
+  preserve the existing Disabled integration smoke under its honest name.
+- [ ] Execute success, scope widening, forbidden filesystem/network, cross-agent
+  leakage, shared-budget contention, continuation replay, crash/restart and
+  revocation with both caller-output and external-effect assertions.
+- [ ] Independently verify one exact-run artifact joining capabilities, workers,
+  graph, receipts, accounting, confinement and terminal outcomes. Only that
+  complete result closes M5. Any unavailable required authorization or platform
+  remains explicit and does not relax the milestone.
