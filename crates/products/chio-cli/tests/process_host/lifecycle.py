@@ -3,13 +3,16 @@
 import ctypes
 import errno
 import os
+import signal
 import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
+import runner
 from runner import command, write
 
 BINARY = sys.argv.pop(1)
@@ -71,6 +74,119 @@ capabilities:
 
 
 class NativeLifecycle(unittest.TestCase):
+    def test_cancelled_worker_preserves_terminal_state(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary) / "case"
+            state, path, plan = prepare(BINARY, directory)
+            pid_file = directory / "cancelled.pid"
+            plan["workers"][0]["command"] = [sys.executable, runner.__file__, "--cancel"]
+            plan["workers"][0]["input"] = {"pid_file": str(pid_file)}
+            write(path, plan)
+            result = command(BINARY, "run", "--state", state, "--plan", path, success=False)
+            with sqlite3.connect(state / "runner.db") as db:
+                self.assertEqual(
+                    db.execute("SELECT state,attempts,outcome FROM run_workers").fetchone(),
+                    ("failed", 1, "process_cancelled"),
+                    result.stdout + result.stderr,
+                )
+            self.assertFalse((Path("/proc") / pid_file.read_text()).exists())
+
+    def test_failed_attempt_retains_bounded_logs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            state, path, plan = prepare(BINARY, Path(temporary) / "case")
+            plan["workers"][0]["max_attempts"] = 1
+            plan["workers"][0]["command"] = [
+                sys.executable,
+                "-c",
+                "import json,subprocess,sys; json.load(sys.stdin); "
+                "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(2)']); "
+                "print('failed-work'); sys.exit(1)",
+            ]
+            write(path, plan)
+            command(BINARY, "run", "--state", state, "--plan", path, success=False)
+            self.assertTrue(
+                (state / "run-logs/reader-1.stdout").exists(), "failed attempt lost its diagnostics"
+            )
+            self.assertEqual((state / "run-logs/reader-1.stdout").read_text(), "failed-work\n")
+
+    def test_reaped_exit_survives_interruption_during_descendant_log_drain(self):
+        for unfinished in (False, True):
+            with self.subTest(unfinished=unfinished), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary) / "case"
+                state, path, plan = prepare(BINARY, directory)
+                code = f"""
+import json, os, pathlib, sys, time
+json.load(sys.stdin)
+root = pathlib.Path({str(directory)!r})
+with (root / 'effects').open('a') as marker:
+    marker.write('effect\\n')
+if os.fork() == 0:
+    (root / 'descendant.pid').write_text(str(os.getpid()))
+    while root.exists() and not (root / 'release').exists():
+        time.sleep(0.001)
+    os._exit(0)
+(root / 'worker.pid').write_text(str(os.getpid()))
+if {unfinished!r}:
+    while root.exists() and not (root / 'release').exists():
+        time.sleep(0.001)
+os._exit(0)
+"""
+                plan["workers"][0]["command"] = [sys.executable, "-c", code]
+                write(path, plan)
+                host = subprocess.Popen(
+                    [BINARY, "process", "run", "--state", str(state), "--plan", str(path)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                try:
+                    deadline = time.monotonic() + 10
+                    while not all(
+                        (directory / name).exists() and (directory / name).read_text().isdigit()
+                        for name in ("worker.pid", "descendant.pid")
+                    ):
+                        self.assertIsNone(host.poll())
+                        self.assertLess(time.monotonic(), deadline)
+                        time.sleep(0.001)
+                    worker = Path("/proc") / (directory / "worker.pid").read_text()
+                    if not unfinished:
+                        # Disappearance proves the real wait4 reaped the worker.
+                        # Its descendant still owns stdout, so log EOF cannot occur.
+                        while worker.exists():
+                            self.assertLess(time.monotonic(), deadline)
+                            time.sleep(0.001)
+                    self.assertTrue(
+                        (Path("/proc") / (directory / "descendant.pid").read_text()).exists()
+                    )
+                    host.send_signal(signal.SIGTERM)
+                    host.communicate(timeout=10)
+                    self.assertNotEqual(host.returncode, 0)
+                    with sqlite3.connect(state / "runner.db") as db:
+                        self.assertEqual(
+                            db.execute("SELECT state,attempts,outcome FROM run_workers").fetchone(),
+                            ("pending", 1, "runner_interrupted")
+                            if unfinished
+                            else ("completed", 1, "exit_0"),
+                        )
+                        self.assertGreater(
+                            db.execute("SELECT peak_resident_bytes FROM run_workers").fetchone()[0],
+                            0,
+                            "reaper's final resource accounting was lost",
+                        )
+                    (directory / "release").touch()
+                    if not unfinished:
+                        command(BINARY, "run", "--state", state, "--plan", path)
+                        self.assertEqual((directory / "effects").read_text(), "effect\n")
+                        with sqlite3.connect(state / "runner.db") as db:
+                            self.assertEqual(
+                                db.execute("SELECT attempts FROM run_workers").fetchone(), (1,)
+                            )
+                finally:
+                    (directory / "release").touch()
+                    if host.poll() is None:
+                        host.kill()
+                    host.communicate(timeout=10)
+
     def test_invalid_container_plans_precede_journal(self):
         for template in (False, True):
             for fault in ("image", "cwd", "resources"):

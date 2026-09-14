@@ -71,6 +71,8 @@ elif args[0] == "start":
     time.sleep(scenario.get("start_sleep", 0))
     raise SystemExit(scenario.get("attach_exit", 0))
 elif args[:2] == ["container", "inspect"]:
+    if scenario.get("inspect_failure") and (root / "starts").exists():
+        raise SystemExit("engine inspection unavailable")
     print(stored.read_text())
 elif args[:2] == ["container", "ls"]:
     if stored.exists():

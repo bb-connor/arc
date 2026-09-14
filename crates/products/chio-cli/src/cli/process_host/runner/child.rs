@@ -28,6 +28,7 @@ pub(super) struct Usage {
     pub cpu_ms: u64,
 }
 
+#[derive(Clone)]
 pub(super) struct Outcome {
     pub success: bool,
     pub reason: String,
@@ -44,6 +45,79 @@ pub(super) struct Spawned {
     child: Child,
     process: ProcessFd,
     resident: ResidentProcess,
+    observation: Observation,
+}
+
+impl Spawned {
+    pub(super) fn observation(&self) -> Observation {
+        self.observation.clone()
+    }
+}
+
+#[derive(Clone)]
+pub(super) struct Observation {
+    state: Arc<Mutex<ObservedExecution>>,
+    ready: Arc<tokio::sync::Notify>,
+}
+
+struct ObservedExecution {
+    stop: End,
+    finished: bool,
+    outcome: Option<Outcome>,
+}
+
+impl Observation {
+    fn new() -> Self {
+        Self {
+            state: Arc::new(Mutex::new(ObservedExecution {
+                stop: End::Exited,
+                finished: false,
+                outcome: None,
+            })),
+            ready: Arc::new(tokio::sync::Notify::new()),
+        }
+    }
+
+    fn stop(&self, stop: End) {
+        if let Ok(mut state) = self.state.lock() {
+            if !state.finished && matches!(state.stop, End::Exited) {
+                state.stop = stop;
+            }
+        }
+    }
+
+    fn reap(&self, pid: libc::pid_t, resident_ceiling: Option<u64>) -> io::Result<Outcome> {
+        // Never hold the observation mutex across the blocking syscall. Publish
+        // from this reaper, not from the cancellable async consumer of its result.
+        let reaped = reap(pid);
+        let result = {
+            let mut state = self
+                .state
+                .lock()
+                .map_err(|_| io::Error::other("worker observation poisoned"))?;
+            let result = reaped
+                .map(|(status, usage)| execution(status, usage, state.stop, resident_ceiling));
+            state.outcome = result.as_ref().ok().cloned();
+            state.finished = true;
+            result
+        };
+        self.ready.notify_waiters();
+        result
+    }
+
+    pub(super) fn outcome(&self) -> Option<Outcome> {
+        self.state.lock().ok()?.outcome.clone()
+    }
+
+    pub(super) async fn settled(&self) {
+        loop {
+            let notified = self.ready.notified();
+            if self.state.lock().is_ok_and(|state| state.finished) {
+                return;
+            }
+            notified.await;
+        }
+    }
 }
 
 struct ResidentProcess(OwnedFd);
@@ -217,6 +291,7 @@ pub(super) fn spawn_command(
                 child,
                 process,
                 resident,
+                observation: Observation::new(),
             })
         }
         Err(failure) => {
@@ -281,23 +356,66 @@ fn peak_resident(process: &ResidentProcess) -> Option<u64> {
 /// cancelled supervision never leaves a worker running.
 struct Guard {
     process: ProcessFd,
+    observation: Observation,
     reaped: bool,
 }
 
 impl Drop for Guard {
     fn drop(&mut self) {
         if !self.reaped {
+            self.observation.stop(End::Interrupted);
             let _ = self.process.kill();
         }
     }
 }
 
+#[derive(Clone, Copy)]
 enum End {
     Exited,
     BootstrapFailed,
     Timeout,
     ResidentCeiling,
     OutputCeiling,
+    Interrupted,
+}
+
+fn execution(
+    status: ExitStatus,
+    usage: Usage,
+    mut end: End,
+    resident_ceiling: Option<u64>,
+) -> Outcome {
+    // Descriptor cancellation sends SIGKILL. A real exit code therefore cannot
+    // be caused by that request, even if cancellation raced publication.
+    if matches!(end, End::Interrupted) && status.code().is_some() {
+        end = End::Exited;
+    }
+    if matches!(end, End::Exited)
+        && resident_ceiling.is_some_and(|ceiling| usage.peak_resident_bytes > ceiling)
+    {
+        end = End::ResidentCeiling;
+    }
+    let (success, reason) = match end {
+        End::Exited => (
+            status.success(),
+            status
+                .code()
+                .map_or_else(|| "signal".to_owned(), |code| format!("exit_{code}")),
+        ),
+        End::BootstrapFailed => (false, "worker_io_failed".to_owned()),
+        End::Timeout => (false, "timeout".to_owned()),
+        End::ResidentCeiling => (false, "resident_memory_ceiling".to_owned()),
+        End::OutputCeiling => (false, "output_ceiling".to_owned()),
+        End::Interrupted => (false, "runner_interrupted".to_owned()),
+    };
+    Outcome {
+        success,
+        reason,
+        usage,
+        stdout: vec![],
+        stderr: vec![],
+        diagnostic: None,
+    }
 }
 
 async fn capture(
@@ -322,7 +440,8 @@ async fn capture(
     }
 }
 
-pub(super) async fn wait(
+#[cfg(test)]
+async fn wait(
     spawned: Spawned,
     input: Vec<u8>,
     timeout: Duration,
@@ -338,20 +457,38 @@ pub(super) async fn wait_bounded(
     resident_ceiling: Option<u64>,
     output_ceiling: Option<usize>,
 ) -> io::Result<Outcome> {
+    let (mut outcome, diagnostics) =
+        observe(spawned, input, timeout, resident_ceiling, output_ceiling).await?;
+    diagnostics.finish(&mut outcome).await?;
+    Ok(outcome)
+}
+
+/// No diagnostic await follows observation of the execution status. The caller
+/// owns this outcome before it decides whether to collect or cancel diagnostics.
+pub(super) async fn observe(
+    spawned: Spawned,
+    input: Vec<u8>,
+    timeout: Duration,
+    resident_ceiling: Option<u64>,
+    output_ceiling: Option<usize>,
+) -> io::Result<(Outcome, Diagnostics)> {
     let Spawned {
         mut child,
         process,
         resident,
+        observation,
     } = spawned;
     let pid = libc::pid_t::try_from(child.id()).map_err(io::Error::other)?;
     let mut guard = Guard {
         process,
+        observation: observation.clone(),
         reaped: false,
     };
     // One blocking thread waits for each active worker so the kernel's
     // accounting of the attempt arrives with its exit status. The plan's
     // concurrency ceiling bounds these threads.
-    let mut reaping = tokio::task::spawn_blocking(move || reap(pid));
+    let reaper = observation.clone();
+    let mut reaping = tokio::task::spawn_blocking(move || reaper.reap(pid, resident_ceiling));
     let deadline = tokio::time::sleep(timeout);
     tokio::pin!(deadline);
     let stdout = Arc::new(Mutex::new(Vec::new()));
@@ -390,7 +527,7 @@ pub(super) async fn wait_bounded(
     let mut samples = tokio::time::interval(RESIDENT_SAMPLE_INTERVAL);
     samples.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     let mut reaped = None;
-    let mut end = loop {
+    let end = loop {
         tokio::select! {
             biased;
             result = &mut reaping => {
@@ -417,54 +554,59 @@ pub(super) async fn wait_bounded(
     let result = match reaped {
         Some(result) => result,
         None => {
+            observation.stop(end);
             guard.process.kill()?;
             (&mut reaping).await
         }
     };
     guard.reaped = true;
-    let (status, usage) = result.map_err(io::Error::other)??;
-    // A short-lived worker can exit between samples. Its final accounting
-    // still enforces the ceiling, including an otherwise successful exit.
-    if matches!(end, End::Exited)
-        && resident_ceiling.is_some_and(|ceiling| usage.peak_resident_bytes > ceiling)
-    {
-        end = End::ResidentCeiling;
+    let outcome = result.map_err(io::Error::other)??;
+    Ok((
+        outcome,
+        Diagnostics {
+            readers,
+            stdout,
+            stderr,
+            total,
+            output_ceiling,
+        },
+    ))
+}
+
+pub(super) struct Diagnostics {
+    readers: JoinSet<io::Result<()>>,
+    stdout: Capture,
+    stderr: Capture,
+    total: Arc<AtomicUsize>,
+    output_ceiling: Option<usize>,
+}
+
+impl Diagnostics {
+    pub(super) async fn finish(mut self, outcome: &mut Outcome) -> io::Result<()> {
+        // Descendants can inherit stdio. They cannot hold the runner open forever.
+        let _ = tokio::time::timeout(Duration::from_secs(1), async {
+            while self.readers.join_next().await.is_some() {}
+        })
+        .await;
+        self.readers.shutdown().await;
+        if self
+            .output_ceiling
+            .is_some_and(|limit| self.total.load(Ordering::Relaxed) > limit)
+            && outcome.reason != "output_ceiling"
+        {
+            // This is late diagnostic evidence, not a reason to rewrite an
+            // already observed exit or an actual forced-stop/resource limit.
+            outcome.diagnostic = Some("output_ceiling".to_owned());
+        }
+        let copy = |data: Capture| {
+            data.lock()
+                .map(|v| v.clone())
+                .map_err(|_| io::Error::other("worker log capture poisoned"))
+        };
+        outcome.stdout = copy(self.stdout)?;
+        outcome.stderr = copy(self.stderr)?;
+        Ok(())
     }
-    let (mut success, mut reason) = match end {
-        End::Exited => (
-            status.success(),
-            status
-                .code()
-                .map_or_else(|| "signal".to_owned(), |code| format!("exit_{code}")),
-        ),
-        End::BootstrapFailed => (false, "worker_io_failed".to_owned()),
-        End::Timeout => (false, "timeout".to_owned()),
-        End::ResidentCeiling => (false, "resident_memory_ceiling".to_owned()),
-        End::OutputCeiling => (false, "output_ceiling".to_owned()),
-    };
-    // Descendants can inherit stdio. They cannot hold the runner open forever.
-    let _ = tokio::time::timeout(Duration::from_secs(1), async {
-        while readers.join_next().await.is_some() {}
-    })
-    .await;
-    readers.shutdown().await;
-    if output_ceiling.is_some_and(|limit| total.load(Ordering::Relaxed) > limit) {
-        success = false;
-        reason = "output_ceiling".to_owned();
-    }
-    let copy = |data: Capture| {
-        data.lock()
-            .map(|v| v.clone())
-            .map_err(|_| io::Error::other("worker log capture poisoned"))
-    };
-    Ok(Outcome {
-        success,
-        reason,
-        usage,
-        stdout: copy(stdout)?,
-        stderr: copy(stderr)?,
-        diagnostic: None,
-    })
 }
 
 pub(super) fn write_log(

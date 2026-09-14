@@ -25,11 +25,13 @@ struct Attempt {
     attempt: u32,
     secret: String,
     result: std::io::Result<child::Outcome>,
+    diagnostics: Option<child::Diagnostics>,
     cleanup: Option<container::Cleanup>,
 }
 
 enum Supervised {
     Worker(Attempt),
+    Diagnosed(Attempt),
     Cleaned(usize, Result<(), String>),
 }
 
@@ -140,6 +142,7 @@ async fn drive(
 ) -> Result<(), CliError> {
     let mut active = JoinSet::new();
     let mut active_ids: BTreeSet<usize> = BTreeSet::new();
+    let mut observations = BTreeMap::new();
     let mut retry_at = BTreeMap::new();
     let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
     let mut interrupt = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
@@ -176,11 +179,13 @@ async fn drive(
                     return Err(error("run worker was cancelled"));
                 }
             }
+            let stopping = plan.failure_policy == FailurePolicy::Stop && snapshots.iter().any(|s| s.state == "failed");
             if snapshots.iter().any(|s| s.state == "failed") {
-                if plan.failure_policy == FailurePolicy::Stop {
+                let finishing_failed = active_ids.iter().any(|index| snapshots.iter().any(|snapshot| snapshot.process == journal.workers[*index].process && snapshot.state == "failed"));
+                if stopping && !finishing_failed {
                     return Err(error("worker restart budget exhausted; preserve state and inspect with chio process status and chio process logs"));
                 }
-                if snapshots.iter().all(|s| s.state == "completed" || s.state == "failed") {
+                if snapshots.iter().all(|s| s.state == "completed" || s.state == "failed") && active.is_empty() {
                     if plan.failure_policy == FailurePolicy::Supervised {
                         return if journal.completion()?.complete { Ok(()) } else {
                             Err(error("run contains unhandled child failures or failed declared workers; inspect status and logs"))
@@ -211,7 +216,7 @@ async fn drive(
             for snapshot in &snapshots {
                 *root_attempts.entry(journal.root(&snapshot.process).to_owned()).or_default() += snapshot.attempts;
             }
-            while active.len() < plan.max_parallel {
+            while !stopping && active.len() < plan.max_parallel {
                 let Some(position) = (0..ready.len()).min_by_key(|&position| {
                     let root = journal.root(&journal.workers[ready[position]].process);
                     (root_active.get(root).copied().unwrap_or(0), root_attempts.get(root).copied().unwrap_or(0), ready[position])
@@ -232,6 +237,9 @@ async fn drive(
                     Some((lease, writer))
                 } else { None };
                 let spawned = container.is_none().then(|| child::spawn(&worker));
+                if let Some(Ok(child)) = &spawned {
+                    observations.insert(index, (attempt, secret.clone(), child.observation()));
+                }
                 let socket = socket.to_owned();
                 let mut input = serde_json::to_vec(&serde_json::json!({"schema": "chio.process.worker-bootstrap.v1", "connection": connection, "attempt": attempt, "input": worker.input})).map_err(error)?;
                 input.push(b'\n');
@@ -239,15 +247,18 @@ async fn drive(
                 let resident_ceiling = worker.resources.and_then(|resources| resources.max_resident_bytes);
                 active_ids.insert(index);
                 active.spawn(async move {
-                    let (result, cleanup) = if let Some((lease, writer)) = container {
+                    let (result, diagnostics, cleanup) = if let Some((lease, writer)) = container {
                         let (result, cleanup) = container::run(writer, lease, worker, socket, input).await;
-                        (result.map_err(|failure| std::io::Error::other(failure.to_string())), Some(cleanup))
-                    } else { (match spawned {
-                        Some(Ok(child)) => child::wait(child, input, timeout, resident_ceiling).await,
+                        (result.map_err(|failure| std::io::Error::other(failure.to_string())), None, Some(cleanup))
+                    } else { match match spawned {
+                        Some(Ok(child)) => child::observe(child, input, timeout, resident_ceiling, None).await,
                         Some(Err(failure)) => Err(failure),
                         None => Err(std::io::Error::other("missing direct worker launch")),
-                    }, None) };
-                    Supervised::Worker(Attempt { index, attempt, secret, result, cleanup })
+                    } {
+                        Ok((outcome, diagnostics)) => (Ok(outcome), Some(diagnostics), None),
+                        Err(failure) => (Err(failure), None, None),
+                    } };
+                    Supervised::Worker(Attempt { index, attempt, secret, result, diagnostics, cleanup })
                 });
             }
             match next_event(&mut active, async {
@@ -256,14 +267,28 @@ async fn drive(
                 Event::Interrupted => return Err(error("worker run interrupted; resume with the same plan and state")),
                 Event::Completed(result) => {
                     match result.map_err(error)? {
-                        Supervised::Worker(attempt) => {
+                        Supervised::Worker(mut attempt) => {
                             let index = attempt.index;
+                            observations.remove(&index);
                             let recorded = record_attempt(host, journal, logs, service, &attempt);
-                            if let Some(cleanup) = attempt.cleanup {
+                            if let Some(diagnostics) = attempt.diagnostics.take() {
+                                active.spawn(async move {
+                                    if let Ok(outcome) = &mut attempt.result {
+                                        if let Err(failure) = diagnostics.finish(outcome).await {
+                                            outcome.diagnostic = Some(failure.to_string());
+                                        }
+                                    }
+                                    Supervised::Diagnosed(attempt)
+                                });
+                            } else if let Some(cleanup) = attempt.cleanup {
                                 active.spawn(async move { Supervised::Cleaned(index, cleanup.run().await.map_err(|failure| failure.to_string())) });
                             } else { active_ids.remove(&index); }
                             recorded?;
                             retry_at.insert(index, Instant::now() + Duration::from_secs(1));
+                        }
+                        Supervised::Diagnosed(attempt) => {
+                            active_ids.remove(&attempt.index);
+                            retain_logs(logs, &journal.workers[attempt.index].process, &attempt)?;
                         }
                         Supervised::Cleaned(index, result) => {
                             active_ids.remove(&index);
@@ -280,7 +305,13 @@ async fn drive(
     let mut result = result;
     while let Some(completed) = active.try_join_next() {
         let recorded = completed.map_err(error).and_then(|event| match event {
-            Supervised::Worker(attempt) => record_attempt(host, journal, logs, service, &attempt),
+            Supervised::Worker(attempt) => {
+                observations.remove(&attempt.index);
+                record_attempt(host, journal, logs, service, &attempt)
+            }
+            Supervised::Diagnosed(attempt) => {
+                retain_logs(logs, &journal.workers[attempt.index].process, &attempt)
+            }
             Supervised::Cleaned(_, result) => result.map_err(error),
         });
         if let Err(failure) = recorded {
@@ -290,6 +321,32 @@ async fn drive(
         }
     }
     active.shutdown().await;
+    // Aborting an async waiter cannot erase the independent reaper's status.
+    // One shared grace bounds reconciliation of all descriptor-cancelled children.
+    let _ = tokio::time::timeout(Duration::from_secs(1), async {
+        for (_, _, observation) in observations.values() {
+            observation.settled().await;
+        }
+    })
+    .await;
+    for (index, (attempt, secret, observation)) in observations {
+        let observed = observation.outcome().ok_or_else(|| {
+            std::io::Error::other("worker exit remains unconfirmed after bounded shutdown")
+        });
+        let attempt = Attempt {
+            index,
+            attempt,
+            secret,
+            result: observed,
+            diagnostics: None,
+            cleanup: None,
+        };
+        if let Err(failure) = record_attempt(host, journal, logs, service, &attempt) {
+            if result.is_ok() {
+                result = Err(failure);
+            }
+        }
+    }
     for snapshot in journal.snapshots()? {
         if snapshot.state != "running" {
             continue;
@@ -341,6 +398,10 @@ fn record_attempt(
     };
     let end = if outcome.success {
         Completion::Completed(&outcome.reason)
+    } else if host.runtime.process(&worker.process).map_err(error)?.state
+        == chio_process::ProcessState::Cancelled
+    {
+        Completion::Terminal("process_cancelled")
     } else if matches!(
         outcome.reason.as_str(),
         "container_attachment_lost" | "container_state_unknown"
@@ -360,15 +421,27 @@ fn record_attempt(
     };
     journal.finish(&worker, end, outcome.usage)?;
     service.revoke_credentials(&worker.process).map_err(error)?;
+    if attempt.diagnostics.is_none() {
+        retain_logs(logs, &worker.process, attempt)?;
+    }
+    Ok(())
+}
+
+fn retain_logs(
+    logs: &chio_control_plane::PreparedPrivateDirectory,
+    process: &str,
+    attempt: &Attempt,
+) -> Result<(), CliError> {
+    let outcome = attempt.result.as_ref().map_err(error)?;
     child::write_log(
         logs,
-        &format!("{}-{}.stdout", worker.process, attempt.attempt),
+        &format!("{}-{}.stdout", process, attempt.attempt),
         &outcome.stdout,
         &attempt.secret,
     )?;
     child::write_log(
         logs,
-        &format!("{}-{}.stderr", worker.process, attempt.attempt),
+        &format!("{}-{}.stderr", process, attempt.attempt),
         &outcome.stderr,
         &attempt.secret,
     )?;

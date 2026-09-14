@@ -83,6 +83,9 @@ On normal exit, timeout, output overflow or cooperative suspension, supervision
 checks the actual container state. Only an owned, actually started, exited worker
 provides a completed exit; a never-started `created` object is not success.
 An attachment failure cannot erase an independently confirmed worker exit.
+Attachment launch or wait errors also trigger bounded inspection of the exact
+owned object before removal. A proved exit is retained with the original client
+error as diagnostic evidence; failed inspection or live state remains uncertain.
 Unknown or contradictory state is terminal for automatic worker retry and
 requires operator reconciliation of the application's operation identities.
 

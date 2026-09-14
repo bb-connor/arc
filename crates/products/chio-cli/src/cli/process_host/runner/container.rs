@@ -27,6 +27,12 @@ static ENGINE_COMMAND: std::sync::Mutex<Option<std::path::PathBuf>> = std::sync:
 #[cfg(test)]
 static ENGINE_FIXTURE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+#[cfg(test)]
+type AttachmentTransport = fn(&Lease) -> Result<Spawned, CliError>;
+#[cfg(test)]
+static ATTACHMENT_TRANSPORT: std::sync::Mutex<Option<AttachmentTransport>> =
+    std::sync::Mutex::new(None);
+
 pub(super) struct Lease {
     pub owner: String,
     pub engine: String,
@@ -110,6 +116,9 @@ async fn control_attempt(arguments: &[&str]) -> Result<Vec<u8>, ControlFailure> 
     )
     .await
     .map_err(|failure| ControlFailure::Uncertain(failure.to_string()))?;
+    if let Some(diagnostic) = outcome.diagnostic {
+        return Err(ControlFailure::Uncertain(diagnostic));
+    }
     if !outcome.success {
         return Err(if outcome.reason.starts_with("exit_") {
             ControlFailure::Exited {
@@ -304,6 +313,13 @@ pub(super) async fn create(
 }
 
 pub(super) fn attach(lease: &Lease) -> Result<Spawned, CliError> {
+    #[cfg(test)]
+    if let Some(transport) = *ATTACHMENT_TRANSPORT
+        .lock()
+        .map_err(|_| error("attachment transport lock poisoned"))?
+    {
+        return transport(lease);
+    }
     let id = lease
         .id
         .as_deref()
@@ -435,7 +451,19 @@ fn classify(record: &Record, outcome: &mut Outcome) {
     // Docker attachment exit status alone cannot prove that worker execution ended.
     if record.running {
         outcome.success = false;
-        if !matches!(outcome.reason.as_str(), "timeout" | "output_ceiling") {
+        if outcome.diagnostic.as_deref() == Some("output_ceiling")
+            && matches!(outcome.reason.as_str(), "timeout" | "output_ceiling")
+        {
+            outcome
+                .stderr
+                .extend_from_slice(b"\nattachment output_ceiling\n");
+            outcome.diagnostic = None;
+        } else if outcome.diagnostic.as_deref() == Some("output_ceiling")
+            && outcome.reason.starts_with("exit_")
+        {
+            outcome.reason = "output_ceiling".to_owned();
+            outcome.diagnostic = None;
+        } else if !matches!(outcome.reason.as_str(), "timeout" | "output_ceiling") {
             outcome.reason = "container_attachment_lost".to_owned();
         }
     } else if record.status == "created" && record.started_at.starts_with("0001-") {
@@ -446,10 +474,12 @@ fn classify(record: &Record, outcome: &mut Outcome) {
             .is_ok_and(|started| chrono::Datelike::year(&started) > 1)
     {
         if !outcome.reason.starts_with("exit_") {
-            outcome.diagnostic = Some(format!(
-                "container worker exit observed after attachment {}",
-                outcome.reason
-            ));
+            outcome.diagnostic.get_or_insert_with(|| {
+                format!(
+                    "container worker exit observed after attachment {}",
+                    outcome.reason
+                )
+            });
         }
         outcome.success = record.exit_code == 0 && !record.oom_killed;
         outcome.reason = if record.oom_killed {
@@ -482,17 +512,19 @@ pub(super) async fn run(
 ) -> (Result<Outcome, CliError>, Cleanup) {
     let result: Result<Outcome, CliError> = async {
         create(&mut writer, &mut lease, &worker, &socket).await?;
-        let spawned = attach(&lease)?;
-        let mut result = child::wait_bounded(
-            spawned,
-            input,
-            Duration::from_secs(worker.timeout_seconds),
-            None,
-            Some(2 * 1024 * 1024),
-        )
-        .await?;
-        outcome(&lease, &mut result).await?;
-        Ok(result)
+        let attachment = match attach(&lease) {
+            Ok(spawned) => child::wait_bounded(
+                spawned,
+                input,
+                Duration::from_secs(worker.timeout_seconds),
+                None,
+                Some(2 * 1024 * 1024),
+            )
+            .await
+            .map_err(CliError::from),
+            Err(failure) => Err(failure),
+        };
+        observe_attachment(&lease, attachment).await
     }
     .await;
     let result = result.or_else(|failure| {
@@ -510,6 +542,44 @@ pub(super) async fn run(
         }
     });
     (result, Cleanup { writer, lease })
+}
+
+async fn observe_attachment(
+    lease: &Lease,
+    attachment: Result<Outcome, CliError>,
+) -> Result<Outcome, CliError> {
+    let client_failed = attachment.is_err();
+    let mut result = attachment.unwrap_or_else(|failure| {
+        let diagnostic = failure.to_string();
+        Outcome {
+            success: false,
+            reason: "container_attachment_error".into(),
+            usage: Usage::default(),
+            stdout: vec![],
+            stderr: diagnostic.as_bytes().to_vec(),
+            diagnostic: Some(diagnostic),
+        }
+    });
+    // Inspection uses the same bounded control path and exact owned identity.
+    // A client error neither establishes absence nor makes cleanup an exit oracle.
+    if let Err(failure) = outcome(lease, &mut result).await {
+        if !client_failed {
+            return Err(failure);
+        }
+        let diagnostic = format!(
+            "{}; authoritative inspection failed: {failure}",
+            result.diagnostic.as_deref().unwrap_or("attachment failed")
+        );
+        result.stderr = diagnostic.as_bytes().to_vec();
+        result.diagnostic = Some(diagnostic);
+        result.reason = "container_state_unknown".into();
+    } else if client_failed
+        && !result.reason.starts_with("exit_")
+        && result.reason != "container_memory_ceiling"
+    {
+        result.reason = "container_state_unknown".into();
+    }
+    Ok(result)
 }
 
 pub(super) struct Cleanup {

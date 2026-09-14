@@ -69,10 +69,106 @@ impl EngineDouble {
 
 impl Drop for EngineDouble {
     fn drop(&mut self) {
+        if let Ok(mut transport) = ATTACHMENT_TRANSPORT.lock() {
+            *transport = None;
+        }
         if let Ok(mut command) = ENGINE_COMMAND.lock() {
             *command = None;
         }
     }
+}
+
+fn attachment_error_after_request(lease: &Lease) -> Result<Spawned, CliError> {
+    use std::io::Write;
+    // Only external request delivery is substituted. The fixture starts its
+    // owned worker before reporting a lost client-supervision result. Real
+    // production run/inspection/journal/cleanup decide what this error means.
+    let id = lease
+        .id
+        .as_deref()
+        .ok_or_else(|| error("missing fixture ID"))?;
+    let mut client = command(&strings(&["start", "--attach", "--interactive", id]))
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()?;
+    client
+        .stdin
+        .take()
+        .ok_or_else(|| error("missing fixture stdin"))?
+        .write_all(b"{}\n")?;
+    if !client.wait()?.success() {
+        return Err(error("fixture start failed before transport fault"));
+    }
+    Err(std::io::Error::other("attachment transport failed after request delivery").into())
+}
+
+#[test]
+fn attachment_error_preserves_authoritative_exit_and_uncertainty(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for (scenario, completed, retained) in [
+        (serde_json::json!({}), true, 0),
+        (serde_json::json!({"cleanup_failure": true}), true, 1),
+        (serde_json::json!({"worker_status": "running"}), false, 0),
+        (serde_json::json!({"inspect_failure": true}), false, 1),
+    ] {
+        let engine = EngineDouble::new(scenario.clone())?;
+        *ATTACHMENT_TRANSPORT
+            .lock()
+            .map_err(|_| "attachment lock poisoned")? = Some(attachment_error_after_request);
+        let (state, plan) = engine.host()?;
+        let failure = super::super::run(&state, &plan)
+            .err()
+            .ok_or("client failure must fail the command")?;
+        if retained == 0 {
+            assert!(
+                failure.to_string().contains("attachment transport failed"),
+                "{failure}"
+            );
+        }
+        let db = rusqlite::Connection::open(state.join("runner.db"))?;
+        let snapshot: (String, u32, String) = db.query_row(
+            "SELECT state,attempts,outcome FROM run_workers",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
+        assert_eq!(
+            snapshot.0,
+            if completed { "completed" } else { "failed" },
+            "{scenario}"
+        );
+        assert_eq!(snapshot.1, 1, "{scenario}");
+        if completed {
+            assert_eq!(snapshot.2, "exit_0");
+        }
+        assert!(
+            std::fs::read_to_string(state.join("run-logs/root-1.stderr"))?
+                .contains("attachment transport failed after request delivery")
+        );
+        assert_eq!(
+            db.query_row("SELECT COUNT(*) FROM run_containers", [], |row| row
+                .get::<_, i64>(0))?,
+            retained,
+            "{scenario}"
+        );
+        engine.scenario(serde_json::json!({}))?;
+        assert_eq!(super::super::run(&state, &plan).is_ok(), completed);
+        assert_eq!(
+            db.query_row("SELECT COUNT(*) FROM run_containers", [], |row| row
+                .get::<_, i64>(0))?,
+            0
+        );
+        assert_eq!(
+            db.query_row("SELECT attempts FROM run_workers", [], |row| row
+                .get::<_, i64>(0))?,
+            1
+        );
+        assert_eq!(
+            std::fs::read_to_string(engine.root.path().join("starts"))?,
+            "1"
+        );
+    }
+    Ok(())
 }
 
 #[test]
@@ -219,6 +315,7 @@ fn ready_completion_is_durable_before_interruption() -> Result<(), Box<dyn std::
                 attempt,
                 secret: "test-only-secret".into(),
                 cleanup: None,
+                diagnostics: None,
                 result: Ok(Outcome {
                     success: true,
                     reason: "exit_0".into(),

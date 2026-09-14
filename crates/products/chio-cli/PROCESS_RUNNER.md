@@ -456,6 +456,14 @@ override `runner.db`. Initial journal/readiness publication must succeed before
 launch. Later publication failures do not undo committed starts or completions;
 the command reports the diagnostic failure after bounded supervision. Log or
 cleanup failure also cannot turn a known completed worker into a retry.
+The blocking reaper publishes direct-worker exit status and final usage to an
+observation owned independently of async supervision. Bounded log draining then
+occupies the original scheduler slot. On interruption, descriptor cancellation
+and one shared one-second reconciliation grace precede classification of
+unfinished workers. An available exit is retained; unavailable exit evidence
+remains terminally uncertain. A descendant holding stdout open cannot erase an
+already reaped successful exit. Late output diagnostics do not rewrite actual
+exit or forced-stop/resource-accounting evidence.
 Both readers require existing private state, reject
 linked or broadly readable files and bound their reads. They do not construct
 a kernel, read signing keys or connect to tool servers.
