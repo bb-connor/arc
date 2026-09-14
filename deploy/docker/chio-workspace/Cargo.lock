@@ -2851,6 +2851,7 @@ dependencies = [
  "chio-control-plane",
  "chio-core-types",
  "chio-credit",
+ "chio-cross-protocol",
  "chio-custody-hw",
  "chio-decoy",
  "chio-egress-contract",

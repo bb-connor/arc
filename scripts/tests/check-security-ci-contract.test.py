@@ -488,6 +488,34 @@ def run_extraction_fixture(
 
 
 assert_nonzero_bootstrap_accepted()
+for python_job in ("check", "msrv"):
+    for dependency in ("jsonschema==4.26.0", "referencing==0.37.0"):
+        assert_rejected(
+            f"{python_job} omits {dependency}",
+            "ci.yml",
+            replace_in_named_job(python_job, f" {dependency}", ""),
+            f"{python_job} Python validator prerequisites changes mandatory step body",
+        )
+    assert_rejected(
+        f"{python_job} conditionally skips Python validators",
+        "ci.yml",
+        replace_in_named_job(
+            python_job,
+            "      - name: Install Python workflow validators\n",
+            "      - name: Install Python workflow validators\n        if: false\n",
+        ),
+        f"{python_job} Python validator prerequisites conditionally skips mandatory step",
+    )
+    assert_rejected(
+        f"{python_job} tolerates failed Python validator installation",
+        "ci.yml",
+        replace_in_named_job(
+            python_job,
+            "      - name: Install Python workflow validators\n",
+            "      - name: Install Python workflow validators\n        continue-on-error: true\n",
+        ),
+        f"required CI job uses continue-on-error: {python_job}",
+    )
 assert_rejected(
     "all-zero enterprise workflow bootstrap placeholder",
     "ci.yml",

@@ -62,7 +62,7 @@ EXPECTED_APK_LOCK_SHA256 = (
     "b4d4642b66191c1923fe7c293b408b570b71df9edb710ffa09bc518ca36a5ad8"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
-    "c43752ceecff506343bf58c7a6cfdd20f02c0b53edd1ef78678e3d5e80ffed45"
+    "a4e631319b00c54f2cbc6457ad0149198a4a367db8dec060fcce376c98728b49"
 )
 EXPECTED_RUST_TOOLCHAIN_SHA256 = (
     "d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0"
@@ -1266,7 +1266,8 @@ EXPECTED_THREAT_CONCURRENCY = {
     "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
 }
 EXPECTED_CI_PYTHON_VALIDATORS_RUN = (
-    "python -m pip install --disable-pip-version-check PyYAML==6.0.2"
+    "python -m pip install --disable-pip-version-check "
+    "PyYAML==6.0.2 jsonschema==4.26.0 referencing==0.37.0"
 )
 EXPECTED_ENTERPRISE_PYTHON_VALIDATORS_RUN = (
     "python -m pip install --disable-pip-version-check "
@@ -7880,9 +7881,22 @@ def validate(root: Path) -> None:
             raise ContractError(f"required CI job uses continue-on-error: {identifier}")
 
     check_job = job(ci, "check")
-    ci_validators = named_step(check_job, "Install Python workflow validators")
-    if ci_validators.get("run") != EXPECTED_CI_PYTHON_VALIDATORS_RUN:
-        raise ContractError("required CI does not install pinned PyYAML")
+    for identifier, boundary in (
+        ("check", "Workspace structural gates"),
+        ("msrv", "MSRV workspace lane"),
+    ):
+        python_job = job(ci, identifier)
+        validate_exact_steps(
+            python_job,
+            (("Install Python workflow validators", EXPECTED_CI_PYTHON_VALIDATORS_RUN),),
+            f"{identifier} Python validator prerequisites",
+        )
+        if step_position(python_job, "Install Python workflow validators") >= step_position(
+            python_job, boundary
+        ):
+            raise ContractError(
+                f"{identifier} Python validators are installed after their consumers"
+            )
     check_lines = run_lines(check_job)
     require_run_markers(
         check_job,
