@@ -4,7 +4,40 @@ Refreshed 2026-09-14 during the claim-escrow execution. The independent model,
 contract, trace replay and financial reproduction are implemented. Native
 funding admission remains gated on a qualified Security M4 source.
 
-## Latest refresh after rail-worker recovery
+## Latest refresh after complete lifecycle recovery
+
+At 2026-09-14 14:36 UTC, the security worktree still identifies
+`f1b88451527b2dec7314114b3b1e91cf101312cf`. Its acceptance report now says
+all required local execution gates, documentation review and source-graph
+refresh passed. This is progress beyond the previous status below. Five
+closeout documentation files remain modified, and the report says hosted MSRV
+qualification is still running with its prior failure unresolved. These are
+reported local results, not native suites rerun by this work.
+
+Draft PR #1117 remains open, draft and blocked at
+`6bb648b613b44ff5aaf1853768f2747bff166077`. No committed M4 closeout was
+selected. A fresh read-only merge-tree of security `f1b8845152` and research
+`331bd1bf8c` has 10 conflicts: nine code paths plus generated
+`docs/formal/COVERAGE.md`. The merge base is `f5566d9a765c21cb36652a99c79de64968a656bf`
+and the repository is not shallow. This rehearsal excludes dirty security
+documentation and does not resolve, build or qualify a combined candidate.
+
+The [lifecycle result](12-lifecycle-recovery-results.md) and
+[manifest](13-lifecycle-results.json) retain the exact heads, conflict paths,
+source hashes and gate observation. Admission versions are still research 10
+and security 34, with distinct historical version-10 meanings. The existing
+provider's unsigned manifest construction still differs from security's
+`VerifiedManifestRegistry` constructor. These semantic requirements remain even
+where Git reports no textual conflict.
+
+All post-funding private-chain actions now use durable worker recovery:
+submission, decision, payment and refund pass the full four-point crash matrix.
+Funding/deployment/setup, native admission/hold correlation, Finding facets,
+public finality and actual parent tool-process loss remain pending. Preserve
+the qualified security lifecycle and the paper's separately authorized unknown
+payment successor together when creating the isolated integration candidate.
+
+## Previous refresh after rail-worker recovery
 
 At 2026-09-14 13:13 UTC, the security worktree identifies
 `f1b88451527b2dec7314114b3b1e91cf101312cf`, with its M4 acceptance report

@@ -1,0 +1,11 @@
+490e19f6e3447ac66cc907dd5aae01b5bcf3407f
+crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs
+crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs
+crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs
+crates/kernel/chio-runtime-core/src/store/sqlite.rs
+crates/kernel/chio-runtime-core/tests/runtime_admission.rs
+crates/platform/chio-store-sqlite/src/admission_operation_store.rs
+crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs
+crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs
+crates/protocol/chio-a2a-edge/src/tests/all.rs
+docs/formal/COVERAGE.md

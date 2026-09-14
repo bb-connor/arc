@@ -1,0 +1,44 @@
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✖ accepted W0 recovers submission, decision and payment (5701.753244ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16120.062745
+
+✖ failing tests:
+
+test at contracts/scripts/work-claim-lifecycle.test.mjs:10:1
+✖ accepted W0 recovers submission, decision and payment (5701.753244ms)
+  AssertionError [ERR_ASSERTION]: financial stages bypass durable recovery
+  + actual - expected
+
+  + []
+  - [
+  -   'submit',
+  -   'decision',
+  -   'pay'
+  - ]
+
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-lifecycle.test.mjs:18:12)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ 'submit', 'decision', 'pay' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

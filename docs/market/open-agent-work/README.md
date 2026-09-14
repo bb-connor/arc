@@ -56,6 +56,7 @@ The plan gives that alternative the same resources and a fair opportunity to win
 | [Claim-escrow execution](execution/05-claim-escrow-results.md) | Implemented finite model, experimental escrow, actual child withdrawal after parent refund and the remaining native gate |
 | [Funded W0 execution](execution/08-funded-w0-results.md) | Actual Rust/Python checked work, signed artifact bindings, local custody and four private-chain financial outcomes |
 | [Recovery execution and review](execution/10-recovery-review-results.md) | Custody and verifier fixes, durable signed transactions, four actual worker crash boundaries and the refreshed integration decision |
+| [Complete lifecycle recovery](execution/12-lifecycle-recovery-results.md) | Submission, decision, payment and refund recovery across 48 worker kills, plus a current integration rehearsal |
 
 The first slice now has six passing allocation-model tests, 38 passing existing
 pool-ledger tests and six real-bytecode escrow characterizations. A deliberately
@@ -84,6 +85,15 @@ checks were rerun after the final verifier fix. No native Rust source changed.
 Private-chain inclusion is not public finality. Native funded admission,
 Finding assurance, original native hold correlation and parent tool-process
 recovery remain gated on qualified Security M4 integration.
+
+The [complete lifecycle extension](execution/12-lifecycle-recovery-results.md)
+now routes every post-funding action through the outbox. Sixteen actual W0
+runs cover 48 worker kills and 100 later re-observations, with no duplicate
+transaction or monetary effect. Selected validation passes 56 Node and 38
+Python checks. A fresh merge-tree identifies nine code conflicts and one
+generated conflict between the committed research/security inputs. Security
+reports its local M4 gates passing, but its committed closeout and hosted MSRV
+qualification remain pending; native integration is not selected yet.
 
 The first executable milestone is **M0: freeze the comparison and expose the
 funding counterexample**. Do this before a general protocol extraction, a new

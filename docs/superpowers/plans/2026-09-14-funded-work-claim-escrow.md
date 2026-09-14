@@ -126,6 +126,15 @@ Task 4: it has no native operation/hold, finalized funding admission, Finding
 facets or killed parent tool process. Tasks 3 and 4 remain unchecked until those
 integrated behaviors are qualified on the selected security checkpoint.
 
+The [complete lifecycle extension](../../market/open-agent-work/execution/12-lifecycle-recovery-results.md)
+adds actual crash recovery for submission, decision and refunds, with 16 W0
+cases and 48 killed workers. Earlier operations remain observable after later
+Paid/Refunded transitions. A read-only integration rehearsal records ten
+conflicts on pinned committed inputs. Security now reports local M4 gates
+passing; uncommitted closeout/hosted qualification still prevent selecting the
+native integration checkpoint. Funding and the native parent process remain
+outside the independent recovery slice.
+
 ## Completion and next gate
 
 The vertical slice completes when the same reviewable candidate demonstrates
