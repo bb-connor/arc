@@ -1141,6 +1141,16 @@ if [[ "${red}" == "1" && -n "${PR_NUMBER}" ]]; then
   gh pr comment "${PR_NUMBER}" --body-file comment.md
 fi
 """.strip()
+EXPECTED_PROMOTED_MARKET_RUN = r"""
+umask 022
+cargo build -p chio-control-plane -p chio-store-sqlite -p chio-open-market
+cargo clippy -p chio-control-plane -p chio-store-sqlite -p chio-open-market -- -D warnings
+cargo test -p chio-control-plane --lib
+cargo test -p chio-store-sqlite
+cargo test -p chio-open-market
+cargo test -p chio-cli --bin chio finding
+cargo test -p chio-finding -p chio-finding-verifier
+""".strip()
 EXPECTED_CI_EVIDENCE_STEPS = (
     ("Formal traceability gate", "bash scripts/check-mapping.sh"),
     ("Temporal security gate", EXPECTED_TEMPORAL_GATE_RUN),
@@ -1152,6 +1162,10 @@ EXPECTED_CI_EVIDENCE_STEPS = (
     ("Workspace build", "cargo build --workspace"),
     ("Workspace tests", "cargo test --workspace --exclude chio-wasm-guards"),
     ("Protocol peer-negotiation gate", "./scripts/check-protocol-peer-negotiation.sh"),
+    (
+        "cognition-market promoted-default build, clippy, and tests",
+        EXPECTED_PROMOTED_MARKET_RUN,
+    ),
     ("Wasm guards library tests", "cargo test -p chio-wasm-guards --lib"),
     (
         "Wasm guards Python SDK round-trip tests",
@@ -1162,6 +1176,10 @@ EXPECTED_CI_EVIDENCE_STEPS = (
 EXPECTED_COMMON_CI_STEP_ENV = {
     "CARGO_BUILD_JOBS": "1",
     "RUSTFLAGS": "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0",
+}
+EXPECTED_SERIAL_FIXTURE_CI_ENV = {
+    **EXPECTED_COMMON_CI_STEP_ENV,
+    "RUST_TEST_THREADS": "1",
 }
 EXPECTED_CI_EVIDENCE_EXTRAS = {
     name: {"env": EXPECTED_COMMON_CI_STEP_ENV}
@@ -1180,6 +1198,13 @@ EXPECTED_CI_EVIDENCE_EXTRAS["Temporal security gate"] = {
     "env": EXPECTED_COMMON_CI_STEP_ENV,
     "shell": EXPECTED_TEMPORAL_STEP_SHELL,
 }
+for serial_fixture_step in (
+    "Workspace tests",
+    "cognition-market promoted-default build, clippy, and tests",
+):
+    EXPECTED_CI_EVIDENCE_EXTRAS[serial_fixture_step] = {
+        "env": EXPECTED_SERIAL_FIXTURE_CI_ENV
+    }
 EXPECTED_KANI_STEP_EXTRAS = {
     "Verify all PR Kani harnesses": {
         "env": {"CARGO_BUILD_JOBS": "1", "CARGO_INCREMENTAL": "0"}
@@ -1197,6 +1222,7 @@ EXPECTED_MSRV_EXTRAS = {
             "CARGO_BUILD_JOBS": "1",
             "CARGO_TARGET_DIR": "${{ runner.temp }}/chio-msrv-target",
             "RUSTFLAGS": "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0",
+            "RUST_TEST_THREADS": "1",
         }
     }
 }

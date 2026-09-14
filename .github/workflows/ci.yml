@@ -287,6 +287,8 @@ jobs:
         env:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+          # Match the flow gate's fixture isolation; explicit races still run.
+          RUST_TEST_THREADS: "1"
         run: cargo test --workspace --exclude chio-wasm-guards
 
       - name: Protocol peer-negotiation gate
@@ -367,6 +369,7 @@ jobs:
         env:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+          RUST_TEST_THREADS: "1"
         run: |
           umask 022
           cargo build -p chio-control-plane -p chio-store-sqlite -p chio-open-market
@@ -540,8 +543,8 @@ jobs:
   msrv:
     name: MSRV build and test
     runs-on: ubuntu-latest
-    # Serial (CARGO_BUILD_JOBS=1) full-workspace lane; healthy runs finish
-    # well under 3h. Same wedge failsafe as the check job.
+    # Serialize compilation and isolate fixtures while preserving explicit
+    # thread/process races. Keep the bounded full-workspace wedge failsafe.
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -561,6 +564,7 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           CARGO_TARGET_DIR: ${{ runner.temp }}/chio-msrv-target
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+          RUST_TEST_THREADS: "1"
         run: |
           cargo build --workspace
           cargo test --workspace --exclude chio-conformance --exclude chio-wasm-guards --exclude chio-formal-diff-tests

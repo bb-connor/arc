@@ -488,6 +488,44 @@ def run_extraction_fixture(
 
 
 assert_nonzero_bootstrap_accepted()
+
+# Full control-plane lanes must retain the same fixture isolation as the flow
+# security gate. Tests still exercise their explicit thread and process races.
+SERIAL_FIXTURE_STEPS = (
+    ("check", "Workspace tests", "required CI test and Loom evidence"),
+    (
+        "check",
+        "cognition-market promoted-default build, clippy, and tests",
+        "required CI test and Loom evidence",
+    ),
+    ("msrv", "MSRV workspace lane", "MSRV evidence"),
+)
+live_ci = CHECKER.load_workflow(ROOT / ".github/workflows/ci.yml")
+for job_id, step_name, error_context in SERIAL_FIXTURE_STEPS:
+    step = CHECKER.named_step(CHECKER.job(live_ci, job_id), step_name)
+    if step.get("env", {}).get("RUST_TEST_THREADS") != "1":
+        raise AssertionError(f"{step_name}: serial fixture profile is not pinned")
+    for label, replacement in (
+        ("removed", ""),
+        ("parallel", '          RUST_TEST_THREADS: "2"\n'),
+        ("dynamic", '          RUST_TEST_THREADS: ${{ vars.TEST_THREADS }}\n'),
+    ):
+        assert_rejected(
+            f"{step_name} fixture serialization {label}",
+            "ci.yml",
+            replace_in_named_step(
+                step_name, '          RUST_TEST_THREADS: "1"\n', replacement
+            ),
+            error_context,
+        )
+    assert_rejected(
+        f"{step_name} fixture serialization overridden by command",
+        "ci.yml",
+        replace_in_named_step(
+            step_name, "cargo test ", "RUST_TEST_THREADS=2 cargo test "
+        ),
+        error_context if job_id == "msrv" else "required CI",
+    )
 for python_job in ("check", "msrv"):
     for dependency in ("jsonschema==4.26.0", "referencing==0.37.0"):
         assert_rejected(
