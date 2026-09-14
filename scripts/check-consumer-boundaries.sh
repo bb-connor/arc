@@ -40,6 +40,14 @@ run_case "remote MCP retained authorization" tests::restored_authorization_match
 run_case "remote MCP ready-session restart" mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls cargo test -p chio-cli --test mcp_serve_http
 run_case "remote MCP restart policy tightening" mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening cargo test -p chio-cli --test mcp_serve_http
 run_target "stdio MCP early profile rejection" mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading cargo test -p chio-cli --test mcp_startup_security
+run_case "supervisor HTTP readiness positive control" supervise::readiness::tests::an_http_endpoint_is_ready_only_on_a_success_status cargo test -p chio-cli --bin chio
+run_case "supervisor readiness redirect denial" supervise::readiness::security_tests::readiness_never_follows_same_or_cross_origin_redirects cargo test -p chio-cli --bin chio
+run_case "supervisor readiness response bounds" supervise::readiness::security_tests::readiness_caps_declared_and_streamed_response_bodies cargo test -p chio-cli --bin chio
+run_case "supervisor readiness exact response limit" supervise::readiness::security_tests::readiness_accepts_a_response_at_its_exact_byte_limit cargo test -p chio-cli --bin chio
+run_case "supervisor readiness invalid configuration" supervise::readiness::security_tests::readiness_rejects_invalid_targets_and_headers_before_launch cargo test -p chio-cli --bin chio
+run_case "supervisor readiness private addresses" supervise::readiness::security_tests::readiness_accepts_operator_selected_private_addresses cargo test -p chio-cli --bin chio
+run_case "operator readiness DNS deadline" operator_readiness::tests::dns_uses_the_async_resolver_inside_the_deadline cargo test -p chio-egress-contract --features reqwest-egress --lib
+run_case "supervisor readiness rejects before child launch" invalid_http_readiness_refuses_to_start_the_service cargo test -p chio-cli --test security_supervise
 run_case "current signed manifest corpus" current_manifest_consumer_corpus_preserves_wire_and_registered_signature cargo test -p chio-manifest --test manifest_v2
 run_target "Rust generated protocol corpus" generated_rust_shapes_parse_reject_and_round_trip_shared_fixtures cargo test -p chio-core-types --test protocol_primitives_generated
 run_case "authoritative protocol schema corpus" protocol_primitives_shared_fixtures_match_authoritative_schemas cargo test -p chio-core-types --test wire_protocol_schema
@@ -52,4 +60,5 @@ run_case "provider fabric bounded profile" provider_verdict::tests::provider_fab
 
 ./scripts/check-protocol-peer-negotiation.sh
 ./scripts/check-adapter-no-bypass.sh
+./scripts/check-http-egress-contract.sh
 echo "Consumer boundary Rust gate passed (SDK, M3 and composed gates remain separate)"

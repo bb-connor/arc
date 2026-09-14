@@ -25,7 +25,8 @@ pub struct SuperviseArgs {
     #[arg(long = "credential-env", value_name = "VARIABLE=CREDENTIAL")]
     pub credential_env: Vec<CredentialBinding>,
 
-    /// Report readiness once a GET of this URL answers with a success status.
+    /// Report readiness once a GET of this operator-selected HTTP(S) URL succeeds.
+    /// Redirects, userinfo and fragments are rejected; responses are limited to 64 KiB.
     #[arg(long, value_name = "URL", conflicts_with = "ready_unix_socket")]
     pub ready_http: Option<String>,
 

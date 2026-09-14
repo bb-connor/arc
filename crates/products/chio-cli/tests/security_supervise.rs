@@ -86,6 +86,29 @@ fn notify_messages(manager: &UnixDatagram, until: &str, deadline: Duration) -> V
 }
 
 #[test]
+fn invalid_http_readiness_refuses_to_start_the_service() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let marker = directory.path().join("started");
+    for url in [
+        "file:///tmp/chio-readiness-invalid",
+        "http://operator:secret@127.0.0.1/health",
+    ] {
+        let output = supervise(directory.path())
+            .args(["--ready-http", url, "--", "/usr/bin/touch"])
+            .arg(&marker)
+            .output()?;
+        assert!(!output.status.success());
+        assert!(stderr(&output).contains("readiness requires an HTTP(S) URL"));
+        assert!(!stderr(&output).contains("operator:secret"));
+        assert!(
+            !marker.exists(),
+            "invalid readiness must reject before service launch"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn exec_delivers_the_credential_and_only_the_credential() {
     let directory = tempfile::tempdir().expect("tempdir");
     write_credential(directory.path(), "session-token", b"s3cret-session\n");

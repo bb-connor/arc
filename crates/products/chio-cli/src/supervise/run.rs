@@ -20,7 +20,7 @@ use tokio::process::{Child, Command};
 use tokio::signal::unix::{signal, Signal, SignalKind};
 
 use super::notify::Notifier;
-use super::readiness::{http_client, Readiness};
+use super::readiness::{Readiness, ReadinessError};
 
 const READINESS_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
@@ -65,7 +65,7 @@ impl fmt::Display for Exit {
 pub enum SuperviseError {
     Spawn(io::Error),
     Signals(io::Error),
-    HttpClient(reqwest::Error),
+    Readiness(ReadinessError),
     Wait(io::Error),
     /// The service did not become ready in time; it was stopped and ended as recorded.
     ReadinessTimeout(Exit),
@@ -78,7 +78,7 @@ impl fmt::Display for SuperviseError {
         match self {
             Self::Spawn(error) => write!(f, "the service could not be started: {error}"),
             Self::Signals(error) => write!(f, "stop signals could not be installed: {error}"),
-            Self::HttpClient(error) => write!(f, "the readiness client could not be built: {error}"),
+            Self::Readiness(error) => write!(f, "the readiness probe could not be prepared: {error}"),
             Self::Wait(error) => write!(f, "waiting for the service failed: {error}"),
             Self::ReadinessTimeout(exit) => {
                 write!(f, "the service did not become ready in time and was stopped ({exit})")
@@ -133,7 +133,7 @@ pub async fn supervise(supervision: Supervision) -> Result<Exit, SuperviseError>
         stop_grace,
         notifier,
     } = supervision;
-    let http = http_client().map_err(SuperviseError::HttpClient)?;
+    let probe = readiness.prepare().map_err(SuperviseError::Readiness)?;
     let mut signals = StopSignals::install().map_err(SuperviseError::Signals)?;
     let mut child = Command::new(&program)
         .args(&args)
@@ -164,7 +164,7 @@ pub async fn supervise(supervision: Supervision) -> Result<Exit, SuperviseError>
                     return Err(SuperviseError::ReadinessTimeout(exit));
                 }
                 () = tokio::time::sleep_until(next_probe) => {
-                    if readiness.probe(&http).await {
+                    if probe.probe().await {
                         break;
                     }
                     next_probe = tokio::time::Instant::now() + READINESS_POLL_INTERVAL;

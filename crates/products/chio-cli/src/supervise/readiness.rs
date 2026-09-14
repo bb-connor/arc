@@ -1,7 +1,8 @@
 //! What "ready" means for a supervised service.
 
 use std::path::PathBuf;
-use std::time::Duration;
+use chio_egress_contract::OperatorReadinessProbe;
+pub use chio_egress_contract::OperatorReadinessError as ReadinessError;
 
 /// The condition the supervisor waits for before it reports readiness.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,29 +29,41 @@ impl Readiness {
         }
     }
 
-    /// One attempt at the condition.
-    pub async fn probe(&self, http: &reqwest::Client) -> bool {
-        match self {
-            Self::Immediate => true,
-            Self::Http { url, bearer } => {
-                let mut request = http.get(url);
-                if let Some(bearer) = bearer {
-                    request = request.bearer_auth(bearer);
-                }
-                matches!(request.send().await, Ok(response) if response.status().is_success())
-            }
-            Self::UnixSocket(path) => tokio::net::UnixStream::connect(path).await.is_ok(),
-        }
+    /// Validate the operator's target and bind the client before service launch.
+    pub fn prepare(&self) -> Result<PreparedReadiness, ReadinessError> {
+        let condition = match self {
+            Self::Immediate => PreparedCondition::Immediate,
+            Self::Http { url, bearer } => PreparedCondition::Http(Box::new(
+                OperatorReadinessProbe::prepare(url, bearer.as_deref())?,
+            )),
+            Self::UnixSocket(path) => PreparedCondition::UnixSocket(path.clone()),
+        };
+        Ok(PreparedReadiness { condition })
     }
 }
 
-/// The client readiness probes use: a short deadline per attempt and no
-/// proxy, because the probe targets the service on this host.
-pub fn http_client() -> reqwest::Result<reqwest::Client> {
-    reqwest::Client::builder()
-        .timeout(Duration::from_secs(2))
-        .no_proxy()
-        .build()
+/// A probe prepared before child launch, with no per-attempt target replacement.
+pub struct PreparedReadiness {
+    condition: PreparedCondition,
+}
+
+enum PreparedCondition {
+    Immediate,
+    Http(Box<OperatorReadinessProbe>),
+    UnixSocket(PathBuf),
+}
+
+impl PreparedReadiness {
+    /// One bounded attempt. Transport, redirect and response-limit errors deny readiness.
+    pub async fn probe(&self) -> bool {
+        match &self.condition {
+            PreparedCondition::Immediate => true,
+            PreparedCondition::Http(probe) => probe.probe().await,
+            PreparedCondition::UnixSocket(path) => {
+                tokio::net::UnixStream::connect(path).await.is_ok()
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -62,10 +75,10 @@ mod tests {
         let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("{error}"));
         let path = directory.path().join("service.sock");
         let readiness = Readiness::UnixSocket(path.clone());
-        let http = http_client().unwrap_or_else(|error| panic!("{error}"));
-        assert!(!readiness.probe(&http).await);
+        let probe = readiness.prepare().unwrap_or_else(|error| panic!("{error}"));
+        assert!(!probe.probe().await);
         let _listener = tokio::net::UnixListener::bind(&path).unwrap_or_else(|error| panic!("{error}"));
-        assert!(readiness.probe(&http).await);
+        assert!(probe.probe().await);
     }
 
     #[tokio::test]
@@ -91,12 +104,16 @@ mod tests {
             url: format!("http://{address}/health"),
             bearer: Some("admin-token".to_string()),
         };
-        let http = http_client().unwrap_or_else(|error| panic!("{error}"));
-        assert!(!readiness.probe(&http).await);
-        assert!(readiness.probe(&http).await);
+        let probe = readiness.prepare().unwrap_or_else(|error| panic!("{error}"));
+        assert!(!probe.probe().await);
+        assert!(probe.probe().await);
         let seen = server.await.unwrap_or_else(|error| panic!("{error}"));
         assert!(seen.iter().all(|request| request.contains("authorization: Bearer admin-token")
             || request.contains("Authorization: Bearer admin-token")));
         assert_eq!(readiness.describe(), format!("GET http://{address}/health"));
     }
 }
+
+#[cfg(test)]
+#[path = "readiness_security_tests.rs"]
+mod security_tests;
