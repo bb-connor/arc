@@ -59,7 +59,12 @@ suspensions per worker and a 1-3600 second deadline per attempt. Initially
 declared process IDs must already exist. Dependencies can be
 listed in any order; unknown, duplicate and cyclic dependencies are rejected.
 Commands use an absolute executable and literal argument vector, with no
-shell expansion. Working directories are absolute. Plan JSON is limited to
+shell expansion. Direct executables must be executable files and working
+directories must be searchable directories. These immutable inputs and required
+Linux pidfd support are checked before opening the run journal. A later definite
+pre-exec refusal releases its unexecuted reservation and reports the original
+error. A failure after execution may have begun remains charged and does not
+automatically restart the worker. Plan JSON is limited to
 one MiB. `input` defaults to null, `depends_on` defaults to an empty list,
 `max_suspensions` defaults to 64 and `resources` is optional; see
 [Resource ceilings](#resource-ceilings).
@@ -107,7 +112,8 @@ interval, and descendants the worker starts are not sampled. Every reaped
 attempt is accounted exactly from the kernel: its peak resident set and CPU
 time, covering the worker process and the descendants it waited for. A final
 measured peak above the ceiling fails the attempt even if it exited successfully
-between samples. Status
+between samples. Sampling uses a proc-directory descriptor pinned before
+reaping, so PID reuse cannot charge another process's memory to the attempt. Status
 and the run report carry `peak_resident_bytes`, the most any attempt of the
 worker held, and `cpu_ms`, the CPU time all its attempts consumed. An attempt
 the host never observed exiting is accounted as zero. Cgroup placement and
@@ -119,6 +125,9 @@ The runner writes one JSON object to the worker's private stdin, then closes
 stdin. It contains `schema: "chio.process.worker-bootstrap.v1"`, the ordinary
 private `connection` descriptor, a one-based `attempt`, and the plan's `input`.
 Descriptors do not need to be written to files.
+Bootstrap writes, process exit and resource sampling share the configured
+attempt deadline. A slow reader may use that deadline; no separate five-second
+startup budget shortens or extends it.
 
 ```python
 import json
@@ -152,14 +161,23 @@ Exit zero completes a worker and releases its dependents. Exit 75 after a
 successful `wait_children` call suspends a worker until its recorded children
 complete. A suspension spends the worker's `max_suspensions` ceiling and
 leaves its `max_attempts` failure budget intact; the launch still counts in
-`attempts`, which numbers logs and bootstrap input. Other exits, signals,
-startup failures and deadlines consume a failed attempt. Failed attempts
+`attempts`, which numbers logs and bootstrap input. Other observed exits, signals
+and enforced deadlines consume a failed attempt. Failed attempts
 retry after one second while budget remains. Under the default failure policy,
 the runner stops when a worker exhausts either ceiling; pending dependents do
 not launch. Exit zero establishes process
 completion, not correct model findings or verified external effects. An
 application should verify its outputs and original receipts before claiming
 its own task complete.
+
+An unconfirmed launch/wait failure or lost container attachment stops automatic
+worker retry and requires reconciliation. Definite pre-exec refusal releases
+only its unexecuted reservation. These distinctions do not change the kernel's
+authority over tool effects or the stable operation keys used during recovery.
+
+Observed completions are committed before log retention, derived status
+publication and container cleanup. Already-ready completions take precedence
+over interruption; only unfinished workers receive interruption outcomes.
 
 With `failure_policy: "continue_independent"`, exhausted workers remain
 terminal failures while ready independent workers run to completion. Already
@@ -434,7 +452,11 @@ credential or running host connection is needed for either local command.
 The runner atomically replaces `run-status.json` after journal transitions.
 This file is a derived observation, not a recovery input. It may lag a
 transition if publication fails; diagnostics never authorize execution or
-override `runner.db`. Both readers require existing private state, reject
+override `runner.db`. Initial journal/readiness publication must succeed before
+launch. Later publication failures do not undo committed starts or completions;
+the command reports the diagnostic failure after bounded supervision. Log or
+cleanup failure also cannot turn a known completed worker into a retry.
+Both readers require existing private state, reject
 linked or broadly readable files and bound their reads. They do not construct
 a kernel, read signing keys or connect to tool servers.
 

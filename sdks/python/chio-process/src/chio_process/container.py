@@ -16,6 +16,7 @@ import tempfile
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 MAX_PROGRAM_BYTES = 1024 * 1024
@@ -25,6 +26,11 @@ DOCKER = ["/usr/bin/docker", "--host", "unix:///var/run/docker.sock"]
 
 class ContainerWorkerError(RuntimeError):
     """A launch, output-bound or lifecycle failure, with no automatic retry."""
+
+    def __init__(self, message, *, result=None, cleanup_pending=False):
+        super().__init__(message)
+        self.result = result
+        self.cleanup_pending = cleanup_pending
 
 
 @dataclass(frozen=True)
@@ -101,15 +107,20 @@ def _remove_owned(name, nonce):
     inspected = _docker("inspect", name, check=False)
     if inspected.returncode:
         # A daemon error is not proof that a possibly created worker is gone.
-        if (
-            b"No such object" not in inspected.stderr
-            and b"No such container" not in inspected.stderr
-        ):
+        message = inspected.stderr.decode("utf-8", errors="replace").strip()
+        absent = {
+            f"{prefix}No such {kind}: {name}"
+            for prefix in ("", "Error: ", "Error response from daemon: ")
+            for kind in ("object", "container")
+        }
+        if message not in absent:
             raise ContainerWorkerError(f"Could not confirm worker cleanup: {name}")
         return
     record = json.loads(inspected.stdout)[0]
     if record["Config"]["Labels"].get("chio.worker.owner") != nonce:
         raise ContainerWorkerError("Refusing cleanup of a container with another owner")
+    if not isinstance(record.get("Id"), str) or re.fullmatch(r"[a-f0-9]{64}", record["Id"]) is None:
+        raise ContainerWorkerError("Refusing cleanup without an exact container identity")
     _docker("rm", "--force", "--volumes", record["Id"])
 
 
@@ -255,6 +266,8 @@ def run_container_worker(
             ["--entrypoint", "/usr/local/bin/python", image, "-u", "/app/worker.py", *arguments]
         )
         attached = None
+        result = None
+        diagnostic = None
         try:
             container_id = _docker(*create).stdout.decode().strip()
             if re.fullmatch(r"[a-f0-9]{64}", container_id) is None:
@@ -265,11 +278,37 @@ def run_container_worker(
                 stderr=subprocess.STDOUT,
                 env={key: value for key, value in os.environ.items() if key != "DOCKER_CONTEXT"},
             )
-            output = _collect(attached, timeout, max_output_bytes)
+            try:
+                output = _collect(attached, timeout, max_output_bytes)
+            except ContainerWorkerError as failure:
+                diagnostic = failure
+                output = b""
             record = json.loads(_docker("inspect", container_id).stdout)[0]
-            if record["State"]["Running"]:
-                raise ContainerWorkerError("Worker attach ended while its container was running")
-            return ContainerResult(
+            if (
+                record.get("Id") != container_id
+                or record.get("Name") != f"/{name}"
+                or record["Config"]["Labels"].get("chio.worker.owner") != nonce
+            ):
+                raise ContainerWorkerError("Worker inspection differs from its owned identity")
+            state = record["State"]
+            started = state.get("StartedAt")
+            try:
+                started = datetime.fromisoformat(started)
+                started = started.year > 1 and started.tzinfo is not None
+            except (TypeError, ValueError):
+                started = False
+            if (
+                state.get("Running") is not False
+                or state.get("Status") != "exited"
+                or not started
+                or type(state.get("ExitCode")) is not int
+            ):
+                if diagnostic is not None:
+                    raise diagnostic
+                raise ContainerWorkerError(
+                    "Worker completion is unconfirmed; reconcile its operation identities"
+                )
+            result = ContainerResult(
                 record["State"]["ExitCode"],
                 output,
                 container_id,
@@ -292,6 +331,9 @@ def run_container_worker(
                     ],
                 },
             )
+            if diagnostic is not None:
+                raise ContainerWorkerError(str(diagnostic), result=result)
+            return result
         finally:
             try:
                 if attached is not None:
@@ -299,9 +341,22 @@ def run_container_worker(
                     # otherwise keep Docker's container removal waiting on I/O.
                     if attached.poll() is None:
                         attached.kill()
-                    attached.wait(timeout=10)
+                    try:
+                        attached.wait(timeout=10)
+                    except (OSError, subprocess.TimeoutExpired) as failure:
+                        raise ContainerWorkerError(
+                            f"Worker attachment cleanup failed: {failure}",
+                            result=result,
+                        ) from failure
             finally:
                 if attached is not None:
                     attached.stdout.close()
                 # Killing the client never substitutes for killing the worker.
-                _remove_owned(name, nonce)
+                try:
+                    _remove_owned(name, nonce)
+                except Exception as failure:
+                    raise ContainerWorkerError(
+                        f"Worker cleanup remains unresolved: {failure}",
+                        result=result,
+                        cleanup_pending=True,
+                    ) from failure

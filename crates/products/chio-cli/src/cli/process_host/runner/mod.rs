@@ -20,6 +20,37 @@ use child::Usage;
 use journal::{Completion, Journal};
 use plan::{FailurePolicy, Plan};
 
+struct Attempt {
+    index: usize,
+    attempt: u32,
+    secret: String,
+    result: std::io::Result<child::Outcome>,
+    cleanup: Option<container::Cleanup>,
+}
+
+enum Supervised {
+    Worker(Attempt),
+    Cleaned(usize, Result<(), String>),
+}
+
+enum Event<T> {
+    Completed(Result<T, tokio::task::JoinError>),
+    Interrupted,
+    Tick,
+}
+
+async fn next_event<T: 'static>(
+    active: &mut JoinSet<T>,
+    interruption: impl std::future::Future<Output = ()>,
+) -> Event<T> {
+    tokio::select! {
+        biased;
+        Some(result) = active.join_next(), if !active.is_empty() => Event::Completed(result),
+        _ = interruption => Event::Interrupted,
+        _ = tokio::time::sleep(Duration::from_millis(100)) => Event::Tick,
+    }
+}
+
 pub(super) fn cleanup_socket_for_export(db: &rusqlite::Connection) -> Result<(), CliError> {
     socket::cleanup_for_export(db)
 }
@@ -28,6 +59,7 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
     let plan: Plan = read_json(plan)?;
     let host = Host::open(state, true)?;
     plan.validate(&host)?;
+    child::preflight()?;
     let mut journal = Journal::open(&host, &plan)?;
     if let Some(service) = &host.lifecycle {
         service
@@ -48,6 +80,9 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
         let service = WorkerService::new(host.runtime.clone());
         for worker in &journal.workers { service.revoke_credentials(&worker.process).map_err(error)?; }
         container::reconcile(&journal).await?;
+        if !journal.containers()?.is_empty() {
+            return Err(error("unresolved container ownership blocks worker replacement; preserve state and reconcile the original engine"));
+        }
         let endpoint = journal.socket_endpoint()?;
         let socket = endpoint.path().to_owned();
         let listener = WorkerServer::bind(&socket, service.clone())?;
@@ -71,8 +106,9 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
         }
         let pending_container_records = journal.containers()?.len();
         let abandoned_socket_intents = journal.abandoned_socket_intents()?;
+        let publication = journal.check_publication();
         host.lease.directory.validate_path_identity()?;
-        let mut report = serde_json::json!({"schema": "chio.process.run-report.v1", "complete": result.is_ok() && drained.is_ok() && cleaned.is_ok() && socket_cleaned.is_ok() && revoke_error.is_none() && !cancelled && completion.complete && pending_container_records == 0, "pending_container_records": pending_container_records, "abandoned_socket_intents": abandoned_socket_intents, "workers": journal.snapshots()?});
+        let mut report = serde_json::json!({"schema": "chio.process.run-report.v1", "complete": result.is_ok() && publication.is_ok() && drained.is_ok() && cleaned.is_ok() && socket_cleaned.is_ok() && revoke_error.is_none() && !cancelled && completion.complete && pending_container_records == 0, "pending_container_records": pending_container_records, "abandoned_socket_intents": abandoned_socket_intents, "workers": journal.snapshots()?});
         if plan.failure_policy == FailurePolicy::Supervised {
             report["schema"] = serde_json::json!("chio.process.run-report.v2");
             report["failure_policy"] = serde_json::json!(plan.failure_policy);
@@ -83,6 +119,7 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
         cleaned?;
         socket_cleaned?;
         result?;
+        publication?;
         drained?;
         if let Some(failure) = revoke_error { return Err(failure); }
         if cancelled { return Err(error("run worker was cancelled during shutdown")); }
@@ -152,7 +189,7 @@ async fn drive(
                     return Err(error("independent work finished; run contains failed workers or failed dependencies; inspect with chio process status and chio process logs"));
                 }
             }
-            if snapshots.iter().all(|s| s.state == "completed") { return Ok(()); }
+            if snapshots.iter().all(|s| s.state == "completed") && active.is_empty() { return journal.check_publication(); }
             let pending: BTreeSet<_> = snapshots.iter().filter(|s| s.state == "pending").map(|s| s.process.as_str()).collect();
             let mut ready = Vec::new();
             for (index, worker) in journal.workers.iter().enumerate() {
@@ -181,6 +218,7 @@ async fn drive(
                 }) else { break };
                 let index = ready.swap_remove(position);
                 let worker = journal.workers[index].clone();
+                if worker.container.is_none() { worker.validate_launch()?; }
                 *root_active.entry(journal.root(&worker.process).to_owned()).or_default() += 1;
                 let attempt = journal.start(&worker)?;
                 service.revoke_credentials(&worker.process).map_err(error)?;
@@ -201,50 +239,56 @@ async fn drive(
                 let resident_ceiling = worker.resources.and_then(|resources| resources.max_resident_bytes);
                 active_ids.insert(index);
                 active.spawn(async move {
-                    let isolated = container.is_some();
-                    let result = if let Some((lease, writer)) = container {
-                        container::run(writer, lease, worker, socket, input).await
-                            .map_err(|failure| std::io::Error::other(failure.to_string()))
-                    } else { match spawned {
+                    let (result, cleanup) = if let Some((lease, writer)) = container {
+                        let (result, cleanup) = container::run(writer, lease, worker, socket, input).await;
+                        (result.map_err(|failure| std::io::Error::other(failure.to_string())), Some(cleanup))
+                    } else { (match spawned {
                         Some(Ok(child)) => child::wait(child, input, timeout, resident_ceiling).await,
                         Some(Err(failure)) => Err(failure),
                         None => Err(std::io::Error::other("missing direct worker launch")),
-                    }};
-                    (index, attempt, secret, isolated, result)
+                    }, None) };
+                    Supervised::Worker(Attempt { index, attempt, secret, result, cleanup })
                 });
             }
-            tokio::select! {
-                biased;
-                _ = terminate.recv() => return Err(error("worker run interrupted; resume with the same plan and state")),
-                _ = interrupt.recv() => return Err(error("worker run interrupted; resume with the same plan and state")),
-                Some(result) = active.join_next(), if !active.is_empty() => {
-                    let (index, attempt, secret, isolated, result) = result.map_err(error)?;
-                    active_ids.remove(&index);
-                    let worker = journal.workers[index].clone();
-                    service.revoke_credentials(&worker.process).map_err(error)?;
-                    let result = if isolated { Ok(result.map_err(error)?) } else { result };
-                    let (success, reason, usage) = match result {
-                        Ok(outcome) => {
-                            child::write_log(logs, &format!("{}-{attempt}.stdout", worker.process), &outcome.stdout, &secret)?;
-                            child::write_log(logs, &format!("{}-{attempt}.stderr", worker.process), &outcome.stderr, &secret)?;
-                            (outcome.success, outcome.reason, outcome.usage)
-                        },
-                        Err(_) => (false, "worker_start_or_io_failed".to_owned(), Usage::default()),
-                    };
-                    let end = if success {
-                        Completion::Completed(&reason)
-                    } else if reason == "exit_75" && host.runtime.registry().worker_waits().map_err(error)?.contains_key(&worker.process) {
-                        Completion::Suspended
-                    } else {
-                        Completion::Failed(&reason)
-                    };
-                    journal.finish(&worker, end, usage)?;
-                    retry_at.insert(index, Instant::now() + Duration::from_secs(1));
+            match next_event(&mut active, async {
+                tokio::select! { _ = terminate.recv() => {}, _ = interrupt.recv() => {} }
+            }).await {
+                Event::Interrupted => return Err(error("worker run interrupted; resume with the same plan and state")),
+                Event::Completed(result) => {
+                    match result.map_err(error)? {
+                        Supervised::Worker(attempt) => {
+                            let index = attempt.index;
+                            let recorded = record_attempt(host, journal, logs, service, &attempt);
+                            if let Some(cleanup) = attempt.cleanup {
+                                active.spawn(async move { Supervised::Cleaned(index, cleanup.run().await.map_err(|failure| failure.to_string())) });
+                            } else { active_ids.remove(&index); }
+                            recorded?;
+                            retry_at.insert(index, Instant::now() + Duration::from_secs(1));
+                        }
+                        Supervised::Cleaned(index, result) => {
+                            active_ids.remove(&index);
+                            result.map_err(error)?;
+                        }
+                    }
                 },
-                _ = tokio::time::sleep(Duration::from_millis(100)) => {},
+                Event::Tick => {},
             }
         }
     }.await;
+    // Preserve results already observed by supervision even when another worker
+    // or diagnostic has stopped scheduling. Only unfinished tasks are aborted.
+    let mut result = result;
+    while let Some(completed) = active.try_join_next() {
+        let recorded = completed.map_err(error).and_then(|event| match event {
+            Supervised::Worker(attempt) => record_attempt(host, journal, logs, service, &attempt),
+            Supervised::Cleaned(_, result) => result.map_err(error),
+        });
+        if let Err(failure) = recorded {
+            if result.is_ok() {
+                result = Err(failure);
+            }
+        }
+    }
     active.shutdown().await;
     for snapshot in journal.snapshots()? {
         if snapshot.state != "running" {
@@ -269,4 +313,87 @@ async fn drive(
         )?;
     }
     result
+}
+
+fn record_attempt(
+    host: &Host,
+    journal: &mut Journal<'_>,
+    logs: &chio_control_plane::PreparedPrivateDirectory,
+    service: &WorkerService,
+    attempt: &Attempt,
+) -> Result<(), CliError> {
+    let worker = journal.workers[attempt.index].clone();
+    let outcome = match &attempt.result {
+        Ok(outcome) => outcome,
+        Err(failure) => {
+            if child::definitely_unexecuted(failure) {
+                journal.unreserve(&worker)?;
+            } else {
+                journal.finish(
+                    &worker,
+                    Completion::Terminal("worker_launch_or_wait_uncertain"),
+                    Usage::default(),
+                )?;
+            }
+            service.revoke_credentials(&worker.process).map_err(error)?;
+            return Err(error(failure));
+        }
+    };
+    let end = if outcome.success {
+        Completion::Completed(&outcome.reason)
+    } else if matches!(
+        outcome.reason.as_str(),
+        "container_attachment_lost" | "container_state_unknown"
+    ) {
+        Completion::Terminal(&outcome.reason)
+    } else if outcome.reason == "exit_75"
+        && host
+            .runtime
+            .registry()
+            .worker_waits()
+            .map_err(error)?
+            .contains_key(&worker.process)
+    {
+        Completion::Suspended
+    } else {
+        Completion::Failed(&outcome.reason)
+    };
+    journal.finish(&worker, end, outcome.usage)?;
+    service.revoke_credentials(&worker.process).map_err(error)?;
+    child::write_log(
+        logs,
+        &format!("{}-{}.stdout", worker.process, attempt.attempt),
+        &outcome.stdout,
+        &attempt.secret,
+    )?;
+    child::write_log(
+        logs,
+        &format!("{}-{}.stderr", worker.process, attempt.attempt),
+        &outcome.stderr,
+        &attempt.secret,
+    )?;
+    if let Some(diagnostic) = &outcome.diagnostic {
+        return Err(error(diagnostic));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn known_completion_precedes_ready_interruption() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let mut active = JoinSet::new();
+        let completed = active.spawn(async { "exit_0" });
+        while !completed.is_finished() {
+            tokio::task::yield_now().await;
+        }
+        match next_event(&mut active, std::future::ready(())).await {
+            Event::Completed(result) => assert_eq!(result?, "exit_0"),
+            _ => panic!("ready completion was discarded by interruption"),
+        }
+        Ok(())
+    }
 }

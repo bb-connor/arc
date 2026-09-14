@@ -216,6 +216,29 @@ impl Worker {
                 "invalid worker command, paths, identity or restart limits",
             ));
         }
+        if self.container.is_none() {
+            self.validate_launch()?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn validate_launch(&self) -> Result<(), CliError> {
+        if !std::fs::metadata(&self.command[0])?.is_file()
+            || !std::fs::metadata(&self.cwd)?.is_dir()
+        {
+            return Err(error(
+                "worker executable must be a file and cwd must be a directory",
+            ));
+        }
+        for path in [std::path::Path::new(&self.command[0]), &self.cwd] {
+            rustix::fs::accessat(
+                rustix::fs::CWD,
+                path,
+                rustix::fs::Access::EXEC_OK,
+                rustix::fs::AtFlags::EACCESS,
+            )
+            .map_err(std::io::Error::from)?;
+        }
         Ok(())
     }
 }

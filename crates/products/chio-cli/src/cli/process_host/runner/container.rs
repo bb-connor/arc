@@ -19,10 +19,19 @@ use crate::CliError;
 
 const OWNER: &str = "chio.runner.owner";
 
+// The unit suite replaces only the engine executable. All supervision, durable
+// transitions, ownership validation and completion classification remain real.
+#[cfg(test)]
+static ENGINE_COMMAND: std::sync::Mutex<Option<std::path::PathBuf>> = std::sync::Mutex::new(None);
+
+#[cfg(test)]
+static ENGINE_FIXTURE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 pub(super) struct Lease {
     pub owner: String,
     pub engine: String,
     pub id: Option<String>,
+    pub create_rejected: bool,
 }
 
 impl Lease {
@@ -32,7 +41,16 @@ impl Lease {
 }
 
 fn command(arguments: &[String]) -> Command {
+    #[cfg(not(test))]
     let mut command = Command::new("/usr/bin/docker");
+    #[cfg(test)]
+    let mut command = Command::new(
+        ENGINE_COMMAND
+            .lock()
+            .ok()
+            .and_then(|path| path.clone())
+            .unwrap_or_else(|| "/usr/bin/docker".into()),
+    );
     command
         .args(["--host", "unix:///var/run/docker.sock"])
         .args(arguments)
@@ -47,7 +65,42 @@ fn strings(arguments: &[&str]) -> Vec<String> {
 }
 
 async fn control(arguments: &[&str]) -> Result<Vec<u8>, CliError> {
-    let child = child::spawn_command(command(&strings(arguments)), None)?;
+    control_attempt(arguments).await.map_err(error)
+}
+
+#[derive(Debug)]
+enum ControlFailure {
+    Exited { reason: String, stderr: Vec<u8> },
+    Uncertain(String),
+}
+
+impl std::fmt::Display for ControlFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (kind, reason) = match self {
+            Self::Exited { reason, .. } => ("client exited", reason),
+            Self::Uncertain(reason) => ("uncertain", reason),
+        };
+        write!(
+            formatter,
+            "local Docker control {kind} ({reason}); preserve state and engine for recovery"
+        )
+    }
+}
+
+impl ControlFailure {
+    fn rejects_image(&self, image: &str) -> bool {
+        // A client exit can also mean a lost response. Recognize only this
+        // positive daemon refusal, bound to the exact requested image. Other
+        // failures retain uncertainty even when immediate inventory is empty.
+        matches!(self, Self::Exited { stderr, .. }
+            if std::str::from_utf8(stderr).is_ok_and(|message|
+                message.trim() == format!("Error response from daemon: No such image: {image}")))
+    }
+}
+
+async fn control_attempt(arguments: &[&str]) -> Result<Vec<u8>, ControlFailure> {
+    let child = child::spawn_command(command(&strings(arguments)), None)
+        .map_err(|failure| ControlFailure::Uncertain(failure.to_string()))?;
     let outcome = child::wait_bounded(
         child,
         Vec::new(),
@@ -55,9 +108,17 @@ async fn control(arguments: &[&str]) -> Result<Vec<u8>, CliError> {
         None,
         Some(65_536),
     )
-    .await?;
+    .await
+    .map_err(|failure| ControlFailure::Uncertain(failure.to_string()))?;
     if !outcome.success {
-        return Err(error("local Docker control failed or timed out; preserve the host state and engine for recovery"));
+        return Err(if outcome.reason.starts_with("exit_") {
+            ControlFailure::Exited {
+                reason: outcome.reason,
+                stderr: outcome.stderr,
+            }
+        } else {
+            ControlFailure::Uncertain(outcome.reason)
+        });
     }
     Ok(outcome.stdout)
 }
@@ -209,7 +270,15 @@ pub(super) async fn create(
     ]);
     args.extend(worker.command[1..].iter().cloned());
     let references: Vec<_> = args.iter().map(String::as_str).collect();
-    let response = control(&references).await?;
+    let response = match control_attempt(&references).await {
+        Ok(response) => response,
+        Err(failure) => {
+            if failure.rejects_image(image) {
+                journal.create_rejected(lease)?;
+            }
+            return Err(error(failure));
+        }
+    };
     let id = String::from_utf8(response)
         .map_err(error)?
         .trim()
@@ -258,13 +327,15 @@ struct Record {
     name: String,
     labels: BTreeMap<String, String>,
     running: bool,
+    status: String,
+    started_at: String,
     exit_code: i32,
     oom_killed: bool,
 }
 
 async fn inspect(id: &str) -> Result<Record, CliError> {
     decode(&control(&["container", "inspect", "--format",
-        r#"{"id":{{json .Id}},"name":{{json .Name}},"labels":{{json .Config.Labels}},"running":{{json .State.Running}},"exit_code":{{json .State.ExitCode}},"oom_killed":{{json .State.OOMKilled}}}"#, id]).await?)
+        r#"{"id":{{json .Id}},"name":{{json .Name}},"labels":{{json .Config.Labels}},"running":{{json .State.Running}},"status":{{json .State.Status}},"started_at":{{json .State.StartedAt}},"exit_code":{{json .State.ExitCode}},"oom_killed":{{json .State.OOMKilled}}}"#, id]).await?)
 }
 
 fn owned(lease: &Lease, record: &Record) -> Result<(), CliError> {
@@ -335,7 +406,7 @@ async fn remove(lease: &Lease) -> Result<bool, CliError> {
     }
     // No ID was committed and no object is visible: an in-flight create may
     // still finish, but no start was issued. Retain its intent for later sweeps.
-    Ok(false)
+    Ok(lease.create_rejected)
 }
 
 pub(super) async fn reconcile(journal: &Journal<'_>) -> Result<(), CliError> {
@@ -356,25 +427,48 @@ pub(super) async fn outcome(lease: &Lease, outcome: &mut Outcome) -> Result<(), 
     )
     .await?;
     owned(lease, &record)?;
+    classify(&record, outcome);
+    Ok(())
+}
+
+fn classify(record: &Record, outcome: &mut Outcome) {
     // Docker attachment exit status alone cannot prove that worker execution ended.
     if record.running {
         outcome.success = false;
-        if outcome.reason.starts_with("exit_") {
+        if !matches!(outcome.reason.as_str(), "timeout" | "output_ceiling") {
             outcome.reason = "container_attachment_lost".to_owned();
         }
-    } else if outcome.reason.starts_with("exit_") {
+    } else if record.status == "created" && record.started_at.starts_with("0001-") {
+        outcome.success = false;
+        outcome.reason = "container_never_started".to_owned();
+    } else if record.status == "exited"
+        && chrono::DateTime::parse_from_rfc3339(&record.started_at)
+            .is_ok_and(|started| chrono::Datelike::year(&started) > 1)
+    {
+        if !outcome.reason.starts_with("exit_") {
+            outcome.diagnostic = Some(format!(
+                "container worker exit observed after attachment {}",
+                outcome.reason
+            ));
+        }
         outcome.success = record.exit_code == 0 && !record.oom_killed;
         outcome.reason = if record.oom_killed {
             "container_memory_ceiling".to_owned()
         } else {
             format!("exit_{}", record.exit_code)
         };
+    } else {
+        outcome.success = false;
+        outcome.reason = "container_state_unknown".to_owned();
     }
     // wait4 accounted the Docker client, not the worker cgroup. Do not publish
     // those host-side numbers as worker resource measurements.
     outcome.usage = Usage::default();
-    Ok(())
 }
+
+#[cfg(test)]
+#[path = "container_tests.rs"]
+mod tests;
 
 /// Supervision, including removal on timeout, runs in its own scheduler slot.
 /// Cancelling the task kills the Docker client; the runner then reconciles all
@@ -385,8 +479,8 @@ pub(super) async fn run(
     worker: Worker,
     socket: std::path::PathBuf,
     input: Vec<u8>,
-) -> Result<Outcome, CliError> {
-    let result = async {
+) -> (Result<Outcome, CliError>, Cleanup) {
+    let result: Result<Outcome, CliError> = async {
         create(&mut writer, &mut lease, &worker, &socket).await?;
         let spawned = attach(&lease)?;
         let mut result = child::wait_bounded(
@@ -401,8 +495,37 @@ pub(super) async fn run(
         Ok(result)
     }
     .await;
-    if remove(&lease).await? {
-        writer.removed(&lease)?;
+    let result = result.or_else(|failure| {
+        if lease.create_rejected {
+            Ok(Outcome {
+                success: false,
+                reason: "container_create_rejected".into(),
+                usage: Usage::default(),
+                stdout: vec![],
+                stderr: failure.to_string().into_bytes(),
+                diagnostic: None,
+            })
+        } else {
+            Err(failure)
+        }
+    });
+    (result, Cleanup { writer, lease })
+}
+
+pub(super) struct Cleanup {
+    writer: ContainerWriter,
+    lease: Lease,
+}
+
+impl Cleanup {
+    pub(super) async fn run(mut self) -> Result<(), CliError> {
+        if remove(&self.lease).await? {
+            self.writer.removed(&self.lease)?;
+            Ok(())
+        } else {
+            Err(error(
+                "container creation remains uncertain; retain its ownership record",
+            ))
+        }
     }
-    result
 }

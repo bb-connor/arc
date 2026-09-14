@@ -80,10 +80,19 @@ before sending any start request. An interrupted create with no committed ID
 cannot have received a start request from this runner.
 
 On normal exit, timeout, output overflow or cooperative suspension, supervision
-checks the actual container state and removes the exact owned container before
-the attempt is recorded and another attempt starts. Attachment exit alone is
-not proof of successful worker completion. Removal verifies both owner and name;
-an engine failure is never interpreted as absence.
+checks the actual container state. Only an owned, actually started, exited worker
+provides a completed exit; a never-started `created` object is not success.
+An attachment failure cannot erase an independently confirmed worker exit.
+Unknown or contradictory state is terminal for automatic worker retry and
+requires operator reconciliation of the application's operation identities.
+
+The runner records the observed exit before log retention and cleanup. Cleanup
+then occupies the same scheduler slot until the exact owned object is removed.
+A log, attachment diagnostic or cleanup failure can fail the command while the
+worker remains durably completed. Resume cleans up without launching that
+completed worker again. Removal verifies owner, name and exact ID; an engine
+failure is never interpreted as absence. Completed worker rows alone do not
+make the run complete or authorize export while ownership debt remains.
 
 On SIGINT/SIGTERM, the runner stops its active attachments, revokes credentials,
 reconciles its container records and drains the host. SIGKILL can leave a
@@ -94,6 +103,14 @@ a new listener or launching replacements. Host loss consumes the reserved
 attempt. A changed engine identity or container name fails closed before a new
 attempt is reserved.
 
+The daemon's exact missing-image refusal, bound to the requested immutable image,
+is retained as a definitive create rejection. A nonzero client exit alone is
+insufficient: it can also mean response loss while daemon work remains in flight.
+A definitively rejected create-only record may be retired only after successful inventory
+on the original engine confirms absence (or verified owned removal). Timeout,
+output-limit failure and other uncertain control outcomes do not grant this
+permission. Legacy records migrate with no definitive-rejection evidence.
+
 If a create request lost its response and no object is yet visible, its record
 is retained. A late create can leave an inert container; later startup/shutdown
 sweeps remove it once visible. An absent object alone cannot prove that an
@@ -103,6 +120,7 @@ operator investigation; this version provides no override to forget uncertain
 creation. `process export` refuses unresolved ownership before retiring the
 authority. The run report exposes `pending_container_records` and cannot claim
 completion while any remain. Export works after all records are reconciled.
+Unresolved records also block replacement workers on resume.
 
 ## Qualification
 

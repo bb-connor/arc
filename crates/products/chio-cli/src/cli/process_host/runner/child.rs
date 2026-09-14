@@ -34,6 +34,7 @@ pub(super) struct Outcome {
     pub usage: Usage,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
+    pub diagnostic: Option<String>,
 }
 
 /// A spawned worker and a descriptor naming exactly that process. Signals go
@@ -42,9 +43,73 @@ pub(super) struct Outcome {
 pub(super) struct Spawned {
     child: Child,
     process: ProcessFd,
+    resident: ResidentProcess,
+}
+
+struct ResidentProcess(OwnedFd);
+
+impl ResidentProcess {
+    fn open(path: &Path) -> io::Result<Self> {
+        Ok(Self(rustix::fs::open(
+            path,
+            rustix::fs::OFlags::PATH | rustix::fs::OFlags::DIRECTORY | rustix::fs::OFlags::CLOEXEC,
+            rustix::fs::Mode::empty(),
+        )?))
+    }
+
+    fn status(&self) -> io::Result<String> {
+        use std::io::Read;
+        let descriptor = rustix::fs::openat(
+            &self.0,
+            "status",
+            rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::CLOEXEC,
+            rustix::fs::Mode::empty(),
+        )?;
+        let mut status = String::new();
+        std::fs::File::from(descriptor).read_to_string(&mut status)?;
+        Ok(status)
+    }
 }
 
 struct ProcessFd(OwnedFd);
+
+#[derive(Debug)]
+struct LaunchFailure {
+    definite: bool,
+    source: io::Error,
+}
+
+impl std::fmt::Display for LaunchFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}: {}",
+            if self.definite {
+                "worker did not execute"
+            } else {
+                "worker may have executed"
+            },
+            self.source
+        )
+    }
+}
+
+impl std::error::Error for LaunchFailure {}
+
+fn launch_failure(source: io::Error, definite: bool) -> io::Error {
+    io::Error::new(source.kind(), LaunchFailure { definite, source })
+}
+
+pub(super) fn definitely_unexecuted(failure: &io::Error) -> bool {
+    failure
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<LaunchFailure>())
+        .is_some_and(|failure| failure.definite)
+}
+
+pub(super) fn preflight() -> io::Result<()> {
+    ProcessFd::open(std::process::id() as libc::pid_t).map(drop)
+}
 
 impl ProcessFd {
     fn open(pid: libc::pid_t) -> io::Result<Self> {
@@ -133,15 +198,31 @@ pub(super) fn spawn_command(
             Ok(())
         });
     }
-    let mut child = command.spawn()?;
+    let mut child = command
+        .spawn()
+        .map_err(|failure| launch_failure(failure, true))?;
     // Nothing reaps the child before it is waited for, so its id names it here.
     let pid = libc::pid_t::try_from(child.id()).map_err(io::Error::other)?;
     match ProcessFd::open(pid) {
-        Ok(process) => Ok(Spawned { child, process }),
+        Ok(process) => {
+            let resident = match ResidentProcess::open(Path::new(&format!("/proc/{pid}"))) {
+                Ok(resident) => resident,
+                Err(failure) => {
+                    process.kill()?;
+                    child.wait()?;
+                    return Err(launch_failure(failure, false));
+                }
+            };
+            Ok(Spawned {
+                child,
+                process,
+                resident,
+            })
+        }
         Err(failure) => {
             child.kill()?;
             child.wait()?;
-            Err(failure)
+            Err(launch_failure(failure, false))
         }
     }
 }
@@ -187,8 +268,8 @@ fn millis(time: libc::timeval) -> u64 {
 
 /// The worker's peak resident set so far. None once the process has exited
 /// or when procfs does not report it.
-fn peak_resident(pid: libc::pid_t) -> Option<u64> {
-    let status = std::fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
+fn peak_resident(process: &ResidentProcess) -> Option<u64> {
+    let status = process.status().ok()?;
     let value = status
         .lines()
         .find_map(|line| line.strip_prefix("VmHWM:"))?;
@@ -257,7 +338,11 @@ pub(super) async fn wait_bounded(
     resident_ceiling: Option<u64>,
     output_ceiling: Option<usize>,
 ) -> io::Result<Outcome> {
-    let Spawned { mut child, process } = spawned;
+    let Spawned {
+        mut child,
+        process,
+        resident,
+    } = spawned;
     let pid = libc::pid_t::try_from(child.id()).map_err(io::Error::other)?;
     let mut guard = Guard {
         process,
@@ -299,34 +384,35 @@ pub(super) async fn wait_bounded(
             .take()
             .ok_or_else(|| io::Error::other("missing stdin"))?,
     )?;
-    let bootstrap = tokio::time::timeout(Duration::from_secs(5), stdin.write_all(&input)).await;
-    drop(stdin);
+    let bootstrap = async move { stdin.write_all(&input).await };
+    tokio::pin!(bootstrap);
+    let mut bootstrapped = false;
     let mut samples = tokio::time::interval(RESIDENT_SAMPLE_INTERVAL);
     samples.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     let mut reaped = None;
-    let mut end = if matches!(bootstrap, Ok(Ok(()))) {
-        loop {
-            tokio::select! {
-                biased;
-                result = &mut reaping => {
-                    reaped = Some(result);
-                    break End::Exited;
+    let mut end = loop {
+        tokio::select! {
+            biased;
+            result = &mut reaping => {
+                reaped = Some(result);
+                break End::Exited;
+            }
+            _ = &mut deadline => break End::Timeout,
+            result = &mut bootstrap, if !bootstrapped => {
+                if result.is_err() { break End::BootstrapFailed; }
+                bootstrapped = true;
+            }
+            _ = samples.tick(), if resident_ceiling.is_some() || output_ceiling.is_some() => {
+                if output_ceiling.is_some_and(|limit| total.load(Ordering::Relaxed) > limit) {
+                    break End::OutputCeiling;
                 }
-                _ = &mut deadline => break End::Timeout,
-                _ = samples.tick(), if resident_ceiling.is_some() || output_ceiling.is_some() => {
-                    if output_ceiling.is_some_and(|limit| total.load(Ordering::Relaxed) > limit) {
-                        break End::OutputCeiling;
-                    }
-                    if let Some(ceiling) = resident_ceiling {
-                        if peak_resident(pid).is_some_and(|peak| peak > ceiling) {
-                            break End::ResidentCeiling;
-                        }
+                if let Some(ceiling) = resident_ceiling {
+                    if peak_resident(&resident).is_some_and(|peak| peak > ceiling) {
+                        break End::ResidentCeiling;
                     }
                 }
             }
         }
-    } else {
-        End::BootstrapFailed
     };
     let result = match reaped {
         Some(result) => result,
@@ -377,6 +463,7 @@ pub(super) async fn wait_bounded(
         usage,
         stdout: copy(stdout)?,
         stderr: copy(stderr)?,
+        diagnostic: None,
     })
 }
 
@@ -395,4 +482,65 @@ pub(super) fn write_log(
         content.truncate(end);
     }
     directory.write_new_secret(Path::new(name), content.as_bytes())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resident_reader_never_follows_reused_identity() -> Result<(), Box<dyn std::error::Error>> {
+        let root = tempfile::tempdir()?;
+        let path = root.path().join("123");
+        std::fs::create_dir(&path)?;
+        std::fs::write(path.join("status"), "VmHWM: 12 kB\n")?;
+        let process = ResidentProcess::open(&path)?;
+        assert_eq!(peak_resident(&process), Some(12_288));
+        std::fs::remove_file(path.join("status"))?;
+        std::fs::remove_dir(&path)?;
+        std::fs::create_dir(&path)?;
+        std::fs::write(path.join("status"), "VmHWM: 999 kB\n")?;
+        assert_eq!(
+            peak_resident(&process),
+            None,
+            "reaped task's numeric path sampled a new task"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn bootstrap_obeys_attempt_deadline() -> Result<(), Box<dyn std::error::Error>> {
+        let mut command = Command::new("/usr/bin/sleep");
+        command.arg("10");
+        let child = spawn_command(command, None)?;
+        let started = std::time::Instant::now();
+        let result = wait(
+            child,
+            vec![b'x'; 1024 * 1024],
+            Duration::from_millis(100),
+            None,
+        )
+        .await?;
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "bootstrap spent its own five-second budget"
+        );
+        assert_eq!(result.reason, "timeout");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn slow_bootstrap_can_use_its_configured_deadline(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut command = Command::new("/usr/bin/python3");
+        command.args([
+            "-c",
+            "import sys,time; time.sleep(6); assert len(sys.stdin.buffer.read()) == 1048576",
+        ]);
+        let child = spawn_command(command, None)?;
+        let result = wait(child, vec![b'x'; 1024 * 1024], Duration::from_secs(9), None).await?;
+        assert!(result.success, "{}", result.reason);
+        assert_eq!(result.reason, "exit_0");
+        Ok(())
+    }
 }

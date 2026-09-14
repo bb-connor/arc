@@ -67,8 +67,19 @@ host artifact directory and no persistent Docker log stream.
 The operator removes the actual container on normal completion, nonzero exit,
 timeout or output overflow. It closes the Docker attachment before removing the
 container so an unread output pipe cannot block cleanup. Killing the Docker
-client alone never establishes that the worker stopped. Cleanup errors propagate
-instead of reporting a completed attempt.
+client alone never establishes that the worker stopped. Completion requires the
+owned exact container ID, an actual start timestamp and an exited, non-running
+worker state. Never-started and unknown states cannot report success. An
+independently confirmed worker exit survives an attachment-client failure.
+
+Diagnostic and cleanup errors raise `ContainerWorkerError`. Its optional
+`result` retains an already observed `ContainerResult`; callers must reconcile
+that result rather than repeat a completed effect. `cleanup_pending` is true
+when container removal remains unresolved, even if `result.exit_code` is zero.
+Successful completion does not waive that cleanup debt. The exception provides
+in-process evidence only; this helper still has no durable journal. Cleanup
+uses the inspected exact ID and treats only a specific missing-object reply as
+absence; unrelated daemon errors retain uncertainty.
 
 The operator process must remain alive to enforce its wall-clock deadline and
 perform cleanup. Abrupt death of that operator, loss of Docker or loss of the

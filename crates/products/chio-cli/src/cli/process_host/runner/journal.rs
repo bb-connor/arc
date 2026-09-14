@@ -23,6 +23,7 @@ pub(super) struct Journal<'a> {
     /// The parent each adaptive child was submitted by.
     parents: BTreeMap<String, String>,
     registry: chio_process::ProcessRegistry,
+    publication_failure: std::cell::RefCell<Option<String>>,
 }
 
 /// Each active container owns a connection so engine I/O cannot block the
@@ -30,6 +31,16 @@ pub(super) struct Journal<'a> {
 pub(super) struct ContainerWriter(Connection);
 
 impl ContainerWriter {
+    pub fn create_rejected(&mut self, lease: &mut Lease) -> Result<(), CliError> {
+        let changed = self.0.execute("UPDATE run_containers SET create_rejected=1 WHERE owner=?1 AND container_id IS NULL", [&lease.owner]).map_err(error)?;
+        if changed != 1 {
+            return Err(error(
+                "create rejection does not match a create-only intent",
+            ));
+        }
+        lease.create_rejected = true;
+        Ok(())
+    }
     pub fn created(&mut self, lease: &mut Lease, id: String) -> Result<(), CliError> {
         let changed = self
             .0
@@ -124,6 +135,16 @@ impl<'a> Journal<'a> {
         tx.execute_batch("CREATE TABLE IF NOT EXISTS run_binding(singleton INTEGER PRIMARY KEY CHECK(singleton=1), binding TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS run_workers(process TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('pending','running','completed','failed')), attempts INTEGER NOT NULL DEFAULT 0, suspensions INTEGER NOT NULL DEFAULT 0 CHECK(suspensions <= attempts), outcome TEXT, peak_resident_bytes INTEGER NOT NULL DEFAULT 0, cpu_ms INTEGER NOT NULL DEFAULT 0);").map_err(error)?;
         tx.execute_batch("CREATE TABLE IF NOT EXISTS run_containers(owner TEXT PRIMARY KEY, process TEXT NOT NULL, attempt INTEGER NOT NULL, engine TEXT NOT NULL, container_id TEXT, UNIQUE(process,attempt));").map_err(error)?;
+        let container_columns = tx
+            .prepare("PRAGMA table_info(run_containers)")
+            .map_err(error)?
+            .query_map([], |row| row.get::<_, String>(1))
+            .map_err(error)?
+            .collect::<Result<BTreeSet<_>, _>>()
+            .map_err(error)?;
+        if !container_columns.contains("create_rejected") {
+            tx.execute_batch("ALTER TABLE run_containers ADD COLUMN create_rejected INTEGER NOT NULL DEFAULT 0 CHECK(create_rejected IN (0,1))").map_err(error)?;
+        }
         tx.execute_batch("CREATE TABLE IF NOT EXISTS run_child_settlements(parent TEXT NOT NULL, child TEXT NOT NULL, request_id TEXT NOT NULL, PRIMARY KEY(parent,child));").map_err(error)?;
         // Journals written before suspensions were counted gain the column; their
         // recorded attempts all count as failures, as they did when recorded.
@@ -199,6 +220,7 @@ impl<'a> Journal<'a> {
             workers,
             parents,
             registry,
+            publication_failure: std::cell::RefCell::new(None),
         };
         journal.publish_status()?;
         Ok(journal)
@@ -263,6 +285,23 @@ impl<'a> Journal<'a> {
             let _ = std::fs::remove_file(self.directory.path().join(&temporary));
         }
         result.map_err(error)
+    }
+
+    fn publish_observation(&self) {
+        if let Err(failure) = self.publish_status() {
+            self.publication_failure
+                .borrow_mut()
+                .get_or_insert_with(|| failure.to_string());
+        }
+    }
+
+    pub fn check_publication(&self) -> Result<(), CliError> {
+        if let Some(failure) = self.publication_failure.borrow().as_ref() {
+            return Err(error(format!(
+                "worker state committed but status publication failed: {failure}"
+            )));
+        }
+        Ok(())
     }
 
     pub fn dependencies(&self, worker: &Worker) -> Result<Vec<String>, CliError> {
@@ -384,7 +423,7 @@ impl<'a> Journal<'a> {
                 }
             }
             tx.commit().map_err(error)?;
-            self.publish_status()?;
+            self.publish_observation();
         }
         Ok(())
     }
@@ -420,7 +459,7 @@ impl<'a> Journal<'a> {
             changed = true;
         }
         if changed {
-            self.publish_status()?;
+            self.publish_observation();
         }
         Ok(())
     }
@@ -477,7 +516,7 @@ impl<'a> Journal<'a> {
                 |r| r.get(0),
             )
             .map_err(error)?;
-        self.publish_status()?;
+        self.publish_observation();
         Ok(attempt)
     }
 
@@ -493,12 +532,23 @@ impl<'a> Journal<'a> {
             owner: uuid::Uuid::new_v4().simple().to_string(),
             engine,
             id: None,
+            create_rejected: false,
         };
         let changed = self.db.execute("INSERT INTO run_containers(owner,process,attempt,engine) SELECT ?1,process,attempts,?2 FROM run_workers WHERE process=?3 AND attempts=?4 AND state='running'", params![lease.owner, lease.engine, process, attempt]).map_err(error)?;
         if changed != 1 {
             return Err(error("container has no reserved worker attempt"));
         }
         Ok(lease)
+    }
+
+    /// Only Command::spawn's definite pre-exec refusal authorizes this rollback.
+    pub fn unreserve(&self, worker: &Worker) -> Result<(), CliError> {
+        let changed = self.db.execute("UPDATE run_workers SET state='pending',attempts=attempts-1,outcome='worker_not_executed' WHERE process=?1 AND state='running' AND attempts>suspensions AND NOT EXISTS(SELECT 1 FROM run_containers WHERE process=?1)", [&worker.process]).map_err(error)?;
+        if changed != 1 {
+            return Err(error("unexecuted launch does not match its reservation"));
+        }
+        self.publish_observation();
+        Ok(())
     }
 
     pub fn container_writer(&self) -> Result<ContainerWriter, CliError> {
@@ -512,13 +562,14 @@ impl<'a> Journal<'a> {
 
     pub fn containers(&self) -> Result<Vec<Lease>, CliError> {
         self.db
-            .prepare("SELECT owner,engine,container_id FROM run_containers ORDER BY owner")
+            .prepare("SELECT owner,engine,container_id,create_rejected FROM run_containers ORDER BY owner")
             .map_err(error)?
             .query_map([], |row| {
                 Ok(Lease {
                     owner: row.get(0)?,
                     engine: row.get(1)?,
                     id: row.get(2)?,
+                    create_rejected: row.get(3)?,
                 })
             })
             .map_err(error)?
@@ -577,7 +628,7 @@ impl<'a> Journal<'a> {
         if changed != 1 {
             return Err(error("worker completion does not match its active attempt"));
         }
-        self.publish_status()?;
+        self.publish_observation();
         Ok(())
     }
 }
