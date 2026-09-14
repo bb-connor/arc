@@ -1,10 +1,12 @@
 # M4 execution plan: consumer-boundary qualification
 
-Status: M4 implementation and focused acceptance are in progress on 2026-09-13.
-The baseline repairs, physical consumer inventory, negotiated mediation and
-public parser changes are implemented. Final M4.8 composed qualification is
-still running; unchecked acceptance items are not waived by this status.
-This document does not yet qualify the milestone.
+Status: M4.0-M4.8 local acceptance is complete on 2026-09-14 UTC, including the
+repaired-source composed workspace, explicit consumer profiles, final review,
+source checks and calibrated CI repairs. Hosted serial control-plane acceptance
+passed all 17 earlier failures; its full MSRV job exhausted the four-hour outer
+limit during SQLite. The bounded capacity repair passed locally, but complete
+exact-candidate hosted qualification remains an M10 release requirement. No
+required local M4 gate or supported native caller profile was deferred.
 Current command results and remaining gates are recorded in the
 [local acceptance report](m4-local-acceptance.md).
 This expands [M4 in the accepted execution plan](launch-execution-plan.md#m4-close-constructor-protocol-and-sdk-bypasses);
@@ -231,7 +233,8 @@ The worklist is maintained in [the consumer support ledger](consumer-support.md)
 The existing adapter source gate now checks 29 construction and 86 dispatch
 references. The ledger separately maps public protocol, caller, portable and SDK
 roles to their owner tests, including effect-only connectors and non-production
-harnesses. Source classification does not substitute for the pending final gates.
+harnesses. Source classification supplements the separately completed local
+execution gates; it does not establish deployment qualification.
 
 Owner: existing `formal/adapter-source-inventory.toml`,
 `xtask/src/adapter_no_bypass.rs` and `xtask/src/adapter_no_bypass/source.rs`, with
@@ -278,26 +281,26 @@ not a count copied from the old 62-constructor snapshot.
 Owners: central control-plane installation, runtime/harness, HTTP authority,
 CLI wrapping and API-protect construction paths identified by M4.1.
 
-- [ ] Route enforcement-capable constructors through the established installation
+- [x] Route enforcement-capable constructors through the established installation
   contract. Where layering precludes a control-plane dependency, keep neutral
   kernel ports and reject unsupported opted-in profiles before effect-capable
   launch or authority acquisition. Do not add a kernel-to-policy/flow dependency.
-- [ ] Validate the full selected authority profile: durable budget/admission,
+- [x] Validate the full selected authority profile: durable budget/admission,
   receipt and revocation state; required runtime, approval and DPoP participants;
   native flow/release/declassification custody; verified manifests; tenant policy;
   topology and trusted security-context source; executor pin for caller execution.
   Configured authority selection and request-triggered credential use are distinct.
-- [ ] Refuse missing, ephemeral, mismatched, inactive or unreadable required stores
+- [x] Refuse missing, ephemeral, mismatched, inactive or unreadable required stores
   without silently constructing replacements. Verify explicit legacy/ephemeral
   constructors cannot advertise the enforced or durable profile.
-- [ ] Bind tenant/session/subject/epoch/lineage/generation to the trusted host or
+- [x] Bind tenant/session/subject/epoch/lineage/generation to the trusted host or
   authenticated session. Headers, request bodies and discovery objects cannot
   select authority identities or upgrade historical context into live authority.
-- [ ] Verify the exact installed guard/hook order, including existing restrictive
+- [x] Verify the exact installed guard/hook order, including existing restrictive
   overlays. Tripwire/containment and flow precede ordinary guards; raw-output
   tripwire precedes sanitization; final flow checks follow sanitization. Preserve
   existing added restrictions rather than reducing installation to an old list.
-- [ ] Test Disabled compatibility, Shadow observation and Enforce denial/allow
+- [x] Test Disabled compatibility, Shadow observation and Enforce denial/allow
   behavior at each applicable public factory. Shadow must not grant permission
   to bypass authentication or other independently enforced policy.
 
@@ -314,22 +317,22 @@ capability issuance/session negotiation, manifest parsing/registry and federatio
 handshake consumers. Preserve the existing implementation unless a test exposes
 a gap.
 
-- [ ] Exercise negotiated aggregate and cumulative approval semantics from
+- [x] Exercise negotiated aggregate and cumulative approval semantics from
   advertisement/intersection through issuance, verification and dispatch. Legacy
   default features remain disabled as specified. Unknown or unnegotiated required
   semantics reject; a request field cannot select a rollout profile.
-- [ ] Preserve exact signed aggregate/cumulative root bindings through delegation
+- [x] Preserve exact signed aggregate/cumulative root bindings through delegation
   and lineage. Test omission, substitution and mixed-version peers. Apply the
   established portable multi-hop rejection until its authenticated witness
   contract exists; do not invent new portable delegation support in M4.
-- [ ] Verify one normative public `ToolDefinition`, explicit v1 parsing/migration,
+- [x] Verify one normative public `ToolDefinition`, explicit v1 parsing/migration,
   v2 re-signing requirements, strict nested fields and unambiguous latency and
   side-effect annotations. Discovery data never substitutes for a verified v2
   registry entry.
-- [ ] Test publisher flow declarations against tenant/data-owner policy and
+- [x] Test publisher flow declarations against tenant/data-owner policy and
   mandatory runtime egress. A publisher cannot widen clearance, erase an output
   floor, invent declassification purposes or label a remote boundary local.
-- [ ] Preserve the legacy per-request approval constraint distinctly from
+- [x] Preserve the legacy per-request approval constraint distinctly from
   cumulative approval. Test complete threshold sets, typed intents and negotiated
   bindings without widening M3's explicitly unsupported combined profiles.
 
@@ -344,24 +347,24 @@ Owners: the M4.1 affected MCP, A2A, ACP-Client, provider, Tower, OpenAPI and
 cross-protocol routes, reusing existing request builders and
 `BridgeSecurityMetadata`.
 
-- [ ] For each transformation, record input/output representation and preserve
+- [x] For each transformation, record input/output representation and preserve
   canonical authenticated semantics: flow declaration, root bindings, full
   approval set/proposal, governed intent, DPoP binding, context references,
   supplemental extension, operation ID and combined capture metadata.
-- [ ] Carry constrained metadata in the authenticated Chio envelope or retained
+- [x] Carry constrained metadata in the authenticated Chio envelope or retained
   registry-bound sidecar when the external protocol lacks fields. Removing the
   sidecar, changing registry coordinates or exporting/importing without required
   authentication must reject. Human-readable descriptions are never authority.
-- [ ] Keep supplemental authorization opaque for the installed verifier. Never
+- [x] Keep supplemental authorization opaque for the installed verifier. Never
   deserialize it into a caller-selected quota claim or silently drop it to make
   an unsupported caller profile run. Preserve operation IDs in supported
   downstream idempotency metadata without claiming provider deduplication where
   none exists.
-- [ ] Exercise synchronous, asynchronous, nested, batch and streaming variants
+- [x] Exercise synchronous, asynchronous, nested, batch and streaming variants
   where exposed. Check incremental output, cancellation, error translation and
   fallback paths for pre-release data leakage or unmediated retry. Reuse existing
   kernel handling and truthful unsupported-streaming denials where required.
-- [ ] Test native, MCP, A2A and ACP-Client promised positives through public
+- [x] Test native, MCP, A2A and ACP-Client promised positives through public
   ingress, actual kernel admission and a counted local connector. Add provider
   projection round trips and explicit extension denials where support is not
   promised. No external provider account or live production effect is needed.
@@ -378,24 +381,24 @@ Owners: API-protect authenticated mediation/control routes, remote session
 authority and Rust caller entrypoints, Python sidecar transport helpers and
 other advertised callers. Reuse [M3's contract](authenticated-caller-delivery.md).
 
-- [ ] Verify reservation responses remain `reserved`, not executable permission.
+- [x] Verify reservation responses remain `reserved`, not executable permission.
   Start requires trusted configured authorizer/executor identity, exact original
   nonce/arguments/credentials and physical capture before signed authorization.
-- [ ] Exercise trusted native host preflight, refreshed flow generation,
+- [x] Exercise trusted native host preflight, refreshed flow generation,
   reservation, start and report through public Rust APIs, including release-owner
   and declassification custody with combined runtime/DPoP/approval participants.
   Request-supplied context cannot replace that host authority.
-- [ ] Keep admin/control tokens, executor signing keys and raw reports out of
+- [x] Keep admin/control tokens, executor signing keys and raw reports out of
   untrusted-agent APIs, diagnostics, exceptions and receipts. Test bearer/admin
   role separation, wrong executor/epoch, wrong request and unsigned report denial.
-- [ ] Test lost start replies, exact start retry, report replay, late original
+- [x] Test lost start replies, exact start retry, report replay, late original
   delivery and changed delivery across the consumer boundary. Invoke the durable
   executor ledger rather than a fixture-only callback map. Recovery never renews
   the original execution interval or repeats an uncertain effect.
-- [ ] Retain early rejection of deprecated unsigned reconciliation and direct
+- [x] Retain early rejection of deprecated unsigned reconciliation and direct
   reserve/execute integrations. Distinguish transport helpers from signature
   verification and custody ownership in SDK docs and tests.
-- [ ] Keep supplemental and combined threshold-approval/credit-exposure caller
+- [x] Keep supplemental and combined threshold-approval/credit-exposure caller
   profiles explicitly fail closed. Native caller custody is not on that list.
 
 Acceptance: a complete consumer-level native caller invocation and restart/replay
@@ -409,29 +412,29 @@ for changes to its dependency closure.
 Owners: `spec/PROTOCOL.md`, authoritative/embedded schemas and registry, xtask
 generation, existing conformance/bindings vectors and actual SDK parse/send paths.
 
-- [ ] Audit duplicated capability, request, result and feature shapes, not just
+- [x] Audit duplicated capability, request, result and feature shapes, not just
   newly added files. Include aggregate/cumulative bindings, bounded approval
   arrays, flow/declassification, DPoP, combined capture, pending approval, execution
   nonce versions and authenticated caller authorization/report schemas.
-- [ ] Extend the existing shared positive/negative fixture corpus. Verify canonical
+- [x] Extend the existing shared positive/negative fixture corpus. Verify canonical
   decode/re-encode bytes and hashes in Rust, Python, TypeScript and Go. Use valid
   signatures and independently known bindings where authenticity is tested;
   schema acceptance is not signature verification.
-- [ ] Test unknown nested fields, missing/extra authority, wrong schema domain,
+- [x] Test unknown nested fields, missing/extra authority, wrong schema domain,
   invalid IDs, boundary integers and bounded collections. Test duplicate map keys
   at supported raw-parser boundaries, recording parser limitations explicitly.
   Reject unrepresentable signed numeric values instead of rounding them.
-- [ ] Verify actual runtime validators and client serialization. TypeScript
+- [x] Verify actual runtime validators and client serialization. TypeScript
   compilation alone is insufficient; default Go unmarshalling or generated types
   alone must not silently erase security fields. Distinguish signature verifiers
   from schema/transport-only consumers in the support ledger.
-- [ ] Regenerate all four languages through xtask, update authoritative schema
+- [x] Regenerate all four languages through xtask, update authoritative schema
   hashes and registry, and run `make codegen-check`. No hand-edited generated
   models. Document intentional source/wire breaks and migration requirements.
-- [ ] Cover both Python packages: the existing `check-chio-py.sh` lane exercises
+- [x] Cover both Python packages: the existing `check-chio-py.sh` lane exercises
   `chio-py`, not the M3 `chio-sdk-python` caller client. Run that client's tests
   separately, plus affected adapter-base integrations.
-- [ ] Qualify browser/mobile/FFI negotiation and request preservation where shared
+- [x] Qualify browser/mobile/FFI negotiation and request preservation where shared
   shapes changed; run affected C++ consumer and kernel-FFI gates. Compilation is
   not mobile hardware qualification or native confinement evidence.
 
@@ -446,23 +449,23 @@ Owners: existing adapter source contracts, binding matrix, exact test-inventory
 runner and relevant CI/test entrypoints. Add only the missing enforcement of the
 M4 ledger, not a general new qualification framework.
 
-- [ ] Link each required inventory row to its positive and negative tests. Extend
+- [x] Link each required inventory row to its positive and negative tests. Extend
   existing source discovery to fail on new unclassified constructors/dispatch
   roots and stale classifications. Exemptions must name a narrow non-effect role,
   never a whole security-capable crate.
-- [ ] Calibrate the guard with deliberate mutations: remove an installer call,
+- [x] Calibrate the guard with deliberate mutations: remove an installer call,
   erase an approval member/root binding, drop a constrained bridge sidecar,
   replace trusted context, omit caller start, and substitute direct-provider
   fallback. The responsible structural or behavioral check must fail. Restore
   calibration inputs without modifying the candidate under test.
-- [ ] Add a bounded `scripts/check-consumer-boundaries.sh` milestone runner
+- [x] Add a bounded `scripts/check-consumer-boundaries.sh` milestone runner
   (proposed new file) using `run-exact-cargo-test-inventory.sh` for Rust cases and
   explicit SDK fixture counts. Missing, renamed, ignored, zero-match or skipped
   required tests fail. Populate counts from the final discovered cases, not a
   speculative target count in this plan.
-- [ ] Test the runner/inventory failure modes. Reuse existing adapter and flow
+- [x] Test the runner/inventory failure modes. Reuse existing adapter and flow
   gates; source matching supplements behavior and is not proof of no bypass.
-- [ ] Wire the runner into the appropriate existing local/CI lane with affected
+- [x] Wire the runner into the appropriate existing local/CI lane with affected
   source selection. CI configuration changes do not authorize manual dispatch,
   changes to protected controller pins or bypassing repository policy.
 
@@ -472,22 +475,22 @@ cannot silently disappear behind a feature flag or unavailable language tool.
 
 ## M4.8. Final qualification, documentation and handoff
 
-- [ ] Run all affected full crate/integration suites and supported feature
+- [x] Run all affected full crate/integration suites and supported feature
   profiles after the exact M4 gate. Retain the workspace feature-unification
   configuration that exposed M4.0, plus portable/production variants selected by
   the inventory. Do not use an invalid blanket `--all-features` combination.
-- [ ] Complete the four-language gates, required C++/FFI gates, codegen/schema
+- [x] Complete the four-language gates, required C++/FFI gates, codegen/schema
   checks, adapter contracts, security dependency checks and affected source/formal
   bindings. Review changed formal anchors before updating them; matching hashes
   do not prove new adapter or caller semantics.
-- [ ] Run normal workspace build, full workspace tests, strict all-target Clippy,
+- [x] Run normal workspace build, full workspace tests, strict all-target Clippy,
   formatting and file hygiene on the final source. Record existing non-M4 ignored
   tests separately. No required M4 test may be ignored and no observed failing
   target may be silently excluded. Missing prerequisites mean incomplete evidence.
-- [ ] Update launch status, consumer support rows, SDK/constructor migration notes
+- [x] Update launch status, consumer support rows, SDK/constructor migration notes
   and examples. Replace only current claims; preserve historical evidence and the
   explicit M1 confinement/hosted/operational boundaries.
-- [ ] Record exact commit, clean-tree state, target/tool versions, Cargo features,
+- [x] Record exact commit, clean-tree state, target/tool versions, Cargo features,
   command exits, test inventories and artifact locations. Keep implementation,
   local qualification, hosted CI and release authorization as separate states.
   Commit/push under existing PR-maintenance authority when execution is requested;

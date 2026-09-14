@@ -1,25 +1,24 @@
 # M4 local consumer-boundary acceptance
 
-Status: final qualification in progress on 2026-09-14 UTC. The completed rows below
-are local evidence, not a completed milestone, hosted CI result or release
-authorization. Required running rows must finish successfully before closeout.
-The complete workspace test command, normal build and strict all-target Clippy
-passed on the earlier `740f359ccc` source, followed by the explicit C++/Drogon
-gates, formatting, file hygiene and proof-coverage freshness. That serial driver
-exited zero. Final review then reproduced two additional defects: the receipt
-schemas and some SDK validators omitted the native `chio_internal` origin, and
-the retained operation's independent 17-attachment limit rejected a valid
-18-attachment outcome append. These repairs change production source. Earlier
-green results are not final qualification for the repaired candidate; current
-M4/M3, composed flow, workspace and affected consumer gates must be refreshed.
-The native caller restart/expiry test and two MCP ready-session restart tests
-failed during qualification. Their corrections passed focused regressions; the
-complete final gates remain required. Hosted checks additionally exposed stale
-dependent proof fixtures; their repair passed local and hosted proof gates without
-weakening verification.
-M4 cannot close on this candidate's current evidence.
+Status: M4 local consumer-boundary acceptance is complete on 2026-09-14 UTC.
+All required local execution gates, final documentation review, source graph
+refresh and verification-script calibrations passed. The
+hosted serial profile passed all 17 previous control-plane regressions, then
+exhausted the outer four-hour job limit during SQLite. Its complete lane remains
+unqualified. The bounded CI-capacity correction passed its full local calibration.
+Local acceptance is not all-PR success, merge approval or release authorization.
 
-## Final review repairs awaiting composed qualification
+The repaired Rust/SDK/schema/dependency source is
+`8738bdfd7be8c43a0543ca0ce468541529c47add`. Later CI and proof-report repairs
+change verification inputs only; their separate qualification is recorded below.
+Current results include 45 exact M4 cases, 61 exact M3 cases, all 69 flow
+inventories, 17,187 workspace tests, normal build, strict all-target Clippy,
+supported compatibility/portable profiles, four-language consumers and explicit
+C++/FFI/live/Drogon acceptance. The 48 existing workspace ignores are unchanged;
+no required M4 test is ignored. Earlier failed runs and their repairs remain
+recorded below, but do not replace these current passing gates.
+
+## Final review repairs and composed qualification
 
 The receipt-origin repair updates both authoritative receipt schemas and all
 four generated languages through xtask. The shared protocol corpus now has 38
@@ -68,8 +67,36 @@ Scope and acceptance requirements are in the
 owners; the [migration contract](m4-consumer-migration.md) records intentional
 source and wire changes.
 
+## Requirement-to-evidence map
+
+This map links the expanded M4 requirements to completed local execution for
+supported profiles in the consumer ledger. It closes M4's local acceptance,
+not unsupported profiles or the separate release requirements.
+
+| Requirement | Acceptance evidence |
+| --- | --- |
+| M4.0: composed baseline | Final full workspace configuration includes the original native nonce, MCP retained-profile and dependent proof-fixture regressions. |
+| M4.1: complete consumer inventory | The calibrated adapter source contract accounts for 29 construction and 86 dispatch references; the support ledger additionally classifies P01-P10 portable, protocol, caller and operator-effect roots. |
+| M4.2: construction and trusted context | Exact factory/early-launch denials, flow installation and authority-profile tests, public host positives, and workspace suites cover required stores, context, ordering and explicit ordinary/unsupported profiles. The readiness helper validates before child launch. |
+| M4.3: negotiation and manifests | All 12 peer identities, the strict manifest inventory, signed registry/policy tests and portable denials preserve host-bound negotiation and reject missing, substituted or unnegotiated authority. |
+| M4.4: protocol transformation and dispatch | Eight real durable native/MCP/A2A/ACP-Client cases cover aggregate and threshold profiles independently, one effect, signed receipts and restart; full provider, batch/stream and projection suites retain the shared authorization envelope. |
+| M4.5: caller and native-host delivery | All 61 M3 identities, the full native-flow inventory and Python caller tests cover signed start/report, durable executor replay, original expiry and required native release/declassification custody. |
+| M4.6: wire and FFI parity | The 38 protocol and 14 manifest vectors, actual Rust/Python/TypeScript/Go parser and serialization suites, four-language generation, binding lanes, browser checks and explicit C++/FFI/live/Drogon gates cover their advertised boundaries. |
+| M4.7: executable coverage | The 45-case M4 gate, strict peer and SDK inventories, source contracts and isolated mutation calibrations require named tests and reject dropped, renamed, ignored or skipped required coverage. Proof-report readers bind the physical inventory and reject 85 calibrated source/inventory mutations each. |
+| M4.8: composed closeout | The repaired-source gate table records the final workspace/build/Clippy, portable, fuzz-compilation, formal/source binding, formatting and hygiene results. Migration and support documents retain the M1 and M5-M11 boundaries; the documentation-only handoff records exact SCM state separately from hosted qualification. |
+
 ## Candidate and environment
 
+- Current local verification source: `fdc70f6fce9b45df1f5586bb2789db009415c967`.
+  Rust, SDK, schema, formal-model and dependency source match `8738bdfd7b`.
+  The closeout commit changes only the five M4 status/support/acceptance
+  documents. Its exact SHA, clean-tree state and local/remote/PR head comparison
+  are recorded in draft PR #1117 and `/tmp/chio-m4-final-scm.log` after the push.
+  Hosted checkpoint `6bb648b613b44ff5aaf1853768f2747bff166077` reached a terminal
+  MSRV result before that push, preserving the observation below. Historical
+  hosted successes do not qualify the documentation closeout head.
+- The following implementation hashes describe the retained sequence, not
+  alternate final candidates.
 - M4 implementation: `348b7ae4c221e59cd4c867dd4a3a77c718dd7003`.
 - Generator dependency correction: `4290972a7fea90503607295bc6b03842a2cd2152`.
   This changes only the generator lockfile's `js-yaml` package from 4.3.1 to
@@ -104,7 +131,11 @@ source and wire changes.
   disabled, locked offline Cargo resolution. The shared target directory is
   `/tmp/chio-security-target.rHKDaO`.
 - SDK tools: Python 3.11.15, Go 1.26.4, Node 24.16.0 and npm 11.19.0;
-  CMake/CTest 3.28.3. TypeScript qualification uses the installed npm workspace.
+  CMake/CTest 3.28.3, GNU C++ 13.3.0 and cbindgen 0.29.2. TypeScript
+  qualification uses the installed npm workspace. Bounded formal checks use
+  Apalache 0.50.1; proof-report reader fixtures separately passed system Python
+  3.13 and CI-compatible Python 3.12.3. Native Rust target:
+  `aarch64-unknown-linux-gnu`; browser check: `wasm32-unknown-unknown`.
 - `umask 022`; deliberate abort tests cannot produce core dumps. `RUST_MIN_STACK`
   is unset. The final workspace and exact milestone gates use one Rust test
   thread. Tests' explicit concurrency remains intact. This does not enlarge the
@@ -152,18 +183,19 @@ live checks precede the effect and retain the original nonce, capability and
 native-custody bounds. No execution window or verification check is changed.
 The final workspace run also passed this entire six-profile test and the
 four-profile original-delivery restart/expiry test. The complete workspace test
-command then passed. The remaining flow inventories must still finish; the
-workspace result does not substitute for their selected feature profiles.
+command then passed. That workspace result did not substitute for the remaining
+flow inventories or their selected feature profiles.
 
-The full failed checkpoint and all subsequent flow inventories must pass in a
-serial rerun after the owned workspace qualification sequence. This prevents
+The full failed checkpoint and all subsequent flow inventories required a
+serial rerun after the owned workspace qualification sequence. This prevented
 overlap with our other heavy qualification jobs; it is not a claim of exclusive
 access to the shared host. A 31-69 resume script was prepared but never executed.
 The final review repair changes the kernel dependency closure, so the entire
-`scripts/check-flow-security.sh` must now run on the repaired source, including
+`scripts/check-flow-security.sh` was rerun on the repaired source, including
 all 69 inventories, bounded formal checks and portable checks. The first run's
 30 successful inventories remain historical evidence only. Its failed native
-caller case is not waived.
+caller case was not waived. The final repaired-source run passed all 69
+inventories, 668 named cases and bounded formal/portable checks, as recorded below.
 
 The MCP diagnostics exposed exact retained-profile re-validation failure, not a
 slow server. The shared negotiation repair passed its new unit regression and
@@ -244,14 +276,22 @@ These are acceptance requirements, not optional follow-up work.
 | M4 exact Rust gate | All 45 identities passed on `8738bdfd7b`, including both earlier review regressions, the operator-readiness cases, eight live consumers and all 12 peers. Adapter and HTTP-egress structural gates passed | `chio-m4-operator-final-consumer.log` |
 | M3 exact caller gate, 61 identities | All 61 passed on `8738bdfd7b`: 33 caller lifecycle, 9 durable executor and 19 native custody. Zero failures/ignores; native stage completed in 1,168.99 seconds | `chio-m4-operator-final-m3.log` |
 | Flow security's 69 exact inventories | All 69 inventories and 668 named cases passed on `8738bdfd7b`, including all 133 native-flow cases with zero failures/ignores in 4,205.69 seconds. Bounded formal positive/negative and portable checks also passed; no stack or deadline override | `chio-m4-operator-final-flow.log`, `chio-m4-operator-final-exact-driver.log` |
-| Full workspace tests, build and strict all-target Clippy | Full workspace tests started automatically after the final-source exact and flow driver exited successfully. Build and strict all-target Clippy follow | `chio-m4-post-review-workspace.log`, post-review build/Clippy logs |
-| C++/FFI, live peer and pinned Drogon gates | Earlier source passed; affected dependency closures require refresh | Post-review C++/Drogon logs |
+| Full workspace tests | Passed: 17,187 tests, zero failures and 48 existing ignores across 1,062 outer targets. One nested helper result is excluded. The full 1,134-case control-plane target passed in 5,338.55 seconds; SQLite passed 1,653 cases with three existing ignores in 2,977.45 seconds | `chio-m4-post-review-workspace.log`, `chio-m4-post-review-workspace-summary.log` |
+| Normal workspace build and strict all-target Clippy | Both passed: build in 6 minutes 41 seconds and strict all-target Clippy in 6 minutes 7 seconds; no lint waivers | `chio-m4-post-review-build.log`, `chio-m4-post-review-clippy.log` |
+| Explicit compatibility profiles | Both production-library checks passed. Feature-enabled A2A edge tests: 97 passed; ACP-Client edge: 93 passed. Zero failures/ignores; no enforced fallback claim | `chio-m4-post-review-compatibility-a2a-build.log`, `chio-m4-post-review-compatibility-a2a.log`, `chio-m4-post-review-compatibility-acp-build.log`, `chio-m4-post-review-compatibility-acp.log` |
+| C++ consumer and kernel FFI gates | Consumer: 19 Rust tests, generated header, ABI/symbol smoke, 2 CTest cases and installed external consumer passed. Kernel: 23 Rust tests and 1 CTest case passed | `chio-m4-post-review-cpp.log`, `chio-m4-post-review-cpp-kernel.log` |
+| Explicit live C++ and pinned Drogon | All five live C++ protocol cases passed with zero ignores. Drogon library/example CTest and real allow/deny/receipt smoke passed with pinned dependencies and a fresh CLI; no optional skip | `chio-m4-post-review-cli.log`, `chio-m4-post-review-cpp-live.log`, `chio-m4-post-review-drogon.log` |
+| Core no-default-features, browser WASM and fuzz inventory | Both portable checks and full fuzz-bin compilation passed. Compilation is not a fuzz campaign or mobile/confinement qualification | `chio-m4-post-review-portable.log`, `chio-m4-post-review-browser.log`, `chio-m4-post-review-fuzz.log` |
+| Legacy binding parity | All configured binding lanes passed. Some Go results were cached; the separate unchanged SDK HTTP suite has fresh execution evidence | `chio-m4-post-review-bindings.log` |
 | Current SDK parser gate | Passed: 15 Python, 8 Go and 19 TypeScript identities; 38 protocol and 14 manifest cases | `chio-m4-post-review-sdk-parity.log` |
 | Node HTTP, TypeScript conformance and AI SDK full suites | Passed: 78, 105 and 42 cases; all three typechecks passed | `chio-m4-post-review-ts-full-final.log`, `chio-m4-post-review-ts-types-final.log` |
 | Code generation and schema registry | Passed all four languages and exact registry inputs | `chio-m4-post-review-codegen.log`, `chio-m4-post-review-registry.log` |
 | Exact wrapper and SDK inventory calibrations | Passed with both new required Rust regressions and the expanded corpus | `chio-m4-post-review-boundary-calibration.log`, `chio-m4-post-review-sdk-calibration.log` |
-| Formal source binding and proof-coverage generation | On the readiness source, 225 entries match; 58 rows and 168 artifacts retained. The generated report's Rust-file and aggregate input hashes were refreshed after its stale-input check failed | `chio-m4-operator-formal-mirrors-green.log`, `chio-m4-operator-proof-coverage-green.log` |
-| Source graph refresh | Passed on `8738bdfd7b`: 167,101 nodes, 435,558 edges and 7,137 communities. Only optional HTML visualization omitted for graph size | `chio-m4-operator-final-graph.log` |
+| Formal source binding and proof-coverage generation | Final checks passed: 225 entries match; 58 rows and 168 artifacts match the reviewed report. No additional regeneration needed | `chio-m4-post-review-formal-mirrors-final.log`, `chio-m4-post-review-proof-coverage-final.log` |
+| Security dependencies, formatting and file hygiene | All passed after the full execution sequence; no new lint or size allowances | `chio-m4-post-review-security-dependencies.log`, `chio-m4-post-review-format.log`, `chio-m4-post-review-hygiene.log` |
+| Final source graph refresh | Passed after the final CI-capacity/proof-reader repairs: 167,104 nodes, 435,562 edges and 7,025 communities across 16,391 files. AST-only source extraction; optional HTML omitted for graph size | `chio-m4-msrv-capacity-graph.log` |
+| Final bounded MSRV budget | Exact CI contract and complete mutation suite passed, including four new reason-checked outer-budget mutations; independent review found no issue. No test/security deadline or command changed | `chio-m4-msrv-capacity-contract.log`, `chio-m4-msrv-capacity-green.log` |
+| Final document claims and independent review | Release-truth check and positive/negative calibration passed. Read-only review found no material issue in the five-document diff, requirement closure or unchanged migration contract; not independent test execution or hosted approval | `chio-m4-final-reviewed-doc-release-truth.log`, `chio-m4-final-doc-release-truth-calibration.log` |
 
 The readiness repair added Rust files after the earlier proof-coverage report was
 generated. A direct check reproduced the stale input digest with exit 1
@@ -259,7 +299,22 @@ generated. A direct check reproduced the stale input digest with exit 1
 lines in `docs/formal/COVERAGE.md`: the Rust-file inventory hash and aggregate
 input digest. The reviewed diff changes no proof rows, artifacts, model inputs
 or lane postures. Both coverage and all 225 formal source bindings then passed.
-The composed closeout driver repeats these checks after workspace qualification.
+The composed closeout driver repeated these checks successfully after workspace
+qualification.
+
+The first repaired-source driver completed workspace tests, build and strict
+all-target Clippy, then exited 101 on a local command-selection error:
+`chio-a2a-adapter` has no `compatibility-surface` feature. Its diagnostic is
+retained in `chio-m4-compatibility-owner-red.log`. The manifests and feature-gated
+exports identify `chio-a2a-edge` and `chio-acp-edge` as the actual compatibility
+owners. No repository feature, source file or assertion was changed to accept
+the incorrect command. The resumed driver ran a production-library `cargo check`
+and `cargo test --lib` for each edge with `--features compatibility-surface`,
+followed by every remaining original gate. It records each successful exit in
+`chio-m4-post-review-remaining-closeout-driver.log` and itself exited zero with
+`Post-review remaining qualification passed`. The original driver is not
+reported as an entirely successful command. These checks supplement, rather
+than replace, the default-profile adapter and edge suites in the full workspace.
 
 `99171c38be62b89d949ee16a79eb39130b87d673` additionally fixes the hosted
 log-redaction gate's false rejection of the fully qualified
@@ -310,7 +365,7 @@ private-network denials (`chio-m4-operator-readiness-egress.log`). The private
 address regression replaces the old internal-contract representation assertion
 at the CLI boundary; redirect/response/invalid-input behavior remains tested.
 The required M4 inventory is now 45 cases. Refreshed CLI acceptance and strict
-affected Clippy passed; the full M4/composed gates remain required. The first
+affected Clippy passed; the full M4/composed gates subsequently passed. The first
 focused Clippy run also caught an unchecked read
 length in the test responder; it now handles EOF without a lint allowance.
 
@@ -327,20 +382,21 @@ The targeted follow-up in
 defects corrected in source and no new blocking finding. It also verified the
 locked reqwest total timeout continues through body polling. Its two stale
 documentation references were corrected to name the separate operator profile.
-This source review does not replace the pending final qualification.
+This source review does not replace the separate behavioral qualification.
 
 The final readiness repair adds the dedicated egress helper and wires CLI
 supervision to it. Existing tenant egress functions and serialized contracts
 are unchanged; the egress library root adds only the gated module and exports.
-Full workspace, affected consumer acceptance and source/formal checks must
-include the new helper. Its exact M4/M3 gates and source graph refresh passed;
-the previous graph is retained only as historical evidence.
+Full workspace, affected consumer acceptance and source/formal checks include
+the new helper and passed. Its exact M4/M3 gates also passed; the final graph
+refresh additionally includes the CI and proof-report reader repairs. Previous
+graph results remain historical evidence.
 
 During qualification, Cargo removed 380 reproducible `chio-fuzz` build artifacts
 from the task-owned `/tmp/chio-security-target.rHKDaO/debug` cache after an
 explicit package-scoped dry run. Source, fixtures, evidence logs and other
-worktrees were preserved. The required fuzz-bin check remains scheduled and
-rebuilds any needed artifacts.
+worktrees were preserved. The required fuzz-bin check subsequently rebuilt its
+needed artifacts and passed.
 
 The proof gate's pre-existing ignored case is
 `tests::historical_v1_trust_bundle_is_not_strict_verifier_input`; its recorded
@@ -349,9 +405,10 @@ not a newly ignored regression or a substitute for an M4 case.
 
 ### Existing workspace ignores
 
-The earlier completed workspace profile records 48 ignored declarations: 39
-library or integration declarations and nine documentation examples. The current
-run must reconcile the final inventory again. No required M4 case is ignored.
+The current completed workspace profile records 48 ignored declarations: 39
+library or integration declarations and nine documentation examples. The exact
+target/name/reason inventory matches the earlier profile after normalizing only
+compiled binary hashes. No required M4 case is ignored.
 Comparing Rust changes against planning baseline
 `3d0f5a0685a84907366705e4b040b47a605f1888` found no added `#[ignore]` attributes
 or ignored documentation blocks. These declarations are not silently promoted
@@ -367,7 +424,8 @@ to passing acceptance cases.
 | Documentation examples | 9 | Existing ignored examples, not executable acceptance |
 
 Exact enclosing targets, test names and recorded reasons are retained in
-`/tmp/chio-m4-workspace-ignored-qualified.log`. The full workspace log retains
+`/tmp/chio-m4-post-review-workspace-ignored.log`; the normalized comparison is
+`/tmp/chio-m4-post-review-workspace-ignored-comparison.log`. The full workspace log retains
 all declarations and terminal results. The current four-language M4 corpus,
 M3 caller gate and explicitly enabled C++/Drogon gates are separate required
 evidence; these existing ignores do not replace or weaken them.
@@ -377,11 +435,99 @@ path. `scripts/setup-drogon-test-deps.sh` also passed against its exact Drogon,
 Trantor and jsoncpp pins. C++ live protocol tests are explicitly enabled because
 the ordinary workspace test profile alone does not establish live peer coverage.
 The live Drogon artifacts are retained under
-`examples/hello-drogon/.artifacts/20260914T020826Z/`. Formal coverage regeneration
-changed only the aggregate input digest and five source-input hashes. The proof
-rows, artifact inventory, lane postures and limitations are unchanged.
+`examples/hello-drogon/.artifacts/20260914T140515Z/`. The earlier
+`20260914T020826Z/` run remains historical evidence. Final formal coverage checks
+match the reviewed report; the proof rows, artifact inventory, lane postures and
+limitations are unchanged.
 
 ## Hosted status observed during qualification
+
+### Serial-profile checkpoint and proof-report compatibility
+
+The serial-fixture CI repair is committed as
+`2b3071e26cf94098beccafea1faf5b5a4772e736`; its documentation checkpoint is
+`6bb648b613b44ff5aaf1853768f2747bff166077`. Local, remote and draft PR heads
+matched at that push. Attempt 1 on the latter source passed
+[SDK Parity](https://github.com/bb-connor/arc/actions/runs/34831061460), both jobs;
+[C++ SDK](https://github.com/bb-connor/arc/actions/runs/34831061797), all eight jobs;
+and [threshold/FIPS](https://github.com/bb-connor/arc/actions/runs/34831061655),
+all three jobs. These observations do not qualify later commits or close the
+separate release requirements below.
+
+The [MSRV workspace job](https://github.com/bb-connor/arc/actions/runs/34831061957/job/103934272945)
+completed on 2026-09-14 at 14:59:09 UTC with GitHub conclusion `cancelled`.
+Its annotation explicitly identifies the maximum four-hour execution limit,
+not a cancellation caused by another push. The full control-plane library
+passed 1,134 tests with zero failures/ignores in 4,134.14 seconds. All 17
+previously failed identities passed on this exact hosted source. The retained
+log contains no failed test result or failed test identity before cancellation.
+The SQLite library was incomplete, and the subsequent formal-diff compilation
+and WASM library commands did not run. This is not a passing workspace lane or
+acceptance of its unexecuted remainder.
+
+Evidence is retained in `chio-m4-6bb-msrv-final.log`,
+`chio-m4-6bb-msrv-final-annotations.json` and
+`chio-m4-6bb-msrv-regressions.log`. The CI capacity correction changes only the
+outer MSRV limit from 240 to 360 minutes, matching the existing main-workspace
+failsafe. Commands, feature sets, serial fixture selection, explicit races,
+test assertions and all production authorization deadlines are unchanged.
+The checker pins the exact bounded value; isolated mutations require rejection
+of its removal, shortening, enlargement or dynamic selection. The new live-budget
+regression failed against the four-hour configuration
+(`chio-m4-msrv-capacity-red.log`). The real contract and complete mutation suite
+then passed (`chio-m4-msrv-capacity-contract.log`,
+`chio-m4-msrv-capacity-green.log`), followed by source graph refresh. The repair
+is committed as `fdc70f6fce9b45df1f5586bb2789db009415c967`.
+Independent review found no issue, while noting that the complete six-hour hosted
+lane must still pass. This is a capacity
+adjustment, not evidence that six hours will suffice or a waiver of M10's
+exact-candidate MSRV requirement.
+
+That source's main CI
+[build job](https://github.com/bb-connor/arc/actions/runs/34831061957/job/103934272852)
+passed the exact security-CI contract and its complete mutation suite, then
+failed the proof-report content fixture. Both proof-report readers still
+required the old four-field adapter inventory, while M4's closed inventory also
+requires `constructor_sites` and `dispatch_sites`. The unchanged fixture
+reproduced the exact schema mismatch locally
+(`chio-m4-proof-report-inventory-red.log`). Compilation and workspace tests in
+that build job did not run.
+
+The repair is locally committed as
+`f1b88451527b2dec7314114b3b1e91cf101312cf`. Both readers now validate the six
+inventory fields and closed site records, include every inventoried physical
+source, bind both child validator modules, and hash the constructor scanner's
+Rust/fragment candidate set. Conservatively hashing regular files below adapter
+roots and contract-source parents includes literal descendant fragments even
+with arbitrary extensions or test-named paths. Source symlinks deny. This binds
+the input closure without replacing the Rust AST validator or changing the
+report's trusted-generator, metadata-only and no-proof-replay boundaries.
+
+The isolated content fixture passed under Python 3.13 and CI's Python 3.12,
+including 85 negative cases per reader, exact intended denial reasons, reader
+AST equality, physical source/validator tampering, descendant include closure
+and a newly introduced unlisted candidate. Follow-up independent review found
+no remaining defect after fixing a test-quality issue: unrelated symlinks must
+not mask malformed inventory acceptance. Each link now exists only for its own
+case. Logs are `chio-m4-proof-report-review-green.log` and
+`chio-m4-proof-report-python312-full-green.log`. An initial Python 3.12 invocation
+removed Rust from `PATH` and failed its tool-version probe; restoring the normal
+tool paths produced the complete passing run. No assertion was relaxed.
+
+The four structural commands following that fixture in CI also passed locally:
+lane-gate calibration, liability-roster enforcement and its calibration, and the
+off-chain broadcast boundary. Their logs use the `chio-m4-post-proof-` prefix.
+Only three verification scripts changed in this repair. Rust, SDK, schema,
+formal-model and dependency source remain identical to the readiness commit.
+The compiled Rust dependency records contain none of the changed verification
+scripts or CI workflow (`chio-m4-verification-script-rust-dep-info.log`); those
+edits do not invalidate the binaries in the completed workspace test command.
+The repair's push was held until the current MSRV job reached a terminal result,
+so a new push did not cancel the serial-profile observation. This is not hosted
+acceptance of the repair. Final source checks and the verification-script graph
+refresh passed after the timing-sensitive workspace qualification.
+
+### Readiness-source observations
 
 Readiness source `8738bdfd7be8c43a0543ca0ce468541529c47add` was pushed
 on draft PR #1117, with local, remote and PR heads matched at observation.
@@ -428,9 +574,11 @@ regression failed because the workspace thread pin was absent
 not Rust behavior: every test, security deadline, assertion and explicit
 thread/process race remains intact. Independent review found the local full and
 MSRV-excluded workspace profiles resolve identical package/feature sets, but
-their executed target inventories still differ. Hosted serial qualification
-must pass before the MSRV failure can be considered resolved. No unrestricted
-parallel-fixture guarantee is inferred.
+their executed target inventories still differ. The hosted serial-profile
+rerun subsequently passed the full control-plane library and all 17 earlier
+failures, as recorded above. It exhausted its outer job budget during SQLite,
+so the complete MSRV lane remains required. No unrestricted parallel-fixture
+guarantee is inferred.
 
 The complete local CI contract and mutation suite passed after the profile
 repair (`chio-m4-ci-fixture-profile-contract.log`,
@@ -438,8 +586,8 @@ repair (`chio-m4-ci-fixture-profile-contract.log`,
 hygiene. An additional actionlint 1.7.7 check reports the same unrecognized
 `artifact-metadata` permission on the unchanged and repaired workflow; this is
 not reported as passing lint or repaired by changing trusted permissions. The
-AST-only graph refresh is deferred until the timing-sensitive workspace tests
-finish, as required by the qualification recipe. Rust, SDK, schema, formal model
+AST-only graph refresh passed after the completed timing-sensitive workspace
+tests, as required by the qualification recipe. Rust, SDK, schema, formal model
 and dependency source remain unchanged from the readiness commit.
 
 Attempt 1 of the same source's
@@ -597,7 +745,7 @@ reconciled against the accepted milestone contract:
 | Document authenticated caller wire schemas | Already addressed by M3 in `spec/PROTOCOL.md`; both signed schema domains are generated and exercised in the current shared caller corpus |
 | Require an approval/DPoP ledger whenever its authority is configured | Not applied as suggested. M4 explicitly distinguishes configured selection from credential use. `run_pre_budget_admission` selects approval when a token is used and DPoP when the grant requires it; dispatch verifies the exact owned claims. Caller decode compares the frozen episode snapshot with physical history. Runtime admission has different activation semantics. Optional unused credential families must not manufacture claim episodes |
 
-The two repaired findings remain subject to current-source composed acceptance.
+The two repaired findings passed current-source exact and composed acceptance.
 The M7 and M10 entries remain open in their owning milestones; they are not
 waivers of a required M4 consumer profile or authorization to activate a release.
 

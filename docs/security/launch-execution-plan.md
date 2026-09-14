@@ -5,7 +5,8 @@ implementation and local acceptance are complete under the explicit confinement
 qualification deferral below. M2's native failure/restart safety acceptance is
 locally complete under the existing fail-closed release contract. M3's local
 authenticated and native caller custody acceptance is complete. M4 consumer
-implementation and final composed qualification are in progress.
+implementation and M4.0-M4.8 local acceptance are complete. Full exact-candidate
+hosted qualification remains a separate M10 requirement.
 See [current execution status](launch-status.md).
 On 2026-09-11 the
 user authorized committing, pushing and maintaining the accumulated work as a PR,
@@ -374,12 +375,17 @@ four-language parity, calibrated no-bypass gates and final qualification.
 The workspace run's 11 failed targets were diagnosed and their focused regressions
 passed, including the nested-nonce default-stack repair. The consumer inventory,
 negotiated protocol boundaries, strict current-wire parsers and executable gates
-are implemented. Final composed qualification is still running. Historical M3
-results and the focused repairs do not substitute for those final gates. The
-earlier-source workspace tests, normal build, strict all-target Clippy, exact M3
-and live C++/Drogon gates passed. Final-review receipt-origin and attachment
-repairs require refreshed qualification, tracked in the
-[acceptance report](m4-local-acceptance.md). See the
+are implemented. Final local execution gates passed on 2026-09-14: 45 exact M4
+cases, 61 exact M3 cases, all 69 flow inventories, 17,187 workspace tests, normal
+build, strict all-target Clippy and affected SDK/portable/C++/Drogon profiles.
+These current results include the final-review receipt-origin, attachment and
+operator-readiness repairs, not just historical M3 evidence. Final document,
+source-graph and calibrated CI checks passed, closing M4's local requirements.
+The hosted serial control-plane suite passed all 17 earlier failures; the full
+MSRV lane exhausted its outer job budget during SQLite. Its bounded capacity
+repair passed locally, while the complete hosted lane remains an M10 requirement.
+Exact evidence and
+separate release boundaries are in the [acceptance report](m4-local-acceptance.md). See the
 [migration contract](m4-consumer-migration.md) for intentional source/wire changes.
 
 1. Reconcile every non-test kernel constructor and each caller/remote dispatch

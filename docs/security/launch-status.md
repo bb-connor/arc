@@ -19,16 +19,16 @@ acceptance is complete. This is not merge or release approval.
 | Milestone | State / missing acceptance | Next action / blocker | Evidence |
 | --- | --- | --- | --- |
 | M0 | Consolidated for implementation | Keep this index current; no independent cleanup campaign | Requirement and review maps below |
-| M1 | Complete: named local acceptance; composed repair locally verified | Earlier M4 workspace passed, including the 1,134-case control-plane target at the default stack size. Current-source workspace rerun remains required; confinement remains deferred | [Acceptance closeout](#m1-local-acceptance-closeout), [qualification deferral](#m1-confined-process-qualification-deferral) |
+| M1 | Complete: named local acceptance; composed repair locally verified | Current M4 workspace passed, including the 1,134-case control-plane target at the default stack size; confinement remains deferred | [Acceptance closeout](#m1-local-acceptance-closeout), [qualification deferral](#m1-confined-process-qualification-deferral) |
 | M2 | Complete: local native failure/restart safety acceptance | Preserve exact failure/recovery contracts during M4 repairs | [Acceptance closeout](#m2-local-acceptance-closeout), [cutpoints and downstream contract](native-restart-safety.md) |
-| M3 | Complete: named local caller acceptance and current exact dependency rerun | All 61 exact cases and selected flow inventories passed; preserve native caller custody through the current full workspace run | [Acceptance closeout](#m3-local-acceptance-closeout), [caller contract](authenticated-caller-delivery.md) |
-| M4 | Consumer changes and final-review repairs implemented; final qualification in progress | Current 45-case M4, 61-case M3 and 69-inventory flow gates passed. Complete workspace/build/Clippy and affected consumer gates remain running or scheduled; hosted MSRV serial-profile qualification remains pending | [Expanded execution plan](m4-consumer-qualification.md), [local acceptance report](m4-local-acceptance.md), [consumer support ledger](consumer-support.md) |
+| M3 | Complete: named local caller acceptance and current dependency qualification | All 61 exact cases, complete flow gate and current full workspace passed, including required native caller custody | [Acceptance closeout](#m3-local-acceptance-closeout), [caller contract](authenticated-caller-delivery.md) |
+| M4 | Complete: M4.0-M4.8 local consumer-boundary acceptance | Current 45-case M4, 61-case M3, 69-inventory flow, full workspace/build/Clippy, affected consumers and final source/document/calibration gates passed. Use the supported profiles for M5; no release or confinement qualification implied | [Completed execution checklist](m4-consumer-qualification.md), [local acceptance report](m4-local-acceptance.md), [consumer support ledger](consumer-support.md) |
 | M5 | Swarm is a Disabled-profile integration smoke | Bind issued capability identities, shared budget and enforced cage | [Swarm limitations](../../examples/reference-swarm/README.md) |
 | M6 | Components present, integrated topology unqualified | Compose keyring, broker, cage and receipts; designated runner needed | Enterprise ledger and original plan |
 | M7 | Active-defense components present, composed paths unqualified | Complete flow, response and rollback acceptance in controlled profiles | Active-defense ledger and original plan |
 | M8 | Retention, scale and operational recovery unqualified | Real campaigns after lifecycle integration | Retention #1045 and million-receipt gates remain required |
 | M9 | Entry packages unpublished and external consumer unqualified | Package dependency closure and clean install after M4-M8 | Three intended entrypoints remain `publish = false` |
-| M10 | Not release qualified | Local gates, audits, authorized exact-candidate hosted and publication steps | Candidate lacks passing exact-head hosted qualification |
+| M10 | Not release qualified | Complete exact-candidate hosted lanes, audits and authorized publication steps. Serial hosted control-plane passed all 17 earlier failures, but MSRV exhausted its outer job limit during SQLite; the bounded capacity repair still needs a complete hosted pass | Candidate lacks passing exact-head hosted qualification; supply-chain, advisory and controller-authorization blockers remain |
 | M11 | Not started | Authorized observed pilot and signed promotion stages | [Numeric operator contract](active-defense-rollout.md) |
 
 ## M3 local acceptance closeout
@@ -113,7 +113,8 @@ control-plane/default-stack suite. M4's earlier-source full workspace subsequent
 17,178 passed, zero failed and 48 existing ignores, with no required M4 case
 ignored. The current exact M3 dependency gate also passed all 61 cases. Historical
 local M3 evidence above is retained separately from these results. The full
-workspace rerun on the final review/readiness source is still in progress. See
+workspace rerun on the final review/readiness source also passed: 17,187 tests,
+zero failures and the same 48 existing ignores. See
 [M4's baseline repair queue](m4-consumer-qualification.md#fresh-baseline-broad-regression-results-now-available)
 and the terminal logs (`/tmp/chio-m3-final-workspace-tests-resumed.log`,
 `/tmp/chio-m3-final-workspace-build-qualified.log`). Exact-head hosted qualification
@@ -257,7 +258,7 @@ the normative plans retain their detailed acceptance requirements.
 | --- | --- | --- |
 | 1 Characterization | Carried; final affected regressions pending | M10 |
 | 2 Signed aggregate root | Carried; bound swarm acceptance pending | M5 |
-| 3 Capability negotiation | Carried; consumer parity pending | M4 |
+| 3 Capability negotiation | M4 supported consumer profiles locally accepted | M4 |
 | 4 Composite holds and mutation | Native composition locally verified | M1 |
 | 5 Durable SQLite and remote authority semantics | Native SQLite crash/recovery locally verified; full original requirement not release-qualified | M2, M10 |
 | 6 Admission ordering and signed terminal projection | Native and authenticated caller profiles locally verified; final M4 dependency gate passed | M1, M3 |
@@ -266,8 +267,8 @@ the normative plans retain their detailed acceptance requirements.
 | 9 Durable replay and collection | Native replay/restart locally verified; response composition pending | M2, M7 |
 | 10 Federation threshold compatibility | Shared authorization and frozen native return context locally verified | M1 |
 | 11 Existing bounded runtime evidence | Signed validity bounds, physical capture and combined native invocation locally verified | M1 |
-| 12 Authoritative schemas and four-language generation | Carried; final changed-wire parity pending | M4 |
-| 13 Adapter preservation | Partial local; complete consumer inventory pending | M4 |
+| 12 Authoritative schemas and four-language generation | M4 changed-wire corpus and generated consumers locally accepted | M4 |
+| 13 Adapter preservation | M4 physical inventory and supported consumer profiles locally accepted | M4 |
 | 14 Cross-implementation conformance | Carried; exact-candidate execution pending | M10 |
 | 15 Formal and concurrency checks | Partial local; full required campaigns pending | M10 |
 | 16 Final release gate | Missing exact integrated qualification/publication | M9-M11 |
@@ -276,10 +277,10 @@ the normative plans retain their detailed acceptance requirements.
 | --- | --- | --- |
 | 0 Provenance and dependency direction | Carried; exact-candidate gate pending | M10 |
 | 1 Portable labels and lattice | Carried; exact-candidate portable gate pending | M10 |
-| 2 Authenticated manifests and bridges | Partial local; constructor/consumer parity pending | M4 |
+| 2 Authenticated manifests and bridges | M4 supported registry/bridge profiles locally accepted | M4 |
 | 3 Durable security stores | Native store recovery locally verified; retention pending | M2, M8 |
 | 4 Flow and one-shot declassification | Native consumption, output outcome and release locally verified | M1 |
-| 5 Kernel adapter composition | Partial local; complete positive profiles pending | M4 |
+| 5 Kernel adapter composition | M4 required positive profiles and early denials locally accepted | M4 |
 | 6 Deception and tripwires | Carried; integrated pre-effect/raw-output acceptance pending | M7 |
 | 7 Temporal correlation | Carried; authenticated bounded replay acceptance pending | M7 |
 | 8 Affected sets, approvals, effects and rollback | Carried; composed failure/overlap acceptance pending | M7 |

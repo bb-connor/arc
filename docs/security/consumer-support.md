@@ -1,17 +1,18 @@
 # Consumer boundary support ledger
 
-This is the M4 worklist, not a release qualification. Source discovery and a
-passing component test do not establish a supported deployment profile. Rows
-remain open until their construction, authenticated input, effect and recovery
-boundaries have the acceptance evidence required by
-[M4](m4-consumer-qualification.md). The complete M3 native caller host contract
-remains required. The M1 Linux x86_64 confinement deferral is unchanged.
+This ledger classifies M4's locally accepted consumer profiles, not a release
+or deployment qualification. The required construction, authenticated input,
+effect and recovery gates passed on the repaired source. Final source/document
+checks and [M4's local closeout](m4-consumer-qualification.md) are complete.
+The complete M3 native caller host contract passed its required dependency
+gates and remains part of the supported Rust profile. The M1 Linux x86_64
+confinement deferral is unchanged.
 
 Intentional source/wire changes and parser limitations are documented in the
 [M4 migration contract](m4-consumer-migration.md). The tables classify source
 roles; final gate results are recorded separately rather than inferred from a
 constructor count. The [local acceptance report](m4-local-acceptance.md) records
-the current candidate, successful gates and still-required qualification.
+the current candidate, successful local gates and separate hosted/release state.
 
 ## Profile vocabulary
 
@@ -97,7 +98,8 @@ target and the public ready-session restart cases.
 These roots extend the direct-construction worklist. The D inventory below pins
 physical native dispatch references; the following public profile mapping also
 covers portable evaluators, declarative translators and effect-only connectors.
-Qualification is still pending where the owner gate has not completed.
+The profile table records the local owner gates and their limits; deployment
+acceptance remains separate.
 
 | ID | Source roots | Required boundary / evidence owner |
 | --- | --- | --- |
@@ -119,13 +121,13 @@ different feature/target. `compatibility-surface` is an explicit unmediated API,
 not a fallback available to an enforced invocation. Ordinary hosts do not acquire
 native caller custody by enabling a negotiation flag.
 
-Component totals below retain earlier-source evidence unless explicitly named
-as current exact-gate results. They do not establish final composed qualification;
-the acceptance report identifies each source revision and still-running gate.
+Component totals below identify the bounded suites for each profile. The current
+exact M4/M3/flow gates, full workspace and explicit consumer profiles passed;
+the acceptance report separates those results from historical runs and hosted CI.
 
 | Row | Entrypoint and physical implementation | Profile and trust/recovery boundary | Required owner gate |
 | --- | --- | --- | --- |
-| P01 | `ChioKernel::evaluate_tool_call*` in `kernel/evaluation/evaluation_entry.rs` and `sync_evaluation_wrapper.rs`; nested APIs in `kernel/session_ops/nested_tool_call.rs`; caller APIs in `kernel/evaluation/caller_execution.rs` | Native host supplies installed ports, authenticated context and verified registry. Ordinary, nested and caller starts converge on retained admission but do not exchange rights. Kernel/store own capture and release recovery. | Current exact M3 61-case gate and all 69 flow inventories passed. The full control-plane/default-stack 1,134-case target passed on earlier source; its current workspace rerun remains required. |
+| P01 | `ChioKernel::evaluate_tool_call*` in `kernel/evaluation/evaluation_entry.rs` and `sync_evaluation_wrapper.rs`; nested APIs in `kernel/session_ops/nested_tool_call.rs`; caller APIs in `kernel/evaluation/caller_execution.rs` | Native host supplies installed ports, authenticated context and verified registry. Ordinary, nested and caller starts converge on retained admission but do not exchange rights. Kernel/store own capture and release recovery. | Current exact M3 61-case gate and all 69 flow inventories passed. The full control-plane/default-stack 1,134-case target also passed in the current workspace run, with zero failures/ignores. |
 | P02 | `ChioMcpEdge::handle_jsonrpc*` via `handle_initialize`, `handle_tools_call*`, `handle_tasks_result*`, `process_background_tasks*`; `RemoteSessionFactory::{new,spawn_session,restore_session}` | MCP negotiation is session-retained and re-derived exactly on restore, with no legacy upgrade. Task execution reuses the prepared operation. Remote/stdio ordinary factories reject required flow before launch/store acquisition. Hosted control credentials remain separate from session credentials. | MCP 113 library cases, remote 60 cases, exact peer/profile restoration, live MCP restart, stdio and hosted auth suites passed. Full HTTP target: 43 passed, one existing TTL-race ignore; both public ready-session regressions passed. |
 | P03 | `ChioA2aEdge::{new_with_registry,handle_send_message_with_request_id,handle_stream_message_with_request_id,handle_jsonrpc}` in `chio-a2a-edge/src/edge.rs` | One host-established peer profile per edge; registry-bound sidecar and authenticated context retained through the native target. Unsupported stream/batch authority does not become a direct connector retry. | A2A 97 library cases, exact peer cases and two live restart scenarios. |
 | P04 | `ChioAcpEdge::{new_with_registry,invoke_with_request_id,invoke_with_mcp_target,handle_jsonrpc,start_stream_with_request_id}` in `chio-acp-edge/src/edge.rs` | The roadmap's ACP-Client mediated route is this ACP-Client tool-invocation edge. `chio-acp-proxy::AcpProxy` instead supervises an agent protocol and issues observation attestations; it is not a native tool executor or custody owner. Compatibility passthrough is separately feature-gated. | ACP-Client 93 library cases, exact peer cases, two live restart scenarios, ACP-Client proxy and compatibility-source gates. |
@@ -150,7 +152,7 @@ it is host management, not an agent invocation or a new kernel constructor.
 Tenant `HttpEgressContract` restrictions remain unchanged. Redirect/proxy
 suppression, response bounds, asynchronous DNS deadlines and invalid-target
 launch rejection have named regressions. The unchanged HTTP egress source gate
-passes; final behavioral qualification is tracked in the acceptance report.
+passes; final behavioral qualification passed as recorded in the acceptance report.
 
 The provider-fabric `ToolInvocation` vocabulary has no negotiated complete proof
 envelope. Its `build_tool_call_request` lowering therefore rejects aggregate or
@@ -238,9 +240,9 @@ The active-response schema incorrectly used `chio.governed-response-plan.v1`
 while the native validator uses `chio.response-plan.v1`. The schema and shared
 vectors now use the native identifier and independently computed domain-separated
 plan-body hash. All four languages were regenerated successfully. Current Python,
-Go and TypeScript public-parser gates passed; the Rust/schema gate and earlier
-composed workspace run subsequently passed after the expanded corpus. Later
-readiness and review repairs require the current qualification in the report.
+Go and TypeScript public-parser gates passed; the Rust/schema gate and final
+composed workspace run also passed after the expanded corpus and subsequent
+readiness/review repairs, as recorded in the acceptance report.
 
 The current-manifest shared corpus has 14 cases in
 `tests/bindings/fixtures/manifest-v2-consumers.json`. Python initially accepted
@@ -260,7 +262,7 @@ Python, TypeScript and Go. Python's full SDK suite passed 193 tests; TypeScript'
 manifest lane passed 15 tests; Go's HTTP SDK suite passed. These are bounded
 manifest results, not blanket parity for every security schema or numeric domain.
 
-## Current M4 acceptance and remaining qualification
+## Current M4 local acceptance
 
 Eight live tests in `chio-conformance --test consumer_boundary` passed through
 native, MCP, A2A and ACP-Client public ingress. Each protocol has an aggregate-budget
@@ -317,11 +319,16 @@ whitespace removed by `encoding/json`; the transport must also bound the entire
 body. These limits do not create a portable custody authority.
 
 The constructor/dispatch profile table is classified and the optional-DPoP,
-caller wire and receipt-origin regressions pass the public SDK gate. Earlier
+caller wire and receipt-origin regressions pass the public SDK gate. Current
 source passed external C++/FFI, all five explicit live C++ protocols, pinned
-Drogon library/example/live smoke, exact M3 and workspace tests/build/Clippy.
-Receipt-origin and attachment-capacity repairs require refreshed composed
-qualification, including the complete flow gate. M4 is not yet complete.
+Drogon library/example/live smoke, exact M3, all 69 flow inventories and full
+workspace tests/build/Clippy. This includes the receipt-origin, attachment-capacity
+and operator-readiness repairs. Documentation/source-graph checks and M4.8 local
+closeout are complete. The hosted serial control-plane suite passed all 1,134
+cases, including all 17 prior failures, but the full MSRV lane exhausted its
+outer job limit during SQLite. Its complete rerun and M10's separate release
+blockers remain required; local acceptance does not convert them into passing
+hosted evidence.
 
 ## Physical dispatch reference classification
 
