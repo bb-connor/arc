@@ -129,6 +129,7 @@ jobs:
           bash ./scripts/tests/check-security-dependencies.test.sh
           bash ./scripts/check-sre-metrics-registry.sh
           bash ./scripts/check-log-redaction.sh
+          python3 ./scripts/tests/check-log-redaction.test.py
           bash ./scripts/check-http-egress-contract.sh
           bash ./scripts/tests/check-http-egress-contract.test.sh
           bash ./scripts/check-chio-proof-room-release-truth.sh
