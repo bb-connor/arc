@@ -8,11 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-import sys
-
-BUYER = Path(__file__).resolve().parents[1] / "federated-work/python_buyer"
-sys.path.append(str(BUYER))
-import protocol as legacy
+from reference_checker import BUYER, SOURCE_HASHES, protocol as legacy, review as reference_review
 
 ProtocolError = legacy.ProtocolError
 require = legacy.require
@@ -179,7 +175,12 @@ CHECKER_PROFILE = load((Path(__file__).parent / "checker-profile.json").read_byt
 CHECKER_SHA256 = digest(CHECKER_PROFILE)
 
 
-def check_implementation():
+def check_implementation(checker=None):
+    if checker is not None:
+        require(checker is reference_review, 'checker is not the selected reference implementation')
+    require(CHECKER_PROFILE["pythonSourceSha256"] == SOURCE_HASHES['review'] and
+            CHECKER_PROFILE["pythonProtocolSha256"] == SOURCE_HASHES['protocol'],
+            "loaded checker or parser differs from pinned source")
     require(CHECKER_PROFILE["pythonSourceSha256"] == sha256((BUYER / "review.py").read_bytes()),
             "Python checker differs from pinned source")
     require(CHECKER_PROFILE["pythonProtocolSha256"] == sha256((BUYER / "protocol.py").read_bytes()),

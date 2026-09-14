@@ -4,6 +4,9 @@ import base64
 import hashlib
 import json
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -47,6 +50,14 @@ def resign(value):
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_shadow_protocol_module_is_not_used_as_the_pinned_library(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory)/'protocol.py').write_text('raise RuntimeError("shadow parser executed")\n')
+            script='import sys;sys.path[:0]=[sys.argv[1],sys.argv[2]];import artifacts;print("loaded")'
+            result=subprocess.run([sys.executable,'-B','-c',script,str(Path(__file__).parent),directory],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(result.stdout,'loaded\n')
+
     def test_retained_canonical_and_malformed_vectors(self):
         vectors = json.loads((Path(__file__).parent / 'parser-vectors.json').read_text())
         positive = vectors['positive']

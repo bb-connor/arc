@@ -58,9 +58,13 @@ and B to C, with the child paid from B's already held mock tokens.
 `assurance` is only `artifact-only-v1`. No native facet map is accepted. The
 checker digest is the SHA-256 of the canonical [checker profile](checker-profile.json),
 which pins existing Rust/Python source and Python parser bytes. The verifier
-checks its Python source pins before evaluation. The Rust command supplies
-observations; the verifier independently recomputes them in Python. Both
-implementations and all fixture roles remain administered by this project.
+checks its Python source pins before evaluation. The loader executes the exact
+checker and parser bytes it hashes from the selected package files. It loads
+the checker's local dependency by path too; same-named modules elsewhere on
+Python's import path are never selected. The host and interpreter remain trusted.
+The Rust command supplies observations; the verifier independently recomputes
+them in Python. Both implementations and all fixture roles remain administered
+by this project.
 
 Each operation has exactly `path`, `method`, `authenticationRequired`; only
 supported HTTP methods, slash-prefixed paths of at most 256 UTF-8 bytes and

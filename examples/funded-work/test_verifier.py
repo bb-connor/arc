@@ -3,6 +3,8 @@ import copy
 import shutil
 from pathlib import Path
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -32,6 +34,31 @@ class VerifierFixture:
 
 
 class VerifierTests(VerifierFixture, unittest.TestCase):
+    def test_shadow_checker_module_cannot_satisfy_a_pin_for_different_source(self):
+        shadow=Path(self.directory.name)/'shadow'
+        shadow.mkdir()
+        wrong=copy.deepcopy(OUTPUT)
+        wrong['operations'][0]['authenticationRequired']=False
+        (shadow/'review.py').write_text('raise RuntimeError("shadow checker executed")\n')
+        (shadow/'subcontract.py').write_text('raise RuntimeError("shadow dependency executed")\n')
+        submission=self.submit(wrong)
+        request=Path(self.directory.name)/'request.json'
+        request.write_bytes(p.canonical({'agreement':self.a,'pins':self.pins,'submission':submission}))
+        script="""import sys
+sys.path[:0]=[sys.argv[1],sys.argv[2]]
+import artifacts as p
+from custody import Custody
+from verifier import decide
+from test_protocol import keys
+v=p.load(open(sys.argv[3],'rb').read())
+with Custody(sys.argv[4],v['pins']['custodian']) as store:
+    result=decide(v['agreement'],v['pins'],v['submission']['body']['allocationId'],v['submission'],store,keys()[2])
+    print(result['body']['accepted'])
+"""
+        result=subprocess.run([sys.executable,'-B','-c',script,str(Path(__file__).parent),str(shadow),str(request),str(self.path)],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout,'False\n','a shadow checker certified false output')
+
     def test_new_evidence_cannot_starve_an_already_retained_claim_decision(self):
         original = self.submit()
         with Custody(self.path, self.pins['custodian']) as store:

@@ -1,6 +1,6 @@
 """Recompute W0 from custody; sign only the supported artifact assurance."""
 import artifacts as p
-import review
+from reference_checker import review
 
 
 def decide(agreement, pins, allocation, submission, store, key):
@@ -8,7 +8,7 @@ def decide(agreement, pins, allocation, submission, store, key):
     p.require(key.public_key().public_bytes_raw().hex() == body['verifierKey'], "wrong verifier key")
     p.require(store.pin == body['custodianKey'], "wrong custody authority")
     sent = p.verify_submission(submission, body, allocation)
-    p.check_implementation()
+    p.check_implementation(review)
     source = store.get(sent['inputSha256'])
     output = store.get(sent['outputSha256'])
     p.require(store.get(p.digest(sent['custody'])) == p.canonical(sent['custody']), "custody receipt unavailable")
