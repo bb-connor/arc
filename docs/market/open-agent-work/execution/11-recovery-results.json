@@ -517,8 +517,10 @@
     },
     {
       "path": "recovery-evidence/nonce-gap-red.log",
-      "sha256": "a3400a42dfa248388ff1d7902a394696caaf6ac524cbfcb98d4466004ab7b47d",
-      "bytes": 1508
+      "sha256": "65516baa280baaf2521b183f2cdaa34a35d7402476967e434e2cae7448a89393",
+      "bytes": 1504,
+      "normalization": "Removed trailing spaces from two blank log lines for repository whitespace checks.",
+      "originalSha256": "a3400a42dfa248388ff1d7902a394696caaf6ac524cbfcb98d4466004ab7b47d"
     },
     {
       "path": "recovery-evidence/nonce-index-red.log",

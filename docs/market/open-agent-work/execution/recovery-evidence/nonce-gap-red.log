@@ -23,9 +23,9 @@ Falling back to a NodeJS implementation; performance may be degraded.
 test at contracts/scripts/work-claim-recovery-core.test.mjs:95:1
 ✖ an unresolved earlier nonce prevents dispatch of a future transaction (4347.746471ms)
   AssertionError [ERR_ASSERTION]: a future nonce was sent before its predecessor resolved
-  
+
   1 !== 0
-  
+
       at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-recovery-core.test.mjs:105:10)
       at async Test.run (node:internal/test_runner/test:1313:7)
       at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
