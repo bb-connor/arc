@@ -10,6 +10,42 @@ use chio_process::{ProcessLimits, ProcessRuntime};
 use std::sync::{atomic::Ordering, Arc};
 use support::{canonical, now, Fixture, TestResult};
 
+#[derive(Debug, PartialEq)]
+struct RetainedSnapshot {
+    rows: Vec<Vec<rusqlite::types::Value>>,
+    anchor: Vec<u8>,
+}
+
+fn retained_snapshot(fixture: &Fixture) -> TestResult<RetainedSnapshot> {
+    let connection = rusqlite::Connection::open(fixture.database())?;
+    let mut rows = Vec::new();
+    for table in ["admission_operations", "admission_operation_commit_meta"] {
+        let mut statement = connection.prepare(&format!("SELECT * FROM {table}"))?;
+        let columns = statement.column_count();
+        rows.extend(
+            statement
+                .query_map([], |row| {
+                    (0..columns).map(|column| row.get(column)).collect()
+                })?
+                .collect::<rusqlite::Result<Vec<Vec<rusqlite::types::Value>>>>()?,
+        );
+    }
+    let store: String =
+        connection.query_row("SELECT store_uuid FROM chio_serving_owner", [], |row| {
+            row.get(0)
+        })?;
+    Ok(RetainedSnapshot {
+        rows,
+        anchor: std::fs::read(
+            fixture
+                .directory
+                .path()
+                .join("locks")
+                .join(format!("{store}.lock")),
+        )?,
+    })
+}
+
 struct UnknownRead(Arc<std::sync::atomic::AtomicUsize>);
 #[async_trait::async_trait]
 impl ToolServerConnection for UnknownRead {
@@ -47,8 +83,15 @@ impl ToolServerConnection for UnknownRead {
 #[test]
 fn collected_threshold_artifacts_are_bound_on_original_process_call_and_recover_once() -> TestResult
 {
-    // The SQLite budget clock is physical; hold the admission/collector clock
-    // later within the 300-second proposal window to avoid testing clock races.
+    threshold_recovery(false)
+}
+
+#[test]
+fn collected_threshold_artifacts_recover_within_controlled_authority_window() -> TestResult {
+    threshold_recovery(true)
+}
+
+fn threshold_recovery(controlled_clock: bool) -> TestResult {
     let _clock;
     let fixture = Fixture::new()?;
     let executor = tokio::runtime::Builder::new_current_thread()
@@ -68,16 +111,9 @@ fn collected_threshold_artifacts_are_bound_on_original_process_call_and_recover_
             native.kernel.clone(),
         )?;
         let mut request = fixture.request(&native, "approval-process")?;
-        // Diagnostic opt-in preserves the separate physical-clock regression;
-        // this test's normal oracle is retained artifact identity.
-        _clock = std::env::var_os("CHIO_PROCESS_TEST_PHYSICAL_APPROVAL_CLOCK")
-            .is_none()
-            .then(|| {
-                chio_kernel::scope_fixed_runtime_for_current_thread(
-                    now() + 60,
-                    Vec::<String>::new(),
-                )
-            });
+        _clock = controlled_clock.then(|| {
+            chio_kernel::scope_fixed_runtime_for_current_thread(now() + 60, Vec::<String>::new())
+        });
         process.create_root(
             "root",
             &request.capability,
@@ -158,6 +194,7 @@ fn collected_threshold_artifacts_are_bound_on_original_process_call_and_recover_
     let original = std::fs::read(fixture.directory.path().join("original-request.json"))?;
     assert_eq!(original, request_bytes);
     let request = serde_json::from_slice(&original)?;
+    let before = retained_snapshot(&fixture)?;
     let response = executor.block_on(process.invoke("root", "read", &request))?;
     assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
     assert_eq!(response.request_id, process.request_id("root", "read")?);
@@ -170,5 +207,7 @@ fn collected_threshold_artifacts_are_bound_on_original_process_call_and_recover_
     );
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     assert_eq!(canonical(&request)?, request_bytes);
+    assert_eq!(retained_snapshot(&fixture)?, before);
+    assert_eq!(process.process("root")?.tree_calls, 1);
     Ok(())
 }

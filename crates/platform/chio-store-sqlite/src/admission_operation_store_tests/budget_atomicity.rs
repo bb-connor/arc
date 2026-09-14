@@ -830,6 +830,35 @@ fn claimed_joint_budget_transactions_are_one_durable_write_each() {
     );
     let before = fixture.authority.anchor_generation().expect("anchor");
     let claimed = claim_of(&fixture, &claimant, &fused, begun_at + 4);
+    {
+        let connection = Connection::open(&fixture.database).expect("connection");
+        let snapshot = crate::tests::authority_snapshot(&connection).expect("snapshot");
+        let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(
+            (claimed.expires_at_unix_ms / 1000) + 1,
+            [],
+        );
+        let refused = fixture
+            .store
+            .claim_and_authorize_budget_and_commit_admission(
+                claimed,
+                &mut |_, _| panic!("expired authorization called lease callback"),
+                &fused,
+                request.clone(),
+                Some(journal.clone()),
+                None,
+                &fixture.fence,
+                begun_at + 4,
+            );
+        assert!(refused.is_err(), "expired authority authorized a hold");
+        assert_eq!(
+            crate::tests::authority_snapshot(&connection).expect("snapshot"),
+            snapshot
+        );
+        assert_eq!(
+            fixture.authority.anchor_generation().expect("anchor"),
+            before
+        );
+    }
     let (decision, authorized) = fixture
         .store
         .claim_and_authorize_budget_and_commit_admission(
@@ -885,6 +914,45 @@ fn claimed_joint_budget_transactions_are_one_durable_write_each() {
     }
     let before = fixture.authority.anchor_generation().expect("anchor");
     let claimed = claim_of(&fixture, &claimant, &dispatching, begun_at + 12);
+    let capture = BudgetCaptureInvocationRequest {
+        capability_id: fused.binding().capability_id().as_str().to_owned(),
+        grant_index: 0,
+        hold_id: "hold-joint-claim-fused".to_owned(),
+        event_id: "capture-joint-claim-fused".to_owned(),
+        trusted_time: None,
+        authority: Some(BudgetEventAuthority {
+            authority_id: fixture.fence.store_uuid.clone(),
+            lease_id: fixture.fence.lease_id.clone(),
+            lease_epoch: fixture.fence.owner_epoch,
+        }),
+    };
+    {
+        let connection = Connection::open(&fixture.database).expect("connection");
+        let snapshot = crate::tests::authority_snapshot(&connection).expect("snapshot");
+        let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(
+            (claimed.expires_at_unix_ms / 1000) + 1,
+            [],
+        );
+        assert!(fixture
+            .store
+            .claim_and_capture_invocation_and_commit_dispatch(
+                claimed,
+                &mut |_, _| panic!("expired capture called lease callback"),
+                &dispatching,
+                capture,
+                &fixture.fence,
+                begun_at + 12
+            )
+            .is_err());
+        assert_eq!(
+            crate::tests::authority_snapshot(&connection).expect("snapshot"),
+            snapshot
+        );
+        assert_eq!(
+            fixture.authority.anchor_generation().expect("anchor"),
+            before
+        );
+    }
     let (_, dispatched) = fixture
         .store
         .claim_and_capture_invocation_and_commit_dispatch(

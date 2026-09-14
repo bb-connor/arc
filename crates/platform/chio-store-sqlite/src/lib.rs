@@ -26,6 +26,9 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(test)]
+extern crate self as chio_store_sqlite;
+
 use std::path::{Path, PathBuf};
 
 pub mod admission_operation_store;
@@ -815,6 +818,32 @@ pub use tool_outcome_store::SqliteToolOutcomeStore;
 
 #[cfg(test)]
 mod tests {
+    /// Snapshot every durable table so refusal tests cover claims, participants,
+    /// commit chains, and derived authority state together.
+    pub(crate) fn authority_snapshot(
+        connection: &rusqlite::Connection,
+    ) -> rusqlite::Result<Vec<(String, Vec<String>)>> {
+        let names = connection.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")?
+            .query_map([], |row| row.get::<_, String>(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
+        names
+            .into_iter()
+            .map(|name| {
+                let mut statement = connection
+                    .prepare(&format!("SELECT * FROM \"{}\"", name.replace('"', "\"\"")))?;
+                let columns = statement.column_count();
+                let mut rows = statement
+                    .query_map([], |row| {
+                        let values = (0..columns)
+                            .map(|index| row.get::<_, rusqlite::types::Value>(index))
+                            .collect::<rusqlite::Result<Vec<_>>>()?;
+                        Ok(format!("{values:?}"))
+                    })?
+                    .collect::<rusqlite::Result<Vec<_>>>()?;
+                rows.sort();
+                Ok((name, rows))
+            })
+            .collect()
+    }
     use super::{
         is_in_memory_sqlite_path, sqlite_parent_dir_to_create, sqlite_uri_has_nonlocal_authority,
     };

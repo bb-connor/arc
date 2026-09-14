@@ -322,6 +322,35 @@ fn claimed_tool_return_and_post_return_begin_are_one_durable_write_each() {
         expires_at_unix_ms: at + 60_000,
         fence: &fixture.fence,
     };
+    {
+        let connection = rusqlite::Connection::open(&fixture.database).expect("connection");
+        let snapshot = crate::tests::authority_snapshot(&connection).expect("snapshot");
+        let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(
+            request.expires_at_unix_ms / 1000 + 1,
+            [],
+        );
+        assert!(fixture
+            .outcomes
+            .claim_and_record_tool_returned(
+                admission,
+                request,
+                &mut |_, _| panic!("expired return called lease callback"),
+                &operation,
+                &blob,
+                &outcome,
+                &fixture.fence,
+                at + 1
+            )
+            .is_err());
+        assert_eq!(
+            crate::tests::authority_snapshot(&connection).expect("snapshot"),
+            snapshot
+        );
+        assert_eq!(
+            fixture.authority.anchor_generation().expect("anchor"),
+            before
+        );
+    }
     let (stored, finalizing) = fixture
         .outcomes
         .claim_and_record_tool_returned(
@@ -350,6 +379,34 @@ fn claimed_tool_return_and_post_return_begin_are_one_durable_write_each() {
         expires_at_unix_ms: at + 60_000,
         fence: &fixture.fence,
     };
+    {
+        let connection = rusqlite::Connection::open(&fixture.database).expect("connection");
+        let snapshot = crate::tests::authority_snapshot(&connection).expect("snapshot");
+        let anchor = fixture.authority.anchor_generation().expect("anchor");
+        let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(
+            request.expires_at_unix_ms / 1000 + 1,
+            [],
+        );
+        assert!(fixture
+            .outcomes
+            .claim_and_begin_post_return_evaluation(
+                admission,
+                request,
+                &mut |_, _| panic!("expired post-return called lease callback"),
+                &prepared,
+                &fixture.fence,
+                at + 3
+            )
+            .is_err());
+        assert_eq!(
+            crate::tests::authority_snapshot(&connection).expect("snapshot"),
+            snapshot
+        );
+        assert_eq!(
+            fixture.authority.anchor_generation().expect("anchor"),
+            anchor
+        );
+    }
     let (evaluation, lease) = fixture
         .outcomes
         .claim_and_begin_post_return_evaluation(

@@ -724,10 +724,15 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         verify_trusted_time(&transaction, trusted_now_unix_ms)?;
         let stored = load_by_operation_id_tx(&transaction, request.operation_id)?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
-        let (ClaimWrite::Active(claim) | ClaimWrite::Written(claim)) =
+        let claim =
             self.claim_in_transaction(&transaction, &stored, request, trusted_now_unix_ms)?;
-        let command = command(&stored.operation, claim)?;
+        let claim_written = matches!(claim, ClaimWrite::Written(_));
+        let command = command(&stored.operation, claim.into_claim())?;
         let result = self.apply_in_transaction(&transaction, &command, trusted_now_unix_ms)?;
+        if !claim_written && matches!(result, AdmissionCommandResult::Idempotent(_)) {
+            transaction.commit().map_err(sqlite_error)?;
+            return Ok(result);
+        }
         self.commit_write(transaction)?;
         self.sync_after_write(&connection)?;
         Ok(result)

@@ -404,6 +404,9 @@ impl ChioKernel {
     ) -> Result<(), KernelError> {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
+        // Dispatch may have advanced durable time since evaluation began.
+        // Claim and project with one fresh authority observation under the lock.
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
         if runtime
             .outcome_store
             .lookup_by_operation(operation.binding().operation_id())

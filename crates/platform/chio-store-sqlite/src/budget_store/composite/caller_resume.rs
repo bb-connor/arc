@@ -3,6 +3,10 @@
 use super::*;
 use chio_kernel::admission_operation::AdmissionOperationState;
 
+#[cfg(all(test, unix))]
+#[path = "caller_resume_tests.rs"]
+mod tests;
+
 impl SqliteBudgetStore {
     pub(super) fn resume_approved_caller_hold(
         &self,
