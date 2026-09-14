@@ -544,8 +544,11 @@ jobs:
     name: MSRV build and test
     runs-on: ubuntu-latest
     # Serialize compilation and isolate fixtures while preserving explicit
-    # thread/process races. Keep the bounded full-workspace wedge failsafe.
-    timeout-minutes: 240
+    # thread/process races. The serial lane passed all 1,134 control-plane
+    # cases, then exhausted four hours during SQLite without a test failure.
+    # Match the main workspace's bounded six-hour failsafe; do not shorten
+    # coverage or increase fixture concurrency to fit the old job budget.
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - uses: ./.github/actions/setup-rust

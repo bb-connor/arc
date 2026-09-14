@@ -501,6 +501,20 @@ SERIAL_FIXTURE_STEPS = (
     ("msrv", "MSRV workspace lane", "MSRV evidence"),
 )
 live_ci = CHECKER.load_workflow(ROOT / ".github/workflows/ci.yml")
+if CHECKER.job(live_ci, "msrv").get("timeout-minutes") != "360":
+    raise AssertionError("MSRV serial workspace budget must be exactly 360 minutes")
+for label, replacement in (
+    ("removed", ""),
+    ("shortened", "    timeout-minutes: 240\n"),
+    ("oversized", "    timeout-minutes: 361\n"),
+    ("dynamic", "    timeout-minutes: ${{ vars.MSRV_TIMEOUT }}\n"),
+):
+    assert_rejected(
+        f"MSRV serial workspace budget {label}",
+        "ci.yml",
+        replace_in_named_job("msrv", "    timeout-minutes: 360\n", replacement),
+        "MSRV serial workspace budget must be exactly 360 minutes",
+    )
 for job_id, step_name, error_context in SERIAL_FIXTURE_STEPS:
     step = CHECKER.named_step(CHECKER.job(live_ci, job_id), step_name)
     if step.get("env", {}).get("RUST_TEST_THREADS") != "1":

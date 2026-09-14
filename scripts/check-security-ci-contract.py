@@ -7906,6 +7906,9 @@ def validate(root: Path) -> None:
         if contains_key(job(ci, identifier), "continue-on-error"):
             raise ContractError(f"required CI job uses continue-on-error: {identifier}")
 
+    if job(ci, "msrv").get("timeout-minutes") != "360":
+        raise ContractError("MSRV serial workspace budget must be exactly 360 minutes")
+
     check_job = job(ci, "check")
     for identifier, boundary in (
         ("check", "Workspace structural gates"),
