@@ -961,7 +961,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/admission_operation/sequencer.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/admission_operation/sequencer.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=3f9b2c08758961c27bbe067f05aea1f24062a31cd3824f83f5abbe9aeebbfbde, rust_symbols=SequencerState,AdmissionLiveOperation,AdmissionLiveOperation::drop,AdmissionMutationSequencer::for_fence,AdmissionMutationSequencer::try_own_operation)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/admission_operation/store.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/admission_operation/store.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=16b4d9e8645fabf6f3b61fff47f34aacb02facce6e21dd571087ab360dddc005, rust_symbols=AdmissionOperationStore,QualifiedAdmissionOperationStoreExt)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/checkpoint.rs->formal/lean4/Chio/Chio/Core/Receipt.lean` (`manual_mirror`, `transliteration`): `crates/kernel/chio-kernel/src/checkpoint.rs` -> `formal/lean4/Chio/Chio/Core/Receipt.lean` (model_kind=lean, normalized_sha256=cd6e48f20e5218d296a597d1627bae3843ddfd5332733b8d33e8b9c03f3149a5, rust_symbols=KernelCheckpointBody,KernelCheckpoint,ReceiptInclusionProof,ReceiptInclusionProof::verify,build_checkpoint,build_inclusion_proof,verify_checkpoint_signature)
-- `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=42b8d8885628c32bbe662759de1b3a8cabcf2a9e4b6a639a013bf6431d2a6d5b, rust_symbols=ChioKernel::capture_and_commit_durable_dispatch,ChioKernel::begin_durable_tool_admission_for_transport,ChioKernel::native_security_authority_binding,immutable_tool_admission_request_hash)
+- `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=68f4445f3bb46deb74771486c896d5d676c08abc6f411199ee8c72f9bdd9a12c, rust_symbols=ChioKernel::capture_and_commit_durable_dispatch,ChioKernel::begin_durable_tool_admission_for_transport,ChioKernel::native_security_authority_binding,immutable_tool_admission_request_hash)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/admission_coordinator/authority_profile.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/admission_coordinator/authority_profile.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=0cf26e5f780dde7dbaabc22f9cda1bd505a3cd55d1a1f89af744be2b8f98aa49, rust_symbols=ChioKernel::load_original_request_for_finalization,ChioKernel::admission_authority_profile,ChioKernel::validate_original_authority_profile,ChioKernel::validate_live_admission_authority_profile,DurableToolAdmission::original_native_security_authority_binding,DurableToolAdmission::original_retained_request)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/admission_coordinator/caller_budget.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/admission_coordinator/caller_budget.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=7ea6f7893a4f85f9163eb718e07e68b4ececfe38c4d0ee8acc48b2725ef37efd, rust_symbols=ChioKernel::load_durable_caller_budget_shares)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/admission_coordinator/dpop_acquisition.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/admission_coordinator/dpop_acquisition.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=002c8d434e8df1e0c95c63f0367c4328afc0bf0b83a5714adbb86df01d6031c4, rust_symbols=ChioKernel::set_operation_owned_dpop_authority,ChioKernel::verify_dpop_activation,ChioKernel::verify_operation_owned_dpop,ChioKernel::claim_prepared_dpop,ChioKernel::verify_owned_dpop,ChioKernel::release_operation_owned_dpop_before_dispatch,ChioKernel::release_exact_dpop_reservation,ChioKernel::claim_dpop_recovery,reservation_phase,acquisition_phase,load_history,validate_successor)
@@ -1216,7 +1216,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `041b41bffff4129fb087c60bc797d804ac68188d6c2a5a26811c355e7cf79b0b`
+- Input digest: `1d232685d7bbd18b320a17109e2a1bf79a266972a2a05873325875710eee2f7c`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1382,7 +1382,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/apalache/MCReceiptBeforeAllow.cfg`: `71fb93fb3263978fb8568ba2ab3cc6211edf453fc640386acbd205c1467a86e7`
 - `formal/apalache/MCRevocationCutCompleteness.cfg`: `51a0e07e246317382f2922ccf560d1e5ebe0c14f002a6220e2eb1b88d79677fc`
 - `formal/apalache/MonotoneLogApalache.tla`: `b77d34434a091b8a991841500daf6a42ca3f1817f440c9e86f8769fadf074759`
-- `formal/apalache/PostAdmissionDropGuard.tla`: `221cf6d2197834c26c1653d78c2958e6912e33ef9da3ee9a1917d54e887d2fd8`
+- `formal/apalache/PostAdmissionDropGuard.tla`: `f7b23c438d3c388511d483f235735cb8f892b69d002c95d7808612b4e9331872`
 - `formal/apalache/ReceiptBeforeAllow.tla`: `a450d27c537b0ce30e5e5bb7f980235eea3e49c7e854a984b7be95de72bab719`
 - `formal/apalache/RevocationCutCompleteness.tla`: `0cfb9ccdc7fe7d9daf7cab2f73fa39b423d86a0f6793c75d4d332e40f4f602a9`
 - `formal/apalache/_negative_tests/Common.tla`: `4a82138d298b02577c8d17759939a97e173c0b483a52ce497636e1647de20ae4`
@@ -1440,7 +1440,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/mutation/evidence/spec-mutants-7b24142e8523fe08e501063dbf3d4f6cea3397be.json`: `82878e03aaafa1ceeb1f791386cffd57f9f88453b24113bd51e43b67996a66c2`
 - `formal/mutation/evidence/spec-mutants-d292f14df1c493873199f4f9d969ade00472ff28.json`: `d7b7a63401bfb071af87743ec07191e380c29ee1e306cca1fe35859a8194e623`
 - `formal/mutation/registry.toml`: `48387345d00fe7c53e777326f73e31370f7bc3d362a09f1059cadc06c98b6bb6`
-- `formal/proof-manifest.toml`: `24405358ba25aa81bca43a009d6e4b0a3915896d75b779ec1b0c8a60de32c7ed`
+- `formal/proof-manifest.toml`: `42d386b04efebd15c02fd8ab745a85ea53bf9e03ed306ca948efe6fb1bad4612`
 - `formal/rust-verification/creusot-contracts.toml`: `83000c98743013d3d6d468976a163edaf16d0d621070410d741f146bf61a28a5`
 - `formal/rust-verification/formal-mutants.toml`: `5f15de2f3833b11db3d783d05ab6efcd2c49840ede010fe7ec54fc2846c48fc6`
 - `formal/rust-verification/kani-harnesses.toml`: `f82442bef24ae67283c3f171cff15e8aa6cc4d808c7893b9e349b6bf315b50ce`
@@ -1459,7 +1459,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `36983f13648d47d1ac324ce029786b27d1c5cc7ffbfff364aadebcbf182489c8`
 - `fuzz/target-map.toml`: `8a4446045fa28878fe848f96ed0e4fb6a13db407d2fbab1eea2d65271095dee0`
-- `git-worktree://rust-files`: `ad1a9283a3ea4e3b8f5ed763c9cd5c6291244df22e3e6f41e61b130521856d0e`
+- `git-worktree://rust-files`: `b66a7b65654b3325180e0532b5a124fa61a5f4cc0e3fd207b69bcb853fbf3b9a`
 - `releases.toml`: `5b3807734b69abf8f4f16c6476a998134588c2cef671cd4e40b6ad3422cf4932`
 - `rust-toolchain.toml`: `d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`

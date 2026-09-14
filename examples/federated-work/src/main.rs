@@ -1,5 +1,6 @@
 mod buyer;
 mod common;
+mod funded_work;
 mod https;
 mod incident;
 mod market;
@@ -20,6 +21,11 @@ use std::path::Path;
 fn run() -> Result<serde_json::Value> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        ["experimental-funded-smoke",state] => funded_work::smoke(Path::new(state)),
+        #[cfg(unix)]
+        ["experimental-funded-smoke",state,fault] => funded_work::smoke_fault(Path::new(state),fault),
+        #[cfg(unix)]
+        ["experimental-funded-worker",state,socket,fault] => funded_work::worker(Path::new(state),Path::new(socket),fault),
         ["check-openapi",file] => {
             let mut input = String::new();
             std::fs::File::open(file)?.take(64 * 1024 + 1).read_to_string(&mut input)?;

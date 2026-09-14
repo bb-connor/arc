@@ -11,8 +11,7 @@ checks, including all 118 model trace representatives. The independent private
 chain reproduction retains an unpaid child claim through parent refund and
 then pays the child. Task 3 is complete for the selected local integration
 of the committed Security M4 and research checkpoints; the report and public
-evidence are retained with its reviewed local commit. Task 4 native funding
-integration is not started. The independent [artifact/custody sub-slice](2026-09-14-funded-work-artifacts.md) now joins actual Rust W0 output, Python verification and retained local custody to private-chain payment, rejection/refund and child withdrawal. Its example-local profiles do not qualify native Finding facets or public-chain finality. This is not vertical-slice completion.
+evidence are retained with its reviewed local commit. Task 4 now includes the [native funding admission slice](2026-09-14-funded-native-admission.md): verified private-chain funding, one original native operation/hold, actual W0 execution and crash recovery. Its selected qualification is recorded separately from Task 3. The independent [artifact/custody sub-slice](2026-09-14-funded-work-artifacts.md) now joins actual Rust W0 output, Python verification and retained local custody to private-chain payment, rejection/refund and child withdrawal. Its example-local profiles do not qualify native Finding facets or public-chain finality. This is not vertical-slice completion.
 
 **Architecture:** Prototype an experimental claim escrow separately from existing `ChioEscrow`. Fund immutable work terms, commit a timely result, arbitrate through a pinned F1 verifier, and preserve accepted withdrawals. Connect the rail to native admission only after an isolated paper/Security M4 integration is reviewed and qualified for the selected surface.
 
@@ -106,7 +105,12 @@ Unknown broadcast state triggers reconciliation of the same IDs.
 
 **Files:** Experimental federated modules and smoke harness; only necessary adapters in the reviewed candidate.
 
-- [ ] Write an admission test showing unfinalized, wrong-domain, reused or mismatched allocations deny before kernel dispatch and before a new reservation. Reuse under a changed request identity or a fresh authority store must also fail; exercise the native boundary without requiring the optional process stack.
+The first admission slice uses the explicitly bounded private-chain confirmation
+profile in [FUNDED.md](../../../examples/federated-work/FUNDED.md). It does not
+close the public-finality, registered-artifact, Finding or financial-successor
+requirements below. The observer/correlation item remains open for that full scope.
+
+- [x] Write an admission test showing unfinalized, wrong-domain, reused or mismatched allocations deny before kernel dispatch and before a new reservation. Reuse under a changed request identity or a fresh authority store must also fail; exercise the native boundary without requiring the optional process stack.
 - [ ] Define the registered experimental agreement/submission/decision encoding and shared malformed vectors. Map existing bid/ask/acceptance and Finding facets without overriding buyer reimbursement semantics.
 - [ ] Implement the funding observer and durable operation correlation using existing settlement proof requirements. Fail closed on observer unavailability or changed deployment/chain state. Keep chain eligibility, receiver observation age and original capability expiry distinct; fixed historical contract vectors cannot establish fresh admission.
 - [ ] Execute existing W0 checker on the exact agreed input and establish custodian retrieval before a positive verifier decision. Required unavailable/failed facets reject; synthetic contract-only signatures are not accepted here.
@@ -147,4 +151,4 @@ Task 2 alone is a useful contract milestone but does not complete this slice.
 Task 4 now has a locally qualified combined source. Thereafter qualify W1,
 independent implementation and sustained retention before the external trial.
 
-The isolated combined checkpoint is complete under the [M4 integration plan](2026-09-14-funded-work-m4-integration.md). It uses the existing process/namespace harnesses; the optional process stack is not imported. Task 3 closes locally with all selected gates and the reviewed commit. Task 4 remains the next native funding milestone.
+The isolated combined checkpoint is complete under the [M4 integration plan](2026-09-14-funded-work-m4-integration.md). It uses the existing process/namespace harnesses; the optional process stack is not imported. Task 3 closes locally with all selected gates and the reviewed commit. Task 4 native admission is implemented; connecting the original operation to Finding verification, claims, withdrawals, refunds and the earned child remains the next milestone.

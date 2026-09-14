@@ -8,6 +8,8 @@ license = "Apache-2.0"
 [workspace]
 
 [dependencies]
+alloy-primitives = { version = "1.5.7", default-features = false, features = ["std"] }
+alloy-sol-types = { version = "1.5.7", default-features = false, features = ["std"] }
 chio-core-types = { path = "../../crates/core/chio-core-types" }
 chio-open-market = { path = "../../crates/economy/chio-open-market" }
 chio-finding = { path = "../../crates/economy/chio-finding" }
@@ -28,6 +30,9 @@ rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", 
 rustls-pemfile = "2"
 tokio-rustls = { version = "0.26", default-features = false, features = ["aws_lc_rs"] }
 url = "2"
+
+[dev-dependencies]
+tempfile = "3"
 
 [lints.clippy]
 unwrap_used = "deny"

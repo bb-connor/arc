@@ -1,0 +1,272 @@
+{
+  "schema": "chio.local-native-funding-evidence.v1",
+  "createdAtUTC": "2026-09-14T22:10:49.853445+00:00",
+  "baseCommit": "412866ccbd4c6ad2654b648570161fd0d51f3559",
+  "branch": "feat/funded-native-admission",
+  "sourceObjects": {
+    "examples/federated-work": "cc97091a947dfa9ec56eae6ad7b886833a4cd76e",
+    "crates/kernel/chio-kernel": "0149993406f1c79a918dcfb333c27182dc23e83f",
+    "contracts": "579dbb5c706bdf9939f87afb51df856f7e381453",
+    "Cargo.toml": "f622b684573a9e01d2807f6eb95a8f74bfdb6b23",
+    "Cargo.lock": "3beee23ddc1b00265130dc87b135da0b1cc2a0a3",
+    "formal/apalache/PostAdmissionDropGuard.tla": "c54c662e180b11fca87bc95346fe82432830d9e8",
+    "formal/proof-manifest.toml": "4f9f496a2d397009524fb38975be0954b36456f7"
+  },
+  "status": "Selected local qualification passed; no hosted CI, push, merge or release claim",
+  "sourceBinding": "Source objects identify runtime inputs without a self-referential commit hash; compare against the containing commit.",
+  "scope": "Verified private-chain funding bound to one original native operation and budget hold, actual W0 execution, no claim or ERC20 withdrawal.",
+  "profile": "chio.experimental.local-confirmed-funding.v1",
+  "environment": {
+    "rust": "1.94.1 aarch64-unknown-linux-gnu",
+    "node": "24.16.0",
+    "python": "3.13.13",
+    "chainId": "31337",
+    "token": "private mock ERC20",
+    "fundingUnits": 100,
+    "confirmations": "two descendant blocks",
+    "CARGO_BUILD_JOBS": "3",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "RUST_TEST_THREADS": "1",
+    "umask": "022",
+    "coreDumps": "disabled"
+  },
+  "binarySha256": "e80345f673b426be1b0fab0f8c917dd0327b2a96f5261b390de8d1d1b68bb0a6",
+  "artifacts": [
+    {
+      "path": "native-funding-evidence/standalone-tests-qualified.log",
+      "sha256": "5c57f4ce236b934821fe42f036d217acfadc9671bab41d2ee9a2d5f26aeed5fd",
+      "bytes": 2995,
+      "command": "CARGO_TARGET_DIR=target cargo test --locked --manifest-path examples/federated-work/Cargo.toml",
+      "exitCode": 0,
+      "passed": 27,
+      "rawSha256": "e366fc386c230f4884ddd1a8878c1e410c6f0f6be4d55828c1127019c7ec5d6b",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/native-sqlite-qualified.log",
+      "sha256": "7288fe4aa5f40ca6b97b18d99b9b0c7196a7b0a08e474a10d1ec89146e8bdb31",
+      "bytes": 2156,
+      "command": "cargo test -p chio-kernel --test durable_admission_sqlite",
+      "exitCode": 0,
+      "passed": 20,
+      "rawSha256": "03c094c32c067df589e3c442265455d7761c5ac15df9471d1b7a714162d1c35d",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/kernel-lib-final.log",
+      "sha256": "8b3c09ee0308e36c70b19a7da6c251c78db26f4bd61a8e3bbcf1f3b05ecde207",
+      "bytes": 141481,
+      "command": "cargo test -p chio-kernel --lib",
+      "exitCode": 0,
+      "passed": 1445,
+      "rawSha256": "3afe79aafe94bbe54802de2e155b17ef6e765e5278d8050275c76d4530240f98",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/standalone-clippy-qualified.log",
+      "sha256": "bfecd239fdcf7a133697be5cce91445197ee59abfc80aecff8979798a5e0cae3",
+      "bytes": 1602,
+      "command": "CARGO_TARGET_DIR=target cargo clippy --locked --manifest-path examples/federated-work/Cargo.toml --all-targets -- -D warnings",
+      "exitCode": 0,
+      "rawSha256": "bfecd239fdcf7a133697be5cce91445197ee59abfc80aecff8979798a5e0cae3",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/workspace-clippy-final.log",
+      "sha256": "1ef444fccb058ee68daa8923b6aaff2490ab0be18f34158b6d1fd2414df4c246",
+      "bytes": 8694,
+      "command": "cargo clippy --workspace --all-targets --locked --offline -- -D warnings",
+      "exitCode": 0,
+      "rawSha256": "1ef444fccb058ee68daa8923b6aaff2490ab0be18f34158b6d1fd2414df4c246",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/workspace-check-final.log",
+      "sha256": "1088cea68c78a26839e7a395592332b416d6c6cacb373791cd7e449afbbf9b83",
+      "bytes": 8694,
+      "command": "cargo check --workspace --all-targets --locked --offline",
+      "exitCode": 0,
+      "rawSha256": "1088cea68c78a26839e7a395592332b416d6c6cacb373791cd7e449afbbf9b83",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/fuzz-check-final.log",
+      "sha256": "35779ab59d978e0b026c3afa02d263f45378e62591eee3696dfaef674381a023",
+      "bytes": 2107,
+      "command": "CARGO_TARGET_DIR=target cargo check --manifest-path fuzz/Cargo.toml --bins --locked --offline",
+      "exitCode": 0,
+      "rawSha256": "35779ab59d978e0b026c3afa02d263f45378e62591eee3696dfaef674381a023",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/standalone-build-qualified.log",
+      "sha256": "24a3b59b44024d9f1730ce3dc2b234571f84e885df8ccbd858a8b735cd085f08",
+      "bytes": 171,
+      "command": "CARGO_TARGET_DIR=target cargo build --locked --manifest-path examples/federated-work/Cargo.toml",
+      "exitCode": 0,
+      "rawSha256": "24a3b59b44024d9f1730ce3dc2b234571f84e885df8ccbd858a8b735cd085f08",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/funded-smoke-qualified.log",
+      "sha256": "5272ec50c06dcff87973e764d800c20692b36bbcf404ab03c9e29f1eda14b20d",
+      "bytes": 409,
+      "command": "CHIO_FUNDED_EVIDENCE_DIR=<public-summary-directory> python3 -B examples/federated-work/funded_smoke.py",
+      "exitCode": 0,
+      "passed": 2,
+      "rawSha256": "5272ec50c06dcff87973e764d800c20692b36bbcf404ab03c9e29f1eda14b20d",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/python-regressions.log",
+      "sha256": "ee916613161886b13da0e07e5632610aef849ff3b41b0ffcd1050d0ca05e607d",
+      "bytes": 4637,
+      "command": "/tmp/chio-python31-locked-venv/bin/python -B -m unittest discover -s examples/federated-work/python_buyer -v",
+      "exitCode": 0,
+      "passed": 30,
+      "rawSha256": "ee916613161886b13da0e07e5632610aef849ff3b41b0ffcd1050d0ca05e607d",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/contract-regressions.log",
+      "sha256": "1aa6aee8778002b5525e7b20d71d9aa3aff36a147ee7f4581e2c0cd7f297fb03",
+      "bytes": 2455,
+      "command": "node --test contracts/scripts/work-claim-escrow.test.mjs",
+      "exitCode": 0,
+      "passed": 18,
+      "rawSha256": "1aa6aee8778002b5525e7b20d71d9aa3aff36a147ee7f4581e2c0cd7f297fb03",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/hygiene-qualified.log",
+      "sha256": "478995a7760502854d5effff324e7d653e23cb0a6a436e20ef088234bf833cdf",
+      "bytes": 43431,
+      "command": "python3 scripts/check-rust-file-hygiene.py",
+      "exitCode": 0,
+      "rawSha256": "478995a7760502854d5effff324e7d653e23cb0a6a436e20ef088234bf833cdf",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/formal-mirrors-final.log",
+      "sha256": "e3bb3bef614ea322953e7aa8818cee8046ca3683a25c6da1946e87cd5202606b",
+      "bytes": 41,
+      "command": "target/debug/xtask check formal-mirrors",
+      "exitCode": 0,
+      "passed": 225,
+      "rawSha256": "e3bb3bef614ea322953e7aa8818cee8046ca3683a25c6da1946e87cd5202606b",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/proof-coverage-final.log",
+      "sha256": "f6f7e4ae12d9b3e0a3a8053be9604fdeebda525034915e4aecdd99f11c985c60",
+      "bytes": 48,
+      "command": "target/debug/xtask gen proof-coverage --check",
+      "exitCode": 0,
+      "rawSha256": "f6f7e4ae12d9b3e0a3a8053be9604fdeebda525034915e4aecdd99f11c985c60",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/fmt-workspace-qualified.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "command": "cargo fmt --all -- --check",
+      "exitCode": 0,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/fmt-standalone-qualified.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "command": "cargo fmt --manifest-path examples/federated-work/Cargo.toml -- --check",
+      "exitCode": 0,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/happy.json",
+      "sha256": "597e20fd64ee8d4b2ff02ea2e8c85d856b9c8ff973cb857e416a062f2b08bd80",
+      "bytes": 2305
+    },
+    {
+      "path": "native-funding-evidence/after-stage.json",
+      "sha256": "f21c4875ab9eadb3681308097f7fa435a76a3d61f4c624ef7360fe4facb90687",
+      "bytes": 1635
+    },
+    {
+      "path": "native-funding-evidence/before-bind.json",
+      "sha256": "841906af0595a7465edd8cd95274cf456d83ed885545b78d36a30cf43890a762",
+      "bytes": 1669
+    },
+    {
+      "path": "native-funding-evidence/after-hold.json",
+      "sha256": "42976da7d614fc6312c2c7c00c74cc88f358e6d770ac69d45aeed36b8d127a7c",
+      "bytes": 1866
+    },
+    {
+      "path": "native-funding-evidence/after-tool.json",
+      "sha256": "9f13b79d7d877973cc8dcddedb5f62c288c25b74be82ba7830d05f2a0c45f499",
+      "bytes": 1792
+    },
+    {
+      "path": "native-funding-evidence/source-preservation.json",
+      "sha256": "692eb65d78d847fbac59539bc261d00db85c0ce2243979e98dd239ca2edc87e0",
+      "bytes": 362
+    },
+    {
+      "path": "native-funding-evidence/review.json",
+      "sha256": "f34284630e48c31e98c872fe25d51758d61fb956fbb95a336491752bfbdaf0de",
+      "bytes": 1293
+    },
+    {
+      "path": "native-funding-evidence/acknowledgement-red.log",
+      "sha256": "b3b13731d18dd60efc0614de2096c5058cb4940d14e2d33c96690359b35911c4",
+      "bytes": 2150,
+      "expectedFailure": true,
+      "exitCode": 1,
+      "rawSha256": "6e121f60cd410d69ce832eec610994f89e162fd78d78e6916ce61e462166b302",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/late-observer-red.log",
+      "sha256": "7b4296c3e4156affa41acf8e7ef0403a3b69f6f540d1df9b23744e96ba733960",
+      "bytes": 858,
+      "expectedFailure": true,
+      "exitCode": 101,
+      "rawSha256": "7b4296c3e4156affa41acf8e7ef0403a3b69f6f540d1df9b23744e96ba733960",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-funding-evidence/no-payment-red.log",
+      "sha256": "0a1e751dff113635ef0bd5fd1e4e5b6232a0253df928498a68c78a970bc17ae8",
+      "bytes": 2197,
+      "expectedFailure": true,
+      "exitCode": 101,
+      "rawSha256": "0a1e751dff113635ef0bd5fd1e4e5b6232a0253df928498a68c78a970bc17ae8",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    }
+  ],
+  "notes": [
+    "Commands describe the selected reproduction invocations, not a verbatim shell transcript. Public logs normalize trailing whitespace; their raw-output hashes are retained.",
+    "The final smoke comprises two unittest methods, five private-chain scenarios and four workers killed with SIGKILL.",
+    "Workspace check preceded the final rail-mode guard; final workspace all-target Clippy and native recovery tests include that guard.",
+    "Python and contract regression sources were unchanged by subsequent native review fixes.",
+    "Fuzz binaries were compiled; no new fuzz campaign was run.",
+    "Formal hashes record reviewed source anchors, not a proof of funding finality or native payment recovery.",
+    "Acknowledgement red checks also exposed an overly strict expected state after unknown dispatch; Authorized is the correct preserved native state there.",
+    "Late-observer red output includes an existing ambiguous-denial receipt projection failure. The rail now returns a definite refusal for the side-effect-free verification phase; journal commit errors remain uncertain.",
+    "The missing-payment negative was reproduced through a real native budget refusal, without editing a database.",
+    "Ganache used its supported JavaScript fallbacks when optional native acceleration bindings were unavailable.",
+    "Only public summaries and logs are retained; private generated signing keys, original capabilities and authority databases are excluded."
+  ],
+  "remaining": [
+    "Registered work/submission/decision and Finding facet integration",
+    "Custodian retrieval and verifier-authorized on-chain claim",
+    "Observed withdrawal/refund linked to the original native payment",
+    "Earned child after native parent process loss",
+    "Independent implementation, company and sustained-capacity qualification"
+  ]
+}

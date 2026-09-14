@@ -1,0 +1,44 @@
+{
+  "after": {
+    "holdCount": 1,
+    "holdDisposition": "open",
+    "holdId": "admission-budget:8e17c7d203f060c7ba931d5a056bba4d339e0a68b2d983680d842c93a15adb90:0",
+    "operationCount": 1,
+    "operationId": "8e17c7d203f060c7ba931d5a056bba4d339e0a68b2d983680d842c93a15adb90"
+  },
+  "before": {
+    "holdCount": 1,
+    "holdDisposition": "open",
+    "holdId": "admission-budget:8e17c7d203f060c7ba931d5a056bba4d339e0a68b2d983680d842c93a15adb90:0",
+    "operationCount": 1,
+    "operationId": "8e17c7d203f060c7ba931d5a056bba4d339e0a68b2d983680d842c93a15adb90"
+  },
+  "chain": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "100",
+    "fundingTransaction": "0x1147d61e373b3ffb11a3d43f40613d0e0f4422a2087c8475297b41f5db98d8d0",
+    "paid": "0",
+    "payerBalance": "900",
+    "refunded": "0",
+    "state": "Funded"
+  },
+  "checkpoint": "after-tool",
+  "killedSignal": 9,
+  "replay": {
+    "allocationId": "0x168bac1d87706432da4b6c9d631f644967e1b5cbb7a35ea4151129d9320a71f2",
+    "authorityUuid": "01a0a1f7-dd7b-7242-a911-94d548498726",
+    "authorizationId": "funded-168bac1d87706432da4b6c9d631f644967e1b5cbb7a35ea4151129d9320a71f2",
+    "executions": 1,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:8e17c7d203f060c7ba931d5a056bba4d339e0a68b2d983680d842c93a15adb90:0",
+    "nativeAuthorizationId": "funded-168bac1d87706432da4b6c9d631f644967e1b5cbb7a35ea4151129d9320a71f2",
+    "nativePaymentState": "Authorized",
+    "nativeState": "OutcomeUnknownAfterDispatch",
+    "operationId": "8e17c7d203f060c7ba931d5a056bba4d339e0a68b2d983680d842c93a15adb90",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "startupReconciliationError": null
+  }
+}

@@ -1464,6 +1464,8 @@ dependencies = [
 name = "chio-federated-work"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
  "async-trait",
  "base64 0.22.1",
  "chio-a2a-adapter",
@@ -1480,6 +1482,7 @@ dependencies = [
  "rustls-pemfile",
  "serde",
  "serde_json",
+ "tempfile",
  "tiny_http",
  "tokio",
  "tokio-rustls",

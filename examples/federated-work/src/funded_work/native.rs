@@ -1,0 +1,376 @@
+use super::{
+    agreement::{Policy, SignedAgreement},
+    journal::Journal,
+    observer::{self, Domain, FundingSource},
+    rail::FundingRail,
+    tool::W0Tool,
+};
+use crate::common::{self, digest, Result};
+use chio_core_types::{
+    capability::scope::{ChioScope, MonetaryAmount, Operation, ToolGrant},
+    PublicKey,
+};
+use chio_kernel::{
+    admission_operation::{
+        AdmissionIdentifier, AdmissionOperationStore, AdmissionOperationV1, DurableAdmissionMode,
+    },
+    ChioKernel, ToolCallRequest,
+};
+use chio_store_sqlite::{SqliteAuthorityStore, SqliteReceiptStore};
+use std::{fs, path::Path, sync::Arc};
+
+pub(super) const SERVER: &str = "experimental-funded-w0";
+// Native receipts require a three-letter denomination. The pinned local
+// profile maps XTS one-to-one to the mock token's integer base units.
+pub(super) const CURRENCY: &str = "XTS";
+
+pub struct Native {
+    pub(super) kernel: ChioKernel,
+    pub(super) authority: SqliteAuthorityStore,
+    pub(super) policy: Policy,
+    pub(super) source: Arc<dyn FundingSource>,
+    pub(super) journal: Arc<Journal>,
+    checkpoint: super::Checkpoint,
+    recovery_error: Option<String>,
+}
+
+pub fn implementation_digest() -> String {
+    chio_core_types::sha256_hex(
+        &[
+            include_bytes!("allocation.rs").as_slice(),
+            include_bytes!("observer.rs").as_slice(),
+            include_bytes!("agreement.rs").as_slice(),
+            include_bytes!("native.rs").as_slice(),
+            include_bytes!("journal.rs").as_slice(),
+            include_bytes!("rail.rs").as_slice(),
+            include_bytes!("tool.rs").as_slice(),
+            include_bytes!("../review.rs").as_slice(),
+        ]
+        .concat(),
+    )
+}
+
+impl Native {
+    pub fn provision(state: &Path, buyer: PublicKey, domain: Domain) -> Result<()> {
+        domain.validate()?;
+        match fs::symlink_metadata(state) {
+            Ok(metadata)
+                if metadata.file_type().is_dir() && fs::read_dir(state)?.next().is_none() => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Ok(_) => {
+                return Err("native funding requires an empty disposable state directory".into())
+            }
+            Err(error) => return Err(error.into()),
+        }
+        let provider = common::init(state)?;
+        let locks = state.join("locks");
+        fs::create_dir(&locks)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&locks, fs::Permissions::from_mode(0o700))?;
+        }
+        let database = state.join("authority.sqlite");
+        SqliteAuthorityStore::provision(&database, &locks)?;
+        let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
+        let policy = Policy {
+            authority_uuid: authority.mutation_fence().store_uuid,
+            implementation_sha256: implementation_digest(),
+            buyer_key: buyer,
+            provider_key: provider,
+            domain,
+        };
+        fs::write(
+            state.join("funding-policy.json"),
+            chio_core_types::canonical_json_bytes(&policy)?,
+        )?;
+        Journal::provision(&state.join("funding.sqlite"), &policy)?;
+        Ok(())
+    }
+
+    pub fn open(state: &Path, source: Arc<dyn FundingSource>) -> Result<Self> {
+        Self::open_with_checkpoint(state, source, Arc::new(|_| Ok(())))
+    }
+
+    pub fn open_with_checkpoint(
+        state: &Path,
+        source: Arc<dyn FundingSource>,
+        checkpoint: super::Checkpoint,
+    ) -> Result<Self> {
+        let policy: Policy = common::read(state.join("funding-policy.json"))?;
+        let key = common::key(state)?;
+        let authority = SqliteAuthorityStore::open_serving(
+            state.join("authority.sqlite"),
+            state.join("locks"),
+        )?;
+        if policy.authority_uuid != authority.mutation_fence().store_uuid
+            || policy.provider_key != key.public_key()
+            || policy.implementation_sha256 != implementation_digest()
+        {
+            return Err("funding policy does not bind this authority and implementation".into());
+        }
+        policy.domain.validate()?;
+        let journal = Arc::new(Journal::open(&state.join("funding.sqlite"), &policy)?);
+        let mut config = common::kernel_config(key);
+        config.policy_hash = digest(&policy)?;
+        let mut kernel = ChioKernel::new(config);
+        kernel.set_receipt_store_handle(Arc::new(SqliteReceiptStore::open(
+            state.join("receipts.sqlite"),
+        )?))?;
+        kernel.set_budget_store_handle(Arc::new(authority.budget_store()));
+        kernel.set_revocation_store_handle(Arc::new(authority.revocation_store()));
+        kernel.require_durable_request_retention();
+        kernel.set_payment_adapter(Box::new(FundingRail {
+            journal: journal.clone(),
+            operations: authority.admission_operation_store(),
+            fence: authority.mutation_fence(),
+            policy: policy.clone(),
+            source: source.clone(),
+            checkpoint: checkpoint.clone(),
+        }));
+        kernel.register_tool_server(Box::new(W0Tool(journal.clone(), checkpoint.clone())));
+        kernel.set_durable_admission_store(
+            Arc::new(authority.admission_operation_store()),
+            Arc::new(authority.tool_outcome_store()),
+            authority.mutation_fence(),
+        )?;
+        kernel.configure_durable_admission(DurableAdmissionMode::All, false)?;
+        let recovery_error = kernel
+            .reconcile_durable_admission_startup()
+            .err()
+            .map(|error| error.to_string());
+        Ok(Self {
+            kernel,
+            authority,
+            policy,
+            source,
+            journal,
+            checkpoint,
+            recovery_error,
+        })
+    }
+
+    fn scope() -> ChioScope {
+        let amount = MonetaryAmount {
+            units: 100,
+            currency: CURRENCY.into(),
+        };
+        ChioScope {
+            grants: vec![ToolGrant {
+                server_id: SERVER.into(),
+                tool_name: "review".into(),
+                operations: vec![Operation::Invoke],
+                constraints: Vec::new(),
+                max_invocations: Some(1),
+                max_cost_per_invocation: Some(amount.clone()),
+                max_total_cost: Some(amount),
+                dpop_required: None,
+            }],
+            ..ChioScope::default()
+        }
+    }
+
+    pub fn request(&self, id: &str, input: &str, submit_by: u64) -> Result<ToolCallRequest> {
+        let duration = submit_by
+            .checked_sub(common::now()?)
+            .and_then(|remaining| remaining.checked_sub(1))
+            .filter(|duration| *duration > 0 && *duration <= 600)
+            .ok_or("unsupported original capability lifetime")?;
+        let capability =
+            self.kernel
+                .issue_capability(&self.policy.buyer_key, Self::scope(), duration)?;
+        if capability.expires_at > submit_by {
+            return Err("capability issuance crossed funding deadline".into());
+        }
+        Ok(ToolCallRequest {
+            request_id: id.into(),
+            capability,
+            server_id: SERVER.into(),
+            tool_name: "review".into(),
+            agent_id: self.policy.buyer_key.to_hex(),
+            arguments: serde_json::json!({"input": input}),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+            declassification_grant: None,
+        })
+    }
+
+    fn operation(&self, request: &ToolCallRequest) -> Result<Option<AdmissionOperationV1>> {
+        let retained = self
+            .authority
+            .admission_operation_store()
+            .load_unambiguous_retained_tool_request(
+                &AdmissionIdentifier::try_new("request_id", &request.request_id)?,
+                &self.authority.mutation_fence(),
+                super::now_ms()?,
+            )?;
+        retained
+            .map(|(operation, original)| {
+                if digest(original.request_for_revalidation())? != digest(request)? {
+                    return Err("native original request differs from funded request".into());
+                }
+                Ok(operation)
+            })
+            .transpose()
+    }
+
+    pub fn execute(
+        &self,
+        agreement: &SignedAgreement,
+        request: &ToolCallRequest,
+    ) -> Result<serde_json::Value> {
+        let terms = agreement.validate(&self.policy, request)?;
+        let allocation = super::allocation::allocation_id(
+            &self.policy.domain.chain_id,
+            &self.policy.domain.escrow,
+            &terms,
+        )?;
+        if let Some(entry) = self.journal.by_request(&request.request_id)? {
+            if entry.allocation != allocation
+                || digest(&entry.agreement)? != digest(agreement)?
+                || digest(&entry.request)? != digest(request)?
+            {
+                return Err("funding retry changes original request".into());
+            }
+            if self.operation(request)?.is_some() {
+                let recovery = self.kernel.reconcile_recoverable_admissions();
+                let mut report = self.report(request)?;
+                if let Err(error) = recovery {
+                    report["nativeReconciliationError"] =
+                        serde_json::Value::String(error.to_string());
+                }
+                return Ok(report);
+            }
+            if entry.operation.is_some() || entry.hold.is_some() {
+                return Err("funding binding lost its native authority record".into());
+            }
+        } else if self.operation(request)?.is_some() {
+            return Err("native request exists without its funding journal".into());
+        }
+        if self.recovery_error.is_some() {
+            return Err("native startup reconciliation must close before new funded work".into());
+        }
+        let time = common::now()?;
+        if time >= request.capability.expires_at
+            || request.capability.issued_at > time
+            || request.capability.issuer != self.policy.provider_key
+            || !request.capability.verify_signature_at(time)?
+            || request.capability.expires_at > terms.submit_by
+        {
+            return Err("original funding capability is expired or invalid".into());
+        }
+        if request.server_id != SERVER
+            || request.tool_name != "review"
+            || digest(&request.capability.scope)? != digest(&Self::scope())?
+            || !request.capability.delegation_chain.is_empty()
+            || !request.capability.caveats.is_empty()
+            || request.capability.aggregate_invocation_budget.is_some()
+            || request.capability.budget_share_bps.is_some()
+            || request.dpop_proof.is_some()
+            || request.execution_nonce.is_some()
+            || request.governed_intent.is_some()
+            || request.approval_token.is_some()
+            || !request.approval_tokens.is_empty()
+            || request.threshold_approval_proposal.is_some()
+            || request.supplemental_authorization.is_some()
+            || request.model_metadata.is_some()
+            || request.federated_origin_kernel_id.is_some()
+            || request.declassification_grant.is_some()
+            || request
+                .arguments
+                .as_object()
+                .is_none_or(|object| object.len() != 1)
+            || request.arguments["input"]
+                .as_str()
+                .is_none_or(|input| input.len() > 64 * 1024)
+        {
+            return Err("unsupported native funding request profile".into());
+        }
+        let observed = self.source.observe(&allocation)?;
+        let verified =
+            observer::verify(&self.policy.domain, &terms, &observed, time, common::now()?)?;
+        self.journal.stage(&verified, agreement, request)?;
+        (self.checkpoint)("after-stage")?;
+        let evaluation = self.kernel.evaluate_tool_call_blocking(request);
+        // The rail deliberately cannot settle without an observed contract
+        // successor. A retained operation and hold remain inspectable on error.
+        match self.report(request) {
+            Ok(mut report) => {
+                if let Err(error) = evaluation {
+                    report["nativeEvaluationError"] = serde_json::Value::String(error.to_string());
+                }
+                Ok(report)
+            }
+            Err(error) => match evaluation {
+                Err(native) => Err(native.into()),
+                Ok(_) => Err(error),
+            },
+        }
+    }
+
+    pub fn report(&self, request: &ToolCallRequest) -> Result<serde_json::Value> {
+        let entry = self
+            .journal
+            .by_request(&request.request_id)?
+            .ok_or("funding journal missing")?;
+        let terms = entry.agreement.validate(&self.policy, request)?;
+        if entry.allocation
+            != super::allocation::allocation_id(
+                &self.policy.domain.chain_id,
+                &self.policy.domain.escrow,
+                &terms,
+            )?
+        {
+            return Err("funding journal allocation identity changed".into());
+        }
+        let operation = self
+            .operation(request)?
+            .ok_or("native funding operation missing")?;
+        let id = operation.binding().operation_id().as_str();
+        let payment = self
+            .authority
+            .admission_operation_store()
+            .load_payment_journal(id, &self.authority.mutation_fence())?;
+        if operation.payment_participant_id().is_some() != payment.is_some() {
+            return Err("native payment participant and journal disagree".into());
+        }
+        // Prepared admission can stop before any payment participant exists.
+        // Preserve its identity without inventing a hold or authorization.
+        let native_authorization = payment.as_ref().and_then(|p| p.authorization_id.as_deref());
+        let hold = payment
+            .as_ref()
+            .and_then(|p| p.hold_id.as_deref())
+            .or_else(|| operation.budget_hold_id().map(|id| id.as_str()));
+        let authorization = match (entry.operation.as_deref(), entry.hold.as_deref()) {
+            (Some(bound), Some(bound_hold))
+                if payment.is_some() && bound == id && Some(bound_hold) == hold =>
+            {
+                Some(super::rail::authorization_id(&entry.allocation)?)
+            }
+            (None, None) if native_authorization.is_none() => None,
+            _ => return Err("funding correlation conflicts with native identity".into()),
+        };
+        if native_authorization.is_some_and(|id| Some(id) != authorization.as_deref()) {
+            return Err("native payment authorization conflicts with funding journal".into());
+        }
+        let correlated = authorization.is_some();
+        Ok(
+            serde_json::json!({"allocationId": entry.allocation, "operationId": id,
+            "holdId": hold, "authorizationId": authorization,
+            "nativeAuthorizationId": native_authorization, "startupReconciliationError": self.recovery_error,
+            "requestId": request.request_id, "authorityUuid": self.policy.authority_uuid,
+            "nativeState": format!("{:?}", operation.state()), "nativePaymentState": payment.as_ref().map(|p| format!("{:?}", p.state)),
+            "fundingCorrelation": if correlated { "bound" } else { "not_authorized" },
+            "paymentState": if correlated { "pending" } else { "not_authorized" },
+            "externalFundsTransferred": false,
+            "executions": self.journal.execution_count()?, "profile": observer::PROFILE}),
+        )
+    }
+}

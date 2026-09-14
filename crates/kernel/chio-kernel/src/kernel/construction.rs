@@ -255,6 +255,7 @@ impl ChioKernel {
         let mut kernel = Self {
             config,
             durable_admission_mode: crate::admission_operation::DurableAdmissionMode::default(),
+            require_durable_request_retention: false,
             durable_admission_runtime: None,
             #[cfg(feature = "admission-test-support")]
             durable_finalization_cutpoint_hook: None,
@@ -766,6 +767,18 @@ impl ChioKernel {
     #[must_use]
     pub fn durable_admission_mode(&self) -> crate::admission_operation::DurableAdmissionMode {
         self.durable_admission_mode
+    }
+
+    /// Require fenced original request retention before tool admission mutates
+    /// budgets or invokes a payment adapter. Unsupported stores fail closed.
+    ///
+    /// This composition setting supports adapters that correlate their own
+    /// durable journal with the exact native request. It supplies no additional
+    /// execution authority and does not require a nonce preflight. The host
+    /// must bind this selection into its policy hash and configure durable
+    /// admission for the tools it exposes.
+    pub fn require_durable_request_retention(&mut self) {
+        self.require_durable_request_retention = true;
     }
 
     /// Whether durable admission stores are installed, so strict execution
