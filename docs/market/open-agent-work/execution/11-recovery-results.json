@@ -1,0 +1,783 @@
+{
+  "schema": "chio.experimental.funded-recovery-execution.v1",
+  "capturedUtc": "2026-09-14T13:19:26.293706+00:00",
+  "baseCommit": "ef3431bdf42280f5db27d634caf6e45b38b57a46",
+  "implementationCommit": "ceae06b09795883b1b4b8e5c45a42d39d4f4129b",
+  "implementationCommits": [
+    {
+      "commit": "59f1dec0fb4180757ef52c6613ddd7865e5c94b4",
+      "purpose": "Pending custody decision reserve and exact-schema migration"
+    },
+    {
+      "commit": "db4023876d5a4d113a4b138e79317b1c1c3f5d12",
+      "purpose": "Pinned source-byte verifier loader"
+    },
+    {
+      "commit": "ceae06b09795883b1b4b8e5c45a42d39d4f4129b",
+      "purpose": "Durable signed-transaction outbox and worker recovery"
+    }
+  ],
+  "branch": "research/funded-work-baseline",
+  "environment": {
+    "python": "Python 3.12.3",
+    "node": "v24.16.0",
+    "rust": "rustc 1.94.1 (e408947bf 2026-03-25)",
+    "host": "Linux-6.17.0-1020-oracle-aarch64-with-glibc2.39",
+    "machine": "aarch64",
+    "solc": "0.8.30",
+    "ethers": "6.16.0",
+    "ganache": "7.9.2",
+    "chainId": "31337",
+    "runtime": "Shanghai",
+    "compilerEvm": "Paris",
+    "optimizerRuns": 200,
+    "nativeAccelerators": "unavailable on this Node/aarch64 host; supported JavaScript fallback executed"
+  },
+  "runs": [
+    {
+      "command": "/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python -B -m unittest discover -s examples/funded-work -v",
+      "exitCode": 0,
+      "result": "38 passed, zero skips",
+      "log": "recovery-evidence/python-final.log",
+      "sha256": "fc6abd3a7b54eedebfbdc5d31f4f77d2c9e71d6e614652911ff089ef6a41480b"
+    },
+    {
+      "command": "CHIO_W0_PYTHON=/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python CHIO_RECOVERY_EVIDENCE=/tmp/chio-recovery-execution/runs node --test contracts/scripts/work-claim-recovery-core.test.mjs contracts/scripts/work-claim-recovery.test.mjs contracts/scripts/work-claim-w0.test.mjs contracts/scripts/work-claim-escrow.test.mjs contracts/scripts/funded-work-fit.test.mjs",
+      "exitCode": 0,
+      "result": "37 passed, zero skips",
+      "log": "recovery-evidence/node-final.log",
+      "sha256": "eb5907aa7f574006cdb4d939edbe930407a8df787ab1812447ed958a16265d46",
+      "scope": "Before final Python checker loader repair; the nine affected W0/recovery cases were rerun below. Other selected source unchanged."
+    },
+    {
+      "command": "CHIO_W0_PYTHON=/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python CHIO_RECOVERY_EVIDENCE=/tmp/chio-recovery-execution/runs node --test contracts/scripts/work-claim-recovery.test.mjs contracts/scripts/work-claim-w0.test.mjs",
+      "exitCode": 0,
+      "result": "9 affected cases passed, zero skips; included in the 37 unique cases",
+      "log": "recovery-evidence/w0-final.log",
+      "sha256": "0e3940e6623c03bff3774e3432b0549463720ae99dfe5fb82fc32c6e9460cf47"
+    },
+    {
+      "command": "mkdir -m 700 /tmp/chio-recovery-execution/retained-child-final\nCHIO_W0_PYTHON=/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python node contracts/scripts/work-claim-recovery-demo.mjs child after_broadcast /tmp/chio-recovery-execution/retained-child-final --output /tmp/chio-recovery-execution/standalone-child-final.json",
+      "exitCode": 0,
+      "result": "Actual SIGKILL; one payment; 160 funded, 60 paid, 100 refunded",
+      "log": "recovery-evidence/standalone-final.log",
+      "sha256": "d604ed4e80c9666c8d3fed012ee64af14d3e0ef26946a246f1b38d774348ecef"
+    },
+    {
+      "command": "/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python -B /tmp/chio-recovery-execution/reopen-retained.py /tmp/chio-recovery-execution/retained-child-final /tmp/chio-recovery-execution/standalone-child-final.json",
+      "exitCode": 0,
+      "result": "Retained custody and journal reopened; exact artifacts and signatures checked without private keys",
+      "log": "recovery-evidence/reopen-retained.log",
+      "sha256": "d3411131bc847e3cda8f26128c2260c2e0bdc2330a2e41afd932009eb0d50f8c"
+    },
+    {
+      "command": "python3 /tmp/chio-recovery-execution/block-mutation.py",
+      "exitCode": 1,
+      "result": "Expected missing-guard failure: Missing expected rejection: block",
+      "log": "recovery-evidence/block-mutation.log",
+      "sha256": "3d99ac35baf580c044c3a48e889dfc0303c643cc70e0a3d6e733f9488c94b119",
+      "expectedFailure": true
+    }
+  ],
+  "negativeControls": [
+    {
+      "artifact": "recovery-evidence/custody-starvation-red.log",
+      "expectedFailure": true
+    },
+    {
+      "artifact": "recovery-evidence/custody-migration-red.log",
+      "expectedFailure": true
+    },
+    {
+      "artifact": "recovery-evidence/nonce-gap-red.log",
+      "expectedFailure": true
+    },
+    {
+      "artifact": "recovery-evidence/nonce-index-red.log",
+      "expectedFailure": true
+    },
+    {
+      "artifact": "recovery-evidence/nonce-allocation-red.log",
+      "expectedFailure": true
+    },
+    {
+      "artifact": "recovery-evidence/checker-origin-red.log",
+      "expectedFailure": true
+    },
+    {
+      "artifact": "recovery-evidence/parser-origin-red.log",
+      "expectedFailure": true
+    },
+    {
+      "artifact": "recovery-evidence/direct-loader-red.log",
+      "expectedFailure": true
+    }
+  ],
+  "sourceInventory": [
+    {
+      "path": "contracts/package.json",
+      "sha256": "64efeb00225f14767812ce75d78d52002fbc6faa999a4ee43887a31d8357a773"
+    },
+    {
+      "path": "contracts/pnpm-lock.yaml",
+      "sha256": "07cee51275b05dc9c4fea16f42e256bc5707c75a17794425c0c5c64695e23ce8"
+    },
+    {
+      "path": "contracts/scripts/fixtures/WorkClaimTestToken.sol",
+      "sha256": "eadb8d1455095e2d238e0c751139429f489d7febb0841d7b1073ec854c3444dd"
+    },
+    {
+      "path": "contracts/scripts/fixtures/work-claim-vectors.json",
+      "sha256": "43e40c4b99c9f15d5e0afe67a8aac9276fd7843251a52b65f9cc42aa3ffcbd80"
+    },
+    {
+      "path": "contracts/scripts/funded-work-fit.test.mjs",
+      "sha256": "83864ed61cea1136ec5a5b919d675f5394638329fef3caa99173949687dfb593"
+    },
+    {
+      "path": "contracts/scripts/work-claim-demo.mjs",
+      "sha256": "a12a80fb15290f54aa909138e2510a2b71ceabbcb35545852ce656a20865e8e7"
+    },
+    {
+      "path": "contracts/scripts/work-claim-escrow.test.mjs",
+      "sha256": "66ca63196e940331b4525be1badbab9bdd67b2c2e91e89440400c27c991ab8e9"
+    },
+    {
+      "path": "contracts/scripts/work-claim-fixture.mjs",
+      "sha256": "bc645069d0c8225b9b43591d2d5fbb3bb2f80bdd47afce4d191a441d9bb532e2"
+    },
+    {
+      "path": "contracts/scripts/work-claim-journal.mjs",
+      "sha256": "12ff3dd9f27b7dbc15e07e3fe3c4fbbb12397a458a96d7adc2fd04557a9c922c"
+    },
+    {
+      "path": "contracts/scripts/work-claim-model.test.mjs",
+      "sha256": "fb970b03925ebd5de4ce46cf552b9d01751ce9d9b8a8361d716d15fb09934068"
+    },
+    {
+      "path": "contracts/scripts/work-claim-recovery-core.test.mjs",
+      "sha256": "443fa5cebfdf98c6d95d62d5103e4279cde659c452dcd2034168fb6f3d9aa578"
+    },
+    {
+      "path": "contracts/scripts/work-claim-recovery-demo.mjs",
+      "sha256": "852c94b551afd89f4552ba69e1d992e76bb87f707a50d21988bf3c4a153faa67"
+    },
+    {
+      "path": "contracts/scripts/work-claim-recovery-harness.mjs",
+      "sha256": "327740cbef2ec44eafaa119fe3e3ce89dce03e9b9d387256136a678ffd67d84b"
+    },
+    {
+      "path": "contracts/scripts/work-claim-recovery-worker.mjs",
+      "sha256": "1fa72c9610b3e3cc26b8caed68e83e0852a3173a8d8d34442d966d2259b7414c"
+    },
+    {
+      "path": "contracts/scripts/work-claim-recovery.mjs",
+      "sha256": "af84cf015d039f466bb5296e36cb9f2ab46ee7ab7ff214f2d0f75404a8f0262c"
+    },
+    {
+      "path": "contracts/scripts/work-claim-recovery.test.mjs",
+      "sha256": "e2b5e42dbbc16ac517d76446c37eaf89884d8996c5b2c420c2062642c6c66e45"
+    },
+    {
+      "path": "contracts/scripts/work-claim-w0.mjs",
+      "sha256": "4413a4081ba84c1d3b409cfae3f2a44b6d11e250ffedab7cdf26f66e11eff316"
+    },
+    {
+      "path": "contracts/scripts/work-claim-w0.test.mjs",
+      "sha256": "8bf277b8c4ee4618794ee00ace0d83f3a7228d40a40c88b118bc5ac3118bcf74"
+    },
+    {
+      "path": "contracts/src/ChioBondVault.sol",
+      "sha256": "c425add7c32c8617cbcaeba99ca4dffb3dee74cc16c6e539a77cffd9a0b38cd7"
+    },
+    {
+      "path": "contracts/src/ChioEscrow.sol",
+      "sha256": "0ee3d055c3696e0e4847b413838ee9d3e064c64018964d02c03b242dbe089e7f"
+    },
+    {
+      "path": "contracts/src/ChioIdentityRegistry.sol",
+      "sha256": "34feea40aeff3ffc36eec325dbb65aad0fbbe6ac4fe294efa50f47a8e746f1b7"
+    },
+    {
+      "path": "contracts/src/ChioPriceResolver.sol",
+      "sha256": "84fc5f6d020fda58faf09cdae27082703b617ba7afc473651efec1ea00d91146"
+    },
+    {
+      "path": "contracts/src/ChioRootRegistry.sol",
+      "sha256": "0a4d9e48cf4e902bcc641b8be4f44eddf0a2fada0b857abcfb875885ac7c112b"
+    },
+    {
+      "path": "contracts/src/experimental/ChioWorkClaimEscrow.sol",
+      "sha256": "b1def783516523cf58c2e60f9d541cdcc47ec07f80e9662e01f88c8cb77e1df9"
+    },
+    {
+      "path": "contracts/src/interfaces/IAggregatorV3.sol",
+      "sha256": "c9549e5a36ef15792f83547703d429fa0a3c88ef14b2b1b0a01916bc717ebefa"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioBondVault.sol",
+      "sha256": "62d2b34a235a8e9543e7dc49869075beec79894636054d40f0cca98c8b45bccf"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioEscrow.sol",
+      "sha256": "edccfaecb712daba527a68ecbb4092ae7adf91fdc7e0a9b13f1117430b69f9c9"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioIdentityRegistry.sol",
+      "sha256": "dddea33a1506a26546ebbe52d258b227270dba284cc5138b4334740f479840be"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioPriceResolver.sol",
+      "sha256": "412e5fcce50330e28ed4ead8479b3236b8b8765501fb5307c55171bf020d74de"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioRootRegistry.sol",
+      "sha256": "1e8ddedfbf56ef3ca9c9c06e837db431078687f5c9c0b00bf8c55ce8ea7a5d01"
+    },
+    {
+      "path": "contracts/src/interfaces/IERC20.sol",
+      "sha256": "acd7d465fcd0264e92b038a0671f1b90e003325d2c48c211de23fcc09a7f3ec3"
+    },
+    {
+      "path": "contracts/src/interfaces/IERC20Permit.sol",
+      "sha256": "4751af7647654a4891bde119b9ba4662e3e09ef5fe2729fb13d6ea266f7cfb4e"
+    },
+    {
+      "path": "contracts/src/lib/ChioMerkle.sol",
+      "sha256": "4cf0734a1cbd8981a1e64ee3905a878bac2cb2c323168025b6464be65b701c17"
+    },
+    {
+      "path": "contracts/src/mocks/ChioCreate2Factory.sol",
+      "sha256": "e6e0010de71cb2e476ca09bbb1bec35bfacd4cf040c2549a694558a2ee4cb52b"
+    },
+    {
+      "path": "contracts/src/mocks/FeeOnTransferERC20.sol",
+      "sha256": "2b4a08527ce6b41979afe9b8f66c5cf35e6726ca2082374fe308cb74676dc6e8"
+    },
+    {
+      "path": "contracts/src/mocks/Mock1271Admin.sol",
+      "sha256": "f9f5adfc23ad42219a7c8a7a384fb24f6f7518e20e9943eb475a75ce852be3ca"
+    },
+    {
+      "path": "contracts/src/mocks/MockAggregatorV3.sol",
+      "sha256": "b22a0f951b8ab103a3804bd281ab25e02b46bd197f825fe2ce279146e92d74ca"
+    },
+    {
+      "path": "contracts/src/mocks/MockERC20.sol",
+      "sha256": "8a780f5a771b541061aeceb752652d446c52848d9a681835a2e496e5e4821a1d"
+    },
+    {
+      "path": "contracts/src/mocks/NoReturnERC20.sol",
+      "sha256": "3d2e72701c4fadc58ae398fa4c748d9602512bcb17fdaaa49231e9813efb7d20"
+    },
+    {
+      "path": "contracts/src/mocks/ReentrantBondToken.sol",
+      "sha256": "e8c3e32e3fd7280141853c3215db37db9372d10059fd8f7402c451ce82ee6ca9"
+    },
+    {
+      "path": "examples/federated-work/Cargo.lock",
+      "sha256": "324f2b8461ed53bad6771398691e8d71f34bcd98778a52314d217b316dad6165"
+    },
+    {
+      "path": "examples/federated-work/Cargo.toml",
+      "sha256": "5eb5b9fd20aea6e3f8f556bf839eb4164fbcca2d6aaf66ad6f7f0041b36a1708"
+    },
+    {
+      "path": "examples/federated-work/fixtures/openapi.json",
+      "sha256": "952c8a7286a67c8d9d67735bf05d3d083f70ad2d8d744346692de6c92d7ebeb6"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/client.py",
+      "sha256": "0e43b152c0ae5b50564567c131a5ed65315a8b209a5b86b6e39a0d5e55eacdf0"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/incident.py",
+      "sha256": "6ed05e38626deee623794eabf3aee1f6b9dfbfc4fc748777de00b17bfdcf4d91"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/incident_fixture.py",
+      "sha256": "d5451503f25d1f43273b7d6a1eaddae65e06871d0ce961d182f3a0b6286011fa"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/protocol.py",
+      "sha256": "5891d6d04e4f329f24078df332269e319a8e5f3cac031af5e0af93ef82523907"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/requirements.txt",
+      "sha256": "e28d708278727dc498f6d0d417418ba99a389f69547a6d4b1ef318a3a8508689"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/resolution.py",
+      "sha256": "522aaea1c25a55539fa0037ca07c15ce997f0ed85f0823b035f4f514d3a1b31d"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/resolution_fixture.py",
+      "sha256": "ee28d4d69d9aa304b66398575776552e9ff3d24fb1a7c4e7e99300dc1a703f8d"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/review.py",
+      "sha256": "3293712bc70c426462ceae97551b9efd3936fdab722960577a7b7b2afce74ef9"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/subcontract.py",
+      "sha256": "440a808d2e3ad548e9d5c8257156ba75aab77dd7524968042c2f0a5ca5d7726d"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/subcontract_fixture.py",
+      "sha256": "41621f8aef3582a7dffa4262ac951cdbd1a422ac0f7b6d51ccb87eac953101b1"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/subcontract_hostile_worker.py",
+      "sha256": "f2d54208897a32ebb8745e862d00b9c47e80bf3a8881f72af8c05e70be63f967"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/subcontract_probe.py",
+      "sha256": "660f7b3333ec93827e0e8180cd16413e0fc02b31c90138fc241271bee16b47f3"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_enrollment.py",
+      "sha256": "a03256175cf6fa5acf94e7c43135b864f38139470ad5ecee7152d3e48cc9e784"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_incident.py",
+      "sha256": "7628183eb43012dfbbd320b0a0d0de5dbbe662b16cf07c92ec908b067feeedd3"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_protocol.py",
+      "sha256": "a902f486d3a9fc90d2b7c00adc771de3c3a1fce14f2f3110c63cc4e39c006945"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_resolution.py",
+      "sha256": "bb005e152ee878ce45a0f1defe825786d1e434c1b9aadf1a64054a9c3f4e5fee"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/test_subcontract.py",
+      "sha256": "d8ac3b9b9d5d15b3b9cf05baaf1c6e1fda7f9ce9f3fb6b6d222e33927398d20a"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/tls_fixture.py",
+      "sha256": "816d7bf8174a34219173fee8f157ffb771c6bb3e72734939f4b42c3aef3cbe7d"
+    },
+    {
+      "path": "examples/federated-work/src/main.rs",
+      "sha256": "2187bd88ed29cce420db9d7b77dde7ac111f7dbed26e3f74de2e92cbfd7eb279"
+    },
+    {
+      "path": "examples/federated-work/src/review.rs",
+      "sha256": "bc491412dd649ba4fbd49c5409c39740acd30bbfa6618ef81c40188235828919"
+    },
+    {
+      "path": "examples/funded-work-model/claim-traces.json",
+      "sha256": "0b8984fe29ed929450b72d8fa3ac35bbc4938888a5378f6e015bf7d02daf1cdc"
+    },
+    {
+      "path": "examples/funded-work/PROFILE.md",
+      "sha256": "6c080365471cb6a5c06d36aae0233bfd15758fc8d0c969893ebf594f0017ea27"
+    },
+    {
+      "path": "examples/funded-work/README.md",
+      "sha256": "9375b54c414610c0a3372da3c3e49214f2191c4673ffe4940cbcbbcec25c80ce"
+    },
+    {
+      "path": "examples/funded-work/RECOVERY.md",
+      "sha256": "cf0e157088ab1fa90fe9557ee08f88bfcf1fc5c0a358f1cd5dd3a1caa57acd98"
+    },
+    {
+      "path": "examples/funded-work/artifacts.py",
+      "sha256": "96628b382b1c163fd650a216d79fff21a4a5f1186dcc95409f0a32bad8a7437b"
+    },
+    {
+      "path": "examples/funded-work/checker-profile.json",
+      "sha256": "dbb11df4e9402024bd330cb39dc7fc484f062e278ca593986636d86d3101ad78"
+    },
+    {
+      "path": "examples/funded-work/custody.py",
+      "sha256": "50a1db49dafdb3516099acafab364918d3e4f462ffa3d5428bbdea6cadb74a86"
+    },
+    {
+      "path": "examples/funded-work/fixture.py",
+      "sha256": "dc6dec97aeb1487248b931c1a9b7ea8cd28449fecb28afdc11b2f5b1381ad549"
+    },
+    {
+      "path": "examples/funded-work/owned_sqlite.py",
+      "sha256": "edbabf63062ced382582aa89056312b287d278e5ae7e687d6be2b8c666a3dad9"
+    },
+    {
+      "path": "examples/funded-work/parser-vectors.json",
+      "sha256": "13730196269f3785efa1133320cd0dc378ae60e71c3fb333dbc4730e531253ea"
+    },
+    {
+      "path": "examples/funded-work/rail_journal.py",
+      "sha256": "6f1a9658207d17cc3196ea6839861b9b90f4b4922fe82bdfb15b5b59299ae8cb"
+    },
+    {
+      "path": "examples/funded-work/reference_checker.py",
+      "sha256": "ee9ede7d02655b0b926fc75dc5e4180aa7790ca1cbf22f63a53997da9bf6e1fd"
+    },
+    {
+      "path": "examples/funded-work/test_checker_command.py",
+      "sha256": "9b4a4f49b19e255477f7655ebaf9129dfb492ba25bc693ecd0c8649232132fbd"
+    },
+    {
+      "path": "examples/funded-work/test_custody.py",
+      "sha256": "7a1ba60db880dc56bcdad205be99acaabc1bd2e5e53d01e20b9fc9cb23ac50a0"
+    },
+    {
+      "path": "examples/funded-work/test_protocol.py",
+      "sha256": "51ff2b53f86bc3ef755856a03570bcaf9cbd00c7e683b92f95c64f7072676564"
+    },
+    {
+      "path": "examples/funded-work/test_rail_journal.py",
+      "sha256": "b3e5b7f2a8dfe2ade6f7e30d3b3ea04e0183efcc3360de7582a0794aab3ffa77"
+    },
+    {
+      "path": "examples/funded-work/test_verifier.py",
+      "sha256": "939a885a482ff620f30af7cd167f241c05b5bd05b04868ef2f75efe287f4a1ba"
+    },
+    {
+      "path": "examples/funded-work/verifier.py",
+      "sha256": "db4cd50b25be57b127e11fd4857dc64d761e507c3b0a668c563457422b9003f9"
+    }
+  ],
+  "sourceInventoryScope": "Direct example and reused checker/contract inputs; native Rust and Solidity sources unchanged this slice. Full dependency source remains bound by the implementation commit and locked manifests.",
+  "checkerBinary": {
+    "path": "target/debug/chio-federated-work",
+    "sha256": "d463a6fcea329ccc2eda6f7770e73ee37996610668b2ce6001b69bef2818d454"
+  },
+  "artifacts": [
+    {
+      "path": "recovery-evidence/after_broadcast.json",
+      "sha256": "cfe856e9bccbcbd89c2e075bf35460adfb6b4ea869d19d72e6f3b52691c00c5c",
+      "bytes": 39993
+    },
+    {
+      "path": "recovery-evidence/after_observation.json",
+      "sha256": "64059656b39e821075cc50ba1387274aafaee8d02ed0c48b4447f0b12cb24cac",
+      "bytes": 39999
+    },
+    {
+      "path": "recovery-evidence/after_recorded.json",
+      "sha256": "bdf347244ce2e69f64c70912740b9907bc282db7782c07ef09857febd6ee9da9",
+      "bytes": 40300
+    },
+    {
+      "path": "recovery-evidence/before_broadcast.json",
+      "sha256": "ab6a972a1c21569888a9837d650dc88e48d88b9cf67d01d5130f8c1d45fcdf31",
+      "bytes": 39996
+    },
+    {
+      "path": "recovery-evidence/block-mutation.log",
+      "sha256": "3d99ac35baf580c044c3a48e889dfc0303c643cc70e0a3d6e733f9488c94b119",
+      "bytes": 1457
+    },
+    {
+      "path": "recovery-evidence/block-mutation.py",
+      "sha256": "56ce649c7245dc894db6e1ee571f8c908a9b658412680a5335fcc3caaaeac5ec",
+      "bytes": 1084
+    },
+    {
+      "path": "recovery-evidence/checker-origin-red.log",
+      "sha256": "9073bff295e0f0d90db4ba9db9ee9392b23d6d4484b43f562de897b3607b2f15",
+      "bytes": 984
+    },
+    {
+      "path": "recovery-evidence/child.json",
+      "sha256": "8f4a978e07ffdf02deecc20c9f005df62568cfc61529c800359b9b80ac17d136",
+      "bytes": 55465
+    },
+    {
+      "path": "recovery-evidence/custody-migration-red.log",
+      "sha256": "c2258c231c0ea981a7557c0d3cc1d67fc5b56182a9f49761aaf52e8fe0c0ac94",
+      "bytes": 3749
+    },
+    {
+      "path": "recovery-evidence/custody-starvation-red.log",
+      "sha256": "4a6d0d56115178ac47f6f44fccfd05bc5f451a12ac76b6ab1ac253bcd2678d33",
+      "bytes": 1968
+    },
+    {
+      "path": "recovery-evidence/direct-loader-red.log",
+      "sha256": "d018161c67a1f56e46c00dcca193de679bbc1f78a322a3079591b444ee167c11",
+      "bytes": 7871
+    },
+    {
+      "path": "recovery-evidence/legacy-readback.log",
+      "sha256": "0b2dd152c83bade096421f9b0d774110ec956114eee8e481bb179e5eca90f418",
+      "bytes": 136
+    },
+    {
+      "path": "recovery-evidence/node-final.log",
+      "sha256": "eb5907aa7f574006cdb4d939edbe930407a8df787ab1812447ed958a16265d46",
+      "bytes": 6622
+    },
+    {
+      "path": "recovery-evidence/nonce-allocation-red.log",
+      "sha256": "ce28870c4678737a1eed8da1ab6137bcd0551c9e81e1959c6b704aebc76407c1",
+      "bytes": 851
+    },
+    {
+      "path": "recovery-evidence/nonce-gap-red.log",
+      "sha256": "a3400a42dfa248388ff1d7902a394696caaf6ac524cbfcb98d4466004ab7b47d",
+      "bytes": 1508
+    },
+    {
+      "path": "recovery-evidence/nonce-index-red.log",
+      "sha256": "249dd090776aed1abbb5df81afb5e0f13b215c8fa960b920807b509a9e7a0f4f",
+      "bytes": 916
+    },
+    {
+      "path": "recovery-evidence/parser-origin-red.log",
+      "sha256": "b3003b3f7c59b902668acd7b7ec56be80e09efe151aa8117d39b7afe7f80f7cb",
+      "bytes": 954
+    },
+    {
+      "path": "recovery-evidence/python-final.log",
+      "sha256": "fc6abd3a7b54eedebfbdc5d31f4f77d2c9e71d6e614652911ff089ef6a41480b",
+      "bytes": 5976
+    },
+    {
+      "path": "recovery-evidence/reopen-retained.log",
+      "sha256": "d3411131bc847e3cda8f26128c2260c2e0bdc2330a2e41afd932009eb0d50f8c",
+      "bytes": 193
+    },
+    {
+      "path": "recovery-evidence/reopen-retained.py",
+      "sha256": "1c56b46c8557dc5b1c920c7ed73629ca5bb6b6e041522fdfa1f4c10c651405ea",
+      "bytes": 1406
+    },
+    {
+      "path": "recovery-evidence/security-gate.json",
+      "sha256": "1df8bd6c82a6aa979bfbbf8893ac38aa59c564a74b5246730656df49e9f3d999",
+      "bytes": 2321
+    },
+    {
+      "path": "recovery-evidence/security-pr.json",
+      "sha256": "2dc3aea129dc78df8d53215f8619d921196beb599285841415dec0dc6380b69c",
+      "bytes": 238
+    },
+    {
+      "path": "recovery-evidence/source-preservation.json",
+      "sha256": "0e0b4c0636a3c7ea86fd18be0ea23d3b93cc47ad8fc07f0cad1c88d8920e33d7",
+      "bytes": 133
+    },
+    {
+      "path": "recovery-evidence/standalone-child.json",
+      "sha256": "250a1b3adc555da84e3c2cdbe3bd8e792e21e513386a2aabe956fb3e9e1ff06c",
+      "bytes": 55465
+    },
+    {
+      "path": "recovery-evidence/standalone-final.log",
+      "sha256": "d604ed4e80c9666c8d3fed012ee64af14d3e0ef26946a246f1b38d774348ecef",
+      "bytes": 942
+    },
+    {
+      "path": "recovery-evidence/standalone-missing-directory.log",
+      "sha256": "159f976789bb63e1b533196e21c901133ecfd372c5feaabfd7e33bb4aa44c89d",
+      "bytes": 1139
+    },
+    {
+      "path": "recovery-evidence/syntax.log",
+      "sha256": "b400fe8314dcd61b08392273fd5fcec75ffbc3b8b1ed9bcadbd84702082784a0",
+      "bytes": 53
+    },
+    {
+      "path": "recovery-evidence/w0-final.log",
+      "sha256": "0e3940e6623c03bff3774e3432b0549463720ae99dfe5fb82fc32c6e9460cf47",
+      "bytes": 2019
+    }
+  ],
+  "outcomes": [
+    {
+      "artifact": "recovery-evidence/after_broadcast.json",
+      "scenario": "accepted",
+      "killPoint": "after_broadcast",
+      "killedPid": 1017731,
+      "signal": "SIGKILL",
+      "stateAfterLoss": "Unknown",
+      "stateAfterRecovery": "Included",
+      "transactionHash": "0xce286d243b2240e346f8032fa577be1b5245cd2da632175b0678fb0641ee5494",
+      "nonce": "2",
+      "broadcasts": 1,
+      "canonicalTransactionCount": 1,
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "100",
+        "refunded": "0",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "900",
+        "B": "1100",
+        "C": "0",
+        "escrow": "0"
+      }
+    },
+    {
+      "artifact": "recovery-evidence/after_observation.json",
+      "scenario": "accepted",
+      "killPoint": "after_observation",
+      "killedPid": 1017885,
+      "signal": "SIGKILL",
+      "stateAfterLoss": "Unknown",
+      "stateAfterRecovery": "Included",
+      "transactionHash": "0x291b87dae6277a7cfad946220e9cfbf9d40f52eae01ac0b4b63d770518a88d6b",
+      "nonce": "2",
+      "broadcasts": 1,
+      "canonicalTransactionCount": 1,
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "100",
+        "refunded": "0",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "900",
+        "B": "1100",
+        "C": "0",
+        "escrow": "0"
+      }
+    },
+    {
+      "artifact": "recovery-evidence/after_recorded.json",
+      "scenario": "accepted",
+      "killPoint": "after_recorded",
+      "killedPid": 1018034,
+      "signal": "SIGKILL",
+      "stateAfterLoss": "Included",
+      "stateAfterRecovery": "Included",
+      "transactionHash": "0x58fea5ec2d62c71dfbcb138115018985b987ec8e336ebff59b18376c0ab4446d",
+      "nonce": "2",
+      "broadcasts": 1,
+      "canonicalTransactionCount": 1,
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "100",
+        "refunded": "0",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "900",
+        "B": "1100",
+        "C": "0",
+        "escrow": "0"
+      }
+    },
+    {
+      "artifact": "recovery-evidence/before_broadcast.json",
+      "scenario": "accepted",
+      "killPoint": "before_broadcast",
+      "killedPid": 1017560,
+      "signal": "SIGKILL",
+      "stateAfterLoss": "Unknown",
+      "stateAfterRecovery": "Included",
+      "transactionHash": "0xc70da90756dc773b954e352c0e37ecb7863c562d526d9ccbf5d4b29413aa6831",
+      "nonce": "2",
+      "broadcasts": 1,
+      "canonicalTransactionCount": 1,
+      "accounting": {
+        "escrowFunded": "100",
+        "paid": "100",
+        "refunded": "0",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "900",
+        "B": "1100",
+        "C": "0",
+        "escrow": "0"
+      }
+    },
+    {
+      "artifact": "recovery-evidence/child.json",
+      "scenario": "child",
+      "killPoint": "after_broadcast",
+      "killedPid": 1018251,
+      "signal": "SIGKILL",
+      "stateAfterLoss": "Unknown",
+      "stateAfterRecovery": "Included",
+      "transactionHash": "0xd4ddd955cf72bbf044eadfc9424a2dbe52ad8f6add57569da935ceb5b0829243",
+      "nonce": "1",
+      "broadcasts": 1,
+      "canonicalTransactionCount": 1,
+      "accounting": {
+        "escrowFunded": "160",
+        "paid": "60",
+        "refunded": "100",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "940",
+        "C": "60",
+        "escrow": "0"
+      }
+    },
+    {
+      "artifact": "recovery-evidence/standalone-child.json",
+      "scenario": "child",
+      "killPoint": "after_broadcast",
+      "killedPid": 1019929,
+      "signal": "SIGKILL",
+      "stateAfterLoss": "Unknown",
+      "stateAfterRecovery": "Included",
+      "transactionHash": "0xd657f223708142abbe3c0f63f9a0fa03328755d059a0da75335873c850a25fa1",
+      "nonce": "1",
+      "broadcasts": 1,
+      "canonicalTransactionCount": 1,
+      "accounting": {
+        "escrowFunded": "160",
+        "paid": "60",
+        "refunded": "100",
+        "remaining": "0"
+      },
+      "balances": {
+        "A": "1000",
+        "B": "940",
+        "C": "60",
+        "escrow": "0"
+      }
+    }
+  ],
+  "preservation": {
+    "files_checked": 3688,
+    "changed_files": [],
+    "head_unchanged": true,
+    "branch_unchanged": true,
+    "status_unchanged": true
+  },
+  "priorPublishedArtifactsUnchanged": true,
+  "securityGate": {
+    "capturedUtc": "2026-09-14T13:13:22.127135+00:00",
+    "head": "f1b88451527b2dec7314114b3b1e91cf101312cf",
+    "worktreeStatus": "M docs/security/m4-local-acceptance.md",
+    "acceptanceOpening": "# M4 local consumer-boundary acceptance\n\nStatus: final qualification in progress on 2026-09-14 UTC. The completed rows below\nare local evidence, not a completed milestone, hosted CI result or release\nauthorization. Required running rows must finish successfully before closeout.\nThe complete workspace test command, normal build and strict all-target Clippy\npassed on the earlier `740f359ccc` source, followed by the explicit C++/Drogon\ngates, formatting, file hygiene and proof-coverage freshness. That serial driver\nexited zero. Final review then reproduced two additional defects: the receipt\nschemas and some SDK validators omitted the native `chio_internal` origin, and\nthe retained operation's independent 17-attachment limit rejected a valid\n18-attachment outcome append. These repairs change production source. Earlier\ngreen results are not final qualification for the repaired candidate; current\nM4/M3, composed flow, workspace and affected consumer gates must be refreshed.\nThe native caller restart/expiry test and two MCP ready-session restart tests\nfailed during qualification. Their corrections passed focused regressions; the\ncomplete final gates remain required. Hosted checks additionally exposed stale\ndependent proof fixtures; their repair passed local and hosted proof gates without\nweakening verification.\nM4 cannot close on this candidate's current evidence.\n\n## Final review repairs awaiting composed qualification\n\nThe receipt-origin repair updates both authoritative receipt schemas and all\nfour generated languages through xtask. The shared protocol corpus now has 38\ncases, including valid internal origin and invalid unknown/null origins. A Rust\ntest constructs and verifies actual signed receipts for all four native origins,\nthen proves that changing origin invalidates the signature. The shared corpus's",
+    "acceptanceSha256": "cc25fab2566b8d1e5e68fe1b6b7657bd3936adc6fcd69a340426579601ac3b18",
+    "selectedForIntegration": false,
+    "reason": "M4 acceptance report states it cannot close on current evidence; local candidate also differs from the recorded PR head."
+  },
+  "securityPr": {
+    "baseRefOid": "f5566d9a765c21cb36652a99c79de64968a656bf",
+    "headRefOid": "6bb648b613b44ff5aaf1853768f2747bff166077",
+    "isDraft": true,
+    "mergeStateStatus": "BLOCKED",
+    "number": 1117,
+    "state": "OPEN",
+    "url": "https://github.com/bb-connor/arc/pull/1117"
+  },
+  "retainedPrivateState": "/tmp/chio-recovery-execution/retained-child-final",
+  "publicEvidenceSecretScan": {
+    "generatedPrivateKeysChecked": 10,
+    "matches": 0
+  },
+  "limits": [
+    "Single trusted host, verifier and private Ganache; synthetic accounts and mock tokens.",
+    "Exact signed transaction retention with one exclusive local nonce stream, not coordinated independent journals.",
+    "Included/Reverted are trusted private-chain observations, not public finality or proof verification.",
+    "Actual rail-worker SIGKILL; no killed native parent tool process or original native admission/hold.",
+    "Changed-block reinclusion, fee replacement and mined-revert retry need a future authorized successor; uncertainty is retained.",
+    "64 permanent slots and logical byte bounds; no disk reservation, eviction, rollback defense or sustained availability proof.",
+    "Worker receives no signing key; no native confinement or independent key-administration claim.",
+    "No native Finding facets, independent companies, matched economic advantage or deployed activation.",
+    "Native integration remains gated on qualified Security M4; local and PR heads differ."
+  ]
+}

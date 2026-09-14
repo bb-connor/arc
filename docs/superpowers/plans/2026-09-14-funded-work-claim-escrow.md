@@ -91,7 +91,7 @@ Unknown broadcast state triggers reconciliation of the same IDs.
 
 **Files:** Integration report and explicitly mapped existing native files.
 
-- [ ] Refresh #1117 and select an actually closed Security M4 commit with its exact qualification evidence. Current `8738bdfd7b` is an input, not presumed closed. Keep local contract research executable while this gate is pending.
+- [ ] Refresh #1117 and select an actually closed Security M4 commit with its exact qualification evidence. The latest [gate record](../../market/open-agent-work/execution/06-native-integration.md) has differing local/PR heads and incomplete qualification; neither is presumed closed. Keep local contract research executable while this gate is pending.
 - [ ] Create a separate integration worktree from that checkpoint. Apply reviewed paper behavior from the source ledger in bounded slices; inspect each conflict rather than merging the legacy #1029 integration.
 - [ ] Record old/new schema layouts, fingerprinted predecessors and unsupported migrations. Never reinterpret research version 10 as security version 10 or fabricate caller custody for old rows.
 - [ ] Port A2A through verified manifest construction, preserve session/profile negotiation and adapt start/report handling to the security contract. Preserve immutable unknown execution and original payment-release authority.
@@ -115,6 +115,16 @@ Unknown broadcast state triggers reconciliation of the same IDs.
 - [ ] Add native disclosure, key/manifest substitution, capacity exhaustion and unknown-payment successor regressions. Reject new work before the 64-operation retention ceiling is exceeded; sustained trial capacity stays a later P53 gate.
 - [ ] Run selected Rust, Python, Node and native security checks with no required skips. Add required schema/error/SDK/fuzz selection when shared manifests or public artifacts change; preserve existing unsupported-profile denials.
 - [ ] Commit only after review and record source hashes, commands, public artifacts and residual assumptions. Do not claim independent companies, real settlement finality or H1-H5 from this one-host mock-token run.
+
+## Independent recovery subset completed
+
+The [2026-09-14 recovery slice](../../market/open-agent-work/execution/10-recovery-review-results.md)
+adds durable exact signed transactions and four actual rail-worker SIGKILL
+boundaries around real W0 payment. It also fixes custody capacity reservation
+and loads the pinned Python checker bytes directly. This is preparation for
+Task 4: it has no native operation/hold, finalized funding admission, Finding
+facets or killed parent tool process. Tasks 3 and 4 remain unchecked until those
+integrated behaviors are qualified on the selected security checkpoint.
 
 ## Completion and next gate
 

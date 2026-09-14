@@ -4,20 +4,31 @@ Refreshed 2026-09-14 during the claim-escrow execution. The independent model,
 contract, trace replay and financial reproduction are implemented. Native
 funding admission remains gated on a qualified Security M4 source.
 
-## Latest refresh after funded W0 execution
+## Latest refresh after rail-worker recovery
 
-On 2026-09-14 the security worktree and draft PR #1117 both identify
-`6bb648b613b44ff5aaf1853768f2747bff166077`. The worktree is clean and the
-PR remains open, draft and blocked. The M4 acceptance report still states that
-qualification is in progress and M4 cannot close on current evidence. This
-refresh is read-only; no hosted-check or review-thread qualification is inferred.
+At 2026-09-14 13:13 UTC, the security worktree identifies
+`f1b88451527b2dec7314114b3b1e91cf101312cf`, with its M4 acceptance report
+modified. Draft [PR #1117](https://github.com/bb-connor/arc/pull/1117) still
+identifies `6bb648b613b44ff5aaf1853768f2747bff166077`; it is open, draft
+and blocked. The acceptance report explicitly states that M4 cannot close on
+current evidence. The local source is therefore neither the PR head nor a
+selected qualified checkpoint. This was a read-only refresh, not a hosted-check
+or review-thread audit. Exact observations and report hash are in the
+[recovery manifest](11-recovery-results.json).
 
-The independent [funded W0 result](08-funded-w0-results.md) now supplies actual
-Rust-produced work, Python artifact verification, reopened local SQLite custody
-and exact canonical-digest EVM authorization. It remains one host with mock
-tokens and trusted private-chain reads. Native admission, Finding facets,
-unknown-payment correlation and parent process loss remain unimplemented here.
-No integration base was selected or merge attempted.
+The independent [funded W0 result](08-funded-w0-results.md) supplies actual
+Rust-produced work, Python artifact verification, local SQLite custody and
+canonical-digest EVM authorization. The subsequent
+[recovery result](10-recovery-review-results.md) adds immutable signed-transaction
+retention and actual rail-worker SIGKILL/restart. One payment survives four
+interruption points, including an earned child after parent refund. These
+results use one host, mock tokens and trusted private-chain observations.
+
+Native admission, original native hold correlation, Finding facets, public
+finality and parent tool-process loss remain pending. No integration base was
+selected or merge attempted. The earlier funded W0 refresh observed matching
+clean local/PR head `6bb648b613b44ff5aaf1853768f2747bff166077`; that is
+historical evidence preserved in [its report](08-funded-w0-results.md).
 
 ## Earlier observed source
 
@@ -73,7 +84,8 @@ the paper behavior in reviewable slices. Only after that candidate's selected
 regressions pass should Task 4 connect finalized funding to one actual native
 W0 admission and its crash/recovery paths.
 
-The contract-only demo supplies the financial child-claim behavior for that
-integration. It does not yet supply independent verifier custody, native work,
-an actual parent process loss, public-chain finality or independently operated
-companies. Those are the concrete remaining boundaries of this vertical slice.
+The independent demos now supply actual checked artifacts, local custody and
+rail-worker recovery for an earned child claim. They do not supply independent
+verifier custody, native funded admission, actual parent tool-process loss,
+public-chain finality or independently operated companies. Those remain the
+concrete boundaries of the native vertical slice.

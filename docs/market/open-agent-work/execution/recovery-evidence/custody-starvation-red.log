@@ -1,0 +1,28 @@
+test_new_evidence_cannot_starve_an_already_retained_claim_decision (test_verifier.VerifierTests.test_new_evidence_cannot_starve_an_already_retained_claim_decision) ... ERROR
+
+======================================================================
+ERROR: test_new_evidence_cannot_starve_an_already_retained_claim_decision (test_verifier.VerifierTests.test_new_evidence_cannot_starve_an_already_retained_claim_decision)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_verifier.py", line 50, in test_new_evidence_cannot_starve_an_already_retained_claim_decision
+    result = self.run_verifier(original)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_verifier.py", line 31, in run_verifier
+    return decide(self.a, self.pins, allocation, submission, store, key or keys()[2])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/verifier.py", line 26, in decide
+    return store.record_decision(allocation, submission, result)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/custody.py", line 137, in record_decision
+    digest = self._put(p.canonical(decision))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/custody.py", line 89, in _put
+    p.require(size + len(data) <= CAPACITY_BYTES, "custody capacity exhausted")
+  File "/home/connor/backbay/arc-funded-work/examples/federated-work/python_buyer/protocol.py", line 33, in require
+    raise ProtocolError(message)
+protocol.ProtocolError: custody capacity exhausted
+
+----------------------------------------------------------------------
+Ran 1 test in 3.023s
+
+FAILED (errors=1)

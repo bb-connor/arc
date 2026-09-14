@@ -1,8 +1,8 @@
 # Open agent work: the Chio breakthrough program
 
-Status: research and implementation program, with funded W0 work and local custody
-execution recorded on 2026-09-14. This package records decisions, dependencies,
-experiments and completion gates. The new model and existing-escrow tests are
+Status: research and implementation program, with funded W0 work, local custody
+and rail-worker crash recovery recorded on 2026-09-14. This package records
+decisions, dependencies, experiments and completion gates. The new model and existing-escrow tests are
 research artifacts; no new funded protocol is deployed. External deployment,
 real fund transfer and partner communication remain outside this slice.
 
@@ -55,6 +55,7 @@ The plan gives that alternative the same resources and a fair opportunity to win
 | [Next vertical-slice plan](../../superpowers/plans/2026-09-14-funded-work-claim-escrow.md) | Preserve timely claims, then connect finalized funding to native work on the qualified security candidate |
 | [Claim-escrow execution](execution/05-claim-escrow-results.md) | Implemented finite model, experimental escrow, actual child withdrawal after parent refund and the remaining native gate |
 | [Funded W0 execution](execution/08-funded-w0-results.md) | Actual Rust/Python checked work, signed artifact bindings, local custody and four private-chain financial outcomes |
+| [Recovery execution and review](execution/10-recovery-review-results.md) | Custody and verifier fixes, durable signed transactions, four actual worker crash boundaries and the refreshed integration decision |
 
 The first slice now has six passing allocation-model tests, 38 passing existing
 pool-ledger tests and six real-bytecode escrow characterizations. A deliberately
@@ -72,8 +73,17 @@ actual Rust W0 output and Python verification to the claim contract. Its four
 private-chain cases pass alongside the existing contract regressions (147 Node
 checks total), with 23 artifact/custody/CLI tests, 30 existing Python tests and
 11 Rust tests. Custody is owner-local SQLite with no independent availability
-claim. Native funded work, Finding assurance and financial crash recovery remain
-gated on the qualified Security M4 integration.
+claim. These are historical suite totals from that execution.
+
+The next [review and recovery slice](execution/10-recovery-review-results.md)
+fixes custody decision starvation and checker import ambiguity. Its durable
+outbox preserves the original signed payment through four actual worker SIGKILL
+boundaries, including child payout after parent refund. Targeted verification
+passes 38 Python and 37 selected Node checks; the nine affected W0/recovery
+checks were rerun after the final verifier fix. No native Rust source changed.
+Private-chain inclusion is not public finality. Native funded admission,
+Finding assurance, original native hold correlation and parent tool-process
+recovery remain gated on qualified Security M4 integration.
 
 The first executable milestone is **M0: freeze the comparison and expose the
 funding counterexample**. Do this before a general protocol extraction, a new
