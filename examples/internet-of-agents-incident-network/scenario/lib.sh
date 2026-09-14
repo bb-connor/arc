@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 EXAMPLE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${ROOT}/examples/_shared/hello-http-common.sh"
+source "${ROOT}/scripts/lib/provision-mcp-launch.sh"
 
 prepare_scenario_dir() {
   local name="$1"
@@ -15,8 +16,10 @@ prepare_scenario_dir() {
 start_live_topology() {
   local bundle_dir="$1"
   CHIO_BIN="$(ensure_chio_bin)"
-  SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-token}"
+  SERVICE_TOKEN="${CHIO_SERVICE_TOKEN:-demo-control-token}"
   CHIO_AUTH_TOKEN="${CHIO_AUTH_TOKEN:-demo-token}"
+  CHIO_ADMIN_TOKEN="${CHIO_ADMIN_TOKEN:-demo-admin-token}"
+  PRIVATE_STATE="$(chio_launch_state_dir "incident-network-$$")"
   LOG_DIR="${bundle_dir}/logs"
   STATE_DIR="${bundle_dir}/state"
   mkdir -p "${LOG_DIR}" "${STATE_DIR}"
@@ -57,12 +60,10 @@ start_live_topology() {
   OPS_URL="http://127.0.0.1:${OPS_PORT}"
 
   # Trust-control
-  "${CHIO_BIN}" trust serve \
+  "${CHIO_BIN}" --session-db "${PRIVATE_STATE}/trust-sessions.sqlite3" trust serve \
     --listen "127.0.0.1:${TRUST_PORT}" --service-token "${SERVICE_TOKEN}" \
     --receipt-db "${STATE_DIR}/trust-receipts.sqlite3" \
-    --revocation-db "${STATE_DIR}/trust-revocations.sqlite3" \
     --authority-db "${STATE_DIR}/trust-authority.sqlite3" \
-    --budget-db "${STATE_DIR}/trust-budgets.sqlite3" \
     >"${LOG_DIR}/trust.log" 2>&1 &
   TRUST_PID=$!
 
@@ -73,12 +74,18 @@ start_live_topology() {
     "mcp-pagerduty:${PD_PORT}:pagerduty:tools/pagerduty.py" \
     "mcp-provider-ops:${OPS_PORT}:provider-ops:tools/provider_ops.py"; do
     IFS=: read -r sid port policy script <<< "${spec}"
+    chio_provision_mcp_launch \
+      "${CHIO_BIN}" "${PRIVATE_STATE}/${sid}-security" "${sid}" "${sid}" 1 "${PWD}" \
+      python3 "${EXAMPLE_ROOT}/${script}"
     "${CHIO_BIN}" mcp serve-http \
       --policy "${EXAMPLE_ROOT}/policies/${policy}.yaml" \
-      --server-id "${sid}" --listen "127.0.0.1:${port}" \
+      --server-id "${sid}" --server-version 1 --listen "127.0.0.1:${port}" \
       --auth-token "${CHIO_AUTH_TOKEN}" --shared-hosted-owner \
-      --session-db "${STATE_DIR}/${sid}-session.sqlite3" \
-      -- python "${EXAMPLE_ROOT}/${script}" \
+      --admin-token "${CHIO_ADMIN_TOKEN}" \
+      --session-db "${PRIVATE_STATE}/${sid}-session.sqlite3" \
+      --resume-hmac-keyring "$(chio_write_resume_hmac_keyring "${PRIVATE_STATE}/${sid}-resume-hmac-keyring.json")" \
+      "${CHIO_LAUNCH_FLAGS[@]}" \
+      -- "${CHIO_LAUNCH_COMMAND[@]}" \
       >"${LOG_DIR}/chio-${sid}.log" 2>&1 &
   done
 
@@ -96,8 +103,11 @@ start_live_topology() {
     --port "${APPROVAL_PORT}" >"${LOG_DIR}/approval.log" 2>&1 &
   APPROVAL_PID=$!
 
+  wait_for_http "${CONTROL_URL}/health"
+
   # Chio api protect sidecars
   "${CHIO_BIN}" --control-url "${CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+    --control-authority-public-key "$(chio_control_authority_public_key "${CONTROL_URL}" "${SERVICE_TOKEN}")" \
     api protect --upstream "http://127.0.0.1:${COORD_RAW_PORT}" \
     --spec "${EXAMPLE_ROOT}/services/coordinator-openapi.yaml" \
     --listen "127.0.0.1:${COORD_SIDECAR_PORT}" \
@@ -106,6 +116,7 @@ start_live_topology() {
   COORD_SIDECAR_PID=$!
 
   "${CHIO_BIN}" --control-url "${CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+    --control-authority-public-key "$(chio_control_authority_public_key "${CONTROL_URL}" "${SERVICE_TOKEN}")" \
     api protect --upstream "http://127.0.0.1:${EXEC_RAW_PORT}" \
     --spec "${EXAMPLE_ROOT}/services/executor-openapi.yaml" \
     --listen "127.0.0.1:${EXEC_SIDECAR_PORT}" \

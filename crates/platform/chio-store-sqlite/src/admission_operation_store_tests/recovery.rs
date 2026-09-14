@@ -82,6 +82,8 @@ fn recovery_claims_are_bounded_fenced_and_time_monotonic() {
 
 #[test]
 fn recovery_claims_advance_a_full_batch_without_hiding_later_operations() {
+    let _clock =
+        chio_kernel::scope_fixed_runtime_for_current_thread(now_ms() / 1_000, std::iter::empty());
     let fixture = fixture();
     let begun_at = now_ms();
     for index in 0..257 {
@@ -349,7 +351,7 @@ fn recovery_claim_rolls_forward_only_for_the_same_claimant() {
 }
 
 #[test]
-fn trusted_time_high_water_rejects_regression_across_operations() {
+fn decision_time_can_arrive_out_of_order_across_operations() {
     let fixture = fixture();
     let first = prepared_operation(
         &fixture.fence,
@@ -423,19 +425,10 @@ fn trusted_time_high_water_rejects_regression_across_operations() {
             &fixture.fence,
         )
         .expect("advance time high-water");
-    assert!(matches!(
-        fixture.store.begin(&second, &fixture.fence, begun_at + 1),
-        Err(AdmissionOperationStoreError::Invariant(_))
-    ));
-    assert!(fixture
-        .store
-        .load_by_operation_id(second.binding().operation_id())
-        .expect("load")
-        .is_none());
     fixture
         .store
-        .begin(&second, &fixture.fence, begun_at + 2)
-        .expect("non-regressing begin");
+        .begin(&second, &fixture.fence, begun_at + 1)
+        .expect("an independent decision may arrive out of timestamp order");
     let lease = fixture
         .store
         .claim_recovery(
@@ -479,10 +472,12 @@ fn trusted_time_high_water_rejects_regression_across_operations() {
             begun_at + 4,
         )
         .expect("advance high-water by CAS");
-    assert!(matches!(
-        fixture.store.begin(&third, &fixture.fence, begun_at + 3),
-        Err(AdmissionOperationStoreError::Invariant(_))
-    ));
+    fixture
+        .store
+        .begin(&third, &fixture.fence, begun_at + 3)
+        .expect("CAS on another operation cannot invalidate an earlier decision");
+    let connection = fixture.store.connection().expect("connection");
+    verify_admission_operation_invariants(&connection).expect("ordered authority history");
 }
 
 #[test]

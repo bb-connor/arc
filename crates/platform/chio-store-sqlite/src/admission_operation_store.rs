@@ -12,9 +12,10 @@ use chio_credit::obligation::{
     ObligationSettlementLifecycleV1,
 };
 use chio_kernel::admission_operation::{
-    AdmissionAttachment, AdmissionBeginResult, AdmissionCaptureError, AdmissionCommandResult,
-    AdmissionDigest, AdmissionIdentifier, AdmissionOperationCommand, AdmissionOperationError,
-    AdmissionOperationId, AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStore,
+    AdmissionAttachment, AdmissionBeginResult, AdmissionCallerDispatchContextV1,
+    AdmissionCaptureError, AdmissionCommandResult, AdmissionDigest, AdmissionIdentifier,
+    AdmissionOperationCommand, AdmissionOperationError, AdmissionOperationId,
+    AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStore,
     AdmissionOperationStoreError, AdmissionOperationV1, AdmissionProjectionCapabilities,
     AdmissionProjectionContext, AdmissionProjectionManifestV1, AdmissionProjectionRecordKind,
     AdmissionReceiptOrIncident, AdmissionRecoveryLease, AdmissionReplayClassification,
@@ -39,14 +40,69 @@ use serde::{Deserialize, Serialize};
 
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 
+mod caller_budget;
+mod caller_dispatch_context;
+mod caller_wait;
 mod commit_chain;
 mod credit_exposure;
+#[cfg(feature = "admission-test-support")]
+mod dispatch_ledger_test_support;
+mod dpop_claim;
+#[cfg(feature = "admission-test-support")]
+pub use dispatch_ledger_test_support::{
+    NativeDispatchCaptureTestFault, NativeDispatchLedgerTestFault,
+};
+mod dpop_replay;
 mod errors;
+mod execution_nonce;
+mod governed_approval_claim;
+pub(crate) use dpop_claim::{verify_dpop_budget_selection_tx, verify_fresh_dpop_tx};
+mod governed_approval_replay;
+mod native_capture_readback;
+#[cfg(feature = "admission-test-support")]
+mod native_capture_test_support;
+pub(crate) use governed_approval_claim::{
+    verify_approval_budget_selection_tx, verify_fresh_approval_tx,
+};
+#[cfg(feature = "admission-test-support")]
+pub(crate) use native_capture_test_support::reach_native_capture_transaction_cutpoint;
+#[cfg(feature = "admission-test-support")]
+pub use native_capture_test_support::NativeDispatchCaptureResponseTestFault;
+#[cfg(feature = "admission-test-support")]
+pub use native_capture_test_support::NativeDispatchCaptureTransactionTestCutpoint;
+#[cfg(feature = "admission-test-support")]
+pub use security_participant_state::output::NativeOutputJoinTestFault;
+mod nonce_preflight;
+pub(crate) use nonce_preflight::bind_nonce_preflight_tx;
 mod factor_assignment;
 mod obligation;
 mod participant;
 mod projection;
+mod retained_request;
+mod runtime_participant;
+mod runtime_replay;
 mod schema;
+mod security_dispatch;
+pub(crate) use security_dispatch::verify_dispatch_capture_owner_tx;
+pub(crate) use security_dispatch::verify_native_dispatch_capture_owner_tx;
+mod security_participant_migration;
+mod security_participant_state;
+pub(crate) use security_participant_state::dispatch_ledger::projection_reference as native_dispatch_ledger_projection_reference;
+pub(crate) use security_participant_state::dispatch_ledger::{
+    NativeCaptureBinding, VerifiedNativeCapture,
+};
+pub(crate) use security_participant_state::egress::projection_reference as security_participant_egress_projection_reference;
+pub(crate) use security_participant_state::nonce_preflight::projection_reference as security_participant_nonce_preflight_projection_reference;
+pub(crate) use security_participant_state::output::projection_reference as security_participant_output_projection_reference;
+pub(crate) use security_participant_state::projection_reference as security_participant_state_projection_reference;
+pub(crate) use security_participant_state::{
+    NativeEgressAuthority, NativeFlowJoinAuthority, NativeNoncePreflightJoinAuthority,
+    NativeOutputJoinAuthority,
+};
+pub use security_participant_state::{
+    SecurityParticipantEgressHistory, SecurityParticipantFlowJoinHistory,
+    SecurityParticipantStateInitialization,
+};
 mod store;
 mod threshold_approval;
 
@@ -61,6 +117,11 @@ pub(crate) use credit_exposure::{
     apply_credit_exposure_terminal_tx, load_credit_exposure_reservation_tx,
     reserve_credit_exposure_tx,
 };
+pub use dpop_replay::DpopReplayMigrationRecordV1;
+pub(crate) use dpop_replay::{
+    dpop_replay_projection_reference, verify_dpop_replay_pristine,
+    verify_dpop_replay_projection_coverage,
+};
 use errors::*;
 pub use factor_assignment::{
     DurableFactorAssignmentResultV1, FactorAssignmentAuthorityRegistryV1,
@@ -68,12 +129,17 @@ pub use factor_assignment::{
     FactorAssignmentSigningAuthorityV1, FactorAssignmentVerificationAuthorityV1,
     SqliteFactorAssignmentStore, StoredFactorAssignmentResultV1,
 };
+pub use governed_approval_replay::GovernedApprovalReplayMigrationRecordV1;
+pub(crate) use governed_approval_replay::{
+    governed_approval_replay_projection_reference, verify_governed_approval_replay_pristine,
+    verify_governed_approval_replay_projection_coverage,
+};
 use obligation::load_durable_obligation;
 pub(crate) use participant::{
     advance_budget_authorization_tx, advance_budget_capture_tx, advance_tool_outcome_tx,
     append_participant_update_tx, finalize_channel_reservation_operation_tx,
     verify_budget_authorization_replay_tx, verify_participant_recovery_tx,
-    BudgetAuthorizationAdvance,
+    BudgetAuthorizationAdvance, BudgetCaptureAdvance,
 };
 use participant::{
     ensure_no_reserved_terminal_stage, qualify_generic_channel_command,
@@ -86,14 +152,27 @@ use projection::{
     validate_canonical_projection_size, verify_exact_signed_terminal_replay,
     verify_exact_terminal_replay, verify_stored_terminal_projection,
 };
+pub(crate) use runtime_participant::verify_runtime_budget_selection_tx;
+pub use runtime_replay::RuntimeReplayMigrationRecordV1;
+pub(crate) use runtime_replay::{
+    runtime_replay_projection_reference, verify_runtime_replay_pristine,
+    verify_runtime_replay_projection_coverage,
+};
 use schema::{coordinator_lease_id_for_epoch, recovery_claim_digest, verify_latest_commit};
 pub(crate) use schema::{
     initialize_admission_operation_schema, validate_trusted_time, verify_active_owner,
     verify_admission_operation_invariants, verify_trusted_time,
 };
+pub(crate) use security_participant_migration::{
+    security_participant_projection_reference, verify_security_participant_migration_coverage,
+    verify_security_participant_migration_pristine,
+};
+pub use security_participant_migration::{
+    SecurityParticipantMigrationPhase, SecurityParticipantMigrationRecord,
+};
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 9;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 34;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
@@ -113,6 +192,19 @@ const MAX_RECOVERY_LEASE_DURATION_MS: u64 = 5 * 60 * 1_000;
 const COMBINED_CAPTURE_OPERATION_MUTATION_KIND: &str = "compare_and_swap";
 
 const ADMISSION_OPERATION_SCHEMA: &str = include_str!("admission_operation_store.sql");
+const GOVERNED_APPROVAL_CLAIM_SCHEMA: &str =
+    include_str!("admission_operation_governed_approval_claim.sql");
+const RUNTIME_REPLAY_MIGRATION_SCHEMA: &str =
+    include_str!("admission_operation_runtime_replay.sql");
+const GOVERNED_APPROVAL_REPLAY_MIGRATION_SCHEMA: &str =
+    include_str!("admission_operation_governed_approval_replay.sql");
+const DPOP_REPLAY_MIGRATION_SCHEMA: &str = include_str!("admission_operation_dpop_replay.sql");
+const DPOP_AUTHORITY_SCHEMA: &str = include_str!("admission_operation_dpop_authority.sql");
+const DPOP_CLAIM_SCHEMA: &str = include_str!("admission_operation_dpop_claim.sql");
+const SECURITY_PARTICIPANT_MIGRATION_SCHEMA: &str =
+    include_str!("admission_operation_security_participant_migration.sql");
+const RUNTIME_PARTICIPANT_SCHEMA: &str =
+    include_str!("admission_operation_runtime_participant.sql");
 
 #[derive(Clone)]
 pub struct SqliteAdmissionOperationStore {
@@ -337,8 +429,114 @@ impl SqliteAdmissionOperationStore {
         ),
         AdmissionCaptureError,
     > {
+        self.capture_dispatch_inner(
+            crate::budget_store::AdmissionCaptureBinding {
+                operation,
+                recovery_lease,
+                trusted_now_unix_ms,
+                caller_context: None,
+                native: None,
+            },
+            request,
+            active_fence,
+        )
+    }
+
+    pub fn capture_caller_invocation_and_commit_dispatch(
+        &self,
+        capture: chio_kernel::receipt_store::AdmissionCallerDispatchCapture<'_>,
+    ) -> Result<chio_kernel::AdmissionBudgetCapture, AdmissionCaptureError> {
+        self.capture_dispatch_inner(
+            crate::budget_store::AdmissionCaptureBinding {
+                operation: capture.operation,
+                recovery_lease: capture.recovery_lease,
+                trusted_now_unix_ms: capture.trusted_now_unix_ms,
+                caller_context: Some(capture.context),
+                native: None,
+            },
+            capture.request,
+            capture.active_fence,
+        )
+        .map(
+            |(decision, operation)| chio_kernel::AdmissionBudgetCapture {
+                decision,
+                operation,
+            },
+        )
+    }
+
+    pub fn capture_native_invocation_and_commit_dispatch(
+        &self,
+        capture: chio_kernel::receipt_store::AdmissionNativeDispatchCapture<'_>,
+    ) -> Result<chio_kernel::AdmissionBudgetCapture, AdmissionCaptureError> {
+        self.capture_native_dispatch_inner(capture, None)
+    }
+
+    pub fn capture_native_caller_invocation_and_commit_dispatch(
+        &self,
+        capture: chio_kernel::receipt_store::AdmissionNativeDispatchCapture<'_>,
+        context: &chio_kernel::admission_operation::AdmissionCallerDispatchContextV1,
+    ) -> Result<chio_kernel::AdmissionBudgetCapture, AdmissionCaptureError> {
+        self.capture_native_dispatch_inner(capture, Some(context))
+    }
+
+    fn capture_native_dispatch_inner(
+        &self,
+        capture: chio_kernel::receipt_store::AdmissionNativeDispatchCapture<'_>,
+        caller_context: Option<&chio_kernel::admission_operation::AdmissionCallerDispatchContextV1>,
+    ) -> Result<chio_kernel::AdmissionBudgetCapture, AdmissionCaptureError> {
+        let custody = capture.custody;
+        #[cfg(feature = "admission-test-support")]
+        let original = custody.operation;
+        let fence = custody.lease.store_fence();
+        let response = self
+            .capture_dispatch_inner(
+                crate::budget_store::AdmissionCaptureBinding {
+                    operation: custody.operation,
+                    recovery_lease: custody.lease,
+                    trusted_now_unix_ms: custody.trusted_now_unix_ms,
+                    caller_context,
+                    native: Some(NativeCaptureBinding {
+                        custody,
+                        credentials: capture.credentials,
+                        ledger: capture.ledger,
+                        policy_json: capture.policy_json,
+                    }),
+                },
+                capture.request,
+                fence,
+            )
+            .map(
+                |(decision, operation)| chio_kernel::AdmissionBudgetCapture {
+                    decision,
+                    operation,
+                },
+            )?;
+        #[cfg(feature = "admission-test-support")]
+        {
+            self.native_capture_response_for_test(original, response)
+        }
+        #[cfg(not(feature = "admission-test-support"))]
+        {
+            Ok(response)
+        }
+    }
+
+    fn capture_dispatch_inner(
+        &self,
+        binding: crate::budget_store::AdmissionCaptureBinding<'_>,
+        request: BudgetCaptureInvocationRequest,
+        active_fence: &StoreMutationFence,
+    ) -> Result<
+        (
+            chio_kernel::budget_store::BudgetInvocationCaptureDecision,
+            AdmissionOperationV1,
+        ),
+        AdmissionCaptureError,
+    > {
+        let operation = binding.operation;
         if active_fence != &self.serving_owner.fence
-            || recovery_lease.store_fence() != active_fence
+            || binding.recovery_lease.store_fence() != active_fence
             || operation.state() != AdmissionOperationState::CapturePending
             || operation.binding().capability_id().as_str() != request.capability_id
             || operation
@@ -352,14 +550,7 @@ impl SqliteAdmissionOperationStore {
             self.serving_owner.clone(),
         );
         budget
-            .capture_composite_invocation_and_commit_dispatch(
-                request,
-                crate::budget_store::AdmissionCaptureBinding {
-                    operation,
-                    recovery_lease,
-                    trusted_now_unix_ms,
-                },
-            )
+            .capture_composite_invocation_and_commit_dispatch(request, binding)
             .map_err(map_budget_capture_error)
     }
 
@@ -620,6 +811,7 @@ impl SqliteAdmissionOperationStore {
         let context = projection.context();
         context.validate()?;
         verify_trusted_time(transaction, context.trusted_time_unix_ms)?;
+        crate::tool_outcome_store::require_terminal_release(transaction, &stored.operation)?;
         verify_payment_terminal_source(
             transaction,
             &stored.operation,
@@ -691,6 +883,16 @@ impl SqliteAdmissionOperationStore {
                 "terminal operation does not retain its exact projection digest",
             ));
         }
+        execution_nonce::prepare_terminal(
+            transaction,
+            &stored.operation,
+            &updated,
+            context.trusted_time_unix_ms,
+        )?;
+        if updated.state() == AdmissionOperationState::CompensatedBeforeDispatch {
+            crate::budget_store::verify_compensated_budget_hold_tx(transaction, &stored.operation)
+                .map_err(|error| invariant(error.to_string()))?;
+        }
         let encoded = encode_operation(&updated)?;
         let changed = transaction
             .execute(
@@ -733,6 +935,7 @@ impl SqliteAdmissionOperationStore {
             &self.serving_owner,
             context.trusted_time_unix_ms,
         )?;
+        execution_nonce::verify_reservation(transaction, &updated)?;
         terminal_from_operation(&updated).map(|terminal| (terminal, true))
     }
 
@@ -784,16 +987,49 @@ fn verify_stored_recovery_claim(
     if &historical_lease_id != claim.coordinator_lease_id() {
         return Err(AdmissionOperationStoreError::Fenced);
     }
-    if trusted_now_unix_ms >= claim.expires_at_unix_ms() {
+    if schema::authority_validation_time(transaction, trusted_now_unix_ms)?
+        >= claim.expires_at_unix_ms()
+    {
         return Err(AdmissionOperationError::LeaseExpired.into());
     }
     Ok(())
+}
+
+pub(crate) fn verify_participant_recovery_lease_tx(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    expected: &AdmissionOperationV1,
+    lease: &AdmissionRecoveryLease,
+    trusted_now_unix_ms: u64,
+) -> Result<(), AdmissionOperationStoreError> {
+    let stored = load_by_operation_id_tx(transaction, expected.binding().operation_id())?
+        .ok_or(AdmissionOperationStoreError::NotFound)?;
+    if stored.operation != *expected {
+        return Err(AdmissionOperationStoreError::Fenced);
+    }
+    verify_stored_recovery_claim(
+        transaction,
+        owner,
+        &stored,
+        lease.untrusted_claim(),
+        trusted_now_unix_ms,
+        lease.store_fence(),
+    )
 }
 
 struct StoredOperation {
     operation: AdmissionOperationV1,
     recovery_claim: Option<UntrustedAdmissionRecoveryClaim>,
     updated_at_unix_ms: u64,
+}
+
+impl StoredOperation {
+    fn verify_decision_time(&self, decision_time: u64) -> Result<(), AdmissionOperationStoreError> {
+        if decision_time < self.updated_at_unix_ms {
+            return Err(invariant("trusted operation time regressed"));
+        }
+        Ok(())
+    }
 }
 
 pub(crate) enum PreparedAdmissionBeginTxResult {
@@ -971,6 +1207,15 @@ fn load_by_operation_id_tx(
     let stored = raw.map(decode_row).transpose()?;
     if let Some(stored) = &stored {
         verify_latest_commit(transaction, stored)?;
+        execution_nonce::verify_reservation(transaction, &stored.operation)?;
+        caller_dispatch_context::load(transaction, &stored.operation)?;
+        security_participant_state::dispatch_ledger::verify_capture_attachment(
+            transaction,
+            &stored.operation,
+        )?;
+        runtime_participant::verify_operation(transaction, &stored.operation)?;
+        governed_approval_claim::verify_stored_operation(transaction, &stored.operation)?;
+        dpop_claim::verify_stored_operation(transaction, &stored.operation)?;
         verify_stored_terminal_projection(transaction, stored)?;
     }
     Ok(stored)
@@ -986,6 +1231,18 @@ pub(crate) fn begin_prepared_operation_tx(
     if operation.state() != AdmissionOperationState::Prepared || operation.version() != 1 {
         return Err(invariant("begin requires a version-one Prepared operation"));
     }
+    if operation.runtime_participant_ledger_digest().is_some()
+        || operation.governed_approval_ledger_digest().is_some()
+    {
+        return Err(invariant(
+            "begin cannot fabricate replay participant ownership",
+        ));
+    }
+    if operation.execution_nonce_issuance_digest().is_some()
+        || operation.execution_nonce_preflight_digest().is_some()
+    {
+        return Err(invariant("begin cannot fabricate nonce issuance evidence"));
+    }
     if operation.coordinator_lease_epoch() != fence.owner_epoch {
         return Err(AdmissionOperationStoreError::Fenced);
     }
@@ -993,6 +1250,7 @@ pub(crate) fn begin_prepared_operation_tx(
     let encoded = encode_operation(operation)?;
     let replay_key = operation.replay_key();
     if let Some(existing) = load_by_replay_key_tx(transaction, &replay_key)? {
+        existing.verify_decision_time(trusted_now_unix_ms)?;
         return Ok(match existing.operation.classify_replay(operation) {
             AdmissionReplayClassification::Exact { terminal_replay } => {
                 PreparedAdmissionBeginTxResult::ExactReplay {
@@ -1076,6 +1334,15 @@ fn load_by_replay_key_tx(
     let stored = raw.map(decode_row).transpose()?;
     if let Some(stored) = &stored {
         verify_latest_commit(transaction, stored)?;
+        execution_nonce::verify_reservation(transaction, &stored.operation)?;
+        caller_dispatch_context::load(transaction, &stored.operation)?;
+        security_participant_state::dispatch_ledger::verify_capture_attachment(
+            transaction,
+            &stored.operation,
+        )?;
+        runtime_participant::verify_operation(transaction, &stored.operation)?;
+        governed_approval_claim::verify_stored_operation(transaction, &stored.operation)?;
+        dpop_claim::verify_stored_operation(transaction, &stored.operation)?;
         verify_stored_terminal_projection(transaction, stored)?;
     }
     Ok(stored)
@@ -1105,6 +1372,7 @@ fn state_name(state: AdmissionOperationState) -> &'static str {
         AdmissionOperationState::ReadyToDispatch => "ready_to_dispatch",
         AdmissionOperationState::CapturePending => "capture_pending",
         AdmissionOperationState::DispatchCommitted => "dispatch_committed",
+        AdmissionOperationState::AwaitingCallerReport => "awaiting_caller_report",
         AdmissionOperationState::Finalizing => "finalizing",
         AdmissionOperationState::Completed => "completed",
         AdmissionOperationState::CompensatedBeforeDispatch => "compensated_before_dispatch",
@@ -1214,3 +1482,6 @@ impl From<AdmissionOperationStoreError> for SqliteServingOwnerError {
 #[path = "admission_operation_store_tests.rs"]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests;
+
+#[cfg(all(test, unix))]
+pub(crate) use tests::security_participant_state::with_flow_sql_fixture;

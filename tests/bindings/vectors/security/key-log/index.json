@@ -1,0 +1,22 @@
+{
+  "schema": "chio.test-vector.key-log.index.v1",
+  "canonical_encoding": "RFC 8785",
+  "description": "Cryptographically valid key-log bodies, envelopes, paged synchronization, witnessed activation, and enterprise receipt vectors generated from deterministic Ed25519 keys.",
+  "positive": [
+    { "id": "event_body_rotation", "file": "positive/key-log-event-body-rotation-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-event-body-v1.schema.json" },
+    { "id": "event_envelope_genesis", "file": "positive/key-log-event-envelope-genesis-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-event-envelope-v1.schema.json" },
+    { "id": "event_envelope_rotation", "file": "positive/key-log-event-envelope-rotation-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-event-envelope-v1.schema.json" },
+    { "id": "checkpoint_body_witnessed", "file": "positive/key-log-checkpoint-body-witnessed-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-checkpoint-body-v1.schema.json" },
+    { "id": "checkpoint_envelope_genesis", "file": "positive/key-log-checkpoint-envelope-genesis-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-checkpoint-envelope-v1.schema.json" },
+    { "id": "checkpoint_envelope_witnessed", "file": "positive/key-log-checkpoint-envelope-witnessed-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-checkpoint-envelope-v1.schema.json" },
+    { "id": "witness_signature", "file": "positive/key-log-witness-signature-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-witness-signature-v1.schema.json" },
+    { "id": "activation_body", "file": "positive/key-log-activation-commit-body-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-activation-commit-body-v1.schema.json" },
+    { "id": "activation_envelope", "file": "positive/key-log-activation-commit-envelope-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-activation-commit-envelope-v1.schema.json" },
+    { "id": "enterprise_receipt_body_active", "file": "positive/key-log-enterprise-receipt-body-active-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-enterprise-receipt-body-v1.schema.json" },
+    { "id": "enterprise_receipt_envelope_active", "file": "positive/key-log-enterprise-receipt-envelope-active-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-enterprise-receipt-envelope-v1.schema.json" },
+    { "id": "sync_response_paged", "file": "positive/key-log-sync-response-paged-v1.json", "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-sync-response-v1.schema.json" }
+  ],
+  "negative": [
+    { "id": "key_log_mutations_v1", "file": "mutations-v1.json" }
+  ]
+}

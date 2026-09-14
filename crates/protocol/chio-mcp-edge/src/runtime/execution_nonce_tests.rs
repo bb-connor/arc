@@ -100,6 +100,8 @@ fn issue_nonce_capability_token(kernel: &ChioKernel, agent: &Keypair) -> Capabil
 
 fn make_bridge_nonce_request(kernel: &ChioKernel, agent: &Keypair) -> BridgeMcpToolCallRequest {
     BridgeMcpToolCallRequest {
+        dpop_proof: None,
+        peer_capabilities: Default::default(),
         request_id: "req-mcp-strict-nonce".to_string(),
         capability: issue_nonce_capability_token(kernel, agent),
         server_id: "srv".to_string(),
@@ -120,7 +122,7 @@ fn make_bridge_nonce_request(kernel: &ChioKernel, agent: &Keypair) -> BridgeMcpT
 
 fn nonce_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".into(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.into(),
         server_id: "srv".into(),
         name: "Nonce Test Server".into(),
         description: Some("nonce test".into()),
@@ -131,8 +133,14 @@ fn nonce_manifest() -> ToolManifest {
             input_schema: json!({"type": "object"}),
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: Some(LatencyHint::Fast),
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,

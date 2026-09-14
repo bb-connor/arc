@@ -486,6 +486,7 @@ pub(crate) fn execute_runtime_loopback_step(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: step.request.origin_kernel_id.clone(),
+        declassification_grant: None,
     };
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()

@@ -36,42 +36,87 @@ impl ToolServerConnection for SharedUpstreamToolServer {
         )
         .await
     }
+
+    async fn prepare_delivery(
+        &self,
+        context: &chio_kernel::ToolDispatchContext,
+    ) -> Result<(), KernelError> {
+        ToolServerConnection::prepare_delivery(self.upstream.as_ref(), context).await
+    }
+
+    async fn invoke_in_context(
+        &self,
+        context: &chio_kernel::ToolDispatchContext,
+        tool_name: &str,
+        arguments: Value,
+        nested_flow_bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
+    ) -> Result<Value, KernelError> {
+        ToolServerConnection::invoke_in_context(
+            self.upstream.as_ref(),
+            context,
+            tool_name,
+            arguments,
+            nested_flow_bridge,
+        )
+        .await
+    }
 }
 
 impl SharedUpstreamOwner {
-    fn new(config: &RemoteServeHttpConfig) -> Result<Self, CliError> {
+    fn new(
+        config: &RemoteServeHttpConfig,
+        manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    ) -> Result<Self, CliError> {
         let wrapped_arg_refs = config
             .wrapped_args
             .iter()
             .map(String::as_str)
             .collect::<Vec<_>>();
-        let manifest_public_key = config
-            .manifest_public_key
-            .clone()
-            .unwrap_or_else(|| Keypair::generate().public_key().to_hex());
+        let admitted_manifest = manifest_registry
+            .verified_manifest(&config.server_id)
+            .ok_or_else(|| {
+                CliError::cli_other_error(
+                    "admitted remote MCP manifest is unavailable".to_string(),
+                )
+            })?;
+        let native_launch = config.native_launch_factory.prepare_launch(
+            &config.wrapped_command,
+            &wrapped_arg_refs,
+            &config.server_id,
+            Arc::clone(&manifest_registry),
+        )?;
         let notification_source: Arc<dyn McpTransport> = Arc::new(StdioMcpTransport::spawn(
             &config.wrapped_command,
             &wrapped_arg_refs,
+            native_launch,
         )?);
         let adapter = McpAdapter::new(
             McpAdapterConfig {
                 server_id: config.server_id.clone(),
                 server_name: config.server_name.clone(),
                 server_version: config.server_version.clone(),
-                public_key: manifest_public_key,
+                public_key: admitted_manifest.manifest.public_key.clone(),
             },
             Box::new(SerializedMcpTransport::from_arc(
                 notification_source.clone(),
             )),
         );
-        let upstream_server = Arc::new(AdaptedMcpServer::new(adapter)?);
+        let upstream_server = Arc::new(AdaptedMcpServer::new_with_manifest_registry(
+            adapter,
+            manifest_registry.as_ref(),
+        )?);
         let notification_subscribers =
             Arc::new(StdMutex::new(Vec::<Weak<StdMutex<VecDeque<Value>>>>::new()));
         let notification_stats = Arc::new(SharedUpstreamNotificationStats::default());
         let notification_source_for_thread = notification_source.clone();
         let notification_subscribers_for_thread = notification_subscribers.clone();
         let notification_stats_for_thread = notification_stats.clone();
-        thread::spawn(move || loop {
+        let notification_pump_stop = Arc::new(AtomicBool::new(false));
+        let notification_pump_stop_for_thread = Arc::clone(&notification_pump_stop);
+        let notification_pump_thread = thread::spawn(move || loop {
+            if notification_pump_stop_for_thread.load(Ordering::SeqCst) {
+                break;
+            }
             let notifications = notification_source_for_thread.drain_notifications();
             fan_out_shared_upstream_notifications(
                 &notification_subscribers_for_thread,
@@ -87,6 +132,8 @@ impl SharedUpstreamOwner {
             upstream_server,
             notification_subscribers,
             notification_stats,
+            notification_pump_stop,
+            notification_pump_thread: StdMutex::new(Some(notification_pump_thread)),
         })
     }
 
@@ -104,7 +151,10 @@ impl SharedUpstreamOwner {
 
     fn notification_stats_snapshot(&self) -> SharedUpstreamNotificationStatsSnapshot {
         SharedUpstreamNotificationStatsSnapshot {
-            fanout_batches: self.notification_stats.fanout_batches.load(Ordering::Relaxed),
+            fanout_batches: self
+                .notification_stats
+                .fanout_batches
+                .load(Ordering::Relaxed),
             fanout_notifications: self
                 .notification_stats
                 .fanout_notifications
@@ -125,6 +175,31 @@ impl SharedUpstreamOwner {
                 .notification_stats
                 .subscriber_lock_failures
                 .load(Ordering::Relaxed),
+        }
+    }
+
+    fn shutdown(&self) -> Result<(), CliError> {
+        self.notification_pump_stop.store(true, Ordering::SeqCst);
+        let mut failures = Vec::new();
+        match self.notification_pump_thread.lock() {
+            Ok(mut thread) => {
+                if thread.take().is_some_and(|thread| thread.join().is_err()) {
+                    failures.push("shared MCP notification pump panicked".to_string());
+                }
+            }
+            Err(error) => failures.push(format!(
+                "shared MCP notification pump ownership lock is poisoned: {error}"
+            )),
+        }
+        if let Err(error) = self.upstream_server.shutdown() {
+            failures.push(format!(
+                "shared MCP terminal receipt persistence failed: {error}"
+            ));
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(CliError::cli_other_error(failures.join("; ")))
         }
     }
 }
@@ -151,6 +226,12 @@ impl McpTransport for SharedUpstreamNotificationTap {
             return vec![];
         };
         queue.drain(..).collect()
+    }
+
+    fn shutdown(&self) -> Result<(), AdapterError> {
+        // Session taps do not own the shared native child. The owner closes it
+        // once after every session has reached a terminal state.
+        Ok(())
     }
 }
 

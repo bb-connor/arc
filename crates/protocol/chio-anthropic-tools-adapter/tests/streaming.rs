@@ -1,11 +1,13 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+mod support;
+
 use std::future::Future;
 use std::sync::Arc;
 use std::task::{Context, Poll, Wake, Waker};
 
 use chio_anthropic_tools_adapter::transport::MockTransport;
-use chio_anthropic_tools_adapter::{AnthropicAdapter, AnthropicAdapterConfig};
+use chio_anthropic_tools_adapter::AnthropicAdapter;
 use chio_tool_call_fabric::{
     DenyReason, ProviderAdapter, ProviderError, ProviderId, ProviderRequest, ReceiptId, Redaction,
     ToolResult, VerdictResult, DEFAULT_MAX_BUFFERED_RAW_FRAMES,
@@ -32,14 +34,7 @@ fn block_on<F: Future>(future: F) -> F::Output {
 }
 
 fn adapter() -> AnthropicAdapter {
-    let config = AnthropicAdapterConfig::new(
-        "anthropic-1",
-        "Anthropic Messages",
-        "0.1.0",
-        "deadbeef",
-        "wks_chio_demo",
-    );
-    AnthropicAdapter::new(config, Arc::new(MockTransport::new()))
+    support::adapter(Arc::new(MockTransport::new()))
 }
 
 fn allow_verdict() -> VerdictResult {

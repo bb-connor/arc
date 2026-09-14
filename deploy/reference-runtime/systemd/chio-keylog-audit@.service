@@ -1,0 +1,66 @@
+# Chio key-log audit monitor, one instance per monitor identity.
+#
+# The monitor polls the three witnesses its config names and keeps an
+# operator database of what it observed. Its signing seed arrives as a
+# credential file at the fixed credentials path for this unit. The keyring
+# composition runs witnesses a, b and c and monitors a and b.
+
+[Unit]
+Description=Chio key-log audit monitor %i
+Wants=chio-keylog-witness@a.service chio-keylog-witness@b.service chio-keylog-witness@c.service
+After=local-fs.target chio-keylog-witness@a.service chio-keylog-witness@b.service chio-keylog-witness@c.service
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=chio-keylog
+Group=chio-keylog
+StateDirectory=chio-keylog/audit-%i
+StateDirectoryMode=0700
+RuntimeDirectory=chio-keylog/audit-%i
+RuntimeDirectoryMode=0700
+WorkingDirectory=/var/lib/chio-keylog/audit-%i
+LoadCredential=seed:/etc/chio/credentials/keylog-audit-%i.seed
+ExecStart=/usr/local/bin/chio security supervise \
+  --ready-unix-socket /run/chio-keylog/audit-%i/audit.sock \
+  --ready-timeout 30 \
+  --stop-grace 10 \
+  -- /usr/local/bin/chio-keylog-audit \
+  --config /etc/chio/keylog/audit-%i.json
+Restart=on-failure
+RestartSec=5s
+KillSignal=SIGTERM
+TimeoutStopSec=15s
+TimeoutStartSec=45s
+MemoryHigh=256M
+MemoryMax=384M
+LimitNOFILE=4096
+LimitCORE=0
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateNetwork=true
+ProtectHome=true
+ProtectSystem=strict
+ReadOnlyPaths=/etc/chio
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+RemoveIPC=true
+
+[Install]
+WantedBy=multi-user.target

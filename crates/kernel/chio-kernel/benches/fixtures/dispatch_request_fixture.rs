@@ -303,6 +303,7 @@ impl DispatchAllowFixture {
             server_id: &self.guard_server_id,
             session_filesystem_roots: None,
             matched_grant_index: Some(0),
+            security_context: None,
         };
 
         match guard.evaluate(&ctx) {
@@ -381,6 +382,7 @@ fn make_request(capability: &CapabilityToken) -> ToolCallRequest {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -405,6 +407,7 @@ fn make_deny_request(capability: &CapabilityToken) -> ToolCallRequest {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -429,6 +432,7 @@ fn make_guard_request(capability: &CapabilityToken) -> ToolCallRequest {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 

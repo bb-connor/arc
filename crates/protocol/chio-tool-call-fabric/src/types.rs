@@ -71,6 +71,9 @@ pub struct ToolInvocation {
     /// hash without re-serializing.
     pub arguments: Vec<u8>,
     pub provenance: ProvenanceStamp,
+    /// Registry-admitted manifest metadata retained across provider dialects.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bridge_security: Option<chio_manifest::BridgeSecurityMetadata>,
 }
 
 impl ToolInvocation {
@@ -101,6 +104,24 @@ impl ToolInvocation {
         })?;
         if canonical != self.arguments {
             return Err(ToolInvocationValidationError::NonCanonicalArguments);
+        }
+        if let Some(security) = &self.bridge_security {
+            if !security.has_registry_coordinates() {
+                return Err(ToolInvocationValidationError::UnadmittedBridgeSecurity);
+            }
+            let bound_tool = security
+                .tool_name()
+                .ok_or(ToolInvocationValidationError::UnadmittedBridgeSecurity)?;
+            let matches_regular = bound_tool == self.tool_name;
+            let matches_server_tool =
+                chio_manifest::ServerTool::from_anthropic_wire_name(&self.tool_name)
+                    .is_some_and(|tool| tool.as_str() == bound_tool);
+            if !matches_regular && !matches_server_tool {
+                return Err(ToolInvocationValidationError::BridgeToolMismatch {
+                    invocation: self.tool_name.clone(),
+                    admitted: bound_tool.to_string(),
+                });
+            }
         }
 
         Ok(())
@@ -211,6 +232,13 @@ pub enum ToolInvocationValidationError {
     ArgumentCanonicalization { message: String },
     #[error("tool invocation arguments were not canonical JSON bytes")]
     NonCanonicalArguments,
+    #[error("tool invocation bridge security was not registry admitted")]
+    UnadmittedBridgeSecurity,
+    #[error("tool invocation name {invocation} did not match admitted manifest tool {admitted}")]
+    BridgeToolMismatch {
+        invocation: String,
+        admitted: String,
+    },
     #[error("tool invocation {field} {reason}")]
     InvalidIdentity {
         field: &'static str,

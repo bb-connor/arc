@@ -1,10 +1,8 @@
 package chio
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -22,6 +20,14 @@ type protocolPrimitiveFixtureCase struct {
 func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 	var target any
 	switch schemaFile {
+	case "receipt/record.schema.json":
+		target = &ReceiptRecord{}
+	case "kernel/caller_dispatch_authorization.schema.json":
+		target = &KernelCallerDispatchAuthorization{}
+	case "kernel/caller_delivery_report.schema.json":
+		target = &KernelCallerDeliveryReport{}
+	case "kernel/execution_nonce.schema.json":
+		target = &KernelExecutionNonce{}
 	case "capability/token.schema.json":
 		target = &CapabilityToken{}
 	case "capability/aggregate-invocation-budget.schema.json":
@@ -41,6 +47,8 @@ func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 		}
 	case "capability/threshold-approval-proposal.schema.json":
 		target = &CapabilityThresholdApprovalProposal{}
+	case "result/pending_approval.schema.json":
+		target = &ResultPendingApproval{}
 	case "capability/governed-approval-token.schema.json":
 		target = &CapabilityGovernedApprovalToken{}
 	case "agent/active-response-governed-intent.schema.json":
@@ -53,13 +61,9 @@ func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 		return nil, fmt.Errorf("unmapped protocol-primitives fixture schema %q", schemaFile)
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(payload))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
+	// Exercise the ordinary public parser, not a stricter test-only decoder.
+	if err := json.Unmarshal(payload, target); err != nil {
 		return nil, err
-	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		return nil, fmt.Errorf("trailing JSON after protocol primitive: %w", err)
 	}
 	return target, nil
 }

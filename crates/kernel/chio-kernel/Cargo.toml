@@ -75,6 +75,7 @@ chio-appraisal = { workspace = true }
 chio-bounded = { workspace = true }
 chio-supervisor = { workspace = true }
 chio-core-types = { workspace = true }
+chio-security-types = { workspace = true }
 # The workspace declares chio-custody-hw with `default-features = false` so
 # mobile/conformance consumers can drop the passkey graph; the kernel needs the
 # default custody path, so it re-enables those features explicitly.
@@ -86,6 +87,7 @@ chio-credit = { workspace = true }
 chio-federation = { workspace = true }
 chio-link = { path = "../../economy/chio-link", default-features = false }
 chio-log-redact = { workspace = true }
+chio-manifest = { workspace = true }
 chio-metrics-spec = { workspace = true }
 chio-tool-call-fabric = { workspace = true }
 lru = "0.18.2"

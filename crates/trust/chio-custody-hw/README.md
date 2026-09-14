@@ -15,6 +15,9 @@ unsigned capability.
 - Verify Apple App Attest and Android Play Integrity mobile attestations
   against pinned trust roots, never a caller-supplied key in production
   (`attestation`).
+- Issue cryptographically random, application- and audience-bound mobile
+  challenges and consume verified evidence exactly once, with atomic App Attest
+  counter advancement (`mobile_challenge`).
 - Define the audience-pinned `PasskeyCapability` envelope and its RFC 8785
   canonical-JSON encoding (`capability`).
 - Sign capabilities and reconstruct the signed message over any
@@ -46,6 +49,13 @@ Every item below is also re-exported at the crate root
   VerifiedMobileReceiptChain, AttestationError, APP_ATTEST_FORMAT,
   MEETS_DEVICE_INTEGRITY, PLAY_RECOGNIZED}` - mobile device-attestation
   verifiers.
+- `mobile_challenge::{MobileChallengeAuthority, MobileAttestationBinding,
+  IssuedMobileChallenge, VerifiedMobileAttestation,
+  VerifiedMobileAttestationEvidence, MobileChallengeStore,
+  InMemoryMobileChallengeStore, SqliteMobileChallengeStore}` - server-owned,
+  one-time mobile challenge issuance and atomic replay/counter custody
+  (`SqliteMobileChallengeStore` requires feature `sqlite-store` and private
+  Unix file custody).
 - `nonce_store::{PasskeyNonceStore, InMemoryPasskeyNonceStore,
   SqlitePasskeyNonceStore, RecordOutcome, DEFAULT_CLOCK_SKEW_SECONDS}` -
   replay detection (`SqlitePasskeyNonceStore` requires feature
@@ -93,7 +103,7 @@ assert!(!response.capability.signature.is_empty());
 | Flag | Effect |
 |------|--------|
 | `passkey` (default) | Enables `PasskeyVerifier`, pulling in `webauthn-rs` / `webauthn-rs-proto`. |
-| `sqlite-store` (default) | Enables `SqlitePasskeyNonceStore` and `SqliteCredentialRevocationOracle`, durable stores sharing the workspace's pinned `rusqlite` version with `chio-store-sqlite`. |
+| `sqlite-store` (default) | Enables `SqlitePasskeyNonceStore`, `SqliteCredentialRevocationOracle`, and `SqliteMobileChallengeStore`, durable stores sharing the workspace's pinned `rusqlite` version with `chio-store-sqlite`. The mobile store requires an absolute normalized path in a caller-owned, non-group/world-writable Unix directory and a single-link owner-only database file. |
 | `pq` | Enables post-quantum `HybridBackend` signing via `chio-core-types/pq` (ML-DSA-65). |
 | `dev-fixtures` | Compiles in synthetic mobile-attestation fixtures (the App Attest compact-map shape, a caller-supplied Play Integrity JWKS). Test/dev only; never enable in a shipped binary. |
 
@@ -106,6 +116,9 @@ resistance, the revocation cascade, audience confusion, canonical-JSON
 stability, and an end-to-end issuer-to-kernel-verifier flow.
 `fixtures/passkey/` pins a JSON descriptor corpus mapping WebAuthn failure
 modes to their expected `urn:chio:error:custody:*` code.
+Unit tests cover mobile challenge binding, expiry, one-time consume,
+concurrent counter compare-and-swap, SQLite restart durability, parallel
+consumers, and fail-closed database permission and identity drift.
 
 ## See also
 

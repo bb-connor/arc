@@ -34,6 +34,7 @@ fn non_durable_monetary_kernel_denies_before_ambiguous_dispatch() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);

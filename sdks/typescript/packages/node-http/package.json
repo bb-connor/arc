@@ -27,6 +27,9 @@
     "test:watch": "vitest",
     "lint": "tsc --noEmit"
   },
+  "dependencies": {
+    "ajv": "^8.20.0"
+  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "esbuild": "^0.28.1",

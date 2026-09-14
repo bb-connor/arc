@@ -17,6 +17,10 @@ JSON, SHA-256, Ed25519 signing, and signed Chio artifact verification.
 - `chio::invariants::*` for canonical JSON, SHA-256, Ed25519, capability,
   receipt, and manifest verification.
 - `chio::DpopProof` and `chio::sign_dpop_proof` for Chio DPoP request proofs.
+- `chio::sign_authority_dpop_proof` for the explicit v2 durable proof domain.
+  It signs an independently configured `DpopReplayAuthority`, not a caller's
+  claim of activation. Legacy v1 verifiers reject this profile, and signing
+  does not reserve a nonce or authorize execution.
 - `chio::http::Evaluator` and HTTP request models for `spec/HTTP-SUBSTRATE.md`.
 
 ## Build
@@ -33,6 +37,13 @@ ctest --test-dir target/chio-cpp --output-on-failure
 Enable the optional libcurl transport with `-DCHIO_CPP_ENABLE_CURL=ON`.
 Production users can also supply their own implementation of
 `chio::HttpTransport`.
+
+The Rust build and imported FFI library share `CHIO_CPP_CARGO_TARGET_DIR`, which
+defaults to `CARGO_TARGET_DIR` when set, otherwise the repository's `target`
+directory. Set `-DCHIO_CPP_CARGO_TARGET_DIR=/absolute/path` to select it explicitly.
+Relative target paths resolve against the repository root. When building the
+FFI library separately, use the same target directory and configure CMake with
+`-DCHIO_CPP_BUILD_RUST_FFI=OFF`.
 
 ## Install And Consume
 

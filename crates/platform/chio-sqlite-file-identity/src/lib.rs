@@ -7,8 +7,10 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
+#[cfg(unix)]
 use std::ffi::{c_int, c_void, CStr};
 
+#[cfg(unix)]
 use rusqlite::ffi;
 
 /// Filesystem identity of the exact main-database descriptor held by SQLite.
@@ -128,6 +130,17 @@ pub fn main_database_file_identity(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(not(unix))]
+    #[test]
+    fn unsupported_platform_rejects_file_identity() -> Result<(), Box<dyn std::error::Error>> {
+        let connection = rusqlite::Connection::open_in_memory()?;
+        assert_eq!(
+            main_database_file_identity(&connection),
+            Err("qualified SQLite file identity requires Unix".to_owned())
+        );
+        Ok(())
+    }
 
     #[cfg(unix)]
     #[test]

@@ -17,6 +17,40 @@ pub(super) const TASK_POLL_INTERVAL_MILLIS: u64 = 500;
 pub(super) const MAX_BACKGROUND_TASKS_PER_TICK: usize = 8;
 pub(super) const MAX_STDIO_MCP_BUFFERED_MESSAGES: usize = 128;
 pub(super) const RELATED_TASK_META_KEY: &str = "io.modelcontextprotocol/related-task";
+/// `_meta` keys a `tools/call` carries when the kernel dispatches with an
+/// identity. `chioRequestId` is the key a Chio edge already treats as the
+/// caller's stable request identity, so a Chio-to-Chio hop deduplicates on
+/// the upstream operation id; the remaining keys name the attempt for
+/// servers that record provenance.
+pub(super) const DISPATCH_REQUEST_ID_META_KEY: &str = "chioRequestId";
+pub(super) const DISPATCH_OPERATION_ID_META_KEY: &str = "chioOperationId";
+pub(super) const DISPATCH_ATTEMPT_ID_META_KEY: &str = "chioAttemptId";
+pub(super) const DISPATCH_TRANSPORT_KEY_EPOCH_META_KEY: &str = "chioTransportKeyEpoch";
+
+/// The `tools/call` params for a tool, with the dispatch identity in `_meta`
+/// when the kernel provided one.
+pub(super) fn tool_call_params(
+    tool_name: &str,
+    arguments: serde_json::Value,
+    context: Option<&chio_kernel::ToolDispatchContext>,
+) -> serde_json::Value {
+    let mut params = json!({
+        "name": tool_name,
+        "arguments": arguments,
+    });
+    if let (Some(context), Some(object)) = (context, params.as_object_mut()) {
+        object.insert(
+            "_meta".to_string(),
+            json!({
+                DISPATCH_REQUEST_ID_META_KEY: context.idempotency_key(),
+                DISPATCH_OPERATION_ID_META_KEY: context.operation_id(),
+                DISPATCH_ATTEMPT_ID_META_KEY: context.attempt_id(),
+                DISPATCH_TRANSPORT_KEY_EPOCH_META_KEY: context.transport_key_epoch(),
+            }),
+        );
+    }
+    params
+}
 pub(super) const CHIO_AUTH_ENV_VARS: &[&str] = &[
     "CHIO_AUTH_TOKEN",
     "CHIO_ADMIN_TOKEN",
@@ -24,6 +58,11 @@ pub(super) const CHIO_AUTH_ENV_VARS: &[&str] = &[
     "CHIO_MCP_ADMIN_TOKEN",
     "CHIO_CONFORMANCE_AUTH_TOKEN",
     "CHIO_CONFORMANCE_ADMIN_TOKEN",
+    "CHIO_CONTROL_TOKEN",
+    "CHIO_SIDECAR_CONTROL_TOKEN",
+    "CHIO_API_PROTECT_CONTROL_TOKEN",
+    "CHIO_SIEM_WEBHOOK_BEARER_TOKEN",
+    "CHIO_TRUST_SERVICE_TOKEN",
 ];
 
 pub(super) fn remove_chio_auth_env(command: &mut Command) {
@@ -226,4 +265,48 @@ pub(super) fn jsonrpc_request_id_label(request_id: &serde_json::Value) -> String
 pub(super) fn read_line(reader: &mut impl BufRead) -> Result<serde_json::Value, AdapterError> {
     read_jsonrpc_frame(reader)?
         .ok_or_else(|| AdapterError::ConnectionFailed("MCP server closed stdout (EOF)".into()))
+}
+
+#[cfg(test)]
+mod dispatch_identity_tests {
+    use super::*;
+    use chio_core::provider_attempt::ProviderAttemptBindingV1;
+    use chio_kernel::ToolDispatchContext;
+
+    fn context() -> ToolDispatchContext {
+        ToolDispatchContext::new(
+            "request-7",
+            ProviderAttemptBindingV1 {
+                operation_id: "a".repeat(64),
+                attempt_id: format!("attempt:{}", "a".repeat(64)),
+                transport_id: "kernel-tool-server:mcp-fs".into(),
+                transport_key_epoch: 3,
+            },
+        )
+    }
+
+    #[test]
+    fn plain_calls_carry_no_metadata() {
+        let params = tool_call_params("read_file", json!({"path": "/tmp/x"}), None);
+        assert_eq!(
+            params,
+            json!({"name": "read_file", "arguments": {"path": "/tmp/x"}})
+        );
+    }
+
+    #[test]
+    fn dispatch_identity_rides_in_meta() {
+        let params = tool_call_params("read_file", json!({"path": "/tmp/x"}), Some(&context()));
+        assert_eq!(params["name"], "read_file");
+        assert_eq!(params["arguments"], json!({"path": "/tmp/x"}));
+        let meta = &params["_meta"];
+        assert_eq!(meta[DISPATCH_REQUEST_ID_META_KEY], "a".repeat(64));
+        assert_eq!(meta[DISPATCH_OPERATION_ID_META_KEY], "a".repeat(64));
+        assert_eq!(
+            meta[DISPATCH_ATTEMPT_ID_META_KEY],
+            format!("attempt:{}", "a".repeat(64))
+        );
+        assert_eq!(meta[DISPATCH_TRANSPORT_KEY_EPOCH_META_KEY], 3);
+        assert_eq!(meta.as_object().map(|object| object.len()), Some(4));
+    }
 }

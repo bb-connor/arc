@@ -343,6 +343,43 @@ fn evaluate_pure_rejects_unsupported_authorization_extensions() {
 }
 
 #[test]
+fn browser_rejects_unnegotiated_approval_set_proposal_and_governed_intent() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let input = EvaluateRequestJson {
+        request: make_request_json(&subject),
+        capability: make_capability(&subject, &issuer),
+        trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],
+        clock_override_unix_secs: Some(ISSUED_AT + 1),
+        session_filesystem_roots: None,
+        peer_capabilities: None,
+        direct_root_capability: None,
+        capability_trust_roots: BTreeMap::new(),
+        parent_budget_snapshots: std::vec![],
+    };
+    let positive = evaluate_pure(input.clone(), &FixedClock::new(ISSUED_AT + 1)).unwrap();
+    assert_eq!(positive.capability_verdict, "allow");
+    assert!(!positive.authorized);
+    for field in [
+        "approval_tokens",
+        "threshold_approval_proposal",
+        "governed_intent",
+        "approval_token",
+        "supplemental_authorization",
+    ] {
+        let mut value = serde_json::to_value(&input).unwrap();
+        value["request"][field] = if field == "approval_tokens" {
+            serde_json::json!([{"artifact":"one"}, {"artifact":"two"}])
+        } else {
+            serde_json::json!({"artifact":field})
+        };
+        let changed: EvaluateRequestJson = serde_json::from_value(value).unwrap();
+        let error = evaluate_pure(changed, &FixedClock::new(ISSUED_AT + 1)).unwrap_err();
+        assert_eq!(error.code, "unsupported_authorization_extension", "{field}");
+    }
+}
+
+#[test]
 fn evaluate_pure_deny_on_expired_capability() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();

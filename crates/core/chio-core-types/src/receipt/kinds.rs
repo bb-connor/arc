@@ -107,6 +107,7 @@ impl ObservationOutcome {
 pub enum ToolOrigin {
     #[default]
     CallerExecuted,
+    ChioInternal,
     HostExecutedProviderReported,
     HostExecutedUnmediated,
 }
@@ -116,6 +117,7 @@ impl ToolOrigin {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::CallerExecuted => "caller_executed",
+            Self::ChioInternal => "chio_internal",
             Self::HostExecutedProviderReported => "host_executed_provider_reported",
             Self::HostExecutedUnmediated => "host_executed_unmediated",
         }

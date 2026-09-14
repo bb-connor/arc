@@ -574,7 +574,7 @@ async fn send_chat_completion_fails_closed_when_transport_empty() {
 }
 
 #[tokio::test]
-async fn send_chat_completion_stream_gates_tool_calls() {
+async fn raw_send_chat_completion_stream_rejects_before_evaluator() {
     let mock = transport::MockTransport::new();
     let chunk = json!({
         "id": "chatcmpl_stream",
@@ -603,11 +603,16 @@ async fn send_chat_completion_stream_gates_tool_calls() {
         redactions: vec![],
         receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_stream".into()),
     };
-    let gated = adapter
-        .send_chat_completion_stream(&chat_request(), |_invocation| Ok(verdict.clone()))
+    let evaluated = std::cell::Cell::new(false);
+    let error = adapter
+        .send_chat_completion_stream(&chat_request(), |_invocation| {
+            evaluated.set(true);
+            Ok(verdict.clone())
+        })
         .await
-        .unwrap();
-    assert_eq!(gated.invocations.len(), 1);
-    assert_eq!(gated.invocations[0].tool_name, "get_weather");
-    assert_eq!(gated.invocations[0].provenance.request_id, "call_stream_1");
+        .expect_err("raw projection must not enter streaming authorization");
+    assert!(error
+        .to_string()
+        .contains("requires a registry-admitted security sidecar"));
+    assert!(!evaluated.get());
 }

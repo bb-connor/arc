@@ -124,6 +124,13 @@ impl ChioMcpEdge {
             Ok(version) => version,
             Err(error) => return error,
         };
+        let authorization =
+            match crate::authorization::negotiate_authorization_capabilities(&params) {
+                Ok(profile) => profile,
+                Err(error) => return jsonrpc_error(id, JSONRPC_INVALID_PARAMS, &error.to_string()),
+            };
+        let mut peer_capabilities = parse_peer_capabilities(&params);
+        peer_capabilities.authorization = Some(authorization.clone());
 
         let opened_session = match self.initial_session_id.clone() {
             Some(session_id) => self.kernel.open_session_with_id(
@@ -155,7 +162,6 @@ impl ChioMcpEdge {
                 &format!("failed to persist session auth context: {error}"),
             );
         }
-        let peer_capabilities = parse_peer_capabilities(&params);
         if let Err(error) = self
             .kernel
             .set_session_peer_capabilities(&session_id, peer_capabilities)
@@ -199,6 +205,10 @@ impl ChioMcpEdge {
             capabilities.insert("logging".to_string(), json!({}));
         }
         let mut experimental = serde_json::Map::new();
+        experimental.insert(
+            crate::authorization::CHIO_AUTHORIZATION_CAPABILITY_KEY.to_string(),
+            json!(authorization),
+        );
         experimental.insert(
             CHIO_TOOL_STREAMING_CAPABILITY_KEY.to_string(),
             json!({

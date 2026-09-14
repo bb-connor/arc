@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-authority-request-envelope-v1.schema.json",
+  "title": "Chio signed broker authority RPC request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["body", "algorithm", "signature"],
+  "properties": {
+    "body": { "$ref": "broker-authority-request-body-v1.schema.json" },
+    "algorithm": { "$ref": "#/$defs/algorithm" },
+    "signature": { "$ref": "#/$defs/signature" }
+  },
+  "$defs": {
+    "algorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
+    "signature": { "type": "string", "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$" }
+  }
+}

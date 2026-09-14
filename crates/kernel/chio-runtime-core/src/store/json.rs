@@ -3,6 +3,9 @@ use crate::validation::validate_non_empty;
 use crate::*;
 use chio_swarm_authority::SwarmAuthorityBundle;
 
+/// JSON-backed state with trust-floor transitions serialized across clones of one instance.
+/// Independently opened handles and other processes are not coordinated. Use the SQLite
+/// runtime store when transitions must be serialized across independent database connections.
 #[derive(Debug, Clone)]
 pub struct JsonRuntimeAdmissionStore {
     path: PathBuf,
@@ -391,6 +394,31 @@ impl RuntimeAdmissionStore for JsonRuntimeAdmissionStore {
         entry: RuntimeTrustFloorEntry,
     ) -> Result<(), ChioRuntimeError> {
         let mut state = self.lock_state()?;
+        if let Some(existing) = state.trust_floors.iter_mut().find(|existing| {
+            existing.verifier_id == entry.verifier_id && existing.key_id == entry.key_id
+        }) {
+            *existing = entry;
+        } else {
+            state.trust_floors.push(entry);
+        }
+        Self::validate_state(&state)?;
+        self.persist_state(&state)
+    }
+
+    fn validate_and_record_runtime_trust_floor(
+        &self,
+        entry: RuntimeTrustFloorEntry,
+        previous_hash_sha256: Option<&str>,
+    ) -> Result<(), ChioRuntimeError> {
+        let mut state = self.lock_state()?;
+        let existing = state
+            .trust_floors
+            .iter()
+            .find(|existing| {
+                existing.verifier_id == entry.verifier_id && existing.key_id == entry.key_id
+            })
+            .cloned();
+        validate_runtime_trust_floor_transition(existing, &entry, previous_hash_sha256)?;
         if let Some(existing) = state.trust_floors.iter_mut().find(|existing| {
             existing.verifier_id == entry.verifier_id && existing.key_id == entry.key_id
         }) {

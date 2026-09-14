@@ -832,10 +832,23 @@ pub(crate) async fn handle_record_lineage_snapshot(
         Ok(store) => store,
         Err(response) => return response,
     };
-    if let Err(error) = store
+    match store
         .record_capability_snapshot(&payload.capability, payload.parent_capability_id.as_deref())
     {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        Ok(()) => {}
+        Err(chio_kernel::capability_lineage::CapabilityLineageError::ReceiptStore(
+            ReceiptStoreError::NotFound(message),
+        )) => {
+            return plain_http_error(StatusCode::NOT_FOUND, &message);
+        }
+        Err(chio_kernel::capability_lineage::CapabilityLineageError::ReceiptStore(
+            ReceiptStoreError::Conflict(message),
+        )) => {
+            return plain_http_error(StatusCode::CONFLICT, &message);
+        }
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
     }
     respond_after_leader_visible_write(
         &state,

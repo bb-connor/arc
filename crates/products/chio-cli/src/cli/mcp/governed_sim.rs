@@ -240,6 +240,7 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel
