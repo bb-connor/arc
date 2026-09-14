@@ -182,6 +182,14 @@ async fn guest_identity_is_fixed_and_admin_operations_are_absent() -> Result {
         "checkpoint_conflict"
     );
     request(&service, secret, json!({"op": "cancel"})).await?;
+    let cancelled = request(&service, secret, json!({"op": "inspect"})).await?;
+    assert_eq!(cancelled["ok"], true, "{cancelled}");
+    assert_eq!(cancelled["result"]["state"], "cancelled");
+    assert_eq!(cancelled["result"]["checkpoint"]["value"], json!([1, 2]));
+    assert!(matches!(
+        runtime.put_blob("reader", b"after cancellation"),
+        Err(ProcessError::Cancelled(_))
+    ));
     assert_eq!(
         request(&service, secret, invoke("after-cancel")).await?["error"]["code"],
         "cancelled"
@@ -190,6 +198,15 @@ async fn guest_identity_is_fixed_and_admin_operations_are_absent() -> Result {
         runtime.process("root")?.state,
         chio_process::ProcessState::Running
     );
+    service.revoke_credentials("reader")?;
+    assert_eq!(
+        request(&service, secret, json!({"op": "inspect"})).await?["error"]["code"],
+        "unauthenticated"
+    );
+    assert!(matches!(
+        service.revoke_credentials("absent"),
+        Err(ProcessError::NotFound(_))
+    ));
     Ok(())
 }
 

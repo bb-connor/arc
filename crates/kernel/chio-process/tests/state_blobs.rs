@@ -10,6 +10,63 @@ use std::sync::Arc;
 use support::{child, kernel, limits, parent_key, root, scope, Result};
 
 struct Server;
+
+#[test]
+fn reader_opens_basename_in_private_cwd() -> Result {
+    // A subprocess owns cwd so this fixture cannot change other tests' paths.
+    if std::env::var_os("CHIO_STATE_READER_CWD_CHILD").is_some() {
+        let reader = chio_process::ProcessStateReader::open("process.db")?;
+        assert_eq!(reader.checkpoint("root")?.revision, 0);
+        return Ok(());
+    }
+    let dir = tempfile::tempdir()?;
+    let kernel = kernel(dir.path(), Box::new(Server))?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    root(&runtime, &kernel, 1)?;
+    let output = std::process::Command::new(std::env::current_exe()?)
+        .args([
+            "--exact",
+            "reader_opens_basename_in_private_cwd",
+            "--nocapture",
+        ])
+        .env("CHIO_STATE_READER_CWD_CHILD", "1")
+        .current_dir(dir.path())
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn state_reader_rejects_broad_modes_symlinks_and_nonregular_journals() -> Result {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+    let dir = tempfile::tempdir()?;
+    let kernel = kernel(dir.path(), Box::new(Server))?;
+    let path = dir.path().join("process.db");
+    let runtime = ProcessRuntime::open(&path, kernel.clone())?;
+    root(&runtime, &kernel, 1)?;
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640))?;
+    assert!(chio_process::ProcessStateReader::open(&path).is_err());
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o750))?;
+    assert!(chio_process::ProcessStateReader::open(&path).is_err());
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700))?;
+    let alias = dir.path().join("alias.db");
+    symlink(&path, &alias)?;
+    assert!(chio_process::ProcessStateReader::open(&alias).is_err());
+    assert!(chio_process::ProcessStateReader::open(dir.path()).is_err());
+    assert_eq!(
+        chio_process::ProcessStateReader::open(&path)?
+            .checkpoint("root")?
+            .revision,
+        0
+    );
+    Ok(())
+}
 #[async_trait::async_trait]
 impl ToolServerConnection for Server {
     fn server_id(&self) -> &str {

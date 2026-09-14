@@ -44,6 +44,7 @@ impl Store {
     }
 
     pub fn revoke_worker_credentials(&mut self, process_id: &str) -> Result<usize, ProcessError> {
+        self.process(process_id)?;
         Ok(self.connection.execute(
             "DELETE FROM worker_credentials WHERE process_id = ?1",
             [process_id],

@@ -146,7 +146,15 @@ impl MailboxServer {
         let caller = match (&self.registry, operation) {
             (Some(registry), "send" | "claim" | "complete" | "renew") => {
                 let context = context.ok_or(ProcessError::Unauthenticated)?;
-                Some(registry.caller(context)?.id)
+                Some(
+                    registry
+                        .caller(context)
+                        .map_err(|error| match error {
+                            ProcessError::Conflict => ProcessError::Unauthenticated,
+                            other => other,
+                        })?
+                        .id,
+                )
             }
             (None, "claim" | "complete" | "renew") => return Err(ProcessError::Unauthenticated),
             _ => None,

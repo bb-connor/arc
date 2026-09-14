@@ -8,7 +8,8 @@ There is no additional worker protocol method or tool dispatcher.
 
 ## Endpoint authority
 
-Each configured channel exposes five concrete tools on server `chio-ipc`:
+Each configured channel exposes five concrete tools on server `chio-ipc`, plus
+one optional tool when `renewable_leases` is enabled:
 
 | Tool for channel `reviews` | Required arguments | Effect |
 | --- | --- | --- |
@@ -17,10 +18,12 @@ Each configured channel exposes five concrete tools on server `chio-ipc`:
 | `ack_reviews` | `through_sequence` | Release pending payloads through a sequence, retaining key/hash tombstones |
 | `claim_reviews` | `limit`, `lease_ms` | Lease up to 16 of the oldest pending messages no live lease holds to the calling process |
 | `complete_reviews` | `sequence`, `claim` | Consume one message under the claim that holds it |
+| `renew_reviews` (optional) | `sequence`, `claim`, `lease_ms` | Extend a live claim held by the caller without changing its generation |
 
 Each endpoint has a separate `ToolGrant`. A producer can receive only the
 send grant; a consumer can receive read and acknowledgement grants; a member
-of a worker pool can receive claim and complete grants. Parents need
+of a worker pool can receive claim and complete grants, plus a separate renewal
+grant when renewal is enabled. Parents need
 `delegate` to attenuate these rights to children. Possessing a send grant
 authorizes writing to that channel. Payload fields cannot transfer authority
 or establish a sender identity. Any authorized holder, including a parent
@@ -38,6 +41,22 @@ CLI host attests senders. Servers opened without a registry, and messages
 stored before attestation, report `sender: null`; consumers must treat a null
 sender as unattested. Attestation names the process identity the kernel
 admitted, not the application code that ran inside it.
+
+Direct embedders may reopen a pre-sender or pre-claim mailbox database with the
+same authority, key and configuration. Migration adds nullable sender/claimant
+and deadline columns and starts historical claim generations at zero. It never
+assigns a sender to historical rows. An attested sender cannot replay a key
+originally written with a null sender, even after its payload is drained.
+Before enabling attestation, stop producers and drain historical payloads with
+the original receive/ack API, or deliberately consume them as unattested data
+using newly granted claim/complete authority. Use fresh application message keys
+for new messages; keep tombstones and original operation identities.
+
+This direct-embedder migration is not a CLI host upgrade. ABI v1 hosts must
+finish or drain with their original compatible binary. ABI v2 refuses those
+hosts, and all accepted tool manifests remain pinned by canonical equality,
+including `wait_ms` and renewal configuration. Reinitializing a host does not
+recover pending messages or uncertain effects.
 
 Messages and tool outputs are untrusted data and traverse native guards.
 Output guards can redact message content. Applications needing exact signed

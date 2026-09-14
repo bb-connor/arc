@@ -19,6 +19,136 @@ use serde_json::{json, Value};
 use support::Result;
 
 struct Unused;
+
+#[tokio::test]
+async fn pre_sender_and_claim_schema_migrates_without_assigning_historical_ownership() -> Result {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("mailboxes.db");
+    let payload = "{\"text\":\"legacy\"}";
+    {
+        let db = rusqlite::Connection::open(&path)?;
+        db.execute_batch("CREATE TABLE mailboxes(id TEXT PRIMARY KEY,last_sequence INTEGER NOT NULL DEFAULT 0,acknowledged_through INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE mailbox_messages(channel TEXT NOT NULL REFERENCES mailboxes(id),sequence INTEGER NOT NULL,message_key TEXT NOT NULL,payload_hash TEXT NOT NULL,payload TEXT,payload_bytes INTEGER NOT NULL,PRIMARY KEY(channel,sequence),UNIQUE(channel,message_key));
+            INSERT INTO mailboxes VALUES('jobs',1,0);")?;
+        db.execute(
+            "INSERT INTO mailbox_messages VALUES('jobs',1,'legacy',?1,?2,17)",
+            rusqlite::params![
+                chio_core_types::crypto::sha256_hex(payload.as_bytes()),
+                payload
+            ],
+        )?;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+    }
+    {
+        let kernel = support::kernel(directory.path(), Box::new(Unused))?;
+        let server = MailboxServer::open(&path, &kernel, config())?;
+        let replay = server
+            .invoke(
+                "send_jobs",
+                json!({"message_key":"legacy","payload":{"text":"legacy"}}),
+                None,
+            )
+            .await?;
+        assert_eq!(replay, json!({"status":"sent","sequence":"1"}));
+    }
+    let kernel = attesting_kernel(directory.path())?;
+    let runtime = processes(directory.path(), kernel)?;
+    let read = invoke(
+        &runtime,
+        "receiver",
+        "read-legacy",
+        "receive_jobs",
+        json!({"after_sequence":"0","limit":1}),
+    )
+    .await?;
+    assert_eq!(
+        value(&read)?["messages"][0],
+        json!({"sequence":"1","payload":{"text":"legacy"},"sender":null})
+    );
+    let stolen = invoke(
+        &runtime,
+        "sender",
+        "steal-legacy",
+        "send_jobs",
+        json!({"message_key":"legacy","payload":{"text":"legacy"}}),
+    )
+    .await?;
+    assert_eq!(stolen.verdict, Verdict::Deny);
+    let claimed = invoke(
+        &runtime,
+        "worker_a",
+        "claim-legacy",
+        "claim_jobs",
+        json!({"limit":1,"lease_ms":300000}),
+    )
+    .await?;
+    assert_eq!(sequences(&claimed)?, vec![("1".into(), "1".into())]);
+    let complete = invoke(
+        &runtime,
+        "worker_a",
+        "complete-legacy",
+        "complete_jobs",
+        json!({"sequence":"1","claim":"1"}),
+    )
+    .await?;
+    assert_eq!(complete.verdict, Verdict::Allow);
+    drop(runtime);
+    let kernel = attesting_kernel(directory.path())?;
+    let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel)?;
+    let db = rusqlite::Connection::open(&path)?;
+    let historical: (Option<String>, i64, Option<String>) = db.query_row(
+        "SELECT sender,claim_generation,payload FROM mailbox_messages WHERE message_key='legacy'",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    )?;
+    assert_eq!(historical, (None, 1, None));
+    let stolen = invoke(
+        &runtime,
+        "sender",
+        "steal-drained",
+        "send_jobs",
+        json!({"message_key":"legacy","payload":{"text":"legacy"}}),
+    )
+    .await?;
+    assert_eq!(stolen.verdict, Verdict::Deny);
+    Ok(())
+}
+
+#[tokio::test]
+async fn ambiguous_registry_caller_reports_authentication_failure() -> Result {
+    let directory = tempfile::tempdir()?;
+    let kernel = attesting_kernel(directory.path())?;
+    let runtime = processes(directory.path(), kernel)?;
+    let db = rusqlite::Connection::open(directory.path().join("process.db"))?;
+    db.execute("UPDATE processes SET capability=(SELECT capability FROM processes WHERE id='sender') WHERE id='outsider'", [])?;
+    let denied = invoke(
+        &runtime,
+        "sender",
+        "ambiguous",
+        "send_jobs",
+        json!({"message_key":"new","payload":null}),
+    )
+    .await?;
+    assert_eq!(denied.verdict, Verdict::Deny);
+    assert!(
+        denied
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("not one live attested process")),
+        "{:?}",
+        denied.reason
+    );
+    let messages: i64 = rusqlite::Connection::open(directory.path().join("mailboxes.db"))?
+        .query_row("SELECT COUNT(*) FROM mailbox_messages", [], |row| {
+            row.get(0)
+        })?;
+    assert_eq!(messages, 0);
+    Ok(())
+}
 #[async_trait::async_trait]
 impl ToolServerConnection for Unused {
     fn server_id(&self) -> &str {

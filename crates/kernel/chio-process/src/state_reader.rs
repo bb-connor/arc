@@ -25,7 +25,8 @@ impl ProcessStateReader {
         let file = path.symlink_metadata()?;
         let parent = path
             .parent()
-            .ok_or(ProcessError::Invalid("missing journal parent"))?;
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
         let directory = parent.metadata()?;
         if !file.is_file() || !directory.is_dir() {
             return Err(ProcessError::Configuration(

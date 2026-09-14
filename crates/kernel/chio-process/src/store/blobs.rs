@@ -53,7 +53,6 @@ impl Store {
 
     pub fn storage(&self, id: &str) -> Result<ProcessStorage, ProcessError> {
         let process = self.process(id)?;
-        require_running(&process)?;
         usage(&self.connection, &process)
     }
 }
