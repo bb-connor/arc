@@ -1,6 +1,6 @@
 # Security launch: current execution status
 
-Updated 2026-09-13. This is the short working index for the accepted
+Updated 2026-09-14 UTC. This is the short working index for the accepted
 [execution plan](launch-execution-plan.md), not another qualification campaign.
 Candidate: `/tmp/arc-security-launch`, `security/launch-integration`, base HEAD
 `8b9f9243905dfa61acac82d83438684940777fe3`. The accumulated 722-path checkpoint
@@ -19,10 +19,10 @@ acceptance is complete. This is not merge or release approval.
 | Milestone | State / missing acceptance | Next action / blocker | Evidence |
 | --- | --- | --- | --- |
 | M0 | Consolidated for implementation | Keep this index current; no independent cleanup campaign | Requirement and review maps below |
-| M1 | Complete: named local acceptance; composed repair locally verified | Final M4 workspace rerun remains required; default-stack repair passed the original 1,134-test control-plane target; confinement remains deferred | [Acceptance closeout](#m1-local-acceptance-closeout), [qualification deferral](#m1-confined-process-qualification-deferral) |
+| M1 | Complete: named local acceptance; composed repair locally verified | Earlier M4 workspace passed, including the 1,134-case control-plane target at the default stack size. Current-source workspace rerun remains required; confinement remains deferred | [Acceptance closeout](#m1-local-acceptance-closeout), [qualification deferral](#m1-confined-process-qualification-deferral) |
 | M2 | Complete: local native failure/restart safety acceptance | Preserve exact failure/recovery contracts during M4 repairs | [Acceptance closeout](#m2-local-acceptance-closeout), [cutpoints and downstream contract](native-restart-safety.md) |
-| M3 | Complete: named local caller acceptance; final M4 dependency rerun pending | Preserve native caller custody and qualify the current dependency closure; observed broader regressions have focused repairs | [Acceptance closeout](#m3-local-acceptance-closeout), [caller contract](authenticated-caller-delivery.md) |
-| M4 | Consumer changes implemented; final qualification in progress | Finish current workspace, M3, protocol/SDK, compatibility, C++/FFI and codegen gates; no skipped required cases | [Expanded execution plan](m4-consumer-qualification.md), [consumer support ledger](consumer-support.md), [migration contract](m4-consumer-migration.md) |
+| M3 | Complete: named local caller acceptance and current exact dependency rerun | All 61 exact cases and selected flow inventories passed; preserve native caller custody through the current full workspace run | [Acceptance closeout](#m3-local-acceptance-closeout), [caller contract](authenticated-caller-delivery.md) |
+| M4 | Consumer changes and final-review repairs implemented; final qualification in progress | Current 45-case M4, 61-case M3 and 69-inventory flow gates passed. Complete workspace/build/Clippy and affected consumer gates remain running or scheduled; hosted MSRV serial-profile qualification remains pending | [Expanded execution plan](m4-consumer-qualification.md), [local acceptance report](m4-local-acceptance.md), [consumer support ledger](consumer-support.md) |
 | M5 | Swarm is a Disabled-profile integration smoke | Bind issued capability identities, shared budget and enforced cage | [Swarm limitations](../../examples/reference-swarm/README.md) |
 | M6 | Components present, integrated topology unqualified | Compose keyring, broker, cage and receipts; designated runner needed | Enterprise ledger and original plan |
 | M7 | Active-defense components present, composed paths unqualified | Complete flow, response and rollback acceptance in controlled profiles | Active-defense ledger and original plan |
@@ -109,9 +109,11 @@ failed targets, including a nested-nonce stack overflow under the workspace
 feature configuration. Runtime proof, hosted-MCP startup, canonical JSON and
 boundary-assertion failures also required diagnosis. M4 has since repaired these
 signatures and passed the focused targets, including the original full
-control-plane/default-stack suite. Final composed qualification is still pending.
-The exact local M3 evidence
-above is retained, not a claim that the composed workspace is green. See
+control-plane/default-stack suite. M4's earlier-source full workspace subsequently passed:
+17,178 passed, zero failed and 48 existing ignores, with no required M4 case
+ignored. The current exact M3 dependency gate also passed all 61 cases. Historical
+local M3 evidence above is retained separately from these results. The full
+workspace rerun on the final review/readiness source is still in progress. See
 [M4's baseline repair queue](m4-consumer-qualification.md#fresh-baseline-broad-regression-results-now-available)
 and the terminal logs (`/tmp/chio-m3-final-workspace-tests-resumed.log`,
 `/tmp/chio-m3-final-workspace-build-qualified.log`). Exact-head hosted qualification
@@ -258,7 +260,7 @@ the normative plans retain their detailed acceptance requirements.
 | 3 Capability negotiation | Carried; consumer parity pending | M4 |
 | 4 Composite holds and mutation | Native composition locally verified | M1 |
 | 5 Durable SQLite and remote authority semantics | Native SQLite crash/recovery locally verified; full original requirement not release-qualified | M2, M10 |
-| 6 Admission ordering and signed terminal projection | Native profiles locally verified; caller handshake missing | M1, M3 |
+| 6 Admission ordering and signed terminal projection | Native and authenticated caller profiles locally verified; final M4 dependency gate passed | M1, M3 |
 | 7 Policy-owned threshold requirements | Carried; composed action acceptance pending | M7 |
 | 8 Bounded approval verification | Complete native credential composition locally verified | M1 |
 | 9 Durable replay and collection | Native replay/restart locally verified; response composition pending | M2, M7 |

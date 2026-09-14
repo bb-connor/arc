@@ -5,6 +5,8 @@ The baseline repairs, physical consumer inventory, negotiated mediation and
 public parser changes are implemented. Final M4.8 composed qualification is
 still running; unchecked acceptance items are not waived by this status.
 This document does not yet qualify the milestone.
+Current command results and remaining gates are recorded in the
+[local acceptance report](m4-local-acceptance.md).
 This expands [M4 in the accepted execution plan](launch-execution-plan.md#m4-close-constructor-protocol-and-sdk-bypasses);
 it does not replace that plan or narrow its requirements.
 
@@ -121,7 +123,7 @@ tools, the runtime facade and security-kernel caller callbacks.
 - [x] For hosted MCP, distinguish the first startup failure from subsequent
   poisoned-fixture failures. Restore the intended positive sessions without
   removing the separate admin-token requirement.
-- [ ] Rerun all 11 affected targets under the failing feature configuration.
+- [x] Rerun all 11 affected targets under the failing feature configuration.
   Rerun the exact M3 gate if its dependency closure changes; retain the ordinary
   and nested M1/M2 cases affected by the stack repair.
 
@@ -130,7 +132,16 @@ whether each correction was production code, fixture setup, API assertion or
 canonical evidence. Full-workspace qualification is repeated at M4.8, not after
 every small fix.
 
-### M4.0 implementation evidence (partial)
+### M4.0 implementation and composed baseline evidence
+
+The earlier-source full workspace run passed on 2026-09-14 UTC: 17,178 passed, zero failed,
+48 existing ignores. All 11 original failed targets passed, including the full
+1,134-case control-plane target at the default stack limit. The final exact M3
+gate also passed all 61 cases. No Rust ignore was added relative to the planning
+baseline. The [acceptance report](m4-local-acceptance.md) retains original failures,
+corrections and command evidence. Final review then reproduced receipt-origin
+schema/SDK drift and a stale retained attachment capacity limit. Their repaired
+source requires refreshed M4.8 qualification, including the full workspace gate.
 
 The original default-stack crash was reproduced in the workspace-built test
 executable under GDB. The retained-request decode was reached through legitimate
@@ -184,10 +195,12 @@ passed, followed by all 147 CLI proof-contract tests with the corrected profile
 (`/tmp/chio-m4-cli-proof-correct-profile.log`), including the tampered-report
 negative. Exact package/report parity remains unchanged.
 
-### Open consumer findings from source discovery
+### Historical consumer findings from source discovery
 
-These are implementation work, not new milestone requirements or qualification
-waivers. M4.1's complete ledger and M4.7's executable inventory remain open.
+These findings drove the implemented consumer ledger, exact source gate, public
+parser repairs and migration contract. They are retained as discovery history,
+not new milestone requirements or qualification waivers. Current results and
+remaining final gates are in the acceptance report.
 
 - The direct Rust construction/factory audit found 29 physical sites across
   crates, examples and benchmarks after excluding inline test modules. Two
@@ -199,7 +212,8 @@ waivers. M4.1's complete ledger and M4.7's executable inventory remain open.
   The generated-schema lanes also live in different packages: Python
   `chio-sdk-python`, TypeScript `packages/conformance`, and Go `chio-go-http`.
   Baselines passed 179 Python tests, the TypeScript shared-corpus test and the Go
-  HTTP suite, but current-manifest/runtime parity remains open.
+  HTTP suite. The subsequent shared 35-protocol/14-manifest corpus and actual
+  public parser lanes now pass; the legacy helper version limits remain explicit.
 - V2's schema rejected `annotations.estimated_duration_ms` while Rust accepted
   it. Adding a runtime assertion reproduced the mismatch (22 manifest-v2 tests
   passed, one failed). The public normative annotation field and its constructor
@@ -208,7 +222,8 @@ waivers. M4.1's complete ledger and M4.7's executable inventory remain open.
   break aligned with the existing v2 wire schema, not a second latency authority.
   The focused core, forward-compatibility and manifest suites passed 29, 7, 389,
   32 and 23 tests in `/tmp/chio-m4-manifest-single-latency.log`. Broad compilation,
-  codegen and final consumer qualification remain required after this change.
+  codegen and current-manifest parity subsequently passed. Final milestone
+  qualification remains governed by M4.8.
 
 ## M4.1. Establish the complete consumer and support inventory
 

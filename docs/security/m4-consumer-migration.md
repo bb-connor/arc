@@ -46,7 +46,7 @@ actually absent. Custom target executors must retain the supplied profile and
 use the common bound kernel projection. These field additions are intentional
 source changes, not a source-compatible migration for downstream literals.
 
-A2A and ACP edges take the profile from trusted edge configuration, one profile
+A2A and ACP-Client edges take the profile from trusted edge configuration, one profile
 per authenticated peer. Native cross-protocol, Tower `KernelService`, and the
 ordinary OpenAI wrapper use their host configuration/builder. Negotiation means
 that a wire vocabulary can be carried. It does not install approval custody,
@@ -70,6 +70,13 @@ tool-launch preparation and store acquisition. The ordinary OpenAI constructor
 also rejects flow-required unsigned manifests. The verified native/cross-protocol
 host owns the supported flow profile; enabling a peer flag is not a substitute.
 
+Restart preserves the exact authenticated MCP authorization profile. Remote
+restore re-derives a retained profile from the original initialize parameters
+using the handshake negotiation helper and rejects any mismatch before upstream
+acquisition. Legacy sessions without a retained profile remain legacy, even if
+their old advertisement mentions newer features. Restart never grants an upgrade.
+Restoration errors do not include bearer session identifiers.
+
 The separate Tower HTTP middleware's explicit fail-open configuration is
 unenforced operation. It is not part of the qualified `KernelService` profile
 and must not be selected as fallback after an enforced invocation is denied.
@@ -81,6 +88,18 @@ not secure agent invocation APIs. Attach them to the kernel. Ordinary examples,
 policy probes and benchmark harnesses do not acquire production custody or
 confinement guarantees merely because their constructors compile.
 
+`chio security supervise --ready-http` uses an operator-selected HTTP(S) endpoint,
+not an agent-selected tool destination. Readiness now retains the exact GET target
+in the separate immutable `OperatorReadinessProbe` host-management profile.
+Tenant `HttpEgressContract` restrictions are unchanged. Redirects are not followed,
+proxies are disabled, and both declared and streamed bodies are limited to 64 KiB.
+Configure the final health endpoint directly and return a bounded response with
+a success status. Userinfo, fragments, port zero and invalid bearer headers reject
+before the service is launched. Pass readiness credentials using the existing
+`--ready-http-bearer-env` path rather than embedding them in URLs. The two-second
+per-attempt deadline is unchanged. Explicit local/private addresses remain valid;
+this host-management probe grants no tool execution or native custody authority.
+
 ## Pending approval and receipt projection
 
 MCP tool results carry kernel receipt information under `_meta.chio`. Kernel
@@ -90,7 +109,7 @@ A genuine pending approval has `isError: false`, empty content, and
 signed `proposal`. It is neither successful execution nor a terminal failure.
 
 A2A pending approval uses the nonterminal `working` state with proposal data;
-ACP uses the shared pending-result representation. Adapters must not pick only
+ACP-Client uses the shared pending-result representation. Adapters must not pick only
 the first approval or discard the proposal during result translation.
 
 The governed active-response schema uses `chio.response-plan.v1`, matching the
@@ -106,7 +125,10 @@ alternate accepted domain. Regenerate clients from the current schema registry.
 | Go `chio-go-http` | Public security-artifact `json.Unmarshal` retains opaque numbers as `json.Number`, rejects missing/unknown typed properties, duplicate raw keys, schema-forbidden nulls, typed integer overflow and bounded domain violations; updates the receiver only after success | Complete JSON Schema validation of every generated type or cryptographic verification |
 | Rust | Native validated types, generated shape tests, authoritative schemas and registered-publisher verification are separate tested layers | A generated type alone is not a trusted publisher or native execution authority |
 
-Go's raw security-artifact profile is bounded to one MiB and 64 nesting levels.
+Go's security-artifact JSON values are bounded to one MiB and 64 nesting levels.
+These custom-decoder limits do not replace a transport body limit: `encoding/json`
+removes surrounding whitespace before invoking `UnmarshalJSON`. Bound the entire
+HTTP body separately before parsing.
 Typed integers retain the generated `int64` domain; narrower fields also enforce
 their wire bounds. Opaque numbers are preserved, not rounded through `float64`.
 TypeScript rejects integers outside JavaScript's safe-integer domain. Do not
@@ -117,9 +139,9 @@ Signed caller delivery reports require both `output` and `realized_cost`, even
 when their values are null. The Python client accepts generated authorization and
 report models and preserves these fields in HTTP serialization. Do not serialize
 these reports with `exclude_none=True`. Caller integer fields are positive safe
-integers; cost units may be zero. The Go authorization decoder also bounds raw
-input to 32 KiB. The caller corpus checks wire shape and preservation, not the
-authenticity of its illustrative signatures. M3's exact signed custody gate owns
+integers; cost units may be zero. The Go authorization decoder further bounds
+its JSON value to 32 KiB. The caller corpus checks wire shape and preservation,
+not the authenticity of its illustrative signatures. M3's exact signed custody gate owns
 that separate contract.
 
 Legacy invariant packages (`chio-py`, `chio-ts`, and `chio-go`) retain their
@@ -128,6 +150,19 @@ of current manifest-v2 verification. Run both the legacy binding lane and the
 current four-language consumer corpus when changing shared shapes.
 
 ## Caller and recovery ownership
+
+Receipt consumers must accept all four current `tool_origin` values, including
+`chio_internal` for Chio-owned control, session and cage operations. Upgrade the
+generated models and runtime validators together. Older three-value validators
+reject legitimate internal receipts. Unknown and null origins still reject;
+the new value does not confer authority. Signer trust, signature, receipt ID,
+receipt kind and mediation boundary remain independently mandatory. Changing an
+existing signed receipt's origin invalidates its signature.
+
+Retained operations now accept every strictly ordered unique set in the closed
+attachment vocabulary, including the valid 18-attachment finalization case.
+There is no stored format change or new caller authority combination. Existing
+participant requirements, dispatch binding and duplicate rejection still apply.
 
 M3's [authenticated caller contract](authenticated-caller-delivery.md) is
 unchanged. Reservation is not execution permission. A trusted executor must

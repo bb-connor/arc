@@ -10,7 +10,8 @@ remains required. The M1 Linux x86_64 confinement deferral is unchanged.
 Intentional source/wire changes and parser limitations are documented in the
 [M4 migration contract](m4-consumer-migration.md). The tables classify source
 roles; final gate results are recorded separately rather than inferred from a
-constructor count.
+constructor count. The [local acceptance report](m4-local-acceptance.md) records
+the current candidate, successful gates and still-required qualification.
 
 ## Profile vocabulary
 
@@ -20,7 +21,7 @@ constructor count.
   caller execution have distinct public entrypoints, not interchangeable rights.
 - **Mediated protocol:** authenticated Chio authorization is retained through the
   protocol envelope and checked by the configured kernel. External discovery,
-  headers and provider descriptions cannot create authority. MCP, A2A and ACP
+  headers and provider descriptions cannot create authority. MCP, A2A and ACP-Client
   require positive negotiated cases, not only unsupported-profile denials.
 - **Ordinary kernel host:** the factory does not install active defense. It must
   reject a selected flow-required profile before acquiring effect-capable launch
@@ -52,7 +53,7 @@ inventory, not Rust macro expansion or a semantic proof of all network effects.
 | C01 | `crates/platform/chio-control-plane/src/lib.rs::build_kernel` | Ordinary host factory | `build_kernel_registers_default_guard_profile`, `build_kernel_registers_post_invocation_pipeline`; flow gate owns missing-port negatives |
 | C02 | same file, `build_kernel_components` | Private composition for C01/C03 | C01 tests plus `security/active_defense_host_tests.rs` and flow installation-order gate |
 | C03 | same file, `build_kernel_with_active_defense` | Trusted native host factory | `ensure_ready`, pre/post guards, dispatch and issuance installation; M3 dependency gate required |
-| C04 | `crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs::RemoteSessionFactory::spawn_session` | Ordinary remote MCP host | Remote `tests::session_runtime`, 59 library cases and exact early-startup rejection; P02 owns hosted role separation |
+| C04 | `crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs::RemoteSessionFactory::spawn_session` | Ordinary remote MCP host | Remote `tests::session_runtime`, 60 current library cases and exact early-startup rejection; P02 owns hosted role separation |
 | C05 | same file, `RemoteSessionFactory::restore_session` | Restarted ordinary remote MCP host | Remote session runtime/restoration tests and exact MCP retained-profile test; no profile upgrade on restart |
 | C06 | `crates/platform/chio-http-core/src/authority.rs::HttpAuthority::assemble` | HTTP authorization, not native executor | `authority/tests.rs`: final receipt/kernel linkage, revoked-capability denial and path-identity binding; `tests/execution_nonce.rs` real nonce/replay cases |
 | C07 | same file, `HttpAuthorityBuilder::build` | Configured HTTP authorization | Same C06 public-authority suite; request hints cannot replace configured issuer/policy or parsed route identity |
@@ -68,7 +69,7 @@ inventory, not Rust macro expansion or a semantic proof of all network effects.
 | C17 | `crates/platform/chio-control-plane/src/trust_control/finding_operator_purchase.rs::FindingOperatorPurchaseExecutor::build_kernel` | Bounded single-operator purchase host | `finding_wedge_purchase_e2e_tests`: configured independent listing/buyer pins, reserved-restart recovery, expired/pre-dispatch rejection and durable finalization. Not generalized native flow or public hosted production |
 | C18 | `examples/hello-mcp/src/lib.rs::build_demo_state` | Ordinary executable MCP example | Local echo server; `mcp_lifecycle_direct_jsonrpc_lists_and_calls_tool`, receipt projection and unknown-tool denial tests |
 | C19 | `examples/hello-a2a/src/lib.rs::build_demo_state` | Ordinary executable A2A example | Local echo server; `direct_jsonrpc_send_stream_and_task_get_carry_receipts` and unknown-tool denial tests |
-| C20 | `examples/hello-acp/src/lib.rs::build_demo_state` | Ordinary executable ACP example | Local echo server; `direct_jsonrpc_invoke_stream_and_resume_carry_receipts` and unknown-tool denial tests |
+| C20 | `examples/hello-acp/src/lib.rs::build_demo_state` | Ordinary executable ACP-Client example | Local echo server; `direct_jsonrpc_invoke_stream_and_resume_carry_receipts` and unknown-tool denial tests |
 | C21 | `crates/tooling/chio-conformance/src/native_suite.rs::capture_runtime_revocation_trace_with_store` | Conformance harness | Native conformance revocation traces, supplied store and local connector; no independent production authority |
 | C22 | `crates/tooling/chio-conformance/verdict_matrix/src/driver.rs::evaluate_scenario` | Verdict conformance harness | Verdict-matrix schema/scenario suite; fixed projections and local connector, not deployment authority |
 | C23 | `crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_fixture.rs::TreatyPredispatchDenyFixture::new` | Benchmark harness | Predispatch denial cost, not execution qualification |
@@ -85,9 +86,11 @@ Remote construction is gated by the public factory's
 test first failed because the unsupported profile was accepted. The fix rejects
 from the verified registry before launch preparation or store acquisition. The
 same test requires a valid unconstrained factory and nonzero launch preparation.
-All 59 remote-MCP library tests passed in
+The initial 59 remote-MCP library tests passed in
 `/tmp/chio-m4-remote-startup-fixed.log`. This is local component evidence, not
-exact-candidate hosted qualification.
+exact-candidate hosted qualification. The retained-profile restore regression
+increased the current target to 60 cases; the earlier workspace run passed that
+target and the public ready-session restart cases.
 
 ## Other required consumer boundaries
 
@@ -101,7 +104,7 @@ Qualification is still pending where the owner gate has not completed.
 | P01 | `chio-kernel` public ordinary, nested and caller APIs; `chio-runtime`, `chio-runtime-core` | Original authorization and operation identity, installed ports, one physical capture, output release and recovery |
 | P02 | `chio-mcp-edge/src/runtime/tool_calls.rs`, `chio-mcp-remote`, `chio-hosted-mcp` | Negotiated metadata, session identity, role-separated control credentials, replay and durable session restoration |
 | P03 | `chio-a2a-edge`, `chio-a2a-adapter` | Negotiated complete authorization, authenticated sidecar and counted mediated connector |
-| P04 | `chio-acp-edge`, `chio-acp-proxy`, ACP client routes | Same guarantees through ACP ingress/transport, compatibility surface explicitly separate |
+| P04 | `chio-acp-edge`, `chio-acp-proxy`, ACP-Client routes | Same guarantees through ACP-Client ingress/transport, compatibility surface explicitly separate |
 | P05 | `chio-cross-protocol`, `chio-openapi`, `chio-openapi-mcp-bridge` | Registry-bound flow sidecar and canonical projection; dropped/substituted metadata must deny |
 | P06 | Provider adapter crates and `chio-tower` | Complete approval/proposal/DPoP/intent/opaque extension projection, no direct-provider fallback after denial, streaming release boundary |
 | P07 | `chio-api-protect/src/proxy/mediated/authenticated.rs`, caller control routes | Reserved/start/report lifecycle, configured executor pin, signed delivery and durable ledger replay |
@@ -116,16 +119,20 @@ different feature/target. `compatibility-surface` is an explicit unmediated API,
 not a fallback available to an enforced invocation. Ordinary hosts do not acquire
 native caller custody by enabling a negotiation flag.
 
+Component totals below retain earlier-source evidence unless explicitly named
+as current exact-gate results. They do not establish final composed qualification;
+the acceptance report identifies each source revision and still-running gate.
+
 | Row | Entrypoint and physical implementation | Profile and trust/recovery boundary | Required owner gate |
 | --- | --- | --- | --- |
-| P01 | `ChioKernel::evaluate_tool_call*` in `kernel/evaluation/evaluation_entry.rs` and `sync_evaluation_wrapper.rs`; nested APIs in `kernel/session_ops/nested_tool_call.rs`; caller APIs in `kernel/evaluation/caller_execution.rs` | Native host supplies installed ports, authenticated context and verified registry. Ordinary, nested and caller starts converge on retained admission but do not exchange rights. Kernel/store own capture and release recovery. | Exact M3 61 cases passed on the changed closure; full control-plane/default-stack and flow gate remain final dependencies. |
-| P02 | `ChioMcpEdge::handle_jsonrpc*` via `handle_initialize`, `handle_tools_call*`, `handle_tasks_result*`, `process_background_tasks*`; `RemoteSessionFactory::{new,spawn_session,restore_session}` | MCP negotiation is session-retained. Task execution reuses the prepared operation. Remote/stdio ordinary factories reject required flow before launch/store acquisition. Hosted control credentials remain separate from session credentials. | MCP 113 library cases, remote 59 cases, exact peer/profile restoration, live MCP restart, stdio and hosted auth suites. |
+| P01 | `ChioKernel::evaluate_tool_call*` in `kernel/evaluation/evaluation_entry.rs` and `sync_evaluation_wrapper.rs`; nested APIs in `kernel/session_ops/nested_tool_call.rs`; caller APIs in `kernel/evaluation/caller_execution.rs` | Native host supplies installed ports, authenticated context and verified registry. Ordinary, nested and caller starts converge on retained admission but do not exchange rights. Kernel/store own capture and release recovery. | Current exact M3 61-case gate and all 69 flow inventories passed. The full control-plane/default-stack 1,134-case target passed on earlier source; its current workspace rerun remains required. |
+| P02 | `ChioMcpEdge::handle_jsonrpc*` via `handle_initialize`, `handle_tools_call*`, `handle_tasks_result*`, `process_background_tasks*`; `RemoteSessionFactory::{new,spawn_session,restore_session}` | MCP negotiation is session-retained and re-derived exactly on restore, with no legacy upgrade. Task execution reuses the prepared operation. Remote/stdio ordinary factories reject required flow before launch/store acquisition. Hosted control credentials remain separate from session credentials. | MCP 113 library cases, remote 60 cases, exact peer/profile restoration, live MCP restart, stdio and hosted auth suites passed. Full HTTP target: 43 passed, one existing TTL-race ignore; both public ready-session regressions passed. |
 | P03 | `ChioA2aEdge::{new_with_registry,handle_send_message_with_request_id,handle_stream_message_with_request_id,handle_jsonrpc}` in `chio-a2a-edge/src/edge.rs` | One host-established peer profile per edge; registry-bound sidecar and authenticated context retained through the native target. Unsupported stream/batch authority does not become a direct connector retry. | A2A 97 library cases, exact peer cases and two live restart scenarios. |
-| P04 | `ChioAcpEdge::{new_with_registry,invoke_with_request_id,invoke_with_mcp_target,handle_jsonrpc,start_stream_with_request_id}` in `chio-acp-edge/src/edge.rs` | The roadmap's ACP-Client mediated route is this ACP tool-invocation edge. `chio-acp-proxy::AcpProxy` instead supervises an agent protocol and issues observation attestations; it is not a native tool executor or custody owner. Compatibility passthrough is separately feature-gated. | ACP 93 library cases, exact peer cases, two live restart scenarios, ACP proxy and compatibility-source gates. |
+| P04 | `ChioAcpEdge::{new_with_registry,invoke_with_request_id,invoke_with_mcp_target,handle_jsonrpc,start_stream_with_request_id}` in `chio-acp-edge/src/edge.rs` | The roadmap's ACP-Client mediated route is this ACP-Client tool-invocation edge. `chio-acp-proxy::AcpProxy` instead supervises an agent protocol and issues observation attestations; it is not a native tool executor or custody owner. Compatibility passthrough is separately feature-gated. | ACP-Client 93 library cases, exact peer cases, two live restart scenarios, ACP-Client proxy and compatibility-source gates. |
 | P05 | `CrossProtocolOrchestrator::execute`; `evaluate_bound_kernel_request`; `chio_openapi::tools_from_spec`; `OpenApiMcpBridge::{registry_bound_mcp_tools,as_tool_server}` | Declarative OpenAPI translation is not authority. Live HTTP dispatch is an effect connector installed behind the kernel. Plain export of remote tools rejects; verified canonical manifest identity, effective egress and sidecar coordinates must match. | Cross-protocol library, live native restart and OpenAPI signed-flow / substitution tests. |
-| P06 | `ChioOpenAiAdapter::{new,with_peer_capabilities,execute_tool_call,execute_tool_calls}`; `KernelService::{new,with_peer_capabilities}` and its `Service::call`; `HttpAuthority::{builder,evaluate,prepare}` via `authorize_via_kernel` | Ordinary host wrappers preserve typed requests and reject unnegotiated extensions before admission. OpenAI's unsigned-manifest constructor rejects flow-required tools; the verified cross-protocol host owns that profile. Provider `ProviderAdapter` implementations translate dialects, and registered tool-server implementations perform effects; neither independently grants Chio admission. The separate HTTP middleware's explicit fail-open option is unenforced operation and excluded from this profile. | OpenAI 46 and Tower 56 library cases passed, including counted-effect/receipt controls. HTTP, provider projection, batch/stream and M3 gates remain required. |
-| P07 | API-protect `proxy/mediated/authenticated.rs::{start,report}` and caller routes in `proxy/mediated.rs`; native Rust `start_caller_execution_blocking_with_security_context` | Trusted executor pin and durable ledger, original nonce/credentials and exact signed delivery. Reservation alone never permits execution. Native release/declassification remain Rust-host-owned, not transport-local. | Exact M3: 33 caller/store, 9 executor-ledger and 19 native-custody cases passed. Python client and hosted role-separation suites remain required. |
-| P08 | Browser `evaluate_pure` / wasm facade; mobile `evaluate`; C ABI `chio_kernel_evaluate_json` / `chio_kernel_verify_capability_with_context_json`; `chio-bindings-ffi` invariant exports | Portable verification, not native dispatch. Unsupported approval/proposal/intent extensions and unauthenticated witness profiles reject. Browser wasm and mobile FFI packaging are distinct from native unit execution. | Exact portable denials; browser 27, mobile 31 and C++ FFI 23 component tests passed. External C/C++ gates remain required. |
+| P06 | `ChioOpenAiAdapter::{new,with_peer_capabilities,execute_tool_call,execute_tool_calls}`; `KernelService::{new,with_peer_capabilities}` and its `Service::call`; `HttpAuthority::{builder,evaluate,prepare}` via `authorize_via_kernel` | Ordinary host wrappers preserve typed requests and reject unnegotiated extensions before admission. OpenAI's unsigned-manifest constructor rejects flow-required tools; the verified cross-protocol host owns that profile. Provider `ProviderAdapter` implementations translate dialects, and registered tool-server implementations perform effects; neither independently grants Chio admission. The separate HTTP middleware's explicit fail-open option is unenforced operation and excluded from this profile. | OpenAI 46 and Tower 56 library cases passed, including counted-effect/receipt controls. HTTP, provider projection and exposed batch/stream suites passed in the final workspace run; the exact M3 gate also passed. |
+| P07 | API-protect `proxy/mediated/authenticated.rs::{start,report}` and caller routes in `proxy/mediated.rs`; native Rust `start_caller_execution_blocking_with_security_context` | Trusted executor pin and durable ledger, original nonce/credentials and exact signed delivery. Reservation alone never permits execution. Native release/declassification remain Rust-host-owned, not transport-local. | Final exact M3: 33 caller/store, 9 executor-ledger and 19 native-custody cases passed. Full Python client and hosted role-separation suites also passed. |
+| P08 | Browser `evaluate_pure` / wasm facade; mobile `evaluate`; C ABI `chio_kernel_evaluate_json` / `chio_kernel_verify_capability_with_context_json`; `chio-bindings-ffi` invariant exports | Portable verification, not native dispatch. Unsupported approval/proposal/intent extensions and unauthenticated witness profiles reject. Browser wasm and mobile FFI packaging are distinct from native unit execution. | Exact portable denials; browser 27, mobile 31 and C++ FFI 23 component tests passed. C ABI, installed external CMake consumer, five explicit live C++ protocol tests and pinned Drogon library/example/live gates also passed. |
 | P09 | `VerifiedManifestRegistry`, `migrate_legacy_manifest_v1`, `ToolDefinition`, `NetworkDestination::new` | v2 uses only `latency_hint`; v1 migration returns an unsigned result and requires trusted re-signing. Registry identity, host-selected policy/topology and nonzero destination ports remain authoritative. | Exact signed manifest corpus, all four wire lanes and the flow registry gate. |
 | P10 | D001-D009, D045-D058 and D076-D079 plus C11-C25 | Arena/load/proof/replay/example hosts are explicit harness or ordinary profiles. Operator purchase execution uses configured signer/buyer pins and durable domain storage. Pure policy probes have no connector effect. These rows do not claim M5 swarm confinement, M6 enterprise topology, M9 packages or M11 public hosted production. | Workspace component suites plus their domain/proof gates; no new production deployment claim. |
 
@@ -134,6 +141,16 @@ not secure invocation APIs for agents. A trusted host can call its own network o
 process primitives directly; Chio's supported host contract requires attaching
 them to the kernel. M4 checks that an enforced adapter does not select such a port
 after denial. Native process confinement remains under the explicit M1 boundary.
+
+P10 also includes the operator-owned HTTP readiness probe in
+`chio-cli/src/supervise/readiness.rs::{Readiness::prepare,PreparedReadiness::probe}`.
+Preparation binds `chio-egress-contract::OperatorReadinessProbe` before child
+launch. This immutable GET handle permits operator-selected private addresses;
+it is host management, not an agent invocation or a new kernel constructor.
+Tenant `HttpEgressContract` restrictions remain unchanged. Redirect/proxy
+suppression, response bounds, asynchronous DNS deadlines and invalid-target
+launch rejection have named regressions. The unchanged HTTP egress source gate
+passes; final behavioral qualification is tracked in the acceptance report.
 
 The provider-fabric `ToolInvocation` vocabulary has no negotiated complete proof
 envelope. Its `build_tool_call_request` lowering therefore rejects aggregate or
@@ -164,7 +181,7 @@ remain explicitly versioned; it cannot be reported as current-v2 verification.
 
 ## Executable gates
 
-- `check-protocol-peer-negotiation.sh`: 12 named native/MCP/A2A/ACP and portable
+- `check-protocol-peer-negotiation.sh`: 12 named native/MCP/A2A/ACP-Client and portable
   cases. Now uses the shared exact listed/executed inventory checker. Its wrapper
   calibration rejects missing, renamed, ignored and zero-match tests. Real Rust
   cases passed in `/tmp/chio-m4-peer-gate-complete.log`.
@@ -187,7 +204,7 @@ references in isolated source trees and removes each required mediation call.
 The first real run of the stricter peer gate failed because
 `tests::cross_protocol_kernel_request_preserves_complete_authorization_context`
 does not exist in the current source. The restored historical wrapper listed
-acceptance names not backed by this candidate. Existing A2A/ACP projection tests
+acceptance names not backed by this candidate. Existing A2A/ACP-Client projection tests
 do preserve approval sets and opaque extensions, but they do not establish all
 the wrapper's advertised negotiated end-to-end scenarios. Reconcile the whole
 12-case contract before changing its acceptance claims or calling the gate green.
@@ -198,7 +215,7 @@ The native orchestrator and public MCP/OpenAI target executors now use one
 manifest- and host-context-preserving kernel projection. Direct MCP target calls
 reject a substituted sidecar or unbound authenticated session before effects or
 receipt mutation; the valid control still invokes once. Cross-protocol target
-execution carries the host-established negotiation profile. A2A/ACP hosts bind
+execution carries the host-established negotiation profile. A2A/ACP-Client hosts bind
 that profile in edge configuration (one authenticated peer profile per edge),
 not message metadata. The baseline profile has all new extensions disabled.
 
@@ -210,7 +227,7 @@ authorization profile and gain no new extension support on restore. The
 not caller-created quota authority. The bridge-only MCP Rust request now carries
 DPoP explicitly and shares one sync/async request projection.
 
-Component reruns passed 97 A2A, 93 ACP, 35 cross-protocol and 112 MCP tests
+Component reruns passed 97 A2A, 93 ACP-Client, 35 cross-protocol and 112 MCP tests
 (`/tmp/chio-m4-peer-boundaries-fixed.log`). The added preservation cases compare
 all signed fields using typed wire fixtures. They are not live admission of
 those fixtures. Ordinary positive invocations plus missing-feature denials prove
@@ -221,8 +238,9 @@ The active-response schema incorrectly used `chio.governed-response-plan.v1`
 while the native validator uses `chio.response-plan.v1`. The schema and shared
 vectors now use the native identifier and independently computed domain-separated
 plan-body hash. All four languages were regenerated successfully. Current Python,
-Go and TypeScript public-parser gates passed; the final Rust/composed gate remains
-required after the expanded corpus and later consumer changes.
+Go and TypeScript public-parser gates passed; the Rust/schema gate and earlier
+composed workspace run subsequently passed after the expanded corpus. Later
+readiness and review repairs require the current qualification in the report.
 
 The current-manifest shared corpus has 14 cases in
 `tests/bindings/fixtures/manifest-v2-consumers.json`. Python initially accepted
@@ -245,7 +263,7 @@ manifest results, not blanket parity for every security schema or numeric domain
 ## Current M4 acceptance and remaining qualification
 
 Eight live tests in `chio-conformance --test consumer_boundary` passed through
-native, MCP, A2A and ACP public ingress. Each protocol has an aggregate-budget
+native, MCP, A2A and ACP-Client public ingress. Each protocol has an aggregate-budget
 case and a threshold-approval case. They use real SQLite admission/outcome,
 budget/revocation and receipt stores, registered signed manifests, counted local
 connectors and verified kernel receipts. Threshold cases consume an actual signed
@@ -256,7 +274,7 @@ profiles remain separate; unsupported joint roots still reject.
 Evidence: `/tmp/chio-m4-consumer-durable-e2e-supported.log`, 8 passed. MCP now
 returns the actual signed receipt in `_meta.chio` and a valid pending proposal in
 `structuredContent`. A2A pending approval remains `working`, with a proposal data
-message. ACP uses the same pending-result wire shape. Connector-supplied metadata
+message. ACP-Client uses the same pending-result wire shape. Connector-supplied metadata
 cannot replace the kernel receipt namespace. These response additions are
 intentional public contract changes.
 
@@ -265,11 +283,11 @@ rejections, profile restoration, Rust/schema vectors and Tower/OpenAI ingress
 denials, then runs the 12-case peer gate and source contracts. It is wired into
 the existing PR and enterprise lanes. `scripts/check-consumer-sdk-parity.sh`
 separately checks exact Python, Go and TypeScript terminal identities and all
-14 manifest / 35 protocol vectors. Missing, renamed, ignored, duplicated and
+14 manifest / 38 protocol vectors. Missing, renamed, ignored, duplicated and
 zero-match SDK reports fail calibration. No hosted run is claimed by this wiring.
 
-The expanded public SDK gate passed with all 35 protocol and 14 manifest vectors
-(`/tmp/chio-m4-sdk35-final.log`). It verifies 15 Python, seven Go top-level and
+The expanded public SDK gate passed with all 38 protocol and 14 manifest vectors
+(`/tmp/chio-m4-post-review-sdk-parity.log`). It verifies 15 Python, eight Go top-level and
 19 TypeScript terminal test identities, plus every Go corpus subcase. Python's
 full SDK suite passed 193 tests after caller-artifact and optional-DPoP hardening
 (`/tmp/chio-m4-python-full-caller-final.log`). The authenticated caller HTTP test
@@ -284,20 +302,26 @@ not a claim that every Go generated shape implements the complete JSON Schema.
 TypeScript's public `@chio-protocol/node-http` package exposes
 `createWireSchemaValidator` over operator-selected authoritative schemas. The
 corpus gate rebuilds and imports that package export, not a private test wrapper.
-All 73 existing Node HTTP tests also passed. The validator compiles at setup and
+All 78 Node HTTP tests also passed, along with 105 TypeScript conformance and
+42 AI SDK cases (`/tmp/chio-m4-post-review-ts-full-final.log`). All affected
+receipt consumers accept the four current origins, including `chio_internal`,
+while rejecting unknown/null origins. Internal provenance does not replace
+trusted verification. The validator compiles at setup and
 accepts synchronous validation only. Its parsed-
 JSON profile rejects unsafe integer values, non-JSON values and excessive nesting.
 Already-parsed JavaScript and Python dictionaries cannot recover duplicate raw
 keys; duplicate-rejecting raw ingress remains a host responsibility. Go's raw
 security-artifact profile rejects duplicate keys, more than 64 nesting levels and
-artifacts above one MiB. These limits do not create a portable custody authority.
+JSON values above one MiB. These custom-decoder limits exclude surrounding
+whitespace removed by `encoding/json`; the transport must also bound the entire
+body. These limits do not create a portable custody authority.
 
-The constructor/dispatch profile table is classified and the optional-DPoP and
-caller wire regressions pass the public SDK gate. The remaining external C++/FFI,
-exact M3 dependency and final composed qualification are still required.
-The C++ kernel/FFI gate passed locally;
-Drogon's strict library/example/live smoke and the other final gates are still
-running. M4 is not yet complete.
+The constructor/dispatch profile table is classified and the optional-DPoP,
+caller wire and receipt-origin regressions pass the public SDK gate. Earlier
+source passed external C++/FFI, all five explicit live C++ protocols, pinned
+Drogon library/example/live smoke, exact M3 and workspace tests/build/Clippy.
+Receipt-origin and attachment-capacity repairs require refreshed composed
+qualification, including the complete flow gate. M4 is not yet complete.
 
 ## Physical dispatch reference classification
 

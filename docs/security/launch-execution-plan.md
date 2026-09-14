@@ -375,7 +375,11 @@ The workspace run's 11 failed targets were diagnosed and their focused regressio
 passed, including the nested-nonce default-stack repair. The consumer inventory,
 negotiated protocol boundaries, strict current-wire parsers and executable gates
 are implemented. Final composed qualification is still running. Historical M3
-results and the focused repairs do not substitute for those final gates. See the
+results and the focused repairs do not substitute for those final gates. The
+earlier-source workspace tests, normal build, strict all-target Clippy, exact M3
+and live C++/Drogon gates passed. Final-review receipt-origin and attachment
+repairs require refreshed qualification, tracked in the
+[acceptance report](m4-local-acceptance.md). See the
 [migration contract](m4-consumer-migration.md) for intentional source/wire changes.
 
 1. Reconcile every non-test kernel constructor and each caller/remote dispatch
@@ -469,6 +473,12 @@ scheduler implementations. Automatic effects remain disabled in the preview.
 6. Produce signed dry-run plans and executable caught-mutant/conformance evidence.
    Do not mark threat rows closed from registry metadata or source checks alone.
 
+Carry the three open structured-classifier review findings from PR #1117 into
+this acceptance: zero-width regex behavior, validated JSON-pointer field paths,
+and bounded regex compilation complexity. These belong to the future classifier
+composition, not the distinct M4 native `ClassificationPort`. Preserve runtime
+fail-closed behavior until construction and composed regressions qualify them.
+
 Acceptance: all original active-defense implementation gates pass, response
 simulation is correct, and temporary actions use reversible overlays rather than
 permanent revocation. Operational promotion remains M11, not an implied outcome
@@ -536,6 +546,11 @@ undocumented local paths. Registry publication remains separately authorized.
 4. After authorization, run designated Linux and hosted workflows and reconcile
    exact source/PR/remote SHA, workflow definition, run attempt, terminal checks,
    review findings, generated artifacts and package input hashes.
+   Close the remaining FIPS workflow review findings: explicit repository-pinned
+   compiler installation, locked smoke resolution and mandatory release
+   aggregation of the required nonce/FIPS evidence. Named green jobs alone do
+   not establish this contract. Enterprise bootstrap must not bypass absent
+   authoritative Linux evidence or exact controller/source binding.
 5. Choose the next unused `0.2.0-alpha.N` through the existing release mechanism.
    Refresh registry state at that time. Build signed evidence and provenance for
    the same artifacts that will actually be published.
@@ -614,7 +629,8 @@ release custody remains a fail-closed availability limit. The dependency order
 above still governs the remaining milestones.
 
 1. Preserve M3's authenticated caller start, durable executor ledger and native
-   custody acceptance; rerun its exact dependency gate on the M4 candidate.
+   custody acceptance. Its current exact dependency and selected flow gates
+   passed; the complete current-source workspace rerun remains required.
 2. Finish M4's consumer, parser, compatibility, C++/FFI and composed qualification
    with its classified inventory and required startup/dispatch denials.
 3. Qualify M5's capability-bound reference swarm and M6's enterprise topology on

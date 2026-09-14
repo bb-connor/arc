@@ -5896,7 +5896,7 @@ review and regeneration, including the expanded codec and store-port anchors
 and final namespace guard. Regenerated proof coverage matches 58 rows and 168
 artifacts. No model transition, assumption or resource bound was changed. Strict
 all-target Clippy passes with warnings denied for the kernel, SQLite store,
-security kernel, control plane, MCP remote, API protect, conformance, ACP edge,
+security kernel, control plane, MCP remote, API protect, conformance, ACP-Client edge,
 CLI, hosted finding edge and xtask packages. The kernel no-default-features
 build, formatting, diff whitespace, Rust hygiene, public-surface, security-CI,
 Apalache slice and formal-mapping static gates pass, including the applicable
