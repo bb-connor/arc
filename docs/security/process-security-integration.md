@@ -111,6 +111,13 @@ attribution. Both complete parent histories must remain reachable.
 
 ## Task 2: Preserve truthful worker and container terminal outcomes
 
+Checkpoint completed at `3b926837372f2a878169671911e613968455f553`.
+Independent specification and quality review approved the lifecycle repairs
+after one fix round. Evidence includes all eight native host integration tests,
+19 runner tests, 27 Python process tests, strict Clippy and formatting.
+Actual Docker host-loss and combined-foundation qualification remain Task 5
+requirements, not claims of this checkpoint.
+
 **Files:** `crates/products/chio-cli/src/cli/process_host/runner/{mod,child,
 container,journal,plan}.rs`, adjacent focused modules when separating actual
 completion from diagnostics, `crates/products/chio-cli/tests/process_host/`,
@@ -122,36 +129,46 @@ ownership records and credential revocation remain the authority. Separate an
 observed worker exit from log retention and pending cleanup without declaring
 the run exportable while an owned container may remain alive.
 
-- [ ] Add failing table-driven native/Python tests for `created` with exit code
+- [x] Add failing table-driven native/Python tests for `created` with exit code
   zero, a failed start attachment, live/unknown container states, successful
   exit with failed log retention, and successful exit with failed cleanup.
   Literal expectations: never-started is not completed; durable observed success
   survives diagnostic failure; unresolved ownership blocks replacement/export.
-- [ ] Add an interruption regression where an already-observed completion and
+- [x] Add an interruption regression where an already-observed completion and
   termination are simultaneously ready; consume known completions before
   recording interruption for unfinished workers.
-- [ ] Validate immutable plan commands and working directories before charging
+- [x] Validate immutable plan commands and working directories before charging
   attempts. Preserve the configured attempt deadline during bootstrap writes;
   do not spend a separate fixed five-second startup budget.
-- [ ] Keep derived status publication observational after journal commit. Retain
+- [x] Keep derived status publication observational after journal commit. Retain
   actual completion through publication failure, while preserving fatal initial
   readiness checks and explicit diagnostics.
-- [ ] Preflight required pidfd support and preserve definite pre-execution versus
+- [x] Preflight required pidfd support and preserve definite pre-execution versus
   ambiguous launch failures. Pin resident-memory sampling to the owned child
   identity, not a reusable numeric PID. Preserve final resource accounting.
-- [ ] Distinguish definitive create rejection plus authoritative absence from
+- [x] Distinguish definitive create rejection plus authoritative absence from
   uncertain creation. Cover Python bounded collection and exact-owner cleanup.
   Preserve worker restart semantics with stable logical operation identities;
   restart is not permission to redispatch an unknown tool effect.
-- [ ] Run each new regression red against inherited code, implement its smallest
+- [x] Run each new regression red against inherited code, implement its smallest
   state transition, rerun green, then run the native process-host and Python
   container suites. Use real journal persistence and filesystem faults. Engine
   doubles may model unavailable Docker responses but must not replace the code
   deciding completion or ownership.
-- [ ] Commit and independently review. Real Docker host-loss qualification stays
+- [x] Commit and independently review. Real Docker host-loss qualification stays
   explicitly required for the container profile, separate from unit tests.
 
 ## Task 3: Close process lineage and retained-response integrity gaps
+
+Checkpoint completed at `ac2ca99973f24048b57b87e78cae4b61fa1d1d65`.
+Independent specification and quality review approved the integrity repairs
+with no new task findings. Covering gates passed 1,722 Rust and 334 Python tests,
+the live no-bypass checker, strict affected Clippy and formatting. One inherited
+kernel-core documentation example remains ignored. These counts exclude repeated
+and nested fixture executions, and do not represent whole-workspace qualification.
+The reproduced ordinary-clock threshold recovery failure remains assigned to
+Task 4's durable-store group; 11 inherited mini-SWE import-order lint findings
+remain assigned to its SDK group. Neither is treated as a passing gate here.
 
 **Files:** `crates/kernel/chio-process/src/lib.rs`, focused process tests,
 `crates/kernel/chio-kernel-core/tests/signed_lineage.rs`,
@@ -164,32 +181,32 @@ lineage verification; `ProcessRuntime` stable request identities; the CLI's
 independent retained-response verification. Do not create a second receipt or
 dispatch authority.
 
-- [ ] Reproduce missing signed denials for invalid/revoked/expired process
+- [x] Reproduce missing signed denials for invalid/revoked/expired process
   lineage. Route attempts to the owning kernel denial boundary while retaining
   exact ancestor snapshots and preventing dispatch or output release.
-- [ ] Add negative lineage cases with missing Delegate permission, invalid link
+- [x] Add negative lineage cases with missing Delegate permission, invalid link
   times, repeated identities and mismatched signed root. Assert the specific
   owning refusal, not a generic error from an unrelated malformed fixture.
-- [ ] Update the no-bypass contract to the actual shared evidence verifier and
+- [x] Update the no-bypass contract to the actual shared evidence verifier and
   execute its behavioral/source-graph checker.
-- [ ] Classify read-only redispatch eligibility inside the owning kernel using
+- [x] Classify read-only redispatch eligibility inside the owning kernel using
   actual matching grants. Exclude monetary, quota, aggregate, cumulative,
   finding-recovery/delivery and native/runtime/approval/DPoP authority as well as
   all existing id-bound artifacts. Matching errors deny retry. Test the attempt
   cap and retained original charge/hold identity under uncertainty.
-- [ ] Replace incomplete signed uncertainty metadata with a truthful registered
+- [x] Replace incomplete signed uncertainty metadata with a truthful registered
   typed projection and update its consumers together, preserving retained
   evidence. Do not manufacture completion merely to satisfy the schema.
-- [ ] Require every originally selected runtime, approval and DPoP custody
+- [x] Require every originally selected runtime, approval and DPoP custody
   participant before producing a caller snapshot; test missing selections and
   genuinely unselected legacy absence without refunding unknown effects.
-- [ ] Add retained-response attempt-two/three positive bindings and wrong request
+- [x] Add retained-response attempt-two/three positive bindings and wrong request
   identity/attempt negatives. Share the existing bounded-attempt contract through
   a public narrowly documented constant or identity helper instead of duplicating
   a literal upper limit in the CLI.
-- [ ] Clarify Python normalization versus direct retained JSON verification.
+- [x] Clarify Python normalization versus direct retained JSON verification.
   Preserve original signed receipts and never retry on verification failure.
-- [ ] Run red/green regression cycles, focused suites and strict Clippy; commit
+- [x] Run red/green regression cycles, focused suites and strict Clippy; commit
   and review the complete integrity repair.
 
 ## Task 4: Reconcile the remaining inherited review findings
