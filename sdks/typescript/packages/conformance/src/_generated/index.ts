@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 73153fd32c8a01bebd24270788a9c941fe0554dc990be68d150a81c7e6d52b49
+// Schema SHA: 38ea5b1a436af1ed26f294673f70f20f71002214a522a308369d54dc8943298e
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -1945,7 +1945,7 @@ export namespace Kernel_ToolCallResponse {
     /**
      * Signed classification of where the tool effect executed relative to Chio.
      */
-    tool_origin: "caller_executed" | "host_executed_provider_reported" | "host_executed_unmediated";
+    tool_origin: "caller_executed" | "host_executed_provider_reported" | "host_executed_unmediated" | "chio_internal";
     /**
      * Signed redaction mode applied to receipt details.
      */
@@ -2618,7 +2618,7 @@ export namespace Receipt_Record {
     /**
      * Signed classification of where the tool effect executed relative to Chio.
      */
-    tool_origin: "caller_executed" | "host_executed_provider_reported" | "host_executed_unmediated";
+    tool_origin: "caller_executed" | "host_executed_provider_reported" | "host_executed_unmediated" | "chio_internal";
     /**
      * Signed redaction mode applied to receipt details.
      */

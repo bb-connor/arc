@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 706cff7c58d41fb3e788bbc44edf6741118a7a7966f144967e651ad9eb450c18
+// Schema content SHA-256: f59213f04dc92183bf2948613d715452239f18c3b3ba8ef316ae68637d0a55f5
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -644,6 +644,7 @@ const (
 // Defines values for ReceiptRecordToolOrigin.
 const (
 	ReceiptRecordToolOriginCallerExecuted               ReceiptRecordToolOrigin = "caller_executed"
+	ReceiptRecordToolOriginChioInternal                 ReceiptRecordToolOrigin = "chio_internal"
 	ReceiptRecordToolOriginHostExecutedProviderReported ReceiptRecordToolOrigin = "host_executed_provider_reported"
 	ReceiptRecordToolOriginHostExecutedUnmediated       ReceiptRecordToolOrigin = "host_executed_unmediated"
 )

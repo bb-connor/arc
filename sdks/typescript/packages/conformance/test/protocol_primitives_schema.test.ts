@@ -17,9 +17,11 @@ import type {
   Kernel_CallerDispatchAuthorization,
   Kernel_ExecutionNonce,
   Result_PendingApproval,
+  Receipt_Record,
 } from "../src/_generated/index.js";
 
 type ProtocolPrimitive =
+  | Receipt_Record.ChioReceiptRecord
   | Kernel_CallerDeliveryReport.ChioSignedCallerDeliveryReport
   | Kernel_CallerDispatchAuthorization.ChioSignedCallerDispatchAuthorization
   | Kernel_ExecutionNonce.ChioSignedExecutionNonce

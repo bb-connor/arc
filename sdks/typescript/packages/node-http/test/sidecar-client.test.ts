@@ -271,11 +271,14 @@ describe("SidecarError", () => {
 });
 
 describe("ChioSidecarClient.evaluate", () => {
-  it("returns allow only after receipt authority verification", async () => {
+  it.each([
+    "caller_executed", "host_executed_provider_reported",
+    "host_executed_unmediated", "chio_internal",
+  ] as const)("returns allow only after receipt authority verification for %s", async (origin) => {
     let verifyCalls = 0;
     const result: EvaluateResponse = {
       verdict: { verdict: "allow" },
-      receipt: authoritativeAllowReceipt(),
+      receipt: { ...authoritativeAllowReceipt(), tool_origin: origin },
       evidence: [],
     };
     const { server, url } = await startEvaluateSidecar(result, true, () => {
@@ -286,6 +289,25 @@ describe("ChioSidecarClient.evaluate", () => {
       const client = new ChioSidecarClient({ sidecarUrl: url });
       await expect(client.evaluate(testRequest())).resolves.toEqual(result);
       expect(verifyCalls).toBe(1);
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  it.each(["untrusted_future_origin", null])("rejects invalid receipt origin %s before verification", async (origin) => {
+    let verifyCalls = 0;
+    const result: EvaluateResponse = {
+      verdict: { verdict: "allow" },
+      receipt: { ...authoritativeAllowReceipt(), tool_origin: origin } as unknown as HttpReceipt,
+      evidence: [],
+    };
+    const { server, url } = await startEvaluateSidecar(result, true, () => {
+      verifyCalls += 1;
+    });
+    try {
+      const client = new ChioSidecarClient({ sidecarUrl: url });
+      await expectSidecarError(client.evaluate(testRequest()), "chio_invalid_receipt");
+      expect(verifyCalls).toBe(0);
     } finally {
       await closeServer(server);
     }

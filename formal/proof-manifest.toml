@@ -2229,14 +2229,14 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs"
 rust_symbols = ["RetainedToolAdmissionRequestV1","RetainedRequestWire","immutable_tool_request_hash","immutable_tool_request_hash_with_profile","RetainedToolAdmissionRequestV1::from_admission_with_profile","RetainedToolAdmissionRequestV1::from_canonical_bytes","RetainedToolAdmissionRequestV1::schema","RetainedToolAdmissionRequestV1::authority_profile","RetainedToolAdmissionRequestV1::security_binding","RetainedToolAdmissionRequestV1::native_security_authority_binding","RetainedToolAdmissionRequestV1::validate_binding","RetainedToolAdmissionRequestV1::validate_request_binding","RetainedToolAdmissionRequestV1::validate_request_material","RetainedToolAdmissionRequestV1::matching_grants_require_dpop"]
-normalized_sha256 = "f83dbb85328201e5017981dd94ff69f44210ffb2eec7e55324500ba10eda9b9b"
+normalized_sha256 = "bfad474cda3140d9f1d44339c33a64003e775902a406609d37075dc697864dd1"
 symbol_sha256 = [
-  { symbol = "RetainedToolAdmissionRequestV1", sha256 = "4671c8735edbc4e9630cf35be9183f71173f34c9e50592e465e0192f5d70c52c" },
-  { symbol = "RetainedRequestWire", sha256 = "761f60daad8613a0cdbf63dc77efba4469bf098fa5a1cf436158099868739cb1" },
+  { symbol = "RetainedToolAdmissionRequestV1", sha256 = "6fc1dd53ae89a56806be6db03e7d24aea5abb688ef44253f7ab2c6f0dfebada3" },
+  { symbol = "RetainedRequestWire", sha256 = "6c0c7fba88e3f2ffa4c753618c6f8db6e280337acd3a5ff37e2342b21c0d6bba" },
   { symbol = "immutable_tool_request_hash", sha256 = "aed6bce90056fc422b348e249d9b054254543172bc1277a7170341cc5bc72c06" },
   { symbol = "immutable_tool_request_hash_with_profile", sha256 = "ec7bebe0d716fbc4f5184cbeaa315a19fde7ec447a489ad121876be364ee646b" },
-  { symbol = "RetainedToolAdmissionRequestV1::from_admission_with_profile", sha256 = "d0ba465aabd5b0589749a65713d60983dccccd973f353f4d712705274a56006e" },
-  { symbol = "RetainedToolAdmissionRequestV1::from_canonical_bytes", sha256 = "6ce2bf008fa091229617ce6ccd4f998e1f2306776bce77bc8c8990f6212cc79f" },
+  { symbol = "RetainedToolAdmissionRequestV1::from_admission_with_profile", sha256 = "6faa9a2b62d84bca97f077e5a13295afc46756d2f8df549b82dca001d1879007" },
+  { symbol = "RetainedToolAdmissionRequestV1::from_canonical_bytes", sha256 = "64770f67b7089ab4eb3f3ae0a924c524651cc9f21e5da386aa0afa1aeb857759" },
   { symbol = "RetainedToolAdmissionRequestV1::schema", sha256 = "2ffffc5bebe38b75f7e676817d6404ef6d6a429881fbff69950972348a73405f" },
   { symbol = "RetainedToolAdmissionRequestV1::authority_profile", sha256 = "28c678616f8fa7f3aafe9d7cc16cd40187c53c66bf877bc6d42d526c7ac72741" },
   { symbol = "RetainedToolAdmissionRequestV1::security_binding", sha256 = "486c0a28935145e735d94973d4ecbc50575a4ebc60029269eb8ac6dbac556bed" },

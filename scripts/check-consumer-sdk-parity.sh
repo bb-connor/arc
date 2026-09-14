@@ -19,7 +19,7 @@ trap 'rm -rf "${consumer_evidence}"' EXIT
 
 (
   cd sdks/go/chio-go-http
-  go test -count=1 -json -run '^(TestGeneratedProtocolPrimitivesConsumeSharedFixtures|TestGeneratedManifestV2RuntimeCorpus|TestChioToolCallRequestPreservesApprovalSetAndOpaqueExtension|TestProtocolPublicDecoderRejectsMutationsWithoutReplacingPriorValue|TestProtocolNumbersPreserveOpaqueValuesAndRejectTypedOverflow|TestAggregatePublicUnionRejectsUnknownAndForbiddenRootProperties|TestProtocolWireBoundsAndOpaqueDuplicatesReject)$' ./...
+  go test -count=1 -json -run '^(TestGeneratedProtocolPrimitivesConsumeSharedFixtures|TestGeneratedManifestV2RuntimeCorpus|TestChioToolCallRequestPreservesApprovalSetAndOpaqueExtension|TestProtocolPublicDecoderRejectsMutationsWithoutReplacingPriorValue|TestProtocolNumbersPreserveOpaqueValuesAndRejectTypedOverflow|TestAggregatePublicUnionRejectsUnknownAndForbiddenRootProperties|TestProtocolWireBoundsAndOpaqueDuplicatesReject|TestReceiptOriginRejectsInvalidValuesWithoutReplacingPriorValue)$' ./...
 ) >"${consumer_evidence}/go.jsonl"
 
 (

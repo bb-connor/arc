@@ -6,11 +6,13 @@ runner="scripts/check-consumer-boundaries.sh"
 test -x "${runner}"
 bash -n "${runner}"
 test "$(grep -c '^  [a-z].* \\$' "${runner}")" -eq 8
-test "$(grep -c '^run_case ' "${runner}")" -eq 13
+test "$(grep -c '^run_case ' "${runner}")" -eq 15
 test "$(grep -c '^run_target ' "${runner}")" -eq 2
 grep -Fq 'run_target "stdio MCP early profile rejection" mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading cargo test -p chio-cli --test mcp_startup_security' "${runner}"
 grep -Fq 'run_target "Rust generated protocol corpus" generated_rust_shapes_parse_reject_and_round_trip_shared_fixtures cargo test -p chio-core-types --test protocol_primitives_generated' "${runner}"
 grep -Fq 'run_case "remote MCP retained authorization" tests::restored_authorization_matches_the_handshake_without_upgrading_legacy_sessions cargo test -p chio-mcp-remote --lib' "${runner}"
+grep -Fq 'run_case "signed receipt origin vocabulary" receipt_schemas_accept_signed_internal_origin_and_keep_closed_vocabulary cargo test -p chio-core-types --test wire_protocol_schema' "${runner}"
+grep -Fq 'run_case "retained caller attachment capacity" admission_operation::tests::attachment_capacity::rich_native_caller_attachments_survive_outcome_append_and_persistence cargo test -p chio-kernel --lib' "${runner}"
 grep -Fq 'run_case "remote MCP ready-session restart" mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls cargo test -p chio-cli --test mcp_serve_http' "${runner}"
 grep -Fq 'run_case "remote MCP restart policy tightening" mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening cargo test -p chio-cli --test mcp_serve_http' "${runner}"
 grep -Fq -- '-- cargo test -p chio-conformance --test consumer_boundary --locked' "${runner}"

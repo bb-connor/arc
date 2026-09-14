@@ -32,6 +32,7 @@ class SdkInventoryCalibration(unittest.TestCase):
             "TestProtocolNumbersPreserveOpaqueValuesAndRejectTypedOverflow",
             "TestAggregatePublicUnionRejectsUnknownAndForbiddenRootProperties",
             "TestProtocolWireBoundsAndOpaqueDuplicatesReject",
+            "TestReceiptOriginRejectsInvalidValuesWithoutReplacingPriorValue",
         ]]
         for test, corpus in [("TestGeneratedProtocolPrimitivesConsumeSharedFixtures", primitives), ("TestGeneratedManifestV2RuntimeCorpus", manifest)]:
             go.extend({"Action": "pass", "Test": f"{test}/{case['name']}"} for case in corpus)

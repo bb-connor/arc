@@ -2351,3 +2351,6 @@ fn admission_receipt_qualification_pins_kernel_and_exact_signed_body() {
 
 #[path = "admission_operation_tests/terminal_projection.rs"]
 mod terminal_projection;
+
+#[path = "admission_operation_tests/attachment_capacity.rs"]
+mod attachment_capacity;

@@ -1051,7 +1051,7 @@ The current pre-release v1 receipt envelope is `ChioReceipt` from
 | `receipt_kind` | `mediated_decision`, `trace_observation`, or `advisory_evaluation` |
 | `boundary_class` | Runtime boundary: `prevent`, `detect_only`, or `advisory_only` |
 | `observation_outcome` | Trace/advisory outcome. Omitted for mediated decisions |
-| `tool_origin` | Where the tool effect executed relative to Chio |
+| `tool_origin` | Closed signed vocabulary: `caller_executed`, `host_executed_provider_reported`, `host_executed_unmediated`, or `chio_internal` |
 | `redaction_mode` | Signed redaction mode for receipt details |
 | `actor_chain` | Signed actor attribution chain |
 | `decision` | Present only for `mediated_decision` + `prevent` receipts |
@@ -1066,6 +1066,13 @@ The current pre-release v1 receipt envelope is `ChioReceipt` from
 | `bbs_signature` | Optional BBS signature material for selective disclosure. When present, it is covered by the authoritative receipt signature |
 | `algorithm` | Optional envelope hint (`ed25519`, `p256`, or `p384`); verification dispatches off the signature prefix, not this field |
 | `signature` | Algorithm-aware hex signature over canonical JSON of `ChioReceiptSigningBody { id, body: ChioReceiptIdInput, bbs_signature? }`. The schema regex is `^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$`: bare 128-hex for Ed25519, `p256:<DER hex>` for P-256, or `p384:<DER hex>` for P-384 |
+
+`chio_internal` identifies a Chio-owned operation such as a cage decision or
+kernel session report. It is not an external tool-execution claim and grants no
+authority by itself. Receipt kind, boundary class, trusted signer and signature
+verification remain independently required. Changing the origin changes the
+content-addressed receipt identity and invalidates its existing signature. The
+wire and HTTP receipt schemas share this vocabulary; unknown origins reject.
 
 ### WYSIWYS Signing Invariant
 

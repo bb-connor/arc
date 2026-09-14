@@ -28523,7 +28523,8 @@ pub mod kernel_tool_call_response {
     ///          "enum": [
     ///            "caller_executed",
     ///            "host_executed_provider_reported",
-    ///            "host_executed_unmediated"
+    ///            "host_executed_unmediated",
+    ///            "chio_internal"
     ///          ]
     ///        },
     ///        "tool_server": {
@@ -30100,7 +30101,8 @@ pub mod kernel_tool_call_response {
     ///      "enum": [
     ///        "caller_executed",
     ///        "host_executed_provider_reported",
-    ///        "host_executed_unmediated"
+    ///        "host_executed_unmediated",
+    ///        "chio_internal"
     ///      ]
     ///    },
     ///    "tool_server": {
@@ -31247,7 +31249,8 @@ pub mod kernel_tool_call_response {
     ///  "enum": [
     ///    "caller_executed",
     ///    "host_executed_provider_reported",
-    ///    "host_executed_unmediated"
+    ///    "host_executed_unmediated",
+    ///    "chio_internal"
     ///  ]
     ///}
     /// ```
@@ -31271,6 +31274,8 @@ pub mod kernel_tool_call_response {
         HostExecutedProviderReported,
         #[serde(rename = "host_executed_unmediated")]
         HostExecutedUnmediated,
+        #[serde(rename = "chio_internal")]
+        ChioInternal,
     }
     impl ::std::convert::From<&Self> for ChioReceiptRecordToolOrigin {
         fn from(value: &ChioReceiptRecordToolOrigin) -> Self {
@@ -31285,6 +31290,7 @@ pub mod kernel_tool_call_response {
                     f.write_str("host_executed_provider_reported")
                 }
                 Self::HostExecutedUnmediated => f.write_str("host_executed_unmediated"),
+                Self::ChioInternal => f.write_str("chio_internal"),
             }
         }
     }
@@ -31295,6 +31301,7 @@ pub mod kernel_tool_call_response {
                 "caller_executed" => Ok(Self::CallerExecuted),
                 "host_executed_provider_reported" => Ok(Self::HostExecutedProviderReported),
                 "host_executed_unmediated" => Ok(Self::HostExecutedUnmediated),
+                "chio_internal" => Ok(Self::ChioInternal),
                 _ => Err("invalid value".into()),
             }
         }

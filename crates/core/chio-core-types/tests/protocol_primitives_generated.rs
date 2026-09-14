@@ -43,6 +43,9 @@ fn generated_instance(schema_file: &str, instance: Value) -> Value {
 
 fn parse_generated(schema_file: &str, instance: Value) -> Result<Value, serde_json::Error> {
     match schema_file {
+        "receipt/record.schema.json" => {
+            round_trip::<generated::kernel_tool_call_response::ChioReceiptRecord>(instance)
+        }
         "kernel/caller_dispatch_authorization.schema.json" => round_trip::<
             generated::kernel_caller_dispatch_authorization::ChioSignedCallerDispatchAuthorization,
         >(instance),

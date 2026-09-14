@@ -43,6 +43,8 @@ run_target "stdio MCP early profile rejection" mcp_serve_rejects_flow_before_sto
 run_case "current signed manifest corpus" current_manifest_consumer_corpus_preserves_wire_and_registered_signature cargo test -p chio-manifest --test manifest_v2
 run_target "Rust generated protocol corpus" generated_rust_shapes_parse_reject_and_round_trip_shared_fixtures cargo test -p chio-core-types --test protocol_primitives_generated
 run_case "authoritative protocol schema corpus" protocol_primitives_shared_fixtures_match_authoritative_schemas cargo test -p chio-core-types --test wire_protocol_schema
+run_case "signed receipt origin vocabulary" receipt_schemas_accept_signed_internal_origin_and_keep_closed_vocabulary cargo test -p chio-core-types --test wire_protocol_schema
+run_case "retained caller attachment capacity" admission_operation::tests::attachment_capacity::rich_native_caller_attachments_survive_outcome_append_and_persistence cargo test -p chio-kernel --lib
 run_case "Tower peer boundary" kernel_service::tests::kernel_service_rejects_unnegotiated_extensions_before_effect_or_receipt cargo test -p chio-tower --lib
 run_case "OpenAI peer boundary" tests::openai_host_rejects_unnegotiated_authority_before_effect_or_receipt cargo test -p chio-openai-adapter --lib
 run_case "OpenAI ordinary host flow rejection" tests::openai_ordinary_host_rejects_flow_required_manifest_before_exposure cargo test -p chio-openai-adapter --lib

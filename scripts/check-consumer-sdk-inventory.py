@@ -10,7 +10,7 @@ from pathlib import Path
 def verify(evidence: Path, root: Path) -> None:
     manifest = json.loads((root / "tests/bindings/fixtures/manifest-v2-consumers.json").read_text())["cases"]
     primitives = json.loads((root / "tests/bindings/fixtures/protocol-primitives-v1.json").read_text())["cases"]
-    if len(manifest) != 14 or len(primitives) != 35:
+    if len(manifest) != 14 or len(primitives) != 38:
         raise ValueError("shared consumer fixture inventory changed")
     expected_python = {f"test_manifest_v2_runtime_corpus[{case['name']}]" for case in manifest}
     expected_python.add("test_protocol_primitives_shared_fixtures_parse_reject_and_round_trip")
@@ -29,6 +29,7 @@ def verify(evidence: Path, root: Path) -> None:
         "TestProtocolNumbersPreserveOpaqueValuesAndRejectTypedOverflow",
         "TestAggregatePublicUnionRejectsUnknownAndForbiddenRootProperties",
         "TestProtocolWireBoundsAndOpaqueDuplicatesReject",
+        "TestReceiptOriginRejectsInvalidValuesWithoutReplacingPriorValue",
     }
     events = [json.loads(line) for line in (evidence / "go.jsonl").read_text().splitlines()]
     if any(event["Action"] in {"fail", "skip"} for event in events):

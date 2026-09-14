@@ -174,6 +174,26 @@ func (n *KernelExecutionNonce) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// UnmarshalJSON preserves the closed signed origin vocabulary. It does not
+// establish a trusted signer, verify a receipt, or grant execution authority.
+func (origin *ReceiptRecordToolOrigin) UnmarshalJSON(data []byte) error {
+	var decoded string
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	value := ReceiptRecordToolOrigin(decoded)
+	switch value {
+	case ReceiptRecordToolOriginCallerExecuted,
+		ReceiptRecordToolOriginHostExecutedProviderReported,
+		ReceiptRecordToolOriginHostExecutedUnmediated,
+		ReceiptRecordToolOriginChioInternal:
+		*origin = value
+		return nil
+	default:
+		return fmt.Errorf("unknown receipt tool origin")
+	}
+}
+
 func (p *CapabilityThresholdApprovalProposal) UnmarshalJSON(data []byte) error {
 	type wire CapabilityThresholdApprovalProposal
 	var decoded wire

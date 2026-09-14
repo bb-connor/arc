@@ -20,6 +20,8 @@ type protocolPrimitiveFixtureCase struct {
 func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 	var target any
 	switch schemaFile {
+	case "receipt/record.schema.json":
+		target = &ReceiptRecord{}
 	case "kernel/caller_dispatch_authorization.schema.json":
 		target = &KernelCallerDispatchAuthorization{}
 	case "kernel/caller_delivery_report.schema.json":

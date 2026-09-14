@@ -538,11 +538,13 @@ impl AdmissionOperationAttachmentsV1 {
     }
 
     fn validate(&self) -> Result<(), AdmissionOperationError> {
-        if self.0.len() > 17
-            || self
-                .0
-                .windows(2)
-                .any(|pair| pair[0].slot() >= pair[1].slot())
+        // Strict ordering over the closed slot vocabulary bounds the set to
+        // one attachment per kind. A separate cardinality limit can lag newly
+        // introduced custody slots and reject an otherwise valid operation.
+        if self
+            .0
+            .windows(2)
+            .any(|pair| pair[0].slot() >= pair[1].slot())
         {
             return Err(AdmissionOperationError::DuplicateAttachment {
                 field: "persisted_attachment_set",

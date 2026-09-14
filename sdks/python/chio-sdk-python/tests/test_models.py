@@ -134,6 +134,7 @@ class TestGeneratedWireModels:
         self,
     ) -> None:
         models: dict[str, type[Any]] = {
+            "receipt/record.schema.json": ChioReceipt,
             "kernel/caller_dispatch_authorization.schema.json": ChioSignedCallerDispatchAuthorization,
             "kernel/caller_delivery_report.schema.json": ChioSignedCallerDeliveryReport,
             "kernel/execution_nonce.schema.json": ChioSignedExecutionNonce,
