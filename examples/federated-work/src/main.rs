@@ -14,11 +14,17 @@ mod work_buyer;
 
 use common::*;
 use serde_json::json;
+use std::io::Read;
 use std::path::Path;
 
 fn run() -> Result<serde_json::Value> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        ["check-openapi",file] => {
+            let mut input = String::new();
+            std::fs::File::open(file)?.take(64 * 1024 + 1).read_to_string(&mut input)?;
+            Ok(serde_json::to_value(review::check_openapi(&input)?)?)
+        },
         ["init",state] => Ok(json!({"publicKey":init(Path::new(state))?})),
         ["grant",state,buyer] => Ok(serde_json::to_value(provider::grant(Path::new(state),chio_core_types::PublicKey::from_hex(buyer)?)?)?),
         ["grant-session",state,buyer] => Ok(serde_json::to_value(provider::grant_session(Path::new(state),chio_core_types::PublicKey::from_hex(buyer)?)?)?),

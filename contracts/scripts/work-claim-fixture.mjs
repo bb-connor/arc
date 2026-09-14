@@ -114,5 +114,20 @@ export async function fixture(t, { testToken = false } = {}) {
   async function submit(id, providerActor = B, commitment = "output") {
     await (await escrow.connect(providerActor).submitClaim(id, digest(commitment))).wait();
   }
-  return { ...actors, actors, rpc, provider, escrow, token, terms, start, now, at, fund, sign, submit, deploy };
+  async function authorizeChecked(body) {
+    assert.deepEqual(Object.keys(body).sort(), decisionTypes.ChioWorkDecision.map((v) => v.name).sort());
+    assert.match(body.decisionDigest, /^0x[0-9a-f]{64}$/);
+    assert.equal(typeof body.accepted, "boolean");
+    const work = await escrow.getWork(body.allocationId);
+    assert.equal(work.state, 2n, "checked authorization requires a submitted claim");
+    for (const field of ["agreementDigest", "commitment", "beneficiary", "token", "amount"]) {
+      const expected = field === "commitment" ? work.commitment : work.terms[field];
+      assert.equal(String(body[field]).toLowerCase(), String(expected).toLowerCase(), `changed ${field}`);
+    }
+    assert.equal(work.terms.verifier, V.address);
+    const signature = await wallet(V).signTypedData({ name: "ChioWorkClaimEscrow", version: "1",
+      chainId: 31337, verifyingContract: await escrow.getAddress() }, decisionTypes, body);
+    return [body.allocationId, body.decisionDigest, body.accepted, signature];
+  }
+  return { ...actors, actors, rpc, provider, escrow, token, terms, start, now, at, fund, sign, submit, deploy, authorizeChecked };
 }
