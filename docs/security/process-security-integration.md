@@ -59,6 +59,13 @@ integration-only. No current combined implementation or merge is qualified.
 
 ## Task 1: Reconcile the complete process ancestry with M4
 
+Checkpoint completed at `deb9b8a85623f7eb4bebd65eeb608af76f11d125`.
+Independent specification and quality review approved the reconciliation.
+Evidence: both compile checks, 55 process tests, five signed-lineage tests,
+29 distinct focused SQLite regressions, mutation-sensitive shared-custody tests,
+generated coverage and formatting checks. Source hygiene passes with existing
+size warnings. This is not the full-foundation qualification in Task 5.
+
 **Files:** All inherited process changes from the pinned #1155 head. Resolve
 conflicts in `.github/workflows/cflite_pr.yml`, kernel `admission_coordinator.rs`,
 `tests.rs`, `validation.rs`, `receipt_store.rs`, `runtime.rs`, SQLite
@@ -74,19 +81,19 @@ Restore the process branch's signed ancestor verification, process journal,
 worker protocols, process ABI v2, recovery claims and capability digest dispatch
 attribution. Both complete parent histories must remain reachable.
 
-- [ ] Inspect the three-way changes at each conflict, including auto-merged
+- [x] Inspect the three-way changes at each conflict, including auto-merged
   admission/terminal code. Record which invariant each resolution preserves.
-- [ ] Begin the non-destructive merge and inspect unresolved paths:
+- [x] Begin the non-destructive merge and inspect unresolved paths:
 
   ```sh
   git merge --no-ff --no-commit 2e84f121273df7f205cc218739b86e93c91bdc37
   git diff --name-only --diff-filter=U
   ```
 
-- [ ] Resolve with `apply_patch`, retaining both behaviors, not blanket ours or
+- [x] Resolve with `apply_patch`, retaining both behaviors, not blanket ours or
   theirs. For generated proof coverage, merge its source inventories and
   regenerate with `cargo xtask gen proof-coverage` after compilation.
-- [ ] Capture the first combined compilation failures, then repair precisely the
+- [x] Capture the first combined compilation failures, then repair precisely the
   incompatible interfaces. Do not disable features, guards or tests to compile:
 
   ```sh
@@ -96,10 +103,10 @@ attribution. Both complete parent histories must remain reachable.
   cargo test --locked -p chio-process --features worker-server,mailboxes
   ```
 
-- [ ] Verify no conflict markers, whitespace errors or lost ancestry. Commit the
+- [x] Verify no conflict markers, whitespace errors or lost ancestry. Commit the
   reconciliation as `feat(process): reconcile durable hosting with M4 security`.
   The commit is an integration checkpoint, not full qualification.
-- [ ] Review the conflict resolutions and changed security interfaces against
+- [x] Review the conflict resolutions and changed security interfaces against
   both parents before proceeding to behavior repairs.
 
 ## Task 2: Preserve truthful worker and container terminal outcomes
@@ -126,6 +133,16 @@ the run exportable while an owned container may remain alive.
 - [ ] Validate immutable plan commands and working directories before charging
   attempts. Preserve the configured attempt deadline during bootstrap writes;
   do not spend a separate fixed five-second startup budget.
+- [ ] Keep derived status publication observational after journal commit. Retain
+  actual completion through publication failure, while preserving fatal initial
+  readiness checks and explicit diagnostics.
+- [ ] Preflight required pidfd support and preserve definite pre-execution versus
+  ambiguous launch failures. Pin resident-memory sampling to the owned child
+  identity, not a reusable numeric PID. Preserve final resource accounting.
+- [ ] Distinguish definitive create rejection plus authoritative absence from
+  uncertain creation. Cover Python bounded collection and exact-owner cleanup.
+  Preserve worker restart semantics with stable logical operation identities;
+  restart is not permission to redispatch an unknown tool effect.
 - [ ] Run each new regression red against inherited code, implement its smallest
   state transition, rerun green, then run the native process-host and Python
   container suites. Use real journal persistence and filesystem faults. Engine
@@ -155,6 +172,17 @@ dispatch authority.
   owning refusal, not a generic error from an unrelated malformed fixture.
 - [ ] Update the no-bypass contract to the actual shared evidence verifier and
   execute its behavioral/source-graph checker.
+- [ ] Classify read-only redispatch eligibility inside the owning kernel using
+  actual matching grants. Exclude monetary, quota, aggregate, cumulative,
+  finding-recovery/delivery and native/runtime/approval/DPoP authority as well as
+  all existing id-bound artifacts. Matching errors deny retry. Test the attempt
+  cap and retained original charge/hold identity under uncertainty.
+- [ ] Replace incomplete signed uncertainty metadata with a truthful registered
+  typed projection and update its consumers together, preserving retained
+  evidence. Do not manufacture completion merely to satisfy the schema.
+- [ ] Require every originally selected runtime, approval and DPoP custody
+  participant before producing a caller snapshot; test missing selections and
+  genuinely unselected legacy absence without refunding unknown effects.
 - [ ] Add retained-response attempt-two/three positive bindings and wrong request
   identity/attempt negatives. Share the existing bounded-attempt contract through
   a public narrowly documented constant or identity helper instead of duplicating
@@ -181,6 +209,10 @@ not sufficient to mark a repair complete or discard valuable functionality.
 - [ ] Repair reproduced security, recovery, correctness and validation defects
   through focused TDD tasks, grouping only closely related changes. Preserve
   supported adapters, process ABI handling, mailbox semantics and resource bounds.
+- [ ] Add the reconciliation review's remaining expiry oracles through joint
+  budget authorization/capture, post-return claims, approved-caller replay and
+  reserved-terminal active claims. Refusal must preserve participant, claim,
+  commit-chain and anchor state, without charging a replay.
 - [ ] Reply in the original thread with exact committed evidence after review.
   No cosmetic cleanup or unverified claim may conceal an unresolved invariant.
 
