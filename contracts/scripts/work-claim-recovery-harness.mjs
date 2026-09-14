@@ -57,20 +57,47 @@ export async function runWorker(configFile,operationId,rpc,rawTransaction,killPo
 }
 
 export async function recoverPayment({f,allocation,seller,agreement},state,killPoint) {
-  const owner=seller.address.toLowerCase();
+  return recoverAction({f,allocation,actor:seller,agreement,action:'pay',args:[allocation]},state,killPoint,true);
+}
+
+export async function recoverRailAction(context,state,killPoint) {
+  return recoverAction(context,state,killPoint,false);
+}
+
+export function actionConfig(state,owner) {
+  return path.join(state,'rail-'+owner,'rail-config.json');
+}
+
+async function recoverAction({f,allocation,actor,agreement,action,args},state,killPoint,legacy) {
+  const methods={submit:'submitClaim',decision:'recordDecision',pay:'withdrawPayment',refund:'withdrawRefund'};
+  assert.ok(Object.hasOwn(methods,action));
+  assert.equal(args[0],allocation);
+  const owner=actor.address.toLowerCase();
   const domain={chainId:String((await f.provider.getNetwork()).chainId),escrow:(await f.escrow.getAddress()).toLowerCase(),
     runtimeKeccak256:ethers.keccak256(await f.provider.getCode(await f.escrow.getAddress())),
     genesisHash:(await f.provider.send('eth_getBlockByNumber',['0x0',false])).hash};
-  const config={owner,domain,path:path.join(state,'rail.sqlite'),python:process.env.CHIO_W0_PYTHON ?? 'python3'};
+  const directory=legacy?state:path.join(state,'rail-'+owner);
+  if(!legacy) {
+    try {fs.mkdirSync(directory,{mode:0o700});} catch(error) {if(error.code!=='EEXIST')throw error;}
+    const info=fs.lstatSync(directory);
+    assert.ok(info.isDirectory() && info.uid===process.getuid() && (info.mode&0o777)===0o700,'unsafe actor directory');
+  }
+  const config={owner,domain,path:path.join(directory,'rail.sqlite'),python:process.env.CHIO_W0_PYTHON ?? 'python3'};
   journal(config,'init');
-  const configFile=path.join(state,'rail-config.json');
-  fs.writeFileSync(configFile,JSON.stringify(config),{flag:'wx',mode:0o600});
-  const data=f.escrow.interface.encodeFunctionData('withdrawPayment',[allocation]);
-  const raw=await f.signRawCall(seller,data);
+  const configFile=path.join(directory,'rail-config.json');
+  try {fs.writeFileSync(configFile,JSON.stringify(config),{flag:'wx',mode:0o600});}
+  catch(error) {
+    if(error.code!=='EEXIST')throw error;
+    const info=fs.lstatSync(configFile);
+    assert.ok(info.isFile() && info.uid===process.getuid() && (info.mode&0o777)===0o600 && info.nlink===1,'unsafe actor config');
+    assert.deepEqual(JSON.parse(fs.readFileSync(configFile,'utf8')),config,'actor scope changed');
+  }
+  const data=f.escrow.interface.encodeFunctionData(methods[action],args);
+  const raw=await f.signRawCall(actor,data);
   const transaction=ethers.Transaction.from(raw);
   const work=await f.escrow.getWork(allocation);
   assert.equal(work.terms.agreementDigest,'0x'+await canonicalBodyHash(agreement.body,config));
-  const intent=intentFor(config,allocation,work.terms.agreementDigest,'pay',data);
+  const intent=intentFor(config,allocation,work.terms.agreementDigest,action,data);
   const prepared={intent,nonce:String(transaction.nonce),rawTransaction:raw,transactionHash:transaction.hash};
   validatePrepared(prepared,config);
   journal(config,'prepare',{prepared});

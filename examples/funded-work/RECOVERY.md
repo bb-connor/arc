@@ -124,3 +124,43 @@ artifacts, killed worker identity/signal, journal snapshots, exact signed
 transaction, receipts/events and balances. The private fixture state remains
 local. Ganache is ephemeral; the retained journal is not proof that its old
 private-chain inclusion remains available after the run ends.
+
+## Complete post-funding lifecycle
+
+[work-claim-lifecycle.mjs](../../contracts/scripts/work-claim-lifecycle.mjs)
+extends the same worker to submission, verifier decision, payout and refund.
+The accepted path recovers submit/decision/pay; rejection recovers
+submit/decision/refund; unavailable custody recovers submit/refund with no
+certificate; the child recovers submit/decision/parent-refund/pay. The relay
+submits the already authorized verifier decision, and a refund can be relayed
+by an actor other than the payer without changing its contract-fixed recipient.
+
+Each actor has a private `rail-<address>` directory with its own journal and
+pinned configuration. Consecutive actions share the actor's original occupied
+nonce records. Existing configuration is checked against the reconstructed
+owner/domain/path and is never overwritten to accept a changed scope. The old
+payment-only command retains its original store paths.
+
+After every new effect, additional keyless processes reopen and re-observe all
+earlier transactions. A submission or decision must remain observable after the
+allocation becomes Paid or Refunded. These processes require the original
+inclusion and perform zero broadcasts. The four interruption points apply to
+every action; the lifecycle matrix comprises 16 runs and 48 killed workers.
+
+```sh
+CHIO_W0_PYTHON=/absolute/path/to/python node --test \
+  contracts/scripts/work-claim-lifecycle.test.mjs \
+  contracts/scripts/work-claim-recovery-actions.test.mjs
+
+state_dir=$(mktemp -d /tmp/chio-lifecycle.XXXXXX)
+CHIO_W0_PYTHON=/absolute/path/to/python node contracts/scripts/work-claim-lifecycle.mjs \
+  child after_broadcast "$state_dir" --output "$state_dir/public-result.json"
+```
+
+Use `accepted`, `rejected`, `missing-custody` or `child` with any documented
+kill point. Reports contain `railRecoveries` and `lifecycle.reobservations` in
+addition to the original work, receipts, events and balances. The workflow
+parent, fixture signing authority and chain stay alive during worker loss.
+Funding/deployment/setup recovery and orchestration-parent restart are outside
+this slice. Native admission/hold correlation, full parent tool-process loss,
+Finding facets and public-chain finality retain their integration gates.

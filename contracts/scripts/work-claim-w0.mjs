@@ -14,8 +14,9 @@ const binary = process.env.CHIO_W0_BINARY ?? path.join(root, 'target/debug/chio-
 const fixtureScript = path.join(root, 'examples/funded-work/fixture.py');
 const stringify = (value) => JSON.stringify(value, (_, v) => typeof v === 'bigint' ? String(v) : v, 2);
 
-export async function runW0(scenario, directory, { payment } = {}) {
+export async function runW0(scenario, directory, { payment, railAction } = {}) {
   assert.equal(mutation, '', 'W0 requires the unmodified claim contract');
+  assert.ok(!(payment && railAction), 'select one recovery adapter');
   assert.ok(['accepted', 'rejected', 'missing-custody', 'child'].includes(scenario));
   const state = path.resolve(directory);
   assert.equal(fs.statSync(state).mode & 0o777, 0o700, 'state must be mode 0700');
@@ -24,6 +25,7 @@ export async function runW0(scenario, directory, { payment } = {}) {
   const receipts = [];
   let serial = 0;
   let recovery;
+  const railRecoveries = [];
   function command(command, request, allowFailure = false) {
     const args = ['-B', fixtureScript, command, state];
     if (request) {
@@ -73,6 +75,17 @@ export async function runW0(scenario, directory, { payment } = {}) {
     const prepared = prepare(scenario + '-w0', selectedRail, parentAgreement?.agreementDigest.slice(2) ?? null);
     const allocation = await fund(prepared, scenario === 'child' ? f.B : f.A);
     const seller = scenario === 'child' ? f.C : f.B;
+    async function perform(action, label, actor, args, selected = prepared) {
+      const methods = { submit: 'submitClaim', decision: 'recordDecision', pay: 'withdrawPayment', refund: 'withdrawRefund' };
+      if (railAction) {
+        const result = await railAction({ f, allocation: args[0], actor, agreement: selected.agreement, action, args });
+        assert.equal(result.receipt.status, 1);
+        receipts.push({ label, receipt: result.receipt.toJSON() });
+        railRecoveries.push({ label, ...result.recovery });
+      } else {
+        await record(label, f.escrow.connect(actor)[methods[action]](...args));
+      }
+    }
     async function inspect(id) {
       const work = await f.escrow.getWork(id);
       return { allocationId: id, agreementDigest: work.terms.agreementDigest,
@@ -96,7 +109,7 @@ export async function runW0(scenario, directory, { payment } = {}) {
     if (scenario === 'rejected') output.operations[0].authenticationRequired = !output.operations[0].authenticationRequired;
     const submitted = command('submit', { agreement: prepared.agreement, allocationId: allocation, inputPath: source, output });
     await f.at(2);
-    await record('submit_exact_artifact', f.escrow.connect(seller).submitClaim(allocation, submitted.commitment));
+    await perform('submit', 'submit_exact_artifact', seller, [allocation, submitted.commitment]);
     observations.push(await observe('submitted'));
     await f.at(5);
     const work = await f.escrow.getWork(allocation);
@@ -121,7 +134,7 @@ export async function runW0(scenario, directory, { payment } = {}) {
         verifierFailure = failure.stderr.trim();
       } finally { fs.renameSync(db + '.offline', db); }
       await f.at(9);
-      await record('uncertified_timeout_refund', f.escrow.connect(f.X).withdrawRefund(allocation));
+      await perform('refund', 'uncertified_timeout_refund', f.X, [allocation]);
     } else {
       certificate = command('authorize', verificationRequest);
       // Same state reopened in a second verifier process must retain the exact decision.
@@ -129,14 +142,14 @@ export async function runW0(scenario, directory, { payment } = {}) {
       assert.deepEqual(retry.decision, certificate.decision);
       assert.deepEqual(retry.authorization, certificate.authorization);
       evmCertificate = await f.authorizeChecked(certificate.authorization);
-      await record('record_checked_decision', f.escrow.connect(f.X).recordDecision(...evmCertificate));
+      await perform('decision', 'record_checked_decision', f.X, evmCertificate);
       observations.push(await observe('decided_unwithdrawn'));
       if (scenario === 'rejected') {
-        await record('rejected_refund', f.escrow.connect(f.X).withdrawRefund(allocation));
+        await perform('refund', 'rejected_refund', f.X, [allocation]);
       } else {
         if (parent) {
           await f.at(9);
-          await record('unsubmitted_parent_refund', f.escrow.connect(f.X).withdrawRefund(parent));
+          await perform('refund', 'unsubmitted_parent_refund', f.X, [parent], parentAgreement);
           observations.push(await observe('parent_refunded'));
         }
         await f.at(30);
@@ -146,7 +159,7 @@ export async function runW0(scenario, directory, { payment } = {}) {
           receipts.push({ label: 'recovered_earned_payment', receipt: result.receipt.toJSON() });
           recovery = result.recovery;
         } else {
-          await record('earned_payment_after_deadlines', f.escrow.connect(seller).withdrawPayment(allocation));
+          await perform('pay', 'earned_payment_after_deadlines', seller, [allocation]);
         }
       }
     }
@@ -179,6 +192,7 @@ export async function runW0(scenario, directory, { payment } = {}) {
       observationForVerifier: observed, certificate, evmCertificate, verifierFailure,
       providerCheckerMs, observations, receipts, runtimeCodeKeccak256: codeHash,
       ...(recovery ? { recovery } : {}),
+      ...(railAction ? { railRecoveries } : {}),
       accounting: { escrowFunded: funded, paid: recordedPaid, refunded: recordedRefunded, remaining: funded - withdrawn },
       escrowEvents: (await f.provider.getLogs({ address: escrowAddress, fromBlock: 0 })).map((log) => log.toJSON()),
       tokenEvents: logs.map((log) => log.toJSON()),

@@ -62,3 +62,8 @@ Functional mock-token amounts do not establish profit or cheap verification.
 No independent company operations, native Finding assurance, remote custody,
 public-chain finality, challenge court, long-duration availability or economic
 advantage is established by this experiment. Those remain program gates.
+
+The [lifecycle runner](../../contracts/scripts/work-claim-lifecycle.mjs) now
+recovers all post-funding actions, including claim submission, decisions and
+refunds. Its [profile and commands](RECOVERY.md#complete-post-funding-lifecycle)
+cover accepted, rejected, unavailable-custody and earned-child outcomes.
