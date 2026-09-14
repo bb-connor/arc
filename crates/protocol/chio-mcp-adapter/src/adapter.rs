@@ -213,13 +213,31 @@ impl McpAdapter {
         config: McpAdapterConfig,
         launch: crate::transport::NativeMcpLaunch,
     ) -> Result<Self, AdapterError> {
+        Self::from_command_with_timeouts(
+            command,
+            args,
+            config,
+            launch,
+            crate::transport::StdioRequestTimeouts::default(),
+        )
+    }
+
+    /// Create an authorized subprocess adapter with operator-selected request deadlines.
+    pub fn from_command_with_timeouts(
+        command: &str,
+        args: &[&str],
+        config: McpAdapterConfig,
+        launch: crate::transport::NativeMcpLaunch,
+        request_timeouts: crate::transport::StdioRequestTimeouts,
+    ) -> Result<Self, AdapterError> {
         if launch.server_id() != config.server_id {
             return Err(AdapterError::ConnectionFailed(
                 "native MCP launch authorization belongs to a different server".to_string(),
             ));
         }
         let cage_required = matches!(&launch, crate::transport::NativeMcpLaunch::CageRequired(_));
-        let transport = StdioMcpTransport::spawn(command, args, launch)?;
+        let transport =
+            StdioMcpTransport::spawn_with_timeouts(command, args, launch, request_timeouts)?;
         let enforcement_evidence = if cage_required {
             match transport.enforcement_evidence().cloned() {
                 Some(evidence) => Some(evidence),

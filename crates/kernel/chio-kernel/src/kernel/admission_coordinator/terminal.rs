@@ -334,27 +334,16 @@ impl ChioKernel {
             trusted_now_unix_ms,
         )
         .map_err(tool_outcome_error)?;
-        let expires_at_unix_ms = trusted_now_unix_ms
-            .checked_add(RECOVERY_LEASE_DURATION_MS)
-            .ok_or_else(|| {
-                KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
-            })?;
-        let lease = runtime
-            .store
-            .claim_recovery(
-                admission.operation.binding().operation_id(),
-                admission.operation.version(),
-                &runtime.claimant_id,
-                trusted_now_unix_ms,
-                expires_at_unix_ms,
-                &runtime.fence,
-            )
-            .map_err(durable_store_error)?;
+        let claim =
+            Self::recovery_claim_request(runtime, &admission.operation, trusted_now_unix_ms)?;
+        let admission_store: &dyn QualifiedAdmissionOperationStore = runtime.store.as_ref();
         let (stored, finalizing) = runtime
             .outcome_store
-            .record_tool_returned(
+            .claim_and_record_tool_returned(
+                admission_store,
+                claim,
+                &mut qualified_lease(claim, trusted_now_unix_ms),
                 &admission.operation,
-                &lease,
                 &blob,
                 &record,
                 &runtime.fence,
@@ -1174,9 +1163,11 @@ impl ChioKernel {
             )
             .max(1);
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let lease = self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
-        let mut evaluation = match existing_evaluation {
-            Some(existing) => existing,
+        let (mut evaluation, lease) = match existing_evaluation {
+            Some(existing) => (
+                existing,
+                self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?,
+            ),
             None => {
                 if !matches!(
                     stored_outcome.disposition(),
@@ -1194,10 +1185,18 @@ impl ChioKernel {
                     normalized_context.clone(),
                 )
                 .map_err(tool_outcome_error)?;
+                let claim = Self::recovery_claim_request(
+                    runtime,
+                    &admission.operation,
+                    trusted_now_unix_ms,
+                )?;
+                let admission_store: &dyn QualifiedAdmissionOperationStore = runtime.store.as_ref();
                 let begun = runtime
                     .outcome_store
-                    .begin_post_return_evaluation(
-                        &lease,
+                    .claim_and_begin_post_return_evaluation(
+                        admission_store,
+                        claim,
+                        &mut qualified_lease(claim, trusted_now_unix_ms),
                         &prepared,
                         &runtime.fence,
                         trusted_now_unix_ms,
@@ -1300,6 +1299,8 @@ impl ChioKernel {
         )?;
         let (terminal_evaluation, terminal_outcome) = match evaluation.state() {
             PostReturnEvaluationStateV1::Evaluating => {
+                let expected_evaluation_version = evaluation.version();
+                let mut pending_results = Vec::new();
                 for (index, expected_digest) in step_result_digests.iter().enumerate() {
                     match evaluation.step_result_digest(index) {
                         Some(recorded) if recorded != expected_digest => {
@@ -1309,20 +1310,10 @@ impl ChioKernel {
                         }
                         Some(_) => {}
                         None => {
-                            let next = evaluation
+                            evaluation = evaluation
                                 .record_next_pure_result(expected_digest.clone())
                                 .map_err(tool_outcome_error)?;
-                            evaluation = runtime
-                                .outcome_store
-                                .stage_post_return_evaluation(
-                                    admission.operation.binding().operation_id(),
-                                    evaluation.version(),
-                                    &lease,
-                                    &next,
-                                    &runtime.fence,
-                                    trusted_now_unix_ms,
-                                )
-                                .map_err(durable_outcome_store_error)?;
+                            pending_results.push(expected_digest.clone());
                         }
                     }
                 }
@@ -1362,9 +1353,10 @@ impl ChioKernel {
                     .map_err(tool_outcome_error)?;
                 let (terminal_evaluation, terminal_outcome) = runtime
                     .outcome_store
-                    .finalize_post_return(
+                    .finalize_post_return_with_pure_results(
                         admission.operation.binding().operation_id(),
-                        evaluation.version(),
+                        expected_evaluation_version,
+                        &pending_results,
                         &lease,
                         &terminal_evaluation,
                         stored_outcome.version(),

@@ -364,6 +364,12 @@ mod crash_cutpoints {
             "crash-after-delivery",
             CrashPoint::Transport(AbortPoint::AfterDelivery),
         )?;
+        // The child aborts after writing, before the server necessarily reads
+        // the queued bytes. Require actual delivery within a bounded wait.
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while server.requests()?.is_empty() && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
         assert_eq!(
             server.requests()?.len(),
             1,

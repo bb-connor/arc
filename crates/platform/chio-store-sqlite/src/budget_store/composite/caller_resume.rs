@@ -8,7 +8,7 @@ impl SqliteBudgetStore {
         &self,
         transaction: &Transaction<'_>,
         original_event: &BudgetMutationRecord,
-        binding: AdmissionAuthorizationBinding<'_>,
+        binding: &mut AdmissionAuthorizationBinding<'_, '_>,
     ) -> Result<Option<BudgetAuthorizeHoldDecision>, BudgetStoreError> {
         let operation = binding.operation;
         if operation.state() != AdmissionOperationState::ReadyToDispatch
@@ -97,11 +97,29 @@ impl SqliteBudgetStore {
             .serving_owner
             .as_deref()
             .ok_or_else(|| invalid("caller authorization requires its serving owner"))?;
+        let recovery = match &mut binding.recovery {
+            crate::admission_operation_store::RecoveryAuthority::Lease(lease) => {
+                crate::admission_operation_store::RecoveryAuthority::Lease(lease)
+            }
+            crate::admission_operation_store::RecoveryAuthority::Claim { request, lease } => {
+                crate::admission_operation_store::RecoveryAuthority::Claim {
+                    request: *request,
+                    lease: &mut **lease,
+                }
+            }
+        };
+        let recovery_lease = crate::admission_operation_store::resolve_recovery_authority(
+            transaction,
+            owner,
+            recovery,
+            binding.trusted_now_unix_ms,
+        )
+        .map_err(|error| invalid(&error.to_string()))?;
         crate::admission_operation_store::verify_participant_recovery_tx(
             transaction,
             owner,
             operation,
-            binding.recovery_lease,
+            &recovery_lease,
             binding.trusted_now_unix_ms,
         )
         .map_err(|error| invalid(&error.to_string()))?;

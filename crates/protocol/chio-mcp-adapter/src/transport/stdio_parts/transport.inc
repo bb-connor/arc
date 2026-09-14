@@ -4,10 +4,34 @@ struct TransportInner {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct StdioRequestTimeouts {
+/// Bounded stdio deadlines selected by the operator before launching a server.
+/// Initialization and discovery remain limited to ten seconds each.
+pub struct StdioRequestTimeouts {
     initialization: Duration,
     discovery: Duration,
     request: Duration,
+}
+
+impl StdioRequestTimeouts {
+    /// Set the deadline for tool calls and other requests to 1-3600 seconds.
+    /// The deadline includes request transmission and waiting for its response.
+    pub fn with_request_timeout_seconds(seconds: u64) -> Result<Self, AdapterError> {
+        if !(1..=3600).contains(&seconds) {
+            return Err(AdapterError::ConnectionFailed(
+                "MCP request_timeout_seconds must be between 1 and 3600".to_string(),
+            ));
+        }
+        Ok(Self {
+            request: Duration::from_secs(seconds),
+            ..Self::default()
+        })
+    }
+
+    /// Return the configured request deadline in seconds (60 by default).
+    #[must_use]
+    pub fn request_timeout_seconds(&self) -> u64 {
+        self.request.as_secs()
+    }
 }
 
 impl Default for StdioRequestTimeouts {
@@ -362,6 +386,16 @@ pub enum NativeMcpLaunch {
 }
 
 impl NativeMcpLaunch {
+    /// Publisher manifests admitted by the signed launch policy. Hosts retain
+    /// this registry when matching live discovery to authenticated tool metadata.
+    #[must_use]
+    pub fn manifest_registry(&self) -> &Arc<chio_manifest::VerifiedManifestRegistry> {
+        match self {
+            Self::LegacyAuthorized(authorization) => &authorization.manifest_registry,
+            Self::CageRequired(launch) => &launch.manifest_registry,
+        }
+    }
+
     #[must_use]
     pub fn server_id(&self) -> &str {
         match self {
@@ -606,12 +640,22 @@ impl StdioMcpTransport {
         args: &[&str],
         launch: NativeMcpLaunch,
     ) -> Result<Self, AdapterError> {
+        Self::spawn_with_timeouts(command, args, launch, StdioRequestTimeouts::default())
+    }
+
+    /// Spawn an authorized MCP subprocess with bounded operator-selected deadlines.
+    pub fn spawn_with_timeouts(
+        command: &str,
+        args: &[&str],
+        launch: NativeMcpLaunch,
+        request_timeouts: StdioRequestTimeouts,
+    ) -> Result<Self, AdapterError> {
         match launch {
             NativeMcpLaunch::LegacyAuthorized(authorization) => {
-                Self::spawn_legacy_authorized(command, args, *authorization)
+                Self::spawn_legacy_authorized(command, args, *authorization, request_timeouts)
             }
             NativeMcpLaunch::CageRequired(launch) => {
-                Self::spawn_cage_required(command, args, *launch)
+                Self::spawn_cage_required_with_timeouts(command, args, *launch, request_timeouts)
             }
         }
     }
@@ -620,6 +664,7 @@ impl StdioMcpTransport {
         command: &str,
         args: &[&str],
         authorization: LegacyNativeLaunchAuthorization,
+        request_timeouts: StdioRequestTimeouts,
     ) -> Result<Self, AdapterError> {
         let admitted_manifest = authorization
             .manifest_registry
@@ -631,7 +676,12 @@ impl StdioMcpTransport {
             })?
             .manifest
             .clone();
-        let transport = Self::spawn_legacy_with_gate(command, args, || authorization.revalidate())?;
+        let transport = Self::spawn_legacy_with_gate_and_timeouts(
+            command,
+            args,
+            || authorization.revalidate(),
+            request_timeouts,
+        )?;
         if let Err(error) = validate_signed_mcp_tool_surface(&transport, &admitted_manifest) {
             return Err(merge_cleanup_failures(
                 error,
@@ -658,6 +708,7 @@ impl StdioMcpTransport {
         Self::spawn_legacy_with_gate_and_timeouts(command, args, || Ok(()), request_timeouts)
     }
 
+    #[cfg(test)]
     fn spawn_legacy_with_gate(
         command: &str,
         args: &[&str],
@@ -733,6 +784,20 @@ impl StdioMcpTransport {
         command: &str,
         args: &[&str],
         launch: CageRequiredLaunch,
+    ) -> Result<Self, AdapterError> {
+        Self::spawn_cage_required_with_timeouts(
+            command,
+            args,
+            launch,
+            StdioRequestTimeouts::default(),
+        )
+    }
+
+    fn spawn_cage_required_with_timeouts(
+        command: &str,
+        args: &[&str],
+        launch: CageRequiredLaunch,
+        request_timeouts: StdioRequestTimeouts,
     ) -> Result<Self, AdapterError> {
         let CageRequiredLaunch {
             manifest_registry,
@@ -892,7 +957,7 @@ impl StdioMcpTransport {
             Box::new(stderr),
             Some(evidence),
             Some(cage_receipts.clone()),
-            StdioRequestTimeouts::default(),
+            request_timeouts,
         )?;
         if let Err(error) = validate_signed_mcp_tool_surface(&transport, &signed_manifest.manifest)
         {
@@ -1629,10 +1694,7 @@ impl McpTransport for StdioMcpTransport {
         // A ping round trip would block on an upstream that never answers
         // one; the reachability this transport can prove on its own is that
         // the child process is still running.
-        match poll_natural_child_exit(
-            self.child_lifecycle.as_ref(),
-            self.cage_receipts.as_ref(),
-        ) {
+        match poll_natural_child_exit(self.child_lifecycle.as_ref(), self.cage_receipts.as_ref()) {
             NaturalExitPoll::Running => Ok(()),
             NaturalExitPoll::Stopped | NaturalExitPoll::Exited => Err(
                 AdapterError::ConnectionFailed("MCP child process is not running".to_string()),

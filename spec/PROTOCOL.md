@@ -515,13 +515,34 @@ the issuer's actual upstream parent capability. Concretely:
   witness in the trust-root authority.
 - A chain whose hops omit `scope_hash` is rejected fail-closed.
 
+For an attenuated chain with more than one hop, scope hashes alone are
+insufficient. A verifier MUST either reject the chain or verify the original
+signed ancestor capability tokens in root-to-parent order. The evidence MUST
+cover every hop exactly, match the leaf's signed chain prefixes, bind every
+link's scope hash to its signed parent scope, and prove delegation permission,
+scope inclusion, validity containment and non-increasing budget shares on each
+edge. Ancestor signatures, trusted issuers, crypto floors, current validity and
+negotiated family-budget constraints MUST be checked. The root scope MUST bind
+to the verifier's issuer trust root. Missing, reordered, unsigned or mismatched
+ancestor evidence MUST deny admission.
+
+`verify_capability_full_with_evidence` and
+`evaluate_with_full_floor_and_evidence` extend the shared composite verifier
+with this signed evidence. Existing entry points retain their fail-closed
+behavior when evidence is absent. Hosted kernels retrieve original signed
+tokens from their receipt-store snapshots; scalar snapshot fields do not
+substitute for signed evidence. Stateful ancestor revocation and delegation
+checks remain required after the pure verification pass.
+
 The portable verifier entrypoint
 `chio_kernel_core::verify_capability_with_floor_and_trust_root(token,
 trusted_issuers, clock, crypto_floor, trust_root_scope_hash)` enforces
 the rule in isolation. Production kernels MUST route every inbound
 capability admission through the composite entrypoint
 `chio_kernel_core::verify_capability_full(token, trusted_issuers,
-clock, crypto_floor, peer, trust_root, budgets)`, which chains the W1.1
+clock, crypto_floor, peer, trust_root, budgets)` or its shared
+`verify_capability_full_with_root` / `verify_capability_full_with_evidence`
+variants, which chain the W1.1
 chain-binding check and the W1.2
 sibling-sum budget admission alongside signature, floor, and time-bound
 verification. The earlier partial entry points
@@ -557,9 +578,10 @@ sibling-sum admit MUST is asserted by the hosted-dispatch admit fixtures (e.g.
 `budget_split_cross_hop_rejects_amplification.rs`,
 `hot_path_enforcement.rs`). Both rejection paths surface
 `CapabilityError::AttenuationViolation` with the offending hashes
-formatted as hex. The check costs a single hash comparison on the
-happy path and runs after the basic signature, time, and crypto-floor
-checks (the chain binding is meaningful only once those succeed).
+formatted as hex. The final witness binding is a hash comparison and runs
+after the basic signature, time, and crypto-floor checks. Recursive evidence
+also requires verifying each signed ancestor and its exact chain prefix;
+the single-hop cost does not describe that path.
 
 The MUST above is enforced by conformance fixtures that construct an attenuated
 capability whose `attenuation_proof.parent_scope_hash` does not bind to any

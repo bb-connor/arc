@@ -12,6 +12,27 @@ use crate::kernel::kernel_scopes::RECEIPT_EVALUATION_SCOPE_KEY;
 mod caller;
 
 impl ChioKernel {
+    /// The recovery claim a durable step asks the store to persist with the
+    /// mutation it protects.
+    pub(super) fn recovery_claim_request<'a>(
+        runtime: &'a DurableAdmissionRuntime,
+        operation: &'a AdmissionOperationV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<RecoveryClaimRequest<'a>, KernelError> {
+        let expires_at_unix_ms = trusted_now_unix_ms
+            .checked_add(RECOVERY_LEASE_DURATION_MS)
+            .ok_or_else(|| {
+                KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
+            })?;
+        Ok(RecoveryClaimRequest {
+            operation_id: operation.binding().operation_id(),
+            expected_version: operation.version(),
+            claimant_id: &runtime.claimant_id,
+            expires_at_unix_ms,
+            fence: &runtime.fence,
+        })
+    }
+
     pub(super) fn claim_admission_recovery(
         &self,
         operation: &AdmissionOperationV1,

@@ -66,6 +66,9 @@ include!("tests/durable_admission_url_elicitation_support.rs");
 include!("tests/chio_runtime.rs");
 #[path = "tests/swarm_required.rs"]
 mod swarm_required;
+include!("tests/invocation_context.rs");
+#[path = "tests/invocation_dispatch.rs"]
+mod invocation_dispatch;
 include!("tests/chio_runtime_url_elicitation.rs");
 include!("tests/drop_guard_proptest.rs");
 include!("tests/formal_closure.rs");

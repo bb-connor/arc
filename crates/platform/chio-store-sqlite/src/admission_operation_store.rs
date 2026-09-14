@@ -20,10 +20,11 @@ use chio_kernel::admission_operation::{
     AdmissionProjectionContext, AdmissionProjectionManifestV1, AdmissionProjectionRecordKind,
     AdmissionReceiptOrIncident, AdmissionRecoveryLease, AdmissionReplayClassification,
     AdmissionReplayKey, AdmissionTerminal, AdmissionTerminalProjection, AdmissionTerminalReplay,
-    CanonicalAdmissionProjectionRecord, CanonicalAdmissionTerminalProjection,
-    PersistedAdmissionOperationV1, QualifiedAdmissionOperationStore, SideEffectClass,
-    SignedAdmissionTerminalProjectionV1, UntrustedAdmissionRecoveryClaim,
-    VerifiedAdmissionTerminalProjectionRecordV1, VerifiedAdmissionTerminalProjectionV1,
+    CanonicalAdmissionProjectionRecord, CanonicalAdmissionTerminalProjection, ClaimedCommand,
+    ClaimedLease, PersistedAdmissionOperationV1, QualifiedAdmissionOperationStore,
+    RecoveryClaimRequest, SideEffectClass, SignedAdmissionTerminalProjectionV1,
+    UntrustedAdmissionRecoveryClaim, VerifiedAdmissionTerminalProjectionRecordV1,
+    VerifiedAdmissionTerminalProjectionV1,
 };
 use chio_kernel::budget_store::{
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest,
@@ -104,6 +105,45 @@ pub use security_participant_state::{
     SecurityParticipantStateInitialization,
 };
 mod store;
+pub(crate) use store::claim_lease_tx;
+
+/// How a joint transaction proves its recovery authority: a lease the
+/// coordinator already holds, or a claim it asks the transaction to persist
+/// and qualify before the mutation, so the claim and the mutation are one
+/// durable write.
+pub(crate) enum RecoveryAuthority<'a, 'l> {
+    Lease(&'a AdmissionRecoveryLease),
+    Claim {
+        request: RecoveryClaimRequest<'a>,
+        lease: &'a mut ClaimedLease<'l>,
+    },
+}
+
+impl RecoveryAuthority<'_, '_> {
+    pub(crate) fn store_fence(&self) -> &StoreMutationFence {
+        match self {
+            Self::Lease(lease) => lease.store_fence(),
+            Self::Claim { request, .. } => request.fence,
+        }
+    }
+}
+
+/// The lease a joint transaction applies under, persisting the claim in the
+/// transaction when the coordinator asked for one.
+pub(crate) fn resolve_recovery_authority<'a>(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    authority: RecoveryAuthority<'a, '_>,
+    trusted_now_unix_ms: u64,
+) -> Result<std::borrow::Cow<'a, AdmissionRecoveryLease>, AdmissionOperationStoreError> {
+    match authority {
+        RecoveryAuthority::Lease(lease) => Ok(std::borrow::Cow::Borrowed(lease)),
+        RecoveryAuthority::Claim { request, lease } => {
+            claim_lease_tx(transaction, owner, request, trusted_now_unix_ms, lease)
+                .map(std::borrow::Cow::Owned)
+        }
+    }
+}
 mod threshold_approval;
 
 use commit_chain::append_operation_commit;
@@ -432,7 +472,39 @@ impl SqliteAdmissionOperationStore {
         self.capture_dispatch_inner(
             crate::budget_store::AdmissionCaptureBinding {
                 operation,
-                recovery_lease,
+                recovery: RecoveryAuthority::Lease(recovery_lease),
+                trusted_now_unix_ms,
+                caller_context: None,
+                native: None,
+            },
+            request,
+            active_fence,
+        )
+    }
+
+    /// Claim recovery and capture the invocation in one durable write.
+    pub fn claim_and_capture_invocation_and_commit_dispatch(
+        &self,
+        claim: RecoveryClaimRequest<'_>,
+        lease: &mut ClaimedLease<'_>,
+        operation: &AdmissionOperationV1,
+        request: BudgetCaptureInvocationRequest,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        (
+            chio_kernel::budget_store::BudgetInvocationCaptureDecision,
+            AdmissionOperationV1,
+        ),
+        AdmissionCaptureError,
+    > {
+        self.capture_dispatch_inner(
+            crate::budget_store::AdmissionCaptureBinding {
+                operation,
+                recovery: RecoveryAuthority::Claim {
+                    request: claim,
+                    lease,
+                },
                 trusted_now_unix_ms,
                 caller_context: None,
                 native: None,
@@ -449,7 +521,7 @@ impl SqliteAdmissionOperationStore {
         self.capture_dispatch_inner(
             crate::budget_store::AdmissionCaptureBinding {
                 operation: capture.operation,
-                recovery_lease: capture.recovery_lease,
+                recovery: RecoveryAuthority::Lease(capture.recovery_lease),
                 trusted_now_unix_ms: capture.trusted_now_unix_ms,
                 caller_context: Some(capture.context),
                 native: None,
@@ -493,7 +565,7 @@ impl SqliteAdmissionOperationStore {
             .capture_dispatch_inner(
                 crate::budget_store::AdmissionCaptureBinding {
                     operation: custody.operation,
-                    recovery_lease: custody.lease,
+                    recovery: RecoveryAuthority::Lease(custody.lease),
                     trusted_now_unix_ms: custody.trusted_now_unix_ms,
                     caller_context,
                     native: Some(NativeCaptureBinding {
@@ -524,7 +596,7 @@ impl SqliteAdmissionOperationStore {
 
     fn capture_dispatch_inner(
         &self,
-        binding: crate::budget_store::AdmissionCaptureBinding<'_>,
+        binding: crate::budget_store::AdmissionCaptureBinding<'_, '_>,
         request: BudgetCaptureInvocationRequest,
         active_fence: &StoreMutationFence,
     ) -> Result<
@@ -536,7 +608,7 @@ impl SqliteAdmissionOperationStore {
     > {
         let operation = binding.operation;
         if active_fence != &self.serving_owner.fence
-            || binding.recovery_lease.store_fence() != active_fence
+            || binding.recovery.store_fence() != active_fence
             || operation.state() != AdmissionOperationState::CapturePending
             || operation.binding().capability_id().as_str() != request.capability_id
             || operation
@@ -565,8 +637,56 @@ impl SqliteAdmissionOperationStore {
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<(BudgetAuthorizeHoldDecision, AdmissionOperationV1), AdmissionCaptureError> {
-        if active_fence != &self.serving_owner.fence || recovery_lease.store_fence() != active_fence
-        {
+        self.authorize_budget_and_commit_admission_under(
+            RecoveryAuthority::Lease(recovery_lease),
+            operation,
+            request,
+            payment_journal,
+            credit_exposure,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    /// Claim recovery and authorize the budget hold in one durable write.
+    #[allow(clippy::too_many_arguments)]
+    pub fn claim_and_authorize_budget_and_commit_admission(
+        &self,
+        claim: RecoveryClaimRequest<'_>,
+        lease: &mut ClaimedLease<'_>,
+        operation: &AdmissionOperationV1,
+        request: BudgetAuthorizeHoldRequest,
+        payment_journal: Option<PaymentJournalRecord>,
+        credit_exposure: Option<chio_credit::obligation::CreditExposureReservationRequest>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(BudgetAuthorizeHoldDecision, AdmissionOperationV1), AdmissionCaptureError> {
+        self.authorize_budget_and_commit_admission_under(
+            RecoveryAuthority::Claim {
+                request: claim,
+                lease,
+            },
+            operation,
+            request,
+            payment_journal,
+            credit_exposure,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn authorize_budget_and_commit_admission_under(
+        &self,
+        recovery: RecoveryAuthority<'_, '_>,
+        operation: &AdmissionOperationV1,
+        request: BudgetAuthorizeHoldRequest,
+        payment_journal: Option<PaymentJournalRecord>,
+        credit_exposure: Option<chio_credit::obligation::CreditExposureReservationRequest>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(BudgetAuthorizeHoldDecision, AdmissionOperationV1), AdmissionCaptureError> {
+        if active_fence != &self.serving_owner.fence || recovery.store_fence() != active_fence {
             return Err(AdmissionCaptureError::Fenced);
         }
         let budget = crate::budget_store::SqliteBudgetStore::open_alongside(
@@ -578,7 +698,7 @@ impl SqliteAdmissionOperationStore {
                 request,
                 crate::budget_store::AdmissionAuthorizationBinding {
                     operation,
-                    recovery_lease,
+                    recovery,
                     payment_journal: payment_journal.as_ref(),
                     credit_exposure: credit_exposure.as_ref(),
                     trusted_now_unix_ms,

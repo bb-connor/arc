@@ -1779,11 +1779,22 @@ async fn durable_dispatch_forwards_its_identity_and_probes_the_upstream() {
     .await
     .unwrap_or_else(|e| panic!("invoke: {e}"));
     assert!(value.to_string().contains("/tmp/x"));
+    let (cost_value, cost) = ToolServerConnection::invoke_with_cost_in_context(
+        &server,
+        &context,
+        "read_file",
+        serde_json::json!({"path": "/tmp/monetary"}),
+        None,
+    )
+    .await
+    .unwrap_or_else(|e| panic!("cost invoke: {e}"));
+    assert!(cost_value.to_string().contains("/tmp/monetary"));
+    assert!(cost.is_none());
     let contexts = transport
         .contexts
         .lock()
         .unwrap_or_else(|e| panic!("lock: {e}"));
-    assert_eq!(contexts.as_slice(), &[context]);
+    assert_eq!(contexts.as_slice(), &[context.clone(), context]);
 }
 
 /// Shares one recording transport between the adapter and the assertions.

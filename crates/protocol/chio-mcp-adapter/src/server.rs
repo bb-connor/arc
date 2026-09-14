@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use chio_kernel::{KernelError, NestedFlowBridge, ToolDispatchContext, ToolServerConnection};
+use chio_kernel::{
+    KernelError, NestedFlowBridge, ToolDispatchContext, ToolInvocationCost, ToolServerConnection,
+};
 use chio_manifest::ToolManifest;
 
 use crate::adapter::{McpAdapter, McpAdapterConfig};
@@ -211,5 +213,20 @@ impl ToolServerConnection for AdaptedMcpServer {
         self.adapter
             .invoke_in_context(context, tool_name, arguments, nested_flow_bridge)
             .map_err(map_tool_invocation_error)
+    }
+
+    async fn invoke_with_cost_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
+        // Preserve the same realized-cost behavior as the plain MCP adapter
+        // while retaining caller and operation binding on monetary dispatches.
+        let value = self
+            .invoke_in_context(context, tool_name, arguments, nested_flow_bridge)
+            .await?;
+        Ok((value, None))
     }
 }
