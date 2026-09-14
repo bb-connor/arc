@@ -5,13 +5,14 @@ import io
 import json
 
 import pytest
+from minisweagent.models.test_models import make_toolcall_output
+from test_recovery import MemoryProcess
+
 from chio_mini_swe import ChioAgent, ChioEnvironment, ChioModel, ChioModelError
 from chio_mini_swe.gateway import serve
 from chio_mini_swe.model import RESULT_SCHEMA
 from chio_mini_swe.state import encode
 from chio_mini_swe.worker import SCHEMA, build_agent, export_result, run_bootstrap
-from minisweagent.models.test_models import make_toolcall_output
-from test_recovery import MemoryProcess
 
 
 def message(command, cost=0.25):
@@ -40,12 +41,14 @@ class GatewayProcess(MemoryProcess):
         self.provider_calls = 0
         self.model_fault = None
         self.unknown = False
+        self.model_keys = []
 
     def invoke(self, key, server, tool, arguments, *, known_outcome_only=False):
         if server != "model":
             assert not known_outcome_only
             return super().invoke(key, server, tool, arguments)
         assert known_outcome_only, "model query permitted unknown-outcome redispatch"
+        self.model_keys.append(key)
         payload = encode([server, tool, arguments, known_outcome_only])
         if key in self.operations:
             previous, result = self.operations[key]
@@ -55,7 +58,7 @@ class GatewayProcess(MemoryProcess):
         self.provider_calls += 1
         result = {
             "verdict": "allow",
-            "terminal_state": {"state": "unknown" if self.unknown else "completed"},
+            "terminal_state": {"state": "completed"},
             "receipt_json": json.dumps({"model_operation": key}),
             "output": {
                 "kind": "value",
@@ -65,6 +68,51 @@ class GatewayProcess(MemoryProcess):
                 },
             },
         }
+        if self.unknown:
+            result["verdict"] = "deny"
+            # The denial decision completed; the retained provider operation did not.
+            result["terminal_state"] = {"state": "completed"}
+            result["output"] = None
+            result["receipt_json"] = json.dumps(
+                {
+                    "model_operation": key,
+                    "metadata": {
+                        "admission_operation": {
+                            "schema": "chio.admission-receipt.v1",
+                            "operation_id": "a" * 64,
+                            "request_id": key,
+                            "request_namespace_digest": "b" * 64,
+                            "request_binding_hash": "c" * 64,
+                            "projected_operation_version": 7,
+                            "projected_state": "outcome_unknown_after_dispatch",
+                            "projected_dispatch_state": "terminal",
+                            "trusted_time_unix_ms": 1_710_000_000_000,
+                            "coordinator_lease_id": "historical-dispatch",
+                            "coordinator_lease_epoch": 1,
+                            "store_fence": {
+                                "store_uuid": "11111111-1111-4111-8111-111111111111",
+                                "lease_id": "historical-store-owner",
+                                "owner_epoch": 1,
+                            },
+                            "retained_dispatch_commit": {
+                                "committed_version": 6,
+                                "coordinator_lease_id": "historical-dispatch",
+                                "coordinator_lease_epoch": 1,
+                                "store_fence": {
+                                    "store_uuid": "11111111-1111-4111-8111-111111111111",
+                                    "lease_id": "historical-store-owner",
+                                    "owner_epoch": 1,
+                                },
+                                "provider_attempt": None,
+                            },
+                            "compensation_status": "not_compensated",
+                            "tool_outcome_id": None,
+                            "tool_outcome_version": None,
+                        }
+                    },
+                },
+                indent=2,
+            ) + "\n"
         self.operations[key] = (payload, result)
         if self.model_fault is not None:
             error, self.model_fault = self.model_fault, None
@@ -111,11 +159,57 @@ def test_completed_model_response_replays_without_another_query_or_charge(fault)
 def test_unknown_model_outcome_stops_every_attempt_without_commands_or_regeneration():
     client = GatewayProcess([FINISH])
     client.unknown = True
+    original_receipt = None
     for _ in range(2):
-        with pytest.raises(ChioModelError, match="unknown"):
-            agent(client).run("Task")
+        instance = agent(client)
+        with pytest.raises(ChioModelError, match="unknown") as failure:
+            instance.run("Task")
+        receipt = next(iter(client.operations.values()))[1]["receipt_json"]
+        if original_receipt is None:
+            original_receipt = receipt
+        assert failure.value.receipt_json == original_receipt == receipt
+        assert instance.model.receipts == [original_receipt]
     assert client.provider_calls == 1
     assert not client.effects
+    assert len(client.model_keys) == 2 and len(set(client.model_keys)) == 1
+
+
+@pytest.mark.parametrize(
+    "receipt",
+    [
+        "not json\n",
+        "[]\n",
+        '{"metadata": null}\n',
+        '{"metadata": {"admission_operation": []}}\n',
+        '{"metadata": {"admission_operation": {"retained_state": '
+        '"outcome_unknown_after_dispatch"}}}\n',
+        '{"metadata": {"admission_operation": {"schema": "unrecognized", '
+        '"projected_state": "outcome_unknown_after_dispatch"}}}\n',
+        '{"metadata": {"admission_operation": {"schema": "chio.admission-receipt.v1", '
+        '"projected_state": "completed"}}}\n',
+    ],
+)
+def test_unrecognized_denials_preserve_evidence_and_never_regenerate(receipt):
+    class DenyingGateway(GatewayProcess):
+        def invoke(self, key, server, tool, arguments, *, known_outcome_only=False):
+            result = super().invoke(
+                key, server, tool, arguments, known_outcome_only=known_outcome_only
+            )
+            if server == "model":
+                result["receipt_json"] = receipt
+            return result
+
+    client = DenyingGateway([FINISH])
+    client.unknown = True
+    for _ in range(2):
+        instance = agent(client)
+        with pytest.raises(ChioModelError, match="denied") as failure:
+            instance.run("Task")
+        assert failure.value.receipt_json == receipt
+        assert instance.model.receipts == [receipt]
+    assert client.provider_calls == 1
+    assert not client.effects
+    assert len(client.model_keys) == 2 and len(set(client.model_keys)) == 1
 
 
 def test_model_route_and_format_configuration_cannot_change_on_resume():

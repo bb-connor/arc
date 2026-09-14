@@ -169,6 +169,144 @@ fn accepted(
     .is_ok())
 }
 
+fn lineage_refusal(
+    f: &Fixture,
+    ancestors: &[CapabilityToken],
+    leaf: &CapabilityToken,
+    direct_root: Option<&CapabilityToken>,
+) -> Result<String> {
+    let root_hash = scope_hash(&f.root.scope)?;
+    let resolver = |_: &PublicKey| Some(root_hash.clone());
+    let peer = CapabilityNegotiation::v1_default();
+    let result = verify_capability_full_with_evidence(
+        leaf,
+        &[f.issuer.public_key()],
+        &FixedClock::new(150),
+        CapabilityCryptoFloor::AllowClassical,
+        CapabilityEvidenceContext {
+            features: CapabilityFeatureContext {
+                peer: &peer,
+                direct_root,
+            },
+            ancestors,
+        },
+        &resolver,
+        &mut NoopBudgetRegistry,
+    );
+    match result {
+        Err(chio_kernel_core::CapabilityError::AttenuationViolation(reason)) => Ok(reason),
+        other => Err(format!("expected owning lineage refusal, got {other:?}").into()),
+    }
+}
+
+#[test]
+fn signed_lineage_refuses_missing_delegate_for_each_grant_family() -> Result {
+    use chio_core_types::capability::scope::{PromptGrant, ResourceGrant};
+    for family in ["tool", "resource", "prompt"] {
+        let mut f = fixture()?;
+        let mut root_scope = ChioScope::default();
+        match family {
+            "tool" => {
+                root_scope = scope(&["read"]);
+                root_scope.grants[0].operations = vec![Operation::Invoke];
+            }
+            "resource" => root_scope.resource_grants.push(ResourceGrant {
+                uri_pattern: "data:*".into(),
+                operations: vec![Operation::Read],
+            }),
+            _ => root_scope.prompt_grants.push(PromptGrant {
+                prompt_name: "prompt".into(),
+                operations: vec![Operation::Get],
+            }),
+        }
+        let mut root_body = f.root.body();
+        root_body.scope = root_scope.clone();
+        f.root = CapabilityToken::sign(root_body, &f.issuer)?;
+        f.child = issue_child(
+            &f.root,
+            &f.root_key,
+            &f.issuer,
+            &f.child_key.public_key(),
+            "child",
+            root_scope.clone(),
+            true,
+        )?;
+        f.leaf = issue_child(
+            &f.child,
+            &f.child_key,
+            &f.issuer,
+            &f.leaf.subject,
+            "leaf",
+            root_scope,
+            true,
+        )?;
+        let error = lineage_refusal(&f, &[f.root.clone(), f.child.clone()], &f.leaf, None)?;
+        assert!(
+            error.contains("signed parent does not grant delegation for the child scope"),
+            "{family}: {error}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn signed_lineage_refuses_invalid_link_times_at_the_validity_boundary() -> Result {
+    for timestamp in [99, 111, 300] {
+        let f = fixture()?;
+        let mut child = f.child.clone();
+        let mut leaf = f.leaf.clone();
+        let index = usize::from(timestamp != 99);
+        let mut body = leaf.delegation_chain[index].body();
+        body.timestamp = timestamp;
+        leaf.delegation_chain[index] = DelegationLink::sign(
+            body,
+            if index == 0 {
+                &f.root_key
+            } else {
+                &f.child_key
+            },
+        )?;
+        if index == 0 {
+            child.delegation_chain[0] = leaf.delegation_chain[0].clone();
+            child.signature = f.issuer.sign_canonical(&child.signing_body())?.0;
+        }
+        leaf.signature = f.issuer.sign_canonical(&leaf.signing_body())?.0;
+        let error = lineage_refusal(&f, &[f.root.clone(), child], &leaf, None)?;
+        assert!(
+            error.contains("delegated validity or budget share widens its signed parent"),
+            "{timestamp}: {error}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn signed_lineage_refuses_repeated_identity_and_mismatched_negotiated_root() -> Result {
+    let f = fixture()?;
+    let mut repeated = f.leaf.clone();
+    repeated.id = f.child.id.clone();
+    repeated.signature = f.issuer.sign_canonical(&repeated.signing_body())?.0;
+    let error = lineage_refusal(&f, &[f.root.clone(), f.child.clone()], &repeated, None)?;
+    assert!(
+        error.contains("signed lineage repeats a capability identity"),
+        "{error}"
+    );
+    let mut another_body = f.root.body();
+    another_body.id = "other-root".into();
+    let other_root = CapabilityToken::sign(another_body, &f.issuer)?;
+    let error = lineage_refusal(
+        &f,
+        &[f.root.clone(), f.child.clone()],
+        &f.leaf,
+        Some(&other_root),
+    )?;
+    assert!(
+        error.contains("signed lineage differs from the negotiated family root"),
+        "{error}"
+    );
+    Ok(())
+}
+
 #[test]
 fn recursive_narrowing_requires_complete_signed_evidence() -> Result {
     let f = fixture()?;

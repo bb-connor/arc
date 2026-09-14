@@ -106,6 +106,21 @@ def _cost(message):
         raise ChioModelError("missing or invalid model cost")
 
 
+def _retained_unknown(receipt):
+    """Classify a stop reason only; never authorize recovery or rewrite evidence."""
+    try:
+        value = json.loads(receipt)
+    except ValueError:
+        return False
+    metadata = value.get("metadata") if isinstance(value, dict) else None
+    admission = metadata.get("admission_operation") if isinstance(metadata, dict) else None
+    return (
+        isinstance(admission, dict)
+        and admission.get("schema") == "chio.admission-receipt.v1"
+        and admission.get("projected_state") == "outcome_unknown_after_dispatch"
+    )
+
+
 class ChioModel:
     """No provider client, API key or network fallback is installed in this adapter.
 
@@ -166,6 +181,10 @@ class ChioModel:
         if not isinstance(receipt, str) or not receipt:
             raise ChioModelError("missing receipt")
         self.receipts.append(receipt)
+        # A completed Deny decision can observe an unknown provider operation.
+        # Keep the original bytes; this reader is not a receipt verifier.
+        if _retained_unknown(receipt):
+            raise ChioModelError("unknown or incomplete provider outcome", receipt)
         if result.get("verdict") != "allow":
             raise ChioModelError("denied", receipt)
         if result.get("terminal_state", {}).get("state") != "completed":

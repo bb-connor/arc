@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+pub mod supplemental;
+
 use std::path::Path;
 use std::sync::Arc;
 
@@ -59,6 +61,24 @@ pub fn config() -> KernelConfig {
 }
 
 pub fn kernel(path: &Path, server: Box<dyn ToolServerConnection>) -> Result<Arc<ChioKernel>> {
+    kernel_with_payment(path, server, false)
+}
+
+pub fn kernel_with_payment(
+    path: &Path,
+    server: Box<dyn ToolServerConnection>,
+    payment: bool,
+) -> Result<Arc<ChioKernel>> {
+    kernel_with_artifacts(path, server, payment, false, false)
+}
+
+pub fn kernel_with_artifacts(
+    path: &Path,
+    server: Box<dyn ToolServerConnection>,
+    payment: bool,
+    nonce: bool,
+    supplemental: bool,
+) -> Result<Arc<ChioKernel>> {
     private_dir(path)?;
     let locks = path.join("locks");
     private_dir(&locks)?;
@@ -83,6 +103,36 @@ pub fn kernel(path: &Path, server: Box<dyn ToolServerConnection>) -> Result<Arc<
         authority.mutation_fence(),
     )?;
     kernel.configure_durable_admission(DurableAdmissionMode::All, false)?;
+    kernel.set_governed_approval_replay_store(Box::new(
+        chio_kernel::InMemoryGovernedApprovalReplayStore::new(64),
+    ));
+    if nonce {
+        let config = chio_kernel::execution_nonce::ExecutionNonceConfig {
+            nonce_ttl_secs: 300,
+            nonce_store_capacity: 64,
+            require_nonce: true,
+        };
+        kernel.set_execution_nonce_store(
+            config.clone(),
+            Box::new(
+                chio_kernel::execution_nonce::InMemoryExecutionNonceStore::from_config(&config),
+            ),
+        );
+    }
+    if payment {
+        kernel.set_payment_adapter(Box::new(
+            chio_store_sqlite::SqliteFindingOperatorPaymentAdapter::open(path.join("payments.db"))?,
+        ));
+    }
+    if supplemental {
+        kernel.set_supplemental_quota_verifier(
+            Arc::new(supplemental::Verifier),
+            chio_kernel::supplemental_quota::SupplementalQuotaVerifierBinding {
+                verifier_identity: "process-test-signed-supplemental".into(),
+                configuration_digest: sha256_hex(b"process-test-supplemental-v1"),
+            },
+        )?;
+    }
     kernel.register_tool_server(server);
     kernel.reconcile_durable_admission_startup()?;
     Ok(Arc::new(kernel))

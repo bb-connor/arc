@@ -761,9 +761,18 @@ impl ChioKernel {
                 operation
             }
             AdmissionBeginResult::ExactReplay { operation, .. } => {
-                return Err(KernelError::DurableAdmissionRetained {
-                    state: operation.state(),
-                });
+                if operation.state() == AdmissionOperationState::OutcomeUnknownAfterDispatch {
+                    return Err(KernelError::DurableAdmissionRetained(Box::new(
+                        AdmissionReceiptMetadataV1::retained_unknown_dispatch(
+                            &operation,
+                            trusted_now_unix_ms,
+                        )?,
+                    )));
+                }
+                return Err(KernelError::DurableAdmission(format!(
+                    "request replay is retained in state {:?}",
+                    operation.state()
+                )));
             }
             AdmissionBeginResult::Conflict {
                 existing_operation_id,

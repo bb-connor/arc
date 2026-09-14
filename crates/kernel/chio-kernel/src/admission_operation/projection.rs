@@ -72,6 +72,44 @@ pub struct AdmissionReceiptMetadataV1 {
     pub tool_outcome_version: Option<u64>,
 }
 
+impl AdmissionReceiptMetadataV1 {
+    /// Observe an already-retained unknown outcome without claiming a new
+    /// transition or a live recovery lease. Unlike terminal-transition metadata,
+    /// the version is unchanged and the coordinator/fence tuple is the validated
+    /// historical dispatch tuple. This is not `VerifiedAdmissionReceipt` authority.
+    pub(crate) fn retained_unknown_dispatch(
+        operation: &AdmissionOperationV1,
+        trusted_time_unix_ms: u64,
+    ) -> Result<Self, AdmissionOperationError> {
+        operation.validate()?;
+        super::state::validate_positive_ijson("trusted_time_unix_ms", trusted_time_unix_ms)?;
+        if operation.state() != AdmissionOperationState::OutcomeUnknownAfterDispatch {
+            return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
+        }
+        let dispatch = operation
+            .dispatch_commit()
+            .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+        Ok(Self {
+            schema: AdmissionReceiptSchema::V1,
+            operation_id: operation.binding().operation_id().clone(),
+            request_id: operation.binding().request_id().clone(),
+            request_namespace_digest: operation.binding().request_namespace_digest().clone(),
+            request_binding_hash: operation.binding().request_binding_hash().clone(),
+            projected_operation_version: operation.version(),
+            projected_state: operation.state(),
+            projected_dispatch_state: operation.dispatch_state(),
+            trusted_time_unix_ms,
+            coordinator_lease_id: dispatch.coordinator_lease_id.clone(),
+            coordinator_lease_epoch: dispatch.coordinator_lease_epoch,
+            store_fence: dispatch.store_fence.clone(),
+            retained_dispatch_commit: Some(dispatch.clone()),
+            compensation_status: AdmissionCompensationStatus::NotCompensated,
+            tool_outcome_id: None,
+            tool_outcome_version: None,
+        })
+    }
+}
+
 /// A receipt qualified by the kernel against the exact admission projection.
 ///
 /// Raw participant and post-return evidence constructors are absent from the

@@ -154,7 +154,8 @@ async fn committed_renewal_with_unknown_kernel_outcome_is_not_redispatched() -> 
     assert_eq!(replay.verdict, Verdict::Deny);
     assert!(replay.receipt.verify_signature()?);
     assert_eq!(
-        serde_json::to_value(&replay.receipt)?["metadata"]["admission_operation"]["retained_state"],
+        serde_json::to_value(&replay.receipt)?["metadata"]["admission_operation"]
+            ["projected_state"],
         "outcome_unknown_after_dispatch",
     );
     assert_eq!(deadline()?, retained);

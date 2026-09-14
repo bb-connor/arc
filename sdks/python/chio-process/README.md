@@ -108,6 +108,13 @@ Denials may withhold a payload whose digest remains signed; they must return no
 output. Incomplete streams retain their authenticated prefix. Equivalent JSON
 number spellings are supported; duplicate keys and precision-losing numbers
 are refused. The stricter original signed-receipt validation remains in use.
+The Python helper normalizes its in-memory request through Python JSON before
+dispatch and records that normalized request. It cannot recover duplicate keys
+or precision already lost when an application parsed its input. Direct CLI
+verification reads the retained JSON documents with duplicate-key and numeric
+precision checks; those checks apply to the original text supplied to the CLI.
+Neither path normalizes, rewrites or re-signs `receipt_json`. A verification
+failure retains the original evidence and never triggers another invocation.
 The signed decision also constrains output shape: a completed allow contains a
 value or stream, while cancellation and nonce preflight contain no payload.
 This distinguishes a successful JSON null value from an absent result even

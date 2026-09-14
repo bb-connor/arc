@@ -141,6 +141,52 @@ impl Fixture {
 }
 
 #[test]
+fn retained_later_attempts_require_the_exact_signed_identity_and_bounded_attempt() -> Result {
+    for attempt in [2_u32, 3] {
+        let mut fixture = Fixture::new()?;
+        fixture.request["known_outcome_only"] = json!(false);
+        fixture.request_id = format!(
+            "process:{}",
+            sha256_hex(&canonical_json_bytes(&json!([
+                "runtime-one",
+                "operator",
+                "assign-one",
+                attempt
+            ]))?)
+        );
+        let metadata = fixture.body.metadata.as_mut().ok_or("metadata")?;
+        metadata["chio_process"]
+            .as_object_mut()
+            .ok_or("process")?
+            .remove("recovery_policy");
+        metadata["chio_process"]["attempt"] = json!(attempt);
+        metadata["receipt_context"]["request_id"] = json!(fixture.request_id);
+        let response = fixture.response(
+            "allow",
+            json!({"kind": "value", "value": {"owner": "λ", "revision": 1}}),
+            Value::Null,
+            json!({"state": "completed"}),
+        )?;
+        fixture.accepts(&response)?;
+        let mut wrong_id = response.clone();
+        wrong_id["request_id"] = json!("process:unrelated");
+        fixture.rejects(&wrong_id)?;
+        for wrong_attempt in [0, 1, 4, 5 - attempt] {
+            fixture.body.metadata.as_mut().ok_or("metadata")?["chio_process"]["attempt"] =
+                json!(wrong_attempt);
+            let wrong_signed_attempt = fixture.response(
+                "allow",
+                response["output"].clone(),
+                Value::Null,
+                json!({"state": "completed"}),
+            )?;
+            fixture.rejects(&wrong_signed_attempt)?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn null_content_preserves_success_cancellation_and_preflight_output_presence() -> Result {
     let mut fixture = Fixture::new()?;
     fixture.body.content_hash = sha256_hex(b"null");

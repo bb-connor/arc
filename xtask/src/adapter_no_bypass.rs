@@ -340,12 +340,18 @@ const CALL_CONTRACTS: &[CallContract] = &[
     CallContract {
         path: MCP_LAUNCH_SOURCE,
         function: "StdioMcpTransport::spawn_cage_required",
+        target: "Self::spawn_cage_required_with_timeouts",
+        minimum: 1,
+    },
+    CallContract {
+        path: MCP_LAUNCH_SOURCE,
+        function: "StdioMcpTransport::spawn_cage_required_with_timeouts",
         target: "migration.require_enforced",
         minimum: 1,
     },
     CallContract {
         path: MCP_LAUNCH_SOURCE,
-        function: "StdioMcpTransport::spawn_cage_required",
+        function: "StdioMcpTransport::spawn_cage_required_with_timeouts",
         target: "chio_cage::launch_prepared",
         minimum: 1,
     },
@@ -424,7 +430,7 @@ const CALL_CONTRACTS: &[CallContract] = &[
     CallContract {
         path: "crates/kernel/chio-kernel/src/kernel/validation.rs",
         function: "ChioKernel::verify_capability_full_pre_admit",
-        target: "chio_kernel_core::verify_capability_full_with_root",
+        target: "chio_kernel_core::verify_capability_full_with_evidence",
         minimum: 1,
     },
     CallContract {
@@ -524,7 +530,7 @@ fn require_native_launch_gate(source: &SourceFacts) -> Result<(), String> {
     require_call_tokens(
         source,
         "StdioMcpTransport::spawn_legacy_authorized",
-        "Self::spawn_legacy_with_gate",
+        "Self::spawn_legacy_with_gate_and_timeouts",
         &["||authorization.revalidate()"],
     )?;
     require_call_tokens(
@@ -1091,7 +1097,8 @@ mod tests {
         let safe = r#"
             impl StdioMcpTransport {
                 fn spawn_legacy_authorized() {
-                    Self::spawn_legacy_with_gate(command, args, || authorization.revalidate())?;
+                    Self::spawn_legacy_with_gate_and_timeouts(
+                        command, args, || authorization.revalidate(), request_timeouts)?;
                 }
                 fn spawn_legacy_with_gate_and_timeouts() {
                     dispatch_native_launch(NativeLaunchRequirement::LegacyAllowed,

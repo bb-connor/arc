@@ -9,6 +9,34 @@ use chio_process::ProcessRuntime;
 use serde_json::{json, Value};
 use support::Result;
 
+#[derive(Debug, PartialEq)]
+struct RetainedSnapshot {
+    operation_and_claim: Vec<Vec<rusqlite::types::Value>>,
+    commit_head: Vec<Vec<rusqlite::types::Value>>,
+    anchor: Vec<u8>,
+}
+
+fn retained_snapshot(dir: &std::path::Path) -> Result<RetainedSnapshot> {
+    let connection = rusqlite::Connection::open(dir.join("authority.db"))?;
+    let rows = |table: &str| -> Result<Vec<Vec<rusqlite::types::Value>>> {
+        let mut statement = connection.prepare(&format!("SELECT * FROM {table}"))?;
+        let columns = statement.column_count();
+        let values = statement.query_map([], |row| {
+            (0..columns).map(|column| row.get(column)).collect()
+        })?;
+        Ok(values.collect::<std::result::Result<Vec<_>, _>>()?)
+    };
+    let store: String =
+        connection.query_row("SELECT store_uuid FROM chio_serving_owner", [], |row| {
+            row.get(0)
+        })?;
+    Ok(RetainedSnapshot {
+        operation_and_claim: rows("admission_operations")?,
+        commit_head: rows("admission_operation_commit_meta")?,
+        anchor: std::fs::read(dir.join("locks").join(format!("{store}.lock")))?,
+    })
+}
+
 /// `append` is a side effect; `read` is declared free of side effects and
 /// records each execution in a separate log only so the test can count them.
 struct AppendServer {
@@ -102,6 +130,93 @@ fn unknown_read_only_outcome_is_redispatched_under_a_fresh_request_identity() ->
 }
 
 #[test]
+fn original_artifact_calls_keep_one_dispatch_and_identity_after_host_death() -> Result {
+    for artifact in ["dpop", "intent", "approval", "nonce", "supplemental"] {
+        let dir = tempfile::tempdir()?;
+        assert_eq!(
+            phase(dir.path(), &format!("crash-artifact-{artifact}"))?.code(),
+            Some(73),
+            "{artifact}"
+        );
+        let original = std::fs::read(dir.path().join("original-request.json"))?;
+        assert!(
+            phase(dir.path(), &format!("recover-artifact-{artifact}"))?.success(),
+            "{artifact}"
+        );
+        assert_eq!(
+            std::fs::read(dir.path().join("original-request.json"))?,
+            original
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("reads.log"))?,
+            "read-executed\n",
+            "{artifact}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn unknown_monetary_read_retains_one_original_payment_hold() -> Result {
+    let dir = tempfile::tempdir()?;
+    assert_eq!(phase(dir.path(), "crash-monetary-read")?.code(), Some(73));
+    let payment_snapshot = || -> Result<(i64, String, String, i64)> {
+        let database = rusqlite::Connection::open_with_flags(
+            dir.path().join("payments.db"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )?;
+        Ok(database.query_row("SELECT COUNT(*), MIN(authorization_id), MIN(state), SUM(amount_units) FROM chio_finding_operator_payments", [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))?)
+    };
+    let before = payment_snapshot()?;
+    assert_eq!(before.0, 1);
+    assert_eq!(before.2, "held");
+    assert_eq!(before.3, 100);
+    assert!(phase(dir.path(), "recover-monetary-read")?.success());
+    assert_eq!(payment_snapshot()?, before);
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("reads.log"))?,
+        "read-executed\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn unknown_quota_read_keeps_the_original_charge_and_dispatch_identity() -> Result {
+    let dir = tempfile::tempdir()?;
+    assert_eq!(phase(dir.path(), "crash-quota-read")?.code(), Some(73));
+    let hold_snapshot = || -> Result<(String, i64, i64)> {
+        let database = rusqlite::Connection::open_with_flags(
+            dir.path().join("authority.db"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )?;
+        Ok(database.query_row("SELECT MIN(hold_id), COUNT(*), SUM(invocation_count_debited) FROM budget_authorization_holds", [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?)
+    };
+    let before = hold_snapshot()?;
+    assert_eq!((before.1, before.2), (1, 1));
+    assert!(phase(dir.path(), "recover-quota-read")?.success());
+    assert_eq!(hold_snapshot()?, before);
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("reads.log"))?,
+        "read-executed\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn repeatedly_unknown_reads_stop_at_the_third_dispatch() -> Result {
+    let dir = tempfile::tempdir()?;
+    for _ in 0..3 {
+        assert_eq!(phase(dir.path(), "crash-repeated-read")?.code(), Some(73));
+    }
+    assert!(phase(dir.path(), "recover-repeated-read")?.success());
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("reads.log"))?,
+        "read-executed\nread-executed\nread-executed\n"
+    );
+    Ok(())
+}
+
+#[test]
 fn read_only_recovery_keeps_the_request_identity_when_a_grant_is_present() -> Result {
     let dir = tempfile::tempdir()?;
     assert_eq!(phase(dir.path(), "crash-granted-read")?.code(), Some(73));
@@ -132,17 +247,165 @@ async fn subprocess_worker() -> Result {
     };
     let dir = PathBuf::from(dir);
     let phase = std::env::var("CHIO_PROCESS_TEST_PHASE")?;
-    let kernel = support::kernel(
+    let kernel = support::kernel_with_artifacts(
         &dir,
         Box::new(AppendServer {
             path: dir.join("external.log"),
-            crash_after_effect: matches!(
-                phase.as_str(),
-                "crash-in-tool" | "crash-in-read" | "crash-granted-read" | "crash-known-read"
-            ),
+            crash_after_effect: phase.starts_with("crash-artifact-")
+                || matches!(
+                    phase.as_str(),
+                    "crash-in-tool"
+                        | "crash-in-read"
+                        | "crash-granted-read"
+                        | "crash-known-read"
+                        | "crash-repeated-read"
+                        | "crash-quota-read"
+                        | "crash-monetary-read"
+                ),
         }),
+        phase.ends_with("monetary-read"),
+        phase.ends_with("artifact-nonce"),
+        phase.ends_with("artifact-supplemental"),
     )?;
     let runtime = ProcessRuntime::open(dir.join("process.db"), kernel.clone())?;
+    if phase.contains("-artifact-") {
+        let first = phase.starts_with("crash-");
+        let request_path = dir.join("original-request.json");
+        let request = if first {
+            support::root(&runtime, &kernel, 1)?;
+            let mut request = runtime.tool_request("root", "peek", "tools", "read", json!({}))?;
+            if phase.ends_with("dpop") {
+                request.dpop_proof = Some(chio_kernel::dpop::DpopProof::sign(
+                    chio_kernel::dpop::DpopProofBody {
+                        schema: chio_kernel::dpop::DPOP_SCHEMA.into(),
+                        replay_authority: None,
+                        capability_id: request.capability.id.clone(),
+                        tool_server: "tools".into(),
+                        tool_name: "read".into(),
+                        action_hash: chio_core_types::crypto::sha256_hex(
+                            &chio_core_types::crypto::canonical_json_bytes(&request.arguments)?,
+                        ),
+                        nonce: request.request_id.clone(),
+                        issued_at: request.capability.issued_at,
+                        agent_key: support::parent_key().public_key(),
+                    },
+                    &support::parent_key(),
+                )?);
+            } else if phase.ends_with("supplemental") {
+                request.supplemental_authorization = Some(chio_core_types::capability::supplemental_authorization::OpaqueSupplementalAuthorization {
+                    signed_extension: support::supplemental::issue(&request)?,
+                });
+            } else if phase.ends_with("nonce") {
+                let preflight = kernel.evaluate_tool_call(&request).await?;
+                assert_eq!(preflight.verdict, Verdict::Allow, "{:?}", preflight.reason);
+                request.execution_nonce = Some(*preflight.execution_nonce.ok_or("issued nonce")?);
+            } else {
+                let intent: chio_core_types::capability::governance::GovernedTransactionIntent =
+                    serde_json::from_value(
+                        json!({"id": "read-intent", "server_id": "tools", "tool_name": "read", "purpose": "one recorded read"}),
+                    )?;
+                if phase.ends_with("approval") {
+                    use chio_core_types::capability::governance::{
+                        GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+                    };
+                    request.approval_token = Some(GovernedApprovalToken::sign(
+                        GovernedApprovalTokenBody {
+                            id: "read-approval".into(),
+                            approver: support::issuer().public_key(),
+                            subject: request.capability.subject.clone(),
+                            governed_intent_hash: intent.binding_hash()?,
+                            request_id: request.request_id.clone(),
+                            threshold_proposal_hash: None,
+                            issued_at: request.capability.issued_at,
+                            expires_at: request.capability.expires_at,
+                            decision: GovernedApprovalDecision::Approved,
+                        },
+                        &support::issuer(),
+                    )?);
+                }
+                request.governed_intent = Some(intent);
+            }
+            let mut file = std::fs::File::create(&request_path)?;
+            file.write_all(&serde_json::to_vec(&request)?)?;
+            file.sync_all()?;
+            request
+        } else {
+            serde_json::from_slice(&std::fs::read(&request_path)?)?
+        };
+        let response = runtime.invoke("root", "peek", &request).await?;
+        assert!(
+            !first,
+            "original call did not reach crashing tool: {:?}",
+            response.reason
+        );
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert!(response.receipt.verify_signature()?);
+        assert_eq!(response.request_id, request.request_id);
+        let metadata = response.receipt.metadata.as_ref().ok_or("metadata")?;
+        assert_eq!(metadata["chio_process"]["attempt"], 1);
+        assert_eq!(
+            metadata["admission_operation"]["projected_state"],
+            "outcome_unknown_after_dispatch"
+        );
+        assert_eq!(runtime.process("root")?.tree_calls, 1);
+        return Ok(());
+    }
+    if phase.ends_with("quota-read") || phase.ends_with("monetary-read") {
+        if phase.starts_with("crash-") {
+            let mut scope = support::scope(&["read"]);
+            scope.grants[0].max_invocations = Some(10);
+            if phase.ends_with("monetary-read") {
+                scope.grants[0].max_cost_per_invocation =
+                    Some(chio_core_types::capability::scope::MonetaryAmount {
+                        units: 100,
+                        currency: "USD".into(),
+                    });
+                scope.grants[0].max_total_cost =
+                    Some(chio_core_types::capability::scope::MonetaryAmount {
+                        units: 1000,
+                        currency: "USD".into(),
+                    });
+            }
+            let capability =
+                kernel.issue_capability(&support::parent_key().public_key(), scope, 3600)?;
+            runtime.create_root("root", &capability, support::limits(1))?;
+        }
+        let request = runtime.tool_request("root", "peek", "tools", "read", json!({}))?;
+        let original_id = runtime.request_id("root", "peek")?;
+        let response = runtime.invoke("root", "peek", &request).await?;
+        assert!(phase.starts_with("recover-"));
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert_eq!(response.request_id, original_id);
+        assert!(response.receipt.verify_signature()?);
+        assert_eq!(
+            response.receipt.metadata.as_ref().ok_or("metadata")?["chio_process"]["attempt"],
+            1
+        );
+        assert_eq!(runtime.process("root")?.tree_calls, 1);
+        return Ok(());
+    }
+    if phase.ends_with("repeated-read") {
+        if runtime.process("root").is_err() {
+            support::root(&runtime, &kernel, 1)?;
+        }
+        let request = runtime.tool_request("root", "peek", "tools", "read", json!({}))?;
+        let response = runtime.invoke("root", "peek", &request).await?;
+        assert_eq!(phase, "recover-repeated-read");
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert!(response.receipt.verify_signature()?);
+        let metadata = response.receipt.metadata.as_ref().ok_or("metadata")?;
+        assert_eq!(metadata["chio_process"]["attempt"], 3);
+        assert_eq!(
+            metadata["admission_operation"]["schema"],
+            "chio.admission-receipt.v1"
+        );
+        assert_eq!(
+            metadata["admission_operation"]["projected_state"],
+            "outcome_unknown_after_dispatch"
+        );
+        assert_eq!(runtime.process("root")?.tree_calls, 1);
+        return Ok(());
+    }
     if matches!(
         phase.as_str(),
         "crash-in-tool"
@@ -155,6 +418,11 @@ async fn subprocess_worker() -> Result {
     }
     if phase == "crash-known-read" || phase == "recover-known-read" {
         let request = runtime.tool_request("root", "model", "tools", "read", json!({}))?;
+        let retained_before = if phase == "recover-known-read" {
+            Some(retained_snapshot(&dir)?)
+        } else {
+            None
+        };
         let response = runtime.invoke_known_only("root", "model", &request).await?;
         assert_eq!(phase, "recover-known-read");
         assert_eq!(response.verdict, Verdict::Deny);
@@ -174,10 +442,33 @@ async fn subprocess_worker() -> Result {
             "known_outcome_only"
         );
         assert_eq!(
-            receipt["metadata"]["admission_operation"]["retained_state"],
+            receipt["metadata"]["admission_operation"]["projected_state"],
             "outcome_unknown_after_dispatch"
         );
         assert_eq!(runtime.process("root")?.tree_calls, 1);
+        let projection = &receipt["metadata"]["admission_operation"];
+        let dispatch = &projection["retained_dispatch_commit"];
+        assert_eq!(projection["store_fence"], dispatch["store_fence"]);
+        assert_eq!(
+            projection["coordinator_lease_id"],
+            dispatch["coordinator_lease_id"]
+        );
+        assert_eq!(
+            projection["coordinator_lease_epoch"],
+            dispatch["coordinator_lease_epoch"]
+        );
+        let connection = rusqlite::Connection::open(dir.join("authority.db"))?;
+        let current_epoch: i64 =
+            connection.query_row("SELECT owner_epoch FROM chio_serving_owner", [], |row| {
+                row.get(0)
+            })?;
+        assert!(
+            current_epoch
+                > projection["store_fence"]["owner_epoch"]
+                    .as_i64()
+                    .ok_or("historical epoch")?
+        );
+        assert_eq!(retained_before, Some(retained_snapshot(&dir)?));
         return Ok(());
     }
     if phase == "crash-granted-read" || phase == "recover-granted-read" {

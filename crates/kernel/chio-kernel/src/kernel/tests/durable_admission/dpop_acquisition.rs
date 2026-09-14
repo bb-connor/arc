@@ -13,6 +13,15 @@ pub(super) use callbacks::TestDpop;
 use callbacks::{Mode, State};
 use fixture::*;
 
+pub(super) fn selected_profile_fixture() -> (
+    ChioKernel,
+    ToolCallRequest,
+    Arc<TestAdmissionOperationStore>,
+    Arc<AtomicU64>,
+) {
+    fixture(Mode::Normal)
+}
+
 #[test]
 fn dpop_configuration_and_reservation_cannot_bypass_durable_custody() {
     let (kernel, request, store, _) = fixture(Mode::Normal);

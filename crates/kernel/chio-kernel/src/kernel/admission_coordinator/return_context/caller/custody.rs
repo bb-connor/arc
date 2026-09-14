@@ -160,14 +160,28 @@ impl ChioKernel {
             approval: None,
             dpop: None,
         };
-        if admission
+        let profile = admission
             .original_retained_request()
-            .and_then(|request| request.authority_profile())
-            .is_some_and(|profile| profile.runtime().is_some())
+            .and_then(|request| request.authority_profile());
+        if profile.is_some_and(|profile| profile.runtime().is_some())
             && operation.runtime_participant_ledger_digest().is_none()
         {
             return Err(invalid(
                 "caller custody omitted its selected runtime authority",
+            ));
+        }
+        if profile.is_some_and(|profile| profile.approval().is_some())
+            && operation.governed_approval_ledger_digest().is_none()
+        {
+            return Err(invalid(
+                "caller custody omitted its selected approval authority",
+            ));
+        }
+        if profile.is_some_and(|profile| profile.dpop().is_some())
+            && operation.dpop_replay_ledger_digest().is_none()
+        {
+            return Err(invalid(
+                "caller custody omitted its selected DPoP authority",
             ));
         }
         if operation.runtime_participant_ledger_digest().is_none()

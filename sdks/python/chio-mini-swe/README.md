@@ -141,6 +141,14 @@ tool is mistakenly declared read-only. Existing integrations using a direct
 model instance retain their stricter application checkpoint boundary: a response
 lost before checkpoint cannot be reconstructed automatically.
 
+A completed denial decision can still describe an unknown provider outcome.
+The adapter recognizes the registered `chio.admission-receipt.v1` metadata's
+`projected_state` before reporting a generic denial. This is stop-reason
+classification, not receipt verification or recovery authority. Receipt strings
+remain byte-for-byte unchanged. Unrecognized or legacy thin denial markers
+remain fail-closed denials; neither classification permits regeneration or a
+new operation key.
+
 On the operator side, wrap one configured upstream tool-call model instance:
 
 ```python

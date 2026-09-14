@@ -371,6 +371,59 @@ impl ChioKernel {
             .is_some_and(|server| server.tool_is_read_only(tool_name))
     }
 
+    /// Whether an unknown tool outcome can be attempted under a new identity.
+    /// This is a conservative classifier, never dispatch permission: every new
+    /// attempt still needs full kernel evaluation. Any matching constrained
+    /// grant excludes retry, even if another matching grant could be selected.
+    /// Unrelated grants use the ordinary invocation/argument/model matcher and
+    /// do not withdraw eligibility. Matcher or authority-profile errors refuse.
+    pub fn can_redispatch_unknown_read(&self, request: &ToolCallRequest) -> bool {
+        if !self.tool_is_read_only(&request.server_id, &request.tool_name)
+            || request.dpop_proof.is_some()
+            || request.execution_nonce.is_some()
+            || request.declassification_grant.is_some()
+            || request.governed_intent.is_some()
+            || request.approval_token.is_some()
+            || !request.approval_tokens.is_empty()
+            || request.threshold_approval_proposal.is_some()
+            || request.supplemental_authorization.is_some()
+            || request.capability.aggregate_invocation_budget.is_some()
+            || request
+                .arguments
+                .get(crate::memory_provenance::FINDING_DELIVERY_RECEIPT_ID_ARGUMENT)
+                .is_some()
+            || !matches!(request.capability.security_binding(), Ok(None))
+        {
+            return false;
+        }
+        let Ok(profile) = self.admission_authority_profile() else {
+            return false;
+        };
+        if profile.has_operation_owned_authority()
+            || profile.selection().runtime_hook_installed
+            || profile.selection().swarm_admission_required
+        {
+            return false;
+        }
+        let Ok(matching) = resolve_required_matching_grants(
+            &request.capability,
+            &request.tool_name,
+            &request.server_id,
+            &request.arguments,
+            request.model_metadata.as_ref(),
+        ) else {
+            return false;
+        };
+        matching.iter().all(|matching| {
+            let grant = matching.grant;
+            grant.max_invocations.is_none()
+                && grant.max_cost_per_invocation.is_none()
+                && grant.max_total_cost.is_none()
+                && grant.dpop_required != Some(true)
+                && grant.constraints.is_empty()
+        })
+    }
+
     /// Classical local capability authority. The ordinary receipt signer is
     /// available separately through [`Self::receipt_signing_public_key`].
     pub fn public_key(&self) -> chio_core::PublicKey {

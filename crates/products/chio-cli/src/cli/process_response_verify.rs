@@ -168,7 +168,8 @@ fn verify_request(
         .as_u64()
         .ok_or_else(|| fail("missing process attempt"))?;
     require(
-        (1..=3).contains(&attempt) && (!request.known_outcome_only || attempt == 1),
+        (1..=u64::from(chio_process::MAX_DISPATCH_ATTEMPTS)).contains(&attempt)
+            && (!request.known_outcome_only || attempt == 1),
         "attempt",
     )?;
     let identity = if attempt == 1 {

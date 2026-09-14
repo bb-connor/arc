@@ -49,16 +49,34 @@ guard evaluation, payment, receipt persistence and terminal replay. No
 process journal transition authorizes redispatch of an ambiguous effect.
 The runtime does not interpret tool failures as proof that no effect occurred.
 
-The one exception is declared, not inferred: when the kernel projects a
-dispatch as `outcome_unknown_after_dispatch` and the registered server declares
-the tool free of side effects, the journal advances the operation's attempt
+An unknown read can earn a fresh attempt only when the kernel projects its
+retained state as `outcome_unknown_after_dispatch` in the registered
+`chio.admission-receipt.v1` metadata and the owning kernel classifies the request
+as eligible. The classifier requires read-only tool metadata and excludes
+matching invocation/cost quotas, aggregate budgets, cumulative approvals,
+finding recovery/delivery, and native/runtime/approval/DPoP authority profiles.
+It uses the actual invocation, argument and model matcher; matcher errors refuse
+retry. It conservatively refuses any matching constrained grant, even when
+another matching grant could be selected. Unrelated grants do not withdraw
+eligibility. An actually selected original authority profile is part of the
+immutable admission binding, so removing that authority after restart cannot
+reuse its unknown operation. A configured but unselected backend is not retained
+authority usage; original request-bound artifacts independently exclude retry.
+For an eligible request, the journal advances the operation's attempt
 counter in its own transaction before the runtime dispatches a fresh kernel
 operation under an attempt-derived request id. The attempt counter is
 recorded before the dispatch, so a crash between the two leaves the journal
 ahead of the kernel and the next open replays the recorded attempt. Requests
 carrying DPoP proofs, execution nonces, declassification grants, governed
-intents, approvals or supplemental authorization are never redispatched, because
+intents, approvals, threshold proposals or supplemental authorization are never redispatched, because
 those artifacts bind the request id that would change.
+The known-outcome-only policy never redispatches. All other logical operations
+share the public `MAX_DISPATCH_ATTEMPTS` ceiling. Unknown replay metadata
+observes the retained version and historical dispatch lease/fence tuple; it
+does not commit a new terminal transition or grant a live recovery lease.
+Pre-repair thin markers and unrecognized metadata remain original signed
+evidence and cannot authorize new dispatch. Receipts are never rewritten or
+re-signed to manufacture compatibility.
 
 Checkpoints use compare-and-swap revisions. They are application state and
 are not atomically committed with external tool effects. Applications may

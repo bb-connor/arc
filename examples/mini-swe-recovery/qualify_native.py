@@ -303,8 +303,9 @@ def read_state(binary, directory, unknown=False):
         except ChioModelError as error:
             assert error.receipt_json
             receipt = json.loads(error.receipt_json)
+            assert receipt["metadata"]["admission_operation"]["schema"] == "chio.admission-receipt.v1"
             assert (
-                receipt["metadata"]["admission_operation"]["retained_state"]
+                receipt["metadata"]["admission_operation"]["projected_state"]
                 == "outcome_unknown_after_dispatch"
             )
             assert receipt["metadata"]["chio_process"]["recovery_policy"] == "known_outcome_only"

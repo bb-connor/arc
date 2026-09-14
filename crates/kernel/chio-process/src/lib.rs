@@ -6,6 +6,8 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(test)]
+mod integrity_tests;
 #[cfg(feature = "mailboxes")]
 pub mod mailboxes;
 mod registry;
@@ -45,8 +47,9 @@ pub const PROCESS_ABI: &str = "chio.process.abi.v2";
 
 /// Dispatch attempts one logical operation may consume: the first, plus a bounded
 /// number of fresh dispatches after the kernel reports an unknown outcome for a
-/// tool declared free of side effects.
-const MAX_DISPATCH_ATTEMPTS: u32 = 3;
+/// tool classified by the kernel as read-only and free of stateful authority.
+/// Retained-response verifiers must use this same bound when checking attempts.
+pub const MAX_DISPATCH_ATTEMPTS: u32 = 3;
 
 /// A persistent process namespace bound to one durable kernel authority.
 /// Clones share a connection; separate opens serialize mutations in SQLite.
@@ -217,8 +220,8 @@ impl ProcessRuntime {
     /// cache bypasses the admission coordinator. A crash after dispatch uses
     /// the same kernel operation on restart; an unknown outcome stays
     /// fail-closed for every side-effecting tool. When the tool's server
-    /// declares it free of side effects and the request carries no
-    /// authorization artifact bound to its request id, the runtime records a
+    /// declares it free of side effects and the kernel excludes all matching
+    /// stateful authority and request-id-bound artifacts, the runtime records a
     /// further attempt and dispatches a fresh kernel operation, at most
     /// `MAX_DISPATCH_ATTEMPTS` times in total. The earlier unknown operation
     /// keeps its receipt in the kernel journal.
@@ -276,14 +279,31 @@ impl ProcessRuntime {
         } else {
             request_hash.clone()
         };
+        // Validate the persisted process identity and immutable request binding
+        // before any kernel receipt attributes this attempt to the process.
+        self.with_store(|store| store.admit(process_id, operation_key, request, &binding_hash))?;
         // Restore verified ancestor snapshots and budget-parent registrations
         // root-first. A child can run even if its parent has never invoked a
         // tool, including after the kernel's in-memory registry is recreated.
         let lineage = self.with_store(|store| store.lineage(process_id))?;
-        for capability in &lineage {
-            self.kernel.register_delegation_parent(capability)?;
+        let mut ancestor_refusal = None;
+        for capability in lineage.iter().take(lineage.len().saturating_sub(1)) {
+            if let Err(error) = self.kernel.register_delegation_parent(capability) {
+                match error {
+                    chio_kernel::KernelError::GuardDenied(_)
+                    | chio_kernel::KernelError::CapabilityRevoked(_)
+                    | chio_kernel::KernelError::DelegationChainRevoked(_)
+                    | chio_kernel::KernelError::DelegationInvalid(_)
+                    | chio_kernel::KernelError::SubjectMismatch { .. } => {
+                        ancestor_refusal = Some(error.to_string());
+                        break;
+                    }
+                    // Storage, unknown outcomes and infrastructure failures retain
+                    // their owning error. Incomplete ancestry never reaches dispatch.
+                    _ => return Err(error.into()),
+                }
+            }
         }
-        self.with_store(|store| store.admit(process_id, operation_key, request, &binding_hash))?;
         let mut current = request.clone();
         loop {
             let mut attribution = json!({
@@ -297,11 +317,16 @@ impl ProcessRuntime {
             // Keep the kernel evaluation frame out of every enclosing worker
             // future. Durable nonce verification adds a deep synchronous path;
             // embedding its state inline can exhaust ordinary executor stacks.
-            let result = Box::pin(
+            let result = if let Some(reason) = &ancestor_refusal {
                 self.kernel
-                    .evaluate_tool_call_with_metadata(&current, Some(attribution)),
-            )
-            .await;
+                    .sign_planned_deny_response(&current, reason, Some(attribution))
+            } else {
+                Box::pin(
+                    self.kernel
+                        .evaluate_tool_call_with_metadata(&current, Some(attribution)),
+                )
+                .await
+            };
             // Even an error can follow a committed side effect. Keep the operation
             // identity and call reservation forever; recovery belongs to the kernel.
             self.with_store(|store| store.require_running(process_id))?;
@@ -309,7 +334,7 @@ impl ProcessRuntime {
             if attempt >= MAX_DISPATCH_ATTEMPTS
                 || known_outcome_only
                 || !outcome_unknown(&response)
-                || !self.redispatchable(&current)
+                || !self.kernel.can_redispatch_unknown_read(&current)
             {
                 return Ok(response);
             }
@@ -324,22 +349,6 @@ impl ProcessRuntime {
             })?;
             current.request_id = self.request_id_for_attempt(process_id, operation_key, attempt)?;
         }
-    }
-
-    /// A fresh dispatch is safe only for a tool its registered server declares
-    /// free of side effects, and only when no authorization artifact in the
-    /// request is bound to the request id that would change.
-    fn redispatchable(&self, request: &ToolCallRequest) -> bool {
-        self.kernel
-            .tool_is_read_only(&request.server_id, &request.tool_name)
-            && request.dpop_proof.is_none()
-            && request.execution_nonce.is_none()
-            && request.declassification_grant.is_none()
-            && request.governed_intent.is_none()
-            && request.approval_token.is_none()
-            && request.approval_tokens.is_empty()
-            && request.threshold_approval_proposal.is_none()
-            && request.supplemental_authorization.is_none()
     }
 
     /// Compare-and-swap checkpoint. Returns the new revision. Competing
@@ -375,14 +384,30 @@ impl ProcessRuntime {
 /// The kernel retains this operation as dispatched without a recorded outcome,
 /// so the denial describes uncertainty rather than a policy decision.
 fn outcome_unknown(response: &ToolCallResponse) -> bool {
-    response.verdict == Verdict::Deny
-        && response
-            .receipt
-            .metadata
-            .as_ref()
-            .and_then(|metadata| metadata.pointer("/admission_operation/retained_state"))
-            .and_then(Value::as_str)
-            == Some("outcome_unknown_after_dispatch")
+    if response.verdict != Verdict::Deny {
+        return false;
+    }
+    let Some(metadata) = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("admission_operation"))
+    else {
+        return false;
+    };
+    // Old thin or unrecognized markers remain signed evidence, but cannot
+    // authorize fresh dispatch. Never rewrite their bytes into the new schema.
+    let Ok(projection) = serde_json::from_value::<
+        chio_kernel::admission_operation::AdmissionReceiptMetadataV1,
+    >(metadata.clone()) else {
+        return false;
+    };
+    projection.projected_state
+        == chio_kernel::admission_operation::AdmissionOperationState::OutcomeUnknownAfterDispatch
+        && projection.request_id.as_str() == response.request_id
+        && projection.retained_dispatch_commit.is_some()
+        && projection.tool_outcome_id.is_none()
+        && projection.tool_outcome_version.is_none()
 }
 
 fn digest(value: &impl Serialize) -> Result<String, ProcessError> {

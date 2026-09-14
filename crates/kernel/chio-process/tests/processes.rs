@@ -51,6 +51,87 @@ fn server(calls: &Arc<AtomicUsize>) -> Box<Server> {
 }
 
 #[tokio::test]
+async fn invalid_process_lineage_produces_attributed_signed_denials_without_dispatch() -> Result {
+    for refusal in [
+        "expired",
+        "revoked_leaf",
+        "revoked_parent",
+        "untrusted_leaf",
+    ] {
+        let dir = tempfile::tempdir()?;
+        let calls = Arc::new(AtomicUsize::new(0));
+        let kernel = kernel(dir.path(), server(&calls))?;
+        let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+        let mut capability = kernel.issue_capability(
+            &parent_key().public_key(),
+            scope(&["append", "read"]),
+            3600,
+        )?;
+        if refusal == "untrusted_leaf" {
+            let other = Keypair::generate();
+            capability.issuer = other.public_key();
+            capability.signature = other.sign_canonical(&capability.signing_body())?.0;
+        }
+        runtime.create_root("root", &capability, support::limits(2))?;
+        let process_id = if refusal == "revoked_parent" {
+            let delegated = child(
+                &capability,
+                &parent_key(),
+                "child",
+                &Keypair::generate(),
+                scope(&["read"]),
+            )?;
+            runtime.spawn("root", "child", &delegated)?;
+            "child"
+        } else {
+            "root"
+        };
+        if refusal.starts_with("revoked") {
+            kernel.revoke_capability(&capability.id)?;
+        }
+        let request = runtime.tool_request(process_id, "read", "tools", "read", json!({}))?;
+        let _clock = (refusal == "expired").then(|| {
+            chio_kernel::scope_fixed_runtime_for_current_thread(capability.expires_at + 1, [])
+        });
+        let response = runtime.invoke(process_id, "read", &request).await?;
+        assert_eq!(response.verdict, Verdict::Deny, "{refusal}");
+        assert!(response.output.is_none());
+        assert!(response.receipt.verify_signature()?);
+        assert_eq!(
+            response.receipt.metadata.as_ref().ok_or("metadata")?["chio_process"]["process_id"],
+            process_id
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        assert!(kernel
+            .receipt_log()
+            .receipts()
+            .iter()
+            .any(|receipt| receipt.id == response.receipt.id
+                && receipt.signature == response.receipt.signature));
+        let mut wrong_identity = request.clone();
+        wrong_identity.agent_id = "another-agent".into();
+        let receipts_before = kernel.receipt_log().receipts().len();
+        assert!(matches!(
+            runtime.invoke(process_id, "read", &wrong_identity).await,
+            Err(ProcessError::Conflict)
+        ));
+        assert_eq!(kernel.receipt_log().receipts().len(), receipts_before);
+        let mut wrong_request = request.clone();
+        wrong_request.request_id = "process:substituted-request".into();
+        assert!(matches!(
+            runtime.invoke(process_id, "read", &wrong_request).await,
+            Err(ProcessError::Invalid(_))
+        ));
+        assert!(runtime
+            .invoke("unregistered-process", "read", &request)
+            .await
+            .is_err());
+        assert_eq!(kernel.receipt_log().receipts().len(), receipts_before);
+    }
+    Ok(())
+}
+
+#[tokio::test]
 async fn logical_call_replays_original_signed_receipt_after_kernel_restart() -> Result {
     let dir = tempfile::tempdir()?;
     let calls = Arc::new(AtomicUsize::new(0));

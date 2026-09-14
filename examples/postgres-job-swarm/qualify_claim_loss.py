@@ -201,7 +201,8 @@ def main():
             recovery_ids.append(response["request_id"])
             assert response["verdict"] == "deny" and response["output"] is None
             assert (
-                receipt["metadata"]["admission_operation"]["retained_state"]
+                receipt["metadata"]["admission_operation"]["schema"] == "chio.admission-receipt.v1"
+                and receipt["metadata"]["admission_operation"]["projected_state"]
                 == "outcome_unknown_after_dispatch"
             )
             assert (
