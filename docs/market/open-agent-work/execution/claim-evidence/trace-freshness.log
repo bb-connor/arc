@@ -1,0 +1,1 @@
+{"schema": "chio.experimental.claim-model-exploration.v1", "broken_expiry": false, "timestamps": [0, 2, 3, 4, 5, 6, 7, 8, 9], "deposits": {"A": 3, "B": 2}, "states": 5508, "transitions": 132192, "states_seen": ["Funded", "Paid", "Payable", "Refunded", "Rejected", "Submitted", "TimedOut"]}

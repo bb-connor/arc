@@ -4,6 +4,14 @@
 
 **Goal:** Demonstrate one finalized allocation, one admitted W0 job, one verifier-established claim and one reconciled payment, including rejection/refund and an earned child claim surviving parent failure.
 
+**Execution status (2026-09-14):** Tasks 1-2 are implemented and locally tested.
+See [claim-escrow results](../../market/open-agent-work/execution/05-claim-escrow-results.md).
+The complete model suite passes 18 tests; the combined Node suite passes 143
+checks, including all 118 model trace representatives. The independent private
+chain reproduction retains an unpaid child claim through parent refund and
+then pays the child. Task 3 remains gated on a qualified Security M4 checkpoint;
+Task 4 native integration is not started. This is not vertical-slice completion.
+
 **Architecture:** Prototype an experimental claim escrow separately from existing `ChioEscrow`. Fund immutable work terms, commit a timely result, arbitrate through a pinned F1 verifier, and preserve accepted withdrawals. Connect the rail to native admission only after an isolated paper/Security M4 integration is reviewed and qualified for the selected surface.
 
 **Tech Stack:** Python standard-library transition model, Solidity with the locked Node/solc/Ganache test environment, existing Rust market/kernel/store/settlement code, and the standalone federated example. Local development chain and mock ERC20 only.
@@ -57,27 +65,27 @@ Unknown broadcast state triggers reconciliation of the same IDs.
 
 **Files:** New claim-model pair; retain existing allocation model unchanged.
 
-- [ ] Read the F1 terminal matrix and freeze enum states: Funded, Submitted, Payable, Paid, Rejected, TimedOut and Refunded. Keep execution-unknown as independent metadata.
-- [ ] Write failing tests for exact submission replay, changed commitment, early/late decisions, payment/refund exclusion, verifier outage, failed transfer and accepted withdrawal after all deadlines.
-- [ ] Add two sources and a parent/child relationship. Test that parent refund cannot erase a child's Payable state and that unfunded parent revenue cannot reserve a child.
-- [ ] Implement only the model transitions needed by those tests, with explicit chain-time input and bounded integer amounts.
-- [ ] Exhaust bounded action sequences and adversarial orderings, including duplicate decisions and competing withdrawals. Emit minimal traces and verify conservation per funding source after every step.
-- [ ] Retain a broken legacy-expiry transition as an expected negative calibration. Run both model suites with `python3 -B -m unittest discover -s examples/funded-work-model -p 'test_*.py' -v`.
-- [ ] Review and commit `test: model funded claim and refund exclusivity`. Report a bounded model result, not an unbounded proof.
+- [x] Read the F1 terminal matrix and freeze enum states: Funded, Submitted, Payable, Paid, Rejected, TimedOut and Refunded. Keep execution-unknown as independent metadata.
+- [x] Write failing tests for exact submission replay, changed commitment, early/late decisions, payment/refund exclusion, verifier outage, failed transfer and accepted withdrawal after all deadlines.
+- [x] Add two sources and a parent/child relationship. Test that parent refund cannot erase a child's Payable state and that unfunded parent revenue cannot reserve a child.
+- [x] Implement only the model transitions needed by those tests, with explicit chain-time input and bounded integer amounts.
+- [x] Exhaust bounded action sequences and adversarial orderings, including duplicate decisions and competing withdrawals. Emit minimal traces and verify conservation per funding source after every step.
+- [x] Retain a broken legacy-expiry transition as an expected negative calibration. Run both model suites with `python3 -B -m unittest discover -s examples/funded-work-model -p 'test_*.py' -v`.
+- [x] Review and commit `test: model funded claim and refund exclusivity`. Report a bounded model result, not an unbounded proof.
 
 ## Task 2: enforce claim eligibility on the development chain
 
 **Files:** New experimental Solidity contract and `work-claim-escrow.test.mjs`.
 
-- [ ] Start with contract tests that fail because the experimental artifact is absent. Reuse locked compilation/deployment patterns from `funded-work-fit.test.mjs`, with private in-process chain construction only.
-- [ ] Test exact received backing; derived ID and all agreement bindings; wrong payer, beneficiary, verifier, chain and contract; signature replay; duplicate/mutated commitment; safe-integer bounds and deadline ordering.
-- [ ] Implement full-price funding, timely submission and resolution with no existing-contract edit. Record final decision before token withdrawal; use checks/effects/interactions and reentrancy protection.
-- [ ] Test `submit_by` inclusively, challenge window closure, `resolve_by` inclusively and timeout refund strictly after `refund_after`. Reject refund while claim resolution is pending.
-- [ ] Test accepted withdrawal after expiry and after new-job pause/key rotation, with no buyer action. Test rejected refund, absent submission, unavailable verifier timeout and failed-token-transfer retry without double accounting.
-- [ ] Test actual transaction ordering for competing payment/refund attempts and decision conflicts. Run model-generated traces against contract state and balance deltas.
-- [ ] Fund child separately, establish child Payable, expire/refund parent, then withdraw child successfully. This specifically improves on the already-paid-child characterization.
-- [ ] Run `node --test contracts/scripts/work-claim-escrow.test.mjs contracts/scripts/funded-work-fit.test.mjs`. Retain legacy counterexample and mutation controls that fail for the intended missing guard.
-- [ ] Review code, source/bytecode hashes, limits and all test skips. Commit `feat: prototype funded work claim escrow`. Do not deploy or expand legacy public claims.
+- [x] Start with contract tests that fail because the experimental artifact is absent. Reuse locked compilation/deployment patterns from `funded-work-fit.test.mjs`, with private in-process chain construction only.
+- [x] Test exact received backing; derived ID and all agreement bindings; wrong payer, beneficiary, verifier, chain and contract; signature replay; duplicate/mutated commitment; safe-integer bounds and deadline ordering.
+- [x] Implement full-price funding, timely submission and resolution with no existing-contract edit. Record final decision before token withdrawal; use checks/effects/interactions and reentrancy protection.
+- [x] Test `submit_by` inclusively, challenge window closure, `resolve_by` inclusively and timeout refund strictly after `refund_after`. Reject refund while claim resolution is pending.
+- [x] Test accepted withdrawal after expiry and after new-job pause/key rotation, with no buyer action. Test rejected refund, absent submission, unavailable verifier timeout and failed-token-transfer retry without double accounting.
+- [x] Test actual transaction ordering for competing payment/refund attempts and decision conflicts. Run model-generated traces against contract state and balance deltas.
+- [x] Fund child separately, establish child Payable, expire/refund parent, then withdraw child successfully. This specifically improves on the already-paid-child characterization.
+- [x] Run `node --test contracts/scripts/work-claim-escrow.test.mjs contracts/scripts/funded-work-fit.test.mjs`. Retain legacy counterexample and mutation controls that fail for the intended missing guard.
+- [x] Review code, source/bytecode hashes, limits and all test skips. Commit `feat: prototype funded work claim escrow`. Do not deploy or expand legacy public claims.
 
 ## Task 3: qualify the paper/security integration before native funding
 

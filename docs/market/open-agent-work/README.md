@@ -53,6 +53,7 @@ The plan gives that alternative the same resources and a fair opportunity to win
 | [First-slice implementation plan](../../superpowers/plans/2026-09-14-open-agent-work.md) | Exact files, model/test code, inspection commands and review checkpoints for starting M0/M1 |
 | [First-slice execution](execution/00-baseline.md) | Isolated source checkpoint, fresh regression results, escrow deadline counterexample and frozen draft decisions |
 | [Next vertical-slice plan](../../superpowers/plans/2026-09-14-funded-work-claim-escrow.md) | Preserve timely claims, then connect finalized funding to native work on the qualified security candidate |
+| [Claim-escrow execution](execution/05-claim-escrow-results.md) | Implemented finite model, experimental escrow, actual child withdrawal after parent refund and the remaining native gate |
 
 The first slice now has six passing allocation-model tests, 38 passing existing
 pool-ledger tests and six real-bytecode escrow characterizations. A deliberately
@@ -61,6 +62,12 @@ after expiry even when a valid certificate was produced earlier. The selected
 next experiment adds explicit claim/resolution state in a separate contract.
 These results complete the bounded handoff's artifacts, not M0/M1 or the
 independent-company trial. See execution for source and qualification limits.
+
+That next financial experiment now executes: the separate claim contract
+preserves a still-unpaid accepted child through parent refund and later pays
+the child. Its combined Node suite passes 143 checks, including 118 model
+trace replays and the legacy regressions. Native funded work remains gated on
+the qualified Security M4 integration and actual verifier custody.
 
 The first executable milestone is **M0: freeze the comparison and expose the
 funding counterexample**. Do this before a general protocol extraction, a new

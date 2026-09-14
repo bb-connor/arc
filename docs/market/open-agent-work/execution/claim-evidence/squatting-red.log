@@ -1,0 +1,41 @@
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✖ another payer cannot squat a publicly known agreement digest (3481.826186ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14060.251674
+
+✖ failing tests:
+
+test at contracts/scripts/work-claim-escrow.test.mjs:128:1
+✖ another payer cannot squat a publicly known agreement digest (3481.826186ms)
+  Error: missing revert data (action="estimateGas", data=null, reason=null, transaction={ "data": "0x6a8712bde1d5e7977e7776858f77e42aa5505a28cdb0b6c35bad05a57ec1ac95c5d42547000000000000000000000000ffcf8fdee72ac11b5c542428b35eef5769c409f000000000000000000000000022d491bde2303f2f43325b2108d26f1eaba1e32b000000000000000000000000e11ba2b4d45eaed5996cd0823791e0c93114882d0000000000000000000000005b1869d9a4c187f2eaa108f3062412ecf0526b240000000000000000000000000000000000000000000000000000000000000064000000000000000000000000000000000000000000000000000000006aa73902000000000000000000000000000000000000000000000000000000006aa73904000000000000000000000000000000000000000000000000000000006aa73906000000000000000000000000000000000000000000000000000000006aa73908", "from": "0xFFcf8FDEE72ac11b5c542428B35EEF5769C409f0", "to": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab" }, invocation=null, revert=null, code=CALL_EXCEPTION, version=6.16.0)
+      at makeError (file:///home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ethers@6.16.0_bufferutil@4.0.7_utf-8-validate@6.0.3/node_modules/ethers/lib.esm/utils/errors.js:132:21)
+      at getBuiltinCallException (file:///home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ethers@6.16.0_bufferutil@4.0.7_utf-8-validate@6.0.3/node_modules/ethers/lib.esm/abi/abi-coder.js:102:12)
+      at AbiCoder.getBuiltinCallException (file:///home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ethers@6.16.0_bufferutil@4.0.7_utf-8-validate@6.0.3/node_modules/ethers/lib.esm/abi/abi-coder.js:203:16)
+      at BrowserProvider.getRpcError (file:///home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ethers@6.16.0_bufferutil@4.0.7_utf-8-validate@6.0.3/node_modules/ethers/lib.esm/providers/provider-jsonrpc.js:691:32)
+      at BrowserProvider.getRpcError (file:///home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ethers@6.16.0_bufferutil@4.0.7_utf-8-validate@6.0.3/node_modules/ethers/lib.esm/providers/provider-browser.js:75:22)
+      at file:///home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ethers@6.16.0_bufferutil@4.0.7_utf-8-validate@6.0.3/node_modules/ethers/lib.esm/providers/provider-jsonrpc.js:298:45 {
+    code: 'CALL_EXCEPTION',
+    action: 'estimateGas',
+    data: null,
+    reason: null,
+    transaction: { to: '0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab', data: '0x6a8712bde1d5e7977e7776858f77e42aa5505a28cdb0b6c35bad05a57ec1ac95c5d42547000000000000000000000000ffcf8fdee72ac11b5c542428b35eef5769c409f000000000000000000000000022d491bde2303f2f43325b2108d26f1eaba1e32b000000000000000000000000e11ba2b4d45eaed5996cd0823791e0c93114882d0000000000000000000000005b1869d9a4c187f2eaa108f3062412ecf0526b240000000000000000000000000000000000000000000000000000000000000064000000000000000000000000000000000000000000000000000000006aa73902000000000000000000000000000000000000000000000000000000006aa73904000000000000000000000000000000000000000000000000000000006aa73906000000000000000000000000000000000000000000000000000000006aa73908', from: '0xFFcf8FDEE72ac11b5c542428B35EEF5769C409f0' },
+    invocation: null,
+    revert: null,
+    shortMessage: 'missing revert data',
+    info: { error: { code: -32000, data: [Object], message: 'VM Exception while processing transaction: revert' }, payload: { method: 'eth_estimateGas', params: [Array], id: 99, jsonrpc: '2.0' } }
+  }
