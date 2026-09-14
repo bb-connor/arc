@@ -54,7 +54,10 @@ impl Journal {
                 operation TEXT UNIQUE, hold TEXT UNIQUE,
                 CHECK((operation IS NULL) = (hold IS NULL)));
             CREATE TABLE executions(sequence INTEGER PRIMARY KEY, output TEXT NOT NULL);
-            PRAGMA user_version=1;",
+            CREATE TABLE custody(digest TEXT PRIMARY KEY, bytes BLOB NOT NULL);
+            CREATE TABLE records(allocation TEXT NOT NULL REFERENCES allocations(allocation),
+                kind TEXT NOT NULL, payload BLOB NOT NULL, PRIMARY KEY(allocation,kind));
+            PRAGMA user_version=2;",
         )?;
         connection.execute("INSERT INTO identity VALUES(?1)", [digest(policy)?])?;
         connection.execute_batch("COMMIT;")?;
@@ -67,19 +70,19 @@ impl Journal {
         }
         let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE)?;
         connection.busy_timeout(std::time::Duration::from_secs(5))?;
-        connection.execute_batch("PRAGMA synchronous=FULL;")?;
+        connection.execute_batch("PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON;")?;
         let version: i64 = connection.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         let pins: Vec<String> = connection
             .prepare("SELECT policy_digest FROM identity")?
             .query_map([], |r| r.get(0))?
             .collect::<std::result::Result<_, _>>()?;
-        if version != 1 || pins != [digest(policy)?] {
+        if version != 2 || pins != [digest(policy)?] {
             return Err("funding journal owner or version mismatch".into());
         }
         Ok(Self(Mutex::new(connection)))
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>> {
+    pub(super) fn connection(&self) -> Result<MutexGuard<'_, Connection>> {
         self.0
             .lock()
             .map_err(|_| "funding journal lock poisoned".into())
@@ -186,5 +189,120 @@ impl Journal {
             self.connection()?
                 .query_row("SELECT count(*) FROM executions", [], |r| r.get(0))?;
         Ok(u64::try_from(count)?)
+    }
+
+    pub fn put_blob(&self, bytes: &[u8]) -> Result<String> {
+        if bytes.is_empty() || bytes.len() > 256 * 1024 {
+            return Err("custody object exceeds profile".into());
+        }
+        let hash = chio_core_types::sha256_hex(bytes);
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let existing: Option<Vec<u8>> = tx
+            .query_row("SELECT bytes FROM custody WHERE digest=?1", [&hash], |r| {
+                r.get(0)
+            })
+            .optional()?;
+        if let Some(stored) = existing {
+            if stored != bytes {
+                return Err("custody content address conflict".into());
+            }
+            tx.commit()?;
+            return Ok(hash);
+        }
+        let count: i64 = tx.query_row("SELECT count(*) FROM custody", [], |r| r.get(0))?;
+        if count >= i64::try_from(CAPACITY * 8)? {
+            return Err("custody capacity exhausted".into());
+        }
+        tx.execute(
+            "INSERT OR IGNORE INTO custody VALUES(?1,?2)",
+            params![hash, bytes],
+        )?;
+        let stored: Vec<u8> =
+            tx.query_row("SELECT bytes FROM custody WHERE digest=?1", [&hash], |r| {
+                r.get(0)
+            })?;
+        if stored != bytes {
+            return Err("custody content address conflict".into());
+        }
+        tx.commit()?;
+        Ok(hash)
+    }
+
+    pub fn blob(&self, hash: &str) -> Result<Vec<u8>> {
+        let bytes: Vec<u8> = self.connection()?.query_row(
+            "SELECT bytes FROM custody WHERE digest=?1",
+            [hash],
+            |r| r.get(0),
+        )?;
+        if bytes.is_empty()
+            || bytes.len() > 256 * 1024
+            || chio_core_types::sha256_hex(&bytes) != hash
+        {
+            return Err("custody bytes do not match content address".into());
+        }
+        Ok(bytes)
+    }
+
+    /// Insert once, compare exact bytes on every retry. Never replace an intent
+    /// after an uncertain external effect, even with another valid signature.
+    pub fn retain<T: serde::Serialize>(
+        &self,
+        allocation: &str,
+        kind: &str,
+        value: &T,
+    ) -> Result<()> {
+        let bytes = chio_core_types::canonical_json_bytes(value)?;
+        if bytes.len() > 256 * 1024
+            || !matches!(
+                kind,
+                "submission"
+                    | "decision"
+                    | "submit"
+                    | "record"
+                    | "pay"
+                    | "refund"
+                    | "submit-observed"
+                    | "record-observed"
+                    | "pay-observed"
+                    | "refund-observed"
+            )
+        {
+            return Err("unsupported lifecycle record".into());
+        }
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        tx.execute(
+            "INSERT OR IGNORE INTO records VALUES(?1,?2,?3)",
+            params![allocation, kind, bytes],
+        )?;
+        let stored: Vec<u8> = tx.query_row(
+            "SELECT payload FROM records WHERE allocation=?1 AND kind=?2",
+            params![allocation, kind],
+            |r| r.get(0),
+        )?;
+        if stored != bytes {
+            return Err("conflicting retained lifecycle identity".into());
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn retained<T: serde::de::DeserializeOwned + serde::Serialize>(
+        &self,
+        allocation: &str,
+        kind: &str,
+    ) -> Result<Option<T>> {
+        let bytes: Option<Vec<u8>> = self
+            .connection()?
+            .query_row(
+                "SELECT payload FROM records WHERE allocation=?1 AND kind=?2",
+                params![allocation, kind],
+                |r| r.get(0),
+            )
+            .optional()?;
+        bytes
+            .map(|bytes| super::evidence::decode(&bytes))
+            .transpose()
     }
 }

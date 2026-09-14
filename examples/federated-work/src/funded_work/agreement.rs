@@ -13,6 +13,7 @@ pub struct Policy {
     pub implementation_sha256: String,
     pub buyer_key: PublicKey,
     pub provider_key: PublicKey,
+    pub verifier_key: PublicKey,
     pub domain: Domain,
 }
 

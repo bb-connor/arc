@@ -35,6 +35,30 @@ pub fn authorization_id(allocation: &str) -> Result<String> {
 }
 
 impl FundingRail {
+    fn terminal(&self, reference: &str, id: &str) -> Result<Option<PaymentResult>> {
+        let entry = self
+            .journal
+            .by_operation(reference)?
+            .ok_or("original funding authorization missing")?;
+        if id != authorization_id(&entry.allocation)? {
+            return Err("settlement authorization changed".into());
+        }
+        let payment = self
+            .operations
+            .load_payment_journal(reference, &self.fence)?
+            .ok_or("original native payment missing")?;
+        if payment.hold_id != entry.hold
+            || payment.rail != RAIL
+            || payment.rail_mode != PaymentRailMode::ReversibleHold
+            || payment.amount_units != 100
+            || payment.currency != CURRENCY
+            || payment.request_id != entry.request.request_id
+            || payment.capability_id != entry.request.capability.id
+        {
+            return Err("settlement changed original native payment participant".into());
+        }
+        observed_terminal(&entry, &self.policy, &self.journal, self.source.as_ref())
+    }
     // This phase has no rail side effects. A failure is a definite refusal;
     // only the subsequent journal commit can have an ambiguous outcome.
     fn verify_original(&self, request: &PaymentAuthorizeRequest) -> Result<VerifiedAuthorization> {
@@ -124,23 +148,35 @@ impl PaymentAdapter for FundingRail {
     }
     fn capture(
         &self,
-        _id: &str,
-        _amount: u64,
-        _currency: &str,
-        _reference: &str,
+        id: &str,
+        amount: u64,
+        currency: &str,
+        reference: &str,
     ) -> std::result::Result<PaymentResult, PaymentError> {
-        Err(PaymentError::Unavailable(
-            "claim decision and ERC20 withdrawal have not been observed".into(),
-        ))
+        let checked = || -> Result<PaymentResult> {
+            if amount != 100 || currency != CURRENCY {
+                return Err("capture changed original amount".into());
+            }
+            self.terminal(reference, id)?
+                .filter(|result| result.settlement_status == RailSettlementStatus::Settled)
+                .ok_or_else(|| {
+                    "exact ERC20 payout has not been observed; capture remains pending".into()
+                })
+        };
+        checked().map_err(|error| PaymentError::Unavailable(error.to_string()))
     }
     fn release(
         &self,
-        _id: &str,
-        _reference: &str,
+        id: &str,
+        reference: &str,
     ) -> std::result::Result<PaymentResult, PaymentError> {
-        Err(PaymentError::Unavailable(
-            "allocation refund has not been observed".into(),
-        ))
+        self.terminal(reference, id)
+            .and_then(|result| {
+                result
+                    .filter(|result| result.settlement_status == RailSettlementStatus::Released)
+                    .ok_or_else(|| "exact allocation refund has not been observed".into())
+            })
+            .map_err(|error| PaymentError::Unavailable(error.to_string()))
     }
     fn refund(
         &self,
@@ -181,10 +217,46 @@ impl PaymentAdapter for FundingRail {
             if id.is_some_and(|id| id != authorization) {
                 return Err("funding authorization identity changed".into());
             }
+            if let Some(result) = self.terminal(reference, &authorization)? {
+                return Ok(RailSettlementState::Settled {
+                    authorization_id: authorization,
+                    result,
+                });
+            }
             Ok(RailSettlementState::Held {
                 authorization_id: authorization,
             })
         };
         state().map_err(|error| PaymentError::Unavailable(error.to_string()))
     }
+}
+
+pub fn observed_terminal(
+    entry: &super::journal::Entry,
+    policy: &Policy,
+    journal: &Journal,
+    source: &dyn FundingSource,
+) -> Result<Option<PaymentResult>> {
+    use super::settlement::{self, Action, Prepared};
+    let pay: Option<Prepared> = journal.retained(&entry.allocation, "pay")?;
+    let refund: Option<Prepared> = journal.retained(&entry.allocation, "refund")?;
+    let (action, prepared) = match (pay, refund) {
+        (Some(_), Some(_)) => return Err("conflicting payout and refund intents".into()),
+        (Some(p), None) => (Action::Pay, p),
+        (None, Some(p)) => (Action::Refund, p),
+        (None, None) => return Ok(None),
+    };
+    let request = settlement::request(entry, action, policy, journal)?;
+    let verified = settlement::observe(&prepared, &request, policy, source)?;
+    settlement::retain_observation(journal, &entry.allocation, &verified)?;
+    Ok(Some(PaymentResult {
+        transaction_id: verified.transaction_hash,
+        settlement_status: if action == Action::Pay {
+            RailSettlementStatus::Settled
+        } else {
+            RailSettlementStatus::Released
+        },
+        metadata: serde_json::json!({"allocationId":entry.allocation,"operationId":entry.operation,"holdId":entry.hold,
+            "observationSha256":verified.observation_sha256,"externalFundsTransferred":true,"direction":if action == Action::Pay {"payout"} else {"refund"}}),
+    }))
 }

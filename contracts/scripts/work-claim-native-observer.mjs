@@ -4,6 +4,8 @@ import readline from 'node:readline';
 import { ethers } from 'ethers';
 import ganache from 'ganache';
 import { artifacts, states } from './work-claim-fixture.mjs';
+import { transactions } from './work-claim-native-transactions.mjs';
+import { transactionInventory } from './work-claim-native-inventory.mjs';
 
 const rpc = ganache.provider({ logging: { quiet: true },
   chain: { chainId: 31337, hardfork: 'shanghai', time: new Date() },
@@ -15,6 +17,7 @@ const lower = value => value.toLowerCase();
 const deposits = new Map();
 let escrow;
 let token;
+let lifecycle;
 
 async function deploy(source, name, ...args) {
   const artifact = artifacts[source][name];
@@ -38,7 +41,7 @@ async function initialize() {
   const tokenAddress = lower(await token.getAddress());
   const head = await send('eth_getBlockByNumber', ['latest', false]);
   const start = Number(head.timestamp);
-  return {
+  const result = {
     domain: { profile: 'chio.experimental.local-confirmed-funding.v1', chainId: '31337',
       genesisHash: (await send('eth_getBlockByNumber', ['0x0', false])).hash,
       escrow: escrowAddress, escrowCodeHash: ethers.keccak256(await send('eth_getCode', [escrowAddress, 'latest'])),
@@ -46,10 +49,13 @@ async function initialize() {
     work: { payer: lower(payer.address), beneficiary: lower(beneficiary.address), verifier: lower(verifier.address),
       amount: '100', submitBy: start + 600, challengeUntil: start + 700, resolveBy: start + 800, refundAfter: start + 900 },
   };
+  const wallet = signer => new ethers.Wallet(rpc.getInitialAccounts()[lower(signer.address)].secretKey, provider);
+  lifecycle = transactions({ rpc, provider, escrow, domain: result.domain,
+    payer: wallet(payer), beneficiary: wallet(beneficiary), verifier: wallet(verifier) });
+  return result;
 }
 
-async function observe(allocation) {
-  const transactionHash = deposits.get(allocation);
+async function observe(allocation, transactionHash = deposits.get(allocation)) {
   assert.ok(transactionHash, 'unknown locally funded allocation');
   const receipt = await send('eth_getTransactionReceipt', [transactionHash]);
   const first = Number(receipt.blockNumber);
@@ -83,12 +89,33 @@ async function observe(allocation) {
 
 async function run(request) {
   assert.ok(request && typeof request === 'object' && !Array.isArray(request));
-  assert.ok(['initialize', 'fund', 'observe', 'summary'].includes(request.method), 'unsupported fixture operation');
+  assert.ok(['initialize', 'fund', 'observe', 'summary', 'pin-verifier', 'prepare', 'transact', 'observe-transaction', 'advance', 'expire'].includes(request.method), 'unsupported fixture operation');
   if (request.method === 'initialize') {
     assert.deepEqual(Object.keys(request), ['method']);
     return initialize();
   }
   assert.ok(escrow && token, 'fixture not initialized');
+  if (request.method === 'pin-verifier') {
+    assert.deepEqual(Object.keys(request).sort(), ['key', 'method']);
+    lifecycle.pin(request.key); return {};
+  }
+  if (request.method === 'prepare') {
+    assert.deepEqual(Object.keys(request).sort(), ['method', 'request']);
+    assert.ok(deposits.has(request.request.allocationId));
+    return lifecycle.prepare(request.request);
+  }
+  if (request.method === 'transact' || request.method === 'observe-transaction') {
+    assert.deepEqual(Object.keys(request).sort(), ['method', 'prepared']);
+    assert.ok(deposits.has(request.prepared.intent.allocationId));
+    if (request.method === 'transact') { await lifecycle.transact(request.prepared); return {}; }
+    await lifecycle.validateObservation(request.prepared);
+    return observe(request.prepared.intent.allocationId, request.prepared.transactionHash);
+  }
+  if (request.method === 'advance') {
+    assert.deepEqual(Object.keys(request).sort(), ['allocation', 'method', 'phase']);
+    assert.ok(deposits.has(request.allocation));
+    await lifecycle.advance(request.allocation, request.phase); return {};
+  }
   if (request.method === 'fund') {
     assert.deepEqual(Object.keys(request).sort(), ['method', 'terms']);
     const terms = request.terms;
@@ -109,8 +136,15 @@ async function run(request) {
   assert.match(request.allocation, /^0x[0-9a-f]{64}$/);
   if (request.method === 'observe') return observe(request.allocation);
   assert.ok(deposits.has(request.allocation));
+  if (request.method === 'expire') { await (await escrow.expire(request.allocation)).wait(); return {}; }
   const work = await escrow.getWork(request.allocation);
+  const events = { Funded: 0, ClaimSubmitted: 0, DecisionRecorded: 0, Paid: 0, Refunded: 0, TimedOut: 0 };
+  for (const log of await send('eth_getLogs', [{ address: lower(await escrow.getAddress()), fromBlock: '0x0', toBlock: 'latest' }])) {
+    const parsed = escrow.interface.parseLog(log);
+    if (parsed && Object.hasOwn(events, parsed.name) && parsed.args[0] === request.allocation) events[parsed.name]++;
+  }
   return { state: states[Number(work.state)], paid: String(work.paid), refunded: String(work.refunded),
+    events, transactions: await transactionInventory(send, escrow, request.allocation),
     escrowBalance: String(await token.balanceOf(await escrow.getAddress())),
     payerBalance: String(await token.balanceOf(payer.address)),
     beneficiaryBalance: String(await token.balanceOf(beneficiary.address)),

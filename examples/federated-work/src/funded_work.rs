@@ -1,6 +1,12 @@
 //! Experimental, receiver-owned funding admission. Local development chain only.
 
 mod agreement;
+mod evidence;
+mod lifecycle;
+mod settlement;
+mod settlement_observer;
+mod verification;
+pub use lifecycle::run as lifecycle;
 mod allocation;
 mod journal;
 mod local_chain;
@@ -11,7 +17,11 @@ mod smoke;
 mod tool;
 pub use smoke::run as smoke;
 #[cfg(unix)]
+mod lifecycle_process;
+#[cfg(unix)]
 mod process;
+#[cfg(unix)]
+pub use lifecycle_process::{admission_loss, run as lifecycle_fault, worker as lifecycle_worker};
 #[cfg(unix)]
 pub use process::{run_fault as smoke_fault, worker};
 

@@ -28,10 +28,49 @@ impl Drop for Worker {
 
 pub struct LocalChain(Mutex<Worker>);
 
+const SOURCES: &[(&str, &[u8])] = &[
+    (
+        "work-claim-native-observer.mjs",
+        include_bytes!("../../../../contracts/scripts/work-claim-native-observer.mjs"),
+    ),
+    (
+        "work-claim-native-transactions.mjs",
+        include_bytes!("../../../../contracts/scripts/work-claim-native-transactions.mjs"),
+    ),
+    (
+        "work-claim-recovery.mjs",
+        include_bytes!("../../../../contracts/scripts/work-claim-recovery.mjs"),
+    ),
+    (
+        "work-claim-fixture.mjs",
+        include_bytes!("../../../../contracts/scripts/work-claim-fixture.mjs"),
+    ),
+    (
+        "work-claim-native-inventory.mjs",
+        include_bytes!("../../../../contracts/scripts/work-claim-native-inventory.mjs"),
+    ),
+];
+
+pub(super) fn implementation_digest() -> String {
+    chio_core_types::sha256_hex(
+        &SOURCES
+            .iter()
+            .flat_map(|(_, bytes)| *bytes)
+            .copied()
+            .collect::<Vec<_>>(),
+    )
+}
+
 impl LocalChain {
     pub fn start() -> Result<Self> {
         let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../contracts/scripts/work-claim-native-observer.mjs");
+        let directory = script.parent().ok_or("observer script directory missing")?;
+        for (name, pinned) in SOURCES {
+            if std::fs::read(directory.join(name))? != *pinned {
+                return Err("local chain source differs from pinned implementation".into());
+            }
+        }
         let mut child = Command::new("node")
             .arg(script)
             .env_remove("CHIO_CLAIM_MUTATION")
@@ -79,7 +118,7 @@ impl LocalChain {
         if worker.failed {
             return Err("observer transport is unavailable".into());
         }
-        let mut request = || -> Result<Value> {
+        let mut request = || -> Result<Result<Value>> {
             let bytes = serde_json::to_vec(&value)?;
             if bytes.len() > 256 * 1024 {
                 return Err("observer request exceeds limit".into());
@@ -93,18 +132,24 @@ impl LocalChain {
                 return Err("invalid observer response".into());
             }
             if let Some(error) = value.get("error") {
-                return Err(format!("private observer: {error}").into());
+                let error = error.as_str().ok_or("malformed observer error response")?;
+                // A well-framed negative response (including no receipt yet)
+                // preserves channel alignment. It denies this observation but
+                // must not disable recovery of the retained unbroadcast intent.
+                return Ok(Err(format!("private observer: {error}").into()));
             }
-            value
+            Ok(Ok(value
                 .get("result")
                 .cloned()
-                .ok_or_else(|| "observer result missing".into())
+                .ok_or("observer result missing")?))
         };
-        let result = request();
-        if result.is_err() {
-            worker.failed = true;
+        match request() {
+            Ok(result) => result,
+            Err(error) => {
+                worker.failed = true;
+                Err(error)
+            }
         }
-        result
     }
 }
 
@@ -112,6 +157,23 @@ impl FundingSource for LocalChain {
     fn observe(&self, allocation: &str) -> Result<Observation> {
         Ok(serde_json::from_value(self.request(
             json!({"method": "observe", "allocation": allocation}),
+        )?)?)
+    }
+    fn prepare(
+        &self,
+        request: &super::settlement::ActionRequest,
+    ) -> Result<super::settlement::Prepared> {
+        Ok(serde_json::from_value(self.request(
+            json!({"method":"prepare", "request":request}),
+        )?)?)
+    }
+    fn transact(&self, prepared: &super::settlement::Prepared) -> Result<()> {
+        self.request(json!({"method":"transact", "prepared":prepared}))?;
+        Ok(())
+    }
+    fn observe_transaction(&self, prepared: &super::settlement::Prepared) -> Result<Observation> {
+        Ok(serde_json::from_value(self.request(
+            json!({"method":"observe-transaction", "prepared":prepared}),
         )?)?)
     }
 }

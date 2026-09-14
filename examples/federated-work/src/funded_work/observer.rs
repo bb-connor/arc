@@ -74,6 +74,18 @@ pub struct Observation {
 
 pub trait FundingSource: Send + Sync {
     fn observe(&self, allocation: &str) -> Result<Observation>;
+    fn prepare(
+        &self,
+        _request: &super::settlement::ActionRequest,
+    ) -> Result<super::settlement::Prepared> {
+        Err("settlement transaction preparation unavailable".into())
+    }
+    fn transact(&self, _prepared: &super::settlement::Prepared) -> Result<()> {
+        Err("settlement transport unavailable".into())
+    }
+    fn observe_transaction(&self, _prepared: &super::settlement::Prepared) -> Result<Observation> {
+        Err("settlement observation unavailable".into())
+    }
 }
 
 /// Construction is restricted to the verifier. Persisted JSON is not authority.
@@ -101,14 +113,19 @@ impl Domain {
     }
 }
 
-fn data(value: &str, limit: usize) -> Result<Vec<u8>> {
+pub(super) fn data(value: &str, limit: usize) -> Result<Vec<u8>> {
     if value.len() < 2 || value.len() > 2 + 2 * limit || !value.len().is_multiple_of(2) {
         return Err("invalid bounded ABI data".into());
     }
     allocation::hex_bytes(value, (value.len() - 2) / 2)
 }
 
-fn check_read(read: &Read, head: &Block, contract: &str, call: &[u8]) -> Result<Vec<u8>> {
+pub(super) fn check_read(
+    read: &Read,
+    head: &Block,
+    contract: &str,
+    call: &[u8],
+) -> Result<Vec<u8>> {
     if read.contract != contract
         || read.block_number != head.number
         || read.block_hash != head.hash
@@ -126,6 +143,20 @@ pub fn verify(
     started_at: u64,
     now: u64,
 ) -> Result<VerifiedAllocation> {
+    Ok(verify_snapshot(domain, terms, observation, started_at, now, true)?.0)
+}
+
+/// The local lifecycle also reads original funding and current state after
+/// fixture time advances. Only fresh admission applies wall-clock eligibility;
+/// deadline recovery uses the receiver's current private-chain time.
+pub(super) fn verify_snapshot(
+    domain: &Domain,
+    terms: &Terms,
+    observation: &Observation,
+    started_at: u64,
+    now: u64,
+    admission: bool,
+) -> Result<(VerifiedAllocation, AbiWork)> {
     domain.validate()?;
     let elapsed = now
         .checked_sub(started_at)
@@ -159,7 +190,8 @@ pub fn verify(
         allocation::hash(&block.parent_hash)?;
         if block.number == 0
             || block.number > allocation::MAX_UNITS
-            || block.timestamp > now.saturating_add(5)
+            || block.timestamp > allocation::MAX_UNITS
+            || (admission && block.timestamp > now.saturating_add(5))
         {
             return Err("invalid funding block".into());
         }
@@ -173,9 +205,10 @@ pub fn verify(
         }
     }
     if &observation.independent_head != head
-        || now.saturating_sub(head.timestamp) > 90
-        || head.timestamp > terms.submit_by
-        || now > terms.submit_by
+        || (admission
+            && (now.saturating_sub(head.timestamp) > 90
+                || head.timestamp > terms.submit_by
+                || now > terms.submit_by))
     {
         return Err("funding head is stale, changed or ineligible".into());
     }
@@ -237,12 +270,13 @@ pub fn verify(
     let work = AbiWork::abi_decode_validate(&work_bytes)?;
     if work.abi_encode() != work_bytes
         || work.terms.abi_encode() != terms.abi(&domain.escrow)?.abi_encode()
-        || work.state != 1
-        || work.commitment != B256::ZERO
-        || work.decisionDigest != B256::ZERO
-        || work.accepted
-        || work.paid != U256::ZERO
-        || work.refunded != U256::ZERO
+        || (admission
+            && (work.state != 1
+                || work.commitment != B256::ZERO
+                || work.decisionDigest != B256::ZERO
+                || work.accepted
+                || work.paid != U256::ZERO
+                || work.refunded != U256::ZERO))
     {
         return Err("allocation is not exactly funded and unclaimed".into());
     }
@@ -253,12 +287,15 @@ pub fn verify(
     .concat();
     let balance_bytes = check_read(&observation.balance, head, &domain.token, &balance_call)?;
     let balance = U256::abi_decode_validate(&balance_bytes)?;
-    if balance.abi_encode() != balance_bytes || balance < amount {
+    if balance.abi_encode() != balance_bytes || (admission && balance < amount) {
         return Err("escrow token backing is insufficient".into());
     }
-    Ok(VerifiedAllocation {
-        id,
-        observation_digest: digest(observation)?,
-        observed_at: now,
-    })
+    Ok((
+        VerifiedAllocation {
+            id,
+            observation_digest: digest(observation)?,
+            observed_at: now,
+        },
+        work,
+    ))
 }

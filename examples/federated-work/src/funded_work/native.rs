@@ -44,6 +44,14 @@ pub fn implementation_digest() -> String {
             include_bytes!("journal.rs").as_slice(),
             include_bytes!("rail.rs").as_slice(),
             include_bytes!("tool.rs").as_slice(),
+            include_bytes!("evidence.rs").as_slice(),
+            include_bytes!("verification.rs").as_slice(),
+            include_bytes!("settlement.rs").as_slice(),
+            include_bytes!("settlement_observer.rs").as_slice(),
+            include_bytes!("lifecycle.rs").as_slice(),
+            include_bytes!("local_chain.rs").as_slice(),
+            super::local_chain::implementation_digest().as_bytes(),
+            super::verification::checker_digest().as_bytes(),
             include_bytes!("../review.rs").as_slice(),
         ]
         .concat(),
@@ -63,6 +71,7 @@ impl Native {
             Err(error) => return Err(error.into()),
         }
         let provider = common::init(state)?;
+        let verifier = common::init(&state.join("verifier"))?;
         let locks = state.join("locks");
         fs::create_dir(&locks)?;
         #[cfg(unix)]
@@ -78,6 +87,7 @@ impl Native {
             implementation_sha256: implementation_digest(),
             buyer_key: buyer,
             provider_key: provider,
+            verifier_key: verifier,
             domain,
         };
         fs::write(
@@ -106,6 +116,8 @@ impl Native {
         if policy.authority_uuid != authority.mutation_fence().store_uuid
             || policy.provider_key != key.public_key()
             || policy.implementation_sha256 != implementation_digest()
+            || policy.verifier_key == policy.provider_key
+            || policy.verifier_key == policy.buyer_key
         {
             return Err("funding policy does not bind this authority and implementation".into());
         }
@@ -202,7 +214,10 @@ impl Native {
         })
     }
 
-    fn operation(&self, request: &ToolCallRequest) -> Result<Option<AdmissionOperationV1>> {
+    pub(super) fn operation(
+        &self,
+        request: &ToolCallRequest,
+    ) -> Result<Option<AdmissionOperationV1>> {
         let retained = self
             .authority
             .admission_operation_store()
@@ -315,6 +330,66 @@ impl Native {
         }
     }
 
+    pub fn evidence(&self, request: &ToolCallRequest) -> Result<super::evidence::Evidence> {
+        use chio_kernel::tool_outcome::{InvocationOutputV1, ToolOutcomeStore};
+        let report = self.report(request)?;
+        let field = |name: &str| -> Result<String> {
+            Ok(report[name]
+                .as_str()
+                .ok_or("native evidence lacks original identity")?
+                .to_owned())
+        };
+        let operation = self
+            .operation(request)?
+            .ok_or("original operation missing")?;
+        let store = self.authority.tool_outcome_store();
+        let id = operation.binding().operation_id();
+        let outcome = store
+            .lookup_by_operation(id)?
+            .ok_or("native outcome unavailable")?;
+        let raw = store
+            .load_raw_invocation_by_operation(id)?
+            .ok_or("native return bytes unavailable")?;
+        let raw = raw.to_persisted();
+        let raw_digest = digest(&raw)?;
+        if outcome.operation_id() != id
+            || operation.tool_outcome_id() != Some(outcome.outcome_id())
+            || outcome.raw_output_digest().as_str() != raw_digest
+            || raw.operation_id != *id
+            || raw.request_id.as_str() != request.request_id
+            || raw.tool_server.as_str() != SERVER
+            || raw.tool_name.as_str() != "review"
+        {
+            return Err("retained native outcome binding mismatch".into());
+        }
+        let InvocationOutputV1::Value { value: output } = raw.output else {
+            return Err("native output is not a completed W0 value".into());
+        };
+        let entry = self
+            .journal
+            .by_request(&request.request_id)?
+            .ok_or("original funding entry missing")?;
+        Ok(super::evidence::Evidence {
+            binding: super::evidence::Binding {
+                allocation_id: field("allocationId")?,
+                agreement_sha256: digest(&entry.agreement.body)?,
+                authority_uuid: self.policy.authority_uuid.clone(),
+                operation_id: field("operationId")?,
+                hold_id: field("holdId")?,
+                authorization_id: field("authorizationId")?,
+                request_sha256: digest(request)?,
+                outcome_id: outcome.outcome_id().as_str().to_owned(),
+                raw_outcome_sha256: raw_digest,
+                expires_at: entry.agreement.body.work.refund_after,
+            },
+            input: request.arguments["input"]
+                .as_str()
+                .ok_or("original W0 input missing")?
+                .to_owned(),
+            output,
+        })
+    }
+
     pub fn report(&self, request: &ToolCallRequest) -> Result<serde_json::Value> {
         let entry = self
             .journal
@@ -361,15 +436,31 @@ impl Native {
             return Err("native payment authorization conflicts with funding journal".into());
         }
         let correlated = authorization.is_some();
+        let (terminal, observation_error) = match super::rail::observed_terminal(
+            &entry,
+            &self.policy,
+            &self.journal,
+            self.source.as_ref(),
+        ) {
+            Ok(result) => (result, None),
+            Err(error) => (None, Some(error.to_string())),
+        };
+        let payment_state = match terminal.as_ref().map(|r| r.settlement_status) {
+            Some(chio_kernel::payment::RailSettlementStatus::Settled) => "paid",
+            Some(chio_kernel::payment::RailSettlementStatus::Released) => "refunded",
+            _ if correlated => "pending",
+            _ => "not_authorized",
+        };
         Ok(
             serde_json::json!({"allocationId": entry.allocation, "operationId": id,
             "holdId": hold, "authorizationId": authorization,
             "nativeAuthorizationId": native_authorization, "startupReconciliationError": self.recovery_error,
             "requestId": request.request_id, "authorityUuid": self.policy.authority_uuid,
             "nativeState": format!("{:?}", operation.state()), "nativePaymentState": payment.as_ref().map(|p| format!("{:?}", p.state)),
+            "nativePaymentAction": payment.as_ref().and_then(|p| p.settle_action),
             "fundingCorrelation": if correlated { "bound" } else { "not_authorized" },
-            "paymentState": if correlated { "pending" } else { "not_authorized" },
-            "externalFundsTransferred": false,
+            "paymentState": payment_state, "settlementObservationError": observation_error,
+            "externalFundsTransferred": terminal.is_some(), "settlementTransaction":terminal.as_ref().map(|r| &r.transaction_id),
             "executions": self.journal.execution_count()?, "profile": observer::PROFILE}),
         )
     }

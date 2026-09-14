@@ -1,0 +1,568 @@
+{
+  "schema": "chio.local-native-claim-evidence.v1",
+  "createdAtUTC": "2026-09-14T23:10:00.535190+00:00",
+  "baseCommit": "6162bccf5aa2ac0337b61604e5a935d571d41fb7",
+  "branch": "feat/funded-native-admission",
+  "status": "Selected local qualification passed; no hosted CI, push, merge or release claim",
+  "scope": "Original native Finding/custody/W0 verification, observed claim/decision and payout/refund with actual process-loss recovery",
+  "profile": "chio.experimental.local-confirmed-funding.v1",
+  "sourceObjects": {
+    "examples/federated-work": "7bd66ae7068dfb0e4462bd86723fbe9c7e24786c",
+    "examples/funded-work": "0d1dabaa87d2d799ff41bfb88b31d90903cef3b1",
+    "contracts": "61c2120c02804ca45960fad92df9dd712c09efbf",
+    "crates/kernel/chio-kernel": "0149993406f1c79a918dcfb333c27182dc23e83f",
+    "crates/economy/chio-finding": "b88fdc3321103f0ca5a7815929c571ee41a7923a",
+    "Cargo.toml": "f622b684573a9e01d2807f6eb95a8f74bfdb6b23",
+    "Cargo.lock": "3beee23ddc1b00265130dc87b135da0b1cc2a0a3"
+  },
+  "sourceBinding": "Source objects identify runtime inputs without a self-referential commit hash; compare against the containing commit. Changed implementation and test SHA256 hashes are also retained.",
+  "binarySha256": "9d813214c97ce1f74514f19d16c15567ae3c95cbe50300cbaa49812a0d6acaf1",
+  "environment": {
+    "rust": "1.94.1 aarch64-unknown-linux-gnu",
+    "node": "24.16.0",
+    "python": "3.13.13",
+    "pythonDependencies": "examples/federated-work/python_buyer/requirements.txt installed with --require-hashes",
+    "chainId": "31337",
+    "token": "private mock ERC20",
+    "fundingUnits": 100,
+    "confirmations": "two descendant blocks",
+    "CARGO_TARGET_DIR": "target",
+    "CARGO_BUILD_JOBS": "3",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "RUST_TEST_THREADS": "1",
+    "umask": "022",
+    "coreDumps": "disabled"
+  },
+  "counts": {
+    "lifecycleScenarios": 27,
+    "lifecycleSIGKILL": 22,
+    "admissionScenarios": 5,
+    "admissionSIGKILL": 4,
+    "standaloneRustTests": 33,
+    "nativeSqliteTests": 20,
+    "pythonRegressionTests": 68,
+    "contractTests": 18,
+    "inventoryNegativeControls": 1
+  },
+  "artifacts": [
+    {
+      "path": "native-claim-evidence/build.log",
+      "sha256": "ca49de506dd58fc1553dcf5ce24c7e3531f03f44bc5b7dfdc8560cd084763b5b",
+      "bytes": 171,
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 19.704,
+      "completedAt": "2026-09-14T23:03:45.082330+00:00",
+      "rawSha256": "ca49de506dd58fc1553dcf5ce24c7e3531f03f44bc5b7dfdc8560cd084763b5b",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/rust-tests.log",
+      "sha256": "8d7fa61ab72316fa682f9e89937a642b45083890ea7f9ed6d5f4af2a7cfd5fb7",
+      "bytes": 3732,
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--",
+        "--test-threads=1"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 86.92,
+      "completedAt": "2026-09-14T23:05:12.003131+00:00",
+      "passedTests": 31,
+      "rawSha256": "a36404be299a055cc95372c04aa8e1baddffd52df112bbb4850348f30a163dec",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/rust-chain-adversarial.log",
+      "sha256": "12eb530723d6f1f3545e487005074ca3e53357b32172efa0c5251fd8c7459d1f",
+      "bytes": 1673,
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "funded_work::tests",
+        "--",
+        "--ignored",
+        "--test-threads=1"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 41.289,
+      "completedAt": "2026-09-14T23:05:53.292393+00:00",
+      "passedTests": 2,
+      "rawSha256": "0d53858fbb47c85d0279f3c16e47f7cb3f12c3a51d49fc6038446273df412219",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/clippy.log",
+      "sha256": "eed35084e6f982d128591290208c93bceb3e9505f4bd74aab293c92e17a002e9",
+      "bytes": 170,
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 5.264,
+      "completedAt": "2026-09-14T23:05:58.556289+00:00",
+      "rawSha256": "eed35084e6f982d128591290208c93bceb3e9505f4bd74aab293c92e17a002e9",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/native-sqlite.log",
+      "sha256": "c218f320df885c432b5e27748605715570e66b296a0da9c469ab91c86e5ee9f7",
+      "bytes": 1994,
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--test",
+        "durable_admission_sqlite",
+        "--",
+        "--test-threads=1"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 85.132,
+      "completedAt": "2026-09-14T23:07:23.688601+00:00",
+      "passedTests": 20,
+      "rawSha256": "4a77cfedee34d1b60b9f4e4ff8ecf1be7848c53784291a70223e814f24328c53",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "command": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 0.272,
+      "completedAt": "2026-09-14T23:07:23.961094+00:00",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/workspace-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 22.321,
+      "completedAt": "2026-09-14T23:07:46.282192+00:00",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/hygiene.log",
+      "sha256": "ab9696419fc26c27248247e1e063c74b1e05aca31f40dd7a587fe923a5d5de91",
+      "bytes": 43411,
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 1.185,
+      "completedAt": "2026-09-14T23:07:47.467580+00:00",
+      "rawSha256": "ab9696419fc26c27248247e1e063c74b1e05aca31f40dd7a587fe923a5d5de91",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 0.035,
+      "completedAt": "2026-09-14T23:07:47.502964+00:00",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/lifecycle-nominal.log",
+      "sha256": "ecb712a80139c2d2568066347b4a8e0f88ddbbfbb2c06a2d3192c31b2e26c730",
+      "bytes": 229,
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_payout_rejection_and_missing_work_timeouts"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 107.173,
+      "completedAt": "2026-09-14T23:05:41.880025+00:00",
+      "passedScenarios": 5,
+      "rawSha256": "ecb712a80139c2d2568066347b4a8e0f88ddbbfbb2c06a2d3192c31b2e26c730",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/lifecycle-crashes.log",
+      "sha256": "4ec36c85ce4f7453383f06f3408d19158f524c2e118fb28e8ba0741a016b66c5",
+      "bytes": 241,
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_sigkill_around_original_claim_decision_and_money"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 340.878,
+      "completedAt": "2026-09-14T23:09:35.437327+00:00",
+      "passedScenarios": 15,
+      "rawSha256": "4ec36c85ce4f7453383f06f3408d19158f524c2e118fb28e8ba0741a016b66c5",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/lifecycle-deadlines.log",
+      "sha256": "9ff7009b7796bf16cf4e5f43f8c331b60bd353acd168fa6783b7fdac517206df",
+      "bytes": 267,
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_deadline_loss_refunds_even_with_retained_unrecorded_artifacts"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 117.424,
+      "completedAt": "2026-09-14T23:05:52.040595+00:00",
+      "passedScenarios": 5,
+      "rawSha256": "9ff7009b7796bf16cf4e5f43f8c331b60bd353acd168fa6783b7fdac517206df",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/native-refunds.log",
+      "sha256": "2451739567ed8d3ef4033af523b1b05412d6778a078243c5860e500563b03941",
+      "bytes": 272,
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_refund_preserves_unknown_execution_and_unwinds_undispatched_hold"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 46.87,
+      "completedAt": "2026-09-14T23:04:41.526246+00:00",
+      "passedScenarios": 2,
+      "rawSha256": "2451739567ed8d3ef4033af523b1b05412d6778a078243c5860e500563b03941",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/inventory.log",
+      "sha256": "fddc9dfcc7d27312f7f74bdc921476707df2022410927d6e2bf1c95a02244281",
+      "bytes": 835,
+      "command": [
+        "node",
+        "--test",
+        "contracts/scripts/work-claim-native-inventory.test.mjs"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 18.569,
+      "completedAt": "2026-09-14T23:04:13.406964+00:00",
+      "passedTests": 1,
+      "rawSha256": "fddc9dfcc7d27312f7f74bdc921476707df2022410927d6e2bf1c95a02244281",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/admission-smoke.log",
+      "sha256": "ad16b8f4909afd43eb28a3679c07c7e5e90c15097450fcd5a4e06bb81b34b77a",
+      "bytes": 410,
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_smoke.py"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 102.08,
+      "completedAt": "2026-09-14T23:05:36.874688+00:00",
+      "passedScenarios": 5,
+      "rawSha256": "ad16b8f4909afd43eb28a3679c07c7e5e90c15097450fcd5a4e06bb81b34b77a",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/python-buyer.log",
+      "sha256": "41010925281bbc87960fa4b0572dd16f6465147eb8785f4c6180b9c3ba99fe83",
+      "bytes": 4637,
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/federated-work/python_buyer",
+        "-v"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 1.332,
+      "completedAt": "2026-09-14T23:05:38.206871+00:00",
+      "passedTests": 30,
+      "rawSha256": "41010925281bbc87960fa4b0572dd16f6465147eb8785f4c6180b9c3ba99fe83",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/python-funded.log",
+      "sha256": "a7e703cd3d25c58df009e0553d367c1b897ad2e6b61ebb9f121e969f73caaacf",
+      "bytes": 5977,
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/funded-work",
+        "-v"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 10.594,
+      "completedAt": "2026-09-14T23:05:48.801403+00:00",
+      "passedTests": 38,
+      "rawSha256": "a7e703cd3d25c58df009e0553d367c1b897ad2e6b61ebb9f121e969f73caaacf",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/contract.log",
+      "sha256": "3baba710adbaafb5498be9151be1502fa3fca14330caefc14b3a475e9f8d01a1",
+      "bytes": 2456,
+      "command": [
+        "node",
+        "--test",
+        "contracts/scripts/work-claim-escrow.test.mjs"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 79.733,
+      "completedAt": "2026-09-14T23:07:08.535209+00:00",
+      "passedTests": 18,
+      "rawSha256": "3baba710adbaafb5498be9151be1502fa3fca14330caefc14b3a475e9f8d01a1",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "native-claim-evidence/absent-complete.json",
+      "sha256": "c4c794820bb69832dc9ebba608990fd65b70bbedef375945c11b31e87e49ccd5",
+      "bytes": 3246
+    },
+    {
+      "path": "native-claim-evidence/absent-refund-after-broadcast.json",
+      "sha256": "38230e5280dd75625ad8a96f3df5bc36ac72223fe71dc6f4128f313e8aed94ce",
+      "bytes": 3863
+    },
+    {
+      "path": "native-claim-evidence/after-hold.json",
+      "sha256": "54993a476d6e1f45100b04ea9cff89034ee270a5d058f8893653c0e51931ac56",
+      "bytes": 2246
+    },
+    {
+      "path": "native-claim-evidence/after-stage.json",
+      "sha256": "fa6ff2251b088ac16230410692194bc2aa094f71d4a6e8bffe731de2b3a58748",
+      "bytes": 2009
+    },
+    {
+      "path": "native-claim-evidence/after-tool.json",
+      "sha256": "ba7e4218bd3fd556f4311b81c72f6a9ab4cea1717fd730d32e32a33e6bb2ae65",
+      "bytes": 2161
+    },
+    {
+      "path": "native-claim-evidence/before-bind.json",
+      "sha256": "8f37c67991b7d3f0421e98a4e75c35784b203177a5ca7ad620093ceb9199ac9e",
+      "bytes": 2038
+    },
+    {
+      "path": "native-claim-evidence/happy.json",
+      "sha256": "59b5ef4c5c2387588e83b7fbdc5037034944bda2e8f37326d30aec0ba8c1a9d4",
+      "bytes": 2806
+    },
+    {
+      "path": "native-claim-evidence/pay-after-claim.json",
+      "sha256": "6a93f0927a2cb0347dec88e12ab13dd7e863bfe99f66a8c0450decf5e2aa844d",
+      "bytes": 4764
+    },
+    {
+      "path": "native-claim-evidence/pay-after-decision.json",
+      "sha256": "7b95b3e4d143def1065b772820439103dc81a73b05b34ac7ee7b55399a2504b2",
+      "bytes": 4767
+    },
+    {
+      "path": "native-claim-evidence/pay-after-recorded-decision.json",
+      "sha256": "89fdabed34872a6e07f4cbe02332a2597f44c2f1a91d5f99f7100479467d96f9",
+      "bytes": 4776
+    },
+    {
+      "path": "native-claim-evidence/pay-after-submission.json",
+      "sha256": "33e247fb463dbdb75895b49240b483b62c760d05e24d7948bdf46e8af2e2fa96",
+      "bytes": 4769
+    },
+    {
+      "path": "native-claim-evidence/pay-claim-after-broadcast.json",
+      "sha256": "d28d4aa2b795539f143fd07e6cb0cf0c08557927b1e523c428bde0310bbfbe2d",
+      "bytes": 4774
+    },
+    {
+      "path": "native-claim-evidence/pay-claim-after-prepare.json",
+      "sha256": "dafac84c422b8197532c63b070f8e65455a048b449b59be9008b9b3354e9ddbf",
+      "bytes": 4772
+    },
+    {
+      "path": "native-claim-evidence/pay-complete.json",
+      "sha256": "2e8e8fd861decafa98ef7150d187c06942d60e9419005ee6bee492b4da375ae2",
+      "bytes": 4137
+    },
+    {
+      "path": "native-claim-evidence/pay-decision-after-broadcast.json",
+      "sha256": "06984006101efc013b82950df59607fcf18b146ce6eba8a37243ebcde157b1f6",
+      "bytes": 4777
+    },
+    {
+      "path": "native-claim-evidence/pay-decision-after-prepare.json",
+      "sha256": "eee4f42ae2ea6345704bf6f0eaf71746a44a112645d474581bd37a512599a9bb",
+      "bytes": 4775
+    },
+    {
+      "path": "native-claim-evidence/pay-expired-after-decision.json",
+      "sha256": "39e050d33167c13cf3b2786a9fac895b89cabf6fc4ec4918777a42f3e3e6e22d",
+      "bytes": 4110
+    },
+    {
+      "path": "native-claim-evidence/pay-expired-after-submission.json",
+      "sha256": "102a97472b1fa9e05ac79925fa23dafdb5d8fd9b116015857a508cb87ab93b81",
+      "bytes": 3869
+    },
+    {
+      "path": "native-claim-evidence/pay-expired-claim-after-prepare.json",
+      "sha256": "4bda1c5885466990972bd07890f8631944d033965acf3907bab84313666ed3e6",
+      "bytes": 3956
+    },
+    {
+      "path": "native-claim-evidence/pay-expired-decision-after-prepare.json",
+      "sha256": "9c42603c4b7a5b12479ba66d3bf4be8b9e6efb490c1e977e795bd769ef1603e0",
+      "bytes": 4202
+    },
+    {
+      "path": "native-claim-evidence/pay-pay-after-broadcast.json",
+      "sha256": "1f4953d94a107b6189248c176fb83e8e962cfcc73804901092013d0b15aee067",
+      "bytes": 4772
+    },
+    {
+      "path": "native-claim-evidence/pay-pay-after-observation.json",
+      "sha256": "87d5a1331f47f76832e85a62b20bc1e12ac3231808bb04000c765ad7dda46f0d",
+      "bytes": 4774
+    },
+    {
+      "path": "native-claim-evidence/pay-pay-after-prepare.json",
+      "sha256": "54e441d3f549752d1ebe0658403b7ee9befcb26c6442fa90d379a4e6ea9b989d",
+      "bytes": 4770
+    },
+    {
+      "path": "native-claim-evidence/preexpired-complete.json",
+      "sha256": "09cb7ba6a6261dd13bdd2eb88056d09ce4d7e39faad5c640d183bb170da41536",
+      "bytes": 3225
+    },
+    {
+      "path": "native-claim-evidence/reject-complete.json",
+      "sha256": "5a5550491c0b0120729461c11681812fd765e83d94d74a3c340a9086d025159a",
+      "bytes": 4265
+    },
+    {
+      "path": "native-claim-evidence/reject-expired-after-decision.json",
+      "sha256": "32eccad6dc7db5976461bd6cff02dd804409ab696e12c7f43cbf900d76696eb3",
+      "bytes": 4110
+    },
+    {
+      "path": "native-claim-evidence/reject-refund-after-broadcast.json",
+      "sha256": "2b2cbbb2659f9fa294dbf3a68b20ee11170992800ca48212adc765bf3a88f402",
+      "bytes": 4361
+    },
+    {
+      "path": "native-claim-evidence/reject-refund-after-observation.json",
+      "sha256": "310f6dfe2127a6c90de3971ca79d3bbf824da5a0dbda7af9aec47a31aecba18f",
+      "bytes": 4363
+    },
+    {
+      "path": "native-claim-evidence/reject-refund-after-prepare.json",
+      "sha256": "d37c859e85d7868394076eebc3a97c210f8536ca4cca650109f9cd0ea60afa92",
+      "bytes": 4901
+    },
+    {
+      "path": "native-claim-evidence/unavailable-complete.json",
+      "sha256": "810a317ff530f007edc551f951d7e22e5fc92df0927dba0af58aac9a57094019",
+      "bytes": 3558
+    },
+    {
+      "path": "native-claim-evidence/undispatched-complete.json",
+      "sha256": "b7b2cce49d7cfeae5d4a8da76f46995d1ff713c20f7403151f772e9b71ac25b5",
+      "bytes": 3712
+    },
+    {
+      "path": "native-claim-evidence/unknown-complete.json",
+      "sha256": "b5072e16b6dfb1268bdd49baa34d8318dccfa3ab572369d26ce8032a633ab983",
+      "bytes": 3623
+    },
+    {
+      "path": "native-claim-evidence/source-at-qualification.json",
+      "sha256": "d48c4fd6db0803ed8ef3ab32a50a69840c430fbcf6a280365b7ef7574585a539",
+      "bytes": 2990
+    },
+    {
+      "path": "native-claim-evidence/source-preservation.json",
+      "sha256": "003c01832cf1063435688b0f0f9bc9d2027f4bb78daed86214e4ea794522163b",
+      "bytes": 284
+    },
+    {
+      "path": "native-claim-evidence/review.json",
+      "sha256": "a549d78f3627497dfb2dfd55c0f658c7372fec428861196595777b2c71028d00",
+      "bytes": 1352
+    }
+  ],
+  "notes": [
+    "The two external-dependency Rust tests are ignored in the default invocation and explicitly run in rust-chain-adversarial; no required tests are omitted.",
+    "The crash lifecycle restarts an actual second worker over the surviving observer socket. The chain owner is not killed in this profile.",
+    "Every lifecycle summary is asserted against read-only native SQLite counts/identities and independently enumerated mined transactions/receipts, state and token balances.",
+    "Refund of recorded positive work retains the original native capture pending; unknown execution retains original open budget exposure. Undispatched refund completes Settled release, not capture.",
+    "Private fixture time advances for deadlines; admission wall-clock freshness remains enforced.",
+    "Ganache uses its supported JavaScript fallback when optional native acceleration bindings are absent.",
+    "Only public summaries and qualification logs are retained; generated signing keys, request capabilities and authority databases are excluded.",
+    "Shared kernel sources, Cargo manifests/lockfiles and public schemas are unchanged by this slice. Full workspace tests, new fuzz campaigns and hosted qualification are outside this selected gate."
+  ],
+  "remaining": [
+    "Explicit native authority for contractual rejection/timeout of recorded positive capture",
+    "Registered general work artifacts and full Finding facet integration",
+    "Separately funded earned child after native parent process loss",
+    "Broader disclosure/key/manifest substitution and sustained-capacity qualification",
+    "Independent operators, companies and public-chain finality"
+  ]
+}

@@ -34,25 +34,65 @@ fn read_message(reader: impl Read, limit: u64) -> Result<Value> {
     Ok(serde_json::from_slice(&bytes)?)
 }
 
-struct SocketSource(PathBuf);
-impl FundingSource for SocketSource {
-    fn observe(&self, allocation: &str) -> Result<Observation> {
+pub(super) struct SocketSource(pub PathBuf);
+impl SocketSource {
+    pub(super) fn request(&self, request: &Value) -> Result<Value> {
+        let bytes = serde_json::to_vec(request)?;
+        if bytes.len() > 256 * 1024 {
+            return Err("observer request exceeds limit".into());
+        }
         let mut stream = UnixStream::connect(&self.0)?;
         stream.set_read_timeout(Some(Duration::from_secs(30)))?;
         stream.set_write_timeout(Some(Duration::from_secs(30)))?;
-        stream.write_all(&serde_json::to_vec(&allocation)?)?;
+        stream.write_all(&bytes)?;
         stream.write_all(b"\n")?;
-        Ok(serde_json::from_value(read_message(stream, 1024 * 1024)?)?)
+        let response = read_message(stream, 1024 * 1024)?;
+        if response.as_object().is_none_or(|object| object.len() != 1) {
+            return Err("malformed owned observer response".into());
+        }
+        if let Some(error) = response.get("error") {
+            return Err(format!(
+                "owned observer: {}",
+                error.as_str().ok_or("malformed observer error")?
+            )
+            .into());
+        }
+        response
+            .get("result")
+            .cloned()
+            .ok_or_else(|| "observer result missing".into())
+    }
+}
+impl FundingSource for SocketSource {
+    fn observe(&self, allocation: &str) -> Result<Observation> {
+        Ok(serde_json::from_value(self.request(&json!(allocation))?)?)
+    }
+    fn prepare(
+        &self,
+        request: &super::settlement::ActionRequest,
+    ) -> Result<super::settlement::Prepared> {
+        Ok(serde_json::from_value(self.request(
+            &json!({"method":"prepare","request":request}),
+        )?)?)
+    }
+    fn transact(&self, prepared: &super::settlement::Prepared) -> Result<()> {
+        self.request(&json!({"method":"transact","prepared":prepared}))?;
+        Ok(())
+    }
+    fn observe_transaction(&self, prepared: &super::settlement::Prepared) -> Result<Observation> {
+        Ok(serde_json::from_value(self.request(
+            &json!({"method":"observe-transaction","prepared":prepared}),
+        )?)?)
     }
 }
 
-struct Server {
+pub(super) struct Server {
     stop: Arc<AtomicBool>,
     handle: Option<std::thread::JoinHandle<Result<()>>>,
 }
 
 impl Server {
-    fn start(path: &Path, allocation: String, chain: Arc<LocalChain>) -> Result<Self> {
+    pub(super) fn start(path: &Path, allocation: String, chain: Arc<LocalChain>) -> Result<Self> {
         let listener = UnixListener::bind(path)?;
         listener.set_nonblocking(true)?;
         let stop = Arc::new(AtomicBool::new(false));
@@ -63,12 +103,33 @@ impl Server {
                     Ok((mut stream, _)) => {
                         stream.set_read_timeout(Some(Duration::from_secs(30)))?;
                         stream.set_write_timeout(Some(Duration::from_secs(30)))?;
-                        let requested = read_message(&stream, 128)?;
-                        if requested.as_str() != Some(&allocation) {
-                            return Err("observer allocation substitution".into());
-                        }
-                        stream.write_all(&serde_json::to_vec(&chain.observe(&allocation)?)?)?;
-                        stream.write_all(b"\n")?;
+                        let response = read_message(&stream, 256 * 1024).and_then(|requested| {
+                            if requested.as_str() == Some(&allocation) {
+                                return Ok(serde_json::to_value(chain.observe(&allocation)?)?);
+                            }
+                            let requested_allocation = match requested["method"].as_str() {
+                                Some("prepare") => &requested["request"]["allocationId"],
+                                Some("transact" | "observe-transaction") => {
+                                    &requested["prepared"]["intent"]["allocationId"]
+                                }
+                                Some("advance") => &requested["allocation"],
+                                _ => return Err("unsupported owned observer operation".into()),
+                            };
+                            if requested_allocation.as_str() != Some(&allocation) {
+                                return Err("observer allocation substitution".into());
+                            }
+                            chain.request(requested)
+                        });
+                        let response = match response {
+                            Ok(value) => json!({"result":value}),
+                            Err(error) => json!({"error":error.to_string()}),
+                        };
+                        let mut bytes = serde_json::to_vec(&response)?;
+                        bytes.push(b'\n');
+                        // A worker can disappear before acknowledgement. Its
+                        // socket error must not kill the surviving chain owner
+                        // or prevent the next worker from querying the outcome.
+                        let _ = stream.write_all(&bytes);
                     }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                         std::thread::sleep(Duration::from_millis(10))
@@ -83,7 +144,7 @@ impl Server {
             handle: Some(handle),
         })
     }
-    fn finish(&mut self) -> Result<()> {
+    pub(super) fn finish(&mut self) -> Result<()> {
         self.stop.store(true, Ordering::SeqCst);
         if let Some(handle) = self.handle.take() {
             handle.join().map_err(|_| "observer service panicked")??;
@@ -118,7 +179,7 @@ pub fn worker(state: &Path, socket: &Path, fault: &str) -> Result<Value> {
     native.execute(&agreement, &request)
 }
 
-fn counts(state: &Path) -> Result<Value> {
+pub(super) fn counts(state: &Path) -> Result<Value> {
     use rusqlite::OptionalExtension;
     let connection = rusqlite::Connection::open_with_flags(
         state.join("authority.sqlite"),

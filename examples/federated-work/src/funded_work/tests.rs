@@ -1,7 +1,9 @@
 use super::allocation::*;
 use crate::common::Result;
+mod evidence;
 mod native;
 mod observer;
+mod settlement;
 
 #[test]
 fn allocation_matches_the_independent_contract_vector() -> Result<()> {
