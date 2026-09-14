@@ -4,6 +4,15 @@
 
 **Goal:** Produce a reproducible funding counterexample, an escrow-fit decision and a minimal contract draft before implementing funded intercompany work.
 
+**Execution record (2026-09-14):** The bounded deliverables exist in the
+[isolated execution package](../../market/open-agent-work/execution/00-baseline.md).
+Six model tests, 38 existing pool tests and six new escrow characterizations
+pass. The stronger timely-claim promise has a retained failing calibration.
+Native integration awaits a qualified Security M4 checkpoint; its conditional
+gate remains open below. The [next vertical-slice plan](2026-09-14-funded-work-claim-escrow.md)
+uses that finding before native funded implementation. No milestone or release
+completion is inferred from this handoff.
+
 **Architecture:** Keep the first executable model independent of the kernel and settlement runtime. Contrast forkable payer-local balances with one authoritative allocation state, then identify the real repository mechanisms needed to implement that authority. The model is an explanatory counterexample, not a distributed settlement implementation.
 
 **Tech Stack:** Python standard library, existing Rust examples and Solidity source inspection. Use the repository's pinned toolchains for any reproduction of existing binaries.
@@ -47,11 +56,11 @@ the independent funding model does not depend on completing that integration.
 a baseline report identifying source, environment, included changes and
 reproduction commands. No executable API is introduced.
 
-- [ ] Read the three design documents linked in the header and the current local instructions.
-- [ ] Refresh P40's member/artifact/feature map from the candidate. Root-workspace tests do not select standalone `examples/federated-work`, `examples/composed-baseline` or `examples/outcome-ledger-comparison`.
-- [ ] Refresh security PR #1117 and optional process PR #1131. Record the chosen Security M4 checkpoint, the independently checkpointed paper changes, and the isolated integration route. Preserve both active worktrees; do not merge legacy #1029 as a shortcut.
-- [ ] Before native integration, map the version-10 research store versus security's migration lineage, verified A2A manifest constructor, caller start/report contract and unknown-payment successor. Do not backfill custody or bypass unsupported profiles.
-- [ ] Record current source and worktree state with these read-only commands:
+- [x] Read the three design documents linked in the header and the current local instructions.
+- [x] Refresh P40's member/artifact/feature map from the candidate. Root-workspace tests do not select standalone `examples/federated-work`, `examples/composed-baseline` or `examples/outcome-ledger-comparison`.
+- [ ] Refresh security PR #1117 and optional process PR #1131. Record the chosen Security M4 checkpoint, the independently checkpointed paper changes, and the isolated integration route. Preserve both active worktrees; do not merge legacy #1029 as a shortcut. Refresh completed; selecting the qualified M4 checkpoint and the actual integration candidate remains pending.
+- [ ] Before native integration, map the version-10 research store versus security's migration lineage, verified A2A manifest constructor, caller start/report contract and unknown-payment successor. Do not backfill custody or bypass unsupported profiles. The current source map is recorded; implementing and qualifying the combined candidate is deferred until that checkpoint exists.
+- [x] Record current source and worktree state with these read-only commands:
 
 ```bash
 git rev-parse HEAD
@@ -60,8 +69,8 @@ git worktree list --porcelain
 git diff --stat
 ```
 
-- [ ] Use `superpowers:using-git-worktrees` at implementation time to prepare an isolated candidate. Inventory the required uncommitted research files explicitly; a worktree at HEAD alone does not contain them. Do not reset the source or copy unrelated changes into the candidate.
-- [ ] Record the baseline report using these exact sections:
+- [x] Use `superpowers:using-git-worktrees` at implementation time to prepare an isolated candidate. Inventory the required uncommitted research files explicitly; a worktree at HEAD alone does not contain them. Do not reset the source or copy unrelated changes into the candidate.
+- [x] Record the baseline report using these exact sections:
 
 ```markdown
 # Funded-work baseline
@@ -72,8 +81,8 @@ git diff --stat
 ## Uncommitted or externally unqualified boundaries
 ```
 
-- [ ] Run the existing example reproduction commands actually documented in its README against the candidate. Record their exact invocation and terminal results. Do not replace a failed reproduction with historical test counts.
-- [ ] Review the baseline diff separately from any new model code. Suggested commit subject after review: `docs: record funded-work research baseline`.
+- [x] Run the existing example reproduction commands actually documented in its README against the candidate. Record their exact invocation and terminal results. Do not replace a failed reproduction with historical test counts.
+- [x] Review the baseline diff separately from any new model code. Suggested commit subject after review: `docs: record funded-work research baseline`.
 
 ## Task 2: make the double-pledge distinction executable
 
@@ -92,7 +101,7 @@ exposes `reserve(claim: Claim) -> bool`, `available: int` and
 It produces idempotent reservations bound to exact claims. It deliberately
 models no signature, finality, payout, refund or concurrency primitive.
 
-- [ ] Create this failing test file before the implementation:
+- [x] Create this failing test file before the implementation:
 
 ```python
 import itertools
@@ -139,8 +148,8 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] Run `python -m unittest discover -s examples/funded-work-model -p 'test_*.py' -v`. Expected before implementation: failure to import `funding_model`, not a silently skipped suite.
-- [ ] Create the minimal implementation:
+- [x] Run `python -m unittest discover -s examples/funded-work-model -p 'test_*.py' -v`. Expected before implementation: failure to import `funding_model`, not a silently skipped suite.
+- [x] Create the minimal implementation:
 
 ```python
 from dataclasses import dataclass
@@ -181,11 +190,11 @@ class AllocationAuthority:
         return True
 ```
 
-- [ ] Rerun the command. Expected: four passing tests. The first passes by demonstrating the unsafe local-only design; it does not assert that the current Chio escrow is vulnerable.
-- [ ] Write the README with the model interfaces, exact command, first-test counterexample and these limitations: one trusted in-memory authority, serial transitions, no monetary terminals, no signatures, no real funding, no implementation-level concurrency proof.
-- [ ] Add a trace table showing two local claims of 100 against one real source of 100, then the authority accepting the first and rejecting the second. Record why signatures on the local claims would not supply additional backing.
-- [ ] Compare the model with the real signed allocation, store binding, domain lease and rollback anchor. Read `cognition_market_sqlite_clone_cannot_reuse_the_store_binding`, `cognition_market_allocation_binds_one_concrete_store_across_deployments` and `cognition_market_authenticated_pool_restart_never_exceeds_signed_amount` before claiming a missing protection.
-- [ ] In the isolated qualified environment, list and run the existing pool suite:
+- [x] Rerun the command. Expected: four passing tests. The first passes by demonstrating the unsafe local-only design; it does not assert that the current Chio escrow is vulnerable.
+- [x] Write the README with the model interfaces, exact command, first-test counterexample and these limitations: one trusted in-memory authority, serial transitions, no monetary terminals, no signatures, no real funding, no implementation-level concurrency proof.
+- [x] Add a trace table showing two local claims of 100 against one real source of 100, then the authority accepting the first and rejecting the second. Record why signatures on the local claims would not supply additional backing.
+- [x] Compare the model with the real signed allocation, store binding, domain lease and rollback anchor. Read `cognition_market_sqlite_clone_cannot_reuse_the_store_binding`, `cognition_market_allocation_binds_one_concrete_store_across_deployments` and `cognition_market_authenticated_pool_restart_never_exceeds_signed_amount` before claiming a missing protection.
+- [x] In the isolated qualified environment, list and run the existing pool suite:
 
 ```bash
 cargo test --locked -p chio-store-sqlite --test finding_pool_ledger -- --list
@@ -196,8 +205,8 @@ Expected: the named tests are present and the existing protections pass. The
 test fixture uses `/dev/shm` for a separate-device anchor; satisfy that boundary
 instead of weakening it. Record unavailable prerequisites as unqualified.
 
-- [ ] Write three separate results: unsafe model counterexample, qualified ledger behavior under its stated assumptions, and the stronger dishonest-operator threat including control of local enforcement and anchor state. If the stronger native attack is not yet executable, record it as an untested hypothesis rather than marking P01 complete.
-- [ ] Review this as a standalone explanatory artifact. Suggested commit subject: `test: model forked funding claims and exclusive allocation`.
+- [x] Write three separate results: unsafe model counterexample, qualified ledger behavior under its stated assumptions, and the stronger dishonest-operator threat including control of local enforcement and anchor state. If the stronger native attack is not yet executable, record it as an untested hypothesis rather than marking P01 complete.
+- [x] Review this as a standalone explanatory artifact. Suggested commit subject: `test: model forked funding claims and exclusive allocation`.
 
 ## Task 3: determine whether existing escrow can enforce F1
 
@@ -211,18 +220,18 @@ instead of weakening it. Record unavailable prerequisites as unqualified.
 transitions. Produces a fit table with exact caller, data, state, trust and
 deadline requirements. It does not invent a new settlement API.
 
-- [ ] Locate the existing entry points:
+- [x] Locate the existing entry points:
 
 ```bash
 rg -n 'function |deadline|consumedReceipt|operatorEpoch|refunded' contracts/src/ChioEscrow.sol
 rg -n 'pub fn |pub async fn |finality|reorg|escrow' crates/economy/chio-settle/src/evm crates/economy/chio-web3/src/settlement_proof.rs
 ```
 
-- [ ] Read the bodies and their relevant tests. Fill a row for each of funding creation, agreement binding, beneficiary binding, claim certification, one-time release, refund, key rotation, emergency pause and finality observation.
-- [ ] Use columns `F1 requirement`, `existing entry point`, `caller/authority`, `enforced binding`, `time ordering`, `counterexample or supporting test`, and `fit decision`.
-- [ ] For the deadline race, trace a valid result submitted before the work cutoff but certified after the escrow deadline. Determine exactly which chain event preserves or loses eligibility. Do not assume a local verifier timestamp changes contract refund eligibility.
-- [ ] Record whether F1 requires an adapter, a contract amendment or different pre-agreed timing terms. State the residual verifier/registry/admin assumptions for every viable option.
-- [ ] Review the fit decision before any fund-moving implementation. Suggested commit subject: `docs: map funded-work requirements to escrow enforcement`.
+- [x] Read the bodies and their relevant tests. Fill a row for each of funding creation, agreement binding, beneficiary binding, claim certification, one-time release, refund, key rotation, emergency pause and finality observation.
+- [x] Use columns `F1 requirement`, `existing entry point`, `caller/authority`, `enforced binding`, `time ordering`, `counterexample or supporting test`, and `fit decision`.
+- [x] For the deadline race, trace a valid result submitted before the work cutoff but certified after the escrow deadline. Determine exactly which chain event preserves or loses eligibility. Do not assume a local verifier timestamp changes contract refund eligibility.
+- [x] Record whether F1 requires an adapter, a contract amendment or different pre-agreed timing terms. State the residual verifier/registry/admin assumptions for every viable option.
+- [x] Review the fit decision before any fund-moving implementation. Suggested commit subject: `docs: map funded-work requirements to escrow enforcement`.
 
 ## Task 4: freeze the contract and the first comparison
 
@@ -237,14 +246,14 @@ draft with exact monetary terminals, acceptance authority and unresolved researc
 questions, plus the first versioned comparison protocol. These are specification
 deliverables, not claims of executable wire compatibility.
 
-- [ ] Define the smallest bilateral contract using the existing bid/ask/acceptance and Finding types where they fit. Enumerate each necessary new binding and its owning artifact.
-- [ ] Complete P45/P47/P53: map Finding facets/challenge roles, commerce/passport/risk claim ceilings, exact numeric encodings and retention horizons. Select local pool/swarm reuse and distinguish the post-dispatch settlement observer from the required funding-admission gate.
-- [ ] Write the terminal matrix for accepted, rejected, unsubmitted, unknown and contested work. Every row names who decides, what evidence is sufficient, service/fee amounts, refund eligibility and retrievability.
-- [ ] Specify separate work-submission, dispute, claim and refund deadlines consistent with Task 3. Reject any design requiring an unimplemented atomic database/chain transaction.
-- [ ] Record H1-H5, C0-C3, the trial sample-selection method, provisional thresholds, cost accounting and allowed baseline components exactly as adopted. Mark any justified revision with a date and reason before scored work begins.
-- [ ] Link every Q1-Q10 property to a model obligation or a planned production-level test. The small Python model covers only a fragment of Q2; it does not discharge the rest.
-- [ ] Review all four tasks' evidence and choose the next vertical slice: one finalized allocation, one admitted job, one verifier-established claim and one reconciled payment, plus its rejection/refund path. Use the escrow-fit result to write that slice's implementation plan before changing production code.
-- [ ] Suggested commit subject after review: `docs: freeze initial funded-work contract and comparison`.
+- [x] Define the smallest bilateral contract using the existing bid/ask/acceptance and Finding types where they fit. Enumerate each necessary new binding and its owning artifact.
+- [x] Complete P45/P47/P53: map Finding facets/challenge roles, commerce/passport/risk claim ceilings, exact numeric encodings and retention horizons. Select local pool/swarm reuse and distinguish the post-dispatch settlement observer from the required funding-admission gate.
+- [x] Write the terminal matrix for accepted, rejected, unsubmitted, unknown and contested work. Every row names who decides, what evidence is sufficient, service/fee amounts, refund eligibility and retrievability.
+- [x] Specify separate work-submission, dispute, claim and refund deadlines consistent with Task 3. Reject any design requiring an unimplemented atomic database/chain transaction.
+- [x] Record H1-H5, C0-C3, the trial sample-selection method, provisional thresholds, cost accounting and allowed baseline components exactly as adopted. Mark any justified revision with a date and reason before scored work begins.
+- [x] Link every Q1-Q10 property to a model obligation or a planned production-level test. The small Python model covers only a fragment of Q2; it does not discharge the rest.
+- [x] Review all four tasks' evidence and choose the next vertical slice: one finalized allocation, one admitted job, one verifier-established claim and one reconciled payment, plus its rejection/refund path. Use the escrow-fit result to write that slice's implementation plan before changing production code.
+- [x] Suggested commit subject after review: `docs: freeze initial funded-work contract and comparison`.
 
 ## Completion boundary
 

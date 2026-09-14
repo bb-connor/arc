@@ -1,0 +1,314 @@
+{
+  "schema": "chio.funded-work.execution-results.v1",
+  "captured_utc": "2026-09-14T07:06:09.037208+00:00",
+  "branch": "research/funded-work-baseline",
+  "worktree": "/home/connor/backbay/arc-funded-work",
+  "original_source_head": "2b3b5af8cbfbc6f16ce6005de3f97cd149803b81",
+  "reproduced_baseline_head": "905583e951b66db2a3223afffad9dc5de5b0ef5f",
+  "source_inputs": "00-source-inputs.json",
+  "candidate_inventory": "00-candidate-inventory.json",
+  "preservation": "00-preservation.json",
+  "environment": {
+    "host": "Linux 6.17.0-1020-oracle aarch64",
+    "rust": "1.94.1",
+    "python_model": "3.13.13",
+    "python_buyer": "3.12.3",
+    "node": "24.16.0",
+    "corepack": "0.35.0",
+    "pnpm_task_private": "12.4.1",
+    "ethers": "6.16.0",
+    "ganache": "7.9.2",
+    "solc": "0.8.30",
+    "chain_id": 31337,
+    "evm_compile": "paris",
+    "evm_runtime": "shanghai",
+    "pool_qualified_umask": "022",
+    "separate_device_tmp": 2049,
+    "separate_device_dev_shm": 31
+  },
+  "runs": [
+    {
+      "command": "CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=target cargo build --locked --offline --manifest-path examples/federated-work/Cargo.toml",
+      "exit_code": 0,
+      "result": "pass",
+      "log": "evidence/baseline-build.log",
+      "log_sha256": "70581cba0c47ff456f5421a2f1637c9b8f50364299d4ece593079a925bdc8202"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=target cargo test --locked --offline --manifest-path examples/federated-work/Cargo.toml",
+      "exit_code": 0,
+      "result": "pass",
+      "log": "evidence/federated-rust-tests.log",
+      "log_sha256": "b6864531b68dbdc0d932f285b4a6e884d41bd0ca7f1b01d1fa41d1c1a2c8680c",
+      "reported_cases_or_scenario_groups": 11,
+      "raw_log_sha256": "4fb789fb66c94d5a7cd6f53dc8cbd6047641cf186bf8a554cf4771067cf62b30",
+      "log_normalization": "Trailing line whitespace and redundant final blank lines removed for repository hygiene; raw terminal log retained in task temporary directory."
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=target cargo clippy --locked --offline --manifest-path examples/federated-work/Cargo.toml --all-targets -- -D warnings",
+      "exit_code": 0,
+      "result": "pass",
+      "log": "evidence/federated-clippy.log",
+      "log_sha256": "ed5e0b67fe9c68cf997ad9d13cd69452d636dce8e73ad4a486aee06f567e2098"
+    },
+    {
+      "command": "python3 -B examples/federated-work/paid_smoke.py --binary target/debug/chio-federated-work --output /tmp/chio-funding-execution-mfkbfx6y/paid-run",
+      "exit_code": 0,
+      "result": "pass",
+      "log": "evidence/paid-smoke.log",
+      "log_sha256": "fa8cdeb387f137cd00e4e548f25c7883887f35db1bad61c04498231ad11b6e00",
+      "reported_cases_or_scenario_groups": 11
+    },
+    {
+      "command": "python3 -B examples/federated-work/smoke.py --binary target/debug/chio-federated-work --output /tmp/chio-funding-execution-mfkbfx6y/negotiation-run",
+      "exit_code": 0,
+      "result": "pass",
+      "log": "evidence/negotiation-smoke.log",
+      "log_sha256": "6d4f9d1be65848111b807a6512a4b40bdb13f02381e31ab2c2f9199a433a2423",
+      "reported_cases_or_scenario_groups": 3
+    },
+    {
+      "command": "/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python -B examples/federated-work/subcontract_smoke.py --binary target/debug/chio-federated-work --python-env /tmp/chio-funding-execution-mfkbfx6y/python-env --output /tmp/chio-funding-execution-mfkbfx6y/subcontract-run",
+      "exit_code": 0,
+      "result": "pass",
+      "log": "evidence/subcontract-smoke.log",
+      "log_sha256": "47ec178776dffc0f45f9fc44ffcef8eeb0057d9c55c6b2c0fffcf21e64d1e720",
+      "reported_cases_or_scenario_groups": 10
+    },
+    {
+      "command": "/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python -B -m unittest discover -s examples/federated-work/python_buyer -v",
+      "exit_code": 1,
+      "result": "missing_fixture",
+      "log": "evidence/python-buyer.log",
+      "log_sha256": "5fb470c75653d7c750c364bf310567bd29c0af50d99a089d04c2924087002ff0"
+    },
+    {
+      "command": "/tmp/chio-funding-execution-mfkbfx6y/python-env/bin/python -B -m unittest discover -s examples/federated-work/python_buyer -v",
+      "exit_code": 0,
+      "result": "pass",
+      "log": "evidence/python-buyer-complete.log",
+      "log_sha256": "c9da96e8fab33d6ca830b831266425a6cef1464ded4da4633c3fba6aadfb39d9",
+      "reported_cases_or_scenario_groups": 30
+    },
+    {
+      "command": "python3 -B -m unittest discover -s examples/funded-work-model -p 'test_*.py' -v",
+      "exit_code": 1,
+      "result": "expected_red_before_implementation",
+      "log": "evidence/model-red.log",
+      "log_sha256": "40aa4a75b24acc1b55264e997f329facca6e6ad3a71cbdf63e1b6c9c208108b5"
+    },
+    {
+      "command": "python3 -B -m unittest discover -s examples/funded-work-model -p 'test_*.py' -v",
+      "exit_code": 0,
+      "result": "pass",
+      "log": "evidence/model-green.log",
+      "log_sha256": "2557913361a540fbc3560df45446afb0d77633b080eb12da8114e8b0be6d2a2f",
+      "reported_cases_or_scenario_groups": 6
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=target cargo test --locked -p chio-store-sqlite --test finding_pool_ledger -- --list",
+      "exit_code": 0,
+      "result": "inventory",
+      "log": "evidence/pool-list.log",
+      "log_sha256": "32f5440a5b43418a47bdf3b5e49616f20331a66a9544cf081ce12bc4d6c303bc",
+      "reported_cases_or_scenario_groups": 38
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=target cargo test --locked -p chio-store-sqlite --test finding_pool_ledger -- --test-threads=1",
+      "exit_code": 101,
+      "result": "unsafe_temporary_parent_permissions",
+      "log": "evidence/pool-tests.log",
+      "log_sha256": "57fc6e0474803a5d6d6fec6004207864a49912cf51d3ba2a295296faa734f8a0"
+    },
+    {
+      "command": "umask 022\nCARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=target cargo test --locked -p chio-store-sqlite --test finding_pool_ledger -- --test-threads=1",
+      "exit_code": 0,
+      "result": "pass",
+      "log": "evidence/pool-tests-qualified.log",
+      "log_sha256": "5a10aa7943f5f3809baaeba0fcc54165713187d64b5ee3cfde60e9bcf23e49fd",
+      "reported_cases_or_scenario_groups": 38,
+      "raw_log_sha256": "e2e534273c1b369dd394269d968705d327cde459795c373e9069bda55b877353",
+      "log_normalization": "Trailing line whitespace and redundant final blank lines removed for repository hygiene; raw terminal log retained in task temporary directory."
+    },
+    {
+      "command": "pnpm --dir contracts install --frozen-lockfile",
+      "exit_code": 1,
+      "result": "incomplete_shared_pnpm_cache",
+      "log": "evidence/contracts-install.log",
+      "log_sha256": "5a4119f9e37a2305c7e318a76749322f5aacc11870330fe15056345c241016da"
+    },
+    {
+      "command": "COREPACK_HOME=/tmp/chio-funding-execution-mfkbfx6y/corepack corepack pnpm@12.4.1 --dir contracts install --frozen-lockfile",
+      "exit_code": 0,
+      "result": "pass",
+      "log": "evidence/contracts-install-private.log",
+      "log_sha256": "8a1a4d630ca085e0c85206a3e82a0511a48a7d99f51ee78a9a3d59e70f7b78e3"
+    },
+    {
+      "command": "node --test contracts/scripts/funded-work-fit.test.mjs",
+      "exit_code": 0,
+      "result": "pass",
+      "log": "evidence/escrow-fit-tests.log",
+      "log_sha256": "a246da378b8121fca0380d6af6a43d001df95d7552522025a3174d74ed2160a9",
+      "reported_cases_or_scenario_groups": 6
+    },
+    {
+      "command": "CHIO_F1_REQUIRE_TIMELY_CLAIM=1 node --test --test-name-pattern='pre-expiry' contracts/scripts/funded-work-fit.test.mjs",
+      "exit_code": 1,
+      "result": "expected_failure_of_stronger_F1_promise",
+      "log": "evidence/escrow-timely-claim-counterexample.log",
+      "log_sha256": "3ae2ed4d4e19503abd8f0e02fca832b4d211a024d834eef6e0625c5055bed1c2",
+      "reported_cases_or_scenario_groups": 1,
+      "raw_log_sha256": "0cc1e96190b5efb962454c8200802562161663c9febe0691406d0094f7083da9",
+      "log_normalization": "Trailing line whitespace and redundant final blank lines removed for repository hygiene; raw terminal log retained in task temporary directory."
+    }
+  ],
+  "source_hashes": [
+    {
+      "path": "Cargo.toml",
+      "sha256": "f1af9cc30375572b2b393e0d4fde6ffd536638f95d3d2e1d48dd75d75e1e1424"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "24cea648f49c8c62c810828bf1d36574bb7a6faf375ae8c00c1a2183a5381bf2"
+    },
+    {
+      "path": "contracts/package.json",
+      "sha256": "64efeb00225f14767812ce75d78d52002fbc6faa999a4ee43887a31d8357a773"
+    },
+    {
+      "path": "contracts/pnpm-lock.yaml",
+      "sha256": "07cee51275b05dc9c4fea16f42e256bc5707c75a17794425c0c5c64695e23ce8"
+    },
+    {
+      "path": "contracts/scripts/funded-work-fit.test.mjs",
+      "sha256": "83864ed61cea1136ec5a5b919d675f5394638329fef3caa99173949687dfb593"
+    },
+    {
+      "path": "examples/funded-work-model/funding_model.py",
+      "sha256": "3fad21a8060d24ee5ac700f640673e9ee1a26caaee50b85c852a058394bae71b"
+    },
+    {
+      "path": "examples/funded-work-model/test_funding_model.py",
+      "sha256": "e5103c224aaa50cb4f8211faaff4e83f71581590e4e828b1c12f356c42be3768"
+    },
+    {
+      "path": "examples/federated-work/Cargo.toml",
+      "sha256": "5eb5b9fd20aea6e3f8f556bf839eb4164fbcca2d6aaf66ad6f7f0041b36a1708"
+    },
+    {
+      "path": "examples/federated-work/Cargo.lock",
+      "sha256": "324f2b8461ed53bad6771398691e8d71f34bcd98778a52314d217b316dad6165"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/requirements.txt",
+      "sha256": "e28d708278727dc498f6d0d417418ba99a389f69547a6d4b1ef318a3a8508689"
+    },
+    {
+      "path": "contracts/src/ChioBondVault.sol",
+      "sha256": "c425add7c32c8617cbcaeba99ca4dffb3dee74cc16c6e539a77cffd9a0b38cd7"
+    },
+    {
+      "path": "contracts/src/ChioEscrow.sol",
+      "sha256": "0ee3d055c3696e0e4847b413838ee9d3e064c64018964d02c03b242dbe089e7f"
+    },
+    {
+      "path": "contracts/src/ChioIdentityRegistry.sol",
+      "sha256": "34feea40aeff3ffc36eec325dbb65aad0fbbe6ac4fe294efa50f47a8e746f1b7"
+    },
+    {
+      "path": "contracts/src/ChioPriceResolver.sol",
+      "sha256": "84fc5f6d020fda58faf09cdae27082703b617ba7afc473651efec1ea00d91146"
+    },
+    {
+      "path": "contracts/src/ChioRootRegistry.sol",
+      "sha256": "0a4d9e48cf4e902bcc641b8be4f44eddf0a2fada0b857abcfb875885ac7c112b"
+    },
+    {
+      "path": "contracts/src/interfaces/IAggregatorV3.sol",
+      "sha256": "c9549e5a36ef15792f83547703d429fa0a3c88ef14b2b1b0a01916bc717ebefa"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioBondVault.sol",
+      "sha256": "62d2b34a235a8e9543e7dc49869075beec79894636054d40f0cca98c8b45bccf"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioEscrow.sol",
+      "sha256": "edccfaecb712daba527a68ecbb4092ae7adf91fdc7e0a9b13f1117430b69f9c9"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioIdentityRegistry.sol",
+      "sha256": "dddea33a1506a26546ebbe52d258b227270dba284cc5138b4334740f479840be"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioPriceResolver.sol",
+      "sha256": "412e5fcce50330e28ed4ead8479b3236b8b8765501fb5307c55171bf020d74de"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioRootRegistry.sol",
+      "sha256": "1e8ddedfbf56ef3ca9c9c06e837db431078687f5c9c0b00bf8c55ce8ea7a5d01"
+    },
+    {
+      "path": "contracts/src/interfaces/IERC20.sol",
+      "sha256": "acd7d465fcd0264e92b038a0671f1b90e003325d2c48c211de23fcc09a7f3ec3"
+    },
+    {
+      "path": "contracts/src/interfaces/IERC20Permit.sol",
+      "sha256": "4751af7647654a4891bde119b9ba4662e3e09ef5fe2729fb13d6ea266f7cfb4e"
+    },
+    {
+      "path": "contracts/src/lib/ChioMerkle.sol",
+      "sha256": "4cf0734a1cbd8981a1e64ee3905a878bac2cb2c323168025b6464be65b701c17"
+    },
+    {
+      "path": "contracts/src/mocks/ChioCreate2Factory.sol",
+      "sha256": "e6e0010de71cb2e476ca09bbb1bec35bfacd4cf040c2549a694558a2ee4cb52b"
+    },
+    {
+      "path": "contracts/src/mocks/FeeOnTransferERC20.sol",
+      "sha256": "2b4a08527ce6b41979afe9b8f66c5cf35e6726ca2082374fe308cb74676dc6e8"
+    },
+    {
+      "path": "contracts/src/mocks/Mock1271Admin.sol",
+      "sha256": "f9f5adfc23ad42219a7c8a7a384fb24f6f7518e20e9943eb475a75ce852be3ca"
+    },
+    {
+      "path": "contracts/src/mocks/MockAggregatorV3.sol",
+      "sha256": "b22a0f951b8ab103a3804bd281ab25e02b46bd197f825fe2ce279146e92d74ca"
+    },
+    {
+      "path": "contracts/src/mocks/MockERC20.sol",
+      "sha256": "8a780f5a771b541061aeceb752652d446c52848d9a681835a2e496e5e4821a1d"
+    },
+    {
+      "path": "contracts/src/mocks/NoReturnERC20.sol",
+      "sha256": "3d2e72701c4fadc58ae398fa4c748d9602512bcb17fdaaa49231e9813efb7d20"
+    },
+    {
+      "path": "contracts/src/mocks/ReentrantBondToken.sol",
+      "sha256": "e8c3e32e3fd7280141853c3215db37db9372d10059fd8f7402c451ce82ee6ca9"
+    }
+  ],
+  "binary_sha256": "d097724e94cf5a904ca9a783e92d14fffa2414b2d95e0d5c698b841764d53001",
+  "external_state": [
+    {
+      "path": "evidence/security-pr-current.json",
+      "sha256": "a6514c8b2bb38e27d5ade3a19e74530f068b6a58f67523406b2ece8431187131"
+    },
+    {
+      "path": "evidence/process-pr-current.json",
+      "sha256": "800fa3adb78fd94ccd853fc6e3911d97053bfefb6f9c8a411bb13f8365b8d681"
+    }
+  ],
+  "required_final_test_skips": 0,
+  "limits": [
+    "Source checkpoint and tests are local; no remote CI or release qualification.",
+    "Three local process smoke suites use local credit, not external funds.",
+    "New contract tests use synthetic certifications, mock tokens, one administrator and no work checker.",
+    "The accepted child in the legacy escrow test is already paid before parent expiry.",
+    "The Python model is trusted, serial and in-memory; no monetary terminal or concurrency proof.",
+    "Stronger native dishonest-administrator attack and Security M4 integration remain pending.",
+    "No public deployment, real-funds transfer, independent company trial or commercial scoring.",
+    "Logs contain public fixture observations; private role directories, signing seeds and negotiation credentials are excluded."
+  ]
+}

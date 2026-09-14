@@ -1,9 +1,10 @@
 # Open agent work: the Chio breakthrough program
 
-Status: proposed research and implementation program. Written 2026-09-14.
-This package records decisions, dependencies, experiments and completion gates.
-It implements no new protocol behavior and authorizes no external deployment,
-fund transfer or partner communication.
+Status: research and implementation program, with the first local execution
+slice recorded on 2026-09-14. This package records decisions, dependencies,
+experiments and completion gates. The new model and existing-escrow tests are
+research artifacts; no new funded protocol is deployed. External deployment,
+real fund transfer and partner communication remain outside this slice.
 
 Approved whitepaper title, locked 2026-09-14:
 **Chio: A Peer-to-Peer Economy of Verifiable Work**.
@@ -50,6 +51,16 @@ The plan gives that alternative the same resources and a fair opportunity to win
 | [08: Repository reconciliation](08-repository-review.md) | Source-backed reuse decisions, sixteen integration gaps and the inventory of all 163 workspace members |
 | [09: Security roadmap and sync decision](09-security-roadmap-sync-review.md) | Active security/process PRs, ten additional integration findings, actual merge conflicts and the checkpoint to reuse |
 | [First-slice implementation plan](../../superpowers/plans/2026-09-14-open-agent-work.md) | Exact files, model/test code, inspection commands and review checkpoints for starting M0/M1 |
+| [First-slice execution](execution/00-baseline.md) | Isolated source checkpoint, fresh regression results, escrow deadline counterexample and frozen draft decisions |
+| [Next vertical-slice plan](../../superpowers/plans/2026-09-14-funded-work-claim-escrow.md) | Preserve timely claims, then connect finalized funding to native work on the qualified security candidate |
+
+The first slice now has six passing allocation-model tests, 38 passing existing
+pool-ledger tests and six real-bytecode escrow characterizations. A deliberately
+stronger timely-claim assertion fails: the existing escrow refunds the buyer
+after expiry even when a valid certificate was produced earlier. The selected
+next experiment adds explicit claim/resolution state in a separate contract.
+These results complete the bounded handoff's artifacts, not M0/M1 or the
+independent-company trial. See execution for source and qualification limits.
 
 The first executable milestone is **M0: freeze the comparison and expose the
 funding counterexample**. Do this before a general protocol extraction, a new

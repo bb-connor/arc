@@ -1,0 +1,232 @@
+    Finished `test` profile [unoptimized] target(s) in 1.46s
+     Running tests/finding_pool_ledger.rs (target/debug/deps/finding_pool_ledger-bab6c9bedb88fa81)
+
+running 38 tests
+test cloned_receipt_database_cannot_reuse_the_ledger_sink_binding ... FAILED
+test cognition_market_allocation_binds_one_concrete_store_across_deployments ... FAILED
+test cognition_market_authenticated_pool_restart_never_exceeds_signed_amount ... FAILED
+test cognition_market_debit_rejects_non_ready_sessions_before_reservation ... FAILED
+test cognition_market_debit_resolves_tenant_from_authenticated_session_context ... FAILED
+test cognition_market_kernel_refuses_pool_ledger_replacement ... FAILED
+test cognition_market_ledger_rejects_an_in_place_rollback ... FAILED
+test cognition_market_pool_binds_one_purchaser_allocation_per_pool ... FAILED
+test cognition_market_pool_bounds_expired_reclamation_per_debit ... FAILED
+test cognition_market_pool_configuration_failure_is_atomic ... FAILED
+test cognition_market_pool_domain_excludes_a_second_live_store ... FAILED
+test cognition_market_pool_ledger_persists_its_authority_selected_domain ... FAILED
+test cognition_market_pool_receipt_authority_is_pinned_ledger_wide ... FAILED
+test cognition_market_pool_receipts_survive_ordinary_kernel_key_rotation ... FAILED
+test cognition_market_pool_reclaims_unclaimed_reservations_at_the_claim_deadline ... FAILED
+test cognition_market_pool_reclamation_progress_survives_a_capacity_rejection ... FAILED
+test cognition_market_pool_rejects_authority_purchaser_digest_and_pool_substitution ... FAILED
+test cognition_market_pool_replay_skips_mutable_purchase_admission ... FAILED
+test cognition_market_pool_replays_after_allocation_authority_rotation ... FAILED
+test cognition_market_pool_replays_after_expiry_and_clock_rollback_but_rejects_new_spend ... FAILED
+test cognition_market_pool_replays_after_purchase_verifier_rotation ... FAILED
+test cognition_market_pool_requires_live_status_before_new_debit_but_replays ... FAILED
+test cognition_market_qualified_pool_refuses_in_memory_storage ... ok
+test cognition_market_receipt_sink_rejects_an_in_place_rollback_after_acknowledgment ... FAILED
+test cognition_market_sqlite_clone_cannot_reuse_the_store_binding ... FAILED
+test finding_pool_receipt_sink_rejects_a_writable_parent_directory ... ok
+test finding_pool_receipt_sink_rejects_unsafe_file_permissions_and_links ... ok
+test in_memory_receipt_stores_never_advertise_a_durable_pool_sink ... ok
+test independent_receipt_anchors_produce_distinct_sink_identities ... FAILED
+test qualified_pool_creates_percent_decoded_uri_parent ... FAILED
+test qualified_pool_rejects_a_symlink_database_path ... ok
+test qualified_pool_rejects_group_or_world_writable_database_files ... ok
+test qualified_pool_rejects_percent_decoded_nul_uris ... ok
+test qualified_pool_rejects_read_only_sqlite_uris ... FAILED
+test qualified_pool_rejects_sqlite_uris_that_disable_file_locking ... ok
+test sqlite_outbox_claim_serializes_independent_ledger_instances ... FAILED
+test sqlite_outbox_restart_reclaims_a_prior_epoch_after_clock_rollback ... FAILED
+test sqlite_receipt_store_identity_survives_reopen ... FAILED
+
+failures:
+
+---- cloned_receipt_database_cannot_reuse_the_ledger_sink_binding stdout ----
+
+thread 'cloned_receipt_database_cannot_reuse_the_ledger_sink_binding' (656257) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1748:10:
+open qualified pool ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- cognition_market_allocation_binds_one_concrete_store_across_deployments stdout ----
+
+thread 'cognition_market_allocation_binds_one_concrete_store_across_deployments' (656258) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:910:10:
+open allocation-bound store: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_authenticated_pool_restart_never_exceeds_signed_amount stdout ----
+
+thread 'cognition_market_authenticated_pool_restart_never_exceeds_signed_amount' (656259) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:687:61:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_debit_rejects_non_ready_sessions_before_reservation stdout ----
+
+thread 'cognition_market_debit_rejects_non_ready_sessions_before_reservation' (656260) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:644:61:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_debit_resolves_tenant_from_authenticated_session_context stdout ----
+
+thread 'cognition_market_debit_resolves_tenant_from_authenticated_session_context' (656261) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:607:61:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_kernel_refuses_pool_ledger_replacement stdout ----
+
+thread 'cognition_market_kernel_refuses_pool_ledger_replacement' (656262) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1655:10:
+open first qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_ledger_rejects_an_in_place_rollback stdout ----
+
+thread 'cognition_market_ledger_rejects_an_in_place_rollback' (656263) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1782:53:
+initialize qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_binds_one_purchaser_allocation_per_pool stdout ----
+
+thread 'cognition_market_pool_binds_one_purchaser_allocation_per_pool' (656264) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1212:10:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_bounds_expired_reclamation_per_debit stdout ----
+
+thread 'cognition_market_pool_bounds_expired_reclamation_per_debit' (656265) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1470:61:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_configuration_failure_is_atomic stdout ----
+
+thread 'cognition_market_pool_configuration_failure_is_atomic' (656266) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1095:10:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_domain_excludes_a_second_live_store stdout ----
+
+thread 'cognition_market_pool_domain_excludes_a_second_live_store' (656267) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:893:54:
+open first domain owner: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_ledger_persists_its_authority_selected_domain stdout ----
+
+thread 'cognition_market_pool_ledger_persists_its_authority_selected_domain' (656268) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:877:14:
+initialize qualified ledger domain: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_receipt_authority_is_pinned_ledger_wide stdout ----
+
+thread 'cognition_market_pool_receipt_authority_is_pinned_ledger_wide' (656269) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1065:61:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_receipts_survive_ordinary_kernel_key_rotation stdout ----
+
+thread 'cognition_market_pool_receipts_survive_ordinary_kernel_key_rotation' (656270) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:947:61:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_reclaims_unclaimed_reservations_at_the_claim_deadline stdout ----
+
+thread 'cognition_market_pool_reclaims_unclaimed_reservations_at_the_claim_deadline' (656271) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1412:61:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_reclamation_progress_survives_a_capacity_rejection stdout ----
+
+thread 'cognition_market_pool_reclamation_progress_survives_a_capacity_rejection' (656272) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1515:61:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_rejects_authority_purchaser_digest_and_pool_substitution stdout ----
+
+thread 'cognition_market_pool_rejects_authority_purchaser_digest_and_pool_substitution' (656273) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1115:10:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_replay_skips_mutable_purchase_admission stdout ----
+
+thread 'cognition_market_pool_replay_skips_mutable_purchase_admission' (656274) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1360:10:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_replays_after_allocation_authority_rotation stdout ----
+
+thread 'cognition_market_pool_replays_after_allocation_authority_rotation' (656275) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1271:10:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_replays_after_expiry_and_clock_rollback_but_rejects_new_spend stdout ----
+
+thread 'cognition_market_pool_replays_after_expiry_and_clock_rollback_but_rejects_new_spend' (656276) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1242:60:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_replays_after_purchase_verifier_rotation stdout ----
+
+thread 'cognition_market_pool_replays_after_purchase_verifier_rotation' (656277) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1315:10:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_pool_requires_live_status_before_new_debit_but_replays stdout ----
+
+thread 'cognition_market_pool_requires_live_status_before_new_debit_but_replays' (656278) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1585:10:
+open qualified ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_receipt_sink_rejects_an_in_place_rollback_after_acknowledgment stdout ----
+
+thread 'cognition_market_receipt_sink_rejects_an_in_place_rollback_after_acknowledgment' (656280) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1814:10:
+open qualified pool ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- cognition_market_sqlite_clone_cannot_reuse_the_store_binding stdout ----
+
+thread 'cognition_market_sqlite_clone_cannot_reuse_the_store_binding' (656281) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:929:56:
+open source ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- independent_receipt_anchors_produce_distinct_sink_identities stdout ----
+
+thread 'independent_receipt_anchors_produce_distinct_sink_identities' (656286) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1727:10:
+open receipt store with first anchor: expected Ok(..), got Err(Conflict("finding-pool receipt sink parent has unsafe ownership or permissions"))
+
+---- qualified_pool_creates_percent_decoded_uri_parent stdout ----
+
+thread 'qualified_pool_creates_percent_decoded_uri_parent' (656287) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1013:14:
+open qualified ledger through encoded URI: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- qualified_pool_rejects_read_only_sqlite_uris stdout ----
+
+thread 'qualified_pool_rejects_read_only_sqlite_uris' (656291) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1044:53:
+initialize writable pool ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- sqlite_outbox_claim_serializes_independent_ledger_instances stdout ----
+
+thread 'sqlite_outbox_claim_serializes_independent_ledger_instances' (656293) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:786:63:
+open producer ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- sqlite_outbox_restart_reclaims_a_prior_epoch_after_clock_rollback stdout ----
+
+thread 'sqlite_outbox_restart_reclaims_a_prior_epoch_after_clock_rollback' (656294) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:837:55:
+open producer ledger: expected Ok(..), got Err(Storage("qualified finding pool database parent has unsafe ownership or permissions"))
+
+---- sqlite_receipt_store_identity_survives_reopen stdout ----
+
+thread 'sqlite_receipt_store_identity_survives_reopen' (656295) panicked at crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs:1707:10:
+open first receipt store: expected Ok(..), got Err(Conflict("finding-pool receipt sink parent has unsafe ownership or permissions"))
+
+
+failures:
+    cloned_receipt_database_cannot_reuse_the_ledger_sink_binding
+    cognition_market_allocation_binds_one_concrete_store_across_deployments
+    cognition_market_authenticated_pool_restart_never_exceeds_signed_amount
+    cognition_market_debit_rejects_non_ready_sessions_before_reservation
+    cognition_market_debit_resolves_tenant_from_authenticated_session_context
+    cognition_market_kernel_refuses_pool_ledger_replacement
+    cognition_market_ledger_rejects_an_in_place_rollback
+    cognition_market_pool_binds_one_purchaser_allocation_per_pool
+    cognition_market_pool_bounds_expired_reclamation_per_debit
+    cognition_market_pool_configuration_failure_is_atomic
+    cognition_market_pool_domain_excludes_a_second_live_store
+    cognition_market_pool_ledger_persists_its_authority_selected_domain
+    cognition_market_pool_receipt_authority_is_pinned_ledger_wide
+    cognition_market_pool_receipts_survive_ordinary_kernel_key_rotation
+    cognition_market_pool_reclaims_unclaimed_reservations_at_the_claim_deadline
+    cognition_market_pool_reclamation_progress_survives_a_capacity_rejection
+    cognition_market_pool_rejects_authority_purchaser_digest_and_pool_substitution
+    cognition_market_pool_replay_skips_mutable_purchase_admission
+    cognition_market_pool_replays_after_allocation_authority_rotation
+    cognition_market_pool_replays_after_expiry_and_clock_rollback_but_rejects_new_spend
+    cognition_market_pool_replays_after_purchase_verifier_rotation
+    cognition_market_pool_requires_live_status_before_new_debit_but_replays
+    cognition_market_receipt_sink_rejects_an_in_place_rollback_after_acknowledgment
+    cognition_market_sqlite_clone_cannot_reuse_the_store_binding
+    independent_receipt_anchors_produce_distinct_sink_identities
+    qualified_pool_creates_percent_decoded_uri_parent
+    qualified_pool_rejects_read_only_sqlite_uris
+    sqlite_outbox_claim_serializes_independent_ledger_instances
+    sqlite_outbox_restart_reclaims_a_prior_epoch_after_clock_rollback
+    sqlite_receipt_store_identity_survives_reopen
+
+test result: FAILED. 8 passed; 30 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.26s
+
+error: test failed, to rerun pass `-p chio-store-sqlite --test finding_pool_ledger`
