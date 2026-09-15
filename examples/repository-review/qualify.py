@@ -15,6 +15,8 @@ from chio_process import ProcessClient
 from review import host
 
 HERE = Path(__file__).resolve().parent
+PROFILES = {"inventory": "inventory", "scripted-model": "model_fixture:create"}
+LIMITED_PROFILE = "limited"
 
 
 def command(*args, success=True, env=None):
@@ -64,8 +66,7 @@ def commits(directory):
 def exercise(binary, output, temporary):
     repo, base, head = commits(temporary)
     reports = {}
-    for profile in ("inventory", "model_fixture:create"):
-        name = "inventory" if profile == "inventory" else "scripted-model"
+    for name, profile in PROFILES.items():
         directory = temporary / name
         app = [sys.executable, HERE / "review.py"]
         command(
@@ -244,7 +245,7 @@ def exercise(binary, output, temporary):
             "host_init_seconds": evidence["host_init_seconds"],
             "recovery_attempt_seconds": evidence["attempt_seconds"],
         }
-    limited = temporary / "limited"
+    limited = temporary / LIMITED_PROFILE
     command(
         sys.executable,
         HERE / "review.py",
@@ -279,7 +280,13 @@ def exercise(binary, output, temporary):
 
 def work_directory(requested):
     # Reserve the longest profile and socket suffix before preparing any host.
-    suffix = "inventory/sockets/123456789012.sock"
+    suffix = max(
+        (
+            Path(name) / "sockets/123456789012.sock"
+            for name in (*PROFILES, LIMITED_PROFILE)
+        ),
+        key=lambda path: len(os.fsencode(path)),
+    )
     parent = (requested.parent if requested else Path(tempfile.gettempdir())).resolve(
         strict=True
     )
