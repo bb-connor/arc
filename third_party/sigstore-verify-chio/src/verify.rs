@@ -191,22 +191,27 @@ impl Verifier {
     ///
     /// ```no_run
     /// use sigstore_verify::{Verifier, VerificationPolicy};
-    /// use sigstore_trust_root::TrustedRoot;
-    /// use sigstore_types::{Artifact, Bundle, Sha256Hash};
+    /// use sigstore_verify::trust_root::TrustedRoot;
+    /// use sigstore_verify::types::{Bundle, Sha256Hash};
     ///
     /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let trusted_root = TrustedRoot::production()?;
     /// let verifier = Verifier::new(&trusted_root);
-    /// let bundle: Bundle = todo!();
-    /// let policy = VerificationPolicy::default();
+    /// let bundle_json = std::fs::read_to_string("hello.sigstore.json")?;
+    /// let bundle = Bundle::from_json(&bundle_json)?;
+    /// let policy = VerificationPolicy::default()
+    ///     .require_identity("user@example.com")
+    ///     .require_issuer("https://accounts.google.com");
     ///
     /// // Option 1: Verify with raw bytes
     /// let artifact_bytes = b"hello world";
-    /// verifier.verify(artifact_bytes.as_slice(), &bundle, &policy)?;
+    /// let result = verifier.verify(artifact_bytes.as_slice(), &bundle, &policy)?;
+    /// assert!(result.success);
     ///
     /// // Option 2: Verify with pre-computed digest (no raw bytes needed!)
     /// let digest = Sha256Hash::from_hex("b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9")?;
-    /// verifier.verify(digest, &bundle, &policy)?;
+    /// let result = verifier.verify(digest, &bundle, &policy)?;
+    /// assert!(result.success);
     /// # Ok(())
     /// # }
     /// ```
