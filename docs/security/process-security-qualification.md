@@ -15,6 +15,48 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 ## Recovery and resumed qualification (2026-09-15)
 
+### Latest local continuation
+
+The execution branch retains the preceding repair and M5 commits through
+`3ec843a866` (Linux container test fixture initialization). The primary checkout
+remains unchanged. New reference commands at `a34e7e20b` prepare a signed
+Enforced repository-reader fan-out and independently verify the returned file
+contents against operator-pinned runtime/capability/request identities and input
+hashes. They do not declare complete M5 acceptance.
+
+Fresh terminal results, under the evidence root below:
+
+| Gate | Frozen source | Result / evidence |
+| --- | --- | --- |
+| macOS host and response tests; strict all-target Clippy; formatting; hygiene | `9833a537f` | All four gates pass, nine host/response cases. `macos-m5-9833a537f/` |
+| Linux host and response tests | `9833a537f` | 15 pass, no failures or ignores. `linux-m5-9833a537f-retry1/process-host-response.log` |
+| Fresh supervised native and container workers | `9833a537f` | Both pass, actual two-worker effects and byte-identical completed-run recovery. Same directory, `native-fresh-workers.log` and `container-fresh-workers.log` |
+| Linux strict all-target Clippy | `9833a537f`, then `3ec843a866` | First fails on a Linux-only fixture's old initializer call; repaired invocation passes. `linux-m5-3ec843a86/strict-clippy.log`. Container unit tests continue separately. |
+| Native restart and authenticated caller inventories | `1e747084d` | Both pass; consumer, flow and workspace gates remain queued. `linux-1e747084d/` |
+| x86 real-kernel cage all-target execution | `f3497e23e` | All 26 enforcement probes, 14 compilation cases, eight evidence cases and 20 library cases pass. The gate fails its required 21-library-case inventory before later lanes. `linux-x86-f3497e23e/cage.log` |
+| x86 cross-build, CLI plus static helper/tools | `f3497e23e` | Both build gates pass. `cross-x86-m5-f3497e23e/`; explicit executable hashes in `x86-executables-f3497e23e/manifest.json`. |
+| First Enforced reader run | scripts `a34e7e20b`, binaries `f3497e23e` | Initialization refuses the unoptimized 4.2 MiB helper under the signed 1 MiB retention limit. No tool-workflow pass. `linux-x86-reference-a34e7e20b/`; optimized helper/tool builds continue without relaxing the limit. |
+
+The missing x86 library case was the unsupported-architecture admission test,
+previously excluded by its `not(target_arch = "x86_64")` condition. The repaired
+test submits unsupported architecture results through the same private admission
+path on every Linux host. The public boundary still selects the compiled host
+architecture. The actual public-admission refusal remains tested on non-x86
+Linux. All required names, the 69-case commitment and ten mutation controls stay
+unchanged; complete qualification requires a new terminal gate result.
+
+The first Linux M5 build attempt was killed by the guest's global OOM during
+linking while separate target owners compiled concurrently. Its failed output
+and kernel diagnosis are retained in `linux-m5-9833a537f/` and
+`linux-m5-oom-kernel.log`. A 4 GiB temporary build swap file was then enabled;
+`linux-build-memory-adjustment.json` records the affected active queues. No
+application, test or enforcement limit was changed. These runs make no
+performance claim. The successful retry has its own immutable evidence directory.
+
+Full M5 scenario coverage, signed joined accounting/confinement/terminal evidence,
+dependency audits, reviewed execution-image inputs and designated trusted capture
+remain open. These local x86 VM results are not release-capture authority.
+
 Execution checkout restored at `/tmp/arc-security-launch`, branch
 `integration/process-security-m4`, from live PR head
 `b7211ce2d063ea36ea0f512b6f3c0253b65ecd71`. Both parents remain ancestors:

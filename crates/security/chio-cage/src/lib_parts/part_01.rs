@@ -492,7 +492,11 @@ pub enum SandboxArchitecture {
 
 impl SandboxArchitecture {
     pub fn current() -> Result<Self, CageError> {
-        match std::env::consts::ARCH {
+        Self::for_native_architecture(std::env::consts::ARCH)
+    }
+
+    fn for_native_architecture(architecture: &str) -> Result<Self, CageError> {
+        match architecture {
             "x86_64" => Ok(Self::X86_64),
             architecture => Err(CageError::UnsupportedArchitecture(architecture.to_string())),
         }
@@ -1073,6 +1077,16 @@ pub fn admit(
     authorization: VerifiedCageManifest<'_>,
     ceilings: &OperatorCeilings,
 ) -> Result<AdmittedManifest, CageError> {
+    admit_with_architecture(authorization, ceilings, SandboxArchitecture::current())
+}
+
+// The public boundary always uses the compiled host architecture. Keeping the
+// observed result explicit lets supported hosts exercise the same refusal path.
+fn admit_with_architecture(
+    authorization: VerifiedCageManifest<'_>,
+    ceilings: &OperatorCeilings,
+    architecture: Result<SandboxArchitecture, CageError>,
+) -> Result<AdmittedManifest, CageError> {
     let manifest_digest = authorization.manifest_digest().to_string();
     let signed_manifest_digest = authorization.signed_manifest_digest().to_string();
     let registry_digest = authorization.registry_digest().to_string();
@@ -1123,6 +1137,7 @@ pub fn admit(
     #[cfg(not(target_os = "linux"))]
     {
         let _ = (
+            architecture,
             manifest_digest,
             signed_manifest_digest,
             registry_digest,
@@ -1138,7 +1153,7 @@ pub fn admit(
 
     #[cfg(target_os = "linux")]
     {
-        SandboxArchitecture::current()?;
+        architecture?;
         let forbidden_resources = linux::retain_forbidden(forbidden_paths)?;
         let read_resources = linux::retain_read_grants(&read_paths)?;
         let write_resources = linux::retain_write_grants(&write_paths)?;

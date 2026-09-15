@@ -428,7 +428,7 @@ mod tests {
         assert_eq!(admitted.signed_manifest_digest().len(), 64);
     }
 
-    #[cfg(all(target_os = "linux", not(target_arch = "x86_64")))]
+    #[cfg(target_os = "linux")]
     #[test]
     fn admission_fails_closed_on_unqualified_linux_architecture() {
         let keypair = Keypair::from_seed(&[29; 32]);
@@ -437,10 +437,20 @@ mod tests {
         registry
             .register_public_only(signed, &keypair.public_key(), RuntimeToolTopology::local())
             .test_unwrap();
-        let authorization = registry.authorize_cage_manifest("cage-test").test_unwrap();
-
+        for architecture in ["aarch64", "riscv64", "s390x", "unknown"] {
+            let authorization = registry.authorize_cage_manifest("cage-test").test_unwrap();
+            assert!(matches!(
+                admit_with_architecture(
+                    authorization,
+                    &ceilings(),
+                    SandboxArchitecture::for_native_architecture(architecture),
+                ),
+                Err(CageError::UnsupportedArchitecture(observed)) if observed == architecture
+            ));
+        }
+        #[cfg(not(target_arch = "x86_64"))]
         assert!(matches!(
-            admit(authorization, &ceilings()),
+            admit(registry.authorize_cage_manifest("cage-test").test_unwrap(), &ceilings()),
             Err(CageError::UnsupportedArchitecture(_))
         ));
     }
