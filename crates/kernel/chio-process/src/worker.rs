@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 
+use chio_core_types::capability::governance::GovernedTransactionIntent;
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
 use chio_kernel::{ToolCallOutput, Verdict};
 use rand::RngCore;
@@ -63,6 +64,8 @@ enum Operation {
         server_id: String,
         tool_name: String,
         arguments: Value,
+        #[serde(default)]
+        governed_intent: Option<Box<GovernedTransactionIntent>>,
         #[serde(default)]
         known_outcome_only: bool,
     },
@@ -151,15 +154,19 @@ impl WorkerService {
                 server_id,
                 tool_name,
                 arguments,
+                governed_intent,
                 known_outcome_only,
             } => {
-                let call = self.runtime.tool_request(
+                let mut call = self.runtime.tool_request(
                     &id,
                     &operation_key,
                     &server_id,
                     &tool_name,
                     arguments,
                 )?;
+                // Context is untrusted request input. The capability and caller
+                // remain host-owned; the kernel validates all intent authority.
+                call.governed_intent = governed_intent.map(|intent| *intent);
                 let response = if known_outcome_only {
                     self.runtime
                         .invoke_known_only(&id, &operation_key, &call)

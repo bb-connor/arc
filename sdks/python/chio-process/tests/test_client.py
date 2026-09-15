@@ -7,7 +7,7 @@ import threading
 import unittest
 from pathlib import Path
 
-from chio_process import MAX_RESPONSE_BYTES, PROTOCOL, ProcessClient, WorkerError
+from chio_process import MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, PROTOCOL, ProcessClient, WorkerError
 
 
 class ClientTests(unittest.TestCase):
@@ -128,6 +128,36 @@ class ClientTests(unittest.TestCase):
         for number in [float("nan"), float("inf")]:
             with self.assertRaises(ValueError):
                 client.invoke("one", "tools", "read", {"value": number})
+
+    def test_governed_intent_is_preserved_without_automatic_fallback(self):
+        intent = {
+            "id": "task-read", "server_id": "tools", "tool_name": "read",
+            "purpose": "read task λ", "context": {"chioSwarm": {"taskId": "task-1"}},
+        }
+        original = json.loads(json.dumps(intent))
+        rejected = b'{"protocol":"chio.process.v1","ok":false,"error":{"code":"invalid_request"}}\n'
+
+        def run(client):
+            with self.assertRaises(WorkerError) as caught:
+                client.invoke("one", "tools", "read", {}, governed_intent=intent)
+            self.assertEqual(caught.exception.code, "invalid_request")
+
+        request = self.exchange(rejected, run)
+        self.assertEqual(request["operation"]["governed_intent"], original)
+        self.assertEqual(intent, original)
+        accepted = b'{"protocol":"chio.process.v1","ok":true,"result":{}}\n'
+        request = self.exchange(accepted, lambda c: c.invoke("one", "tools", "read", {}))
+        self.assertNotIn("governed_intent", request["operation"])
+
+    def test_invalid_governed_intent_fails_before_connecting(self):
+        client = ProcessClient("/absent", "test-secret")
+        for value in (False, 1, "intent", [], {"context": float("nan")}):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                client.invoke("one", "tools", "read", {}, governed_intent=value)
+        with self.assertRaises(WorkerError) as caught:
+            client.invoke("one", "tools", "read", {},
+                          governed_intent={"context": "x" * MAX_REQUEST_BYTES})
+        self.assertEqual(caught.exception.code, "request_too_large")
 
     def test_strict_recovery_wire_option_never_falls_back_after_rejection(self):
         rejected = b'{"protocol":"chio.process.v1","ok":false,"error":{"code":"invalid_request"}}\n'

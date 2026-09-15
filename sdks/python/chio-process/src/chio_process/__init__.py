@@ -1,6 +1,6 @@
 """Synchronous local Chio workers. A transport error can follow a committed effect.
 
-Retry an uncertain invocation with its original key and identical arguments.
+Retry with the original key, identical arguments and identical governed intent.
 Keep receipt_json unchanged for independent Chio verification.
 """
 
@@ -54,10 +54,13 @@ class ProcessClient:
         arguments: Any,
         *,
         known_outcome_only: bool = False,
+        governed_intent: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Return verdict, output and original receipt_json, including on denial."""
         if type(known_outcome_only) is not bool:
             raise ValueError("known_outcome_only must be a boolean")
+        if governed_intent is not None and not isinstance(governed_intent, dict):
+            raise ValueError("governed_intent must be an object")
         operation = {
             "op": "invoke",
             "operation_key": operation_key,
@@ -67,6 +70,8 @@ class ProcessClient:
         }
         if known_outcome_only:
             operation["known_outcome_only"] = True
+        if governed_intent is not None:
+            operation["governed_intent"] = governed_intent
         return self._call(operation)
 
     def checkpoint(self, expected_revision: str, value: Any) -> dict[str, Any]:

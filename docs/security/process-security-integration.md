@@ -5,7 +5,7 @@
 
 **Goal:** Preserve the existing process capabilities, reconcile them with the
 locally accepted M4 security implementation, qualify the combined foundation,
-merge eligible dependency-complete changes, then execute M5 using that foundation.
+merge eligible dependency-complete changes, and execute M5 using that foundation.
 
 **Architecture:** `chio-process` owns durable logical process identity,
 checkpoints, authenticated worker transport and supervision. The existing kernel
@@ -18,7 +18,10 @@ SDKs, and the existing Linux enforcement and GitHub qualification machinery.
 
 **Spec:** [Security execution plan](launch-execution-plan.md), especially its
 working rules, M2-M4 preservation requirements and complete M5 acceptance. The
-user approved this integration-before-M5 order on 2026-09-14.
+user approved this integration-before-M5 order on 2026-09-14. On 2026-09-15,
+the user approved building M5 locally on the reconciled branch while protected
+integration gates remain open. This changes implementation order only, not
+the merge, dependency-audit or real enforced-qualification requirements.
 
 ## Global constraints
 
@@ -367,6 +370,11 @@ candidate; no unrelated product or historical omnibus PR is pulled in.
 
 ## Task 7: Execute M5 on the integrated process foundation
 
+Local implementation is now authorized before Task 6's protected merge. Keep
+every completed or interrupted qualification result tied to its source. The
+remaining combined-foundation gates still precede any integration or M5
+acceptance claim.
+
 **Files:** `examples/reference-swarm`, existing process host/runtime wiring,
 runtime authority stores, independent evidence verification and the authorized
 M5 qualification operation. This task retains every requirement of M5 in
@@ -386,3 +394,64 @@ M5 qualification operation. This task retains every requirement of M5 in
   graph, receipts, accounting, confinement and terminal outcomes. Only that
   complete result closes M5. Any unavailable required authorization or platform
   remains explicit and does not relax the milestone.
+
+### M5.1: Carry governed task context through authenticated workers
+
+Owners: `chio-process/src/worker.rs`, its worker protocol tests and protocol
+contract, and the Python/JavaScript process clients and their transport tests.
+
+- [ ] Add a red regression submitting the existing governed-intent shape through
+  an authenticated child. Require the owning kernel's signed missing-authority
+  denial, its actual child capability binding, and zero tool effects.
+- [ ] Carry an optional `governed_intent` on `invoke` using the existing core
+  type. Keep the authenticated process's persisted capability and request
+  identity; do not introduce worker-selected capabilities or trusted metadata.
+- [ ] Prove completed logical-key replay retains the same intent and original receipt;
+  removing or substituting context conflicts without a new effect or charge.
+  A compensated pre-dispatch denial retains the operation and signs a fresh
+  refusal, not a retained tool outcome. Cover malformed intent, forged
+  credentials and ordinary legacy invocation.
+- [ ] Expose the optional context in both process SDKs, omit it by default,
+  preserve nested values, and exercise actual Unix-socket frames. No client
+  validates authority or retries an uncertain effect automatically.
+- [ ] Run the owning Rust worker suite, SDK suites and strict Clippy; document
+  that transport support is not live swarm-authority or confinement acceptance.
+
+### M5.2: Separate live authority from completed-run verification
+
+Implementation exposed a circular prerequisite: the runtime hook used the
+complete-artifact verifier, which requires every graph join and a terminal
+receipt claiming all tasks completed. The Disabled smoke's pending fixture
+receipt cannot establish this condition for real workers.
+
+- [ ] Add a live-admission entry point sharing the strict authority validators.
+  Future results may be absent, but any supplied result must verify; a fan-in
+  continuation still requires its actual join. Keep the complete-artifact
+  verifier strict and report only claims backed by supplied evidence.
+- [ ] Allow an absent join reference for fan-out context only. Reject malformed
+  supplied references, missing fan-in references and mismatched signed evidence.
+  Retain existing reference digests when the join is present.
+- [ ] Compose this path with the existing physically sealed SQLite runtime
+  source and admission participant. Prove signed exact-capability binding,
+  retained single-use continuation custody and completed-outcome replay, without
+  an ephemeral-financial development bypass or invented terminal results.
+- [ ] Run the complete authority and runtime admission suites, strict Clippy,
+  source-format checks and direct root review. These are local composition
+  checks, not the full process topology or Enforced acceptance artifact.
+
+### Remaining M5 implementation checkpoints
+
+1. Bind actual persisted root/child capability bodies and identities to the
+   signed graph, delegation witnesses, route references and continuation tokens
+   in `examples/reference-swarm`. Preserve the existing Disabled smoke.
+2. Compose `ChioRuntimeAdmissionHook` with the sealed runtime source and existing
+   SQLite admission participant. Require swarm admission, authoritative route
+   selection and the real shared aggregate budget; worker context is input to
+   verification, never verifier-owned authority.
+3. Wire the existing authenticated process host and supervised workers to that
+   profile. Provision signed native manifests and require Enforced launch with
+   trusted evidence. Unsupported hosts must refuse, without a Disabled fallback.
+4. Exercise every Task 7 scenario using actual effects and independently checked
+   receipts, then export one exact-run artifact covering graph/capability/worker
+   identity, durable accounting, confinement and terminal outcomes. Complete the
+   actual enforced run only through an authorized qualified runner.

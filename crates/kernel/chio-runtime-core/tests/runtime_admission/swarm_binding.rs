@@ -6,6 +6,9 @@ mod fixtures;
 mod kernel;
 use fixtures::{join_bundle, multihop_bundle, resign};
 
+#[path = "swarm_binding/live_admission.rs"]
+mod live_admission;
+
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 struct BindingFixture {
@@ -30,7 +33,10 @@ impl BindingFixture {
         swarm: SwarmAuthorityBundle,
         capability: CapabilityToken,
     ) -> TestResult<Self> {
-        verify_swarm_authority_bundle(&swarm, &trusted_swarm_witness_keys())?;
+        chio_swarm_authority::verify_swarm_authority_for_admission(
+            &swarm,
+            &trusted_swarm_witness_keys(),
+        )?;
         let store = InMemoryRuntimeAdmissionStore::new();
         let mut admission = bundle();
         admission.destructive = false;

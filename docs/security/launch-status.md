@@ -3,7 +3,8 @@
 Updated 2026-09-15 UTC. Current work is on `integration/process-security-m4` in
 `/tmp/arc-security-launch`, published as [draft PR #1160](https://github.com/bb-connor/arc/pull/1160).
 The complete process ancestry is reconciled locally with M4. Combined
-qualification and protected merge remain open; M5 is not complete. See the
+qualification and protected merge remain open; M5 is not complete. The user
+authorized local M5 implementation before that merge on 2026-09-15. See the
 [integration order](process-security-integration.md) and
 [current qualification results](process-security-qualification.md).
 
@@ -32,7 +33,7 @@ acceptance is complete. This is not merge or release approval.
 | M2 | Complete: local native failure/restart safety acceptance | Preserve exact failure/recovery contracts during M4 repairs | [Acceptance closeout](#m2-local-acceptance-closeout), [cutpoints and downstream contract](native-restart-safety.md) |
 | M3 | Complete: named local caller acceptance and current dependency qualification | All 61 exact cases, complete flow gate and current full workspace passed, including required native caller custody | [Acceptance closeout](#m3-local-acceptance-closeout), [caller contract](authenticated-caller-delivery.md) |
 | M4 | Complete: M4.0-M4.8 local consumer-boundary acceptance | Current 45-case M4, 61-case M3, 69-inventory flow, full workspace/build/Clippy, affected consumers and final source/document/calibration gates passed. Use the supported profiles for M5; no release or confinement qualification implied | [Completed execution checklist](m4-consumer-qualification.md), [local acceptance report](m4-local-acceptance.md), [consumer support ledger](consumer-support.md) |
-| M5 | Swarm is a Disabled-profile integration smoke | Bind issued capability identities, shared budget and enforced cage | [Swarm limitations](../../examples/reference-swarm/README.md) |
+| M5 | Local implementation active before protected merge; reference smoke remains Disabled | Complete governed worker/authority composition, bind issued identities and shared budget, then qualify Enforced tools | [M5 execution checkpoints](process-security-integration.md#m51-carry-governed-task-context-through-authenticated-workers), [swarm limitations](../../examples/reference-swarm/README.md) |
 | M6 | Components present, integrated topology unqualified | Compose keyring, broker, cage and receipts; designated runner needed | Enterprise ledger and original plan |
 | M7 | Active-defense components present, composed paths unqualified | Complete flow, response and rollback acceptance in controlled profiles | Active-defense ledger and original plan |
 | M8 | Retention, scale and operational recovery unqualified | Real campaigns after lifecycle integration | Retention #1045 and million-receipt gates remain required |

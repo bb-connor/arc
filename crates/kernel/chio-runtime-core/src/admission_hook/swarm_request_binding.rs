@@ -21,7 +21,13 @@ pub(super) fn verify_swarm_request_binding(
         || continuation
             .join_receipt_id
             .as_deref()
-            .is_some_and(|join_id| join_id != reference.join_receipt.evidence_id)
+            .is_some_and(|join_id| {
+                reference
+                    .join_receipt
+                    .as_ref()
+                    .map(|join| join.evidence_id.as_str())
+                    != Some(join_id)
+            })
     {
         return rejected(
             "chio_swarm_authority_ref_mismatch",

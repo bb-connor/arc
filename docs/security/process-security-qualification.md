@@ -6,7 +6,7 @@ integration PR is a source/CI checkpoint, not completed qualification, a merge,
 or M5 acceptance. The user requested execution without subagents; subsequent
 review is direct primary-agent review, not independent reviewer evidence.
 
-Published checkpoint: `f0ff43b819547b5cf1ebfd34ad18aae16412f115` on
+Published checkpoint: `58c632ce0f9066a777e6b2e322e661dd18f198a2` on
 `integration/process-security-m4`, in [draft PR #1160](https://github.com/bb-connor/arc/pull/1160).
 Both reviewed parent histories and all
 [109 inherited thread dispositions](process-security-review-dispositions.md)
@@ -16,6 +16,14 @@ remote refresh. Original PR threads have not been represented as resolved.
 ## Current evidence
 
 These are distinct local runs, not one exact-head acceptance certificate.
+
+The serial qualification queue at `58c632ce0f` completed workspace build,
+process features, process host and signed lineage before it was deliberately
+interrupted to begin the user-approved local M5 work. The native-restart gate
+was interrupted, not passed; later queued gates did not execute. The queue
+exited 130 with the candidate still clean and unchanged. Logs remain under
+`/tmp/chio-task5-final-gates.niZqyr`. M5 source changes require fresh affected
+qualification and do not inherit an exact-head pass from that checkpoint.
 
 | Scope | Result and boundary |
 | --- | --- |
@@ -83,5 +91,7 @@ source-review preparation is not a completed package security audit.
 
 Exact-head hosted qualification, protected merge, and required trusted-runner
 authorization remain open. Linux/aarch64 process/container evidence is not
-Linux x86_64 tool-confinement evidence. M5's governed, confined reference swarm
-remains Task 7 after integration; existing process swarm demos do not replace it.
+Linux x86_64 tool-confinement evidence. The user authorized local Task 7/M5
+implementation before protected integration on 2026-09-15. Acceptance still
+requires the governed, confined reference swarm and the remaining foundation
+gates; existing process demos do not replace it.

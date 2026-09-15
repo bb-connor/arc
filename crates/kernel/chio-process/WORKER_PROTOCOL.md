@@ -50,7 +50,7 @@ operation fields, duplicate struct fields and unsupported versions reject.
 | Operation | Fields beyond `op` | Result |
 | --- | --- | --- |
 | `inspect` | None | Own process id, parent/root ids, state, depth, limits, shared call count, own checkpoint and storage capability/usage. No capability token. |
-| `invoke` | `operation_key`, `server_id`, `tool_name`, `arguments`, optional boolean `known_outcome_only` | Kernel verdict, output, request id, reason, terminal state, original `receipt_json`, optional `execution_nonce_json`. |
+| `invoke` | `operation_key`, `server_id`, `tool_name`, `arguments`, optional object `governed_intent`, optional boolean `known_outcome_only` | Kernel verdict, output, request id, reason, terminal state, original `receipt_json`, optional `execution_nonce_json`. |
 | `checkpoint` | `expected_revision` as a decimal string, `value` | New decimal revision and value, or conflict. |
 | `blob_put` | `sha256` (64 lowercase hex), `data_base64` (canonical padded standard base64) | Immutable process-owned `{sha256, bytes}`. |
 | `blob_read` | `sha256` | Own `{sha256, bytes, data_base64}`, or missing/corrupt failure. |
@@ -64,9 +64,14 @@ An opt-in native runner exposes `chio-process/spawn_<template>` and
 receipts. Its [adaptive contract](../../products/chio-cli/PROCESS_RUNNER.md#adaptive-child-work)
 binds caller identity and operator-selected templates without adding a worker
 management RPC.
-The simple invocation profile carries no worker-supplied DPoP or governed
-approval extension. A capability requiring one is still subject to the
-kernel's checks and cannot gain access by using this protocol.
+The optional `governed_intent` uses the core `GovernedTransactionIntent` type,
+including its task context. It is untrusted request input, not authority: the
+kernel validates its binding and any required runtime or task authority against
+the host-owned capability. The worker cannot select trusted route metadata.
+This does not transport a separate DPoP proof or approval token. Missing required
+proof still denies access. Python accepts `governed_intent=`; JavaScript accepts
+an optional fifth argument `{ governedIntent }`. Clients omit an absent intent.
+Older hosts reject the field; clients must not retry by stripping it.
 
 Successful protocol responses use `{"protocol":"chio.process.v1","ok":true,
 "result":{...}}`. A successful `invoke` response can contain a kernel denial;
@@ -93,7 +98,8 @@ encode large application integers as strings for portable JS handling. The
 clients return receipts without independently verifying their signatures.
 The Rust qualification test verifies every returned tool receipt.
 
-Retry a failed invocation with the same operation key and identical arguments.
+Retry a failed invocation with the same operation key, identical arguments and
+identical governed intent. Changing or removing a bound intent returns `conflict`.
 Neither client automatically retries. Timeouts, disconnects, response-size
 failures and runtime errors can follow a completed external effect. They do
 not prove that nothing happened and must not cause the caller to invent a new

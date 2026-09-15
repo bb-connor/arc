@@ -1,6 +1,6 @@
 use chio_core_types::PublicKey;
 use chio_swarm_authority::{
-    verify_swarm_authority_bundle, SwarmAuthorityBundle, SwarmContinuationMode,
+    verify_swarm_authority_for_admission, SwarmAuthorityBundle, SwarmContinuationMode,
     SwarmContinuationToken, SwarmDelegationWitnessChain, SwarmJoinReceipt, SwarmRoutePlanReceipt,
 };
 use serde::Serialize;
@@ -30,7 +30,7 @@ where
     verify_swarm_reference_hashes(&bundle, reference)?;
     let route_plan = find_route_plan(&bundle, &reference.route_plan_receipt.evidence_id)?;
     let route_metadata = verify_route_metadata_matches(route_metadata, route_plan)?;
-    verify_swarm_authority_bundle(&bundle, trusted_witness_keys).map_err(|error| {
+    verify_swarm_authority_for_admission(&bundle, trusted_witness_keys).map_err(|error| {
         ChioRuntimeError::Rejected {
             code: "chio_swarm_authority_rejected",
             detail: error.runtime_detail(),
@@ -127,11 +127,10 @@ fn verify_swarm_reference_hashes(
         &find_witness_chain(bundle, &reference.delegation_witness.evidence_id)?.chain_id,
         find_witness_chain(bundle, &reference.delegation_witness.evidence_id)?,
     )?;
-    verify_ref_matches(
-        &reference.join_receipt,
-        &find_join_receipt(bundle, &reference.join_receipt.evidence_id)?.join_id,
-        find_join_receipt(bundle, &reference.join_receipt.evidence_id)?,
-    )?;
+    if let Some(reference) = &reference.join_receipt {
+        let join = find_join_receipt(bundle, &reference.evidence_id)?;
+        verify_ref_matches(reference, &join.join_id, join)?;
+    }
     verify_ref_matches(
         &reference.revocation_epoch,
         &bundle.revocation_epoch.epoch_id,

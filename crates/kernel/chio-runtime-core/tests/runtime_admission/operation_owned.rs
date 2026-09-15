@@ -28,6 +28,9 @@ mod caller;
 #[path = "operation_owned/combined.rs"]
 mod combined;
 
+#[path = "operation_owned/live_swarm.rs"]
+mod live_swarm;
+
 struct Fixture {
     _directory: FixtureDirectory,
     authority: SqliteAuthorityStore,

@@ -68,6 +68,177 @@ fn invoke(key: &str) -> Value {
     json!({"op": "invoke", "operation_key": key, "server_id": "tools", "tool_name": "read", "arguments": {"text": "hi"}})
 }
 
+fn governed_invoke(key: &str, context: Value) -> Value {
+    let mut operation = invoke(key);
+    operation["governed_intent"] = json!({
+        "id": "worker-task-intent", "server_id": "tools", "tool_name": "read",
+        "purpose": "read for an authenticated task", "context": context
+    });
+    operation
+}
+
+#[tokio::test]
+async fn governed_worker_context_reaches_required_swarm_kernel_without_granting_authority() -> Result
+{
+    let dir = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut kernel = kernel(dir.path(), server(&calls))?;
+    Arc::get_mut(&mut kernel)
+        .ok_or("kernel must be exclusively owned during configuration")?
+        .require_swarm_admission();
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    let parent = root(&runtime, &kernel, 4)?;
+    let cap = child(
+        &parent,
+        &parent_key(),
+        "reader",
+        &Keypair::generate(),
+        scope(&["read"]),
+    )?;
+    runtime.spawn("root", "reader", &cap)?;
+    let service = WorkerService::new(runtime.clone());
+    let token = service.issue_credential("reader", cap.expires_at)?;
+    let operation = governed_invoke("task-read", json!({"chioSwarm": {}}));
+    let denied = request(&service, token.expose_secret(), operation.clone()).await?;
+    assert_eq!(denied["ok"], true, "{denied}");
+    assert_eq!(denied["result"]["verdict"], "deny", "{denied}");
+    let receipt: chio_core_types::receipt::body::ChioReceipt = serde_json::from_str(
+        denied["result"]["receipt_json"]
+            .as_str()
+            .ok_or("missing signed denial")?,
+    )?;
+    assert!(receipt.verify_signature()?);
+    assert_eq!(receipt.capability_id, cap.id);
+    assert_eq!(
+        receipt.metadata.as_ref().ok_or("missing denial metadata")?["chio_runtime"]["failure_code"],
+        "runtime_admission_hook_missing"
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    let replay = request(&service, token.expose_secret(), operation).await?;
+    // A compensated pre-dispatch denial retains the operation, not a tool
+    // outcome. The kernel signs a fresh refusal; it must not retry dispatch.
+    assert_eq!(replay["result"]["verdict"], "deny", "{replay}");
+    assert_eq!(
+        replay["result"]["request_id"],
+        denied["result"]["request_id"]
+    );
+    let replay_receipt: chio_core_types::receipt::body::ChioReceipt = serde_json::from_str(
+        replay["result"]["receipt_json"]
+            .as_str()
+            .ok_or("missing replay denial")?,
+    )?;
+    assert!(replay_receipt.verify_signature()?);
+    assert_eq!(replay_receipt.capability_id, cap.id);
+    assert_eq!(
+        replay_receipt
+            .metadata
+            .as_ref()
+            .ok_or("missing replay metadata")?["governed_transaction"],
+        receipt.metadata.as_ref().ok_or("missing metadata")?["governed_transaction"]
+    );
+    for changed in [
+        invoke("task-read"),
+        governed_invoke("task-read", json!({"chioSwarm": {"taskId": "other"}})),
+    ] {
+        assert_eq!(
+            request(&service, token.expose_secret(), changed).await?["error"]["code"],
+            "conflict"
+        );
+    }
+    assert_eq!(runtime.process("root")?.tree_calls, 1);
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn governed_worker_completed_outcome_reopens_with_identical_intent_and_receipt() -> Result {
+    let dir = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(dir.path(), server(&calls))?;
+    let path = dir.path().join("process.db");
+    let runtime = ProcessRuntime::open(&path, kernel.clone())?;
+    let cap = root(&runtime, &kernel, 4)?;
+    let service = WorkerService::new(runtime.clone());
+    let token = service.issue_credential("root", cap.expires_at)?;
+    // Ordinary governed intent exercises transport and durable outcomes, not
+    // swarm authority acceptance. That profile requires a real verifying hook.
+    let operation = governed_invoke("task-read", json!({"task": "read λ"}));
+    let first = request(&service, token.expose_secret(), operation.clone()).await?;
+    assert_eq!(first["result"]["verdict"], "allow", "{first}");
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    drop(service);
+    drop(runtime);
+    drop(kernel);
+    let reopened_kernel = support::kernel(dir.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(path, reopened_kernel)?;
+    let service = WorkerService::new(runtime.clone());
+    service.revoke_credentials("root")?;
+    let fresh_token = service.issue_credential("root", cap.expires_at)?;
+    assert_eq!(
+        request(&service, token.expose_secret(), operation.clone()).await?["error"]["code"],
+        "unauthenticated"
+    );
+    let replay = request(&service, fresh_token.expose_secret(), operation).await?;
+    assert_eq!(
+        replay["result"]["receipt_json"],
+        first["result"]["receipt_json"]
+    );
+    let receipt: chio_core_types::receipt::body::ChioReceipt = serde_json::from_str(
+        replay["result"]["receipt_json"]
+            .as_str()
+            .ok_or("missing retained receipt")?,
+    )?;
+    assert!(receipt.verify_signature()?);
+    assert_eq!(receipt.capability_id, cap.id);
+    for changed in [
+        invoke("task-read"),
+        governed_invoke("task-read", json!({"task": "other"})),
+    ] {
+        assert_eq!(
+            request(&service, fresh_token.expose_secret(), changed).await?["error"]["code"],
+            "conflict"
+        );
+    }
+    assert_eq!(runtime.process("root")?.tree_calls, 1);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn governed_worker_input_cannot_bypass_authentication_or_select_a_capability() -> Result {
+    let dir = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(dir.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    let cap = root(&runtime, &kernel, 4)?;
+    let service = WorkerService::new(runtime.clone());
+    let token = service.issue_credential("root", cap.expires_at)?;
+    let operation = governed_invoke("task-read", json!({"chioSwarm": {}}));
+    let forged = request(&service, &"a".repeat(64), operation.clone()).await?;
+    assert_eq!(forged["error"]["code"], "unauthenticated", "{forged}");
+    let mut substituted = operation.clone();
+    substituted["capability"] = serde_json::to_value(&cap)?;
+    assert_eq!(
+        request(&service, token.expose_secret(), substituted).await?["error"]["code"],
+        "invalid_request"
+    );
+    for invalid in [
+        json!(false),
+        json!([]),
+        json!({"context": {"chioSwarm": {}}}),
+    ] {
+        let mut malformed = operation.clone();
+        malformed["governed_intent"] = invalid;
+        assert_eq!(
+            request(&service, token.expose_secret(), malformed).await?["error"]["code"],
+            "invalid_request"
+        );
+    }
+    assert_eq!(runtime.process("root")?.tree_calls, 0);
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
 async fn request(service: &WorkerService, secret: &str, operation: Value) -> Result<Value> {
     Ok(serde_json::from_slice(
         &service.handle_frame(&frame(secret, operation)).await,

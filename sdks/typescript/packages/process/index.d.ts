@@ -29,10 +29,14 @@ export interface ToolResult {
   receipt_json: string;
   execution_nonce_json: string | null;
 }
+export interface InvokeOptions {
+  /** Untrusted governed intent, validated by the kernel. Preserve on retries. */
+  governedIntent?: { [key: string]: Json };
+}
 export class ProcessClient {
   constructor(socketPath: string, credential: string, options?: { timeoutMs?: number });
   inspect(): Promise<ProcessSnapshot>;
-  invoke(operationKey: string, serverId: string, toolName: string, args: Json): Promise<ToolResult>;
+  invoke(operationKey: string, serverId: string, toolName: string, args: Json, options?: InvokeOptions): Promise<ToolResult>;
   checkpoint(expectedRevision: string, value: Json): Promise<Checkpoint>;
   putBlob(value: Uint8Array): Promise<StateBlobRef>;
   readBlob(sha256: string): Promise<Uint8Array>;

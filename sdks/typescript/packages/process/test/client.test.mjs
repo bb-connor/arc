@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inspect } from "node:util";
 import test from "node:test";
-import { ProcessClient, PROTOCOL, MAX_RESPONSE_BYTES } from "../index.mjs";
+import { ProcessClient, PROTOCOL, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES } from "../index.mjs";
 
 async function fixture(handler, run) {
   const directory = await mkdtemp(join(tmpdir(), "chio-js-"));
@@ -72,6 +72,39 @@ test("unsafe numeric inputs fail before connecting", async () => {
   for (const value of [NaN, Infinity, 9007199254740992]) {
     await assert.rejects(client.invoke("one", "tools", "read", { value }), TypeError);
   }
+});
+
+test("governed intent is preserved without automatic fallback", async () => {
+  const governedIntent = {
+    id: "task-read", server_id: "tools", tool_name: "read", purpose: "read task λ",
+    context: { chioSwarm: { taskId: "task-1" } },
+  };
+  const original = structuredClone(governedIntent), requests = [];
+  const calls = await fixture((socket, request) => {
+    requests.push(request);
+    socket.end(JSON.stringify({ protocol: PROTOCOL, ok: false, error: { code: "invalid_request" } }) + "\n");
+  }, async client => {
+    await assert.rejects(client.invoke("one", "tools", "read", {}, { governedIntent }), error => error.code === "invalid_request");
+  });
+  assert.equal(calls, 1);
+  assert.deepEqual(requests[0].operation.governed_intent, original);
+  assert.deepEqual(governedIntent, original);
+  await fixture((socket, request) => {
+    requests.push(request);
+    socket.end(JSON.stringify({ protocol: PROTOCOL, ok: true, result: {} }) + "\n");
+  }, client => client.invoke("one", "tools", "read", {}));
+  assert(!Object.hasOwn(requests[1].operation, "governed_intent"));
+});
+
+test("invalid governed intent fails before connecting", async () => {
+  const client = new ProcessClient("/absent", "test-secret");
+  for (const governedIntent of [null, false, 1, "intent", [], { toJSON: () => undefined },
+    { context: NaN }, { context: 9007199254740992 }]) {
+    await assert.rejects(client.invoke("one", "tools", "read", {}, { governedIntent }), TypeError);
+  }
+  await assert.rejects(client.invoke("one", "tools", "read", {}, {
+    governedIntent: { context: "x".repeat(MAX_REQUEST_BYTES) },
+  }), error => error.code === "request_too_large");
 });
 
 test("absolute response deadline closes a stalled connection", async () => {

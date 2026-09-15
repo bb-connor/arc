@@ -19,8 +19,8 @@ export class WorkerError extends Error {
 }
 
 /** One process. A transport failure can follow a committed effect.
- * Retry the original operation key and identical arguments; never change the
- * key to work around an uncertain outcome. Receipts are returned unverified.
+ * Retry the original key, identical arguments and identical governed intent.
+ * Never change the key for an uncertain outcome. Receipts are returned unverified.
  */
 export class ProcessClient {
   #socketPath;
@@ -38,9 +38,15 @@ export class ProcessClient {
 
   inspect() { return this.#call({ op: "inspect" }); }
 
-  invoke(operationKey, serverId, toolName, args) {
+  async invoke(operationKey, serverId, toolName, args, { governedIntent } = {}) {
+    if (governedIntent !== undefined && (governedIntent === null ||
+        typeof governedIntent !== "object" || Array.isArray(governedIntent) ||
+        typeof governedIntent.toJSON === "function")) {
+      throw new TypeError("governedIntent must be a JSON object without a serialization override");
+    }
     return this.#call({ op: "invoke", operation_key: operationKey,
-      server_id: serverId, tool_name: toolName, arguments: args });
+      server_id: serverId, tool_name: toolName, arguments: args,
+      ...(governedIntent === undefined ? {} : { governed_intent: governedIntent }) });
   }
 
   checkpoint(expectedRevision, value) {

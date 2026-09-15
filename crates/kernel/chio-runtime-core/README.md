@@ -13,6 +13,19 @@
 
 ## Public API
 
+### Live swarm authority
+
+The hook uses `verify_swarm_authority_for_admission`: fan-out does not require
+future join or terminal results. `chioSwarm.joinReceipt` may be absent for a
+direct continuation. A fan-in continuation still requires its exact signed
+join reference, and malformed supplied references reject. Existing complete
+references retain their canonical binding. No request can supply its own trust
+roots, capability identity or trusted route metadata.
+
+This verifies live authority, not completed execution. The complete-artifact
+verifier remains strict about every graph join and terminal evidence. M5 must
+join actual worker outcomes and durable accounting before claiming completion.
+
 ### Operation-owned replay custody
 
 `ChioRuntimeAdmissionHook::with_operation_owned_runtime_replay` opts into the
