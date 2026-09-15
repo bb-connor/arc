@@ -223,10 +223,26 @@ callback-refusal tests cover both recovery and unchanged-state boundaries.
 
 Affected kernel, process, SQLite, control-plane and CLI gates passed, with strict
 Clippy and formatting. This is a reviewed local subgroup checkpoint, not combined
-workspace or hosted qualification. SDK, artifact/example and CI/classifier groups
-remain pending, as does the final 109-thread disposition record. The inherited
+workspace or hosted qualification. The inherited
 2,005-line admission coordinator hygiene failure is assigned to the CI/hygiene
 group for a focused structural repair without changing the limit.
+
+The SDK response/resource subgroup is complete at
+`627dc589b28ab60ef391ad866009cefa31c44f5d`, with all 11 assigned threads
+reconciled and independent review reporting no Critical or Important findings.
+Repairs bound inline stream consumption, preserve complete blob replay and
+pending operation identity, distinguish approval/denial/invalid responses, and
+bind container cleanup to the created identity. Supported adapters, storage
+schemas and explicit environment configuration remain available.
+
+Covering tests passed 522 unique automated cases. Both AI SDK 6/7 installed
+profiles passed the selected tool/recovery, journal and pressure scenarios.
+The broader interrupted invocation is not full qualification: complete swarm
+and supervision runs remain required in Task 5 after artifact/example repairs.
+Inherited LangGraph package typing/style failures and its compatibility warning
+also remain Task 5 work. Artifact/example and CI/classifier repairs and the
+final 109-thread disposition record are still pending; no merge or hosted
+qualification is claimed by these subgroup checkpoints.
 
 **Files:** The committed review-disposition record beside this plan, and only the
 source/tests owned by verified findings in the process/security integration.
