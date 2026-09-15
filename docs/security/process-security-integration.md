@@ -1,7 +1,7 @@
 # Process and security integration execution plan
 
-> **For agentic workers:** Use superpowers:subagent-driven-development or
-> superpowers:executing-plans to execute the tasks with review checkpoints.
+> **Execution:** Continue directly with superpowers:executing-plans and focused
+> review checkpoints. The user explicitly requested no further subagents.
 
 **Goal:** Preserve the existing process capabilities, reconcile them with the
 locally accepted M4 security implementation, qualify the combined foundation,
@@ -223,9 +223,9 @@ callback-refusal tests cover both recovery and unchanged-state boundaries.
 
 Affected kernel, process, SQLite, control-plane and CLI gates passed, with strict
 Clippy and formatting. This is a reviewed local subgroup checkpoint, not combined
-workspace or hosted qualification. The inherited
-2,005-line admission coordinator hygiene failure is assigned to the CI/hygiene
-group for a focused structural repair without changing the limit.
+workspace or hosted qualification. The inherited 2,005-line admission
+coordinator hygiene failure is addressed by the CI/classifier subgroup's
+payment-journal extraction, without changing the limit.
 
 The SDK response/resource subgroup is complete at
 `627dc589b28ab60ef391ad866009cefa31c44f5d`, with all 11 assigned threads
@@ -260,7 +260,27 @@ not change the native binary or rerun those full profiles. Task 5 still owns
 combined final-source qualification and the minor standalone authorization
 check's unnecessary ambient mini-SWE initialization.
 
-CI/classifier repairs and the final 109-thread disposition record remain pending.
+The CI/classifier subgroup is implemented and locally checked through
+`a6d3690a42`, with all ten assigned thread dispositions recorded. Nullable
+classification rules and malformed JSON Pointers reject at load; explicit
+checkout anchors support out-of-tree conformance binaries. Required CI now
+joins the nonce/FIPS inventory and refuses missing committed Linux evidence.
+Dependency-parser and nested-manifest regressions preserve the custody boundary
+and select all 30 fuzz targets. Payment journal methods moved unchanged into
+their own module, resolving the coordinator size failure.
+
+The subgroup's covering logs contain 245 distinct passing Rust tests. Focused
+Python fixtures, strict owning-package and CLI Clippy, workflow lint, Rust
+formatting, dependency-tree, no-bypass and hygiene checks passed. Direct root
+review replaced further agent delegation at the user's request. The complete
+security source contract still fails on its execution-image Cargo.lock digest
+ratchet, which already differed from the subgroup base. Task 5 must reconcile
+final candidate image inputs and the separate trusted-execution authorization;
+neither assertion nor controller pin was changed in this subgroup.
+
+The final 109-thread disposition record remains pending. Focused preparation
+confirmed timeout default/override preservation, rich native caller attachments,
+signed caller schemas and selected-native enforcement before Optional fallback.
 No merge or hosted qualification is claimed by these subgroup checkpoints.
 
 **Files:** The committed review-disposition record beside this plan, and only the
