@@ -157,9 +157,10 @@ else
   static_target_dir="$CARGO_TARGET_DIR/static-pie"
 fi
 static_rustflags="${RUSTFLAGS:+${RUSTFLAGS} }-C target-feature=+crt-static -C relocation-model=pie"
+# An explicit target keeps crt-static off host procedural macros and build scripts.
 RUSTFLAGS="$static_rustflags" CARGO_TARGET_DIR="$static_target_dir" \
-  cargo build -p chio-cage --bin chio-cage-init --features real-linux-enforcement
-static_helper="$static_target_dir/debug/chio-cage-init"
+  cargo build --target x86_64-unknown-linux-gnu -p chio-cage --bin chio-cage-init --features real-linux-enforcement
+static_helper="$static_target_dir/x86_64-unknown-linux-gnu/debug/chio-cage-init"
 if [[ ! -x "$static_helper" ]]; then
   echo "static PIE cage-init build did not produce an executable" >&2
   exit 1

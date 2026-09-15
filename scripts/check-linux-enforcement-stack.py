@@ -396,6 +396,8 @@ def validate_sources(root: Path, data: dict, errors: list[str]) -> None:
         "CHIO_CAGE_TEST_HELPER",
         "target-feature=+crt-static",
         "relocation-model=pie",
+        "--target x86_64-unknown-linux-gnu",
+        '$static_target_dir/x86_64-unknown-linux-gnu/debug/chio-cage-init',
         'readelf -hW "$static_helper"',
         'readelf -lW "$static_helper"',
         'readelf -dW "$static_helper"',

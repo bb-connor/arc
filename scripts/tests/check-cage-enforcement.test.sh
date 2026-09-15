@@ -141,7 +141,11 @@ cat >"$fake_bin/cargo" <<'EOF'
 set -euo pipefail
 args=" $* "
 if [[ "$args" == *" build "* ]] && [[ "$args" == *" --bin chio-cage-init "* ]]; then
-  helper="${CARGO_TARGET_DIR:?}/debug/chio-cage-init"
+  [[ "$args" == *" --target x86_64-unknown-linux-gnu "* ]] || {
+    echo "static helper requires an explicit target to isolate host procedural macros" >&2
+    exit 1
+  }
+  helper="${CARGO_TARGET_DIR:?}/x86_64-unknown-linux-gnu/debug/chio-cage-init"
   mkdir -p "$(dirname "$helper")"
   printf '#!/bin/true\n' >"$helper"
   chmod 700 "$helper"
