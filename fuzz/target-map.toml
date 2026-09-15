@@ -83,6 +83,21 @@ triggers = [
 seeds    = "fuzz/corpus/federation_trust_establishment"
 notes    = "Kernel trust-establishment envelopes, peer pins, freshness, and fail-closed resolution."
 
+[targets.bilateral_dsse_verify]
+crate    = "chio-federation"
+path     = "fuzz/fuzz_targets/bilateral_dsse_verify.rs"
+triggers = [
+    "crates/trust/chio-federation/src/bilateral_dsse.rs",
+    "crates/trust/chio-federation/src/bilateral_dsse/**",
+    "crates/trust/chio-federation/src/bilateral.rs",
+    "crates/trust/chio-federation/src/bilateral_verifier/**",
+    "spec/schemas/chio-wire/v1/federation/**",
+    "fuzz/fuzz_targets/bilateral_dsse_verify.rs",
+    "fuzz/corpus/bilateral_dsse_verify/**",
+]
+seeds    = "fuzz/corpus/bilateral_dsse_verify"
+notes    = "Strict bilateral invocation DSSE envelope decode, PAE, predicate validation, and two-key Ed25519 verification."
+
 [targets.finding_worker_protocol]
 crate    = "chio-finding-worker"
 path     = "fuzz/fuzz_targets/finding_worker_protocol.rs"

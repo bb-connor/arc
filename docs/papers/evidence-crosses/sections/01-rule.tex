@@ -1,0 +1,47 @@
+\section{The rule}
+
+A buyer agent at one company asks a vendor agent at a second to stage a refund
+against the vendor's payment ledger. The vendor's software must decide, before
+touching it, whether to obey. An API key and a transport signature
+establish who is calling and nothing about whether this call, with these
+arguments, under the agreement the two companies signed, was already authorized,
+already performed, or rests on a delegation revoked minutes ago. Afterward
+each holds a log about itself that no third party can reconcile. Having the
+sender prove more makes the receiver's security a function of the sender's
+correctness; a shared ledger or broker makes that substrate a participant in
+every call.
+
+The rule here avoids both. \dfn{Authority is minted and verified only inside the
+kernel that dispatches, against roots that kernel activated itself, and nothing
+carried in a request can add a root. Only signed, content-addressed evidence
+crosses an organization boundary.} A signature proves who signed some bytes; it
+cannot decide whether the receiver should act on them, because that depends on
+facts only the receiver holds: which keys it pinned, which agreement it
+activated and when, whether this continuation has been spent.
+
+That is a placement argument, composing with the stack, not replacing it
+\cite{saltzer1984}. Alignment training, transcript monitors, and the sender's
+policy engine change how often the kernel says no; none knows the callee's
+budget is exhausted or this argument hash already dispatched. The receiver
+decides.
+
+One object carries it: the receipt, a kernel-signed record of one admission
+decision named by its own content hash. Two co-signed statements name receipts.
+The \dfn{inbound} statement is evidence a request presents about a receipt the
+receiver already holds, signed by two keys it pinned beforehand; the
+pre-dispatch hook resolves it against the receiver's own stores, where the
+security property lives. The \dfn{outbound} statement the receiver mints
+over its own new receipt, once that receipt is durable, and the peer signs
+those bytes unparsed; it gates the response, never the dispatch. Neither is a bearer credential: what either
+names the receiver stores. Agent protocols define how a tool is called
+\cite{mcp,a2a}; none defines the record of what was admitted. We call the
+mediating component the kernel: Chio is userspace, not an operating-system
+kernel.
+
+Which names must cross is settled by what the receiver decides. Each fact one
+decision binds needs a field to arrive in, so the carrier is co-designed with
+the decision rather than bolted onto a request shaped before it.
+Section~\ref{sec:eval} measures that against a composition of a pinned peer
+identity, a signing policy engine, and a replay table: what an operator must add
+to reach each property of Section~\ref{sec:security}, in fields, checks, and
+order.

@@ -32,6 +32,10 @@ chio-metrics-spec = { workspace = true }
 # SignedEpochRoot), which chio-federation does not re-export - depend on the
 # oracle crate directly rather than re-implement (and weaken) the check.
 chio-revocation-oracle = { workspace = true }
+# Lane b's consumer: `RevocationViewSink` installs verified roots into the
+# `RevocationView` a `ChioKernel` consults on every delegated capability. The
+# kernel-core surface is the whole dependency (no kernel, no store).
+chio-kernel-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -52,6 +56,22 @@ arc-swap = "1.9"
 
 [dev-dependencies]
 tokio = { workspace = true }
+# The two-process federated-call example runs a real receiver kernel: the kernel
+# itself, the runtime admission hook and its treaty artifacts, and the durable
+# receipt / revocation stores it writes. Example-only; the lane code above depends
+# on none of them.
+chio-kernel = { workspace = true }
+chio-runtime-core = { workspace = true }
+chio-store-sqlite = { workspace = true }
+# The example decomposes the receiver's admission window by wrapping the two
+# stores the kernel writes through. Forwarding the `ReceiptStore` surface names
+# two types the kernel does not re-export: `chio_core::canonical::CanonicalBytes`
+# and `chio_settle::SettlementStoreBinding`. Example-only, like the four above.
+chio-core = { workspace = true }
+chio-settle = { workspace = true }
+# Forwarding the `RuntimeAdmissionStore` surface names `SwarmAuthorityBundle`,
+# which chio-runtime-core does not re-export. Already in that crate's own tree.
+chio-swarm-authority = { workspace = true }
 # lane c tests build + sign real `PheromoneDeposit`s (sign_deposit / PheromoneDepositBody)
 # to exercise the self-signed origin-verification path. Production code reaches the
 # deposit through `chio_federation`'s re-exported field types and needs no direct dep.

@@ -8,16 +8,25 @@ if [[ ! -d "$SOURCE/crates" || ! -f "$SOURCE/Cargo.toml" ]]; then
   echo "CHIO_SOURCE does not name a Chio workspace: $SOURCE" >&2
   exit 2
 fi
+GENERATOR="$SOURCE/scripts/generate-programmable-sovereignty-artifact.py"
 SOURCE_COMMIT="$(git -C "$SOURCE" rev-parse HEAD)"
-if [[ -n "$(git -C "$SOURCE" status --short)" ]]; then
+INPUT_PATHS=()
+while IFS= read -r input_path; do
+  INPUT_PATHS+=("$input_path")
+done < <(python3 "$GENERATOR" --benchmark-input-paths PS-B02)
+if [[ -n "$(git -C "$SOURCE" status --short -- "${INPUT_PATHS[@]}")" ]]; then
   SOURCE_DIRTY=true
 else
   SOURCE_DIRTY=false
 fi
+if [[ "$SOURCE_DIRTY" == true && "${CHIO_BENCH_ALLOW_DIRTY:-0}" != "1" ]]; then
+  echo "refusing to measure: the benchmark input tree has uncommitted changes." >&2
+  echo "commit them, or set CHIO_BENCH_ALLOW_DIRTY=1 for a result that must not be pinned." >&2
+  git -C "$SOURCE" status --short -- "${INPUT_PATHS[@]}" >&2
+  exit 2
+fi
 BENCHMARK_INPUT_TREE_SHA256="$(
-  python3 "$SOURCE/scripts/generate-programmable-sovereignty-artifact.py" \
-    --source-commit "$SOURCE_COMMIT" \
-    --benchmark-input-digest PS-B02
+  python3 "$GENERATOR" --source-commit "$SOURCE_COMMIT" --benchmark-input-digest PS-B02
 )"
 
 RESULT_DIR="${CHIO_PAPER_RESULT_DIR:-$SCRIPT_DIR/results}"
@@ -80,7 +89,7 @@ fi
 bilateral_end=$(date +%s)
 
 read -r bilateral_count assumption_count < <(
-  python - "$THREAT_FIXTURE" <<'PY'
+  python3 - "$THREAT_FIXTURE" <<'PY'
 import json
 import sys
 
@@ -105,7 +114,7 @@ bilateral_seconds=$((bilateral_end - bilateral_start))
     "$bilateral_count" "$bilateral_seconds" "$assumption_count"
 } > "$CSV"
 
-python - "$JSON" "$INLINE" "$SOURCE_COMMIT" "$SOURCE_DIRTY" \
+python3 - "$JSON" "$INLINE" "$SOURCE_COMMIT" "$SOURCE_DIRTY" \
   "$BENCHMARK_INPUT_TREE_SHA256" \
   "$generic_count" "$generic_seconds" "$bilateral_count" \
   "$bilateral_seconds" "$assumption_count" <<'PY'

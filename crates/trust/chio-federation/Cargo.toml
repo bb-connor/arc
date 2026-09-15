@@ -14,6 +14,12 @@ name = "chio_federation"
 
 [features]
 demo = []
+# Enables the dudect timing-leak harness at
+# `tests/dudect/bilateral_dsse_verify.rs`. Off by default so
+# `cargo test -p chio-federation` stays fast and deterministic; the dudect
+# lane opts in via `--features dudect --release --test
+# dudect_bilateral_dsse_verify`.
+dudect = ["dep:dudect-bencher"]
 pq = ["chio-core-types/pq"]
 typestate = []
 
@@ -37,6 +43,10 @@ thiserror = { workspace = true }
 base64 = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
+# `dudect-bencher` is gated behind the `dudect` feature so default builds
+# never pull it in. Used only by the timing-leak harness at
+# `tests/dudect/bilateral_dsse_verify.rs`.
+dudect-bencher = { version = "0.7", optional = true }
 
 [dev-dependencies]
 # Integration test crates/trust/chio-federation/tests/oracle_gossip_e2e.rs walks
@@ -45,6 +55,13 @@ hex = { workspace = true }
 # the verifier-side surface so that crate is pulled in here as a dev
 # dependency only.
 chio-kernel-core = { workspace = true }
+# Integration test crates/trust/chio-federation/tests/verifier_hook_conformance.rs
+# drives the specification's numbered conforming verifier and the kernel's
+# pre-dispatch admission hook over one shared corpus, so it needs the kernel
+# hook and the runtime store that backs it. Dev-only, so the published
+# dependency graph is unchanged.
+chio-kernel = { workspace = true }
+chio-runtime-core = { workspace = true }
 chio-spec-validate = { workspace = true }
 criterion = { workspace = true }
 rand_chacha = { workspace = true }
@@ -53,6 +70,16 @@ rand_core = { workspace = true }
 [[bench]]
 name = "bilateral_verify"
 harness = false
+
+# Timing-leak dudect harness. `harness = false` so the test binary's `main`
+# is provided by `dudect_bencher::ctbench_main!`. Gated behind the `dudect`
+# feature so default `cargo test` does not compile it (the source is
+# `#![cfg(feature = "dudect")]`).
+[[test]]
+name = "dudect_bilateral_dsse_verify"
+path = "tests/dudect/bilateral_dsse_verify.rs"
+harness = false
+required-features = ["dudect"]
 
 [lints]
 workspace = true

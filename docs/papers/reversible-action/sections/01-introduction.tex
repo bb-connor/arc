@@ -49,12 +49,13 @@ discipline as the prior substrate
   \item A formal model relating the executive-action type, its TTL
     invariant, its optional rollback receipt, and the TTL-bounded
     amendment chain (Section~\ref{sec:model-ra}).
-  \item A load-bearing candidate theorem statement
+  \item A load-bearing composition theorem
     \thm{ttl_bounded_amendment_chain_preserves_baseline} and a
-    supporting rollback-receipt admission statement
-    \thm{rollback_admission_composes_with_refinement}, with two
-    definitional bridges retained to anchor the type-level discipline
-    (Section~\ref{sec:model-ra}).
+    supporting rollback-receipt admission theorem
+    \thm{rollback_admission_composes_with_refinement}, both mechanized
+    in a paper-local Lean model on an explicit finite admission domain,
+    with two definitional bridges retained to anchor the type-level
+    discipline (Section~\ref{sec:model-ra}).
   \item A proposed endpoint substrate instance in which four reversible
     action variants would have inverse executors with content-hash-gated
     rollback constructors and a four-receipt grammar (request, execution,

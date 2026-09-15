@@ -216,6 +216,9 @@ map_source_to_fuzz_target() {
         *canonical_json*|*normalized*)
             echo "canonical_json"
             ;;
+        *bilateral_dsse*|*bilateral_verifier*|*admission_hook/dsse*)
+            echo "bilateral_dsse_verify"
+            ;;
         *)
             echo ""
             ;;

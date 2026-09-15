@@ -1,5 +1,9 @@
 use std::collections::BTreeSet;
 
+use crate::types::{
+    PresentationIntervalSource, PresentationWindow, PresentationWindowError,
+    ResolvedPresentationInterval,
+};
 use crate::*;
 
 use super::treaty_evidence::TreatyEvidenceReview;
@@ -127,6 +131,25 @@ pub(super) fn verify_treaty_dsse_evidence(
         code: "chio_treaty_unverified_required_evidence",
         detail: "bilateral DSSE signature verification failed".to_string(),
     })?;
+    let window = presentation_window(review)?;
+    if let Some(lease) = statement.predicate.capability_lease_ref.as_ref() {
+        let lease_window = window
+            .for_counterparty(&lease.issuer, REQUIRED_LEASE_INTERVAL_SOURCES)
+            .map_err(presentation_window_rejection)?;
+        if !lease_window.admits_expiry(lease.expires_at_unix_ms) {
+            return rejected(
+                "chio_treaty_unverified_required_evidence",
+                &format!(
+                    "bilateral DSSE capability lease expires at {}, outside the presentation \
+                     window this receiver resolved for {} (not before {}, not after {})",
+                    lease.expires_at_unix_ms,
+                    lease.issuer,
+                    lease_window.not_before_unix_ms(),
+                    lease_window.not_after_unix_ms()
+                ),
+            );
+        }
+    }
     if let Some((bundle, bundle_sha256)) = lineage_bundle {
         if treaty.lineage_bundle_sha256 != bundle_sha256.as_str()
             || treaty.local_receipt_sha256 != bundle.root_receipt_sha256
@@ -154,6 +177,50 @@ pub(super) fn verify_treaty_dsse_evidence(
         }
     }
     Ok(())
+}
+
+/// The records this receiver requires to have resolved for the counterparty a
+/// capability lease names before it will accept the lease that counterparty
+/// co-signed. A required record that stops resolving between calls closes the
+/// window for that counterparty and leaves the other counterparty's window
+/// untouched.
+const REQUIRED_LEASE_INTERVAL_SOURCES: &[PresentationIntervalSource] =
+    &[PresentationIntervalSource::TreatyScope];
+
+/// The intervals this receiver resolved for itself while deciding this call.
+///
+/// The treaty scope is resolved by hash from the receiver's own store and binds
+/// every participant. The capability lease and governance receipt records the
+/// admission bundle names carry counterparty-scoped intervals of their own and
+/// join the intersection once the evidence review carries the resolved records
+/// rather than their identifiers; an interval the receiver does not resolve
+/// contributes nothing, and one it stops resolving between calls drops out.
+fn resolved_presentation_intervals(
+    review: &TreatyEvidenceReview<'_>,
+) -> Result<Vec<ResolvedPresentationInterval>, PresentationWindowError> {
+    Ok(vec![ResolvedPresentationInterval::new(
+        PresentationIntervalSource::TreatyScope,
+        review.treaty_scope.participant_kernel_ids.clone(),
+        review.treaty_scope.issued_at_unix_ms,
+        review.treaty_scope.expires_at_unix_ms,
+    )?])
+}
+
+/// The window in which this receiver accepts a co-signed statement, rebuilt on
+/// every call from the records resolved for that call.
+fn presentation_window(
+    review: &TreatyEvidenceReview<'_>,
+) -> Result<PresentationWindow, ChioRuntimeError> {
+    let intervals =
+        resolved_presentation_intervals(review).map_err(presentation_window_rejection)?;
+    PresentationWindow::intersect(intervals).map_err(presentation_window_rejection)
+}
+
+fn presentation_window_rejection(error: PresentationWindowError) -> ChioRuntimeError {
+    ChioRuntimeError::Rejected {
+        code: "chio_treaty_unverified_required_evidence",
+        detail: format!("bilateral DSSE presentation window is not open: {error}"),
+    }
 }
 
 pub(super) fn treaty_participant_public_key<'a>(

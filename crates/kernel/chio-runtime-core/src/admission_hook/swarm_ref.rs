@@ -1,5 +1,6 @@
 use chio_kernel::ToolCallRequest;
 
+use super::treaty_ref::deny_request_carried_trust_keys;
 use crate::*;
 
 #[derive(Debug, Clone)]
@@ -19,6 +20,22 @@ pub(super) struct SwarmEvidenceReference {
     pub artifact_sha256: String,
 }
 
+/// Names a caller may never bind in a swarm authority context: each one would
+/// hand the receiver trust material that it must instead resolve from its own
+/// store and its configured witness keys.
+const SWARM_TRUST_ROOT_KEYS: [&str; 6] = [
+    "trustRoot",
+    "trustRoots",
+    "trustBundle",
+    "authorityBundle",
+    "signingKey",
+    "witnessKeys",
+];
+
+/// Names that would let a caller steer trust resolution at request time rather
+/// than leaving it pinned to the receiver's configuration.
+const SWARM_DYNAMIC_TRUST_KEYS: [&str; 3] = ["dynamicTrust", "dynamicTrustBundle", "peerDiscovery"];
+
 pub(super) fn swarm_ref_from_request(
     request: &ToolCallRequest,
 ) -> Result<Option<SwarmAuthorityReference>, &'static str> {
@@ -34,23 +51,12 @@ pub(super) fn swarm_ref_from_request(
     let Some(object) = swarm.as_object() else {
         return Err("invalid_chio_swarm_context");
     };
-    for forbidden in [
-        "trustRoot",
-        "trustRoots",
-        "trustBundle",
-        "authorityBundle",
-        "signingKey",
-        "witnessKeys",
-    ] {
-        if object.contains_key(forbidden) {
-            return Err("request_smuggled_trust_root");
-        }
-    }
-    for forbidden in ["dynamicTrust", "dynamicTrustBundle", "peerDiscovery"] {
-        if object.contains_key(forbidden) {
-            return Err("request_smuggled_dynamic_trust");
-        }
-    }
+    deny_request_carried_trust_keys(
+        context,
+        &SWARM_TRUST_ROOT_KEYS,
+        &SWARM_DYNAMIC_TRUST_KEYS,
+        "invalid_chio_swarm_context",
+    )?;
     let task_graph = required_swarm_evidence_ref(
         object,
         &["taskGraph"],
