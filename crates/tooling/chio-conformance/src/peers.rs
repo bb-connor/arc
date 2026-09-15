@@ -274,25 +274,51 @@ pub fn default_peers_lock_path() -> PathBuf {
         .unwrap_or(cwd)
 }
 
-/// The workspace checkout the running executable lives in, when it still
-/// does: cargo places binaries under the workspace's target directory, so
-/// walking up from the executable finds the checkout at runtime. Nothing
-/// about the build machine is baked into the binary, which keeps release
-/// builds reproducible across checkout locations.
+/// Resolve an explicitly configured `CHIO_CHECKOUT_ROOT`, or discover the
+/// checkout above the executable. The override must be an absolute checkout
+/// with the conformance workspace member and fixture layout. An invalid
+/// override returns no checkout, without falling back to a different tree.
+/// This supports external Cargo targets without embedding build-machine paths
+/// or treating the current directory as an implicit checkout authority.
 #[must_use]
 pub fn checkout_root() -> Option<PathBuf> {
+    if let Some(anchor) = std::env::var_os("CHIO_CHECKOUT_ROOT") {
+        return validated_checkout_root(Path::new(&anchor));
+    }
     let executable = std::env::current_exe().ok()?;
     executable
         .ancestors()
         .skip(1)
         .take(8)
-        .find(|directory| {
-            directory.join("Cargo.toml").is_file()
-                && directory
-                    .join("crates/tooling/chio-conformance/Cargo.toml")
-                    .is_file()
-        })
-        .map(Path::to_path_buf)
+        .find_map(validated_checkout_root)
+}
+
+fn validated_checkout_root(directory: &Path) -> Option<PathBuf> {
+    if !directory.is_absolute() {
+        return None;
+    }
+    let root = directory.canonicalize().ok()?;
+    let member = "crates/tooling/chio-conformance";
+    let workspace: toml::Value =
+        toml::from_str(&fs::read_to_string(root.join("Cargo.toml")).ok()?).ok()?;
+    let members = workspace.get("workspace")?.get("members")?.as_array()?;
+    if !members.iter().any(|entry| entry.as_str() == Some(member)) {
+        return None;
+    }
+    let package_path = root.join(member).join("Cargo.toml").canonicalize().ok()?;
+    if !package_path.starts_with(&root) {
+        return None;
+    }
+    let package: toml::Value = toml::from_str(&fs::read_to_string(package_path).ok()?).ok()?;
+    if package.get("package")?.get("name")?.as_str()? != "chio-conformance"
+        || !root.join("tests/conformance/scenarios/mcp_core").is_dir()
+        || !root
+            .join("tests/conformance/fixtures/mcp_core/policy.yaml")
+            .is_file()
+    {
+        return None;
+    }
+    Some(root)
 }
 
 /// The lockfile shipped in the checkout the executable runs from, if any.
@@ -318,18 +344,111 @@ mod tests {
     use super::*;
 
     #[test]
-    fn checkout_root_is_the_workspace_the_test_binary_runs_from() {
-        let root = checkout_root().expect("cargo test runs from a workspace target directory");
-        assert!(root
-            .join("crates/tooling/chio-conformance/Cargo.toml")
-            .is_file());
+    fn out_of_tree_executable_requires_a_valid_explicit_checkout_anchor() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .nth(3)
+            .expect("workspace")
+            .canonicalize()
+            .expect("canonical workspace");
+        let temporary = tempfile::tempdir().expect("temporary directory");
+        let binary = temporary.path().join("conformance-tests");
+        let explicit_lock = temporary.path().join("explicit-peers.lock.toml");
+        fs::copy(
+            root.join("crates/tooling/chio-conformance/peers.lock.toml"),
+            &explicit_lock,
+        )
+        .expect("explicit fixture override");
+        fs::copy(std::env::current_exe().expect("executable"), &binary)
+            .expect("copy binary outside checkout");
+        for (anchor, expected) in [
+            (Some(root.as_path()), Some(root.as_path())),
+            (None, None),
+            (Some(temporary.path()), None),
+            (Some(Path::new(".")), None),
+        ] {
+            let mut command = std::process::Command::new(&binary);
+            command
+                .args([
+                    "--exact",
+                    "peers::tests::checkout_anchor_child",
+                    "--nocapture",
+                ])
+                .current_dir(&root)
+                .env("CHIO_CHECKOUT_TEST_CHILD", "1")
+                .env_remove("CHIO_CHECKOUT_ROOT")
+                .env("CHIO_PEERS_LOCK", &explicit_lock)
+                .env(
+                    "CHIO_CHECKOUT_TEST_EXPECTED",
+                    expected.unwrap_or(Path::new("")),
+                );
+            if let Some(anchor) = anchor {
+                command.env("CHIO_CHECKOUT_ROOT", anchor);
+            }
+            let output = command.output().expect("run relocated executable");
+            assert!(
+                output.status.success(),
+                "anchor {anchor:?}: {}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+    }
+
+    #[test]
+    fn checkout_anchor_child() {
+        if std::env::var_os("CHIO_CHECKOUT_TEST_CHILD").is_none() {
+            return;
+        }
+        let expected = std::env::var_os("CHIO_CHECKOUT_TEST_EXPECTED").expect("expected root");
+        let explicit_lock =
+            PathBuf::from(std::env::var_os("CHIO_PEERS_LOCK").expect("explicit peer fixture"));
+        assert_eq!(default_peers_lock_path(), explicit_lock);
+        PeersLock::load(&default_peers_lock_path())
+            .expect("load explicit peer fixture")
+            .validate()
+            .expect("valid peer fixture");
+        if expected.is_empty() {
+            assert_eq!(checkout_root(), None);
+            return;
+        }
+        let root = PathBuf::from(expected);
+        assert_eq!(checkout_root(), Some(root.clone()));
         assert_eq!(
             in_repo_default_lock_path(),
-            Some(
-                root.join("crates/tooling/chio-conformance")
-                    .join(PEERS_LOCK_FILENAME)
-            )
+            Some(root.join("crates/tooling/chio-conformance/peers.lock.toml"))
         );
+        let options = crate::default_run_options();
+        assert_eq!(options.repo_root, root);
+        assert!(fs::read_to_string(options.policy_path)
+            .expect("resolved fixture")
+            .contains("max_capability_ttl: 3600"));
+        assert!(options.scenarios_dir.is_dir());
+    }
+
+    #[test]
+    fn checkout_anchor_rejects_unrelated_manifests_and_missing_fixtures() {
+        let temporary = tempfile::tempdir().expect("temporary directory");
+        let root = temporary.path();
+        let member = root.join("crates/tooling/chio-conformance");
+        fs::create_dir_all(&member).expect("member directory");
+        fs::write(root.join("Cargo.toml"), "[workspace]\nmembers = []\n")
+            .expect("workspace manifest");
+        fs::write(member.join("Cargo.toml"), "[package]\nname = 'unrelated'\n")
+            .expect("package manifest");
+        assert_eq!(validated_checkout_root(root), None);
+        fs::write(
+            root.join("Cargo.toml"),
+            "[workspace]\nmembers = ['crates/tooling/chio-conformance']\n",
+        )
+        .expect("workspace manifest");
+        assert_eq!(validated_checkout_root(root), None);
+        fs::write(
+            member.join("Cargo.toml"),
+            "[package]\nname = 'chio-conformance'\n",
+        )
+        .expect("package manifest");
+        assert_eq!(validated_checkout_root(root), None);
     }
 
     const VALID: &str = r#"
