@@ -41,6 +41,30 @@ impl TestAdmissionOperationStore {
 }
 
 impl AdmissionOperationStore for TestAdmissionOperationStore {
+    fn load_caller_budget_shares(
+        &self,
+        _parent_id: &AdmissionIdentifier,
+        _limit: usize,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        Vec<crate::admission_operation::AdmissionCallerBudgetShare>,
+        AdmissionOperationStoreError,
+    > {
+        self.require_fence(fence)?;
+        self.caller_share_times
+            .lock()
+            .map_err(|_| {
+                AdmissionOperationStoreError::Invariant("fixture caller-share lock poisoned".into())
+            })?
+            .push(now);
+        // Preserve this fixture's original unsupported-port behavior. Physical
+        // share accounting and refusal are covered by the owning SQLite suite.
+        Err(AdmissionOperationStoreError::Unavailable(
+            "durable caller sibling-share accounting is unsupported".into(),
+        ))
+    }
+
     fn retain_native_dispatch_ledger(
         &self,
         input: crate::admission_operation::NativeSecurityDispatchLedgerContext<'_>,

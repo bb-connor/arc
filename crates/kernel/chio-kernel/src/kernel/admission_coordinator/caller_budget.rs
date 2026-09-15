@@ -17,6 +17,12 @@ impl ChioKernel {
         };
         let parent_id = AdmissionIdentifier::try_new("parent_id", parent_id.to_owned())
             .map_err(|error| error.to_string())?;
+        // The caller holds the budget registry. Serialize with durable writers
+        // before sampling time, so a committed operation cannot be newer than
+        // this complete snapshot's decision time. Store validation stays strict.
+        let _mutation_guard = runtime
+            .lock_mutations()
+            .map_err(|error| error.to_string())?;
         let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
         let shares = runtime
             .store

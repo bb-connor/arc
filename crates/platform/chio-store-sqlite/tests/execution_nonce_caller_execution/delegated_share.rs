@@ -255,11 +255,16 @@ fn caller_share_snapshot_is_complete_scoped_and_fenced() -> TestResult {
     assert!(store
         .load_caller_budget_shares(&parent, 1, &fence, 0)
         .is_err());
+    let stale = store
+        .load_caller_budget_shares(&parent, 1, &fence, now.saturating_sub(1_000))
+        .expect_err("an earlier physical timestamp must remain refused");
+    assert!(stale
+        .to_string()
+        .contains("trusted operation time regressed"));
     assert_eq!(
-        store
-            .load_caller_budget_shares(&parent, 1, &fence, now)?
-            .len(),
-        1
+        store.load_caller_budget_shares(&parent, 1, &fence, now)?,
+        shares,
+        "refused snapshots must leave complete share accounting unchanged"
     );
     Ok(())
 }

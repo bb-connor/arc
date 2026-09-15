@@ -16,6 +16,8 @@ use crate::tool_outcome::{
 
 #[path = "durable_admission/authority_profile.rs"]
 mod authority_profile;
+#[path = "durable_admission/caller_budget_snapshot.rs"]
+mod caller_budget_snapshot;
 #[path = "durable_admission/delivery_revalidation.rs"]
 mod delivery_revalidation;
 #[path = "durable_admission/dispatch_commit_failure.rs"]
@@ -200,6 +202,7 @@ struct TestAdmissionState {
 }
 
 struct TestAdmissionOperationStore {
+    caller_share_times: std::sync::Mutex<Vec<u64>>,
     recovery_lease_faults: recovery_lease::TestRecoveryLeaseFaults,
     native_recovery: native_acquisition::TestNative,
     native_egress: native_egress::TestEgress,
@@ -224,6 +227,7 @@ struct TestAdmissionOperationStore {
 impl TestAdmissionOperationStore {
     fn new(fence: StoreMutationFence) -> Self {
         Self {
+            caller_share_times: std::sync::Mutex::new(Vec::new()),
             recovery_lease_faults: recovery_lease::TestRecoveryLeaseFaults::default(),
             native_recovery: native_acquisition::TestNative::default(),
             native_egress: native_egress::TestEgress::default(),
