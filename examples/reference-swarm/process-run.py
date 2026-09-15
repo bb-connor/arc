@@ -137,11 +137,36 @@ def main():
         )
         write(folder / "verification.json", verification)
         verified.append(call["process"])
+    artifact = output / "completed-run.json"
+    run(
+        chio,
+        "process",
+        "attest-run",
+        "--state",
+        state,
+        "--plan",
+        plan_path,
+        "--out",
+        artifact,
+    )
+    run_verification = run(
+        chio,
+        "process",
+        "verify-run",
+        "--artifact",
+        artifact,
+        "--trusted-kernel-pubkey",
+        key,
+        "--runtime-id",
+        calls["runtime_id"],
+    )
+    write(output / "completed-run-verification.json", run_verification)
     result = {
         "schema": "chio.reference-swarm.process-run.v1",
         "runtime_id": calls["runtime_id"],
         "verified_workers": verified,
         "runner": run_report,
+        "completed_run": run_verification,
         "m5_acceptance_complete": False,
     }
     write(output / "run.json", result)
