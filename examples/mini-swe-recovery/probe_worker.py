@@ -14,6 +14,20 @@ from chio_process import container as container_support
 from minisweagent.agents.default import DefaultAgent
 
 
+def authorization_probe(client):
+    result = client.invoke(
+        "ungranted-mailbox-probe",
+        "chio-ipc",
+        "send_authorization_probe",
+        {"message_key": "must-not-dispatch", "payload": {"probe": True}},
+    )
+    receipt = json.loads(result["receipt_json"])
+    assert result["verdict"] == "deny"
+    assert "not in capability scope" in receipt["decision"]["reason"]
+    assert result["output"] is None
+    return result["receipt_json"]
+
+
 def main():
     upstream = hashlib.sha256(Path(inspect.getfile(DefaultAgent)).read_bytes()).hexdigest()
     assert upstream == "e8ef8aa365942d739c2ec5cb0879f60f377d2dc2de8ec670aaedf3bafb45a4c2"
@@ -53,12 +67,13 @@ def main():
     descriptor = json.loads(Path("/run/chio/connection.json").read_text())
     client = ProcessClient(descriptor["socket_path"], descriptor["credential"])
     assert client.inspect()["checkpoint"]["revision"] == "0"
+    denial = authorization_probe(client)
     try:
         client._call({"op": "credential", "process_id": "root"})
     except WorkerError as error:
         assert error.code == "invalid_request"
     else:
-        raise AssertionError("Worker obtained an administrative credential")
+        raise AssertionError("Worker parser accepted an unknown operation")
     scratch = os.statvfs("/work")
     assert Path("/sys/fs/cgroup/memory.max").read_text().strip() == str(512 * 1024 * 1024)
     assert Path("/sys/fs/cgroup/memory.swap.max").read_text().strip() == "0"
@@ -81,7 +96,9 @@ def main():
                 "docker_socket_absent": True,
                 "readonly_inputs": True,
                 "network_none": True,
-                "admin_request_refused": True,
+                "unknown_operation_parser_rejected": True,
+                "ungranted_invoke_denied": True,
+                "ungranted_invoke_receipt": denial,
                 "scratch_bytes": 64 * 1024 * 1024,
             }
         )

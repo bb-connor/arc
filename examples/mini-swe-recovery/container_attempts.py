@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import sqlite3
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -55,6 +56,14 @@ class ContainerAttempts:
             == hashlib.sha256(Path(container_support.__file__).read_bytes()).hexdigest()
         )
         assert canary.read_text() == "worker must not read this host file"
+        assert self.evidence["probe"]["ungranted_invoke_denied"]
+        assert self.evidence["probe"]["unknown_operation_parser_rejected"]
+        with sqlite3.connect(self.directory / "host/mailboxes.db") as db:
+            assert db.execute("SELECT count(*) FROM mailbox_messages").fetchone()[0] == 0
+            assert db.execute(
+                "SELECT last_sequence FROM mailboxes WHERE id='authorization_probe'"
+            ).fetchone() == (0,)
+        self.evidence["ungranted_tool_not_dispatched"] = True
         # These programs need no Chio operations. Failures must remove the
         # container itself, not just its docker start --attach client.
         before = self._workers()

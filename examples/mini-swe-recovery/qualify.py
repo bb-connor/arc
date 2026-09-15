@@ -147,6 +147,7 @@ capabilities:
             "schema": "chio.process.host.v1",
             "policy": str(policy),
             "servers": [server],
+            "mailboxes": [{"id": "authorization_probe"}],
             "limits": {"max_calls": 8, "max_processes": 2, "max_depth": 1},
             "children": [
                 {
