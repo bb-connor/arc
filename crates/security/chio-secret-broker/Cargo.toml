@@ -29,7 +29,7 @@ hmac = { workspace = true }
 rand_core = { workspace = true }
 rusqlite = { workspace = true }
 rustix = { workspace = true }
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls = { version = "0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
