@@ -235,8 +235,7 @@ fn execution_identity() -> ExecutionIdentity {
             group_count
         );
     }
-    groups.sort_unstable();
-    ExecutionIdentity::new(uid, gid, groups).test_unwrap()
+    ExecutionIdentity::from_observed_credentials(uid, gid, groups).test_unwrap()
 }
 
 fn prepare_write_owner(path: &Path, execution_identity: &ExecutionIdentity) {

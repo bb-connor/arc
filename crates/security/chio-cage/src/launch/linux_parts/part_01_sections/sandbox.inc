@@ -830,13 +830,14 @@ fn observe_execution_identity() -> Result<ExecutionIdentity, BootstrapFault> {
             ));
         }
     }
-    supplementary_gids.sort_unstable();
-    ExecutionIdentity::new(real_uid, real_gid, supplementary_gids).map_err(|_| {
-        BootstrapFault::new(
-            CageEnforcementFailureCode::ExecutionIdentityMismatch,
-            "execution_identity_observed",
-        )
-    })
+    ExecutionIdentity::from_observed_credentials(real_uid, real_gid, supplementary_gids).map_err(
+        |_| {
+            BootstrapFault::new(
+                CageEnforcementFailureCode::ExecutionIdentityMismatch,
+                "execution_identity_observed",
+            )
+        },
+    )
 }
 
 fn apply_execution_identity(

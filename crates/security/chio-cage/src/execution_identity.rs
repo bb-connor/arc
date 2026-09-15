@@ -5,7 +5,8 @@ use crate::CageError;
 /// Maximum supplementary groups admitted for one target execution identity.
 pub const MAX_SUPPLEMENTARY_GIDS: usize = 64;
 
-/// Exact non-root Unix credentials applied to the target before sandboxing.
+/// Canonical non-root Unix permission identity applied before sandboxing.
+/// The primary gid is bound once; supplementary gids name additional groups.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExecutionIdentity {
@@ -23,6 +24,18 @@ impl ExecutionIdentity {
         };
         identity.validate()?;
         Ok(identity)
+    }
+
+    /// Construct the canonical permission identity observed from Unix credentials.
+    /// `getgroups` may repeat the primary gid, which already has its own binding.
+    pub fn from_observed_credentials(
+        uid: u32,
+        gid: u32,
+        mut supplementary_gids: Vec<u32>,
+    ) -> Result<Self, CageError> {
+        supplementary_gids.retain(|observed| *observed != gid);
+        supplementary_gids.sort_unstable();
+        Self::new(uid, gid, supplementary_gids)
     }
 
     pub fn validate(&self) -> Result<(), CageError> {
@@ -114,6 +127,15 @@ mod tests {
         assert!(ExecutionIdentity::new(10001, 10001, vec![10001]).is_err());
         assert!(ExecutionIdentity::new(10001, 10001, vec![10003, 10002]).is_err());
         assert!(ExecutionIdentity::new(10001, 10001, vec![10002, 10002]).is_err());
+        assert!(ExecutionIdentity::from_observed_credentials(0, 10001, vec![]).is_err());
+        assert!(ExecutionIdentity::from_observed_credentials(10001, 0, vec![0]).is_err());
+        assert!(ExecutionIdentity::from_observed_credentials(10001, 10001, vec![0]).is_err());
+        assert!(
+            ExecutionIdentity::from_observed_credentials(10001, 10001, vec![u32::MAX]).is_err()
+        );
+        assert!(
+            ExecutionIdentity::from_observed_credentials(10001, 10001, vec![10002, 10002]).is_err()
+        );
     }
 
     #[test]
@@ -123,5 +145,9 @@ mod tests {
         assert_eq!(identity.uid(), 10001);
         assert_eq!(identity.gid(), 10001);
         assert_eq!(identity.supplementary_gids(), [10002, 10003]);
+        let observed =
+            ExecutionIdentity::from_observed_credentials(10001, 10001, vec![10003, 10001, 10002])
+                .unwrap_or_else(|error| panic!("observed identity must be canonicalized: {error}"));
+        assert_eq!(observed, identity);
     }
 }

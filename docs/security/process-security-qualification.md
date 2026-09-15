@@ -198,10 +198,22 @@ are unchanged. The gate's shell contract and source stack checks pass.
 The frozen `73f3d7fa528c76e6953d5b2a4ddab38757cc328d` retry runs via
 `run-linux-x86-cage-73f3d7fa5.py`, retaining source, compiler, platform,
 environment, log and binary identities in `linux-x86-73f3d7fa5/`.
-It started at 21:48 UTC, child PID 10715, Codex session `10945`; consult the
-terminal records rather than treating a launched process as a pass.
-The earlier failed gate and VM setup failures remain retained. Neither run
-changes trusted capture pins or provides designated-runner release authority.
+It stopped at 22:46:51 UTC with exit 101. The static helper built and passed its
+ELF checks, but every real-kernel probe refused before launch: this guest's
+`getgroups` includes its primary gid, and the observer passed that duplicate to
+the strict configured-identity constructor. All 26 probe failures are retained.
+
+The repair adds an observed-credentials constructor that removes only the
+redundant primary gid and sorts the remaining groups. Root, sentinel and
+duplicate additional groups still refuse; configured identities remain strict.
+The helper and its real-kernel fixture use the same normalization. A focused
+red/green regression preserves the additional group set. Strict macOS cage
+Clippy and the unchanged 69-test source inventory pass. Real-kernel qualification
+must rerun with a rebuilt helper; the pure regression is not confinement proof.
+Logs and calibration patch are `cage-observed-groups-*`.
+
+Earlier failed gates and VM setup failures remain retained. No run changes
+trusted capture pins or provides designated-runner release authority.
 
 ### Native late-caller recovery repair
 
