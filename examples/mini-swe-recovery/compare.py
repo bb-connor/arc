@@ -30,6 +30,7 @@ HARNESS = (
     "compare.py",
     "compare_upstream.py",
     "compare_cleanup.py",
+    "compare_paths.py",
     "compare_fault_worker.py",
     "worker.py",
 )

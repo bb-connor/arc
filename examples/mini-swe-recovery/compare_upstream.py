@@ -23,6 +23,8 @@ import traceback
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from compare_paths import ownership_path
+
 DOCKER = "/usr/bin/docker"
 LABEL = "chio.comparison.owner"
 MAX_STREAM = 4 * 1024 * 1024
@@ -155,7 +157,7 @@ def configuration(path):
     ):
         raise ValueError("The fixture provider must be an explicit loopback HTTP endpoint")
     value["source"] = str(Path(value["source"]).resolve(strict=True))
-    value["output"] = str(Path(value["output"]).absolute())
+    value["output"] = str(ownership_path(value["output"]))
     return value
 
 
@@ -689,7 +691,8 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     arguments = parser.parse_args()
     os.umask(0o077)
-    value = run(configuration(arguments.config), arguments.config.resolve(strict=True))
+    config_path = ownership_path(arguments.config)
+    value = run(configuration(config_path), config_path)
     print(json.dumps({"result": str(Path(value["configuration"]["output"]) / "result.json")}))
 
 

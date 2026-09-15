@@ -33,6 +33,7 @@ def protected_parent(path):
 
 def private_directory(path, *, create=False):
     path = Path(os.path.abspath(path))
+    path = path.parent.resolve(strict=True) / path.name
     protected_parent(path.parent)
     if create:
         path.mkdir(mode=0o700)

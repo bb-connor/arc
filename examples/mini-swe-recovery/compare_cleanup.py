@@ -7,6 +7,8 @@ import signal
 import time
 from pathlib import Path
 
+from compare_paths import ownership_path
+
 from chio_mini_swe.repository_transport import docker
 from chio_mini_swe.session_security import read_document
 
@@ -81,9 +83,10 @@ def terminate_attempt(control, config_path, config, expected_argv):
 
 
 def cleanup(config_path, expected_argv):
-    config_path = Path(config_path)
+    config_path = ownership_path(config_path)
     config = read_document(config_path, private=True, maximum=65536)
-    output = Path(config["output"])
+    output = ownership_path(config["output"])
+    config["output"] = str(output)
     owner, image = config["owner"], config["image"]
     if (
         re.fullmatch(r"[0-9a-f]{32}", owner) is None

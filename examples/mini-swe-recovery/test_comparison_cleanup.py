@@ -9,6 +9,7 @@ import sys
 
 import compare as comparison
 import compare_cleanup as helper
+import compare_upstream as upstream
 import pytest
 
 OWNER = "a" * 32
@@ -201,6 +202,42 @@ def original_container(case):
         output / "container-control.json",
         {"id": CONTAINER, "config_path": str(config_path), **config},
     )
+
+
+def test_symlinked_tmp_root_matches_recorded_config(case, monkeypatch):
+    config_path, config, output = case
+    alias = config_path.parent / "alias"
+    alias.symlink_to(config_path.parent, target_is_directory=True)
+    original_container(case)
+    transport = Containers([container(), container(FOREIGN_CONTAINER, owner="e" * 32)])
+    monkeypatch.setattr(helper, "docker", transport)
+    with sleeper("owned") as owned, sleeper("unrelated") as unrelated:
+        _, expected = worker_control(case, owned)
+        lexical_config = {**config, "output": str(alias / "output")}
+        write_private(config_path, lexical_config)
+        result = helper.cleanup(alias / "config.json", expected)
+        assert owned.wait(timeout=5) == -signal.SIGKILL
+        assert unrelated.poll() is None
+    assert result["removed_container_ids"] == [CONTAINER]
+    assert set(transport.records) == {FOREIGN_CONTAINER}
+
+
+def test_comparison_configuration_canonicalizes_output_before_ownership_recording(case):
+    config_path, config, output = case
+    alias = config_path.parent / "alias"
+    alias.symlink_to(config_path.parent, target_is_directory=True)
+    document = {
+        **config,
+        "output": str(alias / "output"),
+        "source": str(alias),
+        "revision": "f" * 40,
+        "endpoint": "http://127.0.0.1:1234/v1",
+        "scenario": "clean",
+    }
+    write_private(config_path, document)
+    prepared = upstream.configuration(alias / "config.json")
+    assert prepared["output"] == str(output)
+    assert prepared["source"] == str(config_path.parent)
 
 
 @pytest.mark.parametrize("changed", ["label", "image"])

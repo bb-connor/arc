@@ -5,7 +5,31 @@ import json
 import pytest
 from test_provider import config
 
-from chio_mini_swe.operator import prepare, prepared
+from chio_mini_swe.operator import prepare, prepared, private_directory
+
+
+def test_session_symlink_ancestor_normalizes_identity_but_final_symlink_refuses(tmp_path):
+    actual = tmp_path / "actual"
+    actual.mkdir(mode=0o700)
+    alias = tmp_path / "alias"
+    alias.symlink_to(actual, target_is_directory=True)
+    assert private_directory(alias / "session", create=True) == actual / "session"
+    final = actual / "link"
+    final.symlink_to(actual / "session", target_is_directory=True)
+    with pytest.raises(ValueError, match="private and owned"):
+        private_directory(alias / "link")
+    assert (actual / "session").is_dir()
+
+
+def test_symlink_ancestor_does_not_relax_protected_parent_policy(tmp_path):
+    actual = tmp_path / "writable"
+    actual.mkdir(mode=0o777)
+    actual.chmod(0o777)
+    alias = tmp_path / "alias"
+    alias.symlink_to(actual, target_is_directory=True)
+    with pytest.raises(ValueError, match="writable by other users"):
+        private_directory(alias / "session", create=True)
+    assert not (actual / "session").exists()
 
 
 @pytest.fixture
