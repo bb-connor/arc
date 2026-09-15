@@ -86,6 +86,13 @@ struct ActiveCageReceiptPersistence {
 }
 
 impl ActiveCageReceiptPersistence {
+    fn bind_preparation(&mut self, bindings: chio_cage::CageReceiptBindings) -> Result<(), AdapterError> {
+        self.persistence.context = self.persistence.context.with_launch_bindings(&self.bindings, &bindings)
+            .map_err(|error| AdapterError::ConnectionFailed(format!("cage prepared receipt binding failed: {error}")))?;
+        self.bindings = bindings;
+        Ok(())
+    }
+
     fn persist(&self, record: chio_cage::CageEnforcementRecord) -> Result<(), AdapterError> {
         self.persistence
             .persist(Some(self.bindings.clone()), record, self.started_at_unix_ms)
@@ -809,7 +816,7 @@ impl StdioMcpTransport {
             migration,
         } = launch;
         let started_at_unix_ms = now_unix_ms()?;
-        let cage_receipts = ActiveCageReceiptPersistence {
+        let mut cage_receipts = ActiveCageReceiptPersistence {
             persistence: receipt_persistence,
             bindings: chio_cage::CageReceiptBindings::from_compiled(&compiled),
             started_at_unix_ms,
@@ -837,6 +844,9 @@ impl StdioMcpTransport {
         let prepared = match chio_cage::prepare_launch_with_options(compiled, launch_options) {
             Ok(prepared) => prepared,
             Err(error) => {
+                if let Some(bindings) = error.receipt_bindings() {
+                    cage_receipts.bind_preparation(bindings.clone())?;
+                }
                 let record = error.record().clone();
                 let failure = record
                     .failure
@@ -852,6 +862,7 @@ impl StdioMcpTransport {
                 ));
             }
         };
+        cage_receipts.bind_preparation(prepared.receipt_bindings())?;
         if let Err(error) =
             validate_cage_migration_identity(&server_id, &migration).and_then(|()| {
                 migration.require_enforced().map_err(|error| {

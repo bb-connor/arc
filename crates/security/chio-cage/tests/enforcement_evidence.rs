@@ -301,6 +301,51 @@ fn rejection_bootstrap_and_exit_have_distinct_truthful_signed_receipts() {
 
 #[test]
 fn cage_receipt_rejects_missing_or_forged_enforcement_bindings() {
+    let original = CageReceiptBindings::from_prepared(&prepared());
+    let mut bound = original.clone();
+    bound.profile_digest = digest('a');
+    bound.plan_digest = digest('b');
+    bound.fd_table_digest = digest('c');
+    let context = signing_context()
+        .with_launch_bindings(&original, &bound)
+        .test_expect("stdio preparation updates plan bindings");
+    assert!(context.with_launch_bindings(&original, &bound).is_err());
+    for field in [
+        "manifest_digest",
+        "helper_binding_digest",
+        "target_binding_digest",
+        "target_identity",
+    ] {
+        let mut value = serde_json::to_value(&bound).test_unwrap();
+        if field == "target_identity" {
+            value[field]["inode"] = serde_json::json!(99);
+        } else {
+            value[field] = serde_json::json!(digest('d'));
+        }
+        let altered = serde_json::from_value(value).test_unwrap();
+        assert!(
+            signing_context()
+                .with_launch_bindings(&original, &altered)
+                .is_err(),
+            "{field}"
+        );
+    }
+    let mut observed = prepared();
+    observed.profile_digest.clone_from(&bound.profile_digest);
+    observed.plan_digest.clone_from(&bound.plan_digest);
+    observed.fd_table_digest.clone_from(&bound.fd_table_digest);
+    let record = CageEnforcementRecord::fully_enforced(
+        FullyEnforcedEvidence::new(observed, exec_transition(), true).test_unwrap(),
+    )
+    .test_unwrap();
+    let body =
+        CageReceiptBody::new("prepared-stdio", Some(bound), record, 900, 1_001).test_unwrap();
+    let backend = Ed25519Backend::new(Keypair::from_seed(&[94; 32]));
+    assert!(sign_cage_receipt(body.clone(), &signing_context(), &backend).is_err());
+    let signed = sign_cage_receipt(body, &context, &backend).test_unwrap();
+    assert_eq!(signed.policy_hash, digest('a'));
+    verify_signed_cage_receipt(&signed).test_unwrap();
+
     let bootstrap = CageEnforcementRecord::bootstrap_failed(
         CageEnforcementFailure::new(
             CageEnforcementFailureCode::LandlockPartial,

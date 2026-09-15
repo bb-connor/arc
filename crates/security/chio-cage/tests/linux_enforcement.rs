@@ -453,9 +453,27 @@ fn sealed_launch_preparation_is_secret_free_and_owns_descriptors_without_launchi
     assert!(compiled_descriptor_count > baseline_descriptor_count);
     let manifest_digest = compiled.admitted().manifest_digest().to_string();
     let compiler_fd_table_digest = compiled.profile().fd_table_digest.clone();
+    let compiler_receipt_bindings = chio_cage::CageReceiptBindings::from_compiled(&compiled);
     let helper_binding_digest = compiled.profile().helper_binding_digest.clone();
     let target_binding_digest = compiled.profile().target_binding_digest.clone();
     let prepared = prepare_launch(compiled).test_unwrap();
+    let receipt_bindings = prepared.receipt_bindings();
+    assert_ne!(
+        receipt_bindings.profile_digest,
+        compiler_receipt_bindings.profile_digest
+    );
+    assert_ne!(
+        receipt_bindings.plan_digest,
+        compiler_receipt_bindings.plan_digest
+    );
+    assert_ne!(
+        receipt_bindings.fd_table_digest,
+        compiler_receipt_bindings.fd_table_digest
+    );
+    assert_eq!(
+        receipt_bindings.target_identity,
+        compiler_receipt_bindings.target_identity
+    );
     let prepared_descriptor_count = open_file_descriptor_count();
     assert!(prepared_descriptor_count > compiled_descriptor_count);
     let evidence = prepared.evidence();

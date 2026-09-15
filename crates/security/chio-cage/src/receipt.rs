@@ -211,6 +211,30 @@ impl CageReceiptSigningContext {
         Ok(context)
     }
 
+    /// Follow the trusted launch preparation's descriptor binding transition.
+    /// Manifest and executable identities must remain the admitted ones. The
+    /// caller supplies bindings from its owned preparation or launch error.
+    pub fn with_launch_bindings(
+        &self,
+        previous: &CageReceiptBindings,
+        prepared: &CageReceiptBindings,
+    ) -> Result<Self, CageReceiptError> {
+        self.validate()?;
+        previous.validate()?;
+        prepared.validate()?;
+        if self.policy_hash != previous.profile_digest
+            || previous.manifest_digest != prepared.manifest_digest
+            || previous.helper_binding_digest != prepared.helper_binding_digest
+            || previous.target_binding_digest != prepared.target_binding_digest
+            || previous.target_identity != prepared.target_identity
+        {
+            return Err(CageReceiptError::BindingMismatch);
+        }
+        let mut context = self.clone();
+        context.policy_hash.clone_from(&prepared.profile_digest);
+        Ok(context)
+    }
+
     fn validate(&self) -> Result<(), CageReceiptError> {
         validate_identifier(&self.capability_id)?;
         validate_identifier(&self.tool_server)?;

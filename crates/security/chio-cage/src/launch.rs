@@ -181,6 +181,19 @@ impl std::fmt::Debug for PreparedCageLaunch {
 }
 
 impl PreparedCageLaunch {
+    /// Bind receipts to the sealed plan after its target stdio descriptors exist.
+    #[must_use]
+    pub fn receipt_bindings(&self) -> CageReceiptBindings {
+        #[cfg(target_os = "linux")]
+        {
+            self.inner.receipt_bindings()
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            match self.unsupported {}
+        }
+    }
+
     #[must_use]
     pub fn evidence(&self) -> &CageLaunchPreparationEvidence {
         #[cfg(target_os = "linux")]

@@ -92,6 +92,10 @@ pub(super) struct PreparedLaunchContract {
 }
 
 impl PreparedLaunchContract {
+    pub(super) fn receipt_bindings(&self) -> CageReceiptBindings {
+        CageReceiptBindings::from_compiled(&self.compiled)
+    }
+
     pub(super) const fn evidence(&self) -> &CageLaunchPreparationEvidence {
         &self.evidence
     }
