@@ -14,7 +14,6 @@ import tempfile
 from pathlib import Path
 
 from chio_process.launch import demo_python, provision_native_demo
-from minisweagent.agents.default import DefaultAgent
 
 HERE = Path(__file__).resolve().parent
 
@@ -65,6 +64,8 @@ def serving(binary, directory):
 
 
 def exercise(binary, directory, image, worker_image=None):
+    from minisweagent.agents.default import DefaultAgent
+
     upstream_sha256 = hashlib.sha256(Path(inspect.getfile(DefaultAgent)).read_bytes()).hexdigest()
     assert upstream_sha256 == "e8ef8aa365942d739c2ec5cb0879f60f377d2dc2de8ec670aaedf3bafb45a4c2"
     container = command(

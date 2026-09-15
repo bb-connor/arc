@@ -11,7 +11,6 @@ from pathlib import Path
 
 from chio_process import ProcessClient, WorkerError
 from chio_process import container as container_support
-from minisweagent.agents.default import DefaultAgent
 
 
 def authorization_probe(client):
@@ -29,6 +28,8 @@ def authorization_probe(client):
 
 
 def main():
+    from minisweagent.agents.default import DefaultAgent
+
     upstream = hashlib.sha256(Path(inspect.getfile(DefaultAgent)).read_bytes()).hexdigest()
     assert upstream == "e8ef8aa365942d739c2ec5cb0879f60f377d2dc2de8ec670aaedf3bafb45a4c2"
     assert os.getuid() != 0

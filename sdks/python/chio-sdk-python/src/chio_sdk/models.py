@@ -210,22 +210,27 @@ def _prompt_grant_is_subset_of(self: PromptGrant, parent: PromptGrant) -> bool:
     return _operation_set(self.operations).issubset(_operation_set(parent.operations))
 
 
-def _scope_is_subset_of(self: ChioScope, parent: ChioScope) -> bool:
+def scope_is_subset_of(scope: ChioScope, parent: ChioScope) -> bool:
+    """Check conservative attenuation using the SDK's existing grant rules.
+
+    This typed entry point also backs the legacy ``ChioScope.is_subset_of``
+    convenience method. Neither path replaces kernel authorization.
+    """
     parent_tool_grants = parent.grants or []
-    for grant in self.grants or []:
+    for grant in scope.grants or []:
         if not any(
             grant.is_subset_of(parent_grant) for parent_grant in parent_tool_grants
         ):
             return False
     parent_resource_grants = parent.resource_grants or []
-    for grant in self.resource_grants or []:
+    for grant in scope.resource_grants or []:
         if not any(
             grant.is_subset_of(parent_grant)
             for parent_grant in parent_resource_grants
         ):
             return False
     parent_prompt_grants = parent.prompt_grants or []
-    for grant in self.prompt_grants or []:
+    for grant in scope.prompt_grants or []:
         if not any(
             grant.is_subset_of(parent_grant)
             for parent_grant in parent_prompt_grants
@@ -278,7 +283,7 @@ ChioReceipt.is_denied = property(_receipt_is_denied)  # type: ignore[attr-define
 ToolGrant.is_subset_of = _tool_grant_is_subset_of  # type: ignore[attr-defined]
 ResourceGrant.is_subset_of = _resource_grant_is_subset_of  # type: ignore[attr-defined]
 PromptGrant.is_subset_of = _prompt_grant_is_subset_of  # type: ignore[attr-defined]
-ChioScope.is_subset_of = _scope_is_subset_of  # type: ignore[attr-defined]
+ChioScope.is_subset_of = scope_is_subset_of  # type: ignore[attr-defined]
 CapabilityToken.is_valid_at = _token_is_valid_at  # type: ignore[attr-defined]
 CapabilityToken.is_expired_at = _token_is_expired_at  # type: ignore[attr-defined]
 CapabilityToken.body = _token_body  # type: ignore[attr-defined]
@@ -329,6 +334,7 @@ __all__ = [
     "RuntimeAssuranceTier",
     "ToolCallAction",
     "ToolGrant",
+    "scope_is_subset_of",
     # Sourced from models_supplemental (no generated equivalent).
     "AuthMethod",
     "CallerIdentity",

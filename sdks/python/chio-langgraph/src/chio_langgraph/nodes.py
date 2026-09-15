@@ -56,9 +56,7 @@ def chio_node(
     sig = inspect.signature(fn) if callable(fn) else None
     takes_config = _node_accepts_config(sig)
     effective_redaction_policy: RedactionPolicy = (
-        redaction_policy
-        if redaction_policy is not None
-        else RedactionPolicy.chio_default()
+        redaction_policy if redaction_policy is not None else RedactionPolicy.chio_default()
     )
 
     async def _dispatch(state: Any, runtime_config: Any) -> NodeResult:
@@ -89,20 +87,18 @@ def chio_node(
             parameters=parameters,
         )
         decision = receipt.decision
-        if not receipt.is_allowed:
+        verdict = decision.root if decision is not None else None
+        if verdict is None or verdict.verdict != "allow":
+            reason = verdict.reason if verdict is not None else None
             raise ChioLangGraphError(
-                decision.reason
-                if decision is not None and decision.reason is not None
-                else "non-authorizing Chio receipt",
+                reason if reason is not None else "non-authorizing Chio receipt",
                 node_name=node_name,
                 tool_server=tool_server,
                 tool_name=node_name,
-                guard=decision.guard if decision is not None else None,
-                reason=decision.reason if decision is not None else None,
+                guard=verdict.guard if verdict is not None and verdict.verdict == "deny" else None,
+                reason=reason,
                 receipt_id=receipt.id,
-                decision=decision.model_dump(exclude_none=True)
-                if decision is not None
-                else None,
+                decision=decision.model_dump(exclude_none=True) if decision is not None else None,
             )
 
         # Allow: invoke body preserving sync/async + arity.
@@ -116,9 +112,7 @@ def chio_node(
 
     if is_async:
 
-        async def async_wrapper(
-            state: Any, runtime_config: Any = None
-        ) -> NodeResult:
+        async def async_wrapper(state: Any, runtime_config: Any = None) -> NodeResult:
             return await _dispatch(state, runtime_config)
 
         _copy_metadata(fn, async_wrapper, node_name)

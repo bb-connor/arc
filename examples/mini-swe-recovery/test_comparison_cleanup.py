@@ -6,6 +6,7 @@ import os
 import signal
 import subprocess
 import sys
+from pathlib import Path
 
 import compare as comparison
 import compare_cleanup as helper
@@ -16,6 +17,40 @@ OWNER = "a" * 32
 IMAGE = "sha256:" + "b" * 64
 CONTAINER = "c" * 64
 FOREIGN_CONTAINER = "d" * 64
+
+
+@pytest.mark.parametrize("existing_config", [False, True])
+def test_authorization_checker_import_does_not_initialize_upstream_config(
+    tmp_path, existing_config
+):
+    config = tmp_path / "upstream-config"
+    if existing_config:
+        config.mkdir()
+        (config / ".env").write_text("CHIO_TEST_AMBIENT_CONFIG=loaded\n")
+    root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import os; import check_authorization; "
+            "print(os.environ.get('CHIO_TEST_AMBIENT_CONFIG', 'absent'))",
+        ],
+        env={
+            "PATH": os.defpath,
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONPATH": os.pathsep.join(
+                [str(Path(__file__).parent), str(root / "sdks/python/chio-process/src")]
+            ),
+            "MSWEA_GLOBAL_CONFIG_DIR": str(config),
+        },
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    assert result.stdout == "absent\n", result.stdout
+    assert result.stderr == ""
+    assert config.exists() is existing_config
 
 
 def write_private(path, value):
