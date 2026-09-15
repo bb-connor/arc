@@ -34,9 +34,45 @@ use super::types::{
     CLAIM_SWARM_TERMINAL_GRAPH_RECEIPT_BOUND,
 };
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum VerificationPhase {
+    Admission,
+    Complete,
+}
+
+/// Verify authority for a live task without requiring future completion.
+///
+/// A fan-in continuation still requires its signed join receipt. Every supplied
+/// join or terminal receipt is checked, and the report claims only evidence
+/// present in the bundle. This does not qualify a completed run; use
+/// [`verify_swarm_authority_bundle`] for that boundary.
+pub fn verify_swarm_authority_for_admission(
+    bundle: &SwarmAuthorityBundle,
+    trusted_witness_issuer_keys: &[PublicKey],
+) -> Result<SwarmAuthorityVerifierReport, SwarmAuthorityError> {
+    verify_bundle(
+        bundle,
+        trusted_witness_issuer_keys,
+        VerificationPhase::Admission,
+    )
+}
+
+/// Verify a complete artifact, including every graph join and terminal evidence.
 pub fn verify_swarm_authority_bundle(
     bundle: &SwarmAuthorityBundle,
     trusted_witness_issuer_keys: &[PublicKey],
+) -> Result<SwarmAuthorityVerifierReport, SwarmAuthorityError> {
+    verify_bundle(
+        bundle,
+        trusted_witness_issuer_keys,
+        VerificationPhase::Complete,
+    )
+}
+
+fn verify_bundle(
+    bundle: &SwarmAuthorityBundle,
+    trusted_witness_issuer_keys: &[PublicKey],
+    phase: VerificationPhase,
 ) -> Result<SwarmAuthorityVerifierReport, SwarmAuthorityError> {
     require_trusted_witness_issuer_keys(trusted_witness_issuer_keys)?;
     validate_task_graph(&bundle.task_graph, bundle.now_unix_ms)?;
@@ -47,17 +83,28 @@ pub fn verify_swarm_authority_bundle(
     let edge_set = edge_set(&bundle.task_graph.edges);
     let route_by_id =
         validate_route_plan_receipts(bundle, &task_by_id, trusted_witness_issuer_keys)?;
-    let join_by_id = validate_join_receipts(bundle, &task_by_id, trusted_witness_issuer_keys)?;
-    let allocation_by_id = validate_budget_pool(bundle, &task_by_id)?;
-    validate_revocation_epoch(bundle, &task_by_id, trusted_witness_issuer_keys)?;
-    validate_terminal_graph_receipts(
+    // A supplied terminal receipt claims completion, even at admission. It
+    // cannot hide an absent graph join by shrinking the supplied receipt set.
+    let require_complete =
+        phase == VerificationPhase::Complete || !bundle.terminal_receipts.is_empty();
+    let join_by_id = validate_join_receipts(
         bundle,
         &task_by_id,
-        &route_by_id,
-        &join_by_id,
-        &allocation_by_id,
         trusted_witness_issuer_keys,
+        require_complete,
     )?;
+    let allocation_by_id = validate_budget_pool(bundle, &task_by_id)?;
+    validate_revocation_epoch(bundle, &task_by_id, trusted_witness_issuer_keys)?;
+    if require_complete {
+        validate_terminal_graph_receipts(
+            bundle,
+            &task_by_id,
+            &route_by_id,
+            &join_by_id,
+            &allocation_by_id,
+            trusted_witness_issuer_keys,
+        )?;
+    }
     validate_continuation_tokens(&ContinuationValidationContext {
         bundle,
         graph_sha256: &graph_sha256,
@@ -85,7 +132,9 @@ pub fn verify_swarm_authority_bundle(
     }
     verified_claims.push(CLAIM_SWARM_BUDGET_POOL_BOUND.to_string());
     verified_claims.push(CLAIM_SWARM_REVOCATION_EPOCH_BOUND.to_string());
-    verified_claims.push(CLAIM_SWARM_TERMINAL_GRAPH_RECEIPT_BOUND.to_string());
+    if !bundle.terminal_receipts.is_empty() {
+        verified_claims.push(CLAIM_SWARM_TERMINAL_GRAPH_RECEIPT_BOUND.to_string());
+    }
     let hop_reports = swarm_authority_hop_reports(bundle)?;
 
     Ok(SwarmAuthorityVerifierReport {
@@ -1089,6 +1138,7 @@ fn validate_join_receipts<'a>(
     bundle: &'a SwarmAuthorityBundle,
     task_by_id: &BTreeMap<&str, &SwarmGraphNode>,
     trusted_witness_issuer_keys: &[PublicKey],
+    require_complete: bool,
 ) -> Result<BTreeMap<&'a str, &'a SwarmJoinReceipt>, SwarmAuthorityError> {
     let mut graph_joins = BTreeMap::new();
     for join in &bundle.task_graph.joins {
@@ -1145,9 +1195,11 @@ fn validate_join_receipts<'a>(
             )));
         }
     }
-    for join_id in graph_joins.keys() {
-        if !receipts.contains_key(join_id) {
-            return Err(rejected(format!("missing swarm join receipt: {join_id}")));
+    if require_complete {
+        for join_id in graph_joins.keys() {
+            if !receipts.contains_key(join_id) {
+                return Err(rejected(format!("missing swarm join receipt: {join_id}")));
+            }
         }
     }
     Ok(receipts)

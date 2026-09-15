@@ -22,6 +22,7 @@ pub mod transport;
 
 mod response;
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -141,12 +142,61 @@ impl MistralChatRequest {
 pub struct MistralAdapter {
     config: MistralAdapterConfig,
     transport: Arc<dyn Transport>,
+    admitted_security: Option<BTreeMap<String, chio_manifest::BridgeSecurityMetadata>>,
 }
 
 impl MistralAdapter {
-    /// Build a new adapter from a config and a transport handle.
+    /// Build a projection-only adapter from a config and a transport handle.
+    ///
+    /// Batch lifting remains available for capture compatibility, but emitted
+    /// invocations have no manifest authority and cannot enter the streaming
+    /// evaluator. Use [`Self::new_with_registry`] for execution paths.
     pub fn new(config: MistralAdapterConfig, transport: Arc<dyn Transport>) -> Self {
-        Self { config, transport }
+        Self {
+            config,
+            transport,
+            admitted_security: None,
+        }
+    }
+
+    /// Build an execution-capable adapter bound to one admitted manifest.
+    pub fn new_with_registry(
+        config: MistralAdapterConfig,
+        transport: Arc<dyn Transport>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, MistralAdapterError> {
+        let manifest = registry
+            .verified_manifest(&config.server_id)
+            .map(|signed| &signed.manifest)
+            .ok_or_else(|| MistralAdapterError::RegistryManifestUnavailable {
+                server_id: config.server_id.clone(),
+            })?;
+        if manifest.name != config.server_name
+            || manifest.version != config.server_version
+            || manifest.public_key != config.public_key
+        {
+            return Err(MistralAdapterError::ConfigManifestMismatch {
+                server_id: config.server_id.clone(),
+            });
+        }
+
+        let mut admitted_security = BTreeMap::new();
+        for tool in &manifest.tools {
+            let security = registry
+                .bridge_security(&config.server_id, &tool.name)
+                .filter(chio_manifest::BridgeSecurityMetadata::has_registry_coordinates)
+                .ok_or_else(|| MistralAdapterError::RegistryToolSidecarUnavailable {
+                    server_id: config.server_id.clone(),
+                    tool_name: tool.name.clone(),
+                })?;
+            admitted_security.insert(tool.name.clone(), security);
+        }
+
+        Ok(Self {
+            config,
+            transport,
+            admitted_security: Some(admitted_security),
+        })
     }
 
     /// Provider identifier for this adapter.
@@ -261,6 +311,15 @@ impl MistralAdapter {
                 "Mistral functionCall args failed canonical JSON encoding: {error}"
             ))
         })?;
+        let bridge_security = match &self.admitted_security {
+            Some(bindings) => Some(bindings.get(&call.name).cloned().ok_or_else(|| {
+                ProviderError::Malformed(format!(
+                    "admitted security sidecar is missing for Mistral tool `{}`",
+                    call.name
+                ))
+            })?),
+            None => None,
+        };
 
         Ok(ToolInvocation {
             provider: ProviderId::Mistral,
@@ -275,6 +334,7 @@ impl MistralAdapter {
                 },
                 received_at: SystemTime::now(),
             },
+            bridge_security,
         })
     }
 
@@ -329,6 +389,18 @@ pub enum MistralAdapterError {
     /// Bubbled up from the transport layer.
     #[error(transparent)]
     Transport(#[from] transport::TransportError),
+    /// The configured server has no admitted signed manifest.
+    #[error("verified manifest registry has no Mistral server {server_id}")]
+    RegistryManifestUnavailable { server_id: String },
+    /// Runtime configuration must identify exactly the admitted publisher.
+    #[error("Mistral adapter configuration does not match admitted manifest {server_id}")]
+    ConfigManifestMismatch { server_id: String },
+    /// Every admitted tool must have an exact registry-derived sidecar.
+    #[error("verified manifest registry has no Mistral sidecar for {server_id}/{tool_name}")]
+    RegistryToolSidecarUnavailable {
+        server_id: String,
+        tool_name: String,
+    },
 }
 
 /// Map a transport failure into the fabric [`ProviderError`] taxonomy.

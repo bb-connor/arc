@@ -1,0 +1,72 @@
+{
+  "schema": "chio.test-vector.key-log.mutations.v1",
+  "operation_format": "RFC 6902 single-operation subset plus append_bytes",
+  "cases": [
+    {
+      "id": "receipt_noncanonical_trailing_newline",
+      "base": "positive/key-log-enterprise-receipt-envelope-active-v1.json",
+      "mutation": { "op": "append_bytes", "hex": "0a" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "noncanonical_envelope_bytes" }
+    },
+    {
+      "id": "event_unknown_authorization",
+      "base": "positive/key-log-event-envelope-rotation-v1.json",
+      "mutation": { "op": "add", "path": "/authorizations/fallback", "value": true },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "unknown_field" }
+    },
+    {
+      "id": "event_old_signature_tampered",
+      "base": "positive/key-log-event-envelope-rotation-v1.json",
+      "mutation": { "op": "replace", "path": "/authorizations/old_key/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "invalid_old_key_signature" }
+    },
+    {
+      "id": "checkpoint_complete_envelope_root_tampered",
+      "base": "positive/key-log-checkpoint-envelope-witnessed-v1.json",
+      "mutation": { "op": "replace", "path": "/body/root_hash", "value": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "checkpoint_signature_or_tree_binding" }
+    },
+    {
+      "id": "checkpoint_witnesses_not_sorted",
+      "base": "positive/key-log-checkpoint-envelope-witnessed-v1.json",
+      "mutation": { "op": "replace", "path": "/witness_signatures/0/witness_id", "value": "witness.z" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "noncanonical_witness_order" }
+    },
+    {
+      "id": "activation_witness_set_hash_tampered",
+      "base": "positive/key-log-activation-commit-envelope-v1.json",
+      "mutation": { "op": "replace", "path": "/body/witness_set_hash", "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "activation_signature_or_witness_binding" }
+    },
+    {
+      "id": "sync_consistency_path_tampered",
+      "base": "positive/key-log-sync-response-paged-v1.json",
+      "mutation": { "op": "replace", "path": "/consistency_proof/audit_path/0", "value": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "invalid_consistency_proof" }
+    },
+    {
+      "id": "receipt_tree_size_tampered",
+      "base": "positive/key-log-enterprise-receipt-envelope-active-v1.json",
+      "mutation": { "op": "replace", "path": "/body/tree_size", "value": 3 },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "event_tree_size_binding" }
+    },
+    {
+      "id": "receipt_operator_signature_tampered",
+      "base": "positive/key-log-enterprise-receipt-envelope-active-v1.json",
+      "mutation": { "op": "replace", "path": "/operator_signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "invalid_operator_signature" }
+    },
+    {
+      "id": "receipt_forbidden_secret_material",
+      "base": "positive/key-log-enterprise-receipt-body-active-v1.json",
+      "mutation": { "op": "add", "path": "/private_key", "value": "never-on-wire" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "unknown_secret_field" }
+    },
+    {
+      "id": "receipt_stage_outcome_disagreement",
+      "base": "positive/key-log-enterprise-receipt-body-active-v1.json",
+      "mutation": { "op": "replace", "path": "/outcome", "value": "pending_committed" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "stage_outcome_disagreement" }
+    }
+  ]
+}

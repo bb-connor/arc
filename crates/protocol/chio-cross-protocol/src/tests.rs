@@ -18,13 +18,97 @@ use chio_core::capability::{
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::Keypair;
+use chio_core::session::SessionId;
 use chio_kernel::{
-    ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest, ToolServerConnection,
+    ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolServerConnection,
     Verdict as KernelVerdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
-use chio_manifest::{LatencyHint, ToolDefinition};
+use chio_manifest::{
+    sign_manifest, BridgeSecurityMetadata, LatencyHint, RuntimeToolTopology, ToolDefinition,
+    ToolFlowDeclaration, ToolManifest, VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+};
 use serde_json::{json, Value};
+
+mod authorization_projection {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../tests/bindings/support/authorization_projection.rs"
+    ));
+}
+
+#[test]
+fn cross_protocol_kernel_request_preserves_complete_authorization_context() {
+    let expected = authorization_projection::complete_wire_request();
+    let request = CrossProtocolExecutionRequest {
+        origin_request_id: "wire-origin".to_string(),
+        kernel_request_id: expected.request_id.clone(),
+        target_protocol: DiscoveryProtocol::Native,
+        target_server_id: expected.server_id.clone(),
+        target_tool_name: expected.tool_name.clone(),
+        agent_id: expected.agent_id.clone(),
+        arguments: expected.arguments.clone(),
+        capability: expected.capability.clone(),
+        source_envelope: json!({}),
+        dpop_proof: expected.dpop_proof.clone(),
+        execution_nonce: expected.execution_nonce.clone(),
+        governed_intent: expected.governed_intent.clone(),
+        approval_token: expected.approval_token.clone(),
+        approval_tokens: expected.approval_tokens.clone(),
+        threshold_approval_proposal: expected.threshold_approval_proposal.clone(),
+        supplemental_authorization: expected.supplemental_authorization.clone(),
+        model_metadata: expected.model_metadata.clone(),
+        authenticated_session_id: None,
+        security_context: None,
+        bridge_security: BridgeSecurityMetadata::unconstrained(),
+    };
+    authorization_projection::assert_authorization_preserved(
+        &expected,
+        &kernel_tool_call_request(&request),
+    );
+}
+
+#[test]
+fn native_cross_protocol_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation() {
+    let (issuer, mut kernel) = test_kernel();
+    let subject = Keypair::generate();
+    let registry = test_manifest_registry();
+    let calls = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(authorization_projection::CountedToolServer {
+        server: "test-srv".to_string(),
+        tool: "echo".to_string(),
+        calls: calls.clone(),
+    }));
+    let mut baseline = boundary_request(registry.bridge_security("test-srv", "echo").unwrap());
+    baseline.capability = capability_for_tool(&issuer, &subject, "test-srv", "echo");
+    baseline.agent_id = subject.public_key().to_hex();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
+    let positive = orchestrator.execute(&MockBridge, baseline.clone()).unwrap();
+    assert_eq!(positive.response.verdict, KernelVerdict::Allow);
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    let receipts = kernel.receipt_log().receipts().len();
+    for (feature, mutation) in
+        authorization_projection::extension_cases(&kernel_tool_call_request(&baseline))
+    {
+        let mut request = baseline.clone();
+        request.kernel_request_id = mutation.request_id;
+        request.capability = mutation.capability;
+        request.approval_tokens = mutation.approval_tokens;
+        request.threshold_approval_proposal = mutation.threshold_approval_proposal;
+        request.governed_intent = mutation.governed_intent;
+        request.supplemental_authorization = mutation.supplemental_authorization;
+        request.source_envelope["peer_capabilities"] = json!({"features":{feature:true}});
+        let error = orchestrator.execute(&MockBridge, request).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("invocation feature {feature} was not negotiated")),
+            "{error}"
+        );
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(kernel.receipt_log().receipts().len(), receipts);
+    }
+}
 
 struct MockBridge;
 
@@ -103,30 +187,10 @@ impl TargetProtocolExecutor for MockMcpExecutor {
         let route_metadata = route_selection_metadata(request.route_selection)?;
         let response = request
             .kernel
-            .evaluate_tool_call_blocking_with_metadata(
-                &ToolCallRequest {
-                    request_id: request.execution.kernel_request_id.clone(),
-                    capability: request.execution.capability.clone(),
-                    tool_name: request.execution.target_tool_name.clone(),
-                    server_id: request.execution.target_server_id.clone(),
-                    agent_id: request.execution.agent_id.clone(),
-                    arguments: request.execution.arguments.clone(),
-                    dpop_proof: request.execution.dpop_proof.clone(),
-                    execution_nonce: request.execution.execution_nonce.clone(),
-                    governed_intent: request.execution.governed_intent.clone(),
-                    approval_token: request.execution.approval_token.clone(),
-                    approval_tokens: request.execution.approval_tokens.clone(),
-                    threshold_approval_proposal: request
-                        .execution
-                        .threshold_approval_proposal
-                        .clone(),
-                    supplemental_authorization: request
-                        .execution
-                        .supplemental_authorization
-                        .clone(),
-                    model_metadata: request.execution.model_metadata.clone(),
-                    federated_origin_kernel_id: None,
-                },
+            .evaluate_tool_call_blocking_with_manifest_security(
+                &kernel_tool_call_request(request.execution),
+                request.manifest_registry,
+                &request.execution.bridge_security,
                 Some(route_metadata),
             )
             .map_err(BridgeError::Kernel)?;
@@ -203,6 +267,190 @@ fn test_kernel() -> (Keypair, ChioKernel) {
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(MockToolServer));
     (keypair, kernel)
+}
+
+fn test_manifest_registry() -> VerifiedManifestRegistry {
+    let signer = Keypair::from_seed(&[61; 32]);
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: "test-srv".to_string(),
+        name: "Cross-protocol test server".to_string(),
+        description: None,
+        version: "1.0.0".to_string(),
+        tools: ["echo", "write"]
+            .into_iter()
+            .map(|name| semantic_tool(name, None, json!({"type":"object"}), None))
+            .collect(),
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = sign_manifest(&manifest, &signer).unwrap();
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::local())
+        .unwrap();
+    registry
+}
+
+fn flow_manifest_registry() -> VerifiedManifestRegistry {
+    let signer = Keypair::from_seed(&[41; 32]);
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: "test-srv".to_string(),
+        name: "Cross-protocol flow server".to_string(),
+        description: None,
+        version: "1.0.0".to_string(),
+        tools: vec![ToolDefinition {
+            name: "echo".to_string(),
+            description: "Cross-protocol flow test tool".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: Some(json!({"type": "object"})),
+            pricing: None,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: true,
+                requires_approval: false,
+            },
+            latency_hint: Some(LatencyHint::Fast),
+            flow: Some(ToolFlowDeclaration::public_egress()),
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: signer.public_key().to_hex(),
+    };
+    let signed = sign_manifest(&manifest, &signer).unwrap();
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .unwrap();
+    registry
+}
+
+fn boundary_request(bridge_security: BridgeSecurityMetadata) -> CrossProtocolExecutionRequest {
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    CrossProtocolExecutionRequest {
+        origin_request_id: "cross-protocol-security-origin".to_string(),
+        kernel_request_id: "cross-protocol-security-kernel".to_string(),
+        target_protocol: DiscoveryProtocol::Native,
+        target_server_id: "test-srv".to_string(),
+        target_tool_name: "echo".to_string(),
+        agent_id: subject.public_key().to_hex(),
+        arguments: json!({"message": "security boundary"}),
+        capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+        source_envelope: json!({"message": {"role": "user"}}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        authenticated_session_id: None,
+        security_context: None,
+        bridge_security,
+    }
+}
+
+#[test]
+fn execution_boundary_rejects_unadmitted_bridge_security() {
+    let registry = flow_manifest_registry();
+    let request = boundary_request(BridgeSecurityMetadata::unconstrained());
+
+    let error = crate::validation::validate_execution_request_boundary(&request, &registry)
+        .expect_err("unadmitted bridge metadata must fail closed");
+
+    assert_eq!(
+        error.to_string(),
+        "invalid request envelope: bridge security does not match live registry entry for test-srv/echo"
+    );
+}
+
+#[test]
+fn execution_boundary_rejects_authenticated_session_without_security_context() {
+    let registry = flow_manifest_registry();
+    let bridge_security = registry.bridge_security("test-srv", "echo").unwrap();
+    let mut request = boundary_request(bridge_security);
+    request.authenticated_session_id = Some(SessionId::new("authenticated-session"));
+
+    let error = crate::validation::validate_execution_request_boundary(&request, &registry)
+        .expect_err("authenticated session without its security context must fail closed");
+
+    assert_eq!(
+        error.to_string(),
+        "invalid request envelope: authenticated session requires an authoritative security context"
+    );
+}
+
+#[test]
+fn execution_boundary_rejects_forged_digest_flow_and_topology_fields() {
+    let registry = flow_manifest_registry();
+    let exact = registry.bridge_security("test-srv", "echo").unwrap();
+    let exact_value = serde_json::to_value(exact).unwrap();
+
+    let mut forged_cases = Vec::new();
+    let mut forged_digest = exact_value.clone();
+    forged_digest["manifest_digest"] = Value::String("00".repeat(32));
+    forged_cases.push(("manifest digest", forged_digest));
+
+    let mut forged_topology = exact_value.clone();
+    forged_topology["effective_egress"] = Value::Bool(false);
+    forged_cases.push(("effective topology", forged_topology));
+
+    let mut forged_flow = exact_value;
+    forged_flow["flow"]["egress"] = Value::Bool(false);
+    forged_cases.push(("flow egress", forged_flow));
+
+    for (field, value) in forged_cases {
+        let forged: BridgeSecurityMetadata = serde_json::from_value(value).unwrap();
+        let request = boundary_request(forged);
+        let error = crate::validation::validate_execution_request_boundary(&request, &registry)
+            .expect_err("forged bridge metadata must fail closed");
+        assert_eq!(
+            error.to_string(),
+            "invalid request envelope: bridge security does not match live registry entry for test-srv/echo",
+            "forged {field} must fail closed"
+        );
+    }
+}
+
+#[test]
+fn cross_protocol_routing_preserves_registry_admitted_flow_canonical_bytes() {
+    let (_, kernel) = test_kernel();
+    let registry = flow_manifest_registry();
+    let bridge_security = registry.bridge_security("test-srv", "echo").unwrap();
+    let expected_flow = chio_core::canonical_json_bytes(
+        bridge_security
+            .flow()
+            .expect("registry-admitted sidecar must retain flow"),
+    )
+    .unwrap();
+    let mut request = boundary_request(bridge_security.clone());
+    request.target_protocol = DiscoveryProtocol::Mcp;
+
+    let result = CrossProtocolOrchestrator::new(&kernel, &registry)
+        .execute(&MockBridge, request)
+        .expect("route denial must retain registry-admitted security evidence");
+    assert!(matches!(result.response.verdict, KernelVerdict::Deny));
+
+    let metadata = result.metadata();
+    let routed_sidecar = metadata
+        .pointer("/chio/receipt/metadata/chio_manifest_security_v1")
+        .expect("signed route receipt must retain the complete admitted sidecar");
+    assert_eq!(
+        chio_core::canonical_json_bytes(routed_sidecar).unwrap(),
+        chio_core::canonical_json_bytes(&serde_json::to_value(&bridge_security).unwrap()).unwrap()
+    );
+    let routed_flow = routed_sidecar
+        .get("flow")
+        .expect("signed route receipt must retain admitted flow");
+    assert_eq!(
+        chio_core::canonical_json_bytes(routed_flow).unwrap(),
+        expected_flow
+    );
 }
 
 fn capability_for_tool(
@@ -337,8 +585,14 @@ fn semantic_tool(
         input_schema,
         output_schema,
         pricing: None,
-        has_side_effects: false,
+        annotations: chio_manifest::ToolAnnotations {
+            read_only: true,
+            destructive: false,
+            idempotent: false,
+            requires_approval: false,
+        },
         latency_hint,
+        flow: None,
     }
 }
 
@@ -446,7 +700,8 @@ fn source_receipt_context_is_preserved_as_non_authoritative_metadata() {
 fn orchestrator_rejects_empty_origin_request_id_before_signed_lineage() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = test_manifest_registry();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
 
     let err = orchestrator
         .execute(
@@ -457,6 +712,7 @@ fn orchestrator_rejects_empty_origin_request_id_before_signed_lineage() {
                 target_protocol: DiscoveryProtocol::Native,
                 target_server_id: "test-srv".to_string(),
                 target_tool_name: "echo".to_string(),
+                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
                 agent_id: subject.public_key().to_hex(),
                 arguments: json!({"message":"hello"}),
                 capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
@@ -472,6 +728,8 @@ fn orchestrator_rejects_empty_origin_request_id_before_signed_lineage() {
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
                 model_metadata: None,
+                authenticated_session_id: None,
+                security_context: None,
             },
         )
         .unwrap_err();
@@ -486,7 +744,8 @@ fn orchestrator_rejects_empty_origin_request_id_before_signed_lineage() {
 fn orchestrator_rejects_padded_or_control_execution_identity_before_signed_lineage() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = test_manifest_registry();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
     let capability = capability_for_tool(&issuer, &subject, "test-srv", "echo");
     let agent_id = subject.public_key().to_hex();
 
@@ -505,6 +764,7 @@ fn orchestrator_rejects_padded_or_control_execution_identity_before_signed_linea
             target_protocol: DiscoveryProtocol::Native,
             target_server_id: "test-srv".to_string(),
             target_tool_name: "echo".to_string(),
+            bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
             agent_id: agent_id.clone(),
             arguments: json!({"message":"hello"}),
             capability: capability.clone(),
@@ -520,6 +780,8 @@ fn orchestrator_rejects_padded_or_control_execution_identity_before_signed_linea
             threshold_approval_proposal: None,
             supplemental_authorization: None,
             model_metadata: None,
+            authenticated_session_id: None,
+            security_context: None,
         };
 
         match field_name {
@@ -546,7 +808,8 @@ fn orchestrator_rejects_padded_or_control_execution_identity_before_signed_linea
 fn orchestrator_rejects_forged_capability_ref_parent_hash() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = test_manifest_registry();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
     let capability = capability_for_tool(&issuer, &subject, "test-srv", "echo");
 
     let err = orchestrator
@@ -558,6 +821,7 @@ fn orchestrator_rejects_forged_capability_ref_parent_hash() {
                 target_protocol: DiscoveryProtocol::Native,
                 target_server_id: "test-srv".to_string(),
                 target_tool_name: "echo".to_string(),
+                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
                 agent_id: subject.public_key().to_hex(),
                 arguments: json!({"message":"hello"}),
                 capability,
@@ -583,6 +847,8 @@ fn orchestrator_rejects_forged_capability_ref_parent_hash() {
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
                 model_metadata: None,
+                authenticated_session_id: None,
+                security_context: None,
             },
         )
         .unwrap_err();
@@ -597,7 +863,8 @@ fn orchestrator_rejects_forged_capability_ref_parent_hash() {
 fn orchestrator_rejects_capability_ref_origin_protocol_drift() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = test_manifest_registry();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
     let capability = capability_for_tool(&issuer, &subject, "test-srv", "echo");
     let parent_hash = parent_capability_hash(&capability).unwrap();
 
@@ -610,6 +877,7 @@ fn orchestrator_rejects_capability_ref_origin_protocol_drift() {
                 target_protocol: DiscoveryProtocol::Native,
                 target_server_id: "test-srv".to_string(),
                 target_tool_name: "echo".to_string(),
+                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
                 agent_id: subject.public_key().to_hex(),
                 arguments: json!({"message":"hello"}),
                 capability,
@@ -635,6 +903,8 @@ fn orchestrator_rejects_capability_ref_origin_protocol_drift() {
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
                 model_metadata: None,
+                authenticated_session_id: None,
+                security_context: None,
             },
         )
         .unwrap_err();
@@ -649,7 +919,8 @@ fn orchestrator_rejects_capability_ref_origin_protocol_drift() {
 fn orchestrator_executes_and_preserves_bridge_lineage() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = test_manifest_registry();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
 
     let result = orchestrator
         .execute(
@@ -660,6 +931,7 @@ fn orchestrator_executes_and_preserves_bridge_lineage() {
                 target_protocol: DiscoveryProtocol::Native,
                 target_server_id: "test-srv".to_string(),
                 target_tool_name: "echo".to_string(),
+                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
                 agent_id: subject.public_key().to_hex(),
                 arguments: json!({"message":"hello"}),
                 capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
@@ -675,6 +947,8 @@ fn orchestrator_executes_and_preserves_bridge_lineage() {
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
                 model_metadata: None,
+                authenticated_session_id: None,
+                security_context: None,
             },
         )
         .unwrap();
@@ -731,7 +1005,8 @@ fn orchestrator_executes_and_preserves_bridge_lineage() {
 fn orchestrator_fail_closes_with_empty_attenuation_on_out_of_scope_target() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = test_manifest_registry();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
 
     let result = orchestrator
         .execute(
@@ -742,6 +1017,7 @@ fn orchestrator_fail_closes_with_empty_attenuation_on_out_of_scope_target() {
                 target_protocol: DiscoveryProtocol::Native,
                 target_server_id: "test-srv".to_string(),
                 target_tool_name: "write".to_string(),
+                bridge_security: registry.bridge_security("test-srv", "write").unwrap(),
                 agent_id: subject.public_key().to_hex(),
                 arguments: json!({"message":"nope"}),
                 capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
@@ -757,6 +1033,8 @@ fn orchestrator_fail_closes_with_empty_attenuation_on_out_of_scope_target() {
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
                 model_metadata: None,
+                authenticated_session_id: None,
+                security_context: None,
             },
         )
         .unwrap();
@@ -778,7 +1056,8 @@ fn orchestrator_fail_closes_with_empty_attenuation_on_out_of_scope_target() {
 fn pending_approval_metadata_is_not_labeled_allow() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = test_manifest_registry();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
 
     let mut result = orchestrator
         .execute(
@@ -789,6 +1068,7 @@ fn pending_approval_metadata_is_not_labeled_allow() {
                 target_protocol: DiscoveryProtocol::Native,
                 target_server_id: "test-srv".to_string(),
                 target_tool_name: "echo".to_string(),
+                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
                 agent_id: subject.public_key().to_hex(),
                 arguments: json!({"message":"hello"}),
                 capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
@@ -804,6 +1084,8 @@ fn pending_approval_metadata_is_not_labeled_allow() {
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
                 model_metadata: None,
+                authenticated_session_id: None,
+                security_context: None,
             },
         )
         .unwrap();
@@ -826,7 +1108,8 @@ fn orchestrator_dispatches_to_registered_target_executor() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
     let executor = MockMcpExecutor;
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel).with_executor(&executor);
+    let registry = test_manifest_registry();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry).with_executor(&executor);
 
     let result = orchestrator
         .execute(
@@ -837,6 +1120,7 @@ fn orchestrator_dispatches_to_registered_target_executor() {
                 target_protocol: DiscoveryProtocol::Mcp,
                 target_server_id: "test-srv".to_string(),
                 target_tool_name: "echo".to_string(),
+                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
                 agent_id: subject.public_key().to_hex(),
                 arguments: json!({"message":"hello"}),
                 capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
@@ -852,6 +1136,8 @@ fn orchestrator_dispatches_to_registered_target_executor() {
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
                 model_metadata: None,
+                authenticated_session_id: None,
+                security_context: None,
             },
         )
         .unwrap();
@@ -887,7 +1173,8 @@ fn orchestrator_capability_envelope_uses_selected_native_fallback_target() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
     let executor = MockMcpExecutor;
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel)
+    let registry = test_manifest_registry();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry)
         .with_executor(&executor)
         .with_protocol_availability(
             DiscoveryProtocol::Mcp,
@@ -903,6 +1190,7 @@ fn orchestrator_capability_envelope_uses_selected_native_fallback_target() {
                 target_protocol: DiscoveryProtocol::Mcp,
                 target_server_id: "test-srv".to_string(),
                 target_tool_name: "echo".to_string(),
+                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
                 agent_id: subject.public_key().to_hex(),
                 arguments: json!({"message":"hello"}),
                 capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
@@ -920,6 +1208,8 @@ fn orchestrator_capability_envelope_uses_selected_native_fallback_target() {
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
                 model_metadata: None,
+                authenticated_session_id: None,
+                security_context: None,
             },
         )
         .unwrap();
@@ -946,7 +1236,8 @@ fn orchestrator_capability_envelope_uses_selected_native_fallback_target() {
 fn orchestrator_preserves_model_metadata_for_model_constrained_grant() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = test_manifest_registry();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
 
     let result = orchestrator
         .execute(
@@ -957,6 +1248,7 @@ fn orchestrator_preserves_model_metadata_for_model_constrained_grant() {
                 target_protocol: DiscoveryProtocol::Native,
                 target_server_id: "test-srv".to_string(),
                 target_tool_name: "echo".to_string(),
+                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
                 agent_id: subject.public_key().to_hex(),
                 arguments: json!({"message":"hello"}),
                 capability: capability_for_tool_with_constraints(
@@ -987,6 +1279,8 @@ fn orchestrator_preserves_model_metadata_for_model_constrained_grant() {
                     provenance_class:
                         chio_core::capability::governance::ProvenanceEvidenceClass::Asserted,
                 }),
+                authenticated_session_id: None,
+                security_context: None,
             },
         )
         .unwrap();
@@ -998,7 +1292,8 @@ fn orchestrator_preserves_model_metadata_for_model_constrained_grant() {
 fn orchestrator_denies_unregistered_non_native_target_with_signed_route_selection() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+    let registry = test_manifest_registry();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
 
     let result = orchestrator
         .execute(
@@ -1009,6 +1304,7 @@ fn orchestrator_denies_unregistered_non_native_target_with_signed_route_selectio
                 target_protocol: DiscoveryProtocol::Mcp,
                 target_server_id: "test-srv".to_string(),
                 target_tool_name: "echo".to_string(),
+                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
                 agent_id: subject.public_key().to_hex(),
                 arguments: json!({"message":"hello"}),
                 capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
@@ -1024,6 +1320,8 @@ fn orchestrator_denies_unregistered_non_native_target_with_signed_route_selectio
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
                 model_metadata: None,
+                authenticated_session_id: None,
+                security_context: None,
             },
         )
         .unwrap();
@@ -1044,7 +1342,8 @@ fn orchestrator_dispatches_to_registered_openai_target_executor() {
     let (issuer, kernel) = test_kernel();
     let subject = Keypair::generate();
     let executor = OpenAiTargetExecutor;
-    let orchestrator = CrossProtocolOrchestrator::new(&kernel).with_executor(&executor);
+    let registry = test_manifest_registry();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry).with_executor(&executor);
 
     let result = orchestrator
         .execute(
@@ -1055,6 +1354,7 @@ fn orchestrator_dispatches_to_registered_openai_target_executor() {
                 target_protocol: DiscoveryProtocol::OpenAi,
                 target_server_id: "test-srv".to_string(),
                 target_tool_name: "echo".to_string(),
+                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
                 agent_id: subject.public_key().to_hex(),
                 arguments: json!({"message":"hello"}),
                 capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
@@ -1070,6 +1370,8 @@ fn orchestrator_dispatches_to_registered_openai_target_executor() {
                 threshold_approval_proposal: None,
                 supplemental_authorization: None,
                 model_metadata: None,
+                authenticated_session_id: None,
+                security_context: None,
             },
         )
         .unwrap();

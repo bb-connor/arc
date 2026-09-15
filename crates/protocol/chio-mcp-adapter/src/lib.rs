@@ -9,6 +9,7 @@
 
 pub mod adapter;
 pub mod edge {
+    pub use chio_mcp_edge::authorization;
     pub use chio_mcp_edge::{
         AdapterError, ChioMcpEdge, McpEdgeConfig, McpExposedTool, McpServerCapabilities,
         McpToolInfo, McpToolResult, McpTransport,
@@ -20,6 +21,7 @@ mod framing;
 pub mod fuzz;
 pub mod loaded_weights;
 mod manifest;
+pub use manifest::{generate_manifest, verify_discovered_manifest_surface};
 pub mod native;
 pub mod prompts;
 pub mod resources;

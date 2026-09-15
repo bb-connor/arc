@@ -1,6 +1,21 @@
 use super::*;
 
 impl PostgresFindingMarketStore {
+    // Worker logins have SELECT and approved function EXECUTE privileges, but
+    // no direct UPDATE privilege required by SELECT FOR SHARE. Each job
+    // transition function locks and rechecks the enabled tenant itself in this
+    // transaction. This preliminary read preserves typed tenant errors without
+    // moving the effect's authorization check outside its transaction.
+    async fn begin_job_transition(
+        &self,
+        tenant: &HostedTenantId,
+    ) -> Result<Transaction<'_, Postgres>, HostedMarketStoreError> {
+        let mut transaction = self.begin_tenant_scope(tenant).await?;
+        self.require_enabled_tenant(&mut transaction, tenant, false)
+            .await?;
+        Ok(transaction)
+    }
+
     /// Claim a bounded batch without exceeding the tenant's configured active
     /// lease ceiling across all worker replicas. `limit` bounds only this
     /// caller's batch.
@@ -21,7 +36,7 @@ impl PostgresFindingMarketStore {
             return Err(HostedMarketStoreError::Invalid("lease"));
         }
         let lease_duration = checked_i64(lease_duration_secs, "lease_duration_secs")?;
-        let mut transaction = self.begin_tenant(tenant).await?;
+        let mut transaction = self.begin_job_transition(tenant).await?;
         let rows = sqlx::query(
             r#"
             SELECT tenant_id, job_id, job_kind, request_sha256, payload_sha256,
@@ -57,7 +72,7 @@ impl PostgresFindingMarketStore {
         }
         let lease_fence = checked_i64(lease.fence(), "lease_fence")?;
         let lease_duration = checked_i64(lease_duration_secs, "lease_duration_secs")?;
-        let mut transaction = self.begin_tenant(tenant).await?;
+        let mut transaction = self.begin_job_transition(tenant).await?;
         let expires_at: Option<i64> =
             sqlx::query_scalar("SELECT chio_finding_market_renew_job_lease($1, $2, $3, $4, $5)")
                 .bind(tenant.as_str())
@@ -87,7 +102,7 @@ impl PostgresFindingMarketStore {
         let lease_fence = checked_i64(lease.fence(), "lease_fence")?;
         validate_canonical_json(result_json, "result_json")?;
         let result_sha256 = sha256_hex(result_json);
-        let mut transaction = self.begin_tenant(tenant).await?;
+        let mut transaction = self.begin_job_transition(tenant).await?;
         let outcome: i16 =
             sqlx::query_scalar("SELECT chio_finding_market_complete_job($1, $2, $3, $4, $5, $6)")
                 .bind(tenant.as_str())
@@ -130,7 +145,7 @@ impl PostgresFindingMarketStore {
             return Err(HostedMarketStoreError::Invalid("retry_delay_secs"));
         }
         let retry_delay = checked_i64(retry_delay_secs, "retry_delay_secs")?;
-        let mut transaction = self.begin_tenant(tenant).await?;
+        let mut transaction = self.begin_job_transition(tenant).await?;
         let updated: bool =
             sqlx::query_scalar("SELECT chio_finding_market_fail_job($1, $2, $3, $4, $5, $6)")
                 .bind(tenant.as_str())
@@ -164,7 +179,7 @@ impl PostgresFindingMarketStore {
         validate_identifier(job_id, MAX_JOB_ID_BYTES)
             .map_err(|_| HostedMarketStoreError::Invalid("job_id"))?;
         let lease_fence = checked_i64(lease.fence(), "lease_fence")?;
-        let mut transaction = self.begin_tenant(tenant).await?;
+        let mut transaction = self.begin_job_transition(tenant).await?;
         // Expiry alone does not transfer ownership. A successful reclaim
         // changes both owner and fence, so the exact fence remains the
         // authoritative exclusion boundary while delayed cleanup refunds the
@@ -198,7 +213,7 @@ impl PostgresFindingMarketStore {
         validate_identifier(job_id, MAX_JOB_ID_BYTES)
             .map_err(|_| HostedMarketStoreError::Invalid("job_id"))?;
         let lease_fence = checked_i64(lease.fence(), "lease_fence")?;
-        let mut transaction = self.begin_tenant(tenant).await?;
+        let mut transaction = self.begin_job_transition(tenant).await?;
         let updated: bool =
             sqlx::query_scalar("SELECT chio_finding_market_exhaust_job($1, $2, $3, $4, $5)")
                 .bind(tenant.as_str())

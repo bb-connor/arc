@@ -1,14 +1,101 @@
 use chio_core::capability::{
+    caveat::{CapabilitySecurityBinding, CAPABILITY_SECURITY_BINDING_SCHEMA},
     runtime_attestation::RuntimeAttestationEvidence,
     scope::ChioScope,
     token::{CapabilityToken, CapabilityTokenBody},
 };
-use chio_core::crypto::{Keypair, PublicKey};
-use uuid::Uuid;
+use chio_core::crypto::{Keypair, PublicKey, SigningBackend};
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::{NoContext, Timestamp, Uuid};
 
 use crate::KernelError;
+use chio_security_types::ports::{IsolationEpochId, LineageId, SessionId, TenantId};
+use chio_security_types::PrincipalId;
 
 const DEFAULT_CAPABILITY_ISSUANCE_CLOCK_SKEW_SECONDS: u64 = 30;
+
+/// Fallible wall-clock port used only for capability authority issuance.
+/// A clock error denies issuance before any authority signing backend is used.
+pub trait CapabilityAuthorityClock: Send + Sync {
+    fn now_unix_millis(&self) -> Result<u64, CapabilityAuthorityClockError>;
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum CapabilityAuthorityClockError {
+    #[error("system time precedes the Unix epoch")]
+    BeforeUnixEpoch,
+    #[error("clock reading is outside the supported numeric range")]
+    NumericRange,
+    #[error("clock source is unavailable")]
+    Unavailable,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SystemCapabilityAuthorityClock;
+
+impl CapabilityAuthorityClock for SystemCapabilityAuthorityClock {
+    fn now_unix_millis(&self) -> Result<u64, CapabilityAuthorityClockError> {
+        let duration = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| CapabilityAuthorityClockError::BeforeUnixEpoch)?;
+        u64::try_from(duration.as_millis()).map_err(|_| CapabilityAuthorityClockError::NumericRange)
+    }
+}
+
+/// Authoritative tenant and capability-lineage binding for direct issuance.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CapabilityIssuanceContext {
+    pub tenant_id: TenantId,
+    pub lineage_id: LineageId,
+    pub session_id: Option<SessionId>,
+    pub principal_id: Option<PrincipalId>,
+    pub isolation_epoch_id: Option<IsolationEpochId>,
+    pub context_generation: Option<u64>,
+}
+
+impl CapabilityIssuanceContext {
+    #[must_use]
+    pub fn authoritative_session(
+        tenant_id: TenantId,
+        lineage_id: LineageId,
+        session_id: SessionId,
+        principal_id: PrincipalId,
+        isolation_epoch_id: IsolationEpochId,
+        context_generation: u64,
+    ) -> Self {
+        Self {
+            tenant_id,
+            lineage_id,
+            session_id: Some(session_id),
+            principal_id: Some(principal_id),
+            isolation_epoch_id: Some(isolation_epoch_id),
+            context_generation: Some(context_generation),
+        }
+    }
+
+    #[must_use]
+    pub const fn tenant_lineage(tenant_id: TenantId, lineage_id: LineageId) -> Self {
+        Self {
+            tenant_id,
+            lineage_id,
+            session_id: None,
+            principal_id: None,
+            isolation_epoch_id: None,
+            context_generation: None,
+        }
+    }
+}
+
+/// Immutable workload identity expected on capabilities returned by an
+/// external authority.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CapabilityAuthorityWorkloadBinding {
+    pub tenant_id: String,
+    pub workload_id: String,
+    pub server_id: String,
+    pub signer_public_key: PublicKey,
+}
 
 /// Validate that the local authority can issue the requested scope semantics.
 pub fn ensure_capability_issuance_supported(_scope: &ChioScope) -> Result<(), KernelError> {
@@ -38,6 +125,31 @@ pub fn validate_issued_capability_response(
     )
 }
 
+/// Validate a security-bound authority response against the current wall clock.
+pub fn validate_issued_capability_response_with_binding(
+    capability: &CapabilityToken,
+    requested_subject: &PublicKey,
+    requested_scope: &ChioScope,
+    requested_ttl_seconds: u64,
+    current_issuer: &PublicKey,
+    expected_security_binding: Option<&CapabilitySecurityBinding>,
+) -> Result<(), KernelError> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?
+        .as_secs();
+    validate_issued_capability_response_with_binding_at(
+        capability,
+        requested_subject,
+        requested_scope,
+        requested_ttl_seconds,
+        current_issuer,
+        now,
+        DEFAULT_CAPABILITY_ISSUANCE_CLOCK_SKEW_SECONDS,
+        expected_security_binding,
+    )
+}
+
 /// Deterministically validate an issuance response against the request and current authority.
 pub fn validate_issued_capability_response_at(
     capability: &CapabilityToken,
@@ -47,6 +159,30 @@ pub fn validate_issued_capability_response_at(
     current_issuer: &PublicKey,
     now: u64,
     allowed_clock_skew_seconds: u64,
+) -> Result<(), KernelError> {
+    validate_issued_capability_response_with_binding_at(
+        capability,
+        requested_subject,
+        requested_scope,
+        requested_ttl_seconds,
+        current_issuer,
+        now,
+        allowed_clock_skew_seconds,
+        None,
+    )
+}
+
+/// Deterministically validate a security-bound issuance response.
+#[allow(clippy::too_many_arguments)]
+pub fn validate_issued_capability_response_with_binding_at(
+    capability: &CapabilityToken,
+    requested_subject: &PublicKey,
+    requested_scope: &ChioScope,
+    requested_ttl_seconds: u64,
+    current_issuer: &PublicKey,
+    now: u64,
+    allowed_clock_skew_seconds: u64,
+    expected_security_binding: Option<&CapabilitySecurityBinding>,
 ) -> Result<(), KernelError> {
     if &capability.issuer != current_issuer {
         return Err(KernelError::UntrustedIssuer);
@@ -135,6 +271,16 @@ pub fn validate_issued_capability_response_at(
             "issued capability lifetime {lifetime} exceeds requested TTL {requested_ttl_seconds}"
         )));
     }
+    let actual_security_binding = capability.security_binding().map_err(|error| {
+        KernelError::CapabilityIssuanceFailed(format!(
+            "issued capability security binding is invalid: {error}"
+        ))
+    })?;
+    if actual_security_binding.as_ref() != expected_security_binding {
+        return Err(KernelError::CapabilityIssuanceFailed(
+            "issued capability security binding does not match the requested binding".to_string(),
+        ));
+    }
     Ok(())
 }
 
@@ -143,6 +289,10 @@ pub trait CapabilityAuthority: Send + Sync {
 
     fn trusted_public_keys(&self) -> Vec<PublicKey> {
         vec![self.authority_public_key()]
+    }
+
+    fn workload_binding(&self) -> Option<CapabilityAuthorityWorkloadBinding> {
+        None
     }
 
     fn issue_capability(
@@ -161,15 +311,135 @@ pub trait CapabilityAuthority: Send + Sync {
     ) -> Result<CapabilityToken, KernelError> {
         self.issue_capability(subject, scope, ttl_seconds)
     }
+
+    fn issue_capability_with_security_context(
+        &self,
+        subject: &PublicKey,
+        scope: ChioScope,
+        ttl_seconds: u64,
+        runtime_attestation: Option<RuntimeAttestationEvidence>,
+        _security_context: &CapabilityIssuanceContext,
+    ) -> Result<CapabilityToken, KernelError> {
+        self.issue_capability_with_attestation(subject, scope, ttl_seconds, runtime_attestation)
+    }
+}
+
+pub fn capability_security_binding(
+    issuance: &CapabilityIssuanceContext,
+    workload: &CapabilityAuthorityWorkloadBinding,
+) -> Result<CapabilitySecurityBinding, KernelError> {
+    let session_id = issuance.session_id.as_ref().ok_or_else(|| {
+        KernelError::CapabilityIssuanceDenied(
+            "security-bound capability issuance requires a session".to_string(),
+        )
+    })?;
+    let principal_id = issuance.principal_id.as_ref().ok_or_else(|| {
+        KernelError::CapabilityIssuanceDenied(
+            "security-bound capability issuance requires a principal".to_string(),
+        )
+    })?;
+    let isolation_epoch_id = issuance.isolation_epoch_id.as_ref().ok_or_else(|| {
+        KernelError::CapabilityIssuanceDenied(
+            "security-bound capability issuance requires an isolation epoch".to_string(),
+        )
+    })?;
+    let context_generation = issuance.context_generation.ok_or_else(|| {
+        KernelError::CapabilityIssuanceDenied(
+            "security-bound capability issuance requires a context generation".to_string(),
+        )
+    })?;
+    if issuance.tenant_id.as_str() != workload.tenant_id {
+        return Err(KernelError::CapabilityIssuanceDenied(
+            "security-bound capability tenant does not match the authority workload".to_string(),
+        ));
+    }
+    Ok(CapabilitySecurityBinding {
+        schema: CAPABILITY_SECURITY_BINDING_SCHEMA.to_string(),
+        tenant_id: issuance.tenant_id.as_str().to_string(),
+        lineage_id: issuance.lineage_id.as_str().to_string(),
+        session_id: session_id.as_str().to_string(),
+        principal_id: principal_id.as_str().to_string(),
+        isolation_epoch_id: isolation_epoch_id.as_str().to_string(),
+        context_generation,
+        workload_id: workload.workload_id.clone(),
+        server_id: workload.server_id.clone(),
+        workload_signer_public_key: workload.signer_public_key.to_hex(),
+    })
 }
 
 pub struct LocalCapabilityAuthority {
     keypair: Keypair,
+    clock: Arc<dyn CapabilityAuthorityClock>,
 }
 
 impl LocalCapabilityAuthority {
     pub fn new(keypair: Keypair) -> Self {
-        Self { keypair }
+        Self::new_with_clock(keypair, Arc::new(SystemCapabilityAuthorityClock))
+    }
+
+    pub fn new_with_clock(keypair: Keypair, clock: Arc<dyn CapabilityAuthorityClock>) -> Self {
+        Self { keypair, clock }
+    }
+}
+
+pub(crate) fn capability_authority_now_unix_secs(
+    clock: &dyn CapabilityAuthorityClock,
+) -> Result<u64, KernelError> {
+    if let Some(now) = crate::fixed_runtime_unix_secs_for_current_thread() {
+        return Ok(now);
+    }
+    clock
+        .now_unix_millis()
+        .map(|now_unix_ms| now_unix_ms / 1_000)
+        .map_err(|error| {
+            KernelError::CapabilityIssuanceFailed(format!(
+                "capability authority clock is unavailable: {error}"
+            ))
+        })
+}
+
+fn capability_id_at(now_unix_secs: u64) -> Result<String, KernelError> {
+    const MAX_UUID_V7_UNIX_SECS: u64 = ((1_u64 << 48) - 1) / 1_000;
+    if now_unix_secs > MAX_UUID_V7_UNIX_SECS {
+        return Err(KernelError::CapabilityIssuanceFailed(
+            "capability authority clock is outside the UUIDv7 timestamp range".to_string(),
+        ));
+    }
+    let timestamp = Timestamp::from_unix(NoContext, now_unix_secs, 0);
+    Ok(format!("cap-{}", Uuid::new_v7(timestamp)))
+}
+
+fn sign_capability_with_keypair(
+    body: CapabilityTokenBody,
+    keypair: &Keypair,
+) -> chio_core::error::Result<CapabilityToken> {
+    if body.scope.has_cumulative_approval()
+        && body.scope.grants.iter().any(|grant| {
+            grant
+                .operations
+                .contains(&chio_core::capability::scope::Operation::Delegate)
+        })
+    {
+        CapabilityToken::sign_cumulative_approval_family_root(body, keypair)
+    } else {
+        CapabilityToken::sign(body, keypair)
+    }
+}
+
+fn sign_capability_with_backend(
+    body: CapabilityTokenBody,
+    backend: &dyn SigningBackend,
+) -> chio_core::error::Result<CapabilityToken> {
+    if body.scope.has_cumulative_approval()
+        && body.scope.grants.iter().any(|grant| {
+            grant
+                .operations
+                .contains(&chio_core::capability::scope::Operation::Delegate)
+        })
+    {
+        CapabilityToken::sign_cumulative_approval_family_root_with_backend(body, backend)
+    } else {
+        CapabilityToken::sign_with_backend(body, backend)
     }
 }
 
@@ -185,12 +455,9 @@ impl CapabilityAuthority for LocalCapabilityAuthority {
         ttl_seconds: u64,
     ) -> Result<CapabilityToken, KernelError> {
         ensure_capability_issuance_supported(&scope)?;
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|duration| duration.as_secs())
-            .unwrap_or(0);
+        let now = capability_authority_now_unix_secs(self.clock.as_ref())?;
         let body = CapabilityTokenBody {
-            id: format!("cap-{}", Uuid::now_v7()),
+            id: capability_id_at(now)?,
             issuer: self.keypair.public_key(),
             subject: subject.clone(),
             scope,
@@ -200,18 +467,51 @@ impl CapabilityAuthority for LocalCapabilityAuthority {
             aggregate_invocation_budget: None,
         };
 
-        if body.scope.has_cumulative_approval()
-            && body.scope.grants.iter().any(|grant| {
-                grant
-                    .operations
-                    .contains(&chio_core::capability::scope::Operation::Delegate)
-            })
-        {
-            CapabilityToken::sign_cumulative_approval_family_root(body, &self.keypair)
-        } else {
-            CapabilityToken::sign(body, &self.keypair)
-        }
-        .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
+        sign_capability_with_keypair(body, &self.keypair)
+            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
+    }
+}
+
+/// Capability authority that keeps signing custody behind a runtime backend.
+///
+/// Production keyring composition supplies a generation-fenced backend here so
+/// capability tokens cannot bypass witnessed selector activation.
+pub struct GovernedCapabilityAuthority {
+    backend: Arc<dyn SigningBackend>,
+    clock: Arc<dyn CapabilityAuthorityClock>,
+}
+
+impl GovernedCapabilityAuthority {
+    pub fn new(backend: Arc<dyn SigningBackend>, clock: Arc<dyn CapabilityAuthorityClock>) -> Self {
+        Self { backend, clock }
+    }
+}
+
+impl CapabilityAuthority for GovernedCapabilityAuthority {
+    fn authority_public_key(&self) -> PublicKey {
+        self.backend.public_key()
+    }
+
+    fn issue_capability(
+        &self,
+        subject: &PublicKey,
+        scope: ChioScope,
+        ttl_seconds: u64,
+    ) -> Result<CapabilityToken, KernelError> {
+        ensure_capability_issuance_supported(&scope)?;
+        let now = capability_authority_now_unix_secs(self.clock.as_ref())?;
+        let body = CapabilityTokenBody {
+            id: capability_id_at(now)?,
+            issuer: self.backend.public_key(),
+            subject: subject.clone(),
+            scope,
+            issued_at: now,
+            expires_at: now.saturating_add(ttl_seconds),
+            delegation_chain: vec![],
+            aggregate_invocation_budget: None,
+        };
+        sign_capability_with_backend(body, self.backend.as_ref())
+            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
     }
 }
 
@@ -262,6 +562,80 @@ mod tests {
             },
             issuer,
         )
+    }
+
+    #[test]
+    fn issuance_response_requires_the_exact_requested_security_binding(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let workload_signer = Keypair::generate();
+        let scope = tool_scope();
+        let issuance = CapabilityIssuanceContext::authoritative_session(
+            TenantId::new("tenant-1")?,
+            LineageId::new("lineage-1")?,
+            SessionId::new("session-1")?,
+            PrincipalId::new(subject.public_key().to_hex())?,
+            IsolationEpochId::new("epoch-1")?,
+            7,
+        );
+        let workload = CapabilityAuthorityWorkloadBinding {
+            tenant_id: "tenant-1".to_string(),
+            workload_id: "workload-1".to_string(),
+            server_id: "authority-1".to_string(),
+            signer_public_key: workload_signer.public_key(),
+        };
+        let binding = capability_security_binding(&issuance, &workload)?;
+        let capability = CapabilityToken::sign_with_security_binding(
+            CapabilityTokenBody {
+                id: "cap-security-response".to_string(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: scope.clone(),
+                issued_at: 100,
+                expires_at: 160,
+                delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
+            },
+            binding.clone(),
+            &issuer,
+        )?;
+
+        validate_issued_capability_response_with_binding_at(
+            &capability,
+            &subject.public_key(),
+            &scope,
+            60,
+            &issuer.public_key(),
+            100,
+            30,
+            Some(&binding),
+        )?;
+        assert!(validate_issued_capability_response_at(
+            &capability,
+            &subject.public_key(),
+            &scope,
+            60,
+            &issuer.public_key(),
+            100,
+            30,
+        )
+        .is_err());
+
+        let mut wrong_binding = binding;
+        wrong_binding.context_generation = 8;
+        assert!(validate_issued_capability_response_with_binding_at(
+            &capability,
+            &subject.public_key(),
+            &scope,
+            60,
+            &issuer.public_key(),
+            100,
+            30,
+            Some(&wrong_binding),
+        )
+        .is_err());
+        Ok(())
     }
 
     #[test]
@@ -580,6 +954,53 @@ mod tests {
                     }
                 )
             }));
+    }
+
+    struct FixedClock(Result<u64, CapabilityAuthorityClockError>);
+
+    impl CapabilityAuthorityClock for FixedClock {
+        fn now_unix_millis(&self) -> Result<u64, CapabilityAuthorityClockError> {
+            self.0
+        }
+    }
+
+    #[test]
+    fn local_authority_fails_closed_when_clock_is_unavailable() {
+        let authority = LocalCapabilityAuthority::new_with_clock(
+            Keypair::generate(),
+            Arc::new(FixedClock(Err(CapabilityAuthorityClockError::Unavailable))),
+        );
+        assert!(matches!(
+            authority.issue_capability(
+                &Keypair::generate().public_key(),
+                ChioScope::default(),
+                60,
+            ),
+            Err(KernelError::CapabilityIssuanceFailed(message))
+                if message.contains("clock is unavailable")
+        ));
+    }
+
+    #[test]
+    fn governed_authority_signs_through_the_supplied_backend() {
+        let keypair = Keypair::generate();
+        let public_key = keypair.public_key();
+        let backend: Arc<dyn SigningBackend> =
+            Arc::new(chio_core::crypto::Ed25519Backend::new(keypair));
+        let authority =
+            GovernedCapabilityAuthority::new(backend, Arc::new(FixedClock(Ok(1_700_000_000_000))));
+        let capability = match authority.issue_capability(
+            &Keypair::generate().public_key(),
+            ChioScope::default(),
+            60,
+        ) {
+            Ok(capability) => capability,
+            Err(error) => panic!("governed capability failed: {error}"),
+        };
+
+        assert_eq!(capability.issuer, public_key);
+        assert_eq!(capability.issued_at, 1_700_000_000);
+        assert!(matches!(capability.verify_signature(), Ok(true)));
     }
 }
 

@@ -483,6 +483,7 @@ pub(in crate::runtime) fn parse_peer_capabilities(params: &Value) -> PeerCapabil
         .is_some_and(|value| value.get("url").is_some() || value.get("openUrl").is_some());
 
     PeerCapabilities {
+        authorization: None,
         supports_progress: true,
         supports_cancellation: true,
         supports_subscriptions: resources

@@ -2,8 +2,7 @@ use super::*;
 
 #[derive(Clone, Default)]
 pub(super) struct AdmissionReceiptProjectionStore {
-    receipts:
-        std::sync::Arc<std::sync::Mutex<std::collections::BTreeMap<String, ChioReceipt>>>,
+    receipts: std::sync::Arc<std::sync::Mutex<std::collections::BTreeMap<String, ChioReceipt>>>,
     successful_appends: std::sync::Arc<AtomicU64>,
     fail_next_append: std::sync::Arc<AtomicBool>,
 }

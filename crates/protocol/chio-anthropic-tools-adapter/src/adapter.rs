@@ -71,6 +71,12 @@ impl AnthropicAdapter {
         validate_tool_use_block(block)?;
         ensure_server_tool_feature(&block.name)?;
         self.server_tool_gate().ensure_tool_allowed(&block.name)?;
+        let bridge_security = self.bridge_security_for_tool(&block.name).ok_or_else(|| {
+            ProviderError::Malformed(format!(
+                "verified manifest registry has no admitted Anthropic tool `{}`",
+                block.name
+            ))
+        })?;
         let arguments = canonical_json_bytes(&block.input).map_err(|error| {
             ProviderError::BadToolArgs(format!(
                 "Anthropic tool_use input failed canonical JSON encoding: {error}"
@@ -90,6 +96,7 @@ impl AnthropicAdapter {
                 },
                 received_at: SystemTime::now(),
             },
+            bridge_security: Some(bridge_security),
         })
     }
 

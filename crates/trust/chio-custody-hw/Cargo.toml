@@ -44,18 +44,20 @@ pq = ["chio-core-types/pq"]
 # Google root.
 dev-fixtures = []
 
-# SQLite-backed durable stores: the replay-detection `PasskeyNonceStore`
-# AND the `CredentialRevocationOracle` cascade. Re-uses the rusqlite
+# SQLite-backed durable stores: the replay-detection `PasskeyNonceStore`,
+# the `CredentialRevocationOracle` cascade, and server-owned mobile
+# attestation challenges plus App Attest counters. Re-uses the rusqlite
 # version pinned by the workspace (the same version chio-store-sqlite
 # uses) so a deployment persists both the replay-detection store and the
-# revocation cascade across issuer restarts. ON by default (see the
-# `default` feature); disable default features to fall back to the
+# revocation, challenge, and counter state across issuer restarts. ON by
+# default (see the `default` feature); disable default features to fall back to the
 # in-memory stores for unit tests and single-process integration tests.
-sqlite-store = ["dep:rusqlite"]
+sqlite-store = ["dep:chio-sqlite-file-identity", "dep:rusqlite", "dep:rustix"]
 
 [dependencies]
 chio-core-types = { workspace = true }
 chio-revocation-oracle = { workspace = true }
+chio-sqlite-file-identity = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -65,6 +67,8 @@ coset = { workspace = true }
 der = { workspace = true }
 hex = { workspace = true }
 jsonwebtoken = { workspace = true }
+rand_core = { workspace = true }
+rustix = { workspace = true, optional = true }
 sha2 = { workspace = true }
 webauthn-rs = { workspace = true, optional = true }
 webauthn-rs-proto = { workspace = true, optional = true }
@@ -76,6 +80,7 @@ rusqlite = { workspace = true, optional = true }
 serde_json = { workspace = true }
 proptest = { workspace = true }
 rusqlite = { workspace = true }
+tempfile = { workspace = true }
 # Enable the synthetic mobile-attestation fixtures for this crate's own
 # integration tests. Integration tests link the regular (non-`cfg(test)`)
 # library, so the development-fixture helpers would otherwise be compiled

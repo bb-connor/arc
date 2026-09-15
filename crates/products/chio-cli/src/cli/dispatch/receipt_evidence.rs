@@ -11,6 +11,14 @@ pub(crate) fn dispatch_receipt(
     control_token: Option<String>,
 ) -> Result<(), CliError> {
     match command {
+            ReceiptCommands::Verify { input, trusted_kernel_pubkey } => {
+                crate::receipt_verify::cmd_receipt_verify(&input, &trusted_kernel_pubkey, json_output)
+            },
+            ReceiptCommands::VerifyProcessResponse { response, request, context, trusted_kernel_pubkey } => {
+                crate::process_response_verify::cmd_verify_process_response(
+                    &response, &request, &context, &trusted_kernel_pubkey, json_output,
+                )
+            },
             ReceiptCommands::List {
                 capability,
                 tool_server,

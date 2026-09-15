@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
 import {
   ChioClient,
@@ -291,6 +291,63 @@ describe("chioTool: shape and type preservation", () => {
 // -- chioTool: allow/deny path ---------------------------------------------
 
 describe("chioTool: allow path invokes underlying execute", () => {
+  it.each([
+    "caller_executed",
+    "host_executed_provider_reported",
+    "host_executed_unmediated",
+    "chio_internal",
+  ] as const)("requires verification before executing for receipt origin %s", async (toolOrigin) => {
+    const { fetch } = fakeFetch([{ ...allowReceipt(), tool_origin: toolOrigin }]);
+    const verifyReceipt = vi.fn(trustedReceiptVerifier);
+    const execute = vi.fn(async () => "ok");
+    const wrapped = chioTool({
+      verifyReceipt,
+      parameters: z.object({}),
+      execute,
+      scope: { toolServer: "s", toolName: "t" },
+      clientOptions: { fetch },
+    });
+
+    await expect(wrapped.execute!({})).resolves.toBe("ok");
+    expect(verifyReceipt).toHaveBeenCalledOnce();
+    expect(execute).toHaveBeenCalledOnce();
+    expect(verifyReceipt.mock.invocationCallOrder[0]).toBeLessThan(execute.mock.invocationCallOrder[0]!);
+  });
+
+  it.each(["unknown_origin", null])("rejects invalid receipt origin %s before verification or execution", async (toolOrigin) => {
+    const { fetch } = fakeFetch([{ ...allowReceipt(), tool_origin: toolOrigin }]);
+    const verifyReceipt = vi.fn(trustedReceiptVerifier);
+    const execute = vi.fn(async () => "forbidden");
+    const wrapped = chioTool({
+      verifyReceipt,
+      parameters: z.object({}),
+      execute,
+      scope: { toolServer: "s", toolName: "t" },
+      clientOptions: { fetch },
+    });
+
+    await expect(wrapped.execute!({})).rejects.toBeInstanceOf(ChioToolError);
+    expect(verifyReceipt).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("does not treat internal origin as verification authority", async () => {
+    const { fetch } = fakeFetch([{ ...allowReceipt(), tool_origin: "chio_internal" }]);
+    const execute = vi.fn(async () => "forbidden");
+    const verifyReceipt = vi.fn(() => ({ ...trustedReceiptVerifier(), signer_trusted: false }));
+    const wrapped = chioTool({
+      verifyReceipt,
+      parameters: z.object({}),
+      execute,
+      scope: { toolServer: "s", toolName: "t" },
+      clientOptions: { fetch },
+    });
+
+    await expect(wrapped.execute!({})).rejects.toMatchObject({ verdict: "incomplete" });
+    expect(verifyReceipt).toHaveBeenCalledOnce();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it("delegates to the original execute on allow and returns its value", async () => {
     const { fetch, calls } = fakeFetch([allowReceipt()]);
     const wrapped = chioTool({

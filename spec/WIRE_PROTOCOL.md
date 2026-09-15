@@ -113,6 +113,12 @@ All agent-to-kernel frames are JSON objects with a `type` discriminator.
 | `server_id` | string | Target tool server identifier |
 | `tool` | string | Tool name within the target server |
 | `params` | JSON value | Tool arguments |
+| `governed_intent` | optional `GovernedTransactionIntent` | Governed operation being authorized |
+| `approval_token` | optional `GovernedApprovalToken` | Single approval, exclusive with nonempty `approval_tokens` |
+| `approval_tokens` | optional array of `GovernedApprovalToken` | Collected votes, requiring the exact threshold proposal |
+| `threshold_approval_proposal` | optional `ThresholdApprovalProposal` | Returned proposal, requiring at least one collected vote |
+| `supplemental_authorization` | optional opaque authorization object | Kernel-verified authorization extension |
+| `execution_nonce` | optional `SignedExecutionNonce` | Exact preflight retry token in supported execution-nonce profiles |
 
 #### 2.4.2 KernelMessage
 
@@ -121,7 +127,7 @@ All kernel-to-agent frames are JSON objects with a `type` discriminator.
 | `type` | Required fields | Meaning |
 | --- | --- | --- |
 | `tool_call_chunk` | `id`, `chunk_index`, `data` | Streaming chunk emitted before the final response |
-| `tool_call_response` | `id`, `result`, `receipt` | Terminal result plus signed receipt |
+| `tool_call_response` | `id`, `result`, `receipt` | Execution result, approval wait or failure plus signed receipt |
 | `capability_list` | `capabilities` | Reply to `list_capabilities` |
 | `capability_revoked` | `id` | Notification that a capability identifier is no longer valid |
 | `heartbeat` | none | Liveness reply |
@@ -139,8 +145,9 @@ All kernel-to-agent frames are JSON objects with a `type` discriminator.
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `id` | string | Parent request identifier |
-| `result` | `ToolCallResult` object | Terminal execution status |
+| `result` | `ToolCallResult` object | Execution status or non-terminal approval wait |
 | `receipt` | `ChioReceipt` object | Signed receipt for the evaluated action |
+| `execution_nonce` | optional `SignedExecutionNonce` | Exact retry token for a supported execution preflight; absent for approval waits |
 
 `capability_list` fields:
 
@@ -163,9 +170,30 @@ discriminator.
 | --- | --- | --- |
 | `ok` | `value` | Tool completed and returned a value |
 | `stream_complete` | `total_chunks` | Tool completed after streaming chunks |
+| `pending_approval` | `proposal` | Execution is waiting for approvals of this exact signed threshold proposal |
 | `cancelled` | `reason`, `chunks_received` | Explicit cancellation |
 | `incomplete` | `reason`, `chunks_received` | Non-terminal interruption or upstream truncation |
 | `err` | `error` | Denial or failure |
+
+`pending_approval` is not execution success, a terminal denial, or execution
+authority. Its `proposal` is the complete signed `ThresholdApprovalProposal`
+committed by the receipt's content hash. Senders **MUST** preserve the proposal
+without changing its signed fields, algorithm metadata or signature. The response,
+receipt and proposal request identifiers **MUST** match. A pending response
+**MUST NOT** carry an execution nonce or emit tool-output chunks.
+
+An agent retries the original request, preserving its `id`, capability, server,
+tool, parameters and governed intent, and adding the returned proposal as
+`threshold_approval_proposal` plus its collected `approval_tokens`. It **MUST NOT**
+start a replacement request merely because approval is pending. The kernel
+independently revalidates authority, policy, expiry and votes before dispatch.
+Receiving or parsing a proposal does not authenticate current policy authority;
+collectors and receivers still need their configured trust anchors and original
+authenticated request context.
+
+Peers that do not support `pending_approval` must reject that unknown status;
+they **MUST NOT** reinterpret it as `ok` or retry execution without approvals.
+This addition does not alter the encoding of existing result variants.
 
 #### 2.4.4 ToolCallError
 
@@ -183,10 +211,12 @@ discriminator.
 
 ### 2.5 Signed Artifact Requirements
 
-Two nested signed Chio artifacts appear directly on the native wire:
+Nested signed Chio artifacts appear directly on the native wire, including:
 
 - `CapabilityToken`
 - `ChioReceipt`
+- `ThresholdApprovalProposal` and `GovernedApprovalToken`
+- `SignedExecutionNonce`
 
 Normative requirements:
 

@@ -25,9 +25,18 @@ pub const THRESHOLD_APPROVAL_PROPOSAL_SCHEMA: &str = "chio.threshold-approval-pr
 const THRESHOLD_APPROVAL_PROPOSAL_DIGEST_DOMAIN: &[u8] = b"chio.threshold-approval-proposal.v1\0";
 const VERIFIED_APPROVAL_SET_DIGEST_DOMAIN: &[u8] = b"chio.verified-approval-set.v1\0";
 const GOVERNED_RESPONSE_PLAN_BODY_DIGEST_DOMAIN: &[u8] = b"chio:response-plan:v1\0";
+const MAX_RESPONSE_PLAN_IDENTIFIER_BYTES: usize = 256;
+const MAX_RESPONSE_PLAN_BODY_BYTES: usize = 64 * 1024;
+const MAX_RESPONSE_PLAN_BINDING_BYTES: usize = 16 * 1024;
+const MAX_RESPONSE_PLAN_JSON_DEPTH: usize = 32;
+const MAX_RESPONSE_PLAN_JSON_NODES: usize = 4_096;
+const MAX_RESPONSE_PLAN_EFFECTS: usize = 5;
 
 pub const GOVERNED_RESPONSE_PLAN_SCHEMA: &str = "chio.response-plan.v1";
+pub const CHIO_RESPONSE_PLAN_SCHEMA: &str = GOVERNED_RESPONSE_PLAN_SCHEMA;
 pub const ACTIVE_RESPONSE_SERVER_ID: &str = "chio.control-plane.active-response";
+/// Backward-compatible protocol name used by the enterprise response runtime.
+pub const CHIO_ACTIVE_RESPONSE_SERVER_ID: &str = ACTIVE_RESPONSE_SERVER_ID;
 pub const ACTIVE_RESPONSE_PLAN_TOOL_NAME: &str = "apply_plan";
 
 /// Explicit governed autonomy tier requested for one economically sensitive action.
@@ -778,7 +787,7 @@ impl GovernedResponseEffect {
 }
 
 /// Protocol-owned binding for a governed active-response plan.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct GovernedResponsePlanIntentBody {
     pub plan_schema: String,
@@ -795,8 +804,164 @@ pub struct GovernedResponsePlanIntentBody {
     pub rollback_binding: serde_json::Value,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GovernedResponsePlanIntentBodyWire {
+    plan_schema: String,
+    plan_id: String,
+    operator_capability_id: String,
+    operator_capability_hash: String,
+    operator_capability_expires_at: u64,
+    executor_subject: PublicKey,
+    canonical_plan_body: serde_json::Value,
+    plan_body_hash: String,
+    target_binding: serde_json::Value,
+    ordered_effects: Vec<GovernedResponseEffect>,
+    expires_at: u64,
+    rollback_binding: serde_json::Value,
+}
+
+impl<'de> Deserialize<'de> for GovernedResponsePlanIntentBody {
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error as _;
+
+        let wire = GovernedResponsePlanIntentBodyWire::deserialize(deserializer)?;
+        let body = Self {
+            plan_schema: wire.plan_schema,
+            plan_id: wire.plan_id,
+            operator_capability_id: wire.operator_capability_id,
+            operator_capability_hash: wire.operator_capability_hash,
+            operator_capability_expires_at: wire.operator_capability_expires_at,
+            executor_subject: wire.executor_subject,
+            canonical_plan_body: wire.canonical_plan_body,
+            plan_body_hash: wire.plan_body_hash,
+            target_binding: wire.target_binding,
+            ordered_effects: wire.ordered_effects,
+            expires_at: wire.expires_at,
+            rollback_binding: wire.rollback_binding,
+        };
+        body.validate().map_err(D::Error::custom)?;
+        Ok(body)
+    }
+}
+
 impl GovernedResponsePlanIntentBody {
+    /// Construct and validate a complete governed response-plan projection.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        plan_schema: impl Into<String>,
+        plan_id: impl Into<String>,
+        operator_capability_id: impl Into<String>,
+        operator_capability_hash: impl Into<String>,
+        operator_capability_expires_at: u64,
+        executor_subject: PublicKey,
+        canonical_plan_body: serde_json::Value,
+        plan_body_hash: impl Into<String>,
+        target_binding: serde_json::Value,
+        ordered_effects: Vec<GovernedResponseEffect>,
+        expires_at: u64,
+        rollback_binding: serde_json::Value,
+    ) -> Result<Self> {
+        let body = Self {
+            plan_schema: plan_schema.into(),
+            plan_id: plan_id.into(),
+            operator_capability_id: operator_capability_id.into(),
+            operator_capability_hash: operator_capability_hash.into(),
+            operator_capability_expires_at,
+            executor_subject,
+            canonical_plan_body,
+            plan_body_hash: plan_body_hash.into(),
+            target_binding,
+            ordered_effects,
+            expires_at,
+            rollback_binding,
+        };
+        body.validate()?;
+        Ok(body)
+    }
+
+    /// Domain-separated compatibility name used by active-response validation.
+    pub fn compute_plan_body_digest(
+        canonical_plan_body: &serde_json::Value,
+    ) -> Result<crate::Hash> {
+        crate::Hash::from_hex(&Self::plan_body_hash(canonical_plan_body)?)
+    }
+
+    /// Compatibility alias for the domain-separated canonical plan-body hash.
+    pub fn compute_plan_body_hash(canonical_plan_body: &serde_json::Value) -> Result<String> {
+        Self::plan_body_hash(canonical_plan_body)
+    }
+
+    #[must_use]
+    pub fn plan_schema(&self) -> &str {
+        &self.plan_schema
+    }
+
+    #[must_use]
+    pub fn plan_id(&self) -> &str {
+        &self.plan_id
+    }
+
+    #[must_use]
+    pub fn operator_capability_id(&self) -> &str {
+        &self.operator_capability_id
+    }
+
+    #[must_use]
+    pub fn operator_capability_hash(&self) -> &str {
+        &self.operator_capability_hash
+    }
+
+    #[must_use]
+    pub const fn operator_capability_expires_at(&self) -> u64 {
+        self.operator_capability_expires_at
+    }
+
+    #[must_use]
+    pub fn executor_subject(&self) -> &PublicKey {
+        &self.executor_subject
+    }
+
+    #[must_use]
+    pub fn canonical_plan_body(&self) -> &serde_json::Value {
+        &self.canonical_plan_body
+    }
+
+    #[must_use]
+    pub fn plan_body_hash_value(&self) -> &str {
+        &self.plan_body_hash
+    }
+
+    #[must_use]
+    pub fn target_binding(&self) -> &serde_json::Value {
+        &self.target_binding
+    }
+
+    #[must_use]
+    pub fn ordered_effects(&self) -> &[GovernedResponseEffect] {
+        &self.ordered_effects
+    }
+
+    #[must_use]
+    pub const fn expires_at(&self) -> u64 {
+        self.expires_at
+    }
+
+    #[must_use]
+    pub fn rollback_binding(&self) -> &serde_json::Value {
+        &self.rollback_binding
+    }
+
     pub fn plan_body_hash(canonical_plan_body: &serde_json::Value) -> Result<String> {
+        validate_response_plan_body(canonical_plan_body)?;
+        validate_bounded_response_json(
+            canonical_plan_body,
+            MAX_RESPONSE_PLAN_BODY_BYTES,
+            "canonical plan body",
+        )?;
         let canonical = canonical_json_bytes(canonical_plan_body)?;
         let mut preimage =
             Vec::with_capacity(GOVERNED_RESPONSE_PLAN_BODY_DIGEST_DOMAIN.len() + canonical.len());
@@ -811,19 +976,22 @@ impl GovernedResponsePlanIntentBody {
                 "governed response plan schema is unsupported".into(),
             ));
         }
-        if self.plan_id.is_empty()
-            || self.plan_id.trim() != self.plan_id
-            || self.operator_capability_id.is_empty()
-            || self.operator_capability_id.trim() != self.operator_capability_id
+        validate_response_plan_identifier(&self.plan_id, "plan id")?;
+        validate_response_plan_identifier(&self.operator_capability_id, "operator capability id")?;
+        validate_response_plan_digest(&self.operator_capability_hash, "operator capability hash")?;
+        validate_response_plan_digest(&self.plan_body_hash, "plan body hash")?;
+        if self.ordered_effects.is_empty() || self.ordered_effects.len() > MAX_RESPONSE_PLAN_EFFECTS
         {
             return Err(Error::CanonicalJson(
-                "governed response plan identifiers must be canonical text".into(),
+                "governed response plan must contain between 1 and 5 effects".into(),
             ));
         }
-        if self.ordered_effects.is_empty() || self.ordered_effects.len() > 32 {
-            return Err(Error::CanonicalJson(
-                "governed response plan must contain between 1 and 32 effects".into(),
-            ));
+        for (index, effect) in self.ordered_effects.iter().enumerate() {
+            if self.ordered_effects[..index].contains(effect) {
+                return Err(Error::CanonicalJson(
+                    "governed response plan effects must be unique".into(),
+                ));
+            }
         }
         if self.expires_at == 0
             || self.operator_capability_expires_at == 0
@@ -833,14 +1001,19 @@ impl GovernedResponsePlanIntentBody {
                 "governed response plan expiry exceeds operator capability expiry".into(),
             ));
         }
-        if !self.canonical_plan_body.is_object()
-            || !self.target_binding.is_object()
-            || !self.rollback_binding.is_object()
-        {
-            return Err(Error::CanonicalJson(
-                "governed response plan bindings must be canonical objects".into(),
-            ));
-        }
+        validate_response_plan_body(&self.canonical_plan_body)?;
+        validate_response_plan_binding(&self.target_binding, "target binding")?;
+        validate_bounded_response_json(
+            &self.target_binding,
+            MAX_RESPONSE_PLAN_BINDING_BYTES,
+            "target binding",
+        )?;
+        validate_response_plan_binding(&self.rollback_binding, "rollback binding")?;
+        validate_bounded_response_json(
+            &self.rollback_binding,
+            MAX_RESPONSE_PLAN_BINDING_BYTES,
+            "rollback binding",
+        )?;
         if self.plan_body_hash != Self::plan_body_hash(&self.canonical_plan_body)? {
             return Err(Error::CanonicalJson(
                 "governed response plan body hash does not match its canonical body".into(),
@@ -848,6 +1021,100 @@ impl GovernedResponsePlanIntentBody {
         }
         Ok(())
     }
+}
+
+fn validate_response_plan_identifier(value: &str, label: &str) -> Result<()> {
+    if value.is_empty()
+        || value.len() > MAX_RESPONSE_PLAN_IDENTIFIER_BYTES
+        || value.trim() != value
+        || value.chars().any(char::is_control)
+    {
+        return Err(Error::CanonicalJson(alloc::format!(
+            "governed response plan {label} is not canonical bounded text"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_response_plan_digest(value: &str, label: &str) -> Result<()> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(Error::CanonicalJson(alloc::format!(
+            "governed response plan {label} must be lowercase SHA-256 hex"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_response_plan_body(value: &serde_json::Value) -> Result<()> {
+    let Some(object) = value.as_object() else {
+        return Err(Error::CanonicalJson(
+            "governed response plan body must be an object".into(),
+        ));
+    };
+    if object.is_empty() || object.contains_key("planHash") || object.contains_key("plan_hash") {
+        return Err(Error::CanonicalJson(
+            "governed response plan body is empty or recursively hashed".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_response_plan_binding(value: &serde_json::Value, label: &str) -> Result<()> {
+    if value.as_object().is_none_or(serde_json::Map::is_empty) {
+        return Err(Error::CanonicalJson(alloc::format!(
+            "governed response plan {label} must be a nonempty object"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_bounded_response_json(
+    value: &serde_json::Value,
+    max_bytes: usize,
+    label: &str,
+) -> Result<()> {
+    let mut nodes = 0_usize;
+    validate_response_json_shape(value, 0, &mut nodes, label)?;
+    if canonical_json_bytes(value)?.len() > max_bytes {
+        return Err(Error::CanonicalJson(alloc::format!(
+            "governed response plan {label} exceeds the byte ceiling"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_response_json_shape(
+    value: &serde_json::Value,
+    depth: usize,
+    nodes: &mut usize,
+    label: &str,
+) -> Result<()> {
+    *nodes = nodes.checked_add(1).ok_or_else(|| {
+        Error::CanonicalJson("governed response plan JSON node count overflowed".into())
+    })?;
+    if depth > MAX_RESPONSE_PLAN_JSON_DEPTH || *nodes > MAX_RESPONSE_PLAN_JSON_NODES {
+        return Err(Error::CanonicalJson(alloc::format!(
+            "governed response plan {label} exceeds the JSON shape ceiling"
+        )));
+    }
+    match value {
+        serde_json::Value::Array(values) => {
+            for child in values {
+                validate_response_json_shape(child, depth + 1, nodes, label)?;
+            }
+        }
+        serde_json::Value::Object(values) => {
+            for child in values.values() {
+                validate_response_json_shape(child, depth + 1, nodes, label)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 /// Typed extension carried by a governed transaction intent.
@@ -906,6 +1173,33 @@ pub struct GovernedTransactionIntent {
 }
 
 impl GovernedTransactionIntent {
+    /// Wrap a validated protocol-owned active-response plan.
+    #[must_use]
+    pub fn active_response_plan(body: GovernedResponsePlanIntentBody) -> Self {
+        Self {
+            id: body.plan_id.clone(),
+            server_id: String::from(ACTIVE_RESPONSE_SERVER_ID),
+            tool_name: String::from(ACTIVE_RESPONSE_PLAN_TOOL_NAME),
+            purpose: String::from("execute governed active response"),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: None,
+            body: GovernedTransactionIntentBody::ActiveResponsePlan(Box::new(body)),
+        }
+    }
+
+    #[must_use]
+    pub fn as_active_response_plan(&self) -> Option<&GovernedResponsePlanIntentBody> {
+        match &self.body {
+            GovernedTransactionIntentBody::ActiveResponsePlan(plan) => Some(plan.as_ref()),
+            GovernedTransactionIntentBody::ToolInvocation => None,
+        }
+    }
+
     /// Compute a stable canonical hash for approval-token binding and receipts.
     pub fn binding_hash(&self) -> Result<String> {
         if let GovernedTransactionIntentBody::ActiveResponsePlan(plan) = &self.body {
@@ -1105,6 +1399,11 @@ impl GovernedApprovalToken {
         Ok(sha256_hex(&preimage))
     }
 
+    /// Compatibility name for the canonical signed artifact digest.
+    pub fn token_digest(&self) -> Result<String> {
+        self.artifact_digest()
+    }
+
     /// Verify the signature AND enforce the approval-token validity window in
     /// one pass.
     ///
@@ -1165,6 +1464,46 @@ pub struct ThresholdApprovalProposalBody {
 }
 
 impl ThresholdApprovalProposalBody {
+    #[must_use]
+    pub fn request_id(&self) -> &str {
+        &self.request_id
+    }
+
+    #[must_use]
+    pub fn governed_intent_hash(&self) -> &str {
+        &self.governed_intent_hash
+    }
+
+    #[must_use]
+    pub fn subject(&self) -> &PublicKey {
+        &self.subject
+    }
+
+    #[must_use]
+    pub fn authorization_capability_hash(&self) -> &str {
+        &self.authorizing_capability_digest
+    }
+
+    #[must_use]
+    pub fn policy_hash(&self) -> &str {
+        &self.policy_hash
+    }
+
+    #[must_use]
+    pub const fn required(&self) -> u32 {
+        self.threshold
+    }
+
+    #[must_use]
+    pub fn eligible_set_digest(&self) -> &str {
+        &self.eligible_set_digest
+    }
+
+    #[must_use]
+    pub const fn proposal_created_at(&self) -> u64 {
+        self.proposal_created_at
+    }
+
     pub fn proposal_deadline(
         proposal_created_at: u64,
         timeout_seconds: u64,
@@ -1281,6 +1620,20 @@ impl<'de> Deserialize<'de> for ThresholdApprovalProposal {
 }
 
 impl ThresholdApprovalProposal {
+    #[must_use]
+    pub fn body(&self) -> &ThresholdApprovalProposalBody {
+        &self.body
+    }
+
+    #[must_use]
+    pub fn policy_authority(&self) -> &PublicKey {
+        &self.body.policy_authority
+    }
+
+    pub fn proposal_hash(&self) -> Result<String> {
+        self.artifact_digest()
+    }
+
     pub fn sign(body: ThresholdApprovalProposalBody, keypair: &Keypair) -> Result<Self> {
         body.validate()?;
         ensure_keypair_matches_embedded_key(

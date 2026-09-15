@@ -1123,6 +1123,7 @@ guards:
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let session_roots = vec!["/workspace/project".to_string()];
     let ctx = chio_kernel::GuardContext {
@@ -1132,6 +1133,7 @@ guards:
         server_id: &server_id,
         session_filesystem_roots: Some(session_roots.as_slice()),
         matched_grant_index: None,
+        security_context: None,
     };
 
     let result = pipeline.evaluate(&ctx).test_unwrap();

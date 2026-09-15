@@ -692,6 +692,8 @@ fn release_dispatch_requires_exact_durable_slot_and_verified_commit_identity() -
 
 #[test]
 fn immediate_claim_has_one_winner_and_exact_replay_has_no_permit() -> TestResult {
+    let _runtime =
+        chio_kernel::scope_fixed_runtime_for_current_thread(30, std::iter::empty::<String>());
     let fixture = fixture()?;
     let candidate = candidate()?;
     seed_closing_lifecycle(&fixture, &candidate)?;

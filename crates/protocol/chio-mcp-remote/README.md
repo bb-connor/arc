@@ -24,6 +24,12 @@ admin API.
   JWT, or token introspection), verifying EdDSA/RS256-512/PS256-512/ES256-384
   signatures plus DPoP proof-of-possession, mTLS thumbprint, and runtime
   attestation sender constraints.
+- Bound DPoP replay identity parts before canonicalizing the signed proof and
+  retain sender nonces through the inclusive signed validity horizon, including
+  tolerated future issue time. A local cache TTL cannot shorten that horizon.
+  The shared kernel cache enforces both count and retained-identity byte limits;
+  exhaustion denies rather than evicting a live sender proof. This remains
+  process-local replay protection, not durable DPoP custody.
 - Optionally run a self-issued OAuth 2.0 authorization server
   (`LocalAuthorizationServer`) with PKCE authorization-code and
   token-exchange grants, for deployments without an external identity

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 8ba0a80532a71a901c67466299ea1bfe1de2852479f67791d2ff4b08be726a8c
+# Schema sha256: 3c63e54835ec987b42a61fe8865d0f757cc628bffa531bc98266267703973d8f
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,7 +11,9 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, constr
+from chio_sdk._manifest_wire import SecurityWireModel as BaseModel
+
+from pydantic import ConfigDict, Field, constr
 
 
 class ChioOpaqueSupplementalAuthorization(BaseModel):

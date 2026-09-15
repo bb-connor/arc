@@ -1,12 +1,13 @@
 use super::*;
-use chio_kernel::admission_operation::{
-    AdmissionOperationStoreError, AdmissionOperationV1, AdmissionRecoveryLease,
-};
+use chio_kernel::admission_operation::{AdmissionOperationStoreError, AdmissionOperationV1};
 
-pub(crate) struct AdmissionCaptureBinding<'a> {
+pub(crate) struct AdmissionCaptureBinding<'a, 'l> {
     pub(crate) operation: &'a AdmissionOperationV1,
-    pub(crate) recovery_lease: &'a AdmissionRecoveryLease,
+    pub(crate) recovery: crate::admission_operation_store::RecoveryAuthority<'a, 'l>,
     pub(crate) trusted_now_unix_ms: u64,
+    pub(crate) caller_context:
+        Option<&'a chio_kernel::admission_operation::AdmissionCallerDispatchContextV1>,
+    pub(crate) native: Option<crate::admission_operation_store::NativeCaptureBinding<'a>>,
 }
 
 impl SqliteBudgetStore {
@@ -21,7 +22,7 @@ impl SqliteBudgetStore {
     pub(crate) fn capture_composite_invocation_and_commit_dispatch(
         &self,
         request: BudgetCaptureInvocationRequest,
-        binding: AdmissionCaptureBinding<'_>,
+        binding: AdmissionCaptureBinding<'_, '_>,
     ) -> Result<(BudgetInvocationCaptureDecision, AdmissionOperationV1), BudgetStoreError> {
         let (decision, operation) =
             self.capture_composite_invocation_inner(request, Some(binding))?;
@@ -36,7 +37,7 @@ impl SqliteBudgetStore {
     fn capture_composite_invocation_inner(
         &self,
         request: BudgetCaptureInvocationRequest,
-        admission: Option<AdmissionCaptureBinding<'_>>,
+        admission: Option<AdmissionCaptureBinding<'_, '_>>,
     ) -> Result<
         (
             BudgetInvocationCaptureDecision,
@@ -59,6 +60,62 @@ impl SqliteBudgetStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
         self.validate_joint_authority(request.authority.as_ref())?;
+        super::super::preflight::reject_preflight_capture(&transaction, &request.hold_id)?;
+        let native = admission
+            .as_ref()
+            .and_then(|binding| binding.native.as_ref())
+            .map(|input| {
+                let owner = self.serving_owner.as_deref().ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "native capture requires a physical serving owner".into(),
+                    )
+                })?;
+                crate::admission_operation_store::VerifiedNativeCapture::verify(
+                    &transaction,
+                    owner,
+                    input,
+                    request.grant_index,
+                )
+                .map_err(|error| map_admission_error(self, error))
+            })
+            .transpose()?;
+        if self.serving_owner.is_some() {
+            let expected = admission.as_ref().map(|binding| binding.operation);
+            if let Some(native) = native.as_ref() {
+                crate::admission_operation_store::verify_native_dispatch_capture_owner_tx(
+                    &transaction,
+                    &request.hold_id,
+                    expected,
+                    Some(native),
+                )
+            } else {
+                crate::admission_operation_store::verify_dispatch_capture_owner_tx(
+                    &transaction,
+                    &request.hold_id,
+                    expected,
+                )
+            }
+            .map_err(|error| map_admission_error(self, error))?;
+        }
+        if let Some(binding) = admission.as_ref() {
+            crate::admission_operation_store::verify_runtime_budget_selection_tx(
+                &transaction,
+                binding.operation,
+                request.grant_index,
+                chio_kernel::admission_operation::runtime_participant::RuntimeParticipantPhase::Dispatch,
+            ).map_err(|error| map_admission_error(self, error))?;
+            crate::admission_operation_store::verify_approval_budget_selection_tx(
+                &transaction, binding.operation, request.grant_index,
+                chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalClaimPhase::Dispatch,
+            ).map_err(|error| map_admission_error(self, error))?;
+            crate::admission_operation_store::verify_dpop_budget_selection_tx(
+                &transaction,
+                binding.operation,
+                request.grant_index,
+                chio_kernel::admission_operation::dpop_claim::DpopReplayClaimPhase::Dispatch,
+            )
+            .map_err(|error| map_admission_error(self, error))?;
+        }
         if let Some(decision) = replay_transition(
             self,
             &transaction,
@@ -81,19 +138,31 @@ impl SqliteBudgetStore {
                         &request.event_id,
                         capture_commit_index(&decision)?,
                     )?;
+                    let owner = self.serving_owner.as_deref().ok_or_else(|| {
+                        BudgetStoreError::Invariant(
+                            "combined admission capture requires a serving owner".to_owned(),
+                        )
+                    })?;
+                    let recovery_lease =
+                        crate::admission_operation_store::resolve_recovery_authority(
+                            &transaction,
+                            owner,
+                            binding.recovery,
+                            binding.trusted_now_unix_ms,
+                        )
+                        .map_err(|error| map_admission_error(self, error))?;
                     Some(
                         crate::admission_operation_store::advance_budget_capture_tx(
                             &transaction,
-                            self.serving_owner.as_deref().ok_or_else(|| {
-                                BudgetStoreError::Invariant(
-                                    "combined admission capture requires a serving owner"
-                                        .to_owned(),
-                                )
-                            })?,
-                            binding.operation,
-                            binding.recovery_lease,
-                            &participant_digest,
-                            binding.trusted_now_unix_ms,
+                            owner,
+                            crate::admission_operation_store::BudgetCaptureAdvance {
+                                expected: binding.operation,
+                                recovery_lease: &recovery_lease,
+                                participant_digest: &participant_digest,
+                                trusted_now_unix_ms: binding.trusted_now_unix_ms,
+                                caller_context: binding.caller_context,
+                                native: native.as_ref(),
+                            },
                         )
                         .map_err(|error| map_admission_error(self, error))?,
                     )
@@ -108,7 +177,23 @@ impl SqliteBudgetStore {
             }
             return Ok((decision, operation));
         }
+        if let Some(binding) = admission.as_ref() {
+            crate::admission_operation_store::verify_fresh_dpop_tx(
+                &transaction,
+                binding.operation,
+                binding.trusted_now_unix_ms,
+            )
+            .map_err(|error| map_admission_error(self, error))?;
+        }
 
+        if let Some(binding) = admission.as_ref() {
+            crate::admission_operation_store::verify_fresh_approval_tx(
+                &transaction,
+                binding.operation,
+                binding.trusted_now_unix_ms,
+            )
+            .map_err(|error| map_admission_error(self, error))?;
+        }
         let hold = load_structured_hold(&transaction, &request.hold_id)?.ok_or_else(|| {
             BudgetStoreError::Invariant(format!(
                 "unknown composite budget hold `{}`",
@@ -338,25 +423,58 @@ impl SqliteBudgetStore {
             Some(binding) => {
                 let participant_digest =
                     budget_projection_digest(&transaction, &request.event_id, event_seq)?;
+                let owner = self.serving_owner.as_deref().ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "combined admission capture requires a serving owner".to_owned(),
+                    )
+                })?;
+                let recovery_lease = crate::admission_operation_store::resolve_recovery_authority(
+                    &transaction,
+                    owner,
+                    binding.recovery,
+                    binding.trusted_now_unix_ms,
+                )
+                .map_err(|error| map_admission_error(self, error))?;
                 Some(
                     crate::admission_operation_store::advance_budget_capture_tx(
                         &transaction,
-                        self.serving_owner.as_deref().ok_or_else(|| {
-                            BudgetStoreError::Invariant(
-                                "combined admission capture requires a serving owner".to_owned(),
-                            )
-                        })?,
-                        binding.operation,
-                        binding.recovery_lease,
-                        &participant_digest,
-                        binding.trusted_now_unix_ms,
+                        owner,
+                        crate::admission_operation_store::BudgetCaptureAdvance {
+                            expected: binding.operation,
+                            recovery_lease: &recovery_lease,
+                            participant_digest: &participant_digest,
+                            trusted_now_unix_ms: binding.trusted_now_unix_ms,
+                            caller_context: binding.caller_context,
+                            native: native.as_ref(),
+                        },
                     )
                     .map_err(|error| map_admission_error(self, error))?,
                 )
             }
             None => None,
         };
+        #[cfg(feature = "admission-test-support")]
+        let native_capture = native.is_some();
+        if let Some(native) = native {
+            native
+                .verify_deadline(&transaction)
+                .map_err(|error| map_admission_error(self, error))?;
+        }
+        #[cfg(feature = "admission-test-support")]
+        if native_capture {
+            crate::admission_operation_store::reach_native_capture_transaction_cutpoint(
+                &transaction,
+                crate::admission_operation_store::NativeDispatchCaptureTransactionTestCutpoint::BeforeCommit,
+            )?;
+        }
         self.commit_joint_transaction(transaction)?;
+        #[cfg(feature = "admission-test-support")]
+        if native_capture {
+            crate::admission_operation_store::reach_native_capture_transaction_cutpoint(
+                &connection,
+                crate::admission_operation_store::NativeDispatchCaptureTransactionTestCutpoint::CommittedBeforeAnchor,
+            )?;
+        }
         self.sync_joint_anchor(&connection)?;
         Ok((
             BudgetInvocationCaptureDecision::Captured(decision),

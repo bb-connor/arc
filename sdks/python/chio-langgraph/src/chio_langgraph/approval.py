@@ -129,6 +129,7 @@ def chio_approval_node(
     config.node_scopes.setdefault(node_name, scope)
 
     if approval_policy is None:
+
         async def _default_policy(_state: Any, _rc: Any) -> bool:
             return True
 
@@ -136,9 +137,7 @@ def chio_approval_node(
 
     default_summary = summary or f"Approve execution of node '{node_name}'"
     effective_redaction_policy: RedactionPolicy = (
-        redaction_policy
-        if redaction_policy is not None
-        else RedactionPolicy.chio_default()
+        redaction_policy if redaction_policy is not None else RedactionPolicy.chio_default()
     )
 
     async def _dispatch(state: Any, runtime_config: Any) -> Any:
@@ -275,9 +274,7 @@ def chio_approval_node(
 
     if asyncio.iscoroutinefunction(fn):
 
-        async def async_wrapper(
-            state: Any, runtime_config: Any = None
-        ) -> Any:
+        async def async_wrapper(state: Any, runtime_config: Any = None) -> Any:
             return await _dispatch(state, runtime_config)
 
         _copy_metadata(fn, async_wrapper, node_name)
@@ -312,7 +309,7 @@ def _load_interrupt() -> _InterruptFn:
 
 def _approval_id_from_receipt(receipt: ChioReceipt) -> str | None:
     """Scan guard evidence for a kernel-attached approval id."""
-    for ev in receipt.evidence:
+    for ev in receipt.evidence or ():
         details = getattr(ev, "details", None)
         if isinstance(details, str) and details.startswith("approval_id="):
             return details.split("=", 1)[1]
@@ -340,9 +337,7 @@ def _resolve_capability_id(
     return None
 
 
-def _normalise_resolution(
-    resume_value: Any, approval_id: str
-) -> ApprovalResolution:
+def _normalise_resolution(resume_value: Any, approval_id: str) -> ApprovalResolution:
     """Coerce dict / str / bool / ApprovalResolution into :class:`ApprovalResolution`."""
     if isinstance(resume_value, ApprovalResolution):
         if resume_value.approval_id is None:
@@ -362,9 +357,7 @@ def _normalise_resolution(
             )
         return ApprovalResolution(
             outcome=outcome,
-            approval_id=str(
-                resume_value.get("approval_id") or approval_id
-            ),
+            approval_id=str(resume_value.get("approval_id") or approval_id),
             reason=_as_optional_str(resume_value.get("reason")),
             approver=_as_optional_str(resume_value.get("approver")),
             metadata=dict(resume_value.get("metadata") or {}),
@@ -397,9 +390,7 @@ def _as_optional_str(value: Any) -> str | None:
     return str(value)
 
 
-async def _invoke_body(
-    fn: Callable[..., Any], state: Any, runtime_config: Any
-) -> Any:
+async def _invoke_body(fn: Callable[..., Any], state: Any, runtime_config: Any) -> Any:
     import inspect as _inspect
 
     sig = _inspect.signature(fn)

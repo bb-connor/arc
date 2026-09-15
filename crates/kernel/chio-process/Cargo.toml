@@ -1,0 +1,46 @@
+[package]
+name = "chio-process"
+description = "Durable capability-bound agent processes over the Chio kernel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+default = []
+worker-server = ["dep:tokio", "dep:rand", "dep:hex", "dep:base64"]
+mailboxes = ["dep:async-trait", "dep:chio-manifest"]
+
+[dependencies]
+chio-core-types = { workspace = true }
+chio-kernel = { workspace = true }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+tokio = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
+hex = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
+async-trait = { workspace = true, optional = true }
+chio-manifest = { workspace = true, optional = true }
+
+[dev-dependencies]
+async-trait = { workspace = true }
+chio-store-sqlite = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+
+[lints]
+workspace = true
+
+[[example]]
+name = "polyglot_swarm"
+required-features = ["worker-server"]
+
+[[example]]
+name = "langgraph_report"
+required-features = ["worker-server"]

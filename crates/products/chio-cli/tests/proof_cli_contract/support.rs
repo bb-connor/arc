@@ -193,6 +193,8 @@ pub(crate) fn chio(args: &[&str]) -> std::process::Output {
 
 pub(crate) fn chio_command() -> std::process::Command {
     let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_chio"));
+    // Tests own this checkout even when Cargo puts the CLI in an external target directory.
+    command.env("CHIO_CHECKOUT_ROOT", workspace_root());
     let (verifier_now, max_age_seconds) = standard_webhooks_clock_env();
     set_envs(
         &mut command,

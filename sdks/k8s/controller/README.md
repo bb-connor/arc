@@ -59,7 +59,7 @@ converges without additional sidecar calls.
 | `--leader-elect`             | `false`                                                   | Enable leader election.             |
 | `--leader-election-namespace`| `chio-system`                                              | Namespace for the leader lease.     |
 | `--chio-sidecar-url`          | `http://chio-sidecar.chio-system.svc.cluster.local:9090`    | Chio sidecar base URL.               |
-| `--chio-sidecar-control-token`| `""`                                                     | Bearer token for remote sidecar control APIs; required for non-loopback sidecars. |
+| `--chio-sidecar-control-token`| `""`                                                     | Required bearer token for sidecar control APIs, including loopback sidecars. |
 | `--chio-request-timeout`      | `10s`                                                     | HTTP timeout for sidecar calls.     |
 | `--max-concurrent-reconciles`| `4`                                                       | Parallelism.                        |
 
@@ -67,8 +67,9 @@ The sidecar URL can also be provided via the `CHIO_SIDECAR_URL` environment
 variable. The control token can be provided via
 `CHIO_SIDECAR_CONTROL_TOKEN`.
 
-If `CHIO_SIDECAR_URL` points at a non-loopback sidecar service, configure the
-same `CHIO_SIDECAR_CONTROL_TOKEN` on both the controller and the sidecar. The
+Configure the same dedicated `CHIO_SIDECAR_CONTROL_TOKEN` on both the controller
+and the sidecar, including when they communicate over loopback. An absent or
+blank token disables sidecar control access. Do not expose it to agents. The
 shipped `config/manager/manager.yaml` requires that token via the
 `chio-sidecar-control` Secret.
 

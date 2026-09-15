@@ -1,0 +1,183 @@
+import base64
+import hashlib
+import json
+import socket
+import tempfile
+import threading
+import unittest
+from pathlib import Path
+
+from chio_process import MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, PROTOCOL, ProcessClient, WorkerError
+
+
+class ClientTests(unittest.TestCase):
+    def exchange(self, payload, operation):
+        requests = []
+        with tempfile.TemporaryDirectory(prefix="chio-py-") as directory:
+            path = str(Path(directory) / "s")
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as listener:
+                listener.bind(path)
+                listener.listen(1)
+                listener.settimeout(3)
+
+                def serve():
+                    with listener.accept()[0] as stream:
+                        data = bytearray()
+                        while b"\n" not in data:
+                            chunk = stream.recv(8192)
+                            if not chunk:
+                                return
+                            data.extend(chunk)
+                        requests.append(json.loads(data))
+                        try:
+                            stream.sendall(payload)
+                        except BrokenPipeError:
+                            pass
+
+                thread = threading.Thread(target=serve, daemon=True)
+                thread.start()
+                try:
+                    operation(ProcessClient(path, "test-secret", timeout=1))
+                finally:
+                    thread.join(timeout=3)
+                self.assertFalse(thread.is_alive())
+        self.assertEqual(len(requests), 1)
+        return requests[0]
+
+    def test_preserves_signed_json_and_large_decimal_revision(self):
+        receipt = '{"counter":18446744073709551615,"text":"λ"}'
+        payload = (
+            json.dumps(
+                {
+                    "protocol": PROTOCOL,
+                    "ok": True,
+                    "result": {
+                        "receipt_json": receipt,
+                        "revision": "9007199254740994",
+                    },
+                },
+                ensure_ascii=False,
+            )
+            + "\n"
+        ).encode()
+
+        def run(client):
+            self.assertNotIn("test-secret", repr(client))
+            result = client.checkpoint("9007199254740993", {})
+            self.assertEqual(result["receipt_json"], receipt)
+            self.assertEqual(result["revision"], "9007199254740994")
+
+        request = self.exchange(payload, run)
+        self.assertEqual(request["operation"]["expected_revision"], "9007199254740993")
+
+    def test_invalid_response_and_oversized_response_fail_without_retry(self):
+        for payload, code in [
+            (b'{"protocol":"other","ok":true,"result":{}}\n', "invalid_response"),
+            (b'{"protocol":"chio.process.v1","ok":true}\n', "invalid_response"),
+            (b"\xff\n", "invalid_response"),
+            (b'{"protocol":', "truncated_response"),
+            (b"x" * (MAX_RESPONSE_BYTES + 1), "response_too_large"),
+            (
+                b'{"protocol":"chio.process.v1","ok":false,"error":{"code":"unauthenticated"}}\n',
+                "unauthenticated",
+            ),
+        ]:
+            with self.subTest(code=code):
+
+                def run(client, expected_code=code):
+                    with self.assertRaises(WorkerError) as caught:
+                        client.invoke("publish", "tools", "append", {})
+                    self.assertEqual(caught.exception.code, expected_code)
+
+                self.exchange(payload, run)
+
+    def test_blob_binary_roundtrip_and_corrupt_response(self):
+        data = bytes([0, 255, 128])
+        sha256 = hashlib.sha256(data).hexdigest()
+        reference = {"sha256": sha256, "bytes": len(data)}
+
+        def payload(result):
+            return (
+                json.dumps({"protocol": PROTOCOL, "ok": True, "result": result}) + "\n"
+            ).encode()
+
+        request = self.exchange(
+            payload(reference), lambda client: self.assertEqual(client.put_blob(data), reference)
+        )
+        self.assertEqual(request["operation"]["data_base64"], base64.b64encode(data).decode())
+        self.exchange(
+            payload({**reference, "data_base64": "AP+A"}),
+            lambda client: self.assertEqual(client.read_blob(sha256), data),
+        )
+        for encoded in ("AP+A\n", "AP+B", "AP+A="):
+
+            def rejected(client):
+                with self.assertRaises(WorkerError) as caught:
+                    client.read_blob(sha256)
+                self.assertEqual(caught.exception.code, "invalid_response")
+
+            self.exchange(payload({**reference, "data_base64": encoded}), rejected)
+        client = ProcessClient("/absent", "secret")
+        with self.assertRaises(ValueError):
+            client.put_blob(bytes(1_048_577))
+        with self.assertRaises(ValueError):
+            client.read_blob("A" * 64)
+
+    def test_nonfinite_input_fails_before_connecting(self):
+        client = ProcessClient("/absent", "test-secret")
+        for number in [float("nan"), float("inf")]:
+            with self.assertRaises(ValueError):
+                client.invoke("one", "tools", "read", {"value": number})
+
+    def test_governed_intent_is_preserved_without_automatic_fallback(self):
+        intent = {
+            "id": "task-read", "server_id": "tools", "tool_name": "read",
+            "purpose": "read task λ", "context": {"chioSwarm": {"taskId": "task-1"}},
+        }
+        original = json.loads(json.dumps(intent))
+        rejected = b'{"protocol":"chio.process.v1","ok":false,"error":{"code":"invalid_request"}}\n'
+
+        def run(client):
+            with self.assertRaises(WorkerError) as caught:
+                client.invoke("one", "tools", "read", {}, governed_intent=intent)
+            self.assertEqual(caught.exception.code, "invalid_request")
+
+        request = self.exchange(rejected, run)
+        self.assertEqual(request["operation"]["governed_intent"], original)
+        self.assertEqual(intent, original)
+        accepted = b'{"protocol":"chio.process.v1","ok":true,"result":{}}\n'
+        request = self.exchange(accepted, lambda c: c.invoke("one", "tools", "read", {}))
+        self.assertNotIn("governed_intent", request["operation"])
+
+    def test_invalid_governed_intent_fails_before_connecting(self):
+        client = ProcessClient("/absent", "test-secret")
+        for value in (False, 1, "intent", [], {"context": float("nan")}):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                client.invoke("one", "tools", "read", {}, governed_intent=value)
+        with self.assertRaises(WorkerError) as caught:
+            client.invoke("one", "tools", "read", {},
+                          governed_intent={"context": "x" * MAX_REQUEST_BYTES})
+        self.assertEqual(caught.exception.code, "request_too_large")
+
+    def test_strict_recovery_wire_option_never_falls_back_after_rejection(self):
+        rejected = b'{"protocol":"chio.process.v1","ok":false,"error":{"code":"invalid_request"}}\n'
+
+        def invoke(client):
+            with self.assertRaises(WorkerError) as caught:
+                client.invoke("turn-1", "model", "model_infer", {}, known_outcome_only=True)
+            self.assertEqual(caught.exception.code, "invalid_request")
+
+        request = self.exchange(rejected, invoke)
+        self.assertIs(request["operation"]["known_outcome_only"], True)
+        accepted = b'{"protocol":"chio.process.v1","ok":true,"result":{}}\n'
+        request = self.exchange(accepted, lambda c: c.invoke("one", "tools", "read", {}))
+        self.assertNotIn("known_outcome_only", request["operation"])
+        for value in (1, "true", None):
+            with self.assertRaises(ValueError):
+                ProcessClient("/absent", "secret").invoke(
+                    "one", "tools", "read", {}, known_outcome_only=value
+                )
+
+
+if __name__ == "__main__":
+    unittest.main()

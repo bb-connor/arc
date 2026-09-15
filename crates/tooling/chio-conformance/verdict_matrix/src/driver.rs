@@ -492,6 +492,7 @@ fn evaluate_scenario(scenario: &VerdictScenario) -> Result<VerdictTuple, String>
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     if scenario.category == ScenarioCategory::Replay {

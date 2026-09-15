@@ -268,6 +268,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         (request, scope, agent_id, server_id)
     }
@@ -318,6 +319,7 @@ mod tests {
             server_id: &allowed_server,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
         guard
             .revalidate_before_dispatch(&allowed_context)
@@ -332,6 +334,7 @@ mod tests {
             server_id: &blocked_server,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
         let error = guard
             .revalidate_before_dispatch(&blocked_context)

@@ -892,6 +892,7 @@ mod tests {
                 let action_hash = request_action_hash(&unsigned).unwrap_or_default();
                 let proof = DpopProof::sign(
                     DpopProofBody {
+                        replay_authority: None,
                         schema: DPOP_SCHEMA.to_owned(),
                         capability_id: capability.id.clone(),
                         tool_server: audience,

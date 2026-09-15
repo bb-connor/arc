@@ -132,6 +132,26 @@ fn hosted_mcp_accepts_static_bearer_and_rejects_invalid_token() {
     let session = server.initialize_session();
     assert!(!session.id.is_empty());
 
+    assert_ne!(server.token, server.admin_token);
+    assert_eq!(
+        server.get_admin_session_trust(&session.id).status(),
+        reqwest::StatusCode::OK,
+    );
+    assert_eq!(
+        server
+            .get_admin_session_trust_with_token(&server.token, &session.id)
+            .status(),
+        reqwest::StatusCode::UNAUTHORIZED,
+    );
+    let admin_as_session = server.post_raw(
+        Some(&server.admin_token),
+        None,
+        "application/json, text/event-stream",
+        "application/json",
+        &initialize_request(8),
+    );
+    assert_eq!(admin_as_session.status(), reqwest::StatusCode::UNAUTHORIZED);
+
     let invalid = server.post_raw(
         Some("wrong-token"),
         None,

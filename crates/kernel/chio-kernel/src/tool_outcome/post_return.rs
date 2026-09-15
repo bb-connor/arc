@@ -753,7 +753,10 @@ impl PostReturnEvaluationRecordV1 {
         domain_digest("chio.post-return-step-results.v1", &self.step_results)
     }
 
-    pub(crate) fn record_next_pure_result(
+    /// Record the next result only when the frozen plan declares that step
+    /// pure. The checked transition preserves the exact input dependency and
+    /// cannot stand in for an external stateful result.
+    pub fn record_next_pure_result(
         &self,
         result_digest: AdmissionDigest,
     ) -> Result<Self, ToolOutcomeError> {

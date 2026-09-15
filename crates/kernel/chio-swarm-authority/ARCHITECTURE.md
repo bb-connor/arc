@@ -11,11 +11,13 @@ caller-supplied trusted witness key set (`chio_core_types::crypto::PublicKey`).
 
 It sits under `crates/kernel` because both of its consumers are
 admission-adjacent rather than protocol-transport code: `chio-runtime-core`
-calls `verify_swarm_authority_bundle` from a trusted pre-dispatch admission
-hook, and `chio-proof-room` calls the same function from an untrusted-input,
-post-hoc public proof path. Both call sites get identical acceptance criteria
-because they call the same function against the same bundle shape, so the
-workspace has one definition of delegation authority rather than two.
+calls `verify_swarm_authority_for_admission` from a trusted pre-dispatch hook,
+and `chio-proof-room` calls `verify_swarm_authority_bundle` from an untrusted-input,
+post-hoc public proof path. Both entry points share the authority checks against
+the same bundle shape. Runtime admission additionally binds the
+selected task to the exact request capability and scope, checks route metadata,
+and handles continuation reservations. Offline bundle validity alone is not
+evidence that a live tool call used the capability attested by its task witness.
 
 ## Module map
 
@@ -44,7 +46,9 @@ produced:
    budget pool, then the revocation epoch, each individually
    signature-checked and issuer-pinned.
 5. Validate terminal graph receipts against the task/route/join/budget
-   indexes built above.
+   indexes built above. Live admission may omit future join and terminal
+   receipts. A continuation selecting a join still requires that join, and
+   supplying any terminal receipt requires the complete graph join set.
 6. Validate continuation tokens against the task graph's canonical sha256,
    witness chains, routes, budget allocations, and the revocation epoch.
 7. Validate witness chains cover every task-graph edge exactly once, with
@@ -74,8 +78,9 @@ produced:
 - Route-plan receipts must pin `selected_route`, `protocol_target`, and
   `egress_contract_id` to the same `bridge_id` prefix, and carry exactly one
   `egress_constraints` entry: `"deny-private-network"`.
-- Terminal graph receipts are mandatory (an empty `terminal_receipts` list
-  rejects). Their `completed_task_ids` / `join_receipt_ids` /
+- Terminal graph receipts are mandatory for complete-artifact verification.
+  Admission may omit them and then reports no terminal-evidence claim. Any
+  supplied terminal receipt must still validate. Its `completed_task_ids` / `join_receipt_ids` /
   `route_plan_receipt_ids` must equal the graph's full task/join/route sets
   exactly (set equality, not containment); `terminal_task_ids` only needs to
   reference known tasks.

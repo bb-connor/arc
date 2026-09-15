@@ -512,6 +512,7 @@ def classify(path: str) -> str:
         return "examples"
     if (
         path.startswith("tests/")
+        or path.startswith("fuzz/corpus/")
         or "/src/test/" in f"/{path}/"
         or "/tests/" in f"/{path}/"
         or name == "tests.rs"

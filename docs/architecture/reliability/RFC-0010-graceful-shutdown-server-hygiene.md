@@ -680,8 +680,8 @@ The drain work of F61 is only reachable if the supervisor allows a grace window,
 this RFC ships two new reference units and hardens the existing relay unit for the
 drain, cross-referencing RFC-0004 for the memory and overcommit directives.
 
-- New `docs/release/systemd/chio-trust-control.service` and
-  `docs/release/systemd/chio-mcp-edge.service`, each with:
+- New `chio-trust-control.service` and `chio-mcp-edge.service` reference
+  units (now maintained under `deploy/reference-runtime/systemd/`), each with:
   - `Type=simple`, dedicated `User`/`Group`, `StateDirectory`,
     `ConfigurationDirectory`, and the same `NoNewPrivileges` / `ProtectSystem=strict`
     sandboxing as the relay unit.
@@ -717,7 +717,7 @@ source changes to signed payloads.
 | `ChioKernel::flush_receipt_writes_with_timeout` passthrough (public, delegates to `with_receipt_store`) | `chio-kernel/src/kernel/construction.rs` | ~15 |
 | Six serve-site rewires (MCP edge also gains the session-ledger flush hook) | init.rs, http_service.rs, state.rs, service.rs, server.rs, serve.rs | ~30 each, ~180 |
 | Trust-control hygiene config wiring | `service_runtime/init.rs`, `config_and_public.rs` | ~40 |
-| Systemd units + runbook | `docs/release/systemd/*.service`, relay unit, OPERATIONS_RUNBOOK.md | ~120 |
+| Systemd units + runbook | `deploy/reference-runtime/systemd/*.service`, relay unit, OPERATIONS_RUNBOOK.md | ~120 |
 
 CI tiers: the crate's unit and property tests run on the PR gate; the loom test on
 the watch/drain ordering runs nightly; the SIGTERM soak and the drain-under-load
