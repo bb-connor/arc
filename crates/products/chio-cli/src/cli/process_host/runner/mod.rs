@@ -57,6 +57,25 @@ pub(super) fn cleanup_socket_for_export(db: &rusqlite::Connection) -> Result<(),
     socket::cleanup_for_export(db)
 }
 
+/// Read completion from the bound journal while the caller owns the stopped host.
+pub(super) fn completed_snapshot(host: &Host, path: &Path) -> Result<serde_json::Value, CliError> {
+    if !host.lease.directory.path().join("runner.db").is_file() {
+        return Err(error("a completed worker journal is required"));
+    }
+    let plan: Plan = read_json(path)?;
+    plan.validate(host)?;
+    let journal = Journal::open(host, &plan)?;
+    let snapshots = journal.snapshots()?;
+    if !journal.completion()?.complete
+        || snapshots.iter().any(|worker| worker.state != "completed")
+        || !journal.containers()?.is_empty()
+        || journal.abandoned_socket_intents()? != 0
+    {
+        return Err(error("workers or retained cleanup custody are incomplete"));
+    }
+    Ok(serde_json::json!({"plan": plan, "workers": snapshots}))
+}
+
 pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
     let plan: Plan = read_json(plan)?;
     let host = Host::open(state, true)?;

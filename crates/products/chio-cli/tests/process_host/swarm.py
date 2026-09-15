@@ -148,6 +148,19 @@ capabilities:
 
     if supervisor_only:
         assert effects() == []
+        absent = directory / "premature-completion.json"
+        refused = cli(
+            "attest-run",
+            "--state",
+            state,
+            "--plan",
+            plan,
+            "--out",
+            absent,
+            success=False,
+        )
+        assert "completed worker journal" in refused, refused
+        assert not absent.exists()
         first_run = supervise(binary, state, directory / "verified-run", worker_image)
         assert sorted(row[0] for row in effects()) == ["alice", "bob"], effects()
         # Reopening the completed runner cannot add an effect or replace receipts.

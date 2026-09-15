@@ -18,6 +18,9 @@ mod provision;
 #[cfg(unix)]
 #[path = "process_host/relocation.rs"]
 mod relocation;
+#[cfg(unix)]
+#[path = "process_host/run_evidence.rs"]
+mod run_evidence;
 #[cfg(target_os = "linux")]
 #[path = "process_host/runner/mod.rs"]
 mod runner;
@@ -33,6 +36,24 @@ mod swarm;
 
 #[derive(Subcommand)]
 pub(crate) enum ProcessCommands {
+    /// Attest completed fixed fan-out results and the retained aggregate usage (Linux).
+    AttestRun {
+        #[arg(long)]
+        state: PathBuf,
+        #[arg(long)]
+        plan: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Independently verify completed fan-out evidence against operator pins.
+    VerifyRun {
+        #[arg(long)]
+        artifact: PathBuf,
+        #[arg(long)]
+        trusted_kernel_pubkey: PathBuf,
+        #[arg(long)]
+        runtime_id: String,
+    },
     /// Read retained application state without launching tools or issuing credentials.
     State {
         #[arg(long)]
@@ -127,6 +148,22 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
     #[cfg(unix)]
     {
         match command {
+            ProcessCommands::AttestRun { state, plan, out } => {
+                #[cfg(target_os = "linux")]
+                {
+                    run_evidence::export(&state, &plan, &out)
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    let _ = (state, plan, out);
+                    Err(state::error("worker run attestation requires Linux"))
+                }
+            }
+            ProcessCommands::VerifyRun {
+                artifact,
+                trusted_kernel_pubkey,
+                runtime_id,
+            } => run_evidence::verify_file(&artifact, &trusted_kernel_pubkey, &runtime_id),
             ProcessCommands::State {
                 state,
                 process,

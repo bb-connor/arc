@@ -188,3 +188,30 @@ accounting/confinement artifact and designated-runner acceptance remain open.
 The process host still refuses manifests requiring an information-flow runtime
 until that profile is installed. No Disabled fallback is provided for native
 tools in this governed profile.
+
+## Export a completed fan-out observation
+
+After the supervised workers complete, export the retained result and verify it
+using a kernel key and runtime ID copied from the operator's initialized state:
+
+```sh
+chio process attest-run --state "$PWD/run-state" \
+  --plan "$PWD/run-state/reference-run-plan.json" --out "$PWD/completed-run.json"
+chio process verify-run --artifact "$PWD/completed-run.json" \
+  --trusted-kernel-pubkey "$PWD/run-state/authority.db.kernel.pub" \
+  --runtime-id "$INITIALIZED_RUNTIME_ID"
+```
+
+Export requires Linux, the retained completed worker journal, all successful
+worker receipts, no outstanding container/socket cleanup, and the original
+signed authority. It reads the existing aggregate quota and signs a completed
+observation. It neither dispatches another tool call nor creates new admission
+authority. The verifier binds actual capability bodies, graph/witness references,
+worker request/result receipts, join parents and terminal result digests.
+
+The budget pool in this artifact remains the original allocation authority.
+`aggregate` separately records captured and reserved invocation counts from the
+host's authoritative store. Verification checks this signed observation against
+the issued family limit. Complete custody history, native confinement receipt
+linkage, execution nonces, and the full M5 scenario matrix are still excluded;
+the verifier reports these limits and `m5_acceptance_complete: false`.

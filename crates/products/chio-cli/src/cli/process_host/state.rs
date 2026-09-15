@@ -451,6 +451,8 @@ pub(super) struct Host {
     pub runtime: ProcessRuntime,
     pub kernel: Arc<ChioKernel>,
     #[cfg(target_os = "linux")]
+    pub authority: DurableAdmissionRuntime,
+    #[cfg(target_os = "linux")]
     pub lifecycle: Option<Arc<super::lifecycle::Service>>,
 }
 
@@ -523,6 +525,8 @@ impl Host {
             record,
             runtime,
             kernel,
+            #[cfg(target_os = "linux")]
+            authority,
             #[cfg(target_os = "linux")]
             lifecycle,
         })

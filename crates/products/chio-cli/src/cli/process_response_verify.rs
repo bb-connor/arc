@@ -113,6 +113,23 @@ pub(crate) fn cmd_verify_process_response(
     Ok(())
 }
 
+/// Apply the same offline checks to retained envelopes embedded in a run artifact.
+pub(crate) fn verify_values(
+    request: &Value,
+    context: &Value,
+    response: &Value,
+    key: &chio_core::PublicKey,
+) -> Result<ChioReceipt, CliError> {
+    let request: Request = serde_json::from_value(request.clone()).map_err(fail)?;
+    let context: Context = serde_json::from_value(context.clone()).map_err(fail)?;
+    let response: Response = serde_json::from_value(response.clone()).map_err(fail)?;
+    let receipt = super::receipt_verify::verify_original_receipt(&response.receipt_json, key)?;
+    verify_request(&request, &context, &response, &receipt)?;
+    verify_decision(&response, &receipt)?;
+    verify_output(&response, &receipt)?;
+    Ok(receipt)
+}
+
 fn verify_request(
     request: &Request,
     context: &Context,
