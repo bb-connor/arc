@@ -25,6 +25,13 @@ the signed graph. `verify_swarm_authority_bundle` admits the bundle before
 any worker starts; after the run the pool is released for the completed
 worker and a terminal receipt is signed over the scenario verdicts.
 
+## Governed process host
+
+The separate [governed process fan-out](PROCESS.md) binds actual issued worker
+capabilities to live task authority and durable continuation custody. Its native
+tools require Enforced launch. It remains under M5 qualification; it does not
+change this smoke or claim complete swarm acceptance.
+
 ## Scenarios
 
 | Scenario | What happens | Who refuses |

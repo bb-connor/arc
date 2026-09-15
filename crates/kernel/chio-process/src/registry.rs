@@ -71,6 +71,11 @@ impl ProcessRegistry {
         })
     }
 
+    /// Persistent namespace shared with authenticated worker request identities.
+    pub fn runtime_id(&self) -> &str {
+        &self.namespace
+    }
+
     pub fn process(&self, id: &str) -> Result<ProcessSnapshot, ProcessError> {
         self.with_store(|store| store.process(id))
     }

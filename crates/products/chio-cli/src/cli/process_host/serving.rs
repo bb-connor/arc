@@ -18,6 +18,7 @@ pub(super) fn connect(
     config: &Config,
     kernel: &ChioKernel,
     directory: &Path,
+    require_enforced: bool,
 ) -> Result<ConnectedServers, CliError> {
     let mut servers: Vec<Box<dyn ToolServerConnection>> = Vec::new();
     let mut manifests = Vec::new();
@@ -36,6 +37,14 @@ pub(super) fn connect(
             &arguments,
             None,
         )?;
+        if require_enforced
+            && !matches!(
+                &launch,
+                chio_mcp_adapter::transport::NativeMcpLaunch::CageRequired(_)
+            )
+        {
+            return Err(error("governed process tools require Enforced cage launch"));
+        }
         if launch.requires_flow_runtime() {
             return Err(error("this process host profile does not install an information-flow runtime; flow-required MCP manifests are refused"));
         }
@@ -43,6 +52,17 @@ pub(super) fn connect(
         let admitted = registry
             .verified_manifest(&server.id)
             .ok_or_else(|| error("MCP launch policy belongs to another server"))?;
+        if require_enforced
+            && admitted
+                .manifest
+                .required_permissions
+                .as_ref()
+                .is_none_or(|permissions| permissions.network_destinations.is_some())
+        {
+            return Err(error(
+                "this governed route profile requires a manifest with no network destinations",
+            ));
+        }
         let adapter = McpAdapter::from_command_with_timeouts(
             &server.command[0],
             &arguments,
@@ -59,6 +79,11 @@ pub(super) fn connect(
         .map_err(error)?;
         let adapter =
             AdaptedMcpServer::new_with_manifest_registry(adapter, &registry).map_err(error)?;
+        if require_enforced && adapter.native_enforcement_evidence().is_none() {
+            return Err(error(
+                "governed process tool has no verified enforcement evidence",
+            ));
+        }
         let mut manifest = adapter.manifest_clone();
         manifest.tools.sort_by(|a, b| a.name.cmp(&b.name));
         manifests.push(manifest);

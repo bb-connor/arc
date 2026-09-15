@@ -109,7 +109,12 @@ pub(super) fn child_capability(
     .map_err(error)
 }
 
-pub(super) fn init(config: &Path, state: &Path) -> Result<(), CliError> {
+pub(super) fn init(
+    config: &Path,
+    state: &Path,
+    aggregate_invocations: Option<u32>,
+    swarm_plan: Option<&Path>,
+) -> Result<(), CliError> {
     let config = Config::load(config)?;
     let policy = chio_control_plane::policy::load_policy(&config.policy)?;
     if config.limits.max_depth > policy.kernel.delegation_depth_limit {
@@ -117,19 +122,31 @@ pub(super) fn init(config: &Path, state: &Path) -> Result<(), CliError> {
             "process tree depth exceeds the policy delegation limit",
         ));
     }
+    if policy.kernel.require_swarm_admission != swarm_plan.is_some() {
+        return Err(error("swarm plans require kernel.require_swarm_admission: true, and required swarm admission needs a plan at initialization"));
+    }
+    let plan = swarm_plan.map(super::swarm::load_plan).transpose()?;
     let identity = policy.identity.clone();
     let defaults = policy.default_capabilities.clone();
     let lease = Lease::acquire(state, true)?;
-    let (kernel, issuer) = kernel(lease.directory.path(), policy)?;
-    let (servers, manifests) = super::serving::connect(&config, &kernel, lease.directory.path())?;
+    let (kernel, issuer, authority) = kernel(lease.directory.path(), policy, true)?;
+    let (servers, manifests) =
+        super::serving::connect(&config, &kernel, lease.directory.path(), plan.is_some())?;
     let root_key = Keypair::generate();
-    let root = kernel
-        .issue_capability(
+    let root = match aggregate_invocations {
+        Some(limit) => kernel.issue_aggregate_family_root(
             &root_key.public_key(),
             defaults[0].scope.clone(),
             defaults[0].ttl,
-        )
-        .map_err(error)?;
+            limit,
+        ),
+        None => kernel.issue_capability(
+            &root_key.public_key(),
+            defaults[0].scope.clone(),
+            defaults[0].ttl,
+        ),
+    }
+    .map_err(error)?;
     for template in &config.spawn_templates {
         select_scope(
             &root.scope,
@@ -181,6 +198,16 @@ pub(super) fn init(config: &Path, state: &Path) -> Result<(), CliError> {
         abi: chio_process::PROCESS_ABI.to_owned(),
         written_by: Some(super::state::code_identity()),
     };
+    if let Some(plan) = plan {
+        super::swarm::provision(
+            &lease.directory,
+            &record,
+            &runtime,
+            &issuer,
+            &authority,
+            plan,
+        )?;
+    }
     let encoded = canonical_json_bytes(&record).map_err(error)?;
     if encoded.len() as u64 > super::state::MAX_CONFIG_BYTES {
         return Err(error("configuration and tool definitions exceed one MiB"));

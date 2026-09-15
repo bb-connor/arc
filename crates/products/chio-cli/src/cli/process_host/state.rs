@@ -392,7 +392,15 @@ impl Lease {
 pub(super) fn kernel(
     directory: &Path,
     loaded: policy::LoadedPolicy,
-) -> Result<(ChioKernel, chio_core_types::crypto::Keypair), CliError> {
+    initializing: bool,
+) -> Result<
+    (
+        ChioKernel,
+        chio_core_types::crypto::Keypair,
+        DurableAdmissionRuntime,
+    ),
+    CliError,
+> {
     if loaded.default_capabilities.len() != 1 {
         return Err(error(
             "host policy must define one default capability TTL group",
@@ -404,6 +412,7 @@ pub(super) fn kernel(
     {
         return Err(error("host policy requires durable_admission_mode: all and persistent receipts and revocations"));
     }
+    let swarm_required = loaded.kernel.require_swarm_admission;
     let root_scope = loaded.default_capabilities[0].scope.clone();
     let issuance = loaded.issuance_policy.clone();
     let assurance = loaded.runtime_assurance_policy.clone();
@@ -417,6 +426,9 @@ pub(super) fn kernel(
         None,
         None,
     )?;
+    if swarm_required && !initializing {
+        super::swarm::install(directory, &authority, &mut kernel)?;
+    }
     authority.attach(&mut kernel)?;
     configure_capability_authority(
         &mut kernel,
@@ -430,7 +442,7 @@ pub(super) fn kernel(
         issuance,
         assurance,
     )?;
-    Ok((kernel, key))
+    Ok((kernel, key, authority))
 }
 
 pub(super) struct Host {
@@ -454,7 +466,8 @@ impl Host {
         {
             return Err(error("policy changed since initialization; restore the original policy to recover this host"));
         }
-        let (mut kernel, issuer) = kernel(lease.directory.path(), policy)?;
+        let swarm_required = policy.kernel.require_swarm_admission;
+        let (mut kernel, issuer, authority) = kernel(lease.directory.path(), policy, false)?;
         let lifecycle = if connect && !record.config.spawn_templates.is_empty() {
             Some(Arc::new(super::lifecycle::Service::new(
                 chio_process::ProcessRegistry::open(
@@ -472,8 +485,12 @@ impl Host {
             None
         };
         if connect {
-            let (servers, manifests) =
-                super::serving::connect(&record.config, &kernel, lease.directory.path())?;
+            let (servers, manifests) = super::serving::connect(
+                &record.config,
+                &kernel,
+                lease.directory.path(),
+                swarm_required,
+            )?;
             if chio_core_types::crypto::canonical_json_bytes(&manifests).map_err(error)?
                 != chio_core_types::crypto::canonical_json_bytes(&record.manifests)
                     .map_err(error)?
@@ -488,9 +505,17 @@ impl Host {
                     .register_tool_server(Box::new(super::lifecycle::Connection(service.clone())));
             }
         }
+        let routes = super::swarm::host_routes(
+            lease.directory.path(),
+            &record,
+            &kernel,
+            &authority.kernel_keypair(),
+        )?;
         let kernel = Arc::new(kernel);
         let runtime =
             ProcessRuntime::open(lease.directory.path().join("process.db"), kernel.clone())
+                .map_err(error)?
+                .with_routes(routes)
                 .map_err(error)?;
         lease.directory.validate_path_identity()?;
         Ok(Self {

@@ -1,0 +1,134 @@
+# Governed process fan-out
+
+The process host can now bind a fixed fan-out to the capabilities it actually
+issues. It installs the live swarm verifier, shares one signed aggregate
+invocation budget, and retains single-use continuations in the existing durable
+admission authority. Native MCP tools in this profile require verified Enforced
+cage launch with no network destinations. A missing prerequisite refuses startup.
+
+This path is being qualified for M5. The existing `smoke.sh` keeps its Disabled
+integration-only behavior. The commands below do not yet produce the complete M5
+scenario, accounting, confinement and terminal-outcome acceptance artifact.
+
+## Initialize
+
+Use an ordinary process host configuration with persistent receipts and
+revocations, `durable_admission_mode: all`, and
+`kernel.require_swarm_admission: true`. Declare a root and fixed direct children.
+Each child receives only the tools needed for its task. Native server entries
+must reference signed Enforced launch policies; `security provision-reference-runtime`
+is the existing provisioner. Keep its operator keys outside worker custody.
+The current profile supports 2-32 children with one planned call per child.
+Dynamic spawn templates and deeper graphs are refused.
+
+A plan names real configured processes and concrete calls:
+
+```json
+{
+  "schema": "chio.process.swarm-plan.v1",
+  "graph_id": "repository-review",
+  "calls": [
+    {
+      "process": "reader",
+      "operation_key": "read-source",
+      "server_id": "reference-reader",
+      "tool_name": "read_file",
+      "arguments": {"path": "README.md"}
+    },
+    {
+      "process": "writer",
+      "operation_key": "write-report",
+      "server_id": "reference-writer",
+      "tool_name": "write_file",
+      "arguments": {"path": "/workspace/report.txt", "content": "Review started\n"}
+    }
+  ]
+}
+```
+
+These calls fan out independently. This example does not claim that the writer
+consumes the reader's output. Fan-in must use actual completed receipts.
+
+```sh
+chio process init --config host.json --state "$PWD/run-state" \
+  --aggregate-invocations 2 --swarm-plan tasks.json
+```
+
+The invocation budget belongs to the root's entire delegation family. The
+separate `limits.max_calls` in `host.json` bounds logical process operations,
+including refusals. Set it high enough to retain the desired negative cases.
+
+Initialization records a signed observation of completed capability provisioning,
+the live graph, exact worker request contexts, and the pinned runtime profile.
+It activates the sealed replay source once. It does not invent successful worker
+results or future join/terminal receipts. The private state contains:
+
+- `swarm-bootstrap.json`: signed trace of the actual issued capabilities.
+- `swarm-bundle.json`: signed live graph, witnesses, routes and continuations.
+- `swarm-calls.json`: exact invocation inputs to distribute to each worker.
+- `swarm-profile.json`: signed host/source/route binding.
+- `swarm-runtime.db`: verifier-owned evidence and sealed legacy replay markers.
+- `authority.db`: the existing budget, revocation, outcome and continuation owner.
+
+## Run supervised workers on Linux
+
+Install the local Python process SDK in the worker interpreter, or point
+`PYTHONPATH` to `sdks/python/chio-process/src` for a source checkout. Then run:
+
+```sh
+python3 examples/reference-swarm/process-run.py \
+  --chio /absolute/path/to/chio \
+  --state "$PWD/run-state" --output "$PWD/run-evidence"
+```
+
+The script calls the existing `chio process run` supervisor. Each worker receives
+its own authenticated connection on stdin, submits the exact governed call and
+checkpoints its response. The supervisor retains bounded restart attempts and
+rotates credentials. A repeated logical call goes through kernel recovery and
+retains its original receipt; the worker does not assume an uncertain effect is
+safe to repeat.
+
+For isolated workers, add `--worker-image sha256:<local-image-id>`. The image must
+contain this `process-worker.py` at `/opt/chio/process-worker.py`, its SDK, and
+`/usr/local/bin/python3`. The existing fixed Docker profile mounts only the worker
+socket, has no network, and exposes neither administrative state nor the Docker
+socket to workers. Without this argument, workers run as ordinary native
+processes under the host user. That native profile is for cooperative workers
+and does not isolate them from the host's files.
+
+Build the supplied worker image from the repository root using a reviewed Python
+3.11+ base image pinned by digest. The base must provide `/usr/local/bin/python3`:
+
+```sh
+docker build --build-arg BASE="$PYTHON_BASE_DIGEST" \
+  -f examples/reference-swarm/ProcessWorker.Dockerfile \
+  -t chio-reference-process-worker .
+WORKER_IMAGE=$(docker image inspect --format '{{.Id}}' chio-reference-process-worker)
+python3 examples/reference-swarm/process-run.py \
+  --chio /absolute/path/to/chio --state "$PWD/run-state" \
+  --output "$PWD/run-evidence" --worker-image "$WORKER_IMAGE"
+```
+
+The image copies the dependency-free process SDK and this worker from the same
+checkout. The runner requires the local immutable image ID and never pulls an
+image during worker launch. Code lives outside `/work`, which the runner replaces
+with a private temporary filesystem.
+
+The output directory contains the runner output and a request, context, response
+and independent `chio receipt verify-process-response` result for each worker.
+The verifier checks the operator-pinned kernel key, signed process/capability
+identity, original request, verdict and returned content. A fresh output directory
+is required on every attempt. Preserve the same state, worker command and run
+plan when resuming an interrupted run.
+
+## Current boundary
+
+The mailbox-only host regression exercises actual authenticated socket calls,
+missing/borrowed authority refusals, real effects, SIGKILL recovery, retained
+continuation custody and profile tampering. It is not a native confinement run.
+The native worker orchestration and Enforced reference-tool run need Linux
+qualification. The full M5 scenario matrix, signed completed fan-in, joined
+accounting/confinement artifact and designated-runner acceptance remain open.
+The process host still refuses manifests requiring an information-flow runtime
+until that profile is installed. No Disabled fallback is provided for native
+tools in this governed profile.

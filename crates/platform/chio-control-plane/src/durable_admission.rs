@@ -24,6 +24,7 @@ pub struct DurableAdmissionRuntime {
     outcomes: Arc<dyn QualifiedToolOutcomeStore>,
     budget: Arc<dyn BudgetStore>,
     revocations: Arc<dyn RevocationStore>,
+    local_operations: Option<chio_store_sqlite::SqliteAdmissionOperationStore>,
     local_budget: Option<SqliteBudgetStore>,
     local_revocations: Option<SqliteRevocationStore>,
     fence: StoreMutationFence,
@@ -57,6 +58,7 @@ impl DurableAdmissionRuntime {
             outcomes: Arc::new(authority.tool_outcome_store()),
             budget: Arc::new(budget.clone()),
             revocations: Arc::new(revocations.clone()),
+            local_operations: Some(authority.admission_operation_store()),
             local_budget: Some(budget),
             local_revocations: Some(revocations),
             fence: authority.mutation_fence(),
@@ -186,6 +188,7 @@ impl DurableAdmissionRuntime {
             outcomes: stores.outcomes,
             budget: stores.budget,
             revocations,
+            local_operations: None,
             local_budget: None,
             local_revocations: None,
             fence: stores.fence,
@@ -206,6 +209,20 @@ impl DurableAdmissionRuntime {
     #[must_use]
     pub fn local_revocation_store(&self) -> Option<SqliteRevocationStore> {
         self.local_revocations.clone()
+    }
+
+    /// The local participant and its existing fence, for sealing a runtime
+    /// source before attaching a hook. Remote authorities have no local port.
+    #[must_use]
+    pub fn local_runtime_participant(
+        &self,
+    ) -> Option<(
+        chio_store_sqlite::SqliteAdmissionOperationStore,
+        StoreMutationFence,
+    )> {
+        self.local_operations
+            .clone()
+            .map(|store| (store, self.fence.clone()))
     }
 
     pub fn attach(&self, kernel: &mut ChioKernel) -> Result<(), CliError> {

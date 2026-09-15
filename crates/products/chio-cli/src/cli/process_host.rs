@@ -27,6 +27,9 @@ mod serving;
 #[cfg(unix)]
 #[path = "process_host/state.rs"]
 mod state;
+#[cfg(unix)]
+#[path = "process_host/swarm.rs"]
+mod swarm;
 
 #[derive(Subcommand)]
 pub(crate) enum ProcessCommands {
@@ -60,6 +63,12 @@ pub(crate) enum ProcessCommands {
         config: PathBuf,
         #[arg(long)]
         state: PathBuf,
+        /// Signed invocation budget shared by the root and all descendants.
+        #[arg(long, value_parser = clap::value_parser!(u32).range(1..))]
+        aggregate_invocations: Option<u32>,
+        /// Bind a bounded fan-out plan to this host's actual issued capabilities.
+        #[arg(long, requires = "aggregate_invocations")]
+        swarm_plan: Option<PathBuf>,
     },
     /// Serve authenticated workers until SIGINT or SIGTERM, then drain calls.
     Serve {
@@ -129,7 +138,17 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
                 process,
                 attempt,
             } => diagnostics::logs(&state, &process, attempt),
-            ProcessCommands::Init { config, state } => provision::init(&config, &state),
+            ProcessCommands::Init {
+                config,
+                state,
+                aggregate_invocations,
+                swarm_plan,
+            } => provision::init(
+                &config,
+                &state,
+                aggregate_invocations,
+                swarm_plan.as_deref(),
+            ),
             ProcessCommands::Serve { state, socket } => serving::serve(&state, &socket),
             ProcessCommands::Run { state, plan } => {
                 #[cfg(target_os = "linux")]

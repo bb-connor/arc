@@ -83,12 +83,13 @@ The serial runner is the retained `run-linux-gates.py` in the artifact directory
 above. It started at 20:55 UTC. Formatting, process (72 tests), runtime/swarm
 (348 tests) and the proof CLI contract (147 tests) have terminal exit 0, with
 no failures or ignores. Subprocess fixtures are excluded from these counts.
-The process-host and response-verifier gate is running after those gates.
-At the last live check its guest runner PID was 2742 and Cargo child PID was
-23835. Codex command session: `28376`. These are observation handles,
-not evidence of continuing liveness; poll the session or guest processes before
-deciding whether to resume. Do not launch a duplicate queue after an observation
-timeout. No queue completion is claimed.
+The process-host/response-verifier gate (14 tests) and signed lineage (eight)
+also passed. The queue stopped at the native restart gate: 46 passed, one failed
+with `trusted operation time regressed` during the concurrent late-caller report.
+The rest of that queue has not executed. Its raw failure is retained in
+`linux-7b57f2ef6/native-restart.log`; do not overwrite or resume that frozen source
+in place. A new `/home/connor.guest/chio-foundation-current` checkout is used to
+calibrate and repair the caller lookup's coordination/time race.
 
 `linux-7b57f2ef6/identity.json` pins compiler, source, environment and lock hash;
 `active.json` names the current command and PID; each terminal gate writes its
@@ -125,17 +126,98 @@ Two host composition primitives are implemented in the next local slice:
   retains reputation and runtime-assurance checks and persists the exact root
   snapshot. Ordinary issuance still rejects unexpected aggregate authority.
 
-Focused tests cover route forgery/rebinding and authenticated sibling contention,
-restart and replay under the real SQLite aggregate budget. Verification of this
-new slice is ongoing in `m5-host-development/`; this is not the frozen Linux
-candidate or a claimed completed reference-host profile.
+Implementation commit: `a4d8c2c7dd9befe14a9adf1501922d56a3ee0cfb`.
+The exact clean commit passed six process tests (routes and shared aggregate),
+two aggregate issuance tests, the tenant-context refusal test, all 18 policy
+issuance tests, and strict all-target Clippy for process/kernel/control-plane.
+The retained `m5-host-a4d8c2c7d/` records command, compiler, unchanged source,
+terminal exit, log hash and test binary hashes. Every test passed without
+failures or ignores; filtered counts remain explicit in the owning logs.
+The full 78-test process suite and a 41-test kernel authority selection also
+passed during development, but those earlier logs record an evolving working
+tree and are not an exact-commit certificate. A Linux-only import found during
+macOS compilation is correctly gated; no warning suppression was added.
 
-The next implementation boundary remains the reference host: load actual root
-and child capabilities from the process journal, bind them into the signed task
-graph, install the sealed live authority, select the aggregate issuance API,
-and connect the registered tool routes to `with_routes`.
-The Disabled smoke remains unchanged. Actual Enforced tools, all scenario/effect
-oracles, independent complete-artifact verification and M6-M10 remain required.
+The reference host now implements a bounded, fixed fan-out profile using these
+primitives. `process init --aggregate-invocations N --swarm-plan tasks.json`
+binds actual issued root/child capability bodies to the signed graph, routes,
+witnesses and single-use continuations. It activates the existing local runtime
+participant once. Restart requires the signed profile and the original active
+source generation, installs its hook before recovery, and does not import a
+fresh source or fabricate future result receipts. Native servers require
+verified Enforced cage launch and a manifest with no network destinations.
+
+The four macOS process-host tests and five response-verification tests passed
+with `TMPDIR=/tmp`, including the new authenticated-worker, borrowed-context,
+SIGKILL recovery, two-effect and sealed-continuation test. Strict all-target
+Clippy for CLI/process/control-plane passes after correcting platform guards in
+`dea823c4b` and simplifying one new condition. No lint suppression was added.
+Development logs are `m5-swarm-host-owning-short-tmp.log` and
+`m5-swarm-host-clippy-4.log`; earlier failures are retained. These logs record an
+evolving working tree and are not an exact-source acceptance certificate.
+
+The new `examples/reference-swarm/process-run.py` uses the existing Linux
+supervisor, exports worker checkpoints and independently verifies responses
+with the operator-pinned kernel key. Its optional immutable Docker image uses
+the existing fixed confinement profile; native workers remain cooperative
+same-user processes. The image stores code outside the runner's `/work` tmpfs.
+Linux supervisor and actual Enforced reference-tool runs remain unqualified.
+The Disabled smoke is unchanged. Full fan-in, all scenario/effect oracles,
+independent complete-artifact verification and M6-M10 remain required.
+
+### Local x86_64 enforcement qualification
+
+A separate `chio-m5-x86` Colima QEMU guest now runs Linux 6.8.0-64/x86_64.
+Initial probes observed Landlock ABI 4, sealed memfds and pidfd support. Rust
+1.94.1 and GCC 13.3 are installed. The default VM and Docker context are unchanged.
+A clean frozen clone of `a4d8c2c7d` is at
+`/home/connor.guest/chio-foundation-a4d8c2c7d`; its Git LFS objects were verified
+against their tracked hashes and the checkout is clean.
+
+The original `a4d8c2c7d` local real-kernel gate passed the source stack and
+all-target inventory checks, then exited 101 before tests: static helper
+`RUSTFLAGS` reached host procedural macros. Commit `81e41bf824a886be44ae1a1356cba8aeb1c7c584`
+adds an explicit `x86_64-unknown-linux-gnu` Cargo target and uses its matching
+helper path. Static PIE ELF checks, probe/test inventories and mutation checks
+are unchanged. The gate's shell contract and source stack checks pass.
+
+The frozen `73f3d7fa528c76e6953d5b2a4ddab38757cc328d` retry runs via
+`run-linux-x86-cage-73f3d7fa5.py`, retaining source, compiler, platform,
+environment, log and binary identities in `linux-x86-73f3d7fa5/`.
+It started at 21:48 UTC, child PID 10715, Codex session `10945`; consult the
+terminal records rather than treating a launched process as a pass.
+The earlier failed gate and VM setup failures remain retained. Neither run
+changes trusted capture pins or provides designated-runner release authority.
+
+### Native late-caller recovery repair
+
+The frozen `7b57f2ef6` native-restart gate stopped with 46 passes and one failure:
+`late_caller_report_cannot_replace_native_unknown_outcome` observed
+`trusted operation time regressed`. A caller lookup read trusted time before
+waiting behind recovery's mutation. The store correctly rejected that stale time.
+
+Commit `73f3d7fa528c76e6953d5b2a4ddab38757cc328d` makes that retained lookup acquire
+the existing mutation sequencer before selecting time. Store time validation is
+unchanged. A calibrated regression holds the original coordinator and proves
+that the lookup waits, then confirms the late unsigned report is still refused.
+The test-only calibration failed on `a4d8c2c7d`; the implementation plus test
+passed the owning case. Both source diffs and binary/log hashes are preserved in
+`native-restart-calibration/` and `native-restart-fixed/`.
+
+The full unchanged native-restart script passed on frozen `73f3d7fa5`:
+47 exact process-recovery cases and five exact live ownership cases, zero
+failures or ignores. The gate exited zero at 22:01:50 UTC with both source and
+Cargo.lock unchanged. The log SHA256 is
+`a6e45ea83c9c6e8f6ae013b38d395e6f6c7b8abac934e0f6ec192d8b579a91d7`.
+Its owning binary hashes are in `linux-73f3d7fa5/native-restart.json`.
+The authenticated-caller script also passed: 33 exact lifecycle cases, nine
+durable-executor cases and 19 native-custody cases, zero failures or ignores.
+It exited zero at 22:13:35 UTC with source and lock unchanged; log SHA256 is
+`2009897228feccca7648e664787f8ec5a45151a4845bc9b10f7d163dcae2591e`.
+The serial runner is executing consumer boundaries; flow and workspace gates
+remain queued. The runner is
+`run-linux-gates-73f3d7fa5.py`, Codex session `62677`. Neither frozen
+qualification checkout is edited during these runs.
 
 ## Retained pre-M5 evidence
 
