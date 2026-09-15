@@ -6,7 +6,7 @@ case "$(uname -s):$(uname -m)" in
   Linux:x86_64) ;;
   *) exit 64 ;;
 esac
-for command in awk cargo cc ldd readelf readlink; do
+for command in awk cargo cc ldd readelf readlink sha256sum; do
   command -v "$command" >/dev/null
 done
 
@@ -157,27 +157,34 @@ else
   static_target_dir="$CARGO_TARGET_DIR/static-pie"
 fi
 static_rustflags="${RUSTFLAGS:+${RUSTFLAGS} }-C target-feature=+crt-static -C relocation-model=pie"
-# An explicit target keeps crt-static off host procedural macros and build scripts.
-RUSTFLAGS="$static_rustflags" CARGO_TARGET_DIR="$static_target_dir" \
-  cargo build --target x86_64-unknown-linux-gnu -p chio-cage --bin chio-cage-init --features real-linux-enforcement
-static_helper="$static_target_dir/x86_64-unknown-linux-gnu/debug/chio-cage-init"
-if [[ ! -x "$static_helper" ]]; then
-  echo "static PIE cage-init build did not produce an executable" >&2
-  exit 1
-fi
-if ! readelf -hW "$static_helper" | awk '$1 == "Type:" && $2 == "DYN" { found = 1 } END { exit !found }'; then
-  echo "cage-init is not an ELF static PIE image" >&2
-  exit 1
-fi
-if readelf -lW "$static_helper" | grep -Eq '(^|[[:space:]])INTERP([[:space:]]|$)'; then
-  echo "cage-init contains a forbidden ELF interpreter" >&2
-  exit 1
-fi
-if readelf -dW "$static_helper" 2>/dev/null | grep -Eq '\((NEEDED|RPATH|RUNPATH)\)'; then
-  echo "cage-init contains a forbidden dynamic dependency or search path" >&2
-  exit 1
-fi
-export CHIO_CAGE_TEST_HELPER="$static_helper"
+build_static_helper() {
+  local features="$1" destination="$2"
+  # An explicit target keeps crt-static off host procedural macros and build scripts.
+  RUSTFLAGS="$static_rustflags" CARGO_TARGET_DIR="$static_target_dir" \
+    cargo build --target x86_64-unknown-linux-gnu -p chio-cage --bin chio-cage-init --features "$features"
+  static_helper="$static_target_dir/x86_64-unknown-linux-gnu/debug/chio-cage-init"
+  if [[ ! -x "$static_helper" ]]; then
+    echo "static PIE cage-init build did not produce an executable" >&2
+    exit 1
+  fi
+  if ! readelf -hW "$static_helper" | awk '$1 == "Type:" && $2 == "DYN" { found = 1 } END { exit !found }'; then
+    echo "cage-init is not an ELF static PIE image" >&2
+    exit 1
+  fi
+  if readelf -lW "$static_helper" | grep -Eq '(^|[[:space:]])INTERP([[:space:]]|$)'; then
+    echo "cage-init contains a forbidden ELF interpreter" >&2
+    exit 1
+  fi
+  if readelf -dW "$static_helper" 2>/dev/null | grep -Eq '\((NEEDED|RPATH|RUNPATH)\)'; then
+    echo "cage-init contains a forbidden dynamic dependency or search path" >&2
+    exit 1
+  fi
+  cp "$static_helper" "$destination"
+  export CHIO_CAGE_TEST_HELPER="$destination"
+  sha256sum "$destination"
+}
+
+build_static_helper real-linux-enforcement "$probe_dir/cage-init-normal"
 
 run_cargo_lane() {
   local label="$1"
@@ -283,6 +290,9 @@ if [[ "$probe_passed" -ne "${#expected_probes[@]}" ]] ||
   echo "real-Linux cage probe lane did not execute the declared test inventory" >&2
   exit 1
 fi
+
+# Helper-side mutations must be compiled into the executable actually launched.
+build_static_helper real-linux-enforcement,enforcement-mutants "$probe_dir/cage-init-mutants"
 
 mutation_output="$log_dir/enforcement-mutations.out"
 run_cargo_lane \

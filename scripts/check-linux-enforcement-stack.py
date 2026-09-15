@@ -402,6 +402,8 @@ def validate_sources(root: Path, data: dict, errors: list[str]) -> None:
         'readelf -lW "$static_helper"',
         'readelf -dW "$static_helper"',
         "NEEDED|RPATH|RUNPATH",
+        'build_static_helper real-linux-enforcement "$probe_dir/cage-init-normal"',
+        'build_static_helper real-linux-enforcement,enforcement-mutants "$probe_dir/cage-init-mutants"',
     ]:
         if required not in linux_runner:
             errors.append(f"real Linux runner is missing required contract: {required}")

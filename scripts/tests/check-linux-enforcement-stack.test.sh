@@ -117,4 +117,17 @@ python3 -c 'from pathlib import Path; p=Path("'$missing_atomic_receipt'/crates/s
 test "$(run_checker "$missing_atomic_receipt" "$work/missing-atomic-receipt.out" "$work/missing-atomic-receipt.err")" = 1
 grep -F 'signed cage receipt adapter is missing required token: ChioReceipt::sign_with_backend_using_handle' "$work/missing-atomic-receipt.err" >/dev/null
 
+missing_mutant_helper="$work/missing-mutant-helper"
+cp -R "$valid" "$missing_mutant_helper"
+python3 - "$missing_mutant_helper" <<'PYTEST'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1]) / "crates/security/chio-cage/scripts/check-linux-enforcement.sh"
+s = p.read_text()
+s = s.replace('build_static_helper real-linux-enforcement,enforcement-mutants "$probe_dir/cage-init-mutants"', '')
+p.write_text(s)
+PYTEST
+test "$(run_checker "$missing_mutant_helper" "$work/missing-mutant-helper.out" "$work/missing-mutant-helper.err")" = 1
+grep -F 'real Linux runner is missing required contract: build_static_helper real-linux-enforcement,enforcement-mutants' "$work/missing-mutant-helper.err" >/dev/null
+
 printf 'check-linux-enforcement-stack.test.sh: all assertions passed\n'

@@ -17,6 +17,27 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 ### Latest local continuation
 
+Latest source repairs include `97705575b` (explicit signed artifact ceilings) and
+`6b2552d0e` (independent receipt rollback anchor in the signed runtime policy).
+The real Enforced reader initialization exposed both requirements before any
+workflow effect. Their failed runs remain in `linux-x86-reference-a34e7e20b/`
+and `linux-x86-reference-97705575b/`. Anchor-backed runtime qualification is
+pending. The macOS fixture now canonicalizes its temporary parent and checks the
+unsupported operating system before architecture; both failures are retained.
+
+At `6f99a5465`, all 69 real-Linux cage cases passed. Seven of ten subsequent
+mutation controls failed because the harness launched a normal helper while
+only the parent test binary had the mutation feature. The repaired harness
+builds and checks matching normal/mutant static helpers, preserves both as
+separate files during the run, and logs their hashes. Every original mutation
+assertion and required inventory remains in force. Source stack checks and the
+missing-mutant-helper checker regression pass; a complete real-kernel rerun is
+required. The failed lane is retained in `linux-x86-6f99a5465/`.
+
+The Linux consumer-boundary gate passes at `97705575b`; flow and the remaining
+workspace gates continue on that frozen source. All eight Linux container unit
+cases and strict all-target Clippy pass at `3ec843a866`.
+
 The execution branch retains the preceding repair and M5 commits through
 `3ec843a866` (Linux container test fixture initialization). The primary checkout
 remains unchanged. New reference commands at `a34e7e20b` prepare a signed
