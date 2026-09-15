@@ -93,6 +93,23 @@ pub(super) struct Server {
 
 impl Server {
     pub(super) fn start(path: &Path, allocation: String, chain: Arc<LocalChain>) -> Result<Self> {
+        Self::start_mode(path, allocation, chain, false)
+    }
+
+    pub(super) fn start_readonly(
+        path: &Path,
+        allocation: String,
+        chain: Arc<LocalChain>,
+    ) -> Result<Self> {
+        Self::start_mode(path, allocation, chain, true)
+    }
+
+    fn start_mode(
+        path: &Path,
+        allocation: String,
+        chain: Arc<LocalChain>,
+        readonly: bool,
+    ) -> Result<Self> {
         let listener = UnixListener::bind(path)?;
         listener.set_nonblocking(true)?;
         let stop = Arc::new(AtomicBool::new(false));
@@ -106,6 +123,11 @@ impl Server {
                         let response = read_message(&stream, 256 * 1024).and_then(|requested| {
                             if requested.as_str() == Some(&allocation) {
                                 return Ok(serde_json::to_value(chain.observe(&allocation)?)?);
+                            }
+                            if readonly
+                                && requested["method"].as_str() != Some("observe-transaction")
+                            {
+                                return Err("verifier observer permits only read operations".into());
                             }
                             let requested_allocation = match requested["method"].as_str() {
                                 Some("prepare") => &requested["request"]["allocationId"],

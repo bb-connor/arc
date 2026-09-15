@@ -277,6 +277,7 @@ impl Journal {
                 kind,
                 "submission"
                     | "execution-request"
+                    | "verifier-request"
                     | "execution-evidence"
                     | "execution-checkpoint"
                     | "capture-waiver"

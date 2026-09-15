@@ -43,4 +43,6 @@ fn allocation_rejects_lossy_or_ambiguous_money() {
     }
     assert_eq!(units("9007199254740991").ok(), Some(9_007_199_254_740_991));
 }
+mod authority_enrollment;
 mod checkpoint_handoff;
+mod verifier_handoff;

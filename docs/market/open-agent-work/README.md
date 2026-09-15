@@ -201,3 +201,8 @@ financial backing remains unavailable. The [checkpoint operator handoff](executi
 now exports the original receipt to a separate process with its own signing keys
 and custody, then verifies its response before Finding issuance. Independent
 administration, broader Finding assurance and sustained capacity remain open gates.
+The [public authority and verifier handoff](execution/29-public-authority-verifier.md)
+now provisions provider authority from public role pins and an externally signed
+context, then runs claim observation, Finding verification and signed decisions in
+a separate verifier process. Payout/refund preserve the original native identities.
+Bilateral signature exchange and enforced role isolation are the next delivery gate.

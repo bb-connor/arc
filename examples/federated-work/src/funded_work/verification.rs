@@ -156,7 +156,97 @@ pub fn decide(
     let entry = custody
         .by_operation(&original.binding.operation_id)?
         .ok_or("original verification entry missing")?;
-    let terms = entry.agreement.validate(policy, &entry.request)?;
+    entry.agreement.validate(policy, &entry.request)?;
+    if custody
+        .retained::<Value>(&original.binding.allocation_id, "verifier-request")?
+        .is_some()
+    {
+        return Err("original decision is delegated to external verifier custody".into());
+    }
+    if key.public_key() != policy.verifier_key || key.public_key() == policy.provider_key {
+        return Err("wrong independent decision signer".into());
+    }
+    let execution = super::execution_evidence::retained(policy, &original.binding, custody)?;
+    if digest(&execution)? != digest(&original.execution)? {
+        return Err("original execution evidence differs from retained custody".into());
+    }
+    let body = assess(
+        &DecisionInputs {
+            original,
+            submission,
+            claim,
+            policy,
+            agreement: &entry.agreement,
+        },
+        &custody.blob(&submission.body.input_sha256)?,
+        &custody.blob(&submission.body.output_sha256)?,
+        *checker,
+        crate::common::now()?,
+    )?;
+    let decision = evidence::sign(body, key)?;
+    custody.retain_before(
+        &original.binding.allocation_id,
+        "decision",
+        &decision,
+        &["verifier-request"],
+    )?;
+    Ok(decision)
+}
+
+pub(super) struct DecisionInputs<'a> {
+    pub original: &'a Evidence,
+    pub submission: &'a Submission,
+    pub claim: &'a super::settlement_observer::Verified,
+    pub policy: &'a Policy,
+    pub agreement: &'a super::agreement::SignedAgreement,
+}
+
+pub(super) fn assess(
+    inputs: &DecisionInputs<'_>,
+    input: &[u8],
+    output: &[u8],
+    checker: &dyn Checker,
+    now: u64,
+) -> Result<DecisionBody> {
+    let (matches_native, finding_assessment) = assess_evidence(inputs, input, output, now)?;
+    let DecisionInputs {
+        original,
+        submission,
+        claim,
+        ..
+    } = inputs;
+    use super::finding_acceptance::Outcome;
+    let checked = checker.check(&original.input)?;
+    Ok(DecisionBody {
+        schema: "chio.experimental.native-funded-decision.v2".into(),
+        binding: original.binding.clone(),
+        commitment: format!("0x{}", digest(submission)?),
+        finding_id: submission.body.finding.finding_id.clone(),
+        checker_sha256: checker_digest(),
+        accepted: finding_assessment.outcome == Outcome::Accepted
+            && matches_native
+            && output == canonical_json_bytes(&checked)?,
+        finding_assessment,
+        claim_transaction_hash: claim.transaction_hash.clone(),
+        claim_block_hash: claim.block_hash.clone(),
+    })
+}
+
+/// Validate time-sensitive authority without invoking or repeating the checker.
+pub(super) fn assess_evidence(
+    inputs: &DecisionInputs<'_>,
+    input: &[u8],
+    output: &[u8],
+    now: u64,
+) -> Result<(bool, super::finding_acceptance::Assessment)> {
+    let DecisionInputs {
+        original,
+        submission,
+        claim,
+        policy,
+        agreement,
+    } = inputs;
+    let terms = agreement.validate_public(policy)?;
     if claim.action != super::settlement::Action::Submit
         || claim.allocation_id != original.binding.allocation_id
         || claim.commitment.as_deref() != Some(&format!("0x{}", digest(submission)?))
@@ -167,21 +257,15 @@ pub fn decide(
             "decision requires the observed original claim in its resolution window".into(),
         );
     }
-    if key.public_key() != policy.verifier_key || key.public_key() == policy.provider_key {
-        return Err("wrong independent decision signer".into());
-    }
     let raw = canonical_json_bytes(submission)?;
-    let matches_native = evidence::verify(&raw, original, policy, custody)?;
-    let execution = super::execution_evidence::retained(policy, &original.binding, custody)?;
-    if digest(&execution)? != digest(&original.execution)? {
-        return Err("original execution evidence differs from retained custody".into());
-    }
+    let matches_native = evidence::verify_blobs(&raw, original, policy, input, output, now)?;
+    let execution = &original.execution;
     let finding_assessment = super::finding_acceptance::evaluate_with_evidence(
         &canonical_json_bytes(&submission.body.finding)?,
         &policy.finding_context,
-        &entry.agreement.body.finding_context_sha256,
-        &entry.agreement.body.required_finding_facets,
-        crate::common::now()?,
+        &agreement.body.finding_context_sha256,
+        &agreement.body.required_finding_facets,
+        now,
         execution.as_ref(),
     )?;
     use super::finding_acceptance::Outcome;
@@ -196,26 +280,7 @@ pub fn decide(
         )
         .into());
     }
-    let checked = checker.check(&original.input)?;
-    let retrieved = custody.blob(&submission.body.output_sha256)?;
-    let decision = evidence::sign(
-        DecisionBody {
-            schema: "chio.experimental.native-funded-decision.v2".into(),
-            binding: original.binding.clone(),
-            commitment: format!("0x{}", digest(submission)?),
-            finding_id: submission.body.finding.finding_id.clone(),
-            checker_sha256: checker_digest(),
-            accepted: finding_assessment.outcome == Outcome::Accepted
-                && matches_native
-                && retrieved == canonical_json_bytes(&checked)?,
-            finding_assessment,
-            claim_transaction_hash: claim.transaction_hash.clone(),
-            claim_block_hash: claim.block_hash.clone(),
-        },
-        key,
-    )?;
-    custody.retain(&original.binding.allocation_id, "decision", &decision)?;
-    Ok(decision)
+    Ok((matches_native, finding_assessment))
 }
 
 pub fn verify_decision(
@@ -224,12 +289,20 @@ pub fn verify_decision(
     policy: &Policy,
     custody: &Journal,
 ) -> Result<()> {
+    let execution = super::execution_evidence::retained(policy, &submission.body.binding, custody)?;
+    verify_public_decision(decision, submission, policy, execution.as_ref())
+}
+
+pub(super) fn verify_public_decision(
+    decision: &Decision,
+    submission: &Submission,
+    policy: &Policy,
+    execution: Option<&super::execution_evidence::Bundle>,
+) -> Result<()> {
     let body = &decision.body;
     super::wire::decision(decision)?;
-    let execution = super::execution_evidence::retained(policy, &submission.body.binding, custody)?;
     if body.accepted
         && execution
-            .as_ref()
             .is_some_and(|bundle| bundle.receipt.content_hash != submission.body.output_sha256)
     {
         return Err("accepted decision changes the original executed output".into());
@@ -239,7 +312,7 @@ pub fn verify_decision(
         &submission.body.finding,
         &policy.finding_context,
         &policy.required_finding_facets,
-        execution.as_ref(),
+        execution,
     )?;
     use super::finding_acceptance::Outcome;
     if matches!(

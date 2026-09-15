@@ -87,6 +87,21 @@ impl Agreement {
 
 impl SignedAgreement {
     pub fn validate(&self, policy: &Policy, request: &ToolCallRequest) -> Result<Terms> {
+        let terms = self.validate_public(policy)?;
+        if self.body.request_sha256 != digest(request)?
+            || self.body.request_id != request.request_id
+            || request.agent_id != policy.buyer_key.to_hex()
+            || request.capability.subject != policy.buyer_key
+        {
+            return Err("agreement changes pinned native request".into());
+        }
+        super::waiver_terms::validate(&self.body, policy, request)?;
+        Ok(terms)
+    }
+
+    /// Authenticate bilateral public commitments. Native request preimages and
+    /// financial waiver authority remain additional checks in `validate`.
+    pub(super) fn validate_public(&self, policy: &Policy) -> Result<Terms> {
         let body = &self.body;
         super::wire::agreement(self)?;
         if body.schema != AGREEMENT_SCHEMA
@@ -98,10 +113,6 @@ impl SignedAgreement {
             || body.buyer_key != policy.buyer_key
             || body.provider_key != policy.provider_key
             || body.buyer_key == body.provider_key
-            || body.request_sha256 != digest(request)?
-            || body.request_id != request.request_id
-            || request.agent_id != policy.buyer_key.to_hex()
-            || request.capability.subject != policy.buyer_key
         {
             return Err("agreement changes pinned native funding authority or request".into());
         }
@@ -116,7 +127,6 @@ impl SignedAgreement {
             return Err("funding agreement signature invalid".into());
         }
         let terms = body.terms()?;
-        super::waiver_terms::validate(body, policy, request)?;
         terms.abi(&policy.domain.escrow)?;
         if terms.amount != "100" {
             return Err("native W0 profile requires exactly 100 mock units".into());

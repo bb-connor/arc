@@ -147,6 +147,25 @@ pub fn submit(
 /// remain errors; callers must never turn them into financial decisions.
 pub fn verify(raw: &[u8], original: &Evidence, policy: &Policy, custody: &Journal) -> Result<bool> {
     let submission: Submission = decode(raw)?;
+    verify_blobs(
+        raw,
+        original,
+        policy,
+        &custody.blob(&submission.body.input_sha256)?,
+        &custody.blob(&submission.body.output_sha256)?,
+        crate::common::now()?,
+    )
+}
+
+pub(super) fn verify_blobs(
+    raw: &[u8],
+    original: &Evidence,
+    policy: &Policy,
+    input: &[u8],
+    output: &[u8],
+    now: u64,
+) -> Result<bool> {
+    let submission: Submission = decode(raw)?;
     super::wire::submission(&submission)?;
     let body = &submission.body;
     if body.schema != "chio.experimental.native-funded-submission.v1"
@@ -200,17 +219,16 @@ pub fn verify(raw: &[u8], original: &Evidence, policy: &Policy, custody: &Journa
         || finding.evidence_cost.units != 100
         || finding.evidence_cost.currency != CURRENCY
         || finding.expires_at != original.binding.expires_at
-        || finding.issued_at > crate::common::now()?
-        || crate::common::now()? >= finding.expires_at
+        || finding.issued_at > now
+        || now >= finding.expires_at
         || finding.payload_media_type != "application/json"
     {
         return Err("Finding exceeds supported pre-settlement assurance profile".into());
     }
-    let input = custody.blob(&body.input_sha256)?;
-    let output = custody.blob(&body.output_sha256)?;
     if input != original.input.as_bytes()
         || body.input_sha256 != sha256_hex(original.input.as_bytes())
-        || finding.payload_sha256 != digest(&reveal(&output))?
+        || body.output_sha256 != sha256_hex(output)
+        || finding.payload_sha256 != digest(&reveal(output))?
     {
         return Err("Finding custody or original input binding changed".into());
     }

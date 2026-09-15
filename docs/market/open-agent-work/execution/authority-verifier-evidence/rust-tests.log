@@ -1,0 +1,89 @@
+   Compiling chio-federated-work v0.1.0 (/home/connor/backbay/arc-funded-integration/examples/federated-work)
+    Finished `test` profile [unoptimized] target(s) in 21.59s
+     Running unittests src/main.rs (target/debug/deps/chio_federated_work-ec8305597a8f01bf)
+
+running 82 tests
+test funded_work::finding_acceptance::tests::asserted_w0_has_exact_derived_facets_and_no_backing_upgrade ... ok
+test funded_work::finding_acceptance::tests::changed_claim_and_optional_failed_facet_deny ... ok
+test funded_work::finding_acceptance::tests::changed_trust_profile_and_standing_fail_closed ... ok
+test funded_work::finding_acceptance::tests::context_admission_checks_independent_role_pins_and_time ... ok
+test funded_work::finding_acceptance::tests::execution_context_pins_external_keys_and_requires_receipts_before_agreement ... ok
+test funded_work::finding_acceptance::tests::execution_context_rejects_aliased_receipt_checkpoint_and_status_keys ... ok
+test funded_work::finding_acceptance::tests::execution_context_rejects_extra_and_foreign_standing_and_legacy_profile_mixing ... ok
+test funded_work::finding_acceptance::tests::execution_evidence_is_required_and_assessment_replays_exact_bundle ... ok
+test funded_work::finding_acceptance::tests::invented_evidence_digest_cannot_be_authorized_by_resigning ... ok
+test funded_work::finding_acceptance::tests::invented_optional_verified_facet_cannot_be_authorized_by_resigning ... ok
+test funded_work::finding_acceptance::tests::missing_required_and_unsupported_facets_deny ... ok
+test funded_work::finding_acceptance::tests::raw_ingress_and_relabelled_assessment_deny ... ok
+test funded_work::finding_acceptance::tests::retained_assessment_uses_historical_authority_window ... ok
+test funded_work::finding_acceptance::tests::trust_time_and_authentication_cannot_be_refreshed_by_evaluator ... ok
+test funded_work::tests::allocation_matches_the_independent_contract_vector ... ok
+test funded_work::tests::allocation_rejects_lossy_or_ambiguous_money ... ok
+test funded_work::tests::authority_enrollment::enrolled_authority_cannot_recover_by_replacing_missing_state_or_keys ... ok
+test funded_work::tests::authority_enrollment::every_pair_of_authority_roles_must_be_distinct ... ok
+test funded_work::tests::authority_enrollment::incomplete_enrollment_cannot_replace_original_native_store ... ok
+test funded_work::tests::authority_enrollment::public_enrollment_provisions_only_original_provider_authority ... ok
+test funded_work::tests::authority_enrollment::substituted_public_roles_cannot_provision_native_authority ... ok
+test funded_work::tests::authority_enrollment::valid_foreign_governance_signature_cannot_replace_selected_public_authority ... ok
+test funded_work::tests::checkpoint_handoff::concurrent_operator_connections_retain_one_identical_response ... ok
+test funded_work::tests::checkpoint_handoff::external_checkpoint_completes_evidence_without_provider_key_custody ... ok
+test funded_work::tests::checkpoint_handoff::external_custody_loss_after_finding_cannot_be_repaired_by_resigning ... ok
+test funded_work::tests::checkpoint_handoff::failed_response_publication_replays_committed_bytes_without_keys ... ok
+test funded_work::tests::checkpoint_handoff::import_rejects_signed_revocation_foreign_signers_and_checkpoint_substitution ... ok
+test funded_work::tests::checkpoint_handoff::local_and_external_checkpoint_writers_cannot_both_claim_first_custody ... ok
+test funded_work::tests::checkpoint_handoff::operator_custody_corruption_cannot_publish_a_replacement_response ... ok
+test funded_work::tests::checkpoint_handoff::operator_replays_first_response_without_signers_and_rejects_other_receipts ... ok
+test funded_work::tests::checkpoint_handoff::rotated_operator_key_cannot_sign_pending_original_work ... ok
+test funded_work::tests::checkpoint_handoff::signed_foreign_authority_and_changed_context_cannot_consume_operator_slot ... ok
+test funded_work::tests::evidence::authenticated_wrong_result_is_rejected_without_replacing_execution ... ok
+test funded_work::tests::evidence::custody_capacity_preserves_exact_retrieval_and_retries ... ok
+test funded_work::tests::evidence::custody_loss_and_noncanonical_or_forged_finding_cannot_decide ... ok
+test funded_work::tests::evidence::finding_requires_the_original_retained_native_outcome ... ok
+test funded_work::tests::evidence::private_chain_pays_the_original_native_operation ... ignored, requires the local Node chain and CHIO_FUNDED_PYTHON; exercised by lifecycle qualification
+test funded_work::tests::execution::native_execution_receipt_is_available_before_claim_or_payment ... ignored, requires the owned private chain; selected by execution-evidence qualification
+test funded_work::tests::execution_authority::accepted_execution_decision_replays_after_finding_expiry ... ok
+test funded_work::tests::execution_authority::invalid_execution_standing_cannot_mint_either_financial_decision ... ok
+test funded_work::tests::native::admission_without_a_payment_participant_remains_inspectable ... ok
+test funded_work::tests::native::changed_request_and_unavailable_observer_cannot_reserve ... ok
+test funded_work::tests::native::concurrent_retries_cannot_duplicate_native_dispatch_or_hold ... ok
+test funded_work::tests::native::fresh_native_authority_cannot_inherit_funded_agreement ... ok
+test funded_work::tests::native::invalid_observations_deny_before_any_native_operation_hold_or_dispatch ... ok
+test funded_work::tests::native::observation_lost_during_authorization_keeps_original_native_identity ... ok
+test funded_work::tests::native::original_capability_expiry_and_scope_deny_before_reservation ... ok
+test funded_work::tests::native::resigning_another_request_cannot_reuse_the_original_deposit ... ok
+test funded_work::tests::native::restart_and_replay_preserve_one_operation_and_original_hold ... ok
+test funded_work::tests::native::retention_capacity_denies_before_an_additional_native_reservation ... ok
+test funded_work::tests::native::signed_agreement_rejects_identity_and_signature_substitution ... ok
+test funded_work::tests::native::verified_funding_creates_one_native_operation_and_hold ... ok
+test funded_work::tests::observer::receiver_verifies_exact_funded_state_and_confirmed_ancestry ... ok
+test funded_work::tests::observer::stale_chain_time_cannot_be_refreshed_by_a_new_receiver_timestamp ... ok
+test funded_work::tests::resolution::refund_substitution_cannot_authorize_a_native_waiver ... ignored, requires the owned Node chain; selected explicitly by successor qualification
+test funded_work::tests::settlement::payout_rejects_altered_observations_and_adapter_identities ... ignored, requires the owned Node chain and CHIO_FUNDED_PYTHON; exercised by lifecycle qualification
+test funded_work::tests::successors::altered_original_waiver_authority_denies_before_reservation ... ok
+test funded_work::tests::successors::legacy_funding_cannot_acquire_a_waiver_after_execution ... ok
+test funded_work::tests::successors::substituted_dependency_denies_before_opening_the_child_kernel ... ok
+test funded_work::tests::verifier_handoff::changed_verifier_seed_cannot_consume_pending_original_custody ... ok
+test funded_work::tests::verifier_handoff::provider_signed_binding_substitution_cannot_replace_native_execution_authority ... ok
+test funded_work::tests::verifier_handoff::public_verifier_reconstructs_original_authority_without_private_native_request ... ok
+test funded_work::tests::verifier_handoff::verifier_reobserves_claim_after_checker_before_minting_a_decision ... ignored, requires owned chain; selected by authority/verifier qualification
+test funded_work::tests::wire::canonical_signed_artifact_decoding_rejects_raw_ambiguity ... ok
+test funded_work::tests::wire::original_agreement_commits_finding_context_and_required_facets ... ok
+test funded_work::tests::wire::registered_artifact_vectors_cover_current_signed_shapes ... ok
+test funded_work::tests::wire::required_facet_failure_times_out_without_a_chain_decision_or_payment ... ignored, requires the owned Node chain and pinned Python checker; selected by registered-work qualification
+test funded_work::tests::wire::shared_malformed_vectors_match_the_registered_rust_parser ... ok
+test funded_work::tests::wire::signed_decision_cannot_override_missing_or_changed_finding_authority ... ok
+test funded_work::tests::wire::signed_requirement_or_context_substitution_cannot_admit_work ... ok
+test funded_work::tests::wire::unavailable_or_unsupported_finding_facets_cannot_mint_financial_decisions ... ok
+test https::tests::advertised_origin_cannot_change_scheme_or_route ... ok
+test https::tests::public_enrollment_rejects_keys_and_malformed_certificates ... ok
+test subcontract::tests::disclosure_reconstructs_authentication_without_nested_private_data ... ok
+test subcontract::tests::even_valid_promisor_signatures_cannot_widen_the_exact_procurement ... ok
+test subcontract::tests::four_keys_and_exact_disclosure_are_required ... ok
+test subcontract::tests::parent_signature_cannot_replace_specialist_evidence ... ok
+test tests::authentication_review_observes_inheritance_and_explicit_anonymous_alternatives ... ok
+test tests::authentication_review_rejects_ambiguous_or_unsupported_security_semantics ... ok
+test tests::buyer_rejects_widened_offers_even_when_provider_resigns_them ... ok
+test tests::release_vectors_require_exact_joint_authority_and_completed_receipt ... ok
+test work_buyer::tests::conflicting_verified_terminals_cannot_change_the_first_accounting_choice ... ok
+
+test result: ok. 76 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 201.89s

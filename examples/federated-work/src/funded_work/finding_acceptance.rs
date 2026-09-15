@@ -20,7 +20,9 @@ pub const EXECUTION_CONTEXT_SCHEMA: &str = "chio.experimental.funded-finding-con
 
 #[path = "finding_context.rs"]
 mod context_bootstrap;
-pub use context_bootstrap::{fixture_context, fixture_execution_context};
+pub use context_bootstrap::{
+    fixture_context, fixture_execution_context, signed_execution_context, ContextSigners,
+};
 
 /// Persist before agreement signing. The independently loaded agreement policy
 /// pins the digest of this complete context, including every authority key.

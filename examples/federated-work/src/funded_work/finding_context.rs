@@ -12,7 +12,10 @@ pub fn fixture_context(
         verifier_key,
         kernel_key,
         Keypair::generate().public_key(),
-        &Keypair::generate(),
+        ContextSigners {
+            governance: &Keypair::generate(),
+            status: &Keypair::generate(),
+        },
         now,
         expires_at,
         false,
@@ -33,12 +36,34 @@ pub fn fixture_execution_context(
         verifier_key,
         kernel_key,
         checkpoint_key,
-        status,
+        ContextSigners {
+            governance: &Keypair::generate(),
+            status,
+        },
         now,
         expires_at,
         true,
     )?;
     validate_context(&context, verifier_key, kernel_key, now)?;
+    Ok(context)
+}
+
+pub struct ContextSigners<'a> {
+    pub governance: &'a Keypair,
+    pub status: &'a Keypair,
+}
+
+/// Sign the same bounded profile with externally held governance/status keys.
+pub fn signed_execution_context(
+    verifier: &PublicKey,
+    kernel: &PublicKey,
+    checkpoint: PublicKey,
+    signers: ContextSigners<'_>,
+    now: u64,
+    expires: u64,
+) -> Result<AcceptanceContext> {
+    let context = build_context(verifier, kernel, checkpoint, signers, now, expires, true)?;
+    validate_context(&context, verifier, kernel, now)?;
     Ok(context)
 }
 
@@ -58,7 +83,7 @@ fn build_context(
     verifier_key: &PublicKey,
     kernel_key: &PublicKey,
     checkpoint_key: PublicKey,
-    status: &Keypair,
+    signers: ContextSigners<'_>,
     now: u64,
     expires_at: u64,
     execution: bool,
@@ -66,7 +91,7 @@ fn build_context(
     if now >= expires_at || expires_at - now > 86400 {
         return Err("Finding fixture trust requires a bounded one-day window".into());
     }
-    let governance = Keypair::generate();
+    let ContextSigners { governance, status } = signers;
     let new_authority = |role| authority(Keypair::generate().public_key(), role, now, expires_at);
     let governance_authority = authority(governance.public_key(), "governance", now, expires_at);
     let checkpoint = authority(checkpoint_key, "checkpoint", now, expires_at);
@@ -132,7 +157,7 @@ fn build_context(
         expires_at,
     };
     body.profile_id = compute_profile_id(&body)?;
-    let profile = SignedExportEnvelope::sign(body, &governance)?;
+    let profile = SignedExportEnvelope::sign(body, governance)?;
     let standing = SignedExportEnvelope::sign(
         FindingAuthorityStatus {
             schema: FINDING_AUTHORITY_STATUS_SCHEMA_V1.into(),

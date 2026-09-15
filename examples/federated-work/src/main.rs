@@ -21,6 +21,17 @@ use std::path::Path;
 fn run() -> Result<serde_json::Value> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        ["experimental-authority-context",governance,status,pins,expires,output] => funded_work::authority_enrollment::context_file(Path::new(governance),Path::new(status),Path::new(pins),expires.parse()?,Path::new(output)),
+        ["experimental-provider-enroll",state,pins,context,domain] => funded_work::authority_enrollment::enroll_files(Path::new(state),Path::new(pins),Path::new(context),Path::new(domain)),
+        ["experimental-verifier-init",state,enrollment] => funded_work::verifier_operator::initialize_file(Path::new(state),Path::new(enrollment)),
+        #[cfg(unix)]
+        ["experimental-verifier-decide",state,request,socket,output] => funded_work::verifier_operator::decide_file(Path::new(state),Path::new(request),Path::new(socket),Path::new(output)),
+        #[cfg(unix)]
+        ["experimental-verifier-export",state,request,socket,output] => funded_work::verifier_files::export(Path::new(state),request,Path::new(socket),Path::new(output)),
+        #[cfg(unix)]
+        ["experimental-verifier-import",state,request,socket,input] => funded_work::verifier_files::import(Path::new(state),request,Path::new(socket),Path::new(input)),
+        #[cfg(unix)]
+        ["experimental-authority-lifecycle",root,mode] => funded_work::authority_process::run(Path::new(root),mode),
         ["experimental-checkpoint-init",state,enrollment] => funded_work::checkpoint_operator::initialize_file(Path::new(state),Path::new(enrollment)),
         ["experimental-checkpoint-sign",state,request,response] => funded_work::checkpoint_operator::sign_file(Path::new(state),Path::new(request),Path::new(response)),
         ["experimental-checkpoint-export",state,request,output] => funded_work::checkpoint_files::export(Path::new(state),request,Path::new(output)),

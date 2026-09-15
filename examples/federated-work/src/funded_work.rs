@@ -1,6 +1,9 @@
 //! Experimental, receiver-owned funding admission. Local development chain only.
 
 mod agreement;
+pub mod authority_enrollment;
+#[cfg(unix)]
+pub mod authority_process;
 pub mod checkpoint_files;
 mod checkpoint_handoff;
 pub mod checkpoint_operator;
@@ -11,6 +14,10 @@ mod child;
 mod child_process;
 mod evidence;
 pub mod execution_evidence;
+#[cfg(unix)]
+pub mod verifier_files;
+mod verifier_handoff;
+pub mod verifier_operator;
 #[cfg(unix)]
 pub use child_process::{collect_worker as child_collector, parent_worker, run as child};
 mod capture_resolution;
