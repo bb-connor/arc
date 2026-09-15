@@ -1,5 +1,6 @@
 """Actual process host, signed task authority, sealed custody and restart."""
 
+import argparse
 import copy
 import json
 import select
@@ -12,7 +13,31 @@ from pathlib import Path
 from chio_process import ProcessClient
 
 
-def exercise(binary, directory):
+def supervise(binary, state, output, worker_image):
+    repository = Path(__file__).resolve().parents[5]
+    command = [
+        sys.executable,
+        str(repository / "examples/reference-swarm/process-run.py"),
+        "--chio",
+        binary,
+        "--state",
+        str(state),
+        "--output",
+        str(output),
+    ]
+    if worker_image:
+        command.extend(["--worker-image", worker_image])
+    completed = subprocess.run(
+        command, capture_output=True, text=True, timeout=180, check=False
+    )
+    assert completed.returncode == 0, (completed.stdout, completed.stderr)
+    report = json.loads(completed.stdout)
+    assert report["verified_workers"] == ["alice", "bob"], report
+    assert report["runner"]["complete"], report
+    return report
+
+
+def exercise(binary, directory, worker_image=None, supervisor_only=False):
     repository = Path(__file__).resolve().parents[5]
     state = directory / "state"
     socket = directory / "host.sock"
@@ -114,6 +139,29 @@ capabilities:
             raise AssertionError("sealed source accepted a legacy continuation write")
         except sqlite3.IntegrityError as failure:
             assert "sealed" in str(failure), failure
+
+    def effects():
+        with sqlite3.connect(f"file:{state / 'mailboxes.db'}?mode=ro", uri=True) as db:
+            return db.execute(
+                "SELECT sender, payload FROM mailbox_messages ORDER BY sequence"
+            ).fetchall()
+
+    if supervisor_only:
+        assert effects() == []
+        first_run = supervise(binary, state, directory / "verified-run", worker_image)
+        assert sorted(row[0] for row in effects()) == ["alice", "bob"], effects()
+        # Reopening the completed runner cannot add an effect or replace receipts.
+        second_run = supervise(binary, state, directory / "recovered-run", worker_image)
+        for name in ["alice", "bob"]:
+            original = (
+                directory / "verified-run" / name / "response.json"
+            ).read_bytes()
+            replayed = (
+                directory / "recovered-run" / name / "response.json"
+            ).read_bytes()
+            assert original == replayed
+        assert len(effects()) == 2
+        return {"effects": 2, "first": first_run, "recovered": second_run}
     descriptors = {}
     for name in ["alice", "bob"]:
         out = directory / f"{name}.json"
@@ -164,12 +212,6 @@ capabilities:
             call["arguments"],
             **fields,
         )
-
-    def effects():
-        with sqlite3.connect(f"file:{state / 'mailboxes.db'}?mode=ro", uri=True) as db:
-            return db.execute(
-                "SELECT sender, payload FROM mailbox_messages ORDER BY sequence"
-            ).fetchall()
 
     host = start()
     try:
@@ -261,26 +303,7 @@ capabilities:
             host.terminate()
             host.wait(timeout=30)
     if sys.platform == "linux":
-        completed = subprocess.run(
-            [
-                sys.executable,
-                str(repository / "examples/reference-swarm/process-run.py"),
-                "--chio",
-                binary,
-                "--state",
-                str(state),
-                "--output",
-                str(directory / "verified-run"),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=120,
-            check=False,
-        )
-        assert completed.returncode == 0, (completed.stdout, completed.stderr)
-        report = json.loads(completed.stdout)
-        assert report["verified_workers"] == ["alice", "bob"], report
-        assert report["runner"]["complete"], report
+        supervise(binary, state, directory / "verified-run", worker_image)
         assert len(effects()) == 2
     # The host has exited and checkpointed its authority. Inspect that stable
     # snapshot without requesting new WAL sidecars from the hardened VFS.
@@ -329,5 +352,19 @@ capabilities:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("binary")
+    parser.add_argument("--worker-image")
+    parser.add_argument("--supervisor-only", action="store_true")
+    args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="chio-swarm-host-") as temporary:
-        print(json.dumps(exercise(sys.argv[1], Path(temporary))))
+        print(
+            json.dumps(
+                exercise(
+                    args.binary,
+                    Path(temporary),
+                    args.worker_image,
+                    args.supervisor_only,
+                )
+            )
+        )
