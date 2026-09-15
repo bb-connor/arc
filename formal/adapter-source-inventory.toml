@@ -860,3 +860,11 @@ path = "crates/kernel/chio-process/src/lib.rs"
 symbol = "ProcessRuntime::invoke_with_recovery"
 target = ".evaluate_tool_call_with_metadata"
 references = 1
+
+# Test-only late-caller calibration uses the existing mediated reconciliation API.
+[[dispatch_sites]]
+id = "D088"
+path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_restart.rs"
+symbol = "caller_lookup_waits_for_original_coordinator"
+target = ".reconcile_caller_execution_blocking"
+references = 1

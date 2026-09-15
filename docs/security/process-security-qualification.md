@@ -161,7 +161,21 @@ supervisor, exports worker checkpoints and independently verifies responses
 with the operator-pinned kernel key. Its optional immutable Docker image uses
 the existing fixed confinement profile; native workers remain cooperative
 same-user processes. The image stores code outside the runner's `/work` tmpfs.
-Linux supervisor and actual Enforced reference-tool runs remain unqualified.
+Host implementation: `84f8e77740c521829999071c9861d335b97be1de`.
+Fresh-supervisor fixture: `9833a537ffa8bff878355409e1d93b13608c24d9`.
+Frozen `9833a537f` passed all nine macOS host/response tests, strict all-target
+Clippy, formatting and source hygiene with clean source and lock unchanged.
+Exact commands, compiler, terminal results, log and binary hashes are retained
+in `macos-m5-9833a537f/`.
+
+The separate Linux checkout `/home/connor.guest/chio-m5-9833a537f` and target
+`/home/connor.guest/chio-m5-target` run the full host/response tests, fresh native
+workers, fresh isolated container workers, completed-run reopening and strict
+Clippy. `run-linux-m5-9833a537f.py` records these gates in `linux-m5-9833a537f/`.
+The worker image is built from that same source and pinned to local ID
+`sha256:6bcdff881f83af9262b475c226c0e5e5fb5be82faa011fbe639d9b9d948099d8`;
+the build log and full image metadata are retained. Linux supervisor and actual
+Enforced reference-tool runs remain unqualified until their terminal gates pass.
 The Disabled smoke is unchanged. Full fan-in, all scenario/effect oracles,
 independent complete-artifact verification and M6-M10 remain required.
 
@@ -214,8 +228,15 @@ The authenticated-caller script also passed: 33 exact lifecycle cases, nine
 durable-executor cases and 19 native-custody cases, zero failures or ignores.
 It exited zero at 22:13:35 UTC with source and lock unchanged; log SHA256 is
 `2009897228feccca7648e664787f8ec5a45151a4845bc9b10f7d163dcae2591e`.
-The serial runner is executing consumer boundaries; flow and workspace gates
-remain queued. The runner is
+The consumer gate subsequently stopped at the adapter no-bypass source check.
+It requires an exact inventory entry for the new late-caller regression helper.
+The next checker run also exposed its stale requirement for the complete swarm
+verifier at the live admission boundary. The source contract now names the live
+verifier and additionally requires exact request/capability binding, with both
+calls included in removal-sensitive tests. No runtime authority is bypassed.
+The failed consumer log and unchanged-source manifest remain retained in
+`linux-73f3d7fa5/`. Flow and workspace gates have not run in this queue.
+The original runner is
 `run-linux-gates-73f3d7fa5.py`, Codex session `62677`. Neither frozen
 qualification checkout is edited during these runs.
 

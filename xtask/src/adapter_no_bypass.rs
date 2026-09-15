@@ -400,7 +400,13 @@ const CALL_CONTRACTS: &[CallContract] = &[
     CallContract {
         path: "crates/kernel/chio-runtime-core/src/admission_hook/swarm_authority.rs",
         function: "verify_swarm_authority_reference_from_store",
-        target: "verify_swarm_authority_bundle",
+        target: "verify_swarm_authority_for_admission",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/kernel/chio-runtime-core/src/admission_hook/swarm_authority.rs",
+        function: "verify_swarm_authority_reference_from_store",
+        target: "verify_swarm_request_binding",
         minimum: 1,
     },
     CallContract {
@@ -1261,11 +1267,13 @@ mod tests {
                     "self.prepare_request"
                         | "prepared.reserve"
                         | "verify_swarm_authority_reference_from_store"
+                        | "verify_swarm_authority_for_admission"
+                        | "verify_swarm_request_binding"
                         | "hook.store.consume_swarm_continuation"
                 )
             })
             .collect();
-        assert_eq!(contracts.len(), 4);
+        assert_eq!(contracts.len(), 6);
         for contract in contracts {
             let source = fs::read_to_string(root.join(contract.path))
                 .unwrap_or_else(|error| panic!("read {}: {error}", contract.path));
