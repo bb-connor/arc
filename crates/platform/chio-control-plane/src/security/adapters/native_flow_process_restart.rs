@@ -272,6 +272,7 @@ pub(super) fn verify(
             })?;
         }
         RecoveryMode::LateCallerReport => {
+            caller_lookup_waits_for_original_coordinator(&kernel, witness, &fence)?;
             let barrier = std::sync::Barrier::new(2);
             std::thread::scope(|scope| -> TestResult {
                 let worker = scope.spawn(|| {
@@ -463,4 +464,61 @@ pub(super) fn verify(
     );
     assert_eq!(retained(&authority, &witness.request)?.0, after);
     Ok(())
+}
+
+// A retained-request read must select trusted time only after it owns the same
+// sequencer as recovery. Otherwise a writer can advance the operation while
+// the lookup waits for SQLite, producing a false clock-regression failure.
+fn caller_lookup_waits_for_original_coordinator(
+    kernel: &ChioKernel,
+    witness: &Witness,
+    fence: &chio_kernel::admission_operation::StoreMutationFence,
+) -> TestResult {
+    use chio_kernel::admission_operation::AdmissionMutationSequencer;
+    use std::sync::mpsc;
+
+    let sequencer = AdmissionMutationSequencer::for_fence(fence)?;
+    let guard = sequencer.lock()?;
+    let nonce = witness
+        .request
+        .execution_nonce
+        .as_ref()
+        .ok_or("native nonce")?;
+    std::thread::scope(|scope| -> TestResult {
+        let (started_tx, started_rx) = mpsc::sync_channel(1);
+        let (finished_tx, finished_rx) = mpsc::sync_channel(1);
+        let worker = scope.spawn(move || {
+            let _ = started_tx.send(());
+            let result = kernel.reconcile_caller_execution_blocking(
+                nonce,
+                &witness.request.arguments,
+                chio_kernel::CallerExecutionReport {
+                    output: serde_json::json!({"forged_queued_report": true}),
+                    realized_cost: None,
+                },
+            );
+            let _ = finished_tx.send(result);
+        });
+        let started = started_rx.recv_timeout(Duration::from_secs(30));
+        let early = finished_rx.recv_timeout(Duration::from_secs(1));
+        // Release before checking assertions so a failing test cannot strand
+        // the scoped worker waiting for the held coordinator.
+        drop(guard);
+        started?;
+        let waited = matches!(early, Err(mpsc::RecvTimeoutError::Timeout));
+        let result = match early {
+            Ok(result) => result,
+            Err(_) => finished_rx.recv_timeout(Duration::from_secs(30))?,
+        };
+        worker.join().map_err(|_| "queued caller lookup panicked")?;
+        assert!(
+            waited,
+            "caller lookup bypassed the original mutation sequencer"
+        );
+        assert!(
+            matches!(result, Err(KernelError::DurableAdmission(ref reason)) if reason.contains("caller")),
+            "queued native caller report must still be refused: {result:?}"
+        );
+        Ok(())
+    })
 }

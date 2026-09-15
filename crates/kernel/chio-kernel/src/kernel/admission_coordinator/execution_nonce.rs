@@ -508,6 +508,9 @@ impl ChioKernel {
         trusted_now_unix_ms: u64,
     ) -> Result<ToolCallRequest, KernelError> {
         let runtime = self.durable_runtime()?;
+        // Select trusted time after recovery's mutations, not before waiting
+        // for their SQLite transaction. The retained lookup checks row time.
+        let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
         let selector = AdmissionIdentifier::try_new("request_id", request_id.to_owned())
             .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
