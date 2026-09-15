@@ -29,6 +29,7 @@ REQUIRED_AGGREGATE_NEEDS = (
     "cargo-vet",
     "cargo-deny",
     "enterprise-security-contract",
+    "nonce-fips-contract",
 )
 REQUIRED_AGGREGATE_ASSERTIONS = {
     f"test '${{{{ needs.{identifier}.result }}}}' = success"
@@ -791,7 +792,7 @@ EXPECTED_REVOCATION_STEP_INVENTORY = (
     ("Revoke exact Actions mirrors and dedicated App namespace", None, None),
 )
 EXPECTED_COMMITTED_EVIDENCE_STEP_INVENTORY = (
-    ("Bind committed evidence or authorize narrow bootstrap", "evidence", None),
+    ("Bind required committed evidence", "evidence", None),
     (
         "Checkout exact committed evidence without credentials",
         None,
@@ -919,7 +920,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise-hardening",
         "committed-linux-evidence",
-    ): "98436d207ab41edfb0ce4e3c915cc8f30277ec57d601c48ab5dc32eb44320766",
+    ): "de440f47dbaec2abecd7b935986ecb546e90982b0bf26d97dd6194f3ca24a531",
 }
 EXPECTED_AGGREGATE_RUN = "\n".join(
     (
@@ -4785,7 +4786,103 @@ def validate_isolated_execution_job(
             raise ContractError(f"{contract} executes candidate tooling on the host")
 
 
+# These source contracts retain every reviewed exact-test identity, invocation,
+# pinned action and unprivileged job setting. Update only after reviewing the
+# changed inventory; hashing parsed jobs ignores YAML formatting and comments.
+EXPECTED_NONCE_FIPS_JOBS = {
+    "threshold-crypto-floor": "ee2627806708706d8e70f8da457c4b59964a0c325e1db59bec9132fe95622d19",
+    "session-reports": "2580c99677a6d38a83365cbce616d73202b0d4ef25909f239f355b89d3bb1cd1",
+    "fips-smoke": "2d300a5b16e51ea5260cfad2eb0c2d09f7b179a82cd0a24e30ca744352e9bc9b",
+}
+EXPECTED_NONCE_FIPS_PATHS = [
+    ".github/workflows/chio-tee-fips.yml",
+    "crates/trust/chio-tee/**",
+    "crates/trust/chio-tee-frame/**",
+    "crates/core/chio-core-types/**",
+    "crates/core/chio-core/**",
+    "crates/kernel/chio-kernel/**",
+    "crates/kernel/chio-kernel-core/**",
+    "crates/platform/chio-store-sqlite/**",
+    "crates/products/chio-cli/**",
+    "spec/schemas/chio-wire/v1/**",
+    "tests/bindings/fixtures/protocol-primitives-v1.json",
+    "scripts/check-exact-cargo-test-inventory.py",
+    "scripts/run-exact-cargo-test-inventory.sh",
+    "Cargo.toml",
+    "Cargo.lock",
+]
+
+
+def validate_committed_evidence_binding(committed_evidence: dict) -> None:
+    binding = named_step(committed_evidence, "Bind required committed evidence")
+    if binding != {
+        "name": "Bind required committed evidence",
+        "id": "evidence",
+        "env": {
+            "AUTHORIZED_SOURCE_SHA": "${{ vars.CHIO_AUTHORIZED_SECURITY_SOURCE_SHA }}",
+            "EVIDENCE_SHA": "${{ vars.CHIO_COMMITTED_LINUX_EVIDENCE_SHA }}",
+        },
+        "run": 'set -euo pipefail\n'
+        '[[ "${AUTHORIZED_SOURCE_SHA}" =~ ^[0-9a-f]{40}$ ]]\n'
+        '[[ "${EVIDENCE_SHA}" =~ ^[0-9a-f]{40}$ ]]\n'
+        'test "${EVIDENCE_SHA}" != "${AUTHORIZED_SOURCE_SHA}"\n'
+        'echo "verify=true" >> "${GITHUB_OUTPUT}"\n',
+    }:
+        raise ContractError("required committed Linux evidence binding changed")
+
+
+def validate_nonce_fips_contract(root: Path) -> None:
+    workflow = load_workflow(root / ".github/workflows/chio-tee-fips.yml")
+    ci = load_workflow(root / ".github/workflows/ci.yml")
+    if job(ci, "nonce-fips-contract") != {
+        "uses": "./.github/workflows/chio-tee-fips.yml",
+        "permissions": {"contents": "read"},
+    }:
+        raise ContractError("nonce/FIPS required caller protection changed")
+    aggregate = job(ci, "security-contract-required")
+    if "nonce-fips-contract" not in aggregate.get("needs", []) or (
+        "test '${{ needs.nonce-fips-contract.result }}' = success"
+        not in named_step(aggregate, "Require every security dependency").get("run", "")
+    ):
+        raise ContractError("security aggregate omits nonce/FIPS success")
+    events = workflow.get("on", {})
+    if (
+        set(events) != {"workflow_call", "workflow_dispatch", "pull_request", "push"}
+        or events["workflow_call"] != ""
+        or events["workflow_dispatch"] != ""
+        or set(events["pull_request"]) != {"branches-ignore", "paths"}
+        or events["pull_request"]["branches-ignore"] != ["main"]
+        or set(events["push"]) != {"branches", "paths"}
+        or events["push"]["branches"] != ["project/**"]
+        or events["pull_request"]["paths"] != events["push"]["paths"]
+        or events["push"]["paths"] != EXPECTED_NONCE_FIPS_PATHS
+        or ci.get("on", {}).get("push", {}).get("branches") != ["main"]
+        or ci.get("on", {}).get("pull_request", {}).get("branches") != ["main"]
+    ):
+        raise ContractError("nonce/FIPS triggers lose coverage or duplicate required CI")
+    if (
+        set(workflow) != {"name", "on", "concurrency", "permissions", "env", "jobs"}
+        or workflow.get("permissions") != {"contents": "read"}
+        or workflow.get("env") != {"CARGO_TERM_COLOR": "always", "CARGO_INCREMENTAL": "0"}
+        or workflow.get("concurrency") != {
+            "group": "chio-tee-fips-${{ github.workflow }}-${{ github.ref }}",
+            "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
+        }
+    ):
+        raise ContractError("nonce/FIPS workflow privilege or execution boundary changed")
+    jobs = workflow_jobs(workflow)
+    if set(jobs) != set(EXPECTED_NONCE_FIPS_JOBS):
+        raise ContractError("nonce/FIPS job inventory changed")
+    for identifier, expected in EXPECTED_NONCE_FIPS_JOBS.items():
+        observed = hashlib.sha256(
+            json.dumps(jobs[identifier], sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        if observed != expected:
+            raise ContractError(f"nonce/FIPS {identifier} source contract changed")
+
+
 def validate(root: Path) -> None:
+    validate_nonce_fips_contract(root)
     validate_global_workflow_boundaries(root)
     validate_environment_provisioning_document(root)
     validate_security_execution_boundary_files(root)
@@ -5224,34 +5321,7 @@ def validate(root: Path) -> None:
         EXPECTED_COMMITTED_EVIDENCE_STEP_INVENTORY,
         "committed Linux evidence",
     )
-    bootstrap_step = named_step(
-        committed_evidence, "Bind committed evidence or authorize narrow bootstrap"
-    )
-    if set(bootstrap_step) != {"name", "id", "env", "run"} or bootstrap_step.get(
-        "env"
-    ) != {
-        "AUTHORIZED_SOURCE_SHA": "${{ vars.CHIO_AUTHORIZED_SECURITY_SOURCE_SHA }}",
-        "EVIDENCE_SHA": "${{ vars.CHIO_COMMITTED_LINUX_EVIDENCE_SHA }}",
-        "SOURCE_REPOSITORY": "${{ needs.bind-source.outputs.source_repository }}",
-        "SOURCE_SHA": "${{ needs.bind-source.outputs.source_sha }}",
-    }:
-        raise ContractError("committed Linux evidence bootstrap bindings changed")
-    require_run_markers(
-        committed_evidence,
-        "Bind committed evidence or authorize narrow bootstrap",
-        (
-            '[[ "${AUTHORIZED_SOURCE_SHA}" =~ ^[0-9a-f]{40}$ ]]',
-            '[[ "${SOURCE_SHA}" =~ ^[0-9a-f]{40}$ ]]',
-            'if test -z "${EVIDENCE_SHA}"; then',
-            'test "${SOURCE_REPOSITORY}" = "${GITHUB_REPOSITORY}"',
-            'test "${SOURCE_SHA}" = "${AUTHORIZED_SOURCE_SHA}"',
-            'echo "verify=false" >> "${GITHUB_OUTPUT}"',
-            '[[ "${EVIDENCE_SHA}" =~ ^[0-9a-f]{40}$ ]]',
-            'test "${EVIDENCE_SHA}" != "${AUTHORIZED_SOURCE_SHA}"',
-            'echo "verify=true" >> "${GITHUB_OUTPUT}"',
-        ),
-        "committed Linux evidence bootstrap is wider than empty-E at authorized S",
-    )
+    validate_committed_evidence_binding(committed_evidence)
     verify_condition = "steps.evidence.outputs.verify == 'true'"
     evidence_checkout = named_step(
         committed_evidence, "Checkout exact committed evidence without credentials"

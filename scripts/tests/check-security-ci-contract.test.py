@@ -103,6 +103,7 @@ BOOTSTRAP_SENTINEL_PATTERN = re.compile(
 
 WORKFLOWS = (
     "ci.yml",
+    "chio-tee-fips.yml",
     "enterprise-hardening.yml",
     "enterprise-evidence-controller.yml",
     "enterprise-linux-capture.yml",
@@ -1765,24 +1766,24 @@ assert_rejected(
     "committed Linux evidence job protection changed",
 )
 assert_rejected(
-    "committed evidence bootstrap trusts raw caller input",
+    "required committed evidence trusts raw caller input",
     "enterprise-hardening.yml",
     replace_in_named_step(
-        "Bind committed evidence or authorize narrow bootstrap",
-        "SOURCE_SHA: ${{ needs.bind-source.outputs.source_sha }}",
-        "SOURCE_SHA: ${{ inputs.source_sha }}",
+        "Bind required committed evidence",
+        "EVIDENCE_SHA: ${{ vars.CHIO_COMMITTED_LINUX_EVIDENCE_SHA }}",
+        "EVIDENCE_SHA: ${{ inputs.source_sha }}",
     ),
-    "bootstrap bindings changed",
+    "required committed Linux evidence binding changed",
 )
 assert_rejected(
-    "committed evidence bootstrap widened past authorized S",
+    "required committed evidence permits empty evidence",
     "enterprise-hardening.yml",
     replace_in_named_step(
-        "Bind committed evidence or authorize narrow bootstrap",
-        'test "${SOURCE_SHA}" = "${AUTHORIZED_SOURCE_SHA}"',
+        "Bind required committed evidence",
+        '[[ "${EVIDENCE_SHA}" =~ ^[0-9a-f]{40}$ ]]',
         "true",
     ),
-    "bootstrap is wider",
+    "required committed Linux evidence binding changed",
 )
 assert_rejected(
     "committed evidence E replaced with current C",

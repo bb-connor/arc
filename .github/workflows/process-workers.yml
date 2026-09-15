@@ -24,6 +24,8 @@ on:
       - "examples/process-starter/**"
       - "scripts/qualify-process-packages.py"
       - "scripts/check-process-dependencies.py"
+      - "scripts/tests/check-process-dependencies.test.py"
+      - "scripts/tests/check-process-ci-inventory.test.py"
       - "scripts/package-repository-review.py"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -52,6 +54,8 @@ on:
       - "examples/process-starter/**"
       - "scripts/qualify-process-packages.py"
       - "scripts/check-process-dependencies.py"
+      - "scripts/tests/check-process-dependencies.test.py"
+      - "scripts/tests/check-process-ci-inventory.test.py"
       - "scripts/package-repository-review.py"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -106,6 +110,9 @@ jobs:
           sdks/python/chio-mini-swe/.venv/bin/ruff format --check --config sdks/python/chio-mini-swe/pyproject.toml crates/products/chio-cli/tests/process_host/container_runner.py crates/products/chio-cli/tests/process_host/container_worker.py
       - name: Default kernel and worker dependency boundary
         run: |
+          python3 -m pip install --disable-pip-version-check PyYAML==6.0.2
+          python3 scripts/tests/check-process-dependencies.test.py
+          python3 scripts/tests/check-process-ci-inventory.test.py
           python3 scripts/check-process-dependencies.py
           cargo test --locked -p chio-kernel --lib custody::tests
       - name: CLI host and real MCP worker recovery
@@ -119,7 +126,7 @@ jobs:
           cargo test --locked -p chio-cli --bin chio request_timeout
           cargo test --locked -p chio-cli --bin chio runner::socket::tests
           cargo test --locked -p chio-control-plane --lib prepared_directory
-          cargo clippy --locked -p chio-cli --bin chio --test process_host --test receipt_verify --test process_response_verify -- -D warnings
+          cargo clippy --locked -p chio-cli --bin chio --test process_host --test receipt_verify --test process_response_verify --test process_state -- -D warnings
           rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/process_host.rs
           rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/receipt_verify.rs
           rustfmt --edition 2021 --check crates/products/chio-cli/src/cli/process_response_verify.rs crates/products/chio-cli/tests/process_response_verify.rs

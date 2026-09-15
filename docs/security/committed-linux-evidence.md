@@ -4,6 +4,15 @@ Committed Linux capture evidence is accepted only through the strict
 repository-bound verifier. Signature verification alone is not a committed
 evidence gate.
 
+CI requires a configured, valid `CHIO_COMMITTED_LINUX_EVIDENCE_SHA`, distinct
+from the authorized source commit, followed by successful strict verification.
+An empty evidence variable fails even for the authorized source. There is no
+bootstrap-success path. Updating local workflow source does not rotate the
+separately trusted reusable-workflow pin or authorize a new execution image.
+The required Actions aggregate also joins the reusable nonce and FIPS inventory;
+main pull requests and main pushes reach it through CI, while manual runs,
+project-branch pushes and non-main pull requests retain their direct coverage.
+
 The default-branch control plane and repository variables supply every
 expectation independently of the candidate tree:
 

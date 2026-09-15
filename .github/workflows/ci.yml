@@ -152,6 +152,8 @@ jobs:
           python3 ./scripts/tests/check-mcp-admin-credential-contract.test.py
           python3 ./scripts/check-security-ci-contract.py
           python3 ./scripts/tests/check-security-ci-contract.test.py
+          python3 ./scripts/tests/check-fips-ci-contract.test.py
+          python3 ./scripts/tests/check-required-evidence-binding.test.py
           bash ./scripts/tests/check-rust-verification-gates.test.sh
           bash ./scripts/tests/formal-workflow-wiring.test.sh
           cargo metadata --manifest-path fuzz/Cargo.toml --locked --no-deps --format-version 1 >/dev/null
@@ -496,6 +498,11 @@ jobs:
   threat-model-coverage-contract:
     uses: ./.github/workflows/threat-model-coverage.yml
 
+  nonce-fips-contract:
+    uses: ./.github/workflows/chio-tee-fips.yml
+    permissions:
+      contents: read
+
   enterprise-security-contract:
     # CHIO_ENTERPRISE_HARDENING_BOOTSTRAP_SHA=eba8cdf3fb2e16501947c58415a4739a23cc12b3
     uses: bb-connor/arc/.github/workflows/enterprise-hardening.yml@eba8cdf3fb2e16501947c58415a4739a23cc12b3
@@ -522,6 +529,7 @@ jobs:
       - cargo-vet
       - cargo-deny
       - enterprise-security-contract
+      - nonce-fips-contract
     runs-on: ubuntu-latest
     steps:
       - name: Require every security dependency
@@ -539,6 +547,7 @@ jobs:
           test '${{ needs.cargo-vet.result }}' = success
           test '${{ needs.cargo-deny.result }}' = success
           test '${{ needs.enterprise-security-contract.result }}' = success
+          test '${{ needs.nonce-fips-contract.result }}' = success
 
   msrv:
     name: MSRV build and test

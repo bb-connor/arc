@@ -1,7 +1,10 @@
 name: chio-tee-fips
 
 on:
+  workflow_call:
   pull_request:
+    # Main PRs run through CI's required reusable call.
+    branches-ignore: [main]
     paths:
       - .github/workflows/chio-tee-fips.yml
       - crates/trust/chio-tee/**
@@ -20,7 +23,6 @@ on:
       - Cargo.lock
   push:
     branches:
-      - main
       - 'project/**'
     paths:
       - .github/workflows/chio-tee-fips.yml
@@ -65,8 +67,10 @@ jobs:
       - name: Install Rust toolchain
         run: |
           set -euo pipefail
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+          rustup toolchain install 1.94.1 --profile minimal
+          rustup show active-toolchain
+          rustc --version --verbose
+          cargo --version
 
       - name: Install native build dependencies
         uses: ./.github/actions/apt-install
@@ -550,8 +554,10 @@ jobs:
       - name: Install Rust toolchain
         run: |
           set -euo pipefail
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+          rustup toolchain install 1.94.1 --profile minimal
+          rustup show active-toolchain
+          rustc --version --verbose
+          cargo --version
 
       - name: Install native build dependencies
         uses: ./.github/actions/apt-install
@@ -660,9 +666,11 @@ jobs:
       - name: Install Rust toolchain
         run: |
           set -euo pipefail
-          rustup toolchain install stable --profile minimal --component clippy
-          rustup default stable
-          rustup target add wasm32-unknown-unknown
+          rustup toolchain install 1.94.1 --profile minimal --component clippy
+          rustup show active-toolchain
+          rustc --version --verbose
+          cargo --version
+          rustup target add --toolchain 1.94.1 wasm32-unknown-unknown
 
       - name: Install native build dependencies
         uses: ./.github/actions/apt-install
@@ -672,7 +680,7 @@ jobs:
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
 
       - name: Run mode precedence under fips
-        run: cargo test -p chio-tee --test mode_precedence --features fips
+        run: cargo test --locked -p chio-tee --test mode_precedence --features fips
 
       - name: Cryptographic wire bounds and real signatures
         run: |
@@ -682,9 +690,9 @@ jobs:
           wire_list_output="$(mktemp)"
           wire_run_output="$(mktemp)"
           trap 'rm -f "${wire_list_output}" "${wire_run_output}"' EXIT
-          cargo test -p chio-core-types --all-features --test crypto_wire_bounds \
+          cargo test --locked -p chio-core-types --all-features --test crypto_wire_bounds \
             -- --list 2>&1 | tee "${wire_list_output}"
-          cargo test -p chio-core-types --all-features --test crypto_wire_bounds \
+          cargo test --locked -p chio-core-types --all-features --test crypto_wire_bounds \
             -- --test-threads=1 2>&1 | tee "${wire_run_output}"
           python3 scripts/check-exact-cargo-test-inventory.py \
             --label "Cryptographic wire bounds" \
@@ -711,10 +719,10 @@ jobs:
       - name: Portable crypto feature builds
         run: |
           set -euo pipefail
-          cargo build -p chio-core-types --no-default-features --lib \
+          cargo build --locked -p chio-core-types --no-default-features --lib \
             --target wasm32-unknown-unknown
-          cargo build -p chio-core-types --no-default-features --features pq --lib \
+          cargo build --locked -p chio-core-types --no-default-features --features pq --lib \
             --target wasm32-unknown-unknown
 
       - name: Clippy under fips
-        run: cargo clippy -p chio-tee --features fips -- -D warnings
+        run: cargo clippy --locked -p chio-tee --features fips -- -D warnings

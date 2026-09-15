@@ -669,24 +669,14 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - name: Bind committed evidence or authorize narrow bootstrap
+      - name: Bind required committed evidence
         id: evidence
         env:
           AUTHORIZED_SOURCE_SHA: ${{ vars.CHIO_AUTHORIZED_SECURITY_SOURCE_SHA }}
           EVIDENCE_SHA: ${{ vars.CHIO_COMMITTED_LINUX_EVIDENCE_SHA }}
-          SOURCE_REPOSITORY: ${{ needs.bind-source.outputs.source_repository }}
-          SOURCE_SHA: ${{ needs.bind-source.outputs.source_sha }}
         run: |
           set -euo pipefail
           [[ "${AUTHORIZED_SOURCE_SHA}" =~ ^[0-9a-f]{40}$ ]]
-          [[ "${SOURCE_SHA}" =~ ^[0-9a-f]{40}$ ]]
-          if test -z "${EVIDENCE_SHA}"; then
-            test "${SOURCE_REPOSITORY}" = "${GITHUB_REPOSITORY}"
-            test "${SOURCE_SHA}" = "${AUTHORIZED_SOURCE_SHA}"
-            echo "verify=false" >> "${GITHUB_OUTPUT}"
-            echo "authorized source bootstrap; committed evidence SHA is not configured yet"
-            exit 0
-          fi
           [[ "${EVIDENCE_SHA}" =~ ^[0-9a-f]{40}$ ]]
           test "${EVIDENCE_SHA}" != "${AUTHORIZED_SOURCE_SHA}"
           echo "verify=true" >> "${GITHUB_OUTPUT}"
