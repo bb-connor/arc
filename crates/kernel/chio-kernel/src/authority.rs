@@ -13,6 +13,9 @@ use crate::KernelError;
 use chio_security_types::ports::{IsolationEpochId, LineageId, SessionId, TenantId};
 use chio_security_types::PrincipalId;
 
+mod aggregate;
+pub use aggregate::validate_issued_aggregate_family_root_response;
+
 const DEFAULT_CAPABILITY_ISSUANCE_CLOCK_SKEW_SECONDS: u64 = 30;
 
 /// Fallible wall-clock port used only for capability authority issuance.
@@ -184,18 +187,38 @@ pub fn validate_issued_capability_response_with_binding_at(
     allowed_clock_skew_seconds: u64,
     expected_security_binding: Option<&CapabilitySecurityBinding>,
 ) -> Result<(), KernelError> {
+    validate_issued_response_at(
+        capability,
+        requested_subject,
+        requested_scope,
+        requested_ttl_seconds,
+        current_issuer,
+        now,
+        allowed_clock_skew_seconds,
+        expected_security_binding,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_issued_response_at(
+    capability: &CapabilityToken,
+    requested_subject: &PublicKey,
+    requested_scope: &ChioScope,
+    requested_ttl_seconds: u64,
+    current_issuer: &PublicKey,
+    now: u64,
+    allowed_clock_skew_seconds: u64,
+    expected_security_binding: Option<&CapabilitySecurityBinding>,
+    aggregate_family_limit: Option<u32>,
+) -> Result<(), KernelError> {
     if &capability.issuer != current_issuer {
         return Err(KernelError::UntrustedIssuer);
     }
     if !matches!(capability.verify_signature(), Ok(true)) {
         return Err(KernelError::InvalidSignature);
     }
-    if capability.aggregate_invocation_budget.is_some() {
-        return Err(KernelError::CapabilityIssuanceDenied(
-            "aggregate invocation capability issuance requires atomic composite admission enforcement"
-                .to_string(),
-        ));
-    }
+    aggregate::validate_requested_aggregate(capability, current_issuer, aggregate_family_limit)?;
     ensure_capability_issuance_supported(&capability.scope)?;
     if &capability.subject != requested_subject {
         return Err(KernelError::CapabilityIssuanceFailed(
@@ -301,6 +324,20 @@ pub trait CapabilityAuthority: Send + Sync {
         scope: ChioScope,
         ttl_seconds: u64,
     ) -> Result<CapabilityToken, KernelError>;
+
+    /// Issue an explicitly requested delegation-family root. Authorities must
+    /// opt in; legacy and remote implementations never silently omit the limit.
+    fn issue_aggregate_family_root(
+        &self,
+        _subject: &PublicKey,
+        _scope: ChioScope,
+        _ttl_seconds: u64,
+        _max_invocations: u32,
+    ) -> Result<CapabilityToken, KernelError> {
+        Err(KernelError::CapabilityIssuanceDenied(
+            "this authority does not support aggregate family-root issuance".into(),
+        ))
+    }
 
     fn issue_capability_with_attestation(
         &self,
@@ -448,6 +485,29 @@ impl CapabilityAuthority for LocalCapabilityAuthority {
         self.keypair.public_key()
     }
 
+    fn issue_aggregate_family_root(
+        &self,
+        subject: &PublicKey,
+        scope: ChioScope,
+        ttl_seconds: u64,
+        max_invocations: u32,
+    ) -> Result<CapabilityToken, KernelError> {
+        ensure_capability_issuance_supported(&scope)?;
+        let now = capability_authority_now_unix_secs(self.clock.as_ref())?;
+        let body = CapabilityTokenBody {
+            id: capability_id_at(now)?,
+            issuer: self.authority_public_key(),
+            subject: subject.clone(),
+            scope,
+            issued_at: now,
+            expires_at: now.saturating_add(ttl_seconds),
+            delegation_chain: vec![],
+            aggregate_invocation_budget: None,
+        };
+        CapabilityToken::sign_aggregate_family_root(body, max_invocations, &self.keypair)
+            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
+    }
+
     fn issue_capability(
         &self,
         subject: &PublicKey,
@@ -490,6 +550,33 @@ impl GovernedCapabilityAuthority {
 impl CapabilityAuthority for GovernedCapabilityAuthority {
     fn authority_public_key(&self) -> PublicKey {
         self.backend.public_key()
+    }
+
+    fn issue_aggregate_family_root(
+        &self,
+        subject: &PublicKey,
+        scope: ChioScope,
+        ttl_seconds: u64,
+        max_invocations: u32,
+    ) -> Result<CapabilityToken, KernelError> {
+        ensure_capability_issuance_supported(&scope)?;
+        let now = capability_authority_now_unix_secs(self.clock.as_ref())?;
+        let body = CapabilityTokenBody {
+            id: capability_id_at(now)?,
+            issuer: self.authority_public_key(),
+            subject: subject.clone(),
+            scope,
+            issued_at: now,
+            expires_at: now.saturating_add(ttl_seconds),
+            delegation_chain: vec![],
+            aggregate_invocation_budget: None,
+        };
+        CapabilityToken::sign_aggregate_family_root_with_backend(
+            body,
+            max_invocations,
+            self.backend.as_ref(),
+        )
+        .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
     }
 
     fn issue_capability(

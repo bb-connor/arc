@@ -11,12 +11,14 @@ mod integrity_tests;
 #[cfg(feature = "mailboxes")]
 pub mod mailboxes;
 mod registry;
+mod routes;
 mod state_reader;
 mod store;
 mod types;
 #[cfg(feature = "worker-server")]
 pub mod worker;
 
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -28,6 +30,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 
 pub use registry::{ChildSubmission, ChildWork, ProcessRegistry, WorkerWait};
+pub use routes::ProcessRoute;
 pub use state_reader::ProcessStateReader;
 use store::Store;
 pub use types::{
@@ -58,6 +61,7 @@ pub struct ProcessRuntime {
     kernel: Arc<ChioKernel>,
     store: Arc<Mutex<Store>>,
     namespace: String,
+    routes: Arc<BTreeMap<String, ProcessRoute>>,
 }
 
 impl ProcessRuntime {
@@ -71,7 +75,30 @@ impl ProcessRuntime {
             kernel,
             store: registry.store,
             namespace,
+            routes: Arc::new(BTreeMap::new()),
         })
+    }
+
+    /// Install the trusted host's route for each registered tool server.
+    ///
+    /// The host must derive these selections from its actual connections. The
+    /// kernel still verifies signed route authority; this API grants none.
+    /// Each routed operation freezes the selected route in its existing journal
+    /// binding. Reopening with a changed or missing route cannot redirect or
+    /// recover that operation. Unrouted legacy operations keep their binding.
+    pub fn with_routes(
+        mut self,
+        routes: impl IntoIterator<Item = (String, ProcessRoute)>,
+    ) -> Result<Self, ProcessError> {
+        let mut selected = BTreeMap::new();
+        for (server_id, route) in routes {
+            validate_id(&server_id)?;
+            if selected.insert(server_id, route).is_some() {
+                return Err(ProcessError::Configuration("duplicate host process route"));
+            }
+        }
+        self.routes = Arc::new(selected);
+        Ok(self)
     }
 
     pub fn registry(&self) -> ProcessRegistry {
@@ -274,10 +301,15 @@ impl ProcessRuntime {
         let request_hash = digest(&binding)?;
         // Existing callers retain their original binding. A stricter operation
         // uses a distinct binding so the same key cannot later opt into retries.
-        let binding_hash = if known_outcome_only {
+        let recovery_binding = if known_outcome_only {
             digest(&("chio.process.known-outcome-only.v1", &request_hash))?
         } else {
             request_hash.clone()
+        };
+        let route = self.routes.get(&request.server_id);
+        let binding_hash = match route {
+            Some(route) => digest(&("chio.process.host-route.v1", &recovery_binding, route))?,
+            None => recovery_binding,
         };
         // Validate the persisted process identity and immutable request binding
         // before any kernel receipt attributes this attempt to the process.
@@ -313,6 +345,9 @@ impl ProcessRuntime {
             });
             if known_outcome_only {
                 attribution["chio_process"]["recovery_policy"] = json!("known_outcome_only");
+            }
+            if let Some(route) = route {
+                attribution["route"] = serde_json::to_value(route)?;
             }
             // Keep the kernel evaluation frame out of every enclosing worker
             // future. Durable nonce verification adds a deep synchronous path;

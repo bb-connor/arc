@@ -281,7 +281,10 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
     let valid_response = valid_kernel.evaluate_tool_call_blocking(&valid_request)?;
     assert_eq!(valid_response.verdict, Verdict::Deny);
     let valid_reason = valid_response.reason.as_deref().unwrap_or_default();
-    assert!(valid_reason.contains("qualified admission"), "{valid_reason}");
+    assert!(
+        valid_reason.contains("qualified admission"),
+        "{valid_reason}"
+    );
 
     let missing_path = unique_receipt_db_path("chio-hosted-cumulative-missing-root");
     let mut missing_kernel = make_hosted_kernel();
@@ -635,15 +638,20 @@ fn issuance_security_context(subject: &PublicKey) -> SecurityInvocationContext {
 fn installed_issuance_admission_requires_context_and_allows_exact_subject() {
     let mut kernel = make_kernel(make_config());
     kernel
-        .set_capability_issuance_admission_authority(Arc::new(
-            FixedCapabilityIssuanceAdmission { deny: false },
-        ))
+        .set_capability_issuance_admission_authority(Arc::new(FixedCapabilityIssuanceAdmission {
+            deny: false,
+        }))
         .unwrap_or_else(|error| panic!("install issuance admission: {error}"));
     let subject = Keypair::generate().public_key();
 
     assert!(matches!(
         kernel.issue_capability(&subject, ChioScope::default(), 60),
         Err(KernelError::CapabilityIssuanceDenied(_))
+    ));
+    assert!(matches!(
+        kernel.issue_aggregate_family_root(&subject, ChioScope::default(), 60, 2),
+        Err(KernelError::CapabilityIssuanceDenied(reason))
+            if reason.contains("tenant and lineage context")
     ));
     let capability = kernel
         .issue_capability_with_security_context(
@@ -661,9 +669,9 @@ fn installed_issuance_admission_rejects_freeze_and_principal_substitution() {
     let subject = Keypair::generate().public_key();
     let mut frozen_kernel = make_kernel(make_config());
     frozen_kernel
-        .set_capability_issuance_admission_authority(Arc::new(
-            FixedCapabilityIssuanceAdmission { deny: true },
-        ))
+        .set_capability_issuance_admission_authority(Arc::new(FixedCapabilityIssuanceAdmission {
+            deny: true,
+        }))
         .unwrap_or_else(|error| panic!("install issuance admission: {error}"));
     assert!(matches!(
         frozen_kernel.issue_capability_with_security_context(
@@ -677,9 +685,9 @@ fn installed_issuance_admission_rejects_freeze_and_principal_substitution() {
 
     let mut open_kernel = make_kernel(make_config());
     open_kernel
-        .set_capability_issuance_admission_authority(Arc::new(
-            FixedCapabilityIssuanceAdmission { deny: false },
-        ))
+        .set_capability_issuance_admission_authority(Arc::new(FixedCapabilityIssuanceAdmission {
+            deny: false,
+        }))
         .unwrap_or_else(|error| panic!("install issuance admission: {error}"));
     let substituted = Keypair::generate().public_key();
     assert!(matches!(
@@ -1066,10 +1074,9 @@ fn supplemental_authorization_is_rejected_before_dispatch_when_unconfigured() {
         .expect("unsupported extension must produce a signed denial");
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("supplemental authorization requires an installed verifier")));
+    assert!(response.reason.as_deref().is_some_and(
+        |reason| reason.contains("supplemental authorization requires an installed verifier")
+    ));
 }
 
 #[test]
@@ -1629,7 +1636,10 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.as_deref().unwrap_or("");
-    assert!(reason.contains("root evidence is not a direct token"), "{reason}");
+    assert!(
+        reason.contains("root evidence is not a direct token"),
+        "{reason}"
+    );
 
     let _ = std::fs::remove_file(path);
 }

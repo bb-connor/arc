@@ -96,12 +96,35 @@ impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
         self.issue_capability_with_attestation(subject, scope, ttl_seconds, None)
     }
 
+    fn issue_aggregate_family_root(
+        &self,
+        subject: &PublicKey,
+        scope: ChioScope,
+        ttl_seconds: u64,
+        max_invocations: u32,
+    ) -> Result<CapabilityToken, KernelError> {
+        self.issue(subject, scope, ttl_seconds, None, Some(max_invocations))
+    }
+
     fn issue_capability_with_attestation(
         &self,
         subject: &PublicKey,
         scope: ChioScope,
         ttl_seconds: u64,
         runtime_attestation: Option<RuntimeAttestationEvidence>,
+    ) -> Result<CapabilityToken, KernelError> {
+        self.issue(subject, scope, ttl_seconds, runtime_attestation, None)
+    }
+}
+
+impl PolicyBackedCapabilityAuthority {
+    fn issue(
+        &self,
+        subject: &PublicKey,
+        scope: ChioScope,
+        ttl_seconds: u64,
+        runtime_attestation: Option<RuntimeAttestationEvidence>,
+        aggregate_family_limit: Option<u32>,
     ) -> Result<CapabilityToken, KernelError> {
         let mut scope = scope;
         let now = unix_now();
@@ -147,16 +170,38 @@ impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
 
         ensure_capability_issuance_supported(&scope)?;
 
-        let capability = self
-            .inner
-            .issue_capability(subject, scope.clone(), ttl_seconds)?;
-        validate_issued_capability_response(
-            &capability,
-            subject,
-            &scope,
-            ttl_seconds,
-            &self.inner.authority_public_key(),
-        )?;
+        let capability = match aggregate_family_limit {
+            Some(limit) => {
+                let capability = self.inner.issue_aggregate_family_root(
+                    subject,
+                    scope.clone(),
+                    ttl_seconds,
+                    limit,
+                )?;
+                chio_kernel::authority::validate_issued_aggregate_family_root_response(
+                    &capability,
+                    subject,
+                    &scope,
+                    ttl_seconds,
+                    &self.inner.authority_public_key(),
+                    limit,
+                )?;
+                capability
+            }
+            None => {
+                let capability =
+                    self.inner
+                        .issue_capability(subject, scope.clone(), ttl_seconds)?;
+                validate_issued_capability_response(
+                    &capability,
+                    subject,
+                    &scope,
+                    ttl_seconds,
+                    &self.inner.authority_public_key(),
+                )?;
+                capability
+            }
+        };
 
         if self.persist_lineage_immediately {
             let Some(path) = self.receipt_db_path.as_deref() else {

@@ -22,6 +22,8 @@ use crate::budget_store::{
     BudgetReconcileHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest,
 };
 
+#[path = "validation/aggregate.rs"]
+mod aggregate;
 #[path = "validation/caller_budget.rs"]
 mod caller_budget;
 #[path = "validation/cumulative.rs"]

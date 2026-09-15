@@ -80,9 +80,12 @@ The execution checkout remains `/tmp/arc-security-launch`; the Linux snapshot
 must not be edited while qualification runs.
 
 The serial runner is the retained `run-linux-gates.py` in the artifact directory
-above. It started at 20:55 UTC, passed formatting and is compiling the process
-feature suite. At the last live check its guest runner PID was 2742 and Cargo
-child PID was 2873. Codex command session: `28376`. These are observation handles,
+above. It started at 20:55 UTC. Formatting, process (72 tests), runtime/swarm
+(348 tests) and the proof CLI contract (147 tests) have terminal exit 0, with
+no failures or ignores. Subprocess fixtures are excluded from these counts.
+The process-host and response-verifier gate is running after those gates.
+At the last live check its guest runner PID was 2742 and Cargo child PID was
+23835. Codex command session: `28376`. These are observation handles,
 not evidence of continuing liveness; poll the session or guest processes before
 deciding whether to resume. Do not launch a duplicate queue after an observation
 timeout. No queue completion is claimed.
@@ -106,12 +109,31 @@ sealed SQLite source, persisted continuation custody, signed capability binding
 and identical completed-outcome replay with a single effect. These are local
 component/composition results, not the final swarm artifact.
 
-The next implementation boundary is the reference host: load the actual root
+Two host composition primitives are implemented in the next local slice:
+
+- `ProcessRuntime::with_routes` supplies host-selected `ProcessRoute` metadata.
+  Each route is included in the existing immutable operation binding. Changing
+  or removing it on reopen refuses recovery before another effect or journal
+  charge. The worker protocol cannot select a route, and worker context cannot
+  replace signed top-level route or process attribution. Unrouted legacy
+  operations preserve their previous bindings and wire representations.
+- `ChioKernel::issue_aggregate_family_root` requests a signed shared invocation
+  limit through the configured authority. It requires qualified durable
+  admission in `All` mode and refuses context-free issuance when tenant/lineage
+  admission is installed. Local and governed signing authorities support the
+  explicit request; other authorities default to refusal. The policy wrapper
+  retains reputation and runtime-assurance checks and persists the exact root
+  snapshot. Ordinary issuance still rejects unexpected aggregate authority.
+
+Focused tests cover route forgery/rebinding and authenticated sibling contention,
+restart and replay under the real SQLite aggregate budget. Verification of this
+new slice is ongoing in `m5-host-development/`; this is not the frozen Linux
+candidate or a claimed completed reference-host profile.
+
+The next implementation boundary remains the reference host: load actual root
 and child capabilities from the process journal, bind them into the signed task
-graph, install the sealed live authority and real shared aggregate budget, and
-supply host-selected route metadata. `ProcessRuntime::invoke_with_recovery`
-currently supplies process attribution only; the live verifier correctly refuses
-missing route selection. Worker-provided context must not become route authority.
+graph, install the sealed live authority, select the aggregate issuance API,
+and connect the registered tool routes to `with_routes`.
 The Disabled smoke remains unchanged. Actual Enforced tools, all scenario/effect
 oracles, independent complete-artifact verification and M6-M10 remain required.
 
