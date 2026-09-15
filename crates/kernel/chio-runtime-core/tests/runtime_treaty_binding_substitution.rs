@@ -27,6 +27,9 @@
 
 mod support;
 
+#[path = "support/treaty_presentation.rs"]
+mod treaty_presentation;
+
 #[path = "support/dispatch_counter.rs"]
 mod dispatch_counter;
 
@@ -426,6 +429,26 @@ enum Evidence {
     /// requires two signatures has the record forced into its required
     /// evidence.
     RecordOnly,
+    ReceiverRecords(PresentationState),
+}
+
+#[derive(Clone, Copy)]
+enum PresentationState {
+    MissingLease,
+    MissingGovernance,
+    RevokedLease,
+    RevokedGovernance,
+    ExpiredLease,
+    ExpiredGovernance,
+    FutureLease,
+    FutureGovernance,
+    EmptyGovernanceWindow,
+    ShortContinuation,
+    MatchingScope,
+    InvalidScopeAlgorithm,
+    InvalidScopeDigest,
+    ScopedLeaseOnly,
+    ActivateNow,
 }
 
 fn substitute_and_admit(
@@ -464,6 +487,11 @@ fn substitute_and_admit_with(
         &substituted_envelope,
     )?;
 
+    drop(store);
+    let store = SqliteRuntimeOrchestrationStore::open(
+        directory.path().join("binding-substitution.sqlite3"),
+    )?;
+
     let hook = std::sync::Arc::new(dispatch_counter::TreatyMaterialRecorder::new(Box::new(
         allowing_hook(store)?,
     )));
@@ -480,6 +508,20 @@ fn substitute_and_admit_with(
         treaty_context(&fixture, BASELINE_DSSE_ID, &fixture.envelope_sha256),
     )?;
     let baseline_after = summarize(&hook, &baseline_request)?;
+
+    // Each fixture denies only before dispatch. Include the follow-up in the
+    // invariant, including when the first request consumes its continuation.
+    for (label, decision) in [
+        ("substitution", &substituted),
+        ("follow-up", &baseline_after),
+    ] {
+        assert_eq!(
+            decision.dispatches,
+            u64::from(decision.allowed),
+            "{label} dispatch count disagrees with its verdict: {:?}",
+            decision.failure_code
+        );
+    }
 
     Ok(SubstitutionRun {
         substituted,
@@ -620,7 +662,7 @@ fn tool_arguments() -> serde_json::Value {
 
 fn treaty_fixture(evidence: Evidence) -> Result<TreatyFixture, Box<dyn std::error::Error>> {
     let evidence_required = match evidence {
-        Evidence::LineageAndRecord => {
+        Evidence::LineageAndRecord | Evidence::ReceiverRecords(_) => {
             vec!["bilateral_dsse", "bilateral_invocation", "receipt_lineage"]
         }
         Evidence::RecordOnly => vec!["bilateral_dsse"],
@@ -663,7 +705,14 @@ fn treaty_fixture(evidence: Evidence) -> Result<TreatyFixture, Box<dyn std::erro
         audience_tool: "vendor-ledger.close_account".to_string(),
         nonce: "nonce-binding-substitution-1".to_string(),
         issued_at_unix_ms: 1_800_000_000_000,
-        expires_at_unix_ms: 1_800_003_600_000,
+        expires_at_unix_ms: if matches!(
+            evidence,
+            Evidence::ReceiverRecords(PresentationState::ShortContinuation)
+        ) {
+            1_800_000_001_001
+        } else {
+            1_800_003_600_000
+        },
     };
     let continuation_sha256 = sha256_hex(&canonical_json_bytes(&continuation)?);
 
@@ -753,7 +802,36 @@ fn treaty_fixture(evidence: Evidence) -> Result<TreatyFixture, Box<dyn std::erro
                 lease_id: "lease-live-1".to_string(),
                 issuer: bilateral_invocation.signer_kernel_ids[0].clone(),
                 expires_at_unix_ms: 1_800_003_600_000,
-                scope_digest: None,
+                scope_digest: if matches!(
+                    evidence,
+                    Evidence::ReceiverRecords(
+                        PresentationState::MatchingScope
+                            | PresentationState::InvalidScopeAlgorithm
+                            | PresentationState::InvalidScopeDigest
+                    )
+                ) {
+                    Some(HashRecord {
+                        alg: if matches!(
+                            evidence,
+                            Evidence::ReceiverRecords(PresentationState::InvalidScopeAlgorithm)
+                        ) {
+                            "sha512"
+                        } else {
+                            "sha256"
+                        }
+                        .to_string(),
+                        value: if matches!(
+                            evidence,
+                            Evidence::ReceiverRecords(PresentationState::InvalidScopeDigest)
+                        ) {
+                            "not-a-digest".to_string()
+                        } else {
+                            "a".repeat(64)
+                        },
+                    })
+                } else {
+                    None
+                },
             }),
             policy_evaluation_summary: Some(allow_policy_evaluation_summary()),
             governance_receipt_ref: Some(GovernanceReceiptRef {
@@ -829,6 +907,55 @@ fn insert_treaty_artifacts(
     store: &SqliteRuntimeOrchestrationStore,
     fixture: &TreatyFixture,
 ) -> TestResult {
+    let (mut lease, mut governance) = treaty_presentation::records(&fixture.envelope)?;
+    let state = match fixture.evidence {
+        Evidence::ReceiverRecords(state) => Some(state),
+        _ => None,
+    };
+    let now = dispatch_target().now_unix_ms;
+    match state {
+        Some(PresentationState::ScopedLeaseOnly) => {
+            lease.lease.scope_digest = Some(HashRecord {
+                alg: "sha256".to_string(),
+                value: "a".repeat(64),
+            })
+        }
+        Some(PresentationState::ActivateNow) => {
+            lease.valid_from_unix_ms = now;
+            governance.valid_from_unix_ms = now;
+        }
+        Some(PresentationState::ExpiredLease) => lease.lease.expires_at_unix_ms = now,
+        Some(PresentationState::ExpiredGovernance) => governance.valid_until_unix_ms = now,
+        Some(PresentationState::FutureLease) => lease.valid_from_unix_ms = now + 1,
+        Some(PresentationState::FutureGovernance) => governance.valid_from_unix_ms = now + 1,
+        Some(PresentationState::EmptyGovernanceWindow) => {
+            governance.valid_from_unix_ms = governance.valid_until_unix_ms
+        }
+        _ => {}
+    }
+    if !matches!(state, Some(PresentationState::MissingLease)) {
+        store.insert_treaty_runtime_artifact("capability_lease", &lease.lease.lease_id, &lease)?;
+    }
+    if !matches!(state, Some(PresentationState::MissingGovernance)) {
+        store.insert_treaty_runtime_artifact(
+            "governance_receipt",
+            &governance.receipt.receipt_id,
+            &governance,
+        )?;
+    }
+    match state {
+        Some(PresentationState::RevokedLease) => store.insert_treaty_runtime_artifact(
+            "capability_lease_revocation",
+            &lease.lease.lease_id,
+            &serde_json::json!({"reason": "operator revoked"}),
+        )?,
+        Some(PresentationState::RevokedGovernance) => store.insert_treaty_runtime_artifact(
+            "governance_receipt_revocation",
+            &governance.receipt.receipt_id,
+            &serde_json::json!({"reason": "operator revoked"}),
+        )?,
+        _ => {}
+    }
     store.insert_treaty_runtime_artifact(
         "treaty_scope",
         &fixture.treaty_scope.treaty_id,
@@ -882,7 +1009,7 @@ fn treaty_context(fixture: &TreatyFixture, dsse_id: &str, dsse_sha256: &str) -> 
             "sha256": dsse_sha256
         }
     });
-    if matches!(fixture.evidence, Evidence::LineageAndRecord) {
+    if !matches!(fixture.evidence, Evidence::RecordOnly) {
         context["receiptLineageBundle"] = serde_json::json!({
             "id": fixture.lineage_bundle.bundle_id,
             "sha256": fixture.lineage_bundle_sha256
@@ -1125,4 +1252,171 @@ fn peer_weights() -> RuntimePeerWeights {
             weight: 1.0,
         }],
     }
+}
+
+fn assert_receiver_record_denial(run: &SubstitutionRun) {
+    for decision in [&run.substituted, &run.baseline_after] {
+        assert!(!decision.allowed);
+        assert_eq!(decision.failure_code.as_deref(), Some(UNVERIFIED_EVIDENCE));
+        assert_eq!(decision.dispatches, 0);
+        assert!(!decision.verified_treaty_material);
+    }
+}
+
+#[test]
+fn missing_lease_denies_before_dispatch_after_store_reopen() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::MissingLease),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn missing_governance_denies_before_dispatch_after_store_reopen() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::MissingGovernance),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn revoked_lease_denies_before_dispatch_after_store_reopen() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::RevokedLease),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn revoked_governance_denies_before_dispatch_after_store_reopen() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::RevokedGovernance),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn expired_lease_denies_before_dispatch_after_store_reopen() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::ExpiredLease),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn expired_governance_denies_before_dispatch_after_store_reopen() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::ExpiredGovernance),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn future_lease_denies_before_dispatch_after_store_reopen() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::FutureLease),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn future_governance_denies_before_dispatch_after_store_reopen() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::FutureGovernance),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn empty_governance_window_denies_before_dispatch_after_store_reopen() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::EmptyGovernanceWindow),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn lease_cannot_outlast_its_resolved_continuation() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::ShortContinuation),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn scope_cannot_be_omitted_from_a_scoped_lease() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::ScopedLeaseOnly),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn matching_scoped_lease_admits_once() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::MatchingScope),
+        |_| {},
+    )?;
+    assert_admitted_with_single_dispatch(&run.substituted, "valid receiver activation");
+    assert_eq!(
+        run.baseline_after.failure_code.as_deref(),
+        Some(CONTINUATION_REPLAY)
+    );
+    Ok(())
+}
+
+#[test]
+fn activation_start_is_inclusive() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::ActivateNow),
+        |_| {},
+    )?;
+    assert_admitted_with_single_dispatch(&run.substituted, "valid receiver activation");
+    assert_eq!(
+        run.baseline_after.failure_code.as_deref(),
+        Some(CONTINUATION_REPLAY)
+    );
+    Ok(())
+}
+
+#[test]
+fn matching_invalid_scope_algorithm_denies() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::InvalidScopeAlgorithm),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn matching_invalid_scope_digest_denies() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::InvalidScopeDigest),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
 }

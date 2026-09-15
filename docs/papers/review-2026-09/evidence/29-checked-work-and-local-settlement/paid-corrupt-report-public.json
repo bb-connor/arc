@@ -1,0 +1,11 @@
+{
+  "scenario": "corrupt-report",
+  "reviews": 1,
+  "payments": {
+    "held": 1
+  },
+  "buyerExpenses": 0,
+  "retriedWork": false,
+  "firstError": "tool server error: A2A remote request failed: A2A JSON-RPC error -32603: kernel error: {\"code\":-32603,\"message\":\"bridge error: kernel error: guard denied the request: guard output validation failed: tool server error: review report does not reproduce the agreed check\"}",
+  "recoveryError": "provider did not complete the request: {\"message\":{\"messageId\":\"status-a2a-task-813da9cb6864973a67d85227e1bf3ced9f51889e811341d07ba7ba3d7c3df941-5\",\"parts\":[{\"text\":\"tool server error: review report does not reproduce the agreed check\"}],\"role\":\"ROLE_AGENT\"},\"state\":\"TASK_STATE_FAILED\"}"
+}

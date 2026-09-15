@@ -1,0 +1,25 @@
+{
+  "schema": "scope-contract.experimental.v1",
+  "ceiling": {
+    "grants": [
+      {
+        "server_id": "source-checkout",
+        "tool_name": "read",
+        "operations": [
+          "invoke"
+        ]
+      }
+    ]
+  },
+  "required": {
+    "grants": [
+      {
+        "server_id": "source-checkout",
+        "tool_name": "read",
+        "operations": [
+          "invoke"
+        ]
+      }
+    ]
+  }
+}

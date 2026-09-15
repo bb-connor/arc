@@ -1,0 +1,16 @@
+{
+  "authorizations": [],
+  "jobs": [
+    {
+      "claimed_handle": null,
+      "receiver": "9d5ded500d5ca5e7d40dd5287322237b1ed3df6a5d9e6b81233985f16adf349a",
+      "result_json": null,
+      "revoked": 0,
+      "rule_digest": "5f2cb6fed411830dd21102e1f1d6b2a6a53797dba5acdbcc07403e8fee39ceee",
+      "rule_json": "{\"slot\":{\"receiverId\":\"9d5ded500d5ca5e7d40dd5287322237b1ed3df6a5d9e6b81233985f16adf349a\",\"workflowId\":\"ledger-seller_withholds\",\"stepId\":\"settle\"},\"predecessorStepId\":\"check-encrypted-repair\",\"verifierKey\":\"9d5ded500d5ca5e7d40dd5287322237b1ed3df6a5d9e6b81233985f16adf349a\",\"contractSha256\":\"85ccde4096875807635a07d3db23f28213f611983bc79e22475ffa18cfb60729\",\"serverId\":\"local-repair-exchange\",\"toolName\":\"settle\",\"resource\":\"funded-trade\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+      "state": "waiting",
+      "step": "settle",
+      "workflow": "ledger-seller_withholds"
+    }
+  ]
+}

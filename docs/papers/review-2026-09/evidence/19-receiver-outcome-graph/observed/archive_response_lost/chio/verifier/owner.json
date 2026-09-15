@@ -1,0 +1,31 @@
+{
+  "backend": "chio",
+  "role": "verifier",
+  "contract": {
+    "grants": [
+      {
+        "server_id": "source-checkout",
+        "tool_name": "read",
+        "operations": [
+          "invoke"
+        ]
+      }
+    ]
+  },
+  "rule": null,
+  "successor": {
+    "slot": {
+      "receiverId": "671db1cab47a12622848b5b74893ce4694be4b9ac0a9f8759a2620aac44bbd6a",
+      "workflowId": "reviewed-scope-distribution",
+      "stepId": "publisher"
+    },
+    "predecessorStepId": "verifier",
+    "verifierKey": "1d847543607a26653ec2b0083bec1d67b869ed833d328b03617f866921ad72f4",
+    "contractSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+    "serverId": "publisher",
+    "toolName": "apply",
+    "resource": "publisher/approved-scopes",
+    "validFromUnixMs": 1799999999000,
+    "validUntilUnixMs": 1800000001000
+  }
+}

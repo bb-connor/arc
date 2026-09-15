@@ -62,6 +62,7 @@ struct KernelOutputMaterialization<'a> {
 }
 
 struct DurableEvaluatedOutput {
+    output_guard_rejected: bool,
     output: ToolCallOutput,
     incomplete_reason: Option<String>,
     post_invocation_metadata: Option<serde_json::Value>,
@@ -142,6 +143,55 @@ fn receipt_visible_delivery_content(
     }
 }
 
+fn checked_output_decision() -> Decision {
+    let denial = delivery_contract::output_guard_delivery_denial();
+    Decision::Deny {
+        reason: denial.message.to_owned(),
+        guard: denial.guard.to_owned(),
+    }
+}
+
+fn retained_checked_output_denial(
+    outcome: &ToolOutcomeRecordV1,
+    resolved_output_digest: &str,
+) -> Result<bool, KernelError> {
+    let ResolvedToolOutcomeV1::Resolved {
+        post_guard_decision_digest,
+        ..
+    } = outcome.disposition()
+    else {
+        return Ok(false);
+    };
+    let expected = admission_digest(
+        "post_guard_decision_digest",
+        &KernelOutputGuardDecision {
+            schema: "chio.kernel-output-guard-decision.post-return.v1",
+            resolved_output_digest,
+            decision: &checked_output_decision(),
+        },
+    )?;
+    Ok(post_guard_decision_digest == &expected)
+}
+
+fn visible_terminal_content(
+    actual: &ReceiptContent,
+    evaluation: &delivery_contract::DeliveryEvaluation,
+    expected_digest: Option<&str>,
+) -> ReceiptContent {
+    if evaluation.denial.as_ref().is_some_and(|denial| {
+        denial.reason == crate::admission_operation::DeliveryDenialReason::OutputGuardRejected
+    }) {
+        let canonical_content =
+            crate::admission_operation::OUTPUT_GUARD_REJECTION_REDACTION_DOMAIN.to_vec();
+        return ReceiptContent {
+            content_hash: sha256_hex(&canonical_content),
+            metadata: None,
+            canonical_content,
+        };
+    }
+    receipt_visible_delivery_content(actual, evaluation.digest_mismatched, expected_digest)
+}
+
 fn record_terminal_finding_denial(
     metadata: Option<serde_json::Value>,
     denial: Option<&FindingDenial>,
@@ -192,7 +242,8 @@ impl ChioKernel {
             verified_recovery,
             trusted_now_unix_ms,
         } = input;
-        self.validate_guarded_output(request, matched_grant_index, output, false)?;
+        // Retain the authenticated return before validation. Recording it does
+        // not authorize output release or payment capture.
         let purchase_replay_metadata =
             self.capture_purchase_replay_metadata(request, matched_grant_index, verified_purchase)?;
         let recovery_replay_metadata =
@@ -453,6 +504,13 @@ impl ChioKernel {
         matched_grant_index: usize,
         plan: &DurablePostReturnPlan,
     ) -> Result<DurableEvaluatedOutput, KernelError> {
+        let raw_guard_rejected = self.check_guarded_output(
+            request,
+            matched_grant_index,
+            &invocation_output_to_server_output(raw.output()),
+            false,
+            true,
+        )?;
         let materialized = self.apply_stream_limit_snapshot(
             invocation_output_to_server_output(raw.output()),
             Duration::from_millis(raw.elapsed_millis()),
@@ -489,7 +547,8 @@ impl ChioKernel {
                     .to_owned(),
             ));
         }
-        self.validate_guarded_output(request, matched_grant_index, &handling.output, true)?;
+        let released_guard_rejected =
+            self.check_guarded_output(request, matched_grant_index, &handling.output, true, true)?;
         let (output, transformed_incomplete_reason) =
             Self::terminal_tool_call_output(handling.output);
         let incomplete_reason = materialized_incomplete_reason.or(transformed_incomplete_reason);
@@ -507,6 +566,7 @@ impl ChioKernel {
             ));
         }
         Ok(DurableEvaluatedOutput {
+            output_guard_rejected: raw_guard_rejected || released_guard_rejected,
             output,
             incomplete_reason,
             post_invocation_metadata: handling.extra_metadata,
@@ -650,6 +710,7 @@ impl ChioKernel {
             recovery_status,
         } = self.durable_evaluation_contract(admission, request, &tool_return.raw)?;
         let DurableEvaluatedOutput {
+            output_guard_rejected,
             output,
             incomplete_reason,
             post_invocation_metadata,
@@ -688,6 +749,18 @@ impl ChioKernel {
             &receipt_content.canonical_content,
             purchase.as_ref(),
         );
+        if output_guard_rejected && receipt.decision == Some(Decision::Allow) {
+            return Err(KernelError::GuardDenied(
+                "completed output no longer passes the agreed check".to_owned(),
+            ));
+        }
+        if retained_checked_output_denial(&tool_return.outcome, &receipt_content.content_hash)? {
+            delivery_evaluation.denial = Some(delivery_contract::output_guard_delivery_denial());
+        } else if output_guard_rejected {
+            return Err(KernelError::GuardDenied(
+                "replayed output check conflicts with its retained terminal".to_owned(),
+            ));
+        }
         if let Some(reason) = self.revalidate_replayed_purchase_delivery(
             receipt.decision.as_ref(),
             &mut delivery_evaluation,
@@ -696,9 +769,9 @@ impl ChioKernel {
         ) {
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "finding purchase replay output withheld");
         }
-        let receipt_visible_content = receipt_visible_delivery_content(
+        let receipt_visible_content = visible_terminal_content(
             &receipt_content,
-            delivery_evaluation.digest_mismatched,
+            &delivery_evaluation,
             expected_output_digest.as_deref(),
         );
         let expected_decision = match &delivery_evaluation.denial {
@@ -1582,6 +1655,7 @@ impl ChioKernel {
             recovery_status,
         } = self.durable_evaluation_contract(admission, request, &tool_return.raw)?;
         let DurableEvaluatedOutput {
+            output_guard_rejected,
             output,
             incomplete_reason,
             post_invocation_metadata,
@@ -1647,6 +1721,11 @@ impl ChioKernel {
         stored_outcome
             .validate_canonical_blob(&admission.operation, &raw_blob)
             .map_err(tool_outcome_error)?;
+        if output_guard_rejected
+            || retained_checked_output_denial(&stored_outcome, resolved_output_digest.as_str())?
+        {
+            delivery_evaluation.denial = Some(delivery_contract::output_guard_delivery_denial());
+        }
         let existing_evaluation = runtime
             .outcome_store
             .lookup_post_return_evaluation(admission.operation.binding().operation_id())
@@ -1732,9 +1811,9 @@ impl ChioKernel {
         } else {
             AdmissionOperationState::Completed
         };
-        let receipt_visible_content = receipt_visible_delivery_content(
+        let receipt_visible_content = visible_terminal_content(
             &receipt_content,
-            delivery_evaluation.digest_mismatched,
+            &delivery_evaluation,
             expected_output_digest.as_deref(),
         );
         let receipt_visible_digest = AdmissionDigest::try_new(

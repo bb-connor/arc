@@ -1,0 +1,1 @@
+{"exit":"exit status: 1","stderr":"Error: \"bundle must contain exactly the fixed SHA-256 reference without prerequisites or filters\"\n","stdout":"","success":false}

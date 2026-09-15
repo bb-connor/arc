@@ -1,0 +1,67 @@
+{
+  "reply": {
+    "allowed": false,
+    "output": null,
+    "receipt": {
+      "action": {
+        "parameter_hash": "a93bb1595c330fc268aa540e2f1aaeab0b85d30d9ca84453fd28098c73440c1a",
+        "parameters": {
+          "grants": [
+            {
+              "operations": [
+                "invoke"
+              ],
+              "server_id": "source-checkout",
+              "tool_name": "delete"
+            }
+          ]
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "comparison-capability-6a78ed244c3506275d38817214c67934a26dd92810be1309d10e150511347039",
+      "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "decision": {
+        "guard": "kernel",
+        "reason": "tool server error: attenuation violation: child scope is not a subset of parent scope",
+        "verdict": "deny"
+      },
+      "id": "5cf81ea00104c08d8c4244c7ff37872c65d5eb8a8228bb3ced7cd67821f766de",
+      "kernel_key": "436c9b08481de43052a263e67bcb3b4df979808682ac235439b2a056c3612e4c",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "436c9b08481de43052a263e67bcb3b4df979808682ac235439b2a056c3612e4c",
+          "subject_key": "6a78ed244c3506275d38817214c67934a26dd92810be1309d10e150511347039"
+        },
+        "chio_receipt_signing_nonce": "receipt-695480df31d8966ee6fdb1ea8f85e43397e72d8ce599812b4dbe8ac3b5c338e1",
+        "receipt_context": {
+          "request_id": "695480df31d8966ee6fdb1ea8f85e43397e72d8ce599812b4dbe8ac3b5c338e1"
+        }
+      },
+      "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "4ed76baf28c0d34615530b5564a98bcddac57e7cb6d5dccc6cdf47322dc38fd80032018a05d4ed15cb4ae87f6cd3214045b4e16c22415e45dab495239fb18a03",
+      "timestamp": 1800000000,
+      "tool_name": "verify",
+      "tool_origin": "caller_executed",
+      "tool_server": "verifier",
+      "trust_level": "mediated"
+    }
+  },
+  "request": {
+    "arguments": {
+      "grants": [
+        {
+          "operations": [
+            "invoke"
+          ],
+          "server_id": "source-checkout",
+          "tool_name": "delete"
+        }
+      ]
+    },
+    "tool": "verify"
+  }
+}

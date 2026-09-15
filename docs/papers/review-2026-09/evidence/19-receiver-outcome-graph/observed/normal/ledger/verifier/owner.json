@@ -1,0 +1,31 @@
+{
+  "backend": "ledger",
+  "role": "verifier",
+  "contract": {
+    "grants": [
+      {
+        "server_id": "source-checkout",
+        "tool_name": "read",
+        "operations": [
+          "invoke"
+        ]
+      }
+    ]
+  },
+  "rule": null,
+  "successor": {
+    "slot": {
+      "receiverId": "d84f3c934270404ce5043c3b3246da7365bd0054343d9a8c8bffa5ee8f4cb552",
+      "workflowId": "reviewed-scope-distribution",
+      "stepId": "publisher"
+    },
+    "predecessorStepId": "verifier",
+    "verifierKey": "3e6dee4bd2a3e3e5883e82e84cdb85a678e65770a26f49cb81d8100d761a910d",
+    "contractSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+    "serverId": "publisher",
+    "toolName": "apply",
+    "resource": "publisher/approved-scopes",
+    "validFromUnixMs": 1799999999000,
+    "validUntilUnixMs": 1800000001000
+  }
+}

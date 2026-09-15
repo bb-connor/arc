@@ -624,7 +624,28 @@ impl ChioKernel {
         // Only a grant that can serve this request may force the structured path. An
         // unrelated cumulative grant elsewhere in the capability must not withdraw an
         // otherwise exempt call.
-        let requires_structured_admission = aggregate_quota.is_some()
+        let mut checked_output_required = false;
+        for matching in matching_grants {
+            checked_output_required |= self.has_checked_output_contract(request, matching.index)?;
+        }
+        if checked_output_required
+            && matching_grants.iter().any(|matching| {
+                matching.grant.constraints.iter().any(|constraint| {
+                    matches!(
+                        constraint,
+                        Constraint::OutputDigestSha256(_)
+                            | Constraint::RequireFindingPurchase(_)
+                            | Constraint::RequireFindingRecovery(_)
+                    )
+                })
+            })
+        {
+            return Err(KernelError::DurableAdmission(
+                "checked-output pricing cannot combine with digest, Finding purchase or recovery contracts".to_owned(),
+            ));
+        }
+        let requires_structured_admission = checked_output_required
+            || aggregate_quota.is_some()
             || request.supplemental_authorization.is_some()
             || cumulative_matching_grant_count != 0
             || recovery_matching_grant_count != 0
@@ -708,6 +729,13 @@ impl ChioKernel {
             {
                 return Err(KernelError::DurableAdmission(
                     "output-digest delivery requires a reversible-hold payment rail".to_owned(),
+                ));
+            }
+            if checked_output_required
+                && adapter.rail_mode() != Some(crate::payment::PaymentRailMode::ReversibleHold)
+            {
+                return Err(KernelError::DurableAdmission(
+                    "checked-output pricing requires a reversible-hold payment rail".to_owned(),
                 ));
             }
         }

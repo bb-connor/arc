@@ -1,0 +1,8 @@
+{
+  "verifiedPublicWorkPackages": 14,
+  "verifiedPublicEnrollments": 17,
+  "verifiedSignedSenderDenials": 2,
+  "applicationSeedsOrTlsPrivateKeysExported": false,
+  "legacyBearerCredentialsExported": false,
+  "boundary": "Public enrollment capabilities require the buyer key. Public work packages disclose the public test input. Verification uses the configured peer pins copied from provider state, not keys selected by a remote package."
+}

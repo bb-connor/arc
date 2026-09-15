@@ -1,0 +1,93 @@
+{
+  "reply": {
+    "allowed": true,
+    "output": {
+      "artifact": {
+        "grants": [
+          {
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "source-checkout",
+            "tool_name": "read"
+          }
+        ]
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "contractSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "passed": true,
+          "predecessorStepId": "verifier",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "7db9ab9148cb06f424e74ea43e23a0b726731cb094396527a674d5dde27780d2",
+            "stepId": "publisher",
+            "workflowId": "reviewed-scope-distribution"
+          },
+          "verifiedAtUnixMs": 1800000000000
+        },
+        "signature": "e52b03111c540f6641e1fc46a177c71b196beaa9d8ef83aa5efdb128ec17fea3fd6625cb6a54dba5ce133f894f8d06c80a3389191be0dc9c5d4e28d7bbbff307"
+      }
+    },
+    "receipt": {
+      "action": {
+        "parameter_hash": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+        "parameters": {
+          "grants": [
+            {
+              "operations": [
+                "invoke"
+              ],
+              "server_id": "source-checkout",
+              "tool_name": "read"
+            }
+          ]
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "comparison-capability-21aa75fdeb51fc1b4f19471639b3d34d1edfbeeee41d89361b57910ac175f764",
+      "content_hash": "4a835d273662ead84409298633ed05926763383a324da6c03cb875d6470ce484",
+      "decision": {
+        "verdict": "allow"
+      },
+      "id": "5691f805190c342b293aecbaf9912b39273cadc0e69d216aacaeea365a25dd38",
+      "kernel_key": "96ca38dda7db82fed43dd66ad02e51c24bfbb1b374cc1ee33893c8934f9ef34a",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "96ca38dda7db82fed43dd66ad02e51c24bfbb1b374cc1ee33893c8934f9ef34a",
+          "subject_key": "21aa75fdeb51fc1b4f19471639b3d34d1edfbeeee41d89361b57910ac175f764"
+        },
+        "chio_receipt_signing_nonce": "receipt-3fa3cde21687a2fe54a82eda05066b4435c4b5db22da4fb9adebbef5f383cb99",
+        "receipt_context": {
+          "request_id": "3fa3cde21687a2fe54a82eda05066b4435c4b5db22da4fb9adebbef5f383cb99"
+        }
+      },
+      "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "e95375ff0d56635245c8b1ebc2c040ce1d0a30a1c8e2c6de021e8d4e604d716ee5543e270297f0599a0f99f1262f5c4e3d8b3e42bc725743fc94e299b880100e",
+      "timestamp": 1800000000,
+      "tool_name": "verify",
+      "tool_origin": "caller_executed",
+      "tool_server": "verifier",
+      "trust_level": "mediated"
+    }
+  },
+  "request": {
+    "arguments": {
+      "grants": [
+        {
+          "operations": [
+            "invoke"
+          ],
+          "server_id": "source-checkout",
+          "tool_name": "read"
+        }
+      ]
+    },
+    "tool": "verify"
+  }
+}

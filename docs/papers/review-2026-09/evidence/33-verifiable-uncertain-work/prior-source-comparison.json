@@ -1,0 +1,26 @@
+{
+  "changedExistingSources": [
+    "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs",
+    "crates/kernel/chio-kernel/src/admission_operation_tests/terminal_projection.rs",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests.rs",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery.rs",
+    "docs/papers/evidence-crosses/paper.pdf",
+    "docs/papers/evidence-crosses/sections/01-rule.tex",
+    "docs/papers/review-2026-09/README.md",
+    "examples/federated-work/HTTPS.md",
+    "examples/federated-work/README.md",
+    "examples/federated-work/python_buyer/README.md",
+    "examples/federated-work/python_buyer/client.py",
+    "examples/federated-work/python_smoke.py",
+    "examples/federated-work/src/common.rs",
+    "examples/federated-work/src/main.rs",
+    "examples/federated-work/src/provider.rs",
+    "examples/federated-work/src/review.rs"
+  ],
+  "manifest": "docs/papers/review-2026-09/evidence/32-public-enrollment-and-https/manifest.json",
+  "manifestSha256": "157b62aa176258ccf1dbefd616f85218492b5bfa768ff09a5600a6efce50a007",
+  "previousArtifactsVerified": 148,
+  "previousSourceFiles": 1488
+}

@@ -1,0 +1,19 @@
+{
+  "effectClaim": {
+    "arguments": {
+      "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+      "resource": "review-queue"
+    },
+    "claimedAtUnixMs": 1789310339928,
+    "evidenceSha256": "3ec6f4ecbf4097a997012adcd987165ba81a3402157b040631807f1bada5baaa",
+    "requestId": "kernel-publish-dispatch",
+    "ruleSha256": "931993dc37b305f14d975cce2df20b519add0a3b1e6e5852150a99837ecbb680",
+    "slot": {
+      "receiverId": "4e68614e741dc29e76316d2d1dc53e7ede811766dd6a118e8ba30d60c59495e7",
+      "stepId": "publish-approved-scope",
+      "workflowId": "repair-read-policy"
+    }
+  },
+  "publishedArtifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+  "resource": "review-queue"
+}

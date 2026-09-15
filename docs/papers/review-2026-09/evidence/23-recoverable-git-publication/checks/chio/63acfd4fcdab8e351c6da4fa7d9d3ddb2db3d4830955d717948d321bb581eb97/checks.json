@@ -1,0 +1,253 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "git",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--no-verify",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair"
+      ],
+      "case": 0,
+      "commitReadback": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "test: checked repository repair\n",
+        "success": true
+      },
+      "committedFile": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "checked change\n",
+        "success": true
+      },
+      "execution": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "[master (root-commit) 9da9ccb] test: checked repository repair\n 1 file changed, 1 insertion(+)\n create mode 100644 change.txt\n",
+        "success": true
+      },
+      "hooksObserved": [],
+      "passed": true
+    },
+    {
+      "argv": [
+        "git",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair",
+        "--no-verify"
+      ],
+      "case": 1,
+      "commitReadback": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "test: checked repository repair\n",
+        "success": true
+      },
+      "committedFile": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "checked change\n",
+        "success": true
+      },
+      "execution": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "[master (root-commit) 9da9ccb] test: checked repository repair\n 1 file changed, 1 insertion(+)\n create mode 100644 change.txt\n",
+        "success": true
+      },
+      "hooksObserved": [],
+      "passed": true
+    },
+    {
+      "argv": [
+        "git",
+        "-c",
+        "core.hooksPath=/work/hooks",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--no-verify",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair"
+      ],
+      "case": 2,
+      "commitReadback": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "test: checked repository repair\n",
+        "success": true
+      },
+      "committedFile": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "checked change\n",
+        "success": true
+      },
+      "execution": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "[master (root-commit) 9da9ccb] test: checked repository repair\n 1 file changed, 1 insertion(+)\n create mode 100644 change.txt\n",
+        "success": true
+      },
+      "hooksObserved": [],
+      "passed": true
+    },
+    {
+      "argv": [
+        "git",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.hooksPath=/work/hooks",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--no-verify",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair"
+      ],
+      "case": 3,
+      "commitReadback": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "test: checked repository repair\n",
+        "success": true
+      },
+      "committedFile": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "checked change\n",
+        "success": true
+      },
+      "execution": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "[master (root-commit) df8c4eb] test: checked repository repair\n 1 file changed, 1 insertion(+)\n create mode 100644 change.txt\n",
+        "success": true
+      },
+      "hooksObserved": [],
+      "passed": true
+    },
+    {
+      "argv": [
+        "git",
+        "--config-env=core.hooksPath=HOOK_TEST_PATH",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--no-verify",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair"
+      ],
+      "case": 4,
+      "commitReadback": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "test: checked repository repair\n",
+        "success": true
+      },
+      "committedFile": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "checked change\n",
+        "success": true
+      },
+      "execution": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "[master (root-commit) df8c4eb] test: checked repository repair\n 1 file changed, 1 insertion(+)\n create mode 100644 change.txt\n",
+        "success": true
+      },
+      "hooksObserved": [],
+      "passed": true
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/work",
+        "--git-dir",
+        "/work/.git",
+        "--work-tree",
+        "/work",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--no-verify",
+        "-m",
+        "test: checked repository repair"
+      ],
+      "case": 5,
+      "commitReadback": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "test: checked repository repair\n",
+        "success": true
+      },
+      "committedFile": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "checked change\n",
+        "success": true
+      },
+      "execution": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "[master (root-commit) df8c4eb] test: checked repository repair\n 1 file changed, 1 insertion(+)\n create mode 100644 change.txt\n",
+        "success": true
+      },
+      "hooksObserved": [],
+      "passed": true
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/work",
+        "--git-dir",
+        "/work/.git",
+        "--work-tree",
+        "/work",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--no-verify",
+        "-m",
+        "test: checked repository repair"
+      ],
+      "case": 6,
+      "commitReadback": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "test: checked repository repair\n",
+        "success": true
+      },
+      "committedFile": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "checked change\n",
+        "success": true
+      },
+      "execution": {
+        "exit": "exit status: 0",
+        "stderr": "bwrap: Only the last --chdir option will take effect\n",
+        "stdout": "[master (root-commit) df8c4eb] test: checked repository repair\n 1 file changed, 1 insertion(+)\n create mode 100644 change.txt\n",
+        "success": true
+      },
+      "hooksObserved": [],
+      "passed": true
+    }
+  ],
+  "passed": true
+}

@@ -1,0 +1,49 @@
+   Compiling ciborium-io v0.2.2
+   Compiling ciborium-ll v0.2.2
+   Compiling ciborium v0.2.2
+   Compiling coset v0.4.2
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-custody-hw)
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-finding-verifier)
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-runtime-core)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-store-sqlite)
+   Compiling chio-runtime-harness v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-runtime-harness)
+    Finished `test` profile [unoptimized] target(s) in 1m 23s
+     Running unittests src/lib.rs (target/debug/deps/chio_runtime_harness-fd38783d3f76b7f4)
+
+running 22 tests
+test evidence_io::tests::runtime_relative_path_helper_accepts_only_safe_evidence_paths ... ok
+test scenario::tests::scenario_run_id_must_be_non_empty_and_unpadded ... ok
+test scenario::tests::scenario_rejects_mixed_legacy_fields_and_steps ... ok
+test buyer_closure::tests::governance_receipt_selection_uses_single_fallback_only_without_expected_id ... ok
+test buyer_closure::tests::governance_receipt_selection_accepts_any_matching_expected_id_without_fallback ... ok
+test kernel::tests::runtime_loopback_receipt_metadata_binds_workflow_and_vendor ... ok
+test proof_parity::tests::buyer_closure_parity_rejects_unexpected_treaty_step_drift ... ok
+test tests::runtime_workflow_admission_hash_uses_terminal_denial_hash ... ok
+test tests::step_admission_binding_rejects_more_workflow_steps_than_admission_hashes ... ok
+test tests::step_admission_binding_rejects_more_workflow_steps_than_admission_ids ... ok
+test proof_parity::tests::buyer_closure_parity_accepts_exact_treaty_binding_delta ... ok
+test tests::runtime_workflow_admission_hash_uses_report_hash_without_rehashing ... ok
+test tests::step_admission_binding_uses_exact_index_without_fallback ... ok
+test buyer_closure::tests::governance_receipt_selection_rejects_missing_expected_id_even_with_single_receipt ... ok
+test kernel::tests::runtime_loopback_policy_inputs_emit_chio_runtime_schemas ... ok
+test treaty::tests::runtime_loopback_treaty_context_emits_dsse_for_routine_federated_steps ... ok
+test treaty::tests::runtime_loopback_treaty_context_emits_chio_federation_schemas ... ok
+test proof_parity::tests::materialized_parity_hashes_final_runtime_package ... ok
+test buyer_closure::tests::buyer_closure_emits_chio_federation_schemas ... ok
+test tests::runtime_loopback_rejects_runtime_package_drift_from_static_fixture ... ok
+test tests::runtime_loopback_outputs_chio_native_buyer_and_federation_schemas ... ok
+test tests::runtime_loopback_proof_package_is_semantically_deterministic ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.68s
+
+   Doc-tests chio_runtime_harness
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

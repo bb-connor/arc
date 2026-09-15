@@ -180,7 +180,9 @@ impl AdmissionScalingFixture {
             origin_keypair,
             local_keypair.public_key(),
         )));
-        kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(receipt_store_path)?))?;
+        let receipt_store = SqliteReceiptStore::open(receipt_store_path)?;
+        receipt_store.wait_for_writer_ready(std::time::Duration::from_secs(5))?;
+        kernel.set_receipt_store(Box::new(receipt_store))?;
         kernel.register_tool_server(Box::new(CountingToolServer {
             invocations: Arc::clone(&tool_invocations),
         }));
@@ -804,6 +806,30 @@ impl TreatyBase {
 
 impl TreatyCall {
     fn insert_into(&self, store: &InMemoryRuntimeAdmissionStore) -> Result<(), BoxError> {
+        // Activate records from this locally constructed fixture, not the
+        // envelope supplied by a caller under test.
+        let (statement, _) = self.dsse.decode_statement()?;
+        if let Some(lease) = statement.predicate.capability_lease_ref {
+            store.insert_treaty_runtime_artifact(
+                "capability_lease",
+                &lease.lease_id.clone(),
+                &chio_runtime_core::RuntimeTreatyLeaseRecord {
+                    lease,
+                    valid_from_unix_ms: self.continuation.issued_at_unix_ms,
+                },
+            )?;
+        }
+        if let Some(receipt) = statement.predicate.governance_receipt_ref {
+            store.insert_treaty_runtime_artifact(
+                "governance_receipt",
+                &receipt.receipt_id.clone(),
+                &chio_runtime_core::RuntimeTreatyGovernanceRecord {
+                    receipt,
+                    valid_from_unix_ms: self.continuation.issued_at_unix_ms,
+                    valid_until_unix_ms: self.continuation.expires_at_unix_ms,
+                },
+            )?;
+        }
         store.insert_treaty_runtime_artifact(
             "cross_kernel_continuation",
             &self.continuation.continuation_id,

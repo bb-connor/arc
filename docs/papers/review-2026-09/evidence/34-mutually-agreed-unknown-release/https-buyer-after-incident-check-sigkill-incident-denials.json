@@ -1,0 +1,82 @@
+[
+  {
+    "case": "incident-request-binding",
+    "rejectedByBoth": true,
+    "errors": {
+      "verifier": "buyer: incident projection does not reproduce this dispatch",
+      "rust-verifier": "terminal projection does not match the operation binding"
+    }
+  },
+  {
+    "case": "incident-dispatch-fence",
+    "rejectedByBoth": true,
+    "errors": {
+      "verifier": "buyer: incident projection does not reproduce this dispatch",
+      "rust-verifier": "terminal projection does not match the operation binding"
+    }
+  },
+  {
+    "case": "replay-incident-id",
+    "rejectedByBoth": true,
+    "errors": {
+      "verifier": "buyer: incident rewrites its terminal operation",
+      "rust-verifier": "terminal projection does not match the operation binding"
+    }
+  },
+  {
+    "case": "record-representation",
+    "rejectedByBoth": true,
+    "errors": {
+      "verifier": "buyer: incident projection does not reproduce this dispatch",
+      "rust-verifier": "terminal projection does not match the operation binding"
+    }
+  },
+  {
+    "case": "paid-capability-hash",
+    "rejectedByBoth": true,
+    "errors": {
+      "verifier": "buyer: incident changes paid authority",
+      "rust-verifier": "operation id does not match its immutable binding"
+    }
+  },
+  {
+    "case": "invented-finding",
+    "rejectedByBoth": true,
+    "errors": {
+      "verifier": "buyer: object fields differ from the supported profile",
+      "rust-verifier": "unknown field `finding`, expected one of `schema`, `agreementSha256`, `acceptedBidSha256`, `projection`"
+    }
+  },
+  {
+    "case": "completed-state",
+    "rejectedByBoth": true,
+    "errors": {
+      "verifier": "buyer: incident rewrites its terminal operation",
+      "rust-verifier": "state transition requires attachment tool_outcome_id"
+    }
+  },
+  {
+    "case": "boolean-epoch",
+    "rejectedByBoth": true,
+    "errors": {
+      "verifier": "buyer: integer outside profile",
+      "rust-verifier": "invalid type: boolean `true`, expected u64"
+    }
+  },
+  {
+    "case": "different-signer",
+    "rejectedByBoth": true,
+    "errors": {
+      "verifier": "buyer: incident changes provider",
+      "rust-verifier": "terminal projection does not match the operation binding"
+    }
+  },
+  {
+    "case": "changed-input",
+    "rejectedByBoth": true,
+    "errors": {
+      "verifier": "buyer: input digest differs from agreement",
+      "rust-verifier": "input disclosure or work profile differs from accepted agreement"
+    }
+  }
+]

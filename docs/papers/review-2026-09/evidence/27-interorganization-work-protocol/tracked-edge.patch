@@ -1,0 +1,149 @@
+diff --git a/crates/protocol/chio-a2a-edge/README.md b/crates/protocol/chio-a2a-edge/README.md
+index 1bbf9c2a98..c1064bb540 100644
+--- a/crates/protocol/chio-a2a-edge/README.md
++++ b/crates/protocol/chio-a2a-edge/README.md
+@@ -10,6 +10,26 @@ upstream MCP server) and `chio-mcp-edge` (the MCP hosting runtime).
+ 
+ ## Responsibilities
+ 
++The JSON-RPC handler accepts A2A 1.0 `SendMessage`, `GetTask`, and `CancelTask`
++with standard untagged message parts, task states, and result envelopes.
++`message.messageId` becomes the kernel request id. The caller's authenticated
++execution context supplies authority; message metadata cannot supply it.
++The older slash-form methods remain available for existing integrations.
++
++`SendMessage` blocks by default. With `configuration.returnImmediately: true`,
++it retains a task for execution on `GetTask`. Results and cancellations remain
++retrievable within the existing in-memory task TTL. The 1.0 path limits all
++retained tasks, including completed results. Each edge instance generates a
++fresh task namespace, so a restarted provider rejects old identifiers rather
++than resolving them to unrelated work. This is not durable provider recovery or
++deduplication of repeated `SendMessage` calls.
++
++The Agent Card advertises `text/plain` and `application/json`, and does not
++advertise SSE streaming. Multi-turn contexts, tenant routing, history, file
++parts and message extensions are rejected by this bounded 1.0 projection.
++The HTTP host remains responsible for authentication, request size limits,
++TLS and protocol-version header enforcement.
++
+ - Turn a set of Chio `ToolManifest`s into an A2A Agent Card: resolve each
+   tool's target protocol, evaluate `BridgeFidelity`, assign collision-safe
+   skill ids, and publish only skills whose fidelity resolves to
+diff --git a/crates/protocol/chio-a2a-edge/src/edge.rs b/crates/protocol/chio-a2a-edge/src/edge.rs
+index 3c0cb5312b..c76c8826d3 100644
+--- a/crates/protocol/chio-a2a-edge/src/edge.rs
++++ b/crates/protocol/chio-a2a-edge/src/edge.rs
+@@ -7,6 +7,7 @@ struct DeferredA2aTask {
+     request: CrossProtocolExecutionRequest,
+     response: TaskResponse,
+     expires_at_ms: u64,
++    v1_output_mode: Option<V1OutputMode>,
+ }
+ 
+ /// The A2A edge server.
+@@ -21,6 +22,7 @@ pub struct ChioA2aEdge {
+     /// Maps ambiguous unqualified tool names to the qualified published IDs.
+     ambiguous_skill_ids: BTreeMap<String, Vec<String>>,
+     task_counter: u64,
++    task_namespace: String,
+     tasks: BTreeMap<String, DeferredA2aTask>,
+ }
+ 
+@@ -158,8 +160,8 @@ impl ChioA2aEdge {
+                         description: skill_candidate.description.clone(),
+                         tags: skill_candidate.tags.clone(),
+                         examples: None,
+-                        input_modes: vec!["text".to_string()],
+-                        output_modes: vec!["text".to_string()],
++                        input_modes: vec!["text/plain".to_string(), "application/json".to_string()],
++                        output_modes: vec!["text/plain".to_string(), "application/json".to_string()],
+                         bridge_fidelity: skill_candidate.fidelity.clone(),
+                     });
+                 }
+@@ -196,6 +198,10 @@ impl ChioA2aEdge {
+             skill_bindings,
+             ambiguous_skill_ids,
+             task_counter: 0,
++            // A random identifier prevents stale client task records from
++            // aliasing unrelated work after this process loses its task table.
++            // This public value is not a trust root.
++            task_namespace: chio_core::crypto::Keypair::generate().public_key().to_hex(),
+             tasks: BTreeMap::new(),
+         })
+     }
+@@ -261,12 +267,12 @@ impl ChioA2aEdge {
+                 protocol_version: "1.0".to_string(),
+             }],
+             capabilities: AgentCapabilities {
+-                streaming: true,
++                streaming: false,
+                 push_notifications: false,
+                 state_transition_history: false,
+             },
+-            default_input_modes: vec!["text".to_string()],
+-            default_output_modes: vec!["text".to_string()],
++            default_input_modes: vec!["text/plain".to_string(), "application/json".to_string()],
++            default_output_modes: vec!["text/plain".to_string(), "application/json".to_string()],
+             skills: self.skills.clone(),
+         }
+     }
+@@ -302,7 +308,7 @@ impl ChioA2aEdge {
+     /// Allocate a new task ID.
+     fn next_task_id(&mut self) -> String {
+         self.task_counter += 1;
+-        format!("a2a-task-{}", self.task_counter)
++        format!("a2a-task-{}-{}", self.task_namespace, self.task_counter)
+     }
+ 
+     fn prune_deferred_tasks(&mut self) {
+@@ -525,6 +531,7 @@ impl ChioA2aEdge {
+                 request: orchestrated_request,
+                 response: response.clone(),
+                 expires_at_ms,
++                v1_output_mode: None,
+             },
+         );
+         Ok(response)
+@@ -608,6 +615,10 @@ impl ChioA2aEdge {
+             };
+         let should_respond = id.is_some();
+         let id = id.unwrap_or(Value::Null);
++        if matches!(method.as_str(), "SendMessage" | "GetTask" | "CancelTask") {
++            let response = self.handle_v1_jsonrpc(id, &method, params, kernel, execution);
++            return A2aJsonRpcResponse::from_optional(should_respond.then_some(response));
++        }
+         if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
+             &id,
+             &method,
+diff --git a/crates/protocol/chio-a2a-edge/src/lib.rs b/crates/protocol/chio-a2a-edge/src/lib.rs
+index 8ae38a828d..21b54117fd 100644
+--- a/crates/protocol/chio-a2a-edge/src/lib.rs
++++ b/crates/protocol/chio-a2a-edge/src/lib.rs
+@@ -92,6 +92,7 @@ include!("bridge.rs");
+ include!("conversion.rs");
+ include!("edge.rs");
+ include!("jsonrpc.rs");
++include!("v1.rs");
+ include!("tests/all.rs");
+ 
+ #[cfg(test)]
+diff --git a/crates/protocol/chio-a2a-edge/src/tests/all.rs b/crates/protocol/chio-a2a-edge/src/tests/all.rs
+index 09a10daea7..659ddffcac 100644
+--- a/crates/protocol/chio-a2a-edge/src/tests/all.rs
++++ b/crates/protocol/chio-a2a-edge/src/tests/all.rs
+@@ -1,5 +1,6 @@
+ #[cfg(test)]
+ mod tests {
++    include!("v1.rs");
+     use chio_test_support::prelude::*;
+     use super::*;
+     use std::sync::atomic::{AtomicUsize, Ordering};
+@@ -778,7 +779,7 @@ mod tests {
+         let card = edge.agent_card();
+         assert_eq!(card.name, "My Agent");
+         assert_eq!(card.description, "Custom agent");
+-        assert!(card.capabilities.streaming);
++        assert!(!card.capabilities.streaming);
+         assert_eq!(card.supported_interfaces[0].url, "https://myagent.com");
+         assert_eq!(card.supported_interfaces[0].protocol_binding, "HTTP+JSON");
+     }

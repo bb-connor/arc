@@ -1,0 +1,41 @@
+{
+  "chio": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "6c4675eafcdd02e29913d2cb02ff823bc7770fd6ac282efcd5b8309a5e8a980c",
+        "rule_sha256": "1bf91ea0f2b90c73f62f5fd6de9a83c7b81368e53340053b2caef202844a07f6",
+        "rule_json": "{\"slot\":{\"receiverId\":\"4bf367c890272395e6bb876b2c0348615e75cfacace999dfdd19f9207c77f302\",\"workflowId\":\"disable-git-commit-hooks\",\"stepId\":\"publish-reviewed-repair\"},\"predecessorStepId\":\"check-git-effects\",\"verifierKey\":\"c5d17fd012bb3bba620381e1285cd2c682f92bcad5d079c301104bb5dba69cf9\",\"contractSha256\":\"f18ef93dcd79f072c44eb6fdc16ac4aa6f01239eada4af6c811cacc87f7f0759\",\"serverId\":\"repair-review-queue\",\"toolName\":\"publish\",\"resource\":\"reviewed-source-files\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "bb256b323320ebedb8d8baf48e5e853a98361713386055c45fae695ed498474a",
+        "claim_json": "{\"slot\":{\"receiverId\":\"4bf367c890272395e6bb876b2c0348615e75cfacace999dfdd19f9207c77f302\",\"workflowId\":\"disable-git-commit-hooks\",\"stepId\":\"publish-reviewed-repair\"},\"ruleSha256\":\"1bf91ea0f2b90c73f62f5fd6de9a83c7b81368e53340053b2caef202844a07f6\",\"evidenceSha256\":\"44c9ecfb2af51c7856e411f52d9a09380decc53126907df1cb47657afe12b21b\",\"arguments\":{\"artifactSha256\":\"7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4\",\"resource\":\"reviewed-source-files\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "e0d2e1744bfd5d94eb0151c713d963df101bd6bd3e4113471589499f7ab72ba4",
+        "result_json": "{\"artifactSha256\":\"7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4\",\"publishedForReview\":true}"
+      }
+    ]
+  },
+  "ledger": {
+    "jobs": [
+      {
+        "receiver": "68cf5705ee95fec53a5c5b4ab1aaefeb1093109fa02bcd97b207b2845cdcb679",
+        "workflow": "disable-git-commit-hooks",
+        "step": "publish-reviewed-repair",
+        "rule_json": "{\"slot\":{\"receiverId\":\"68cf5705ee95fec53a5c5b4ab1aaefeb1093109fa02bcd97b207b2845cdcb679\",\"workflowId\":\"disable-git-commit-hooks\",\"stepId\":\"publish-reviewed-repair\"},\"predecessorStepId\":\"check-git-effects\",\"verifierKey\":\"de55db701981ba0b656c48413f8d4cabaa097612bc8092c9486bb3f09e0c7964\",\"contractSha256\":\"f18ef93dcd79f072c44eb6fdc16ac4aa6f01239eada4af6c811cacc87f7f0759\",\"serverId\":\"repair-review-queue\",\"toolName\":\"publish\",\"resource\":\"reviewed-source-files\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "f5ce263c20b9c4064b61865f17ccbbc0027251eaecc767981442edcf891e576d",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "8c42bf3f7b914204cd615ff4b973827ea98f0f9d0c905e88eb05537b34da9ffa",
+        "result_json": "{\"artifactSha256\":\"7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4\",\"publishedForReview\":true}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "8c42bf3f7b914204cd615ff4b973827ea98f0f9d0c905e88eb05537b34da9ffa",
+        "receiver": "68cf5705ee95fec53a5c5b4ab1aaefeb1093109fa02bcd97b207b2845cdcb679",
+        "workflow": "disable-git-commit-hooks",
+        "step": "publish-reviewed-repair",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"68cf5705ee95fec53a5c5b4ab1aaefeb1093109fa02bcd97b207b2845cdcb679\",\"workflowId\":\"disable-git-commit-hooks\",\"stepId\":\"publish-reviewed-repair\"},\"predecessorStepId\":\"check-git-effects\",\"contractSha256\":\"f18ef93dcd79f072c44eb6fdc16ac4aa6f01239eada4af6c811cacc87f7f0759\",\"artifactSha256\":\"7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"bf0fc58f8da2c078408818d65f3f02eda3f6273bc9c8a82782c4b147d48b8d5ec91641dccb9b7523a104ccb5b2f93495d42090b6bdf62cd3b895dc42a0ffb30f\"}",
+        "effect_json": "{\"artifactSha256\":\"7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4\",\"resource\":\"reviewed-source-files\"}"
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+[
+  {
+    "name": "rustls",
+    "version": "0.23.37",
+    "source": "registry+https://github.com/rust-lang/crates.io-index"
+  },
+  {
+    "name": "rustls-pemfile",
+    "version": "2.2.0",
+    "source": "registry+https://github.com/rust-lang/crates.io-index"
+  },
+  {
+    "name": "tiny_http",
+    "version": "0.12.0",
+    "source": "registry+https://github.com/rust-lang/crates.io-index"
+  },
+  {
+    "name": "tokio",
+    "version": "1.50.0",
+    "source": "registry+https://github.com/rust-lang/crates.io-index"
+  },
+  {
+    "name": "tokio-rustls",
+    "version": "0.26.4",
+    "source": "registry+https://github.com/rust-lang/crates.io-index"
+  }
+]

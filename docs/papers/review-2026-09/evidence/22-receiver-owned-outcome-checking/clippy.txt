@@ -1,0 +1,2 @@
+    Checking chio-outcome-ledger-comparison v0.1.0 (/home/connor/backbay/arc/examples/outcome-ledger-comparison)
+    Finished `dev` profile [unoptimized] target(s) in 0.85s

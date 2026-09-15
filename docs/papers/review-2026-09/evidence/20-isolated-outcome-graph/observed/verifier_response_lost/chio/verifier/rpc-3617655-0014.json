@@ -1,0 +1,18 @@
+{
+  "checkpoint": "after_complete",
+  "exit": "signal: 9 (SIGKILL)",
+  "request": {
+    "arguments": {
+      "grants": [
+        {
+          "operations": [
+            "invoke"
+          ],
+          "server_id": "source-checkout",
+          "tool_name": "read"
+        }
+      ]
+    },
+    "tool": "verify"
+  }
+}

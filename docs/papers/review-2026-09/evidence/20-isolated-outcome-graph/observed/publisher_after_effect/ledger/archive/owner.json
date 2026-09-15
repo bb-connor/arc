@@ -1,0 +1,31 @@
+{
+  "backend": "ledger",
+  "role": "archive",
+  "contract": {
+    "grants": [
+      {
+        "server_id": "source-checkout",
+        "tool_name": "read",
+        "operations": [
+          "invoke"
+        ]
+      }
+    ]
+  },
+  "rule": {
+    "slot": {
+      "receiverId": "196a7ef494b469d879966ba8b7be8aaa11a4c8bfbdd06390bb97443f9c2574e1",
+      "workflowId": "reviewed-scope-distribution",
+      "stepId": "archive"
+    },
+    "predecessorStepId": "publisher",
+    "verifierKey": "8f62223f4b35c85bc140266a0f7296e413652f2e7f15b99606b42907ccc12361",
+    "contractSha256": "67a18d393e8c87e25a47ee7584aab238415181c8003a3c6a31ad11619cd60906",
+    "serverId": "archive",
+    "toolName": "apply",
+    "resource": "archive/approved-scopes",
+    "validFromUnixMs": 1799999999000,
+    "validUntilUnixMs": 1800000001000
+  },
+  "successor": null
+}

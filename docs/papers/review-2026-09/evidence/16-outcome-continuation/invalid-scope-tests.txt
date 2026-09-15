@@ -1,0 +1,10 @@
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-runtime-core)
+    Finished `test` profile [unoptimized] target(s) in 11.41s
+     Running tests/runtime_treaty_binding_substitution.rs (target/debug/deps/runtime_treaty_binding_substitution-bd047cb71e808040)
+
+running 2 tests
+test matching_invalid_scope_algorithm_denies ... ok
+test matching_invalid_scope_digest_denies ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 35 filtered out; finished in 1.00s
+

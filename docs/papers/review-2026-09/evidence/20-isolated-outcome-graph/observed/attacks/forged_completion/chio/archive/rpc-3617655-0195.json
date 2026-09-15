@@ -1,0 +1,115 @@
+{
+  "reply": {
+    "allowed": true,
+    "output": {
+      "artifact": {
+        "grants": [
+          {
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "source-checkout",
+            "tool_name": "read"
+          }
+        ]
+      },
+      "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+      "completed": true
+    },
+    "receipt": {
+      "action": {
+        "parameter_hash": "06c2d3300092d6095babead805fac23531830b12a71e4bb6ff64b02d2a1c1b97",
+        "parameters": {
+          "artifact": {
+            "grants": [
+              {
+                "operations": [
+                  "invoke"
+                ],
+                "server_id": "source-checkout",
+                "tool_name": "read"
+              }
+            ]
+          },
+          "evidence": {
+            "body": {
+              "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+              "contractSha256": "a087a30efcb0a5cddaa6342cd53a361d3df28acf76c35b20a1d8680f6a3b7f83",
+              "passed": true,
+              "predecessorStepId": "publisher",
+              "schema": "chio.runtime.artifact-outcome.experimental.v1",
+              "slot": {
+                "receiverId": "a0cfe14425b8b0d080766253a3939b46795a2f26612869d9e067f7655842fd4d",
+                "stepId": "archive",
+                "workflowId": "reviewed-scope-distribution"
+              },
+              "verifiedAtUnixMs": 1800000000000
+            },
+            "signature": "8e1f518ede8db3bb7183c359d778e0df925f7c81b5f1603e15612e11d02d88d263a20dfbeebd023239ce9b6a6f56d67881d465f76b596e8abe782b1b1f7fba0f"
+          }
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "comparison-capability-e20ac9c173e0a5965a370532c63dc521b12055da5c4b2439ea32e661ba46da35",
+      "content_hash": "52bf65b317431d1cb13be7ecd3bb3e0d69d4f593188b59122be4d5d136220724",
+      "decision": {
+        "verdict": "allow"
+      },
+      "id": "1333f4960d60508ca4fb16e9e3a0c77f4c361456af82c86bf57b8f693d0750d8",
+      "kernel_key": "a0cfe14425b8b0d080766253a3939b46795a2f26612869d9e067f7655842fd4d",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "a0cfe14425b8b0d080766253a3939b46795a2f26612869d9e067f7655842fd4d",
+          "subject_key": "e20ac9c173e0a5965a370532c63dc521b12055da5c4b2439ea32e661ba46da35"
+        },
+        "chio_receipt_signing_nonce": "receipt-4e327ce871321ec099ec727ceeee604f8fce641ce5134eae9a65a5e6356101f0",
+        "receipt_context": {
+          "request_id": "4e327ce871321ec099ec727ceeee604f8fce641ce5134eae9a65a5e6356101f0"
+        }
+      },
+      "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "1b8f3ca5e467da2439aaa240c8f7b87a17b5c2c74896beab3aca088474b181991a9e5381795df1f56308efc65004b462e3d790032f1f4e755820f4b1f16d3e00",
+      "timestamp": 1800000000,
+      "tool_name": "apply",
+      "tool_origin": "caller_executed",
+      "tool_server": "archive",
+      "trust_level": "mediated"
+    }
+  },
+  "request": {
+    "arguments": {
+      "artifact": {
+        "grants": [
+          {
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "source-checkout",
+            "tool_name": "read"
+          }
+        ]
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "contractSha256": "a087a30efcb0a5cddaa6342cd53a361d3df28acf76c35b20a1d8680f6a3b7f83",
+          "passed": true,
+          "predecessorStepId": "publisher",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "a0cfe14425b8b0d080766253a3939b46795a2f26612869d9e067f7655842fd4d",
+            "stepId": "archive",
+            "workflowId": "reviewed-scope-distribution"
+          },
+          "verifiedAtUnixMs": 1800000000000
+        },
+        "signature": "8e1f518ede8db3bb7183c359d778e0df925f7c81b5f1603e15612e11d02d88d263a20dfbeebd023239ce9b6a6f56d67881d465f76b596e8abe782b1b1f7fba0f"
+      }
+    },
+    "tool": "apply"
+  }
+}

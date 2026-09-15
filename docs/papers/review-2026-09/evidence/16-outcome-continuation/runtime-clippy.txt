@@ -1,0 +1,3 @@
+    Checking chio-runtime-core v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-runtime-core)
+    Checking chio-runtime-harness v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-runtime-harness)
+    Finished `dev` profile [unoptimized] target(s) in 6.55s

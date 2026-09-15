@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Disable all hooks for hardened direct commits using a final
+  `core.hooksPath=/dev/null` override. `--no-verify` alone still ran
+  prepare-commit-msg, post-commit and reference-transaction hooks.
+
 ## [0.2.0]
 
 `bind_and_redact` shape hardening + 6-axis coverage matrix. The helper

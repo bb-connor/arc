@@ -1,0 +1,36 @@
+{
+  "checkpoint": "after_claim",
+  "exit": "signal: 9 (SIGKILL)",
+  "request": {
+    "arguments": {
+      "artifact": {
+        "grants": [
+          {
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "source-checkout",
+            "tool_name": "read"
+          }
+        ]
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "contractSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "passed": true,
+          "predecessorStepId": "verifier",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "7e56104e7afb415976af1fb3bea953a4ff6b4fd893c54a4ef2b0de0221b98776",
+            "stepId": "publisher",
+            "workflowId": "reviewed-scope-distribution"
+          },
+          "verifiedAtUnixMs": 1800000000000
+        },
+        "signature": "bbeacef2676497c5006b35dc916c5c13751fa674da3b8eb6b459cf1b76542cfa1b0e08f4857da73899d54f71fbe1c5e546f4c5ce064ebfa20aa2207927f6d80b"
+      }
+    },
+    "tool": "apply"
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "reply": {
+    "allowed": false,
+    "output": null,
+    "receipt": {
+      "action": {
+        "parameter_hash": "eae35810a2c17f54e12dbe1c15ade4d294cad1aab8919c845d8d9cfd9368d569",
+        "parameters": {
+          "artifact": {
+            "grants": [
+              {
+                "operations": [
+                  "invoke"
+                ],
+                "server_id": "source-checkout",
+                "tool_name": "read"
+              }
+            ]
+          },
+          "evidence": {
+            "body": {
+              "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+              "contractSha256": "55146a5f7b128eb673ecf1f18f49e981380b8c3c967e2a4444736ac946820db3",
+              "passed": true,
+              "predecessorStepId": "publisher",
+              "schema": "chio.runtime.artifact-outcome.experimental.v1",
+              "slot": {
+                "receiverId": "48061af56f71b78bbecc608af3f0b64b18a519877db52bf061db6aa72e6e05a6",
+                "stepId": "archive",
+                "workflowId": "reviewed-scope-distribution"
+              },
+              "verifiedAtUnixMs": 1800000000000
+            },
+            "signature": "be2ac8c5c23c68f33dd93cc7aec159251dda4f4cb5244a20efc1d788aa5e26b9b14983316b23b48bade231c133023f5144b7faa3ffa2b1a803360fd82eb39904"
+          }
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "comparison-capability-faadc259af962d2e2d4e54a9a944fd953c8fb7ae336cf8a8f5e228d21ed88356",
+      "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "decision": {
+        "guard": "kernel",
+        "reason": "tool server error: outcome_signature_invalid",
+        "verdict": "deny"
+      },
+      "id": "b3531b42033e78ddf6ab171ece174c995885f3c48efc6c94138d8bc7e0bfc38d",
+      "kernel_key": "48061af56f71b78bbecc608af3f0b64b18a519877db52bf061db6aa72e6e05a6",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "48061af56f71b78bbecc608af3f0b64b18a519877db52bf061db6aa72e6e05a6",
+          "subject_key": "faadc259af962d2e2d4e54a9a944fd953c8fb7ae336cf8a8f5e228d21ed88356"
+        },
+        "chio_receipt_signing_nonce": "receipt-23a9da366b4f5a3e69568948ea5c1bce9226c2ea30cc2759bac1b845da3d7b29",
+        "receipt_context": {
+          "request_id": "23a9da366b4f5a3e69568948ea5c1bce9226c2ea30cc2759bac1b845da3d7b29"
+        }
+      },
+      "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "0af88f362ce90777bd5b00d362e09d62ca922feee32404cb85cd22632401094338a3038f0117a33613d27b9e5187d5b491a0c259b14d0ce4be1b1d0f6633b60f",
+      "timestamp": 1800000000,
+      "tool_name": "apply",
+      "tool_origin": "caller_executed",
+      "tool_server": "archive",
+      "trust_level": "mediated"
+    }
+  },
+  "request": {
+    "arguments": {
+      "artifact": {
+        "grants": [
+          {
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "source-checkout",
+            "tool_name": "read"
+          }
+        ]
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "contractSha256": "55146a5f7b128eb673ecf1f18f49e981380b8c3c967e2a4444736ac946820db3",
+          "passed": true,
+          "predecessorStepId": "publisher",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "48061af56f71b78bbecc608af3f0b64b18a519877db52bf061db6aa72e6e05a6",
+            "stepId": "archive",
+            "workflowId": "reviewed-scope-distribution"
+          },
+          "verifiedAtUnixMs": 1800000000000
+        },
+        "signature": "be2ac8c5c23c68f33dd93cc7aec159251dda4f4cb5244a20efc1d788aa5e26b9b14983316b23b48bade231c133023f5144b7faa3ffa2b1a803360fd82eb39904"
+      }
+    },
+    "tool": "apply"
+  }
+}

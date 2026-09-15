@@ -1,0 +1,95 @@
+{
+  "body": {
+    "buyer": "6b7cdff5f14c2af4ca3eaacd6731aff72991190c13ce9c1be2b5dc9dd6b9f3b2",
+    "caPem": "-----BEGIN CERTIFICATE-----\nMIIByTCCAXCgAwIBAgIURsyV+N2qjn1aqNCwntbAYk6GyXgwCgYIKoZIzj0EAwIw\nHTEbMBkGA1UEAwwSQ2hpbyB0ZXN0IHByb3ZpZGVyMB4XDTI2MDkxNDAwNTIxNloX\nDTI2MDkxNDAyNTcxNlowHTEbMBkGA1UEAwwSQ2hpbyB0ZXN0IHByb3ZpZGVyMFkw\nEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQZLmVY2vE61LocR/n17vG5pZLqn6wFnN\nYHl55KeDiz2xMFzinQ7VqevMbj+ymajf/+a8fDyAGnApf3yneweivaOBjTCBijAS\nBgNVHRMBAf8ECDAGAQH/AgEAMA4GA1UdDwEB/wQEAwIBhjAPBgNVHREECDAGhwR/\nAAABMBMGA1UdJQQMMAoGCCsGAQUFBwMBMB0GA1UdDgQWBBQg3sjTpxXKz7yeexd2\nIt5wNdi9ezAfBgNVHSMEGDAWgBQg3sjTpxXKz7yeexd2It5wNdi9ezAKBggqhkjO\nPQQDAgNHADBEAiBd9qjxlhLb7AfGmBn/ZiRY5RyyPQrK6+V9C+dMxU7BAwIgPn+u\nfWEXWdNm5HnwGMK7bH1+LouXSyZ3H0zDRWvTvxs=\n-----END CERTIFICATE-----\n",
+    "origin": "https://127.0.0.1:43173",
+    "profile": "chio.example.security-review-agreement.v3",
+    "provider": "d51834b67baa2080371673155a374dba6cd6f4453f8cf01a55db9dab9a1630bc",
+    "schema": "chio.example.https-enrollment.v2",
+    "session": {
+      "expires_at": 1789351037,
+      "id": "negotiation-17b212fb7dcfe94dcf292b5be1f4e8d42150459dc5b2853158307872d2cc36d7",
+      "issued_at": 1789347432,
+      "issuer": "d51834b67baa2080371673155a374dba6cd6f4453f8cf01a55db9dab9a1630bc",
+      "schema": "chio.capability.v1",
+      "scope": {
+        "grants": [
+          {
+            "constraints": [
+              {
+                "type": "max_args_size",
+                "value": 262144
+              }
+            ],
+            "dpop_required": true,
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "security-review-provider",
+            "tool_name": "quote"
+          },
+          {
+            "constraints": [
+              {
+                "type": "max_args_size",
+                "value": 262144
+              }
+            ],
+            "dpop_required": true,
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "security-review-provider",
+            "tool_name": "accept"
+          },
+          {
+            "constraints": [
+              {
+                "type": "max_args_size",
+                "value": 262144
+              }
+            ],
+            "dpop_required": true,
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "security-review-provider",
+            "tool_name": "status"
+          },
+          {
+            "constraints": [
+              {
+                "type": "max_args_size",
+                "value": 262144
+              }
+            ],
+            "dpop_required": true,
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "security-review-provider",
+            "tool_name": "delivery"
+          },
+          {
+            "constraints": [
+              {
+                "type": "max_args_size",
+                "value": 262144
+              }
+            ],
+            "dpop_required": true,
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "security-review-provider",
+            "tool_name": "resolve"
+          }
+        ]
+      },
+      "signature": "9051c6087b7750e009a44c7f895159e85d5e710d4f6de61af55ebc8595291e123c8342bc6d3752a4a3d207ad1c1a9c71b55bbd896be84908fdcdfcccc927410a",
+      "subject": "6b7cdff5f14c2af4ca3eaacd6731aff72991190c13ce9c1be2b5dc9dd6b9f3b2"
+    }
+  },
+  "signature": "47d239b31374e67916149782a1df2f8a9d8b857d4f4861885d987e74298cede0456519acdcb16605ee3f829a612dd330949c241c00072c911405a52b687ad605",
+  "signerKey": "d51834b67baa2080371673155a374dba6cd6f4453f8cf01a55db9dab9a1630bc"
+}

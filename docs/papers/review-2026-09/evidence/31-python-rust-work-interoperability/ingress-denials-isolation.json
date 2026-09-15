@@ -1,0 +1,11 @@
+{
+  "crossRoleKeyReadable": {
+    "buyer": {
+      "readable": false
+    },
+    "provider": {
+      "readable": false
+    }
+  },
+  "pythonParticipantHasChioBinary": false
+}

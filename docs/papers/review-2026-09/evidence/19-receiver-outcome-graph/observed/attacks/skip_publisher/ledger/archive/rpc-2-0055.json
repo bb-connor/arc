@@ -1,0 +1,103 @@
+{
+  "reply": {
+    "allowed": false,
+    "output": null,
+    "receipt": {
+      "action": {
+        "parameter_hash": "e93c85b19f8f0805b5bdf09171b6bce8f868e24ae0806e8cbf6d5ad9b11598eb",
+        "parameters": {
+          "artifact": {
+            "grants": [
+              {
+                "operations": [
+                  "invoke"
+                ],
+                "server_id": "source-checkout",
+                "tool_name": "read"
+              }
+            ]
+          },
+          "evidence": {
+            "body": {
+              "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+              "contractSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+              "passed": true,
+              "predecessorStepId": "verifier",
+              "schema": "chio.runtime.artifact-outcome.experimental.v1",
+              "slot": {
+                "receiverId": "7ef28456a1d1f92f76874405804b5b9925b65137c6428a1e41431c1ef57a31c9",
+                "stepId": "publisher",
+                "workflowId": "reviewed-scope-distribution"
+              },
+              "verifiedAtUnixMs": 1800000000000
+            },
+            "signature": "c0a1b12a2b9f2badaa0ce57154581e34ed2ddad81899ccc6ee83bef71b38329c78a8478c9d67ebadbfea8cc8983b160643a70925681fbe028b918fab10dd3c06"
+          }
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "comparison-capability-d4d17ea6e1a3b039ff137cd899e269ddf78c7c36ecfa683fe48108734bc7401d",
+      "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "decision": {
+        "guard": "kernel",
+        "reason": "tool server error: unknown_job",
+        "verdict": "deny"
+      },
+      "id": "57696c438eb08c2721118f3f462131d3360158ce7f9ef720a35684f07b9429f9",
+      "kernel_key": "915ce58e050c323876dc1a4fae0aab8fa0c758504d6292ca61a2c2e1a48989b9",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "915ce58e050c323876dc1a4fae0aab8fa0c758504d6292ca61a2c2e1a48989b9",
+          "subject_key": "d4d17ea6e1a3b039ff137cd899e269ddf78c7c36ecfa683fe48108734bc7401d"
+        },
+        "chio_receipt_signing_nonce": "receipt-a04b4cf1f042e57c39d129a71085965413491f914665d4f6d69f5cca3161da5f",
+        "receipt_context": {
+          "request_id": "a04b4cf1f042e57c39d129a71085965413491f914665d4f6d69f5cca3161da5f"
+        }
+      },
+      "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "3bcdc2af3d280aa3abe9470fd8369281679651372cc60ea4730fe6f3227334afcf63b0847c6b475b38acde92271d5ec91929bae88655884fb4dc89edfaf1770b",
+      "timestamp": 1800000000,
+      "tool_name": "apply",
+      "tool_origin": "caller_executed",
+      "tool_server": "archive",
+      "trust_level": "mediated"
+    }
+  },
+  "request": {
+    "arguments": {
+      "artifact": {
+        "grants": [
+          {
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "source-checkout",
+            "tool_name": "read"
+          }
+        ]
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "contractSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "passed": true,
+          "predecessorStepId": "verifier",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "7ef28456a1d1f92f76874405804b5b9925b65137c6428a1e41431c1ef57a31c9",
+            "stepId": "publisher",
+            "workflowId": "reviewed-scope-distribution"
+          },
+          "verifiedAtUnixMs": 1800000000000
+        },
+        "signature": "c0a1b12a2b9f2badaa0ce57154581e34ed2ddad81899ccc6ee83bef71b38329c78a8478c9d67ebadbfea8cc8983b160643a70925681fbe028b918fab10dd3c06"
+      }
+    },
+    "tool": "apply"
+  }
+}

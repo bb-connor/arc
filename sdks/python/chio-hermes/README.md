@@ -112,7 +112,7 @@ receipts.
 > `POST /v1/receipts/verify`) mounted. For chio < 0.2, the plugin
 > stays in degraded-but-safe mode: `chio_sidecar_unreachable` envelopes
 > surface for `status: allowed` paths, but every client-side guard
-> (path filters, env sanitization, `--no-verify` rejection, output
+> (path filters, env sanitization, commit-hook suppression, output
 > capping) still fires. See
 > [docs/integrations/HERMES.md](../../../docs/integrations/HERMES.md)
 > for the full deployment matrix.

@@ -1,0 +1,38 @@
+{
+  "chio": {
+    "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+    "baselineRejected": true,
+    "checkedCommitCases": 7,
+    "evidenceErasureRejected": true,
+    "helperOnlyFixRejected": true,
+    "noCommitRejected": true,
+    "publishedEffects": 1,
+    "replacementRejected": true,
+    "selfAssertedPassRejected": true,
+    "state": "completed",
+    "substitutionRejected": true,
+    "wrongBaseRejected": true
+  },
+  "experiment": "isolated-code-repair",
+  "ledger": {
+    "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+    "baselineRejected": true,
+    "checkedCommitCases": 7,
+    "evidenceErasureRejected": true,
+    "helperOnlyFixRejected": true,
+    "noCommitRejected": true,
+    "publishedEffects": 1,
+    "replacementRejected": true,
+    "selfAssertedPassRejected": true,
+    "state": "completed",
+    "substitutionRejected": true,
+    "wrongBaseRejected": true
+  },
+  "limits": [
+    "Finite black-box regression contract, not universal code correctness",
+    "Trusted host checker, kernel, operator, libraries and Git; candidate Python and Git checks run in separate sandboxes",
+    "No aggregate resource quotas, remote administration, live model or deployment activation",
+    "Sources published into a new review directory; operator checkout is not changed by this workflow"
+  ],
+  "separationObserved": false
+}

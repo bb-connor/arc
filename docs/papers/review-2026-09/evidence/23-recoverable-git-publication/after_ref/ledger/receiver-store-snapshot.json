@@ -1,0 +1,25 @@
+{
+  "authorizations": [
+    {
+      "effect_json": "{\"artifactSha256\":\"ad42faa011846ef81d8b75a1c4e7ae3b44d9f31f3552e5955074722680f01225\",\"resource\":\"refs/heads/verified-repair\"}",
+      "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"19658a34ddbe53b9e48458ee3a207bba5bcb85484ab0b7a2a6d8af50b896d3da\",\"workflowId\":\"recover-checked-git-repair\",\"stepId\":\"publish\"},\"predecessorStepId\":\"receiver-source-check\",\"contractSha256\":\"ad9a50bf9c9712cd1d1ebbfa352bfb48fee196f031eec0cd816279678af46f2c\",\"artifactSha256\":\"ad42faa011846ef81d8b75a1c4e7ae3b44d9f31f3552e5955074722680f01225\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"71308c7967933ea86338a4bd57171b0b3d00352ac90c64929267c603cda7da2616ff86609f873d3e21ab725c95ef1a9cacefed3c9ee0a7fe17e81c8ab510f507\"}",
+      "handle": "5078cafb0ebe2da36b1266519a0ccaf8aa30ac34424a2ed9a4caa794be93919f",
+      "receiver": "19658a34ddbe53b9e48458ee3a207bba5bcb85484ab0b7a2a6d8af50b896d3da",
+      "step": "publish",
+      "workflow": "recover-checked-git-repair"
+    }
+  ],
+  "jobs": [
+    {
+      "claimed_handle": "5078cafb0ebe2da36b1266519a0ccaf8aa30ac34424a2ed9a4caa794be93919f",
+      "receiver": "19658a34ddbe53b9e48458ee3a207bba5bcb85484ab0b7a2a6d8af50b896d3da",
+      "result_json": null,
+      "revoked": 0,
+      "rule_digest": "4758a3f1ca4865fb584afdfedb8065028f98e75822e71d31d3a2fcaeda75a14f",
+      "rule_json": "{\"slot\":{\"receiverId\":\"19658a34ddbe53b9e48458ee3a207bba5bcb85484ab0b7a2a6d8af50b896d3da\",\"workflowId\":\"recover-checked-git-repair\",\"stepId\":\"publish\"},\"predecessorStepId\":\"receiver-source-check\",\"verifierKey\":\"19658a34ddbe53b9e48458ee3a207bba5bcb85484ab0b7a2a6d8af50b896d3da\",\"contractSha256\":\"ad9a50bf9c9712cd1d1ebbfa352bfb48fee196f031eec0cd816279678af46f2c\",\"serverId\":\"checked-git-publication\",\"toolName\":\"publish\",\"resource\":\"refs/heads/verified-repair\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+      "state": "claimed",
+      "step": "publish",
+      "workflow": "recover-checked-git-repair"
+    }
+  ]
+}

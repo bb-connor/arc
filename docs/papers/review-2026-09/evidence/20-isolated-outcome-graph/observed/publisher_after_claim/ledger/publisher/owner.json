@@ -1,0 +1,45 @@
+{
+  "backend": "ledger",
+  "role": "publisher",
+  "contract": {
+    "grants": [
+      {
+        "server_id": "source-checkout",
+        "tool_name": "read",
+        "operations": [
+          "invoke"
+        ]
+      }
+    ]
+  },
+  "rule": {
+    "slot": {
+      "receiverId": "7e56104e7afb415976af1fb3bea953a4ff6b4fd893c54a4ef2b0de0221b98776",
+      "workflowId": "reviewed-scope-distribution",
+      "stepId": "publisher"
+    },
+    "predecessorStepId": "verifier",
+    "verifierKey": "1f2b065626da88292e850a8c4828f6f46faa6198b28896a863faa22cd1ed3a2c",
+    "contractSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+    "serverId": "publisher",
+    "toolName": "apply",
+    "resource": "publisher/approved-scopes",
+    "validFromUnixMs": 1799999999000,
+    "validUntilUnixMs": 1800000001000
+  },
+  "successor": {
+    "slot": {
+      "receiverId": "d84cf609828a94816ab567744dc7366a0a296606174d2e0ab35b2ce00d7d8b43",
+      "workflowId": "reviewed-scope-distribution",
+      "stepId": "archive"
+    },
+    "predecessorStepId": "publisher",
+    "verifierKey": "7e56104e7afb415976af1fb3bea953a4ff6b4fd893c54a4ef2b0de0221b98776",
+    "contractSha256": "fe2c92ab6b877c8a2e57d51478ffcb142f0a692a3aa3609d1ea1ee12574a913c",
+    "serverId": "archive",
+    "toolName": "apply",
+    "resource": "archive/approved-scopes",
+    "validFromUnixMs": 1799999999000,
+    "validUntilUnixMs": 1800000001000
+  }
+}

@@ -14,12 +14,11 @@
   Three things the model keeps apart, because the receiver keeps them apart.
 
   * A leaf bound for **equality** must carry the value the receiver already
-    holds. Twenty-three leaves are of this kind.
+    holds. Twenty-seven leaves are of this kind.
   * A leaf bound to a **domain** must lie in an admissible set the receiver
-    holds, which is not a singleton: the lease expiry must be later than the
-    receiver's clock, and the lease issuer must be one of the agreement's two
-    participants. Two leaves are of this kind, and an accepted statement pins
-    them to the set rather than to a value.
+    holds, which is not a singleton: the lease expiry must be live and inside
+    the receiver-resolved presentation window. One leaf is of this kind;
+    the lease issuer now equals the issuer in the receiver's own lease record.
   * The **statement gate** is everything the receiver checks about the
     statement alone: the wire shape of each leaf, and the agreement checks
     between leaves of the same statement. It reads nothing the receiver holds,
@@ -317,9 +316,9 @@ def classify : Field -> Comparison := fun f =>
   | .leaseId =>
       .selfConsistent "the lease list of the binding reference"
   | .leaseIssuer =>
-      .receiverDomain "the two participant kernel ids of the resolved agreement"
+      .receiverState "the issuer of the lease the receiver resolved"
   | .leaseExpiry =>
-      .receiverDomain "the instants strictly later than the receiver's clock"
+      .receiverDomain "the live instants within the receiver-resolved presentation window"
   | .leaseScopeDigestAlg =>
       .absentOptional "the lease scope digest is optional and this call omits it"
   | .leaseScopeDigestValue =>
@@ -349,14 +348,11 @@ def classify : Field -> Comparison := fun f =>
   | .governanceReceiptId =>
       .selfConsistent "the governance list of the binding reference"
   | .governanceKernelId =>
-      .uncompared "any JSON string"
-        "the governance receipt the receiver acts on is the one its own bundle names"
+      .receiverState "the issuer of the governance receipt the receiver activated"
   | .governanceDigestAlg =>
-      .uncompared "any JSON string"
-        "the governance digest is never resolved during admission"
+      .receiverState "the hash algorithm of the governance receipt the receiver activated"
   | .governanceDigestValue =>
-      .uncompared "any JSON string"
-        "the governance digest is never resolved during admission"
+      .receiverState "the digest of the governance receipt the receiver activated"
   | .consistencyAnchor =>
       .uncompared "any JSON string"
         "the anchor is carried for the peer's own reconciliation"
@@ -632,10 +628,10 @@ theorem absent_leaves_are_refused_or_merely_optional (f : Field) :
   carry.
 -/
 theorem classification_census :
-    (allFields.filter (fun f => (comparedForEquality (classify f)).isSome)).length = 23 ∧
-    (allFields.filter (fun f => (comparedWithinDomain (classify f)).isSome)).length = 2 ∧
+    (allFields.filter (fun f => (comparedForEquality (classify f)).isSome)).length = 27 ∧
+    (allFields.filter (fun f => (comparedWithinDomain (classify f)).isSome)).length = 1 ∧
     (allFields.filter (fun f => statementOnly (classify f))).length = 13 ∧
-    (allFields.filter (fun f => receiverUncompared (classify f))).length = 11 ∧
+    (allFields.filter (fun f => receiverUncompared (classify f))).length = 8 ∧
     (allFields.filter (fun f => refusedByProfile (classify f))).length = 2 ∧
     (allFields.filter (fun f => optionalAndAbsent (classify f))).length = 4 ∧
     (allFields.filter (fun f => carried (classify f))).length = 49 ∧

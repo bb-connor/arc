@@ -1,0 +1,340 @@
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-runtime-core)
+    Finished `test` profile [unoptimized] target(s) in 24.78s
+     Running unittests src/lib.rs (target/debug/deps/chio_runtime_core-2c5f947e15914cf3)
+
+running 9 tests
+test treaty::tests::ladder_mode_rank_agrees_with_federation_on_every_spelling ... ok
+test types::presentation_window_tests::a_receiver_that_resolved_nothing_has_no_window ... ok
+test types::presentation_window_tests::a_record_the_receiver_cannot_read_an_interval_out_of_is_refused ... ok
+test types::presentation_window_tests::each_counterparty_gets_the_intervals_resolved_for_it ... ok
+test types::presentation_window_tests::intervals_that_do_not_overlap_close_the_window ... ok
+test types::presentation_window_tests::the_window_owns_the_upper_bound_of_any_validity_presented_to_it ... ok
+test types::presentation_window_tests::the_window_is_the_intersection_of_the_resolved_intervals ... ok
+test types::presentation_window_tests::withdrawing_one_counterparty_record_closes_that_counterparty_alone ... ok
+test validation::evidence::tests::relative_evidence_path_helper_accepts_only_safe_paths ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/runtime_admission.rs (target/debug/deps/runtime_admission-12034c1616085db1)
+
+running 47 tests
+test chio_native_runtime_admission_schema_emits_chio_report ... ok
+test chio_runtime_hook_denies_swarm_context_without_required_evidence_refs ... ok
+test chio_runtime_hook_releases_chio_native_reserved_state_after_kernel_abort ... ok
+test destructive_consume_error_preserves_same_admission_replay_marker ... ok
+test destructive_consume_panic_preserves_same_admission_replay_marker ... ok
+test chio_runtime_hook_denies_swarm_route_metadata_mismatch_before_dispatch ... ok
+test chio_runtime_hook_denies_swarm_continuation_expired_since_storage ... ok
+test kernel_hook_rejects_treaty_dsse_policy_verdict_disagreement ... ok
+test chio_runtime_hook_denies_stale_swarm_continuation_before_dispatch ... ok
+test chio_runtime_hook_denies_swarm_route_selection_id_mismatch_before_dispatch ... ok
+test chio_runtime_hook_denies_incomplete_swarm_route_metadata_before_dispatch ... ok
+test chio_runtime_hook_denies_swarm_missing_route_metadata_before_dispatch ... ok
+test ambiguous_release_failure_is_not_retried_after_same_admission_reacquire ... ok
+test chio_runtime_hook_denies_swarm_route_plan_not_bound_to_continuation ... ok
+test runtime_failure_code_registry_covers_hook_surface_codes ... ok
+test matching_destructive_admission_accepts_once_then_rejects_replay ... ok
+test kernel_hook_rejects_treaty_dsse_unanimous_deny ... ok
+test runtime_trust_floor_panic_is_denied_and_releases_destructive_lease ... ok
+test destructive_release_panic_does_not_block_treaty_or_swarm_release ... ok
+test kernel_hook_uses_configured_runtime_policy_to_deny ... ok
+test signed_runtime_admission_report_detects_tampering ... ok
+test chio_runtime_hook_revalidates_resumable_swarm_continuation_without_replay_denial ... ok
+test chio_runtime_hook_revalidates_reserved_swarm_continuation_then_denies_replay ... ok
+test treaty_consume_panic_preserves_same_admission_replay_marker ... ok
+test evaluator_bundle_panic_releases_only_observed_continuation_reservations ... ok
+test destructive_release_error_does_not_block_treaty_or_swarm_release ... ok
+test treaty_consume_error_preserves_same_admission_replay_marker ... ok
+test mixed_release_failures_preserve_each_failed_id_and_reason ... ok
+test swarm_consume_error_releases_treaty_and_preserves_same_admission_swarm_marker ... ok
+test swarm_consume_panic_releases_treaty_and_preserves_same_admission_swarm_marker ... ok
+test treaty_record_revocation_is_rechecked_after_admission ... ok
+test sqlite_runtime_hook_denies_stale_swarm_continuation_before_dispatch ... ok
+test treaty_runtime_hook_denies_continuation_from_non_origin_source ... ok
+test sqlite_runtime_hook_denies_replayed_swarm_continuation_before_dispatch ... ok
+test treaty_runtime_hook_denies_bare_tool_continuation_audience ... ok
+test treaty_runtime_hook_denies_mismatched_continuation_hash ... ok
+test treaty_runtime_hook_denies_missing_lineage_evidence_ref ... ok
+test treaty_runtime_hook_denies_missing_bilateral_invocation_evidence_ref ... ok
+test treaty_runtime_hook_denies_stale_continuation_before_dispatch ... ok
+test treaty_runtime_hook_denies_request_smuggled_dynamic_trust ... ok
+test treaty_runtime_hook_denies_replayed_continuation ... ok
+test treaty_runtime_hook_denies_unverified_lineage_bundle_before_dispatch ... ok
+test treaty_runtime_hook_denies_request_smuggled_trust_root ... ok
+test treaty_runtime_hook_preserves_millisecond_time_for_continuation_staleness ... ok
+test treaty_runtime_hook_requires_signed_bilateral_evidence_before_verification ... ok
+test treaty_runtime_hook_releases_continuation_after_runtime_denial ... ok
+test treaty_runtime_hook_releases_reserved_state_after_kernel_abort ... ok
+
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+
+     Running tests/runtime_agreement_context_scan.rs (target/debug/deps/runtime_agreement_context_scan-4404b01a0f26684b)
+
+running 12 tests
+test swarm_context_refuses_dynamic_trust_nested_below_the_agreement_object ... ok
+test swarm_context_refuses_a_trust_root_outside_the_agreement_object ... ok
+test treaty_context_refuses_a_trust_root_nested_below_the_agreement_object ... ok
+test treaty_context_refuses_dynamic_trust_nested_below_the_agreement_object ... ok
+test swarm_context_refuses_a_trust_root_nested_below_the_agreement_object ... ok
+test swarm_context_deeper_than_the_scan_bound_is_refused ... ok
+test treaty_context_refuses_a_trust_root_inside_an_array ... ok
+test treaty_context_deeper_than_the_scan_bound_is_refused ... ok
+test a_nested_agreement_context_without_trust_material_is_not_refused_as_smuggled ... ok
+test treaty_context_refuses_a_trust_root_outside_the_agreement_object ... ok
+test treaty_context_reports_a_smuggled_trust_root_ahead_of_dynamic_trust ... ok
+test treaty_context_wider_than_the_scan_bound_is_refused ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/runtime_buyer_review.rs (target/debug/deps/runtime_buyer_review-d41652c57194ed4e)
+
+running 21 tests
+test buyer_hash_only_packet_rejects_claimed_admission_dsse_evidence ... ok
+test buyer_attestation_packet_preserves_verified_lineage_boundary_without_accepting_unresolved_dsse ... ok
+test buyer_attestation_packet_binds_buyer_to_lineage_source ... ok
+test buyer_hash_only_packet_rejects_unresolved_dsse_hash ... ok
+test buyer_review_package_rejects_minimal_proof_package ... ok
+test buyer_review_package_rejects_missing_strict_dsse_envelope ... ok
+test buyer_review_package_rejects_missing_hydrated_parent_receipt ... ok
+test buyer_review_package_rejects_non_strict_dsse_envelope ... ok
+test buyer_review_package_rejects_lineage_bundle_without_packet_statement ... ok
+test buyer_review_package_rejects_claimed_governance_digest_drift ... ok
+test receipt_lineage_bundle_rejects_asserted_required_edge ... ok
+test buyer_review_package_rejects_runtime_manifest_artifact_drift ... ok
+test buyer_review_package_rejects_duplicate_strict_dsse_signature_keyids ... ok
+test buyer_review_package_rejects_same_key_strict_dsse_trust_material ... ok
+test buyer_review_package_rejects_runtime_report_without_matching_dsse_step ... ok
+test buyer_review_package_rejects_runtime_proof_input_trust_hash_drift ... ok
+test buyer_review_package_rejects_strict_dsse_signer_kernel_mismatch ... ok
+test buyer_review_package_rejects_tampered_strict_dsse_signature_when_peer_keys_available ... ok
+test buyer_review_package_rejects_strict_dsse_policy_verdict_disagreement ... ok
+test buyer_review_package_rejects_signed_receipt_with_unbound_fields ... ok
+test buyer_review_package_hydrates_required_artifacts_by_role ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.17s
+
+     Running tests/runtime_kernel_hook.rs (target/debug/deps/runtime_kernel_hook-1f1780a8c2c4023c)
+
+running 8 tests
+test kernel_hook_bypasses_non_chio_request ... ok
+test kernel_hook_revalidates_non_runtime_request_without_admission_metadata ... ok
+test kernel_hook_denies_federated_origin_without_any_runtime_context ... ok
+test kernel_hook_denies_federated_runtime_request_without_treaty_context ... ok
+test kernel_hook_preserves_millisecond_admission_time ... ok
+test kernel_hook_immediate_dispatch_revalidation_rejects_advanced_trust_floor ... ok
+test kernel_hook_accepts_governed_context_reference_and_returns_receipt_metadata ... ok
+test kernel_hook_denies_cross_boundary_request_when_treaty_store_evidence_missing ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/runtime_ops.rs (target/debug/deps/runtime_ops-90276c8631894ed8)
+
+running 32 tests
+test proof_regeneration_report_records_bound_runtime_artifacts ... ok
+test runtime_ops_input_documents_accept_chio_native_schemas ... ok
+test runtime_ops_retention_plan_rejects_stale_profile ... ok
+test runtime_ops_evidence_health_detects_manifest_report_binding_mismatch ... ok
+test runtime_ops_evidence_health_detects_hash_mismatch ... ok
+test runtime_ops_evidence_health_rejects_manifest_run_mismatch ... ok
+test runtime_ops_status_rejects_stale_supervisor_profile ... ok
+test runtime_ops_recovery_drill_rejects_stale_supervisor_profile ... ok
+test runtime_orchestration_run_report_rejects_inconsistent_outcome ... ok
+test runtime_orchestration_contracts_validate_status_and_run_report ... ok
+test runtime_proof_drift_report_normalizes_runtime_and_proof_report_artifacts ... ok
+test runtime_proof_drift_report_rejects_manifest_hash_change ... ok
+test runtime_proof_drift_report_rejects_manifest_proof_run_id_mismatch ... ok
+test runtime_proof_drift_report_rejects_proof_outcome_drift ... ok
+test runtime_proof_drift_report_rejects_workflow_report_artifact_drift ... ok
+test runtime_proof_regeneration_artifacts_reject_run_id_mismatch ... ok
+test runtime_proof_regeneration_artifacts_reject_source_records_spliced_from_workflow_steps ... ok
+test runtime_proof_regeneration_contracts_bind_evidence ... ok
+test runtime_workflow_report_rejects_placeholder_success_path ... ok
+test runtime_workflow_report_rejects_unsafe_evidence_paths ... ok
+test runtime_workflow_report_requires_structured_step_evidence ... ok
+test runtime_ops_scheduler_tick_rejects_profile_at_exact_expiry ... ok
+test runtime_ops_status_ignores_terminal_lease_for_staleness ... ok
+test runtime_ops_recovery_drill_blocks_terminal_failure_steps ... ok
+test runtime_ops_scheduler_tick_claims_pending_runs_and_expires_stale_leases ... ok
+test runtime_ops_recovery_drill_blocks_non_contiguous_reusable_steps ... ok
+test runtime_ops_scheduler_tick_excludes_active_leased_runs_before_claim_limit ... ok
+test runtime_ops_scheduler_tick_limits_claims_by_active_leases ... ok
+test runtime_ops_recovery_drill_preserves_earlier_terminal_failure_blocker ... ok
+test runtime_ops_scheduler_tick_ignores_terminal_run_leases_for_capacity ... ok
+test runtime_ops_run_lease_blocks_competing_owner_and_allows_stale_takeover ... ok
+test runtime_orchestration_status_rejects_stale_profile ... ok
+
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/runtime_ops_provider_health.rs (target/debug/deps/runtime_ops_provider_health-c553effd1d9dd1dc)
+
+running 14 tests
+test runtime_ops_provider_binding_rejects_missing_model_card_when_required ... ok
+test runtime_ops_provider_health_rejects_stale_supervisor_profile ... ok
+test runtime_ops_provider_health_rejects_discovery_attempts ... ok
+test runtime_ops_provider_health_rejects_stale_model_card ... ok
+test runtime_ops_provider_health_accepts_required_model_card_with_loaded_hash ... ok
+test runtime_ops_provider_health_rejects_loaded_hash_mismatch ... ok
+test runtime_ops_provider_health_report_rejects_accepted_failed_provider_check ... ok
+test runtime_ops_provider_health_rejects_model_card_digest_mismatch ... ok
+test runtime_ops_provider_health_rejects_model_card_without_observed_loaded_hash ... ok
+test runtime_ops_provider_health_accepts_prefixed_model_card_tool_binding ... ok
+test runtime_ops_provider_health_rejects_banned_model_card_tool_binding ... ok
+test runtime_ops_provider_health_report_rejects_inconsistent_provider_counts ... ok
+test runtime_ops_provider_health_report_rejects_inconsistent_degraded_ids ... ok
+test runtime_ops_provider_health_rejects_unavailable_required_model_card ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/runtime_orchestration.rs (target/debug/deps/runtime_orchestration-efef24f58e4664dd)
+
+running 8 tests
+test runtime_orchestration_input_documents_accept_chio_native_schemas ... ok
+test runtime_orchestration_evidence_sink_health_rejects_stale_artifacts ... ok
+test runtime_orchestration_evidence_binding_rejects_wrong_step_index ... ok
+test runtime_orchestration_evidence_loads_rejected_proof_without_verifier_report ... ok
+test runtime_orchestration_evidence_binding_accepts_consistent_artifacts ... ok
+test runtime_orchestration_evidence_binding_rejects_wrong_admission_order ... ok
+test runtime_orchestration_evidence_load_rejects_manifest_artifact_hash_mismatch ... ok
+test runtime_orchestration_evidence_sink_health_rejects_rejected_verifier_report ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/runtime_pheromone_policy.rs (target/debug/deps/runtime_pheromone_policy-e590f49b294417c3)
+
+running 8 tests
+test destructive_admission_requires_signed_pheromone_policy ... ok
+test runtime_pheromone_query_report_parser_reads_snake_case_fields ... ok
+test runtime_pheromone_policy_rejects_query_report_signed_by_other_key ... ok
+test runtime_pheromone_policy_rejects_future_dated_advisory ... ok
+test chio_native_runtime_policy_material_emits_chio_decision ... ok
+test runtime_pheromone_policy_requires_action_class_for_governance_scoped_rule ... ok
+test runtime_pheromone_policy_enforces_distinct_origin_floor ... ok
+test signed_runtime_pheromone_policy_can_deny_before_dispatch ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/runtime_store.rs (target/debug/deps/runtime_store-3c82d3de1dee3ae8)
+
+running 7 tests
+test store_without_treaty_continuation_support_fails_closed ... ok
+test in_memory_runtime_admission_store_insert_bundle_is_idempotent ... ok
+test json_runtime_admission_store_persists_swarm_authority_bundle ... ok
+test sqlite_runtime_orchestration_store_preserves_same_artifact_hash_per_run ... ok
+test sqlite_runtime_orchestration_store_persists_treaty_evidence_idempotently ... ok
+test sqlite_runtime_orchestration_store_records_swarm_authority_bundle_created_at ... ok
+test sqlite_runtime_orchestration_store_persists_replay_fence_and_status ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/runtime_treaty.rs (target/debug/deps/runtime_treaty-abf3f596e1110408)
+
+running 22 tests
+test bounded_treaty_constitution_matches_finite_domain_refinement ... ok
+test bounded_treaty_predicate_covers_every_lean_atom ... ok
+test bilateral_dsse_consistency_models_use_wire_vocabulary ... ok
+test ladder_co_sign_modes_use_wire_vocabulary ... ok
+test retired_quorum_required_spelling_is_rejected ... ok
+test treaty_cross_boundary_admission_rejects_accepted_failure_code ... ok
+test treaty_cross_boundary_admission_rejects_accepted_unverified_required_evidence ... ok
+test governance_ladder_manifest_round_trips_n_of_m_quorum ... ok
+test bounded_treaty_predicate_denies_excessive_nesting ... ok
+test bounded_treaty_predicate_serialization_denies_unknown_or_unsupported_input ... ok
+test treaty_cross_boundary_admission_injects_bilateral_requirement_for_cosign ... ok
+test chio_federation_treaty_schema_is_accepted_and_emitted ... ok
+test treaty_cross_boundary_admission_rejects_accepted_missing_required_evidence ... ok
+test treaty_ladder_intersection_rejects_destructive_observation ... ok
+test treaty_intersection_rejects_manifest_hash_mismatch_and_unknown_class ... ok
+test treaty_cross_boundary_admission_requires_quorum_evidence_for_quorum_cosign ... ok
+test treaty_cross_boundary_admission_rejects_stale_treaty_or_future_intersection ... ok
+test treaty_cross_boundary_admission_requires_intersection_and_evidence ... ok
+test treaty_cross_boundary_admission_rejects_unverified_or_forged_intersection ... ok
+test every_two_signature_co_sign_mode_requires_the_invocation_record ... ok
+test treaty_loaded_ladder_intersection_rejects_destructive_crdt_commutative ... ok
+test bounded_treaty_view_binds_runtime_artifacts_and_rejects_wrong_treaty ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/runtime_treaty_binding_substitution.rs (target/debug/deps/runtime_treaty_binding_substitution-bd047cb71e808040)
+
+running 37 tests
+test future_lease_denies_before_dispatch_after_store_reopen ... ok
+test lineage_bundle_digest_is_not_compared_without_a_resolved_bundle ... ok
+test matching_scoped_lease_admits_once ... ok
+test matching_invalid_scope_algorithm_denies ... ok
+test matching_invalid_scope_digest_denies ... ok
+test lease_cannot_outlast_its_resolved_continuation ... ok
+test empty_governance_window_denies_before_dispatch_after_store_reopen ... ok
+test missing_governance_denies_before_dispatch_after_store_reopen ... ok
+test expired_governance_denies_before_dispatch_after_store_reopen ... ok
+test future_governance_denies_before_dispatch_after_store_reopen ... ok
+test expired_lease_denies_before_dispatch_after_store_reopen ... ok
+test activation_start_is_inclusive ... ok
+test missing_lease_denies_before_dispatch_after_store_reopen ... ok
+test outcome_digest_is_compared_through_the_forced_invocation_record ... ok
+test revoked_lease_denies_before_dispatch_after_store_reopen ... ok
+test reordering_signer_kernel_ids_is_rejected_before_dispatch ... ok
+test revoked_governance_denies_before_dispatch_after_store_reopen ... ok
+test scope_cannot_be_omitted_from_a_scoped_lease ... ok
+test substituting_admission_report_digest_is_admitted ... ok
+test substituting_action_class_id_is_rejected_before_dispatch ... ok
+test substituting_consistency_model_is_rejected_before_dispatch ... ok
+test substituting_continuation_digest_is_rejected_before_dispatch ... ok
+test substituting_admission_report_digest_with_a_non_hex_value_is_rejected ... ok
+test substituting_governance_refs_is_rejected_before_dispatch ... ok
+test substituting_ladder_intersection_digest_is_rejected_before_dispatch ... ok
+test receipt_digests_are_compared_through_the_forced_invocation_record ... ok
+test substituting_lineage_bundle_digest_is_rejected_before_dispatch ... ok
+test substituting_lease_refs_is_rejected_before_dispatch ... ok
+test substituting_local_receipt_digest_is_rejected_before_dispatch ... ok
+test substituting_outcome_digest_is_rejected_before_dispatch ... ok
+test substituting_remote_receipt_digest_is_rejected_before_dispatch ... ok
+test substituting_request_digest_is_rejected_before_dispatch ... ok
+test substituting_treaty_id_is_rejected_before_dispatch ... ok
+test substituting_the_uncompared_field_alongside_a_compared_one_is_rejected ... ok
+test substituting_signer_kernel_ids_is_rejected_before_dispatch ... ok
+test substituting_treaty_scope_digest_is_rejected_before_dispatch ... ok
+test unsubstituted_binding_is_admitted_and_consumes_its_continuation ... ok
+
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.60s
+
+     Running tests/runtime_treaty_continuation_reopen.rs (target/debug/deps/runtime_treaty_continuation_reopen-f066d2dc37529432)
+
+running 3 tests
+test runtime_hook_release_after_reopen_is_scoped_to_the_owning_admission ... ok
+test consumed_treaty_continuation_survives_reopen_until_owner_release ... ok
+test foreign_admission_release_leaves_consumed_treaty_continuation_durable ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests/runtime_treaty_predicate_substitution.rs (target/debug/deps/runtime_treaty_predicate_substitution-ae30a4d2bb137c51)
+
+running 10 tests
+test every_statement_leaf_is_classified ... ok
+test the_lean_model_and_the_executed_classification_are_the_same_enumeration ... ok
+test the_exercised_leaves_are_the_leaves_a_strict_statement_carries ... ok
+test the_uncompared_leaves_substituted_together_are_still_admitted ... ok
+test the_unsubstituted_statement_is_admitted_and_consumes_its_continuation ... ok
+test optional_leaves_this_call_omits_can_be_added_to_the_signed_statement ... ok
+test duplicated_leaves_do_not_mask_the_receiver_comparison ... ok
+test single_field_substitutions_match_their_classification_without_lineage ... ok
+test single_field_substitutions_match_their_classification ... ok
+test every_pair_inside_the_binding_reference_is_rejected has been running for over 60 seconds
+test every_pair_inside_the_binding_reference_is_rejected ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 102.91s
+
+     Running tests/runtime_trust.rs (target/debug/deps/runtime_trust-65fca7c996904274)
+
+running 9 tests
+test trusted_verifiers_parser_accepts_chio_native_schema ... ok
+test strict_runtime_trust_input_binds_profile_verifier ... ok
+test strict_runtime_trust_input_rejects_bundle_hash_mismatch ... ok
+test runtime_trust_floor_store_reads_existing_json_and_normalizes_on_write ... ok
+test strict_runtime_trust_input_binds_bundle_and_signer ... ok
+test runtime_trust_floor_store_error_releases_reserved_destructive_lease ... ok
+test layered_store_keeps_trust_floor_separate_from_admission_state ... ok
+test runtime_trust_floor_rejects_rollback_after_restart ... ok
+test runtime_trust_floor_rejects_same_version_conflict_without_burning_lease ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

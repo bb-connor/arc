@@ -1,0 +1,58 @@
+{
+  "id": "9ab9c57c7b63eac976c782270ef3a6606da5cdef1e03f7664e6c10ca6ae3b002",
+  "timestamp": 1789310340,
+  "capability_id": "cap-01a09b35-0c28-78a3-b37d-175cde2b5305",
+  "tool_server": "artifact-registry",
+  "tool_name": "publish",
+  "action": {
+    "parameters": {
+      "arguments": {
+        "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+        "resource": "review-queue"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "contractSha256": "f2bc1cb96338832ee4cdba2242ad96c25fefea5fe18536eb42ff88df8dfc2cd1",
+          "passed": true,
+          "predecessorStepId": "verify-owner-scope-contract",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "4e68614e741dc29e76316d2d1dc53e7ede811766dd6a118e8ba30d60c59495e7",
+            "stepId": "publish-approved-scope",
+            "workflowId": "repair-read-policy"
+          },
+          "verifiedAtUnixMs": 1789310339521
+        },
+        "signature": "01391044354f2fcd5faccd2d7a48460fc2093398e186c5c9645e4c82a05299f04dd096021babd9cc37201eed25079500dc72d98163f372777adab45b8a782705"
+      }
+    },
+    "parameter_hash": "3cf264c3dc3e587a9c9ce45edfa0d3e22afeeb9fb45088483f49c7305accbb6e"
+  },
+  "decision": {
+    "verdict": "deny",
+    "reason": "tool server error: runtime admission rejected: outcome_effect_already_claimed: logical effect slot already entered dispatch; fresh attempts cannot reset it",
+    "guard": "kernel"
+  },
+  "receipt_kind": "mediated_decision",
+  "boundary_class": "prevent",
+  "tool_origin": "caller_executed",
+  "redaction_mode": "none",
+  "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+  "policy_hash": "f009896c60a294dccb450806f9709f586d5120bcbefdb8f22f469808a903e60b",
+  "metadata": {
+    "attribution": {
+      "delegation_depth": 0,
+      "grant_index": 0,
+      "issuer_key": "4e68614e741dc29e76316d2d1dc53e7ede811766dd6a118e8ba30d60c59495e7",
+      "subject_key": "03a6b630da9a56a1ce5e725cfa506879d4e135e837dc3e05353ac90c80153149"
+    },
+    "chio_receipt_signing_nonce": "rcpt-01a09b35-0c3a-7512-99d2-89f801c9bf25",
+    "receipt_context": {
+      "request_id": "replacement-agent-fresh-capability"
+    }
+  },
+  "trust_level": "mediated",
+  "kernel_key": "4e68614e741dc29e76316d2d1dc53e7ede811766dd6a118e8ba30d60c59495e7",
+  "signature": "3e993375b41b89ac548057912514eca9a458832252a79002659cfb977c2da7f1cbad6a8b12a1ca77232c10b1330073fd806b3eb0bf1b306b5e6f28cfae245006"
+}

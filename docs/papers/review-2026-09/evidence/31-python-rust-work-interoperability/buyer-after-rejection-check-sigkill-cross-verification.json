@@ -1,0 +1,14 @@
+{
+  "python": {
+    "buyerVerified": true,
+    "externalFundsTransferred": false,
+    "receiptId": "9a7b09c070f98ac9f3fdfa1358bf1ae40830227f63aba58926cc601f4b14eb82",
+    "reviewRejected": true
+  },
+  "rust": {
+    "buyerVerified": true,
+    "externalFundsTransferred": false,
+    "receiptId": "9a7b09c070f98ac9f3fdfa1358bf1ae40830227f63aba58926cc601f4b14eb82",
+    "reviewRejected": true
+  }
+}

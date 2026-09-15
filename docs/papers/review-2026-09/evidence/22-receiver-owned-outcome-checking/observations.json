@@ -1,0 +1,38 @@
+[
+  {
+    "profile": "upstream_attested",
+    "backend": "chio",
+    "kernelReceipts": 3,
+    "allowedReceipts": 1,
+    "checkerRuns": 0,
+    "gitCommitCases": 0,
+    "hookMarkers": 0
+  },
+  {
+    "profile": "upstream_attested",
+    "backend": "ledger",
+    "kernelReceipts": 3,
+    "allowedReceipts": 1,
+    "checkerRuns": 0,
+    "gitCommitCases": 0,
+    "hookMarkers": 0
+  },
+  {
+    "profile": "receiver_checked",
+    "backend": "chio",
+    "kernelReceipts": 5,
+    "allowedReceipts": 1,
+    "checkerRuns": 2,
+    "gitCommitCases": 14,
+    "hookMarkers": 21
+  },
+  {
+    "profile": "receiver_checked",
+    "backend": "ledger",
+    "kernelReceipts": 5,
+    "allowedReceipts": 1,
+    "checkerRuns": 2,
+    "gitCommitCases": 14,
+    "hookMarkers": 21
+  }
+]

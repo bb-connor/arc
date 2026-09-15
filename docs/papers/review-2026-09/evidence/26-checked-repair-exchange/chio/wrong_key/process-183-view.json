@@ -1,0 +1,6 @@
+{
+  "exit": "exit status: 0",
+  "stderr": "",
+  "stdout": "{\"balances\": {\"buyer\": 90, \"seller\": 0}, \"locked\": 10, \"offerSha256\": \"3cdf65d38193acd18d41d81f7c81fc0718ca709e3d115deaa788c0c2e2f36919\", \"releasedKey\": null, \"settlementEvents\": 0, \"state\": \"funded\"}\n",
+  "success": true
+}

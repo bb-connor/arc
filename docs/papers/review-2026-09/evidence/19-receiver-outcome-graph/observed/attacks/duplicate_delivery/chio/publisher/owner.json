@@ -1,0 +1,45 @@
+{
+  "backend": "chio",
+  "role": "publisher",
+  "contract": {
+    "grants": [
+      {
+        "server_id": "source-checkout",
+        "tool_name": "read",
+        "operations": [
+          "invoke"
+        ]
+      }
+    ]
+  },
+  "rule": {
+    "slot": {
+      "receiverId": "fe9455c5c2c7b539082a260160b6d51ed9ae9e9eb8a95ad518df1c53c0d06fa0",
+      "workflowId": "reviewed-scope-distribution",
+      "stepId": "publisher"
+    },
+    "predecessorStepId": "verifier",
+    "verifierKey": "6da9fb50f6c9c9fe0261ac9d8161b69e9af48cc4abccc2c00accd1830bfa2ac0",
+    "contractSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+    "serverId": "publisher",
+    "toolName": "apply",
+    "resource": "publisher/approved-scopes",
+    "validFromUnixMs": 1799999999000,
+    "validUntilUnixMs": 1800000001000
+  },
+  "successor": {
+    "slot": {
+      "receiverId": "85da70f44d1af8492b18ec7791b5e6f6cd87fba592e25806ebd9f756815e31f4",
+      "workflowId": "reviewed-scope-distribution",
+      "stepId": "archive"
+    },
+    "predecessorStepId": "publisher",
+    "verifierKey": "fe9455c5c2c7b539082a260160b6d51ed9ae9e9eb8a95ad518df1c53c0d06fa0",
+    "contractSha256": "64c229118418865bde5869b2725b3e59bbab4551594170bbb994b067aa567a4c",
+    "serverId": "archive",
+    "toolName": "apply",
+    "resource": "archive/approved-scopes",
+    "validFromUnixMs": 1799999999000,
+    "validUntilUnixMs": 1800000001000
+  }
+}

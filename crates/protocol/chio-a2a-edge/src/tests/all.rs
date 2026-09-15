@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    include!("v1.rs");
     use chio_test_support::prelude::*;
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -778,7 +779,7 @@ mod tests {
         let card = edge.agent_card();
         assert_eq!(card.name, "My Agent");
         assert_eq!(card.description, "Custom agent");
-        assert!(card.capabilities.streaming);
+        assert!(!card.capabilities.streaming);
         assert_eq!(card.supported_interfaces[0].url, "https://myagent.com");
         assert_eq!(card.supported_interfaces[0].protocol_binding, "HTTP+JSON");
     }

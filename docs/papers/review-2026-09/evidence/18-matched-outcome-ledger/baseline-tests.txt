@@ -1,0 +1,41 @@
+   Compiling chio-composed-baseline v0.1.0 (/home/connor/backbay/arc/examples/composed-baseline)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.06s
+     Running unittests src/lib.rs (examples/composed-baseline/target/debug/deps/chio_composed_baseline-a34aee05eced690e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/run_composed_baseline.rs (examples/composed-baseline/target/debug/deps/run_composed_baseline-dcfb65df8c1d2aa1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/corpora.rs (examples/composed-baseline/target/debug/deps/corpora-da08ffde9413e0d5)
+
+running 8 tests
+test every_field_on_the_wire_is_defined_by_a_published_document ... ok
+test the_substitution_corpus_covers_the_fifteen_binding_fields ... ok
+test an_invented_field_does_not_reach_admission_binding ... ok
+test every_chio_threat_identifier_is_answered ... ok
+test the_null_case_is_admitted_under_both_wirings ... ok
+test the_property_verdicts_are_what_the_paper_reports ... ok
+test hardening_does_not_close_the_structural_gaps ... ok
+test every_denial_is_in_the_declared_vocabulary ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.45s
+
+     Running tests/receiver_owned_issuer.rs (examples/composed-baseline/target/debug/deps/receiver_owned_issuer-f02c05b4915d1d89)
+
+running 1 test
+test receiver_owned_issuer_admits_and_caller_cannot_remint_a_spent_token ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+   Doc-tests chio_composed_baseline
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

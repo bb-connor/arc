@@ -1,0 +1,14 @@
+{
+  "runtime_outcome_effect_slots": [
+    {
+      "claim_json": null,
+      "claim_sha256": null,
+      "result_json": null,
+      "result_sha256": null,
+      "revoked": 0,
+      "rule_json": "{\"slot\":{\"receiverId\":\"682f674404475bf6bdc5a49817e505bc641a5a5055b782a58eb6e092e3fd2c07\",\"workflowId\":\"chio-seller_withholds\",\"stepId\":\"settle\"},\"predecessorStepId\":\"check-encrypted-repair\",\"verifierKey\":\"682f674404475bf6bdc5a49817e505bc641a5a5055b782a58eb6e092e3fd2c07\",\"contractSha256\":\"85ccde4096875807635a07d3db23f28213f611983bc79e22475ffa18cfb60729\",\"serverId\":\"local-repair-exchange\",\"toolName\":\"settle\",\"resource\":\"funded-trade\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+      "rule_sha256": "573900cd22f18ff845c692f8df44d74cdae8ca591b30cd3aa9e29cf55326828d",
+      "slot_sha256": "fbd316d4b4c2aaab797b41e32ce9f1aa60c4cf6205caa8502ed5ca2fb4b817c1"
+    }
+  ]
+}

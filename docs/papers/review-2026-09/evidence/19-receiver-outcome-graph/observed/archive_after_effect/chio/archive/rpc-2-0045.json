@@ -1,0 +1,52 @@
+{
+  "reply": {
+    "allowed": true,
+    "output": {
+      "result": null,
+      "state": "claimed"
+    },
+    "receipt": {
+      "action": {
+        "parameter_hash": "116ae56190083485aca140d4f1a176131acab83c88c9b957fa47e71dac224fa6",
+        "parameters": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746"
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "comparison-capability-e8c147a84beafde6e097b091ae8b19b3321f8538bf2993cdc8cc82a7318d1811",
+      "content_hash": "98e29665c23924b16cd19b11bee1ab515a4e0c945cb261a3860c0394e715a7e0",
+      "decision": {
+        "verdict": "allow"
+      },
+      "id": "ad9cee3b3d87c563a5638f5a820b0ce042f84f52ffd6ac97a5c044f1b0e27811",
+      "kernel_key": "4f1843398db54a970f20d0673b23b11f922af9fceb3b3882deb346092a31f6e3",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "4f1843398db54a970f20d0673b23b11f922af9fceb3b3882deb346092a31f6e3",
+          "subject_key": "e8c147a84beafde6e097b091ae8b19b3321f8538bf2993cdc8cc82a7318d1811"
+        },
+        "chio_receipt_signing_nonce": "receipt-e2d1dfd4ea0f2c183775043673da89b3bfca4b03c2091ae6c18f924880a7fd90",
+        "receipt_context": {
+          "request_id": "e2d1dfd4ea0f2c183775043673da89b3bfca4b03c2091ae6c18f924880a7fd90"
+        }
+      },
+      "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "a7c9bb02066e2d8c36624605677927448698e13ced9bc6ae4473ed01d967fbf97268550146fe7fb4177240d4365b8bd416f631363905b37462b8c5a588b7f90d",
+      "timestamp": 1800000000,
+      "tool_name": "status",
+      "tool_origin": "caller_executed",
+      "tool_server": "archive",
+      "trust_level": "mediated"
+    }
+  },
+  "request": {
+    "arguments": {
+      "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746"
+    },
+    "tool": "status"
+  }
+}

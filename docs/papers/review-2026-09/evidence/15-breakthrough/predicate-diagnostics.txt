@@ -1,0 +1,10 @@
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-runtime-core)
+    Finished `test` profile [unoptimized] target(s) in 13.23s
+     Running tests/runtime_treaty_review_diagnostics.rs (target/debug/deps/runtime_treaty_review_diagnostics-2ed731a26253bd2a)
+
+running 1 test
+test every_pair_inside_the_binding_reference_is_rejected has been running for over 60 seconds
+test every_pair_inside_the_binding_reference_is_rejected ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 86.04s
+

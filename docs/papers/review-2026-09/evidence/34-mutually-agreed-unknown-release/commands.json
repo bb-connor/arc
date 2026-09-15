@@ -1,0 +1,14 @@
+{
+  "budgetTests": "cargo test -p chio-store-sqlite --lib budget_store:: --locked",
+  "build": "CARGO_TARGET_DIR=target cargo build --manifest-path examples/federated-work/Cargo.toml --locked",
+  "exampleTests": "CARGO_TARGET_DIR=target cargo test --manifest-path examples/federated-work/Cargo.toml --locked",
+  "globalTests": "cargo test -p chio-store-sqlite --lib serving_owner::global_commit_chain:: --locked",
+  "http": "python3 examples/federated-work/python_smoke.py --binary target/debug/chio-federated-work --python-env /tmp/chio-python31-locked-venv --output /tmp/chio-release34-http-final",
+  "https": "python3 examples/federated-work/https_smoke.py --binary target/debug/chio-federated-work --python-env /tmp/chio-python31-locked-venv --output /tmp/chio-release34-https-final",
+  "integrationTests": "cargo test -p chio-kernel --test durable_admission_sqlite --locked",
+  "kernelTests": "cargo test -p chio-kernel --lib admission_operation:: --locked",
+  "paper": "make -C docs/papers/evidence-crosses",
+  "pythonTests": "/tmp/chio-python31-locked-venv/bin/python -m unittest discover -s examples/federated-work/python_buyer -p 'test_*.py'",
+  "release": "python3 examples/federated-work/resolution_smoke.py --binary target/debug/chio-federated-work --python-env /tmp/chio-python31-locked-venv --output /tmp/chio-release34-crashes-final",
+  "storeTests": "cargo test -p chio-store-sqlite --lib admission_operation_store:: --locked"
+}

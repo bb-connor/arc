@@ -1,0 +1,30 @@
+{
+  "endpoints": [
+    {
+      "directory": "/tmp/.tmpEVMK7X/publisher_before_claim/ledger/verifier",
+      "key": "10d722a3379365933db1d9f19bb2b84470b7b6f6aee2d112d034f94c4726b8a4",
+      "role": "verifier"
+    },
+    {
+      "directory": "/tmp/.tmpEVMK7X/publisher_before_claim/ledger/publisher",
+      "key": "e97ef0205ffbabd8b435541cf7a8fe431b23e6a0114cd332199f9bd41c1bef71",
+      "role": "publisher"
+    },
+    {
+      "directory": "/tmp/.tmpEVMK7X/publisher_before_claim/ledger/archive",
+      "key": "1296f3e06e36955606418b9910937689df5efb8bbb94c9fe3ec0922862890dea",
+      "role": "archive"
+    }
+  ],
+  "artifact": {
+    "grants": [
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "source-checkout",
+        "tool_name": "read"
+      }
+    ]
+  }
+}

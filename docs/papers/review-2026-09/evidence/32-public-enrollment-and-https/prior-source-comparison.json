@@ -1,0 +1,20 @@
+{
+  "manifest": "docs/papers/review-2026-09/evidence/31-python-rust-work-interoperability/manifest.json",
+  "manifestSha256": "1a243c71dd8a31691a3d29c8b71cfa6bbc9be88974255de30208ded7ee6f076a",
+  "previousSourceFiles": 1485,
+  "changedExistingSources": [
+    "docs/papers/evidence-crosses/paper.pdf",
+    "docs/papers/evidence-crosses/sections/01-rule.tex",
+    "docs/papers/review-2026-09/README.md",
+    "examples/federated-work/Cargo.lock",
+    "examples/federated-work/Cargo.toml",
+    "examples/federated-work/README.md",
+    "examples/federated-work/python_buyer/README.md",
+    "examples/federated-work/python_buyer/client.py",
+    "examples/federated-work/python_smoke.py",
+    "examples/federated-work/src/main.rs",
+    "examples/federated-work/src/provider.rs"
+  ],
+  "productionCrateSourcesChangedSincePriorQualification": false,
+  "previousArtifactsVerified": 102
+}

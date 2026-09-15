@@ -1,0 +1,15 @@
+{
+  "slot": {
+    "receiverId": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+    "workflowId": "repair-read-policy",
+    "stepId": "publish-approved-scope"
+  },
+  "predecessorStepId": "verify-owner-scope-contract",
+  "verifierKey": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+  "contractSha256": "f2bc1cb96338832ee4cdba2242ad96c25fefea5fe18536eb42ff88df8dfc2cd1",
+  "serverId": "artifact-registry",
+  "toolName": "publish",
+  "resource": "review-queue",
+  "validFromUnixMs": 1799999999000,
+  "validUntilUnixMs": 1800000001000
+}

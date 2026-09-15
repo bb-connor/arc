@@ -1,0 +1,11 @@
+TESTED_SOURCE /home/connor/backbay/arc/sdks/python/chio-adapter-base/src/chio_adapter_base/security.py e4ad63fd2af96170cb98cfc025af205ad53649dbe29dadd6b400233ef250b234
+TESTED_SOURCE /home/connor/backbay/arc/sdks/python/chio-hermes/src/chio_hermes/executors.py c7ad6f8d19a33c96e14c1d84312ef77b1c4d52c1bdd494be18b48358d481c726
+....ssss................................................................ [ 36%]
+........................................................................ [ 72%]
+........................................................                 [100%]
+=========================== short test summary info ============================
+SKIPPED [1] sdks/python/chio-hermes/tests/test_against_real_sidecar.py:160: set CHIO_INTEGRATION=1 to exercise the live-sidecar test
+SKIPPED [1] sdks/python/chio-hermes/tests/test_against_real_sidecar.py:172: set CHIO_INTEGRATION=1 to exercise the live-sidecar test
+SKIPPED [1] sdks/python/chio-hermes/tests/test_against_real_sidecar.py:208: set CHIO_INTEGRATION=1 to exercise the live-sidecar test
+SKIPPED [1] sdks/python/chio-hermes/tests/test_against_real_sidecar.py:242: set CHIO_INTEGRATION=1 to exercise the live-sidecar test
+196 passed, 4 skipped in 1.57s

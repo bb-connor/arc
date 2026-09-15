@@ -1,0 +1,33 @@
+{
+  "endpoints": [
+    {
+      "directory": "/tmp/.tmp8F67sy/courier_replaced/chio/verifier",
+      "key": "0779f4c3b5702a6f55a213ecf31cad78a5f75ab6a4187a2b75120981fac1a88b",
+      "role": "verifier",
+      "socket": "/tmp/.tmp8F67sy/courier_replaced/chio/sockets/verifier.sock"
+    },
+    {
+      "directory": "/tmp/.tmp8F67sy/courier_replaced/chio/publisher",
+      "key": "b38c51ccb87e759c41b5d07164fe6b3b29f472dc6daef594d5eaedf98ed43c1a",
+      "role": "publisher",
+      "socket": "/tmp/.tmp8F67sy/courier_replaced/chio/sockets/publisher.sock"
+    },
+    {
+      "directory": "/tmp/.tmp8F67sy/courier_replaced/chio/archive",
+      "key": "262cdfe7c68a76cf6bd9318ea593d7224a75f3966d868d78f42624e66b52796a",
+      "role": "archive",
+      "socket": "/tmp/.tmp8F67sy/courier_replaced/chio/sockets/archive.sock"
+    }
+  ],
+  "artifact": {
+    "grants": [
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "source-checkout",
+        "tool_name": "read"
+      }
+    ]
+  }
+}

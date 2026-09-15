@@ -1,0 +1,33 @@
+{
+  "endpoints": [
+    {
+      "directory": "/tmp/.tmp8F67sy/attacks/duplicate_delivery/chio/verifier",
+      "key": "8ab73e4e45e326b6e7a455bf71247936136a53aabc8bf03a6e1637ef2525a481",
+      "role": "verifier",
+      "socket": "/tmp/.tmp8F67sy/attacks/duplicate_delivery/chio/sockets/verifier.sock"
+    },
+    {
+      "directory": "/tmp/.tmp8F67sy/attacks/duplicate_delivery/chio/publisher",
+      "key": "f46a4a06e82253ccb8213c3976c916db3d8a2a771cd49987b63fb3c332d6d86d",
+      "role": "publisher",
+      "socket": "/tmp/.tmp8F67sy/attacks/duplicate_delivery/chio/sockets/publisher.sock"
+    },
+    {
+      "directory": "/tmp/.tmp8F67sy/attacks/duplicate_delivery/chio/archive",
+      "key": "a2aef490179190326cd07a715df42fec03b09ccad6280c448870b6061f6cf24f",
+      "role": "archive",
+      "socket": "/tmp/.tmp8F67sy/attacks/duplicate_delivery/chio/sockets/archive.sock"
+    }
+  ],
+  "artifact": {
+    "grants": [
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "source-checkout",
+        "tool_name": "read"
+      }
+    ]
+  }
+}

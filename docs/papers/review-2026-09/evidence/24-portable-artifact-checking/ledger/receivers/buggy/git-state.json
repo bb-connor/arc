@@ -1,0 +1,4 @@
+{
+  "publicationReflog": "0000000000000000000000000000000000000000000000000000000000000000 fc3d196e3dd9a71acb2535d3f3048eb977f68f89350f4b6c7f35c58709f4773a Chio repair checker <test@example.invalid> 1789326092 +0000\tchecked-repair-publication\n",
+  "referenceInventory": "refs/heads/verified-repair fc3d196e3dd9a71acb2535d3f3048eb977f68f89350f4b6c7f35c58709f4773a \n"
+}

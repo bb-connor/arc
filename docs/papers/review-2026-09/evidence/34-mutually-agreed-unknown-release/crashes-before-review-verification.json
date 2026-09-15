@@ -1,0 +1,16 @@
+{
+  "python": {
+    "externalFundsTransferred": false,
+    "localCreditSettled": true,
+    "operationId": "aec9c39775b7d8805136fd85eb97fc0dc357f83fbb10cf9e5b0a2931dc55fb6f",
+    "releaseVerified": true,
+    "workExecuted": null
+  },
+  "rust": {
+    "externalFundsTransferred": false,
+    "localCreditSettled": true,
+    "operationId": "aec9c39775b7d8805136fd85eb97fc0dc357f83fbb10cf9e5b0a2931dc55fb6f",
+    "releaseVerified": true,
+    "workExecuted": null
+  }
+}

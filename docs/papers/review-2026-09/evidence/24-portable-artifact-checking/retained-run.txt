@@ -1,0 +1,224 @@
+    Finished `dev` profile [unoptimized] target(s) in 0.57s
+     Running `target/debug/chio-outcome-ledger-comparison --repair-artifact-audit examples/outcome-ledger-comparison/fixtures/git-hook-repair/base .`
+{
+  "auditorBehaviorChecks": 8,
+  "auditorNeedsReceiverKeyOrStore": false,
+  "checkedGitCommitCases": 70,
+  "chio": [
+    {
+      "artifactAccepted": true,
+      "case": "honest_published",
+      "checkedCommitCases": 7,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": false,
+      "case": "signed_buggy",
+      "checkedCommitCases": null,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": true,
+      "case": "signed_unpublished",
+      "checkedCommitCases": 7,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": false,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": true,
+      "case": "unsigned_valid",
+      "checkedCommitCases": 7,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": false,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": false,
+      "case": "changed_base",
+      "checkedCommitCases": null,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": false,
+      "case": "changed_target",
+      "checkedCommitCases": null,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": false,
+      "case": "corrupt_pack",
+      "checkedCommitCases": null,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": false,
+      "case": "wrong_reference",
+      "checkedCommitCases": null,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": false,
+      "case": "too_many_objects",
+      "checkedCommitCases": null,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": false,
+      "case": "oversized_bundle",
+      "checkedCommitCases": null,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    }
+  ],
+  "experiment": "portable-artifact-checking-without-receiver-truth",
+  "gateSeparationObserved": false,
+  "ledger": [
+    {
+      "artifactAccepted": true,
+      "case": "honest_published",
+      "checkedCommitCases": 7,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": false,
+      "case": "signed_buggy",
+      "checkedCommitCases": null,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": true,
+      "case": "signed_unpublished",
+      "checkedCommitCases": 7,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": false,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": true,
+      "case": "unsigned_valid",
+      "checkedCommitCases": 7,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": false,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": false,
+      "case": "changed_base",
+      "checkedCommitCases": null,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": false,
+      "case": "changed_target",
+      "checkedCommitCases": null,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": false,
+      "case": "corrupt_pack",
+      "checkedCommitCases": null,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": false,
+      "case": "wrong_reference",
+      "checkedCommitCases": null,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": false,
+      "case": "too_many_objects",
+      "checkedCommitCases": null,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    },
+    {
+      "artifactAccepted": false,
+      "case": "oversized_bundle",
+      "checkedCommitCases": null,
+      "packetReadOnly": true,
+      "publicationActuallyOccurred": true,
+      "publicationHistoryVerified": false,
+      "receiverClaimSignatureValid": true,
+      "receiverStatePathsDenied": 9
+    }
+  ],
+  "limits": [
+    "Receiver honesty is unnecessary for the delivered source's finite checked property; local auditor, checker, Git, Python and host remain trusted",
+    "Signed claims authenticate statements but do not prove private publication history or receiver execution",
+    "All runs share one host; auditor processes cannot mount receiver state, but independent administration is not qualified",
+    "One MiB bundle, 64 packed objects, per-process resource limits and namespace isolation are not aggregate denial-of-service qualification",
+    "No succinct proof, generic correctness, fair exchange, production activation or novelty claim"
+  ],
+  "pairedScenarios": 10,
+  "privatePublicationHistoryVerified": false,
+  "receiverChecks": 2
+}
+Repair evidence: /tmp/.tmpBEBOPl

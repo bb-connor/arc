@@ -1,0 +1,98 @@
+{
+  "baseSha256": {
+    "sdks/python/chio-adapter-base/src/chio_adapter_base/security.py": "8b5ee6ac0f62c065c22719bba446ececff1584689cf7a4bb7160d4cabcf769b0",
+    "sdks/python/chio-hermes/src/chio_hermes/executors.py": "103407888daf53bc19e7ec074f996da9e7162e5fe9763b91b46cbc21a81adcba"
+  },
+  "checkerSha256": "5e4ce938ebcb2325a994d5bacfc94f442d902609a1fa2ee4cc3ea4bd6458d7a6",
+  "driverSha256": "827c120271a23444183bae4417f6d6d507eaa73563eac19476d595885c97fc15",
+  "experimentSha256": "af2fdc6f41329e6c30320512eca9da2b77f55ce64d3f545d726e0ee0a231e169",
+  "hooks": [
+    "pre-commit",
+    "prepare-commit-msg",
+    "commit-msg",
+    "post-commit",
+    "reference-transaction"
+  ],
+  "input": "Source artifact without an upstream signature",
+  "isolationPolicySha256": "8fbc0fa5119c1db06c5e29c0f63e5684e340dde8d6d5f0c10a879088d3389e03",
+  "paths": [
+    "sdks/python/chio-adapter-base/src/chio_adapter_base/security.py",
+    "sdks/python/chio-hermes/src/chio_hermes/executors.py"
+  ],
+  "profile": "receiver_checked",
+  "requests": [
+    {
+      "argv": [
+        "git",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair"
+      ],
+      "entrypoint": "helper",
+      "message": "test: checked repository repair"
+    },
+    {
+      "argv": [
+        "git",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair",
+        "--no-verify"
+      ],
+      "entrypoint": "helper",
+      "message": "test: checked repository repair"
+    },
+    {
+      "argv": [
+        "git",
+        "-c",
+        "core.hooksPath=/work/hooks",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair"
+      ],
+      "entrypoint": "helper",
+      "message": "test: checked repository repair"
+    },
+    {
+      "argv": [
+        "git",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.hooksPath=/work/hooks",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair"
+      ],
+      "entrypoint": "helper",
+      "message": "test: checked repository repair"
+    },
+    {
+      "argv": [
+        "git",
+        "--config-env=core.hooksPath=HOOK_TEST_PATH",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair"
+      ],
+      "entrypoint": "helper",
+      "message": "test: checked repository repair"
+    },
+    {
+      "entrypoint": "commit",
+      "message": "test: checked repository repair"
+    },
+    {
+      "command": "commit -m 'test: checked repository repair'",
+      "entrypoint": "git_run",
+      "message": "test: checked repository repair"
+    }
+  ],
+  "schema": "repair-receiver-check.experimental.v1"
+}

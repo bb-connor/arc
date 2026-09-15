@@ -1,0 +1,24 @@
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-runtime-core)
+    Finished `test` profile [unoptimized] target(s) in 12.18s
+     Running tests/runtime_treaty_counter_mutation.rs (target/debug/deps/runtime_treaty_counter_mutation-e5f0f5cf8e9b20c2)
+
+running 1 test
+test every_pair_inside_the_binding_reference_is_rejected ... FAILED
+
+failures:
+
+---- every_pair_inside_the_binding_reference_is_rejected stdout ----
+
+thread 'every_pair_inside_the_binding_reference_is_rejected' (189) panicked at crates/kernel/chio-runtime-core/tests/runtime_treaty_counter_mutation.rs:1708:9:
+assertion `left == right` failed: substitution dispatch count disagrees with its verdict: Some("chio_treaty_dsse_binding_mismatch") Some("chio treaty-bound runtime admission denied")
+  left: 999
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    every_pair_inside_the_binding_reference_is_rejected
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.88s
+
+error: test failed, to rerun pass `-p chio-runtime-core --test runtime_treaty_counter_mutation`

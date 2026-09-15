@@ -1,0 +1,9 @@
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 6.53s
+     Running tests/runtime_treaty_review_counter_mutation.rs (target/debug/deps/runtime_treaty_review_counter_mutation-8d25610c7ecf167b)
+
+running 1 test
+test the_uncompared_leaves_substituted_together_are_still_admitted ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 1.00s
+

@@ -128,9 +128,14 @@ pub fn dispatch_through_kernel(
     // A cross-organization allow writes a federated receipt, which the kernel
     // refuses to do without durable storage behind it.
     let receipt_directory = tempfile::tempdir()?;
-    kernel.set_receipt_store_handle(Arc::new(chio_store_sqlite::SqliteReceiptStore::open(
+    let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(
         receipt_directory.path().join("kernel-receipts.sqlite3"),
-    )?))?;
+    )?;
+    // Opening spawns the writer asynchronously. Its head starts closed until
+    // verification finishes, so this host must cross the readiness barrier
+    // before submitting the first request. A sleep would leave the race intact.
+    receipt_store.wait_for_writer_ready(std::time::Duration::from_secs(5))?;
+    kernel.set_receipt_store_handle(Arc::new(receipt_store))?;
 
     let now_unix_secs = target.now_unix_ms / 1000;
     if let Some(origin_kernel_id) = target.origin_kernel_id {

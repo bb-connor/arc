@@ -36,6 +36,83 @@ let hook = ChioRuntimeAdmissionHook::new(profile, InMemoryRuntimeAdmissionStore:
 // register `hook` with the kernel as a `chio_kernel::RuntimeAdmissionHook`
 ```
 
+## Treaty presentation records
+
+Live bilateral admission requires locally activated records for the lease and
+governance identifiers in its admission bundle. Older stores containing only
+the identifiers fail closed until the receiver provisions these records:
+
+| Artifact kind | Artifact id | Record type |
+| --- | --- | --- |
+| `capability_lease` | `lease.lease_id` | `RuntimeTreatyLeaseRecord` |
+| `governance_receipt` | `receipt.receipt_id` | `RuntimeTreatyGovernanceRecord` |
+
+Use the existing `insert_treaty_runtime_artifact` API on the receiver's trusted
+provisioning path. A lease record pins its issuer, optional scope digest, and
+expiry, with a local activation start. A governance record pins the verified
+receipt's issuer and digest with a local validity interval. These are local
+activation records, not a new credential that an incoming request may install.
+The governance reference alone does not prove that its receipt is authentic;
+provisioning must validate that receipt under the receiver's policy.
+
+To revoke an activation, insert an artifact of kind
+`capability_lease_revocation` or `governance_receipt_revocation` under the same
+identifier. The payload can record the operator's reason; its presence closes
+the activation. The default store implementation checks this tombstone on every
+resolution, including after SQLite reopen, and immutable artifact insertion
+prevents widening an existing activation. Renewal uses a new activation
+identifier and a new admission bundle. Custom store implementations must preserve these
+fail-closed semantics.
+
+The hook checks the intersection of treaty, continuation, lease, and governance
+validity at admission and again during dispatch revalidation. A statement may
+shorten its lease expiry but cannot extend the receiver's issuer window. These
+are point-in-time checks, not a transaction with an external revocation service.
+
+## Experimental outcome continuations
+
+`outcome_continuation` adds receiver-owned, single-use effect slots backed by
+SQLite. A trusted provisioning path activates an `OutcomeEffectRule` that pins
+a workflow step, predecessor, verifier key, test-contract digest, target tool,
+resource, and validity interval. Signed artifact outcomes can satisfy that
+rule; they cannot provision or change it. Slot identity excludes candidate
+artifact, evidence, request, capability, and agent identifiers.
+
+Call `preview_outcome_effect` for a non-consuming check and
+`claim_outcome_effect` at the protected tool's final dispatch boundary. The
+latter verifies current state and commits the claim in one immediate SQLite
+transaction before the external effect. Register only the protected adapter
+with the kernel. This API does not automatically gate other registered tools.
+Kernel capability, guard, and runtime admission checks remain necessary.
+
+`complete_outcome_effect` records the trusted adapter's result. A crash or
+ambiguous error after claiming leaves `DispatchClaimed`, including when no
+effect happened. No timeout, fresh agent, re-signature, or identical rule
+activation resets it. Revocation prevents new claims; it does not undo effects
+already authorized. External writes and kernel receipts are outside this
+SQLite transaction. The result record is not a signed kernel receipt or a
+proof of external truth. Rollback or cloning of the trusted database is outside
+this local guarantee.
+
+Run the native capability-policy repair demonstration:
+
+```bash
+cargo run --locked -p chio-runtime-core --example outcome_artifact_workflow
+```
+
+It writes a reviewable scope artifact, owner-selected contract, verification
+evidence, kernel receipts, and summary to a fresh temporary directory. Two
+local kernels verify and publish; a replacement agent cannot publish twice.
+The scope verifier parses data and uses Chio's attenuation validator. It never
+executes proposed code. This is an experimental local composition, with no
+claim of remote deployment or advantage over a matched durable ledger.
+
+The same example accepts `--verify DIRECTORY PUBLISHER_PUBLIC_KEY
+VERIFIER_PUBLIC_KEY` to check an exported run without starting kernels. Supply
+trusted keys independently of the bundle. The checker recomputes the native
+scope contract and verifies the outcome, effect claim and both kernel receipts.
+It checks artifact bindings, not global non-duplication.
+
 ## Testing
 
 `cargo test -p chio-runtime-core`

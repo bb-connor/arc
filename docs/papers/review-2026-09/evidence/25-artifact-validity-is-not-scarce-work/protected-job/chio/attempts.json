@@ -1,0 +1,602 @@
+[
+  {
+    "accepted": true,
+    "request": {
+      "arguments": {
+        "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000000
+        },
+        "signature": "89ca037605b94ef2cc34b30095daebe3bfd5c7bce931f423c952fc3d7f934ae0045f62c9a516a237854c15abf5d7853f0cb2f6aad46e7ef53b78b08be5bf7e06"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000001
+        },
+        "signature": "bc0584a9e81c67d75c92f2a4ac5a369ccd60582e7cca36db40cbbd5685cbb0e20472330412f86a8df4c6f451348873bbcaccb252103974c14d6393ab9ce31305"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000002
+        },
+        "signature": "9ac524317496e4ff9538cc89f2e5d42a5334ed6e3fbf70a19e02ff3bcef99f44ccc7d0cadc838dea7ad7b1e632ce381babae17d99ef78516a52b0a9fa06ed90c"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000003
+        },
+        "signature": "e12decdd90a5a6bc5aa10ed46d36a100302e8f5ff2722eb9e2490f582e541c216c820011bb4ef15153b30b2ce9068966bdd3d47c90c33ce92627b8e7bc1cfc04"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000004
+        },
+        "signature": "9ccd31ba99faa1235c2ffd59a18498fcf05f3d2095d460d252865b4770d962884a22554a17dc578b34ffb5ec0c98c15d47b6050ee3625c04c5f2dadba0443e05"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000005
+        },
+        "signature": "d7817a79b4a3d4a154f2ace9073f3f779e8699f762a51058816dfaa72ff13ca29e3fbc14bfedf3e2cea2738d9c4f1a00a20b2cb8aed7734c6a3df0a54beb6507"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "eaef86741d0008c70ca59c2f5eddce81ddaef336a8ad159e2e3f4c32168f783a",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "eaef86741d0008c70ca59c2f5eddce81ddaef336a8ad159e2e3f4c32168f783a",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000006
+        },
+        "signature": "8700ab5c4fb207855c522be044abf0eb352dd1a16145e04546ebece4ac6b80323593b2048693360104d601944fb4b843e9b6c0b3fe5ae53a32deb93449caa20f"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "035ca630452d1447f6200244aef767ac38c1f13d66893963d8224dda60ea4119",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "035ca630452d1447f6200244aef767ac38c1f13d66893963d8224dda60ea4119",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000007
+        },
+        "signature": "327cc99653465cf8124bf9988d312804c7a74838480b36aeb2acd827956faf59a06df2a3e6ca26119db435bc2e6e1ead44524a303f657c81a61845f8416a5702"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "c5d38189cb3b16d406bfe8ea5306671b42990e47e3cda33107a8da89f0a91363",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "c5d38189cb3b16d406bfe8ea5306671b42990e47e3cda33107a8da89f0a91363",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000008
+        },
+        "signature": "56ae7cab925f790f385dcb94e9fb48818e4ad976eff388ec327694f843112149860ade7cee1bce830911d7a19b7f8ca6746d29fdc5720c8faedfe314c759a402"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "f315ef0c89826745032abd186086832a38c3fbd4998a0b0e4f98caa5290c2d8c",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "f315ef0c89826745032abd186086832a38c3fbd4998a0b0e4f98caa5290c2d8c",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000009
+        },
+        "signature": "be6bbfcb9a730d7dde433f49787f65107f102de0edaed9cd51123c106627ccf331ebf43abe69e515649a9cc78aa758fbc8be0abfaad81f31e75bdaaf04aa0001"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "a47982a9dc366aa3cf32e77fedc3e0acc49d911d30e82ec9aac90334c33798c3",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "a47982a9dc366aa3cf32e77fedc3e0acc49d911d30e82ec9aac90334c33798c3",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000010
+        },
+        "signature": "342b35eca6b14e66bdcd45e4dc0b600731e9cbadbb36fb57e2980f6f88c95b9272f335d3316925b2cb84eecfeb78cb800bb5744d5923be3682c802b59e96250d"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "cf4c60ba93d401fe73852960dace85120ffb582d272a457d32c337d1655b0192",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "cf4c60ba93d401fe73852960dace85120ffb582d272a457d32c337d1655b0192",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000011
+        },
+        "signature": "f401750411a2286579fe6735e83b7f23b30bdde369437f812453c6240d70dfe549e5a06344334d448173ee17308500e8d7eadc17e8f3e2f7752e5192acf8b405"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "9ddab8e1aa4098186123469da5608b8d5231acac90a902a7569398e84b8804a6",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "9ddab8e1aa4098186123469da5608b8d5231acac90a902a7569398e84b8804a6",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000012
+        },
+        "signature": "9a292496a03436335d6f08f3788072b9f9af02e1c64ecb01c6e0cbb77a123465c0e0e97e38e10808b02a2e4fa9e7aa7f9032833741d50480e7694d1015eb760d"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "14fe4bfdd49531dd7e1b64cd68dac957758ff11fe00f11fb97e3706e37b53171",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "14fe4bfdd49531dd7e1b64cd68dac957758ff11fe00f11fb97e3706e37b53171",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000013
+        },
+        "signature": "6f8a87dd50acc69b977c0d8424d4ef40c6156c426b7dfc3a8433da2f7ea23aac4635960d0a2670de936a4dca8f61d91e36bf1b779d78aecdb8a2e519306cfb0b"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "556e75ed2fb461b8a8dae5f01e91c46ab488c092123bfbf5d4156d5e4b90730b",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "556e75ed2fb461b8a8dae5f01e91c46ab488c092123bfbf5d4156d5e4b90730b",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000014
+        },
+        "signature": "eaba315e51102d9b54719cb970c9a1555ae06452f3218a1cedcc7f6fedcc3e5bbb0ffc9bb05a242f596c97a1510350c58f1f968253ecca5b20151504a84ff007"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "9a8512ca9997085423cf371953e1aa239ba526630714d8fef8b569c5743604f0",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "9a8512ca9997085423cf371953e1aa239ba526630714d8fef8b569c5743604f0",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000015
+        },
+        "signature": "f4a61c443f0fb0939dd9acb7f0c5b89619bc8e3bc7e8d914d0de4c1c37d4a16168ea8f3984d199d239af6ea17e1fd246e9de3370ba62dda670ef60d072984304"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "72b67fc6cf2511b5e241add631c0c3218f862c6e04f132c9927c2fe55e57f5b0",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "72b67fc6cf2511b5e241add631c0c3218f862c6e04f132c9927c2fe55e57f5b0",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000016
+        },
+        "signature": "fb2058ffb53ae76c666d5a7e2b123b6fb7ae3a78feb4c3bed07f5eb9c9bd7ec92a3d26c11379cc9748ca1b734a1e1863991840013d084d746340819190425304"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "fb9bec6bb11e68bcc4b2cee0d16732bc510eba90b8add4bd42b886dfb348f142",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "fb9bec6bb11e68bcc4b2cee0d16732bc510eba90b8add4bd42b886dfb348f142",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000017
+        },
+        "signature": "ea4e66d4606cbcec6071686c62436b0e080f2de3d02a82c667c7f0b0cbc1fe9a96108a984fbde4f6b58065448788441a30ffce2f116d19e226e2632370eb7603"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "f05e83ff8ceb917d5ab32bec16e2bb30a8fcd2ab5cce69db2c882b2e83f158db",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "f05e83ff8ceb917d5ab32bec16e2bb30a8fcd2ab5cce69db2c882b2e83f158db",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000018
+        },
+        "signature": "33f3b3163aa9ac0fa95888a22905e49455c54d863bfd5d5bb1b43937e54ceaa8672d10e2fbfdb5063fec5b56344db0665bbbac1cae4396f3f7196794e101eb0a"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "94254dc93d3e95dbe66e3858ab5977f6824fc84c60673f7cae51092f6dc6c5ee",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "94254dc93d3e95dbe66e3858ab5977f6824fc84c60673f7cae51092f6dc6c5ee",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000019
+        },
+        "signature": "dde4610a05e9cd8240f52d8a648b3972b2c34ea38a8edc0d142bbc1b5ce8cebeb5abb3aa01a0558a2c5b56308ce078c2339f7427dc8fdeb166f5e5977776450f"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "722b51372e63d8130d51711e7415b031f2a31fb04bc42fb6e2e1419441fb8656",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "722b51372e63d8130d51711e7415b031f2a31fb04bc42fb6e2e1419441fb8656",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000020
+        },
+        "signature": "705e48511306cc6e5b727ee5fbeeef928474c0093734805c78d68b194151619896640bcaaf171f3596ed758e2f50347f08584f667afdf49effa722949653440a"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "15ac9d438dea52bf8af9ae9692f53e63a685fe6beaa33a247477590634ad72c4",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "15ac9d438dea52bf8af9ae9692f53e63a685fe6beaa33a247477590634ad72c4",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000021
+        },
+        "signature": "62f2b2004e25dd79f56dcb7dad05d89dae39466e1b019d5ca6a9f86a72f0c1637827e67947697d8820da262a1099c4b40bfaa0bb2253beeb9587ef3373041d05"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "9f44dd40a23430cb740643d2cba28b7ee09c25c6e758df55495512fcb186ab43",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "9f44dd40a23430cb740643d2cba28b7ee09c25c6e758df55495512fcb186ab43",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000022
+        },
+        "signature": "91d2a5000711f3bd288df8fc82e07764f35ed92cf0f627a2b1c942d411f663bdcb21da1e046d435c1a5be7394033294608db8108449a55c4a9195fdbdaa0c407"
+      }
+    }
+  },
+  {
+    "accepted": false,
+    "request": {
+      "arguments": {
+        "artifactSha256": "a9e69567f91c184922e17da32e557b79f6dde02a1c8b62dd36418e68c4fd6f8c",
+        "resource": "reviewed-source-files"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "a9e69567f91c184922e17da32e557b79f6dde02a1c8b62dd36418e68c4fd6f8c",
+          "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+          "passed": true,
+          "predecessorStepId": "receiver-check",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+            "stepId": "publish",
+            "workflowId": "repair-git-hook-policy"
+          },
+          "verifiedAtUnixMs": 1800000000023
+        },
+        "signature": "7b90e239029bff2235442fcb874f864133fb18e74f0c66e832398bdcad729c82db0d37e58588970aa360e63d412062ea3ce4a99abe5edbd5e711ab6bcebf6205"
+      }
+    }
+  }
+]

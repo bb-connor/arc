@@ -1,0 +1,62 @@
+{
+  "deniedPaths": [
+    {
+      "path": "/tmp/.tmp8F67sy/normal/ledger/verifier/key.seed",
+      "readDenied": true,
+      "writeDenied": true
+    },
+    {
+      "path": "/tmp/.tmp8F67sy/normal/ledger/verifier/owner.json",
+      "readDenied": true,
+      "writeDenied": true
+    },
+    {
+      "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/key.seed",
+      "readDenied": true,
+      "writeDenied": true
+    },
+    {
+      "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/owner.json",
+      "readDenied": true,
+      "writeDenied": true
+    },
+    {
+      "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/receiver.sqlite",
+      "readDenied": true,
+      "writeDenied": true
+    },
+    {
+      "path": "/tmp/.tmp8F67sy/normal/ledger/archive/key.seed",
+      "readDenied": true,
+      "writeDenied": true
+    },
+    {
+      "path": "/tmp/.tmp8F67sy/normal/ledger/archive/owner.json",
+      "readDenied": true,
+      "writeDenied": true
+    },
+    {
+      "path": "/tmp/.tmp8F67sy/normal/ledger/archive/receiver.sqlite",
+      "readDenied": true,
+      "writeDenied": true
+    },
+    {
+      "path": "/tmp/.tmp8F67sy/normal/ledger/host-only-canary",
+      "readDenied": true,
+      "writeDenied": true
+    }
+  ],
+  "hostLoopbackDenied": true,
+  "namespaces": {
+    "ipc": "ipc:[4026533850]",
+    "mnt": "mnt:[4026533846]",
+    "net": "net:[4026533980]",
+    "pid": "pid:[4026533977]",
+    "user": "user:[4026534048]",
+    "uts": "uts:[4026533847]"
+  },
+  "ownReceiverKeyReadable": true,
+  "procRootDenied": true,
+  "receiverConfigReadonly": true,
+  "symlinkEscapeDenied": true
+}

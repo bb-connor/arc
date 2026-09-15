@@ -1,0 +1,12 @@
+{
+  "body": {
+    "schema": "candidate-work-claim.experimental.v1",
+    "jobId": "repair-git-hook-policy",
+    "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+    "challenge": "91fb1114add2c271115c6fe5a0bf3375e57d721bf95e5d27af7ce188646eb8a2",
+    "artifactSha256": "a9e69567f91c184922e17da32e557b79f6dde02a1c8b62dd36418e68c4fd6f8c",
+    "producer": "741b5b0a877b4437d3f28a42be707305460748580d09765f58a88380f00df667",
+    "claimId": "fresh_challenges-5"
+  },
+  "signature": "670edc6969cc53b24b8846206e1e977d27f81841ca761917b48313567b9ce78652e947fe57e6e1eea7b0006580df1977a9484cb1451543b2efdfd9673fe5ab0a"
+}

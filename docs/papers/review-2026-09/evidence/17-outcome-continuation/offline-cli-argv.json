@@ -1,0 +1,7 @@
+[
+  "target/debug/examples/outcome_artifact_workflow",
+  "--verify",
+  "/tmp/.tmp8B1Y6X",
+  "4e68614e741dc29e76316d2d1dc53e7ede811766dd6a118e8ba30d60c59495e7",
+  "ee36e7ad911353300215912f3c644c0b8524edb2b475aba8b18813bd18de716c"
+]

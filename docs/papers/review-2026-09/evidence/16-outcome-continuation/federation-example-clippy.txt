@@ -1,0 +1,377 @@
+    Blocking waiting for file lock on build directory
+   Compiling serde_core v1.0.228
+   Compiling serde v1.0.228
+    Checking subtle v2.6.1
+   Compiling serde_json v1.0.149
+   Compiling portable-atomic v1.13.1
+    Checking critical-section v1.2.0
+    Checking futures-io v0.3.32
+    Checking slab v0.4.12
+   Compiling derive_more-impl v2.1.1
+    Checking either v1.15.0
+    Checking futures-util v0.3.32
+   Compiling postcard-derive v0.2.2
+    Checking rustc-hash v2.1.1
+    Checking httpdate v1.0.3
+    Checking ff v0.13.1
+    Checking regex-automata v0.4.14
+    Checking group v0.13.0
+    Checking itertools v0.14.0
+    Checking signature v3.0.0
+    Checking num-iter v0.1.45
+   Compiling syn v1.0.109
+    Checking hashbrown v0.16.1
+    Checking hashlink v0.11.0
+    Checking ruint v1.20.0
+    Checking zeroize v1.9.0
+    Checking smallvec v1.15.1
+    Checking generic-array v0.14.7
+    Checking bytes v1.11.1
+    Checking icu_normalizer v2.1.1
+    Checking crypto-common v0.1.7
+    Checking block-buffer v0.10.4
+    Checking block-padding v0.3.3
+    Checking idna_adapter v1.2.1
+    Checking digest v0.10.7
+    Checking idna v1.1.0
+    Checking inout v0.1.4
+    Checking once_cell v1.21.4
+    Checking sha2 v0.10.9
+    Checking cipher v0.4.4
+    Checking hmac v0.12.1
+    Checking url v2.5.8
+    Checking der v0.7.10
+    Checking pbkdf2 v0.12.2
+    Checking aes v0.8.4
+    Checking salsa20 v0.10.2
+    Checking scrypt v0.11.0
+    Checking cbc v0.1.2
+    Checking parking_lot_core v0.9.12
+    Checking tracing-core v0.1.36
+    Checking signature v2.2.0
+    Checking curve25519-dalek v4.1.3
+    Checking parking_lot v0.12.5
+    Checking tracing v0.1.44
+    Checking tokio v1.50.0
+    Checking spki v0.7.3
+    Checking rustls-pki-types v1.14.0
+    Checking pkcs5 v0.7.1
+    Checking http v1.4.0
+    Checking aws-lc-rs v1.16.2
+    Checking pkcs8 v0.10.2
+    Checking ed25519 v2.2.3
+    Checking derive_more v2.1.1
+    Checking ed25519-dalek v2.2.0
+    Checking heapless v0.7.17
+    Checking chio-core-types v0.1.0 (/home/connor/backbay/arc/crates/core/chio-core-types)
+    Checking ipnet v2.12.0
+    Checking postcard v1.1.3
+    Checking http-body v1.0.1
+    Checking rustls-native-certs v0.8.3
+    Checking rs_merkle v1.5.0
+    Checking rustls-webpki v0.103.13
+    Checking http-body-util v0.1.3
+    Checking sha3 v0.10.8
+    Checking universal-hash v0.5.1
+    Checking serdect v0.2.0
+    Checking const-hex v1.18.1
+    Checking sec1 v0.7.3
+    Checking frost-core v3.0.0
+    Checking alloy-primitives v1.5.7
+    Checking rustls v0.23.37
+    Checking hkdf v0.12.4
+    Checking crypto-bigint v0.5.5
+    Checking serde_urlencoded v0.7.1
+    Checking frost-rerandomized v3.0.0
+    Checking frost-ed25519 v3.0.0
+    Checking aead v0.5.2
+    Checking uuid v1.22.0
+    Checking futures-executor v0.3.32
+    Checking futures v0.3.32
+    Checking regex v1.12.3
+    Checking elliptic-curve v0.13.8
+    Checking pem v3.0.6
+    Checking chrono v0.4.44
+    Checking serde_path_to_error v0.1.20
+    Checking tokio-util v0.7.18
+    Checking hyper v1.8.1
+    Checking tower v0.5.3
+    Checking webpki-roots v1.0.6
+   Compiling alloy-json-abi v1.5.7
+    Checking hyper-util v0.1.20
+    Checking tokio-rustls v0.26.4
+    Checking rustls-platform-verifier v0.6.2
+    Checking rfc6979 v0.4.0
+    Checking parking v2.2.1
+    Checking rusqlite v0.39.0
+    Checking tower-http v0.6.8
+    Checking futures-lite v2.6.1
+   Compiling alloy-sol-macro-input v1.5.7
+   Compiling alloy-sol-macro-expander v1.5.7
+    Checking hyper-rustls v0.27.7
+    Checking serde-value v0.7.0
+    Checking reqwest v0.13.2
+    Checking ecdsa v0.16.9
+    Checking primeorder v0.13.6
+    Checking tempfile v3.27.0
+    Checking prost v0.14.3
+    Checking alloy-sol-type-parser v1.5.7
+    Checking pem-rfc7468 v1.0.0
+   Compiling n0-error-macros v1.0.0
+   Compiling spez v0.1.2
+    Checking base64urlsafedata v0.5.2
+    Checking prost-types v0.14.3
+    Checking der v0.8.0
+    Checking olpc-cjson v0.1.4
+    Checking num-bigint-dig v0.8.6
+    Checking n0-error v1.0.0
+    Checking poly1305 v0.8.0
+    Checking pkcs1 v0.7.5
+    Checking serde_plain v1.0.2
+    Checking oci-spec v0.9.0
+    Checking tls_codec v0.4.2
+    Checking spki v0.8.0
+    Checking rsa v0.9.10
+    Checking prost-reflect v0.16.3
+    Checking globset v0.4.18
+    Checking openssl v0.10.78
+    Checking serde_with v3.18.0
+   Compiling alloy-sol-macro v1.5.7
+    Checking p384 v0.13.1
+    Checking alloy-sol-types v1.5.7
+    Checking p256 v0.13.2
+    Checking oauth2 v5.0.0
+    Checking jsonwebtoken v10.4.0
+    Checking sha1 v0.10.6
+    Checking serde_spanned v0.6.9
+    Checking toml_datetime v0.6.11
+   Compiling n0-future v0.3.2
+   Compiling vergen-lib v9.1.0
+    Checking itertools v0.10.5
+   Compiling curve25519-dalek v5.0.0-rc.0
+    Checking ciborium-io v0.2.2
+    Checking spin v0.10.1
+   Compiling winnow v1.0.1
+    Checking base16ct v1.0.0
+    Checking cordyceps v0.3.4
+    Checking fnv v1.0.7
+    Checking diatomic-waker v0.2.3
+    Checking tough v0.22.0
+    Checking alloy-core v1.5.7
+    Checking futures-buffered v0.2.13
+    Checking toml_edit v0.22.27
+    Checking serdect v0.4.3
+    Checking serde_json_canonicalizer v0.3.2
+    Checking openidconnect v4.0.1
+    Checking serde_cbor_2 v0.12.0-dev
+   Compiling toml_parser v1.1.1+spec-1.1.0
+    Checking oci-client v0.17.0
+    Checking ciborium-ll v0.2.2
+    Checking sigstore_protobuf_specs v0.5.1
+    Checking chio-listing v0.1.0 (/home/connor/backbay/arc/crates/economy/chio-listing)
+    Checking chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-revocation-oracle)
+    Checking chio-finding v0.1.0 (/home/connor/backbay/arc/crates/economy/chio-finding)
+    Checking chio-pheromone v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-pheromone)
+    Checking chio-fincred v0.1.0 (/home/connor/backbay/arc/crates/economy/chio-fincred)
+    Checking chio-did v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-did)
+    Checking x509-cert v0.2.5
+    Checking webauthn-attestation-ca v0.5.2
+    Checking pkcs8 v0.11.0
+    Checking crypto_secretbox v0.1.1
+    Checking webauthn-rs-proto v0.5.2
+    Checking polyval v0.6.2
+    Checking tracing-log v0.2.0
+    Checking webbrowser v1.2.2
+    Checking matchers v0.2.0
+   Compiling noq-udp v1.0.1
+   Compiling vergen v9.1.0
+   Compiling data-encoding v2.11.0
+   Compiling crossbeam-epoch v0.9.20
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling toml_edit v0.25.9+spec-1.1.0
+    Checking webauthn-rs-core v0.5.2
+    Checking tracing-subscriber v0.3.23
+   Compiling data-encoding-macro-internal v0.1.18
+    Checking chio-fiscal v0.1.0 (/home/connor/backbay/arc/crates/economy/chio-fiscal)
+    Checking chio-governance v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-governance)
+    Checking sigstore v0.14.0
+    Checking ghash v0.5.1
+    Checking ed25519 v3.0.0
+    Checking ciborium v0.2.2
+    Checking toml v0.8.23
+    Checking alloy v1.8.3
+    Checking chio-egress-contract v0.1.0 (/home/connor/backbay/arc/crates/protocol/chio-egress-contract)
+    Checking prefix-trie v0.8.4
+    Checking ctr v0.9.2
+    Checking pairing v0.23.0
+   Compiling vergen-gitcl v9.1.0
+   Compiling num_threads v0.1.7
+    Checking siphasher v1.0.2
+   Compiling time v0.3.47
+    Checking bls12_381_plus v0.8.13
+    Checking fastbloom v0.17.0
+    Checking ref-cast v1.0.25
+    Checking ed25519-dalek v3.0.0-rc.0
+    Checking hickory-proto v0.26.1
+    Checking jsonwebtoken v9.3.1
+    Checking chio-open-market v0.1.0 (/home/connor/backbay/arc/crates/economy/chio-open-market)
+    Checking chio-appraisal v0.1.0 (/home/connor/backbay/arc/crates/economy/chio-appraisal)
+    Checking aes-gcm v0.10.3
+    Checking coset v0.4.2
+    Checking chio-web3-bindings v0.1.0 (/home/connor/backbay/arc/crates/economy/chio-web3-bindings)
+    Checking webauthn-rs v0.5.2
+    Checking data-encoding-macro v0.1.20
+   Compiling proc-macro-crate v3.5.0
+    Checking chio-attest-verify v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-attest-verify)
+    Checking chio-lineage v0.1.0 (/home/connor/backbay/arc/crates/observability/chio-lineage)
+    Checking chio-federation v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-federation)
+    Checking chio-kernel-core v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-kernel-core)
+    Checking chio-underwriting v0.1.0 (/home/connor/backbay/arc/crates/economy/chio-underwriting)
+    Checking h2 v0.4.16
+    Checking rustls-platform-verifier v0.7.0
+    Checking webpki-roots v0.26.11
+    Checking chio-data-guards-redactors-default v0.1.0 (/home/connor/backbay/arc/crates/guards/chio-data-guards/redactors/default)
+    Checking chio-workflow-preflight v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-workflow-preflight)
+    Checking crossbeam-channel v0.5.15
+   Compiling noq v1.0.1
+    Checking netlink-packet-core v0.8.1
+    Checking rand_pcg v0.10.2
+   Compiling blake3 v1.8.5
+   Compiling enum-assoc v1.3.0
+    Checking sorted-index-buffer v0.2.1
+    Checking lru-slab v0.1.2
+    Checking tagptr v0.2.0
+    Checking identity-hash v0.1.0
+    Checking dashmap v6.1.0
+    Checking moka v0.12.15
+    Checking chio-log-redact v0.1.0 (/home/connor/backbay/arc/crates/observability/chio-log-redact)
+    Checking chio-weights v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-weights)
+    Checking noq-proto v1.0.1
+    Checking ureq v2.12.1
+    Checking iroh-base v1.0.1
+    Checking chio-custody-hw v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-custody-hw)
+    Checking affinidi-bbs v0.1.0
+    Checking chio-disclosure-lineage v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-disclosure-lineage)
+    Checking chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc/crates/protocol/chio-tool-call-fabric)
+    Checking hickory-net v0.26.1
+    Checking chio-swarm-authority v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-swarm-authority)
+    Checking tokio-stream v0.1.18
+    Checking netlink-sys v0.8.8
+    Checking chio-supervisor v0.1.0 (/home/connor/backbay/arc/crates/core/chio-supervisor)
+   Compiling iroh-dns v1.0.1
+   Compiling strum_macros v0.28.0
+   Compiling proc-macro-error-attr v0.4.12
+    Checking constant_time_eq v0.4.2
+    Checking resolv-conf v0.7.6
+   Compiling netdev v0.45.0
+    Checking arrayvec v0.7.6
+    Checking hickory-resolver v0.26.1
+    Checking chio-credit v0.1.0 (/home/connor/backbay/arc/crates/economy/chio-credit)
+   Compiling iroh-relay v1.0.1
+    Checking netlink-packet-route v0.31.0
+   Compiling num_enum_derive v0.7.6
+   Compiling syn-mid v0.5.4
+   Compiling netwatch v0.19.1
+   Compiling iroh-metrics-derive v1.0.1
+    Checking strum v0.28.0
+    Checking simple-dns v0.11.3
+   Compiling proc-macro-error v0.4.12
+    Checking simdutf8 v0.1.5
+    Checking mac-addr v0.3.0
+    Checking bit-vec v0.8.0
+    Checking sha1_smol v1.0.1
+   Compiling proc-macro-hack v0.5.20+deprecated
+    Checking tokio-websockets v0.13.3
+    Checking bit-set v0.8.0
+    Checking iroh-metrics v1.0.1
+    Checking num_enum v0.7.6
+    Checking netlink-proto v0.12.0
+    Checking n0-watcher v1.0.0
+    Checking serde_bytes v0.11.19
+    Checking num-rational v0.4.2
+   Compiling iroh v1.0.1
+    Checking num-complex v0.4.6
+    Checking seize v0.5.1
+    Checking borrow-or-share v0.2.4
+    Checking fluent-uri v0.4.1
+    Checking num v0.4.3
+    Checking papaya v0.2.4
+    Checking ahash v0.8.12
+    Checking backon v1.6.0
+    Checking yasna v0.6.0
+    Checking outref v0.5.2
+    Checking vsimd v0.8.0
+    Checking micromap v0.3.0
+   Compiling genawaiter-proc-macro v0.99.1
+    Checking rcgen v0.14.8
+    Checking uuid-simd v0.8.0
+    Checking fraction v0.15.3
+    Checking referencing v0.46.0
+    Checking unicode-general-category v1.1.0
+    Checking fancy-regex v0.17.0
+    Checking axum-core v0.5.6
+    Checking inplace-vec-builder v0.1.1
+    Checking email_address v0.2.9
+   Compiling irpc-derive v0.17.0
+    Checking genawaiter-macro v0.99.1
+   Compiling redb v4.1.0
+    Checking num-cmp v0.1.0
+    Checking bytecount v0.6.9
+    Checking matchit v0.8.4
+    Checking binary-merge v0.1.2
+    Checking range-collections v0.4.6
+    Checking jsonschema v0.46.0
+    Checking genawaiter v0.99.1
+    Checking irpc v0.17.0
+    Checking iroh-io v0.6.2
+    Checking axum v0.8.8
+    Checking scheduled-thread-pool v0.2.7
+   Compiling iroh-blobs v0.103.0
+    Checking positioned-io v0.3.5
+    Checking self_cell v1.2.2
+    Checking fixedbitset v0.5.7
+    Checking bao-tree v0.16.0
+    Checking futures-concurrency v7.7.1
+    Checking r2d2 v0.8.10
+    Checking iroh-tickets v1.0.0
+   Compiling nested_enum_utils v0.2.3
+    Checking chacha20 v0.9.1
+    Checking reflink-copy v0.1.30
+    Checking wait-timeout v0.2.1
+    Checking quick-error v1.2.3
+    Checking rusty-fork v0.3.1
+    Checking chacha20poly1305 v0.10.1
+    Checking r2d2_sqlite v0.33.0
+    Checking generator v0.8.8
+    Checking chio-runtime-proof-parity v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-runtime-proof-parity)
+    Checking chio-http-serve v0.1.0 (/home/connor/backbay/arc/crates/protocol/chio-http-serve)
+    Checking rand_xorshift v0.4.0
+    Checking chio-sqlite-file-identity v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-sqlite-file-identity)
+    Checking unarray v0.1.4
+    Checking scoped-tls v1.0.1
+    Checking proptest v1.10.0
+    Checking loom v0.7.2
+    Checking iroh-util v0.6.0
+    Checking iroh-gossip v0.101.0
+    Checking chio-market v0.1.0 (/home/connor/backbay/arc/crates/economy/chio-market)
+    Checking chio-web3 v0.1.0 (/home/connor/backbay/arc/crates/economy/chio-web3)
+    Checking chio-autonomy v0.1.0 (/home/connor/backbay/arc/crates/economy/chio-autonomy)
+    Checking chio-core v0.1.0 (/home/connor/backbay/arc/crates/core/chio-core)
+    Checking chio-workflow v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-workflow)
+    Checking chio-settle v0.1.0 (/home/connor/backbay/arc/crates/economy/chio-settle)
+    Checking chio-link v0.1.0 (/home/connor/backbay/arc/crates/economy/chio-link)
+    Checking chio-selective-disclosure v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-selective-disclosure)
+    Checking chio-attest-buyer-core v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-attest-buyer-core)
+    Checking chio-pheromone-runtime v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-pheromone-runtime)
+    Checking chio-federation-authority v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-federation-authority)
+    Checking chio-pheromone-relay v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-pheromone-relay)
+    Checking chio-kernel v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-kernel)
+    Checking chio-federation-transport-iroh v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-federation-transport-iroh)
+    Checking chio-finding-verifier v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-finding-verifier)
+    Checking chio-runtime-core v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-runtime-core)
+    Checking chio-transaction-passport v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-transaction-passport)
+    Checking chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-risk-comptroller)
+    Checking chio-commerce-order v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-commerce-order)
+    Checking chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-agent-web-interop)
+    Checking chio-store-sqlite v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-store-sqlite)
+    Finished `dev` profile [unoptimized] target(s) in 2m 27s

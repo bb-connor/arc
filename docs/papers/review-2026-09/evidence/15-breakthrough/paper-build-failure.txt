@@ -1,0 +1,9 @@
+
+Underfull \hbox (badness 10000) in paragraph at lines 102--102
+[]|\T1/cmtt/m/n/9 remote_receipt_
+[7] [8]) (./sections/07-formal.tex) (./sections/08-evaluation.tex [9]
+! Undefined control sequence.
+l.82 ...re checks. Held at \PSSustainedConcurrency
+                                                  {}
+!  ==> Fatal error occurred, no output PDF file produced!
+Transcript written on /tmp/chio-breakthrough-review-latex/paper.log.

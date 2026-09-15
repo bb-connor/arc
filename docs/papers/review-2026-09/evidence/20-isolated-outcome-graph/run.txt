@@ -1,0 +1,924 @@
+    Finished `dev` profile [unoptimized] target(s) in 0.60s
+     Running `target/debug/chio-outcome-ledger-comparison --isolated-graph`
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=verifier boundary=after_complete exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=verifier boundary=after_complete exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=publisher boundary=after_complete exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=publisher boundary=after_complete exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=archive boundary=after_complete exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=archive boundary=after_complete exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=publisher boundary=before_claim exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=publisher boundary=before_claim exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=archive boundary=before_claim exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=archive boundary=before_claim exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=publisher boundary=after_claim exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=publisher boundary=after_claim exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=publisher boundary=after_effect exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=publisher boundary=after_effect exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=archive boundary=after_claim exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=archive boundary=after_claim exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=archive boundary=after_effect exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_KILL receiver=archive boundary=after_effect exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_COURIER_KILL boundary=after_publisher exit=signal: 9 (SIGKILL)
+ISOLATION_CHILDREN_TERMINATED count=2
+GRAPH_COURIER_KILL boundary=after_publisher exit=signal: 9 (SIGKILL)
+{
+  "experiment": "receiver-owned-outcome-graph",
+  "isolated": true,
+  "isolationProbes": [
+    {
+      "backend": "chio",
+      "probes": [
+        {
+          "report": {
+            "deniedPaths": [
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/verifier/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/verifier/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/publisher/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/publisher/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/publisher/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/archive/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/archive/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/archive/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/host-only-canary",
+                "readDenied": true,
+                "writeDenied": true
+              }
+            ],
+            "hostLoopbackDenied": true,
+            "namespaces": {
+              "ipc": "ipc:[4026533846]",
+              "mnt": "mnt:[4026533844]",
+              "net": "net:[4026533849]",
+              "pid": "pid:[4026533847]",
+              "user": "user:[4026533977]",
+              "uts": "uts:[4026533845]"
+            },
+            "ownReceiverKeyReadable": false,
+            "procRootDenied": true,
+            "receiverConfigReadonly": false,
+            "symlinkEscapeDenied": true
+          },
+          "role": "courier"
+        },
+        {
+          "report": {
+            "deniedPaths": [
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/verifier/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/verifier/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/publisher/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/publisher/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/publisher/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/archive/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/archive/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/archive/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/host-only-canary",
+                "readDenied": true,
+                "writeDenied": true
+              }
+            ],
+            "hostLoopbackDenied": true,
+            "namespaces": {
+              "ipc": "ipc:[4026533976]",
+              "mnt": "mnt:[4026533845]",
+              "net": "net:[4026533980]",
+              "pid": "pid:[4026533978]",
+              "user": "user:[4026533846]",
+              "uts": "uts:[4026533848]"
+            },
+            "ownReceiverKeyReadable": true,
+            "procRootDenied": true,
+            "receiverConfigReadonly": true,
+            "symlinkEscapeDenied": true
+          },
+          "role": "verifier"
+        },
+        {
+          "report": {
+            "deniedPaths": [
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/verifier/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/verifier/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/publisher/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/publisher/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/publisher/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/archive/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/archive/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/archive/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/host-only-canary",
+                "readDenied": true,
+                "writeDenied": true
+              }
+            ],
+            "hostLoopbackDenied": true,
+            "namespaces": {
+              "ipc": "ipc:[4026533849]",
+              "mnt": "mnt:[4026533847]",
+              "net": "net:[4026533852]",
+              "pid": "pid:[4026533850]",
+              "user": "user:[4026533774]",
+              "uts": "uts:[4026533848]"
+            },
+            "ownReceiverKeyReadable": true,
+            "procRootDenied": true,
+            "receiverConfigReadonly": true,
+            "symlinkEscapeDenied": true
+          },
+          "role": "publisher"
+        },
+        {
+          "report": {
+            "deniedPaths": [
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/verifier/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/verifier/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/publisher/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/publisher/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/publisher/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/archive/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/archive/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/archive/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/chio/host-only-canary",
+                "readDenied": true,
+                "writeDenied": true
+              }
+            ],
+            "hostLoopbackDenied": true,
+            "namespaces": {
+              "ipc": "ipc:[4026533976]",
+              "mnt": "mnt:[4026533848]",
+              "net": "net:[4026533980]",
+              "pid": "pid:[4026533977]",
+              "user": "user:[4026533849]",
+              "uts": "uts:[4026533851]"
+            },
+            "ownReceiverKeyReadable": true,
+            "procRootDenied": true,
+            "receiverConfigReadonly": true,
+            "symlinkEscapeDenied": true
+          },
+          "role": "archive"
+        }
+      ]
+    },
+    {
+      "backend": "ledger",
+      "probes": [
+        {
+          "report": {
+            "deniedPaths": [
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/verifier/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/verifier/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/archive/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/archive/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/archive/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/host-only-canary",
+                "readDenied": true,
+                "writeDenied": true
+              }
+            ],
+            "hostLoopbackDenied": true,
+            "namespaces": {
+              "ipc": "ipc:[4026533846]",
+              "mnt": "mnt:[4026533844]",
+              "net": "net:[4026533849]",
+              "pid": "pid:[4026533847]",
+              "user": "user:[4026533977]",
+              "uts": "uts:[4026533845]"
+            },
+            "ownReceiverKeyReadable": false,
+            "procRootDenied": true,
+            "receiverConfigReadonly": false,
+            "symlinkEscapeDenied": true
+          },
+          "role": "courier"
+        },
+        {
+          "report": {
+            "deniedPaths": [
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/verifier/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/verifier/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/archive/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/archive/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/archive/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/host-only-canary",
+                "readDenied": true,
+                "writeDenied": true
+              }
+            ],
+            "hostLoopbackDenied": true,
+            "namespaces": {
+              "ipc": "ipc:[4026533976]",
+              "mnt": "mnt:[4026533845]",
+              "net": "net:[4026533980]",
+              "pid": "pid:[4026533978]",
+              "user": "user:[4026534045]",
+              "uts": "uts:[4026533848]"
+            },
+            "ownReceiverKeyReadable": true,
+            "procRootDenied": true,
+            "receiverConfigReadonly": true,
+            "symlinkEscapeDenied": true
+          },
+          "role": "verifier"
+        },
+        {
+          "report": {
+            "deniedPaths": [
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/verifier/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/verifier/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/archive/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/archive/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/archive/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/host-only-canary",
+                "readDenied": true,
+                "writeDenied": true
+              }
+            ],
+            "hostLoopbackDenied": true,
+            "namespaces": {
+              "ipc": "ipc:[4026533848]",
+              "mnt": "mnt:[4026533846]",
+              "net": "net:[4026533851]",
+              "pid": "pid:[4026533849]",
+              "user": "user:[4026533976]",
+              "uts": "uts:[4026533847]"
+            },
+            "ownReceiverKeyReadable": true,
+            "procRootDenied": true,
+            "receiverConfigReadonly": true,
+            "symlinkEscapeDenied": true
+          },
+          "role": "publisher"
+        },
+        {
+          "report": {
+            "deniedPaths": [
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/verifier/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/verifier/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/publisher/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/archive/key.seed",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/archive/owner.json",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/archive/receiver.sqlite",
+                "readDenied": true,
+                "writeDenied": true
+              },
+              {
+                "path": "/tmp/.tmp8F67sy/normal/ledger/host-only-canary",
+                "readDenied": true,
+                "writeDenied": true
+              }
+            ],
+            "hostLoopbackDenied": true,
+            "namespaces": {
+              "ipc": "ipc:[4026533850]",
+              "mnt": "mnt:[4026533846]",
+              "net": "net:[4026533980]",
+              "pid": "pid:[4026533977]",
+              "user": "user:[4026534048]",
+              "uts": "uts:[4026533847]"
+            },
+            "ownReceiverKeyReadable": true,
+            "procRootDenied": true,
+            "receiverConfigReadonly": true,
+            "symlinkEscapeDenied": true
+          },
+          "role": "archive"
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Linux namespaces with explicit mounts; shared host kernel and operator; no independently administered remote deployment",
+    "Static native policy artifact; no live model or arbitrary code execution",
+    "Unknown external effects require intervention; completion recovery does not replay them",
+    "No integration-cost or latency advantage measured"
+  ],
+  "pairedAttacks": [
+    {
+      "case": "overbroad_candidate",
+      "chio": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      }
+    },
+    {
+      "case": "skip_publisher",
+      "chio": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      }
+    },
+    {
+      "case": "artifact_substitution",
+      "chio": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      }
+    },
+    {
+      "case": "forged_completion",
+      "chio": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      }
+    },
+    {
+      "case": "foreign_workflow",
+      "chio": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      }
+    },
+    {
+      "case": "duplicate_delivery",
+      "chio": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 1,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 1,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      }
+    }
+  ],
+  "pairedScenarios": [
+    {
+      "case": "normal",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      }
+    },
+    {
+      "case": "verifier_response_lost",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      }
+    },
+    {
+      "case": "publisher_response_lost",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      }
+    },
+    {
+      "case": "archive_response_lost",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      }
+    },
+    {
+      "case": "publisher_before_claim",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      }
+    },
+    {
+      "case": "archive_before_claim",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      }
+    },
+    {
+      "case": "publisher_after_claim",
+      "chio": {
+        "archiveEffects": 0,
+        "publisherEffects": 0,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "publisher",
+          "state": "uncertain"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 0,
+        "publisherEffects": 0,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "publisher",
+          "state": "uncertain"
+        }
+      }
+    },
+    {
+      "case": "publisher_after_effect",
+      "chio": {
+        "archiveEffects": 0,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "publisher",
+          "state": "uncertain"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 0,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "publisher",
+          "state": "uncertain"
+        }
+      }
+    },
+    {
+      "case": "archive_after_claim",
+      "chio": {
+        "archiveEffects": 0,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "archive",
+          "state": "uncertain"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 0,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "archive",
+          "state": "uncertain"
+        }
+      }
+    },
+    {
+      "case": "archive_after_effect",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "archive",
+          "state": "uncertain"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "archive",
+          "state": "uncertain"
+        }
+      }
+    },
+    {
+      "case": "courier_replaced",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      }
+    }
+  ],
+  "scope": "Three distinct keys, stores and kernel processes on one host; shared implementation around the two independent gates",
+  "separationObserved": false
+}
+Graph evidence: /tmp/.tmp8F67sy

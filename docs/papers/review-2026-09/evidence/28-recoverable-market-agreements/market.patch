@@ -1,0 +1,249 @@
+diff --git a/crates/economy/chio-open-market/README.md b/crates/economy/chio-open-market/README.md
+index 6ddc0165c6..84885fee60 100644
+--- a/crates/economy/chio-open-market/README.md
++++ b/crates/economy/chio-open-market/README.md
+@@ -25,7 +25,8 @@ that back it. It builds on `chio-listing` for listings and pricing hints and
+ 
+ ## Public API
+ 
+-- `bidding::{bid, accept}` - the two entry points of the bid/ask/accept flow,
++- `bidding::{bid, accept, verify_acceptance}` - mint an offer, sign acceptance,
++  and verify received acceptance under locally selected buyer/provider keys,
+   plus `BidRequest`, `RequestedScope`, `BidMintContext`, `AskResponse`,
+   `AcceptedBid`, `ReservationReceipt`, `VerifiedReservationReceipt`, and
+   `BiddingError`. Signed envelopes: `SignedBidRequest`, `SignedAskResponse`,
+@@ -48,6 +49,13 @@ that back it. It builds on `chio-listing` for listings and pricing hints and
+   (from `chio-core-types`), `governance` (`chio-governance`), `listing`
+   (`chio-listing`).
+ 
++`verify_acceptance` checks the received buyer signature and reconstructs the
++exact accepted body from the signed offer and verified reservation. Its caller
++selects the reservation authority before constructing the witness. It does not
++reserve funds, check the original job's application policy, authorize execution,
++establish current funds availability, or settle a purchase. Those decisions
++belong to the receiving runtime and selected payment service.
++
+ ## Testing
+ 
+ `cargo test -p chio-open-market`
+diff --git a/crates/economy/chio-open-market/src/bidding.rs b/crates/economy/chio-open-market/src/bidding.rs
+index 20c3f03b87..3115821db5 100644
+--- a/crates/economy/chio-open-market/src/bidding.rs
++++ b/crates/economy/chio-open-market/src/bidding.rs
+@@ -462,6 +462,58 @@ pub fn accept(
+     acceptor_keypair: &Keypair,
+     accepted_at: u64,
+ ) -> Result<SignedAcceptedBid, BiddingError> {
++    let accepted = accepted_body(
++        ask,
++        reservation,
++        &acceptor_keypair.public_key(),
++        accepted_at,
++    )?;
++    let signed = SignedAcceptedBid::sign(accepted, acceptor_keypair)
++        .map_err(|error| invalid_request(error.to_string()))?;
++    match signed.verify_signature() {
++        Ok(true) => Ok(signed),
++        _ => Err(invalid_request(
++            "signed accepted bid signature is not verifiable",
++        )),
++    }
++}
++
++/// Verify a received acceptance under locally selected buyer and provider keys.
++///
++/// Checks the same offer, time window, token and reservation bindings used by
++/// [`accept`], without the buyer's private key. The reservation witness must
++/// already have been verified under the caller's selected reservation authority.
++/// This proves a historical signed agreement, not current funds availability,
++/// tool authorization, delivery, consumption, or settlement. Those require the
++/// receiving runtime's live state and execution checks.
++pub fn verify_acceptance(
++    accepted: &SignedAcceptedBid,
++    ask: &SignedAskResponse,
++    reservation: &VerifiedReservationReceipt,
++    expected_provider: &PublicKey,
++    expected_buyer: &PublicKey,
++) -> Result<(), BiddingError> {
++    if &ask.signer_key != expected_provider || &accepted.signer_key != expected_buyer {
++        return Err(BiddingError::AuthorityMismatch);
++    }
++    if !matches!(accepted.verify_signature(), Ok(true)) {
++        return Err(invalid_request("accepted bid signature is not verifiable"));
++    }
++    let expected = accepted_body(ask, reservation, expected_buyer, accepted.body.accepted_at)?;
++    if accepted.body != expected {
++        return Err(invalid_request(
++            "accepted bid does not bind the exact offer and reservation",
++        ));
++    }
++    Ok(())
++}
++
++fn accepted_body(
++    ask: &SignedAskResponse,
++    reservation: &VerifiedReservationReceipt,
++    acceptor: &PublicKey,
++    accepted_at: u64,
++) -> Result<AcceptedBid, BiddingError> {
+     if ask.body.schema != ASK_RESPONSE_SCHEMA {
+         return Err(invalid_request(format!(
+             "unsupported ask response schema: {}",
+@@ -493,7 +545,7 @@ pub fn accept(
+     if accepted_at >= ask.body.expires_at {
+         return Err(BiddingError::PricingExpired);
+     }
+-    if acceptor_keypair.public_key() != ask.body.token_offer.subject {
++    if acceptor != &ask.body.token_offer.subject {
+         return Err(BiddingError::AuthorityMismatch);
+     }
+     let ask_digest = canonical_digest(&ask.body)?;
+@@ -506,7 +558,7 @@ pub fn accept(
+     {
+         return Err(BiddingError::ReservationReceiptInvalid);
+     }
+-    let accepted = AcceptedBid {
++    Ok(AcceptedBid {
+         schema: ACCEPTED_BID_SCHEMA.to_string(),
+         listing_id: ask.body.listing_id.clone(),
+         agent_id: ask.body.agent_id.clone(),
+@@ -518,15 +570,7 @@ pub fn accept(
+         token_id: ask.body.token_offer.id.clone(),
+         token_subject: ask.body.token_offer.subject.clone(),
+         token_expires_at: ask.body.token_offer.expires_at,
+-    };
+-    let signed = SignedAcceptedBid::sign(accepted, acceptor_keypair)
+-        .map_err(|error| invalid_request(error.to_string()))?;
+-    match signed.verify_signature() {
+-        Ok(true) => Ok(signed),
+-        _ => Err(invalid_request(
+-            "signed accepted bid signature is not verifiable",
+-        )),
+-    }
++    })
+ }
+ 
+ fn token_offer_total_liability(ask: &AskResponse) -> Result<MonetaryAmount, BiddingError> {
+diff --git a/crates/economy/chio-open-market/src/bidding/tests.rs b/crates/economy/chio-open-market/src/bidding/tests.rs
+index 023eb67871..b9bdc0c319 100644
+--- a/crates/economy/chio-open-market/src/bidding/tests.rs
++++ b/crates/economy/chio-open-market/src/bidding/tests.rs
+@@ -18,6 +18,118 @@ fn invalid_request_helper_preserves_variant_message() {
+     );
+ }
+ 
++#[test]
++fn received_acceptance_verifies_without_buyer_private_key_and_rejects_substitution() {
++    let provider = Keypair::generate();
++    let buyer = Keypair::generate();
++    let reserve_authority = Keypair::generate();
++    let listing = listing_entry(
++        &provider,
++        &provider,
++        GenericListingStatus::Active,
++        100,
++        110,
++        600,
++    );
++    let request = signed_bid_request(&buyer, "agent-alpha", 200, 300, 120);
++    let ask = bid(
++        &request,
++        BidMintContext {
++            listing: &listing,
++            issuer_keypair: &provider,
++            agent_subject: buyer.public_key(),
++            token_id: "purchase-1".to_string(),
++            now: 120,
++            grant_constraints: Vec::new(),
++            dpop_required: None,
++        },
++    )
++    .test_unwrap();
++    let reservation = reservation_for(&ask, "held-1", &reserve_authority);
++    let accepted = accept(&ask, &reservation, &buyer, 130).test_unwrap();
++    let verify = |value: &SignedAcceptedBid| {
++        verify_acceptance(
++            value,
++            &ask,
++            &reservation,
++            &provider.public_key(),
++            &buyer.public_key(),
++        )
++    };
++    assert!(verify(&accepted).is_ok());
++
++    // Every changed body is signed by the actual buyer. Signature checking
++    // alone therefore cannot reject these changed agreements.
++    let mut variants = Vec::new();
++    for field in [
++        "schema",
++        "listingId",
++        "agentId",
++        "bidDigest",
++        "askDigest",
++        "bidReceiptId",
++        "tokenId",
++    ] {
++        let mut value = serde_json::to_value(&accepted.body).test_unwrap();
++        value[field] = serde_json::json!("different");
++        variants.push(serde_json::from_value::<AcceptedBid>(value).test_unwrap());
++    }
++    let mut changed = accepted.body.clone();
++    changed.quoted_price.units += 1;
++    variants.push(changed);
++    let mut changed = accepted.body.clone();
++    changed.quoted_price.currency = "EUR".to_string();
++    variants.push(changed);
++    let mut changed = accepted.body.clone();
++    changed.token_subject = provider.public_key();
++    variants.push(changed);
++    let mut changed = accepted.body.clone();
++    changed.token_expires_at += 1;
++    variants.push(changed);
++    let mut changed = accepted.body.clone();
++    changed.accepted_at = ask.body.issued_at - 1;
++    variants.push(changed);
++    let mut changed = accepted.body.clone();
++    changed.accepted_at = ask.body.expires_at;
++    variants.push(changed);
++    for variant in variants {
++        let signed = SignedAcceptedBid::sign(variant, &buyer).test_unwrap();
++        assert!(signed.verify_signature().test_unwrap());
++        assert!(verify(&signed).is_err());
++    }
++    let other = Keypair::generate();
++    assert!(verify_acceptance(
++        &accepted,
++        &ask,
++        &reservation,
++        &other.public_key(),
++        &buyer.public_key()
++    )
++    .is_err());
++    assert!(verify_acceptance(
++        &accepted,
++        &ask,
++        &reservation,
++        &provider.public_key(),
++        &other.public_key()
++    )
++    .is_err());
++    let forged = SignedAcceptedBid::sign(accepted.body.clone(), &other).test_unwrap();
++    assert!(verify(&forged).is_err());
++    let mut damaged = accepted.clone();
++    damaged.body.accepted_at += 1;
++    assert!(verify(&damaged).is_err());
++    let other_reservation = reservation_for(&ask, "held-2", &reserve_authority);
++    assert!(verify_acceptance(
++        &accepted,
++        &ask,
++        &other_reservation,
++        &provider.public_key(),
++        &buyer.public_key()
++    )
++    .is_err());
++}
++
+ #[test]
+ fn bid_request_rejects_padded_required_fields() {
+     let mut request = bid_request(" agent-alpha", 200, 300, 120);

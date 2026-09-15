@@ -1,0 +1,11 @@
+{
+  "reviewed_commit": "2b3b5af8cbfbc6f16ce6005de3f97cd149803b81",
+  "source": "crates/kernel/chio-runtime-core/tests/runtime_treaty_predicate_substitution.rs",
+  "source_sha256": "bc7fabfa691e02e8e57b162521e350b373d7e52dfe933509ec486c06c70ee592",
+  "replacement_from": "dispatches: outcome.dispatches,",
+  "replacement_to": "dispatches: 999, // Review mutation: an impossible measured count.",
+  "scope": "A temporary copy of the integration test; production code and the original test were unchanged.",
+  "pair_test": "survived",
+  "combined_residual_test": "survived",
+  "unsubstituted_control": "killed: dispatches 999 != 1"
+}

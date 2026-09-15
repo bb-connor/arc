@@ -1,0 +1,22 @@
+{
+  "evidence": {
+    "body": {
+      "schema": "chio.runtime.artifact-outcome.experimental.v1",
+      "slot": {
+        "receiverId": "682f674404475bf6bdc5a49817e505bc641a5a5055b782a58eb6e092e3fd2c07",
+        "workflowId": "chio-seller_withholds",
+        "stepId": "settle"
+      },
+      "predecessorStepId": "check-encrypted-repair",
+      "contractSha256": "85ccde4096875807635a07d3db23f28213f611983bc79e22475ffa18cfb60729",
+      "artifactSha256": "a6042ed165d38703c9ec2e505263cdc3972da16e5896a941ff2deb66362d5132",
+      "passed": true,
+      "verifiedAtUnixMs": 1800000000000
+    },
+    "signature": "fa681ad8bd497ce2ec9b6056eb2163970fab5d3b883c05d9525274ffcb016b1c673b99ebb9761c40ca6263ddffa176c9b0c5913f51d0a4de86e3ca6ef48c5d0b"
+  },
+  "arguments": {
+    "artifactSha256": "a6042ed165d38703c9ec2e505263cdc3972da16e5896a941ff2deb66362d5132",
+    "resource": "funded-trade"
+  }
+}

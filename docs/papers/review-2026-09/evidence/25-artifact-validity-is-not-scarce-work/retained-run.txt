@@ -1,0 +1,347 @@
+   Compiling chio-outcome-ledger-comparison v0.1.0 (/home/connor/backbay/arc/examples/outcome-ledger-comparison)
+    Finished `dev` profile [unoptimized] target(s) in 13.54s
+     Running `target/debug/chio-outcome-ledger-comparison --repair-work-reuse examples/outcome-ledger-comparison/fixtures/git-hook-repair/base .`
+{
+  "consensusImplemented": false,
+  "experiment": "checked-artifact-reuse-is-not-scarce-work",
+  "families": [
+    {
+      "acceptedClaims": 6,
+      "claims": [
+        {
+          "appendedBytesPerFile": 0,
+          "artifactPassed": true,
+          "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "ca732aefb3f46e17a873d063828e17e99179464bf2febf8f01ed73437822ec57",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 0,
+          "artifactPassed": true,
+          "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "a829eab55103039140658f66e4a15619a141e5b16f5c8a3591bc6779a5a82448",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 0,
+          "artifactPassed": true,
+          "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "20453d1fb0054974fd2a1160d690f123f26d4db6b631f81e65ac91ebac499792",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 0,
+          "artifactPassed": true,
+          "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "439e9aec6b30963b933f13a730ab02b5f5aa698cca1bf60db02f54a7dc25dc57",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 0,
+          "artifactPassed": true,
+          "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "aa8de93d75fba3dcd01305645e2a228832b0bf4edbbd9170732e1046405000aa",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 0,
+          "artifactPassed": true,
+          "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "0ae0c87b9645b47938e8b3003df0034f5261131202d7d07809ccecae74e07329",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        }
+      ],
+      "distinctArtifactHashes": 1,
+      "distinctChallenges": 1,
+      "distinctLogicalJobs": 1,
+      "distinctSyntaxHashes": 1,
+      "family": "new_identities"
+    },
+    {
+      "acceptedClaims": 6,
+      "claims": [
+        {
+          "appendedBytesPerFile": 27,
+          "artifactPassed": true,
+          "artifactSha256": "eaef86741d0008c70ca59c2f5eddce81ddaef336a8ad159e2e3f4c32168f783a",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "1c1ef85dd1e209d37e3ed028604f00989993a914cedccef57d555bac9e028d94",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 27,
+          "artifactPassed": true,
+          "artifactSha256": "035ca630452d1447f6200244aef767ac38c1f13d66893963d8224dda60ea4119",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "324f10941186679dee6d4a3ac1e0042f6855e8f4ba11cad4e8e2243a1923c0e3",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 27,
+          "artifactPassed": true,
+          "artifactSha256": "c5d38189cb3b16d406bfe8ea5306671b42990e47e3cda33107a8da89f0a91363",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "f6313e5b11cc94a1ae0c960a26f5dd57af484cefadc9cceb6b2d6bd790300883",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 27,
+          "artifactPassed": true,
+          "artifactSha256": "f315ef0c89826745032abd186086832a38c3fbd4998a0b0e4f98caa5290c2d8c",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "60b9c07aeb6f22e9d84edd771b5cf9c2c40a5b29fb3ddde0cde9c2a9b4198698",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 27,
+          "artifactPassed": true,
+          "artifactSha256": "a47982a9dc366aa3cf32e77fedc3e0acc49d911d30e82ec9aac90334c33798c3",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "b25307a74fb4d3cfa63f6913ce50011b25830318e850f77fb66800ce2167c9c3",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 27,
+          "artifactPassed": true,
+          "artifactSha256": "cf4c60ba93d401fe73852960dace85120ffb582d272a457d32c337d1655b0192",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "a28f8c80925757ff1956af75f86b777704aa50931d91b53f05a951badeef68b4",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        }
+      ],
+      "distinctArtifactHashes": 6,
+      "distinctChallenges": 1,
+      "distinctLogicalJobs": 1,
+      "distinctSyntaxHashes": 1,
+      "family": "comments"
+    },
+    {
+      "acceptedClaims": 6,
+      "claims": [
+        {
+          "appendedBytesPerFile": 41,
+          "artifactPassed": true,
+          "artifactSha256": "9ddab8e1aa4098186123469da5608b8d5231acac90a902a7569398e84b8804a6",
+          "astSha256": "736820b87c1f9f7d641f8573210495e2de8567b4b85e96f5e0aaed2907420527",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "c7c703a91d13820c9f56baa11b48b05e22f509d245f0aff379b030c2cb12e97a",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": false
+        },
+        {
+          "appendedBytesPerFile": 41,
+          "artifactPassed": true,
+          "artifactSha256": "14fe4bfdd49531dd7e1b64cd68dac957758ff11fe00f11fb97e3706e37b53171",
+          "astSha256": "12583b344989b3bde1326a13c2db25c0901a463190861b0cc22cf686e25f51ed",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "02cea61160968cc61378195b20edafc72ce4cbf66e30494b5cab99979e6d665f",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": false
+        },
+        {
+          "appendedBytesPerFile": 41,
+          "artifactPassed": true,
+          "artifactSha256": "556e75ed2fb461b8a8dae5f01e91c46ab488c092123bfbf5d4156d5e4b90730b",
+          "astSha256": "733b3b2c7afb50bcdf26ce757492f5c97073892146d15ab0224b735f8eb33f43",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "f80c36e04a14b9d83180aae901bf585640b2408c204a10367af3de2cf3bad12d",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": false
+        },
+        {
+          "appendedBytesPerFile": 41,
+          "artifactPassed": true,
+          "artifactSha256": "9a8512ca9997085423cf371953e1aa239ba526630714d8fef8b569c5743604f0",
+          "astSha256": "df735fbb8f527dd5c53fc0cde3bcc43930ca3fe8e7b56fa0b38c9441ab9c541a",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "25b42c2caf095bb7025ab7dfef764b3a854e4d3a139e33ed56b755b345485dc4",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": false
+        },
+        {
+          "appendedBytesPerFile": 41,
+          "artifactPassed": true,
+          "artifactSha256": "72b67fc6cf2511b5e241add631c0c3218f862c6e04f132c9927c2fe55e57f5b0",
+          "astSha256": "b4e024b104e6aa5f25c957e52dd3c3b6189d23e75d7c9614290089404e608b25",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "2f3614060605a62fef741767b85829e32ffbff7697825b285b6e24777ee524af",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": false
+        },
+        {
+          "appendedBytesPerFile": 41,
+          "artifactPassed": true,
+          "artifactSha256": "fb9bec6bb11e68bcc4b2cee0d16732bc510eba90b8add4bd42b886dfb348f142",
+          "astSha256": "07148263e34e7c62211b9f39f4892a57ee2de9bbc3bf397e9ca1d7e991e74678",
+          "challenge": "32a64916d5578a5f3991f1caa81cf3acedf4c3aadc89c87ef8b0c61fbc331bf1",
+          "claimSha256": "0178d32e16435634f0364eb5f01c4e116b7079fccca396d2b2fd218f76374405",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": false
+        }
+      ],
+      "distinctArtifactHashes": 6,
+      "distinctChallenges": 1,
+      "distinctLogicalJobs": 1,
+      "distinctSyntaxHashes": 6,
+      "family": "dead_branches"
+    },
+    {
+      "acceptedClaims": 6,
+      "claims": [
+        {
+          "appendedBytesPerFile": 87,
+          "artifactPassed": true,
+          "artifactSha256": "f05e83ff8ceb917d5ab32bec16e2bb30a8fcd2ab5cce69db2c882b2e83f158db",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "bdaedcf0a553a4ddb12acca6c086bd06164ea0989a0d188d25f65d75b58b163d",
+          "claimSha256": "7bb330939355ee26f766d52d474d0524e67156cadb2846a61d344131afa621b4",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 87,
+          "artifactPassed": true,
+          "artifactSha256": "94254dc93d3e95dbe66e3858ab5977f6824fc84c60673f7cae51092f6dc6c5ee",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "768a5049b33d8d9ea4923baad761235dddb60d753012df5831654273a600e589",
+          "claimSha256": "d04c800e0934edda7466ef020c26da9d792a85cb457098a169bebcc868663fd9",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 87,
+          "artifactPassed": true,
+          "artifactSha256": "722b51372e63d8130d51711e7415b031f2a31fb04bc42fb6e2e1419441fb8656",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "2d0f2bad756e1b39f92b9af9900f09fc6487d8bed5073c2b043063cf111a47ea",
+          "claimSha256": "73553e8edf8b87992195ec3ba48b91e345fdda979c9ff1b949e8f548dd663807",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 87,
+          "artifactPassed": true,
+          "artifactSha256": "15ac9d438dea52bf8af9ae9692f53e63a685fe6beaa33a247477590634ad72c4",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "235671eb82b9b64cca283b84e06696e4e4f3d5f9a979dc80ec5fd71a892f28e5",
+          "claimSha256": "a6a33e42ed22653c95923511322e86fe967f6710048a832ccc85e683cdc44101",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 87,
+          "artifactPassed": true,
+          "artifactSha256": "9f44dd40a23430cb740643d2cba28b7ee09c25c6e758df55495512fcb186ab43",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "6a6af37af709fce17bfaf962b4ebdb24353752ee1227426f3d03d6a1ea89655c",
+          "claimSha256": "06c483937def5680b3e79018b61113abffa78c4f4a950254a74c62fadf8771e3",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        },
+        {
+          "appendedBytesPerFile": 87,
+          "artifactPassed": true,
+          "artifactSha256": "a9e69567f91c184922e17da32e557b79f6dde02a1c8b62dd36418e68c4fd6f8c",
+          "astSha256": "b8ad890cc7f7735132639b138e5ef82763af4379b4a496a5e4ad2b9ec428e463",
+          "challenge": "91fb1114add2c271115c6fe5a0bf3375e57d721bf95e5d27af7ce188646eb8a2",
+          "claimSha256": "201a07ad6c1a31a425f8d1ab3039d789546020d61a0469e9869f8f982df1835d",
+          "signatureAndBindingsValid": true,
+          "sourcePrefixEqualsCachedRepair": true,
+          "syntaxMatchesCachedRepair": true
+        }
+      ],
+      "distinctArtifactHashes": 6,
+      "distinctChallenges": 6,
+      "distinctLogicalJobs": 1,
+      "distinctSyntaxHashes": 1,
+      "family": "fresh_challenges"
+    }
+  ],
+  "limits": [
+    "Illustrative claim, byte-hash and syntax-hash counting metrics, not a deployed consensus algorithm or an attack on existing Chio admission",
+    "Syntax fingerprints are not semantic equivalence proofs; all variants meet only the selected seven-case contract",
+    "No timing advantage, compute lower bound, energy measurement or result about all useful-work protocols",
+    "Stable receiver-owned job budgets stop repeated effects for both gates; independent scarce-resource and membership assumptions remain unspecified"
+  ],
+  "protectedLogicalJob": {
+    "chio": {
+      "accepted": 1,
+      "attempts": 24,
+      "effects": 1,
+      "stateAfterReopen": "completed"
+    },
+    "ledger": {
+      "accepted": 1,
+      "attempts": 24,
+      "effects": 1,
+      "stateAfterReopen": "completed"
+    }
+  },
+  "resourceHardnessEstablished": false,
+  "synthesisMethod": "Load one existing repair, then copy it and append comments or unreachable branches; no new repair search or model invocation",
+  "totals": {
+    "acceptedSignedClaims": 24,
+    "actualGitCommitCases": 140,
+    "distinctArtifactHashes": 19,
+    "distinctChallenges": 7,
+    "distinctLogicalJobs": 1,
+    "distinctProducerKeys": 24,
+    "distinctSyntaxHashes": 7,
+    "totalBehaviorCheckerRuns": 20,
+    "validArtifactsBehaviorChecked": 19
+  }
+}
+Repair evidence: /tmp/.tmpk4tOSb

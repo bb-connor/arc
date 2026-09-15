@@ -1,0 +1,103 @@
+{
+  "reply": {
+    "allowed": false,
+    "output": null,
+    "receipt": {
+      "action": {
+        "parameter_hash": "019d2ad78f8b37f23cdb158183cf97aee5a8c5ca7dc7e3835b201af63463d239",
+        "parameters": {
+          "artifact": {
+            "grants": [
+              {
+                "operations": [
+                  "invoke"
+                ],
+                "server_id": "source-checkout",
+                "tool_name": "read"
+              }
+            ]
+          },
+          "evidence": {
+            "body": {
+              "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+              "contractSha256": "9095b7c4765a58dca3715f34caadc7845de90f605a4be3ff0a5a6e9cd23e86b0",
+              "passed": true,
+              "predecessorStepId": "publisher",
+              "schema": "chio.runtime.artifact-outcome.experimental.v1",
+              "slot": {
+                "receiverId": "a2aef490179190326cd07a715df42fec03b09ccad6280c448870b6061f6cf24f",
+                "stepId": "archive",
+                "workflowId": "reviewed-scope-distribution"
+              },
+              "verifiedAtUnixMs": 1800000000000
+            },
+            "signature": "ae43d36e83f36f3fff10587e70336347460558f96a4e8fa3ec75df1778edb3c7b1005442f2d7676b421d8e06bb12ff10524a09542b710cd791150754e7a29700"
+          }
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "comparison-capability-410f39b9add52f7f845e2594173c4962c1033bb5b4a2174271b37e29a707c10e",
+      "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "decision": {
+        "guard": "kernel",
+        "reason": "tool server error: runtime admission rejected: outcome_effect_already_claimed: logical effect slot already entered dispatch; fresh attempts cannot reset it",
+        "verdict": "deny"
+      },
+      "id": "783397b8cd8ec4446f52b79c4f6da62f43bad61b88150a3457a5744fd41dbc57",
+      "kernel_key": "a2aef490179190326cd07a715df42fec03b09ccad6280c448870b6061f6cf24f",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "a2aef490179190326cd07a715df42fec03b09ccad6280c448870b6061f6cf24f",
+          "subject_key": "410f39b9add52f7f845e2594173c4962c1033bb5b4a2174271b37e29a707c10e"
+        },
+        "chio_receipt_signing_nonce": "receipt-f962315abe7ae20d75b5eddc87da12b28873d505e76f801a470e802c46fcc5ef",
+        "receipt_context": {
+          "request_id": "f962315abe7ae20d75b5eddc87da12b28873d505e76f801a470e802c46fcc5ef"
+        }
+      },
+      "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "cdfdd3d2908be8a89134599b10a80dcd5f7d80e29dc4a42984564254535c37021100c0d4a716476a6871a1b71092b68ecbe4f1a4c2bcbbaa755a0011cf3e950a",
+      "timestamp": 1800000000,
+      "tool_name": "apply",
+      "tool_origin": "caller_executed",
+      "tool_server": "archive",
+      "trust_level": "mediated"
+    }
+  },
+  "request": {
+    "arguments": {
+      "artifact": {
+        "grants": [
+          {
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "source-checkout",
+            "tool_name": "read"
+          }
+        ]
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "contractSha256": "9095b7c4765a58dca3715f34caadc7845de90f605a4be3ff0a5a6e9cd23e86b0",
+          "passed": true,
+          "predecessorStepId": "publisher",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "a2aef490179190326cd07a715df42fec03b09ccad6280c448870b6061f6cf24f",
+            "stepId": "archive",
+            "workflowId": "reviewed-scope-distribution"
+          },
+          "verifiedAtUnixMs": 1800000000000
+        },
+        "signature": "ae43d36e83f36f3fff10587e70336347460558f96a4e8fa3ec75df1778edb3c7b1005442f2d7676b421d8e06bb12ff10524a09542b710cd791150754e7a29700"
+      }
+    },
+    "tool": "apply"
+  }
+}

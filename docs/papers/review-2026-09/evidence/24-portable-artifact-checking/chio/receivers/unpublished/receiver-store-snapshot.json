@@ -1,0 +1,14 @@
+{
+  "runtime_outcome_effect_slots": [
+    {
+      "claim_json": null,
+      "claim_sha256": null,
+      "result_json": null,
+      "result_sha256": null,
+      "revoked": 0,
+      "rule_json": "{\"slot\":{\"receiverId\":\"25af86b21fe7fdf91155e0fbbc9ead26e65bfb2d2a854e07e0623f39270be9e3\",\"workflowId\":\"recover-checked-git-repair\",\"stepId\":\"publish\"},\"predecessorStepId\":\"receiver-source-check\",\"verifierKey\":\"25af86b21fe7fdf91155e0fbbc9ead26e65bfb2d2a854e07e0623f39270be9e3\",\"contractSha256\":\"00fcbd8ae3ea5ede4af97bbf2a3c009a8d46eedbaa9a16ca89e2cce8bb963e30\",\"serverId\":\"checked-git-publication\",\"toolName\":\"publish\",\"resource\":\"refs/heads/verified-repair\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+      "rule_sha256": "f5d1c98bd4109d9ad5b66d9d3b095a535617182263be191e0aa258d239995805",
+      "slot_sha256": "47d9ee8b93487212635124452ec28f0cb8f029c41117863e64dbb1b7349392bc"
+    }
+  ]
+}

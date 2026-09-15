@@ -1,0 +1,485 @@
+{
+  "commonSubstitutionCases": [
+    {
+      "case": "valid",
+      "chio": {
+        "accepted": true,
+        "initialEffects": 1,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": false
+      },
+      "ledger": {
+        "accepted": true,
+        "initialEffects": 1,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": false
+      }
+    },
+    {
+      "case": "key",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    },
+    {
+      "case": "contract",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    },
+    {
+      "case": "predecessor",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    },
+    {
+      "case": "receiver",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    },
+    {
+      "case": "workflow",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    },
+    {
+      "case": "step",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    },
+    {
+      "case": "artifact",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    },
+    {
+      "case": "resource",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    },
+    {
+      "case": "failed",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    },
+    {
+      "case": "future",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    },
+    {
+      "case": "old",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    },
+    {
+      "case": "server",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    },
+    {
+      "case": "tool",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    },
+    {
+      "case": "unsigned",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    },
+    {
+      "case": "schema",
+      "chio": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      },
+      "ledger": {
+        "accepted": false,
+        "initialEffects": 0,
+        "state": "completed",
+        "totalEffects": 1,
+        "validFollowupAllowed": true
+      }
+    }
+  ],
+  "commonTransitionCases": [
+    {
+      "case": "revocation_after_prepare",
+      "chio": {
+        "effects": 0,
+        "secondAllowed": false,
+        "state": "waiting"
+      },
+      "ledger": {
+        "effects": 0,
+        "secondAllowed": false,
+        "state": "waiting"
+      }
+    },
+    {
+      "case": "expiry_after_prepare",
+      "chio": {
+        "effects": 0,
+        "secondAllowed": false,
+        "state": "waiting"
+      },
+      "ledger": {
+        "effects": 0,
+        "secondAllowed": false,
+        "state": "waiting"
+      }
+    },
+    {
+      "case": "argument_after_prepare",
+      "chio": {
+        "effects": 0,
+        "secondAllowed": false,
+        "state": "waiting"
+      },
+      "ledger": {
+        "effects": 0,
+        "secondAllowed": false,
+        "state": "waiting"
+      }
+    },
+    {
+      "case": "fresh_signature_after_completion",
+      "chio": {
+        "effects": 1,
+        "secondAllowed": false,
+        "state": "completed"
+      },
+      "ledger": {
+        "effects": 1,
+        "secondAllowed": false,
+        "state": "completed"
+      }
+    },
+    {
+      "case": "fresh_candidate_after_completion",
+      "chio": {
+        "effects": 1,
+        "secondAllowed": false,
+        "state": "completed"
+      },
+      "ledger": {
+        "effects": 1,
+        "secondAllowed": false,
+        "state": "completed"
+      }
+    },
+    {
+      "case": "two_prepared_authorizations",
+      "chio": {
+        "effects": 1,
+        "secondAllowed": false,
+        "state": "completed"
+      },
+      "ledger": {
+        "effects": 1,
+        "secondAllowed": false,
+        "state": "completed"
+      }
+    }
+  ],
+  "experiment": "matched-outcome-ledger-comparison",
+  "kernelArtifactWorkflows": {
+    "chio": {
+      "admitted": true,
+      "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+      "publicationCount": 1,
+      "receiptsVerified": true,
+      "replacementAdmitted": false,
+      "state": "completed"
+    },
+    "ledger": {
+      "admitted": true,
+      "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+      "publicationCount": 1,
+      "receiptsVerified": true,
+      "replacementAdmitted": false,
+      "state": "completed"
+    }
+  },
+  "ledgerHandleChecks": {
+    "forgedHandleRejected": true,
+    "freshHandleDidNotRefillBudget": true,
+    "freshHandlesObserved": true,
+    "physicalEffects": 1
+  },
+  "limits": [
+    "No timing or integration-effort superiority claim",
+    "No protection against store rollback, dishonest verifier or cloned receiver authority",
+    "Static native-policy workload, not independently administered remote agents"
+  ],
+  "processFaults": [
+    {
+      "case": "race",
+      "chio": {
+        "effectsAfterReplacement": 1,
+        "effectsAtRestart": 1,
+        "killed": false,
+        "resultRetained": true,
+        "stateAfterReplacement": "completed",
+        "stateAtRestart": "completed"
+      },
+      "ledger": {
+        "effectsAfterReplacement": 1,
+        "effectsAtRestart": 1,
+        "killed": false,
+        "resultRetained": true,
+        "stateAfterReplacement": "completed",
+        "stateAtRestart": "completed"
+      }
+    },
+    {
+      "case": "before_claim",
+      "chio": {
+        "effectsAfterReplacement": 1,
+        "effectsAtRestart": 0,
+        "killed": true,
+        "resultRetained": true,
+        "stateAfterReplacement": "completed",
+        "stateAtRestart": "waiting"
+      },
+      "ledger": {
+        "effectsAfterReplacement": 1,
+        "effectsAtRestart": 0,
+        "killed": true,
+        "resultRetained": true,
+        "stateAfterReplacement": "completed",
+        "stateAtRestart": "waiting"
+      }
+    },
+    {
+      "case": "after_claim",
+      "chio": {
+        "effectsAfterReplacement": 0,
+        "effectsAtRestart": 0,
+        "killed": true,
+        "resultRetained": false,
+        "stateAfterReplacement": "claimed",
+        "stateAtRestart": "claimed"
+      },
+      "ledger": {
+        "effectsAfterReplacement": 0,
+        "effectsAtRestart": 0,
+        "killed": true,
+        "resultRetained": false,
+        "stateAfterReplacement": "claimed",
+        "stateAtRestart": "claimed"
+      }
+    },
+    {
+      "case": "after_effect",
+      "chio": {
+        "effectsAfterReplacement": 1,
+        "effectsAtRestart": 1,
+        "killed": true,
+        "resultRetained": false,
+        "stateAfterReplacement": "claimed",
+        "stateAtRestart": "claimed"
+      },
+      "ledger": {
+        "effectsAfterReplacement": 1,
+        "effectsAtRestart": 1,
+        "killed": true,
+        "resultRetained": false,
+        "stateAfterReplacement": "claimed",
+        "stateAtRestart": "claimed"
+      }
+    },
+    {
+      "case": "after_complete",
+      "chio": {
+        "effectsAfterReplacement": 1,
+        "effectsAtRestart": 1,
+        "killed": true,
+        "resultRetained": true,
+        "stateAfterReplacement": "completed",
+        "stateAtRestart": "completed"
+      },
+      "ledger": {
+        "effectsAfterReplacement": 1,
+        "effectsAtRestart": 1,
+        "killed": true,
+        "resultRetained": true,
+        "stateAfterReplacement": "completed",
+        "stateAtRestart": "completed"
+      }
+    }
+  ],
+  "scope": "Outcome gates under identical trusted kernel/tool and storage assumptions; not a comparison of complete protocols",
+  "separationObserved": false
+}

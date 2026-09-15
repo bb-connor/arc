@@ -1,0 +1,103 @@
+{
+  "reply": {
+    "allowed": false,
+    "output": null,
+    "receipt": {
+      "action": {
+        "parameter_hash": "3b74e00c90be7af09825c3a6813cd84ef60dd4d3c75156c8ae18c3b02f075c59",
+        "parameters": {
+          "artifact": {
+            "grants": [
+              {
+                "operations": [
+                  "invoke"
+                ],
+                "server_id": "source-checkout",
+                "tool_name": "delete"
+              }
+            ]
+          },
+          "evidence": {
+            "body": {
+              "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+              "contractSha256": "c9f916b01992d0819f8dedf5ce56110938599c86b5692663f73d5de8686fb0ba",
+              "passed": true,
+              "predecessorStepId": "publisher",
+              "schema": "chio.runtime.artifact-outcome.experimental.v1",
+              "slot": {
+                "receiverId": "f4375a97ba9fcbb896a0986b1ecbb5a2ea1f5e05ffcc46c1364635bb8a3a4d43",
+                "stepId": "archive",
+                "workflowId": "reviewed-scope-distribution"
+              },
+              "verifiedAtUnixMs": 1800000000000
+            },
+            "signature": "af10ffe049abf05e98a999c25277640442ee7d546fa0f5eb8850368b34978c4883e6b22794ea21d7a1988ddccb88cc3d310635752c4d008d4f562b86ad65ea08"
+          }
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "comparison-capability-448ee0b09aa33f00387446596908e13da9c72717b4f23330379137dea1bc6cda",
+      "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "decision": {
+        "guard": "kernel",
+        "reason": "tool server error: runtime admission rejected: outcome_effect_binding_mismatch: outcome or effect binding differs from local rule",
+        "verdict": "deny"
+      },
+      "id": "b7df04add145e21dded17688d6c216d2e00c9ca9339faffd237b5a82d907ba79",
+      "kernel_key": "f4375a97ba9fcbb896a0986b1ecbb5a2ea1f5e05ffcc46c1364635bb8a3a4d43",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "f4375a97ba9fcbb896a0986b1ecbb5a2ea1f5e05ffcc46c1364635bb8a3a4d43",
+          "subject_key": "448ee0b09aa33f00387446596908e13da9c72717b4f23330379137dea1bc6cda"
+        },
+        "chio_receipt_signing_nonce": "receipt-880c09dc7e382a0b04d93c499838b6efe9a0d1db3de02434544de48528ba8461",
+        "receipt_context": {
+          "request_id": "880c09dc7e382a0b04d93c499838b6efe9a0d1db3de02434544de48528ba8461"
+        }
+      },
+      "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "c07509228e5d208ecd436f7f2c85ad6f3aca2086f446ae503e66ece2f2f1c198093c63037e623f528fb7c9dbb39b86a4ec4a5ae2980308a0c99ea6592cd84c08",
+      "timestamp": 1800000000,
+      "tool_name": "apply",
+      "tool_origin": "caller_executed",
+      "tool_server": "archive",
+      "trust_level": "mediated"
+    }
+  },
+  "request": {
+    "arguments": {
+      "artifact": {
+        "grants": [
+          {
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "source-checkout",
+            "tool_name": "delete"
+          }
+        ]
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "contractSha256": "c9f916b01992d0819f8dedf5ce56110938599c86b5692663f73d5de8686fb0ba",
+          "passed": true,
+          "predecessorStepId": "publisher",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "f4375a97ba9fcbb896a0986b1ecbb5a2ea1f5e05ffcc46c1364635bb8a3a4d43",
+            "stepId": "archive",
+            "workflowId": "reviewed-scope-distribution"
+          },
+          "verifiedAtUnixMs": 1800000000000
+        },
+        "signature": "af10ffe049abf05e98a999c25277640442ee7d546fa0f5eb8850368b34978c4883e6b22794ea21d7a1988ddccb88cc3d310635752c4d008d4f562b86ad65ea08"
+      }
+    },
+    "tool": "apply"
+  }
+}

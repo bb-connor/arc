@@ -1,0 +1,21 @@
+   Compiling chio-outcome-ledger-comparison v0.1.0 (/home/connor/backbay/arc/examples/outcome-ledger-comparison)
+    Finished `test` profile [unoptimized] target(s) in 2.03s
+     Running unittests src/main.rs (target/debug/deps/chio_outcome_ledger_comparison-6cebb88d15430076)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/experiment.rs (target/debug/deps/experiment-c304903fa493473c)
+
+running 5 tests
+test outcome_gates_match_under_substitution_reissue_crash_and_kernel_dispatch ... ok
+test receiver_checking_rejects_a_dishonest_attestation_and_accepts_unsigned_valid_work ... ok
+test repaired_repository_sources_require_observed_effects_before_publication ... ok
+test independent_receiver_processes_recover_completed_graph_outputs_without_repeating_effects has been running for over 60 seconds
+test isolated_couriers_cannot_read_receiver_keys_and_preserve_graph_recovery has been running for over 60 seconds
+test independent_receiver_processes_recover_completed_graph_outputs_without_repeating_effects ... ok
+test isolated_couriers_cannot_read_receiver_keys_and_preserve_graph_recovery ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 80.55s
+

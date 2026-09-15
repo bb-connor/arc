@@ -1,0 +1,9 @@
+{
+  "buyer": "buyer",
+  "contractSha256": "85ccde4096875807635a07d3db23f28213f611983bc79e22475ffa18cfb60729",
+  "deadline": 1800000001000,
+  "price": 10,
+  "schema": "checked-repair-trade.experimental.v1",
+  "seller": "seller",
+  "tradeId": "chio-seller_withholds"
+}

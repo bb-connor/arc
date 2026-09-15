@@ -1,0 +1,58 @@
+[
+  {
+    "slot_sha256": "0ed4f2b4dfabcbc63228caac0f86fc4b3b00b531e6174997c03b031792edbddb",
+    "rule_sha256": "931993dc37b305f14d975cce2df20b519add0a3b1e6e5852150a99837ecbb680",
+    "rule_json": {
+      "slot": {
+        "receiverId": "4e68614e741dc29e76316d2d1dc53e7ede811766dd6a118e8ba30d60c59495e7",
+        "workflowId": "repair-read-policy",
+        "stepId": "publish-approved-scope"
+      },
+      "predecessorStepId": "verify-owner-scope-contract",
+      "verifierKey": "ee36e7ad911353300215912f3c644c0b8524edb2b475aba8b18813bd18de716c",
+      "contractSha256": "f2bc1cb96338832ee4cdba2242ad96c25fefea5fe18536eb42ff88df8dfc2cd1",
+      "serverId": "artifact-registry",
+      "toolName": "publish",
+      "resource": "review-queue",
+      "validFromUnixMs": 1789310339209,
+      "validUntilUnixMs": 1789310639209
+    },
+    "revoked": 0,
+    "claim_sha256": "bd3691ef19a1fe608ff38573eab1c2cef4245d2df884d68b7de22769c485e9e1",
+    "claim_json": {
+      "slot": {
+        "receiverId": "4e68614e741dc29e76316d2d1dc53e7ede811766dd6a118e8ba30d60c59495e7",
+        "workflowId": "repair-read-policy",
+        "stepId": "publish-approved-scope"
+      },
+      "ruleSha256": "931993dc37b305f14d975cce2df20b519add0a3b1e6e5852150a99837ecbb680",
+      "evidenceSha256": "3ec6f4ecbf4097a997012adcd987165ba81a3402157b040631807f1bada5baaa",
+      "arguments": {
+        "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+        "resource": "review-queue"
+      },
+      "requestId": "kernel-publish-dispatch",
+      "claimedAtUnixMs": 1789310339928
+    },
+    "result_sha256": "d71c819daf913ec9c77277e05d90dd6c00b34e8e355a462c83cca1c6d99837ad",
+    "result_json": {
+      "effectClaim": {
+        "arguments": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "resource": "review-queue"
+        },
+        "claimedAtUnixMs": 1789310339928,
+        "evidenceSha256": "3ec6f4ecbf4097a997012adcd987165ba81a3402157b040631807f1bada5baaa",
+        "requestId": "kernel-publish-dispatch",
+        "ruleSha256": "931993dc37b305f14d975cce2df20b519add0a3b1e6e5852150a99837ecbb680",
+        "slot": {
+          "receiverId": "4e68614e741dc29e76316d2d1dc53e7ede811766dd6a118e8ba30d60c59495e7",
+          "stepId": "publish-approved-scope",
+          "workflowId": "repair-read-policy"
+        }
+      },
+      "publishedArtifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+      "resource": "review-queue"
+    }
+  }
+]

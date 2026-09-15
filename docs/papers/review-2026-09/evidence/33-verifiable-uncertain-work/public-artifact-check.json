@@ -1,0 +1,10 @@
+{
+  "applicationSeedsOrTlsPrivateKeysExported": false,
+  "enrollments": 19,
+  "incidents": 3,
+  "legacyBearerCredentialsExported": false,
+  "meaning": "Expected application peers are supplied separately by the fixture operator. Work inputs are public test data. Incidents are historical attestations, not proof of no effect or authority to release payment.",
+  "roleDatabasesExported": false,
+  "signedIncidentDenials": 30,
+  "work": 14
+}

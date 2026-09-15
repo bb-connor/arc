@@ -1,0 +1,320 @@
+    Finished `dev` profile [unoptimized] target(s) in 0.63s
+     Running `target/debug/chio-outcome-ledger-comparison --repair-git-recovery examples/outcome-ledger-comparison/fixtures/git-hook-repair/base .`
+GIT_PUBLICATION_KILL pid=3720929 phase=before_claim
+GIT_PUBLICATION_KILL pid=3721541 phase=before_claim
+GIT_PUBLICATION_KILL pid=3722119 phase=after_claim
+GIT_PUBLICATION_KILL pid=3722814 phase=after_claim
+GIT_PUBLICATION_KILL pid=3723262 phase=after_ref
+GIT_PUBLICATION_KILL pid=3723720 phase=after_ref
+GIT_PUBLICATION_KILL pid=3724149 phase=after_complete
+GIT_PUBLICATION_KILL pid=3724644 phase=after_complete
+GIT_PUBLICATION_KILL pid=3725176 phase=after_claim
+GIT_PUBLICATION_KILL pid=3726110 phase=after_claim
+GIT_PUBLICATION_KILL pid=3727121 phase=after_claim
+GIT_PUBLICATION_KILL pid=3727541 phase=after_claim
+GIT_PUBLICATION_KILL pid=3728005 phase=after_claim
+GIT_PUBLICATION_KILL pid=3728238 phase=after_claim
+GIT_PUBLICATION_KILL pid=3728439 phase=after_claim
+GIT_PUBLICATION_KILL pid=3728618 phase=after_claim
+GIT_PUBLICATION_KILL pid=3728845 phase=after_claim
+GIT_PUBLICATION_KILL pid=3729079 phase=after_claim
+GIT_PUBLICATION_KILL pid=3729375 phase=after_claim
+GIT_PUBLICATION_KILL pid=3729651 phase=after_claim
+GIT_PUBLICATION_KILL pid=3729930 phase=after_claim
+GIT_PUBLICATION_KILL pid=3730120 phase=after_claim
+{
+  "checkedCommitCases": 14,
+  "experiment": "receiver-checked-git-publication-recovery",
+  "gateSeparationObserved": false,
+  "genericPermitReconstructed": false,
+  "limits": [
+    "Receiver, checker, adapter, store and host are trusted",
+    "One exclusive receiver-owned SHA-256 Git reference; no reset, rollback or ABA guarantee",
+    "Generic gate remains claimed after permit loss; Git observation is a separate domain result",
+    "Revocation prevents new claims but does not cancel the fixed CAS already accepted by a claim",
+    "Process kills at observed boundaries, not power loss or interruption inside Git ref transactions",
+    "No arbitrary-effect exactly-once claim, remote Git push, deployment or integration-effort advantage"
+  ],
+  "pairedScenarios": [
+    {
+      "case": "before_claim",
+      "chio": {
+        "accepted": true,
+        "claimIdentitySubstitutionsRejected": false,
+        "finalGateState": "completed",
+        "finalPublications": 1,
+        "initialGateState": "waiting",
+        "initialPublications": 0,
+        "observedPublished": true,
+        "repeatPreservedState": true
+      },
+      "ledger": {
+        "accepted": true,
+        "claimIdentitySubstitutionsRejected": false,
+        "finalGateState": "completed",
+        "finalPublications": 1,
+        "initialGateState": "waiting",
+        "initialPublications": 0,
+        "observedPublished": true,
+        "repeatPreservedState": true
+      }
+    },
+    {
+      "case": "after_claim",
+      "chio": {
+        "accepted": true,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 1,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": true,
+        "repeatPreservedState": true
+      },
+      "ledger": {
+        "accepted": true,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 1,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": true,
+        "repeatPreservedState": true
+      }
+    },
+    {
+      "case": "after_ref",
+      "chio": {
+        "accepted": true,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 1,
+        "initialGateState": "claimed",
+        "initialPublications": 1,
+        "observedPublished": true,
+        "repeatPreservedState": true
+      },
+      "ledger": {
+        "accepted": true,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 1,
+        "initialGateState": "claimed",
+        "initialPublications": 1,
+        "observedPublished": true,
+        "repeatPreservedState": true
+      }
+    },
+    {
+      "case": "after_complete",
+      "chio": {
+        "accepted": true,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "completed",
+        "finalPublications": 1,
+        "initialGateState": "completed",
+        "initialPublications": 1,
+        "observedPublished": true,
+        "repeatPreservedState": true
+      },
+      "ledger": {
+        "accepted": true,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "completed",
+        "finalPublications": 1,
+        "initialGateState": "completed",
+        "initialPublications": 1,
+        "observedPublished": true,
+        "repeatPreservedState": true
+      }
+    },
+    {
+      "case": "race_after_claim",
+      "chio": {
+        "accepted": true,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 1,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": true,
+        "repeatPreservedState": true
+      },
+      "ledger": {
+        "accepted": true,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 1,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": true,
+        "repeatPreservedState": true
+      }
+    },
+    {
+      "case": "revoked_after_claim",
+      "chio": {
+        "accepted": true,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 1,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": true,
+        "repeatPreservedState": true
+      },
+      "ledger": {
+        "accepted": true,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 1,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": true,
+        "repeatPreservedState": true
+      }
+    },
+    {
+      "case": "changed_source",
+      "chio": {
+        "accepted": false,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 0,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": false,
+        "repeatPreservedState": true
+      },
+      "ledger": {
+        "accepted": false,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 0,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": false,
+        "repeatPreservedState": true
+      }
+    },
+    {
+      "case": "changed_target",
+      "chio": {
+        "accepted": false,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 0,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": false,
+        "repeatPreservedState": true
+      },
+      "ledger": {
+        "accepted": false,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 0,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": false,
+        "repeatPreservedState": true
+      }
+    },
+    {
+      "case": "conflicting_ref",
+      "chio": {
+        "accepted": false,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 0,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": false,
+        "repeatPreservedState": true
+      },
+      "ledger": {
+        "accepted": false,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 0,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": false,
+        "repeatPreservedState": true
+      }
+    },
+    {
+      "case": "symbolic_ref",
+      "chio": {
+        "accepted": false,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 0,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": false,
+        "repeatPreservedState": true
+      },
+      "ledger": {
+        "accepted": false,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 0,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": false,
+        "repeatPreservedState": true
+      }
+    },
+    {
+      "case": "missing_object",
+      "chio": {
+        "accepted": false,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 0,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": false,
+        "repeatPreservedState": true
+      },
+      "ledger": {
+        "accepted": false,
+        "claimIdentitySubstitutionsRejected": true,
+        "finalGateState": "claimed",
+        "finalPublications": 0,
+        "initialGateState": "claimed",
+        "initialPublications": 0,
+        "observedPublished": false,
+        "repeatPreservedState": true
+      }
+    },
+    {
+      "case": "revoked_before_claim",
+      "chio": {
+        "accepted": false,
+        "claimIdentitySubstitutionsRejected": false,
+        "finalGateState": "waiting",
+        "finalPublications": 0,
+        "initialGateState": "waiting",
+        "initialPublications": 0,
+        "observedPublished": false,
+        "repeatPreservedState": true
+      },
+      "ledger": {
+        "accepted": false,
+        "claimIdentitySubstitutionsRejected": false,
+        "finalGateState": "waiting",
+        "finalPublications": 0,
+        "initialGateState": "waiting",
+        "initialPublications": 0,
+        "observedPublished": false,
+        "repeatPreservedState": true
+      }
+    }
+  ],
+  "receiverChecks": 2,
+  "recoveryRacersPerBackend": 8,
+  "sigkills": 22
+}
+Repair evidence: /tmp/.tmpXqPMhV

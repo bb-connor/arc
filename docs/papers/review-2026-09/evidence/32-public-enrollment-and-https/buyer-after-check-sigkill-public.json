@@ -1,0 +1,458 @@
+{
+  "available": 900,
+  "buyerVerified": true,
+  "creditProfile": "provider-local-credit-checked-or-zero-v1",
+  "delivery": {
+    "checkpoint": {
+      "body": {
+        "batch_end_seq": 3,
+        "batch_start_seq": 1,
+        "chain_root": "0x19576c19b5db04d5b710be56bab187adf11c7a516d5821d70bb02987040c30d8",
+        "checkpoint_seq": 1,
+        "issued_at": 1789341406,
+        "kernel_key": "1272628d062c335db5f77011833c40323d391dfc58325991f1a647f67f1332c2",
+        "merkle_root": "0x194bea1ada4318ccfab09cdbb2fff2635846afb800ae216012ec90f74811bbcf",
+        "schema": "chio.checkpoint_statement.v2",
+        "tree_size": 3
+      },
+      "signature": "11e223873e0dcc686ecc5d5ed518ab709d613318471de44b41df2b331aba6d52df136fd8138356b8cc881fe22669dbb0bf26098ebc635b49187b0b634e2ce308"
+    },
+    "finding": {
+      "bond_ref": "unbacked:517d5582be78fb171098a4d98bde50b50edb733038b385d99720bcb5739f994c",
+      "descriptor": {
+        "context_sha256": "517d5582be78fb171098a4d98bde50b50edb733038b385d99720bcb5739f994c",
+        "outcome_class": "positive_result",
+        "topic": "security:openapi:authentication-declarations"
+      },
+      "evidence_checkpoint_ref": "6c7bfe60071b171321ed1b1deb845195ab13a28614ba275e78b382fa25dc5aba",
+      "evidence_class": "observed",
+      "evidence_cost": {
+        "currency": "TST",
+        "units": 100
+      },
+      "evidence_receipt_ids": [
+        "4d820482e73387656a18376545624d1a5d8f6d95667a1f04b2b6a00d86f25774"
+      ],
+      "expires_at": 1789342001,
+      "finding_id": "cfe85c3b658a0ffed2d902b792305742fc8d97f4924092dca8171bd9b6aa9004",
+      "guarantee_class": "deterministic_replay",
+      "issued_at": 1789341405,
+      "issuer": "1272628d062c335db5f77011833c40323d391dfc58325991f1a647f67f1332c2",
+      "payload_media_type": "application/json",
+      "payload_sha256": "fbf15decfbcd3b7e0409ff0637136019c030eecc32cb2196dcee8531c5ffca26",
+      "replay_recipe_sha256": "3110129713e3204698d7dbc6d55d167928359e4cc75ce9597e64942ecd4ad035",
+      "schema": "chio.finding.v1",
+      "signature": "10dde5efc11630c46cea36cd6a7571ca821e7749ac4141f03402969c0ac51e79a238aad293eb14f4f7cb7462902325dd0559a20b7fb9bba9c9e2b7d35d58a401",
+      "status_feed_ref": "local-job:security-review-001"
+    },
+    "inclusion": {
+      "checkpoint_seq": 1,
+      "leaf_index": 2,
+      "merkle_root": "0x194bea1ada4318ccfab09cdbb2fff2635846afb800ae216012ec90f74811bbcf",
+      "proof": {
+        "audit_path": [
+          "0x6d8cc3331a23d796b7163214f9917608a0e15c59526975bd793021740dd11220"
+        ],
+        "leaf_index": 2,
+        "tree_size": 3
+      },
+      "receipt_seq": 3
+    },
+    "receipt": {
+      "action": {
+        "parameter_hash": "0730af71f35c2aee5145e747cfe78090eba364f336e929b6b999034cc8c4057f",
+        "parameters": {
+          "acceptance": {
+            "accepted": {
+              "body": {
+                "acceptedAt": 1789341404,
+                "agentId": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955",
+                "askDigest": "41480bd36326dd55b1671d4bfb44b3fb11bdfe8c7550f9a09391109a66fe92f2",
+                "bidDigest": "33eadd57d10f3b63a0012a4eddda70e6cda159232c753f8f4c85689b8a9fb20b",
+                "bidReceiptId": "hold-517d5582be78fb171098a4d98bde50b50edb733038b385d99720bcb5739f994c",
+                "listingId": "security-review-v1",
+                "quotedPrice": {
+                  "currency": "TST",
+                  "units": 100
+                },
+                "schema": "chio.marketplace.accepted-bid.v1",
+                "tokenExpiresAt": 1789342001,
+                "tokenId": "work-b21c8ce55c064471ab4d29b365da96d9ecfca495d4e5bab57231883e4b318ff0",
+                "tokenSubject": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955"
+              },
+              "signature": "1a3411f7a0569e809caa1ff4769d9838253a39e197b2f246b7faeaa03a24b9a2b2f16182a3e40742feacd4db8f001b90f99ac69abbc1c2bcc991375cdfe3d706",
+              "signerKey": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955"
+            },
+            "ask": {
+              "body": {
+                "agentId": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955",
+                "bidDigest": "33eadd57d10f3b63a0012a4eddda70e6cda159232c753f8f4c85689b8a9fb20b",
+                "expiresAt": 1789342001,
+                "issuedAt": 1789341404,
+                "listingId": "security-review-v1",
+                "quotedPrice": {
+                  "currency": "TST",
+                  "units": 100
+                },
+                "schema": "chio.marketplace.ask-response.v1",
+                "tokenOffer": {
+                  "expires_at": 1789342001,
+                  "id": "work-b21c8ce55c064471ab4d29b365da96d9ecfca495d4e5bab57231883e4b318ff0",
+                  "issued_at": 1789341404,
+                  "issuer": "1272628d062c335db5f77011833c40323d391dfc58325991f1a647f67f1332c2",
+                  "schema": "chio.capability.v1",
+                  "scope": {
+                    "grants": [
+                      {
+                        "dpop_required": true,
+                        "max_cost_per_invocation": {
+                          "currency": "TST",
+                          "units": 100
+                        },
+                        "max_invocations": 1,
+                        "max_total_cost": {
+                          "currency": "TST",
+                          "units": 100
+                        },
+                        "operations": [
+                          "invoke"
+                        ],
+                        "server_id": "security-review-provider",
+                        "tool_name": "review"
+                      }
+                    ]
+                  },
+                  "signature": "5a70f1829812e700f7c237848a63ef52f6db2f007c04ca1d0b64a0143a6fe791b05118713820a5f9dc6911c09d14ae720c78bfad6a7fb9e416053a6f136b6c04",
+                  "subject": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955"
+                }
+              },
+              "signature": "d4c83779ff3097724e70d0445bdce7039f861bdd08913dc040dda624760a094bdbf347a33ba1de9e57233915d94430b9fbe83f4cc75d7c4ce5ef3f21b781c205",
+              "signerKey": "1272628d062c335db5f77011833c40323d391dfc58325991f1a647f67f1332c2"
+            },
+            "quote": {
+              "agreement": {
+                "buyer": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955",
+                "checker": "openapi-explicit-auth-v1",
+                "creditProfile": "provider-local-credit-checked-or-zero-v1",
+                "deadline": 1789342001,
+                "inputSha256": "952c8a7286a67c8d9d67735bf05d3d083f70ad2d8d744346692de6c92d7ebeb6",
+                "jobId": "security-review-001",
+                "priceCeiling": 200,
+                "profile": "chio.example.security-review-agreement.v3",
+                "provider": "1272628d062c335db5f77011833c40323d391dfc58325991f1a647f67f1332c2",
+                "subcontracting": false
+              },
+              "bid": {
+                "body": {
+                  "agentId": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955",
+                  "issuedAt": 1789341404,
+                  "listingId": "security-review-v1",
+                  "maxPricePerCall": {
+                    "currency": "TST",
+                    "units": 200
+                  },
+                  "requestedScope": {
+                    "capabilityScopePrefix": "tools:security-review:517d5582be78fb171098a4d98bde50b50edb733038b385d99720bcb5739f994c",
+                    "maxInvocations": 1,
+                    "serverId": "security-review-provider",
+                    "toolName": "review"
+                  },
+                  "schema": "chio.marketplace.bid-request.v1",
+                  "windowSeconds": 597
+                },
+                "signature": "c43f64483f6fe22ba32a63686dc5a03b65830d47b02fb8a1f0b920a13f599db83d54e70719b935ead6f10c7b3552b7340d2053a68a76b1517740a2a20f57ad0b",
+                "signerKey": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955"
+              }
+            },
+            "reservation": {
+              "body": {
+                "agentId": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955",
+                "askDigest": "41480bd36326dd55b1671d4bfb44b3fb11bdfe8c7550f9a09391109a66fe92f2",
+                "listingId": "security-review-v1",
+                "receiptId": "hold-517d5582be78fb171098a4d98bde50b50edb733038b385d99720bcb5739f994c",
+                "reservedAmount": {
+                  "currency": "TST",
+                  "units": 100
+                },
+                "schema": "chio.marketplace.reservation-receipt.v1"
+              },
+              "signature": "e8fed8acf35f427414b133045799a403e7149483c22b7d98b603cc25dfbe5e3cb2684d4925b53e347ee5ab0957641112661a78cbaff5d9611d7ae3824d36250d",
+              "signerKey": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955"
+            }
+          },
+          "input": "{\n  \"openapi\": \"3.1.0\",\n  \"info\": {\"title\": \"Example company payments API\", \"version\": \"1.0.0\"},\n  \"components\": {\"securitySchemes\": {\"serviceToken\": {\"type\": \"http\", \"scheme\": \"bearer\"}}},\n  \"security\": [{\"serviceToken\": []}],\n  \"paths\": {\n    \"/accounts\": {\"get\": {\"responses\": {\"200\": {\"description\": \"Accounts\"}}}},\n    \"/refunds\": {\"post\": {\"security\": [], \"responses\": {\"201\": {\"description\": \"Refund staged\"}}}},\n    \"/health\": {\"get\": {\"security\": [{}, {\"serviceToken\": []}], \"responses\": {\"200\": {\"description\": \"Healthy\"}}}},\n    \"/sessions\": {\"delete\": {\"security\": [{\"serviceToken\": []}], \"responses\": {\"204\": {\"description\": \"Session ended\"}}}}\n  }\n}\n"
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "work-b21c8ce55c064471ab4d29b365da96d9ecfca495d4e5bab57231883e4b318ff0",
+      "content_hash": "fbf15decfbcd3b7e0409ff0637136019c030eecc32cb2196dcee8531c5ffca26",
+      "decision": {
+        "verdict": "allow"
+      },
+      "id": "4d820482e73387656a18376545624d1a5d8f6d95667a1f04b2b6a00d86f25774",
+      "kernel_key": "1272628d062c335db5f77011833c40323d391dfc58325991f1a647f67f1332c2",
+      "metadata": {
+        "admission_operation": {
+          "compensation_status": "not_compensated",
+          "coordinator_lease_epoch": 1,
+          "coordinator_lease_id": "01a09d0f-07ef-7683-b76b-973a62267541",
+          "operation_id": "fb5b2bced0c745819d0d543f0165febb948cc18082e2ee689fcd15229978fad4",
+          "projected_dispatch_state": "terminal",
+          "projected_operation_version": 8,
+          "projected_state": "completed",
+          "request_binding_hash": "f2b7312cc2f635ca15e56aa2b5adde9686b58a5dab9da8c465ba09e308bf16b4",
+          "request_id": "e642264ab363df7f39c6ca6346564fa5",
+          "request_namespace_digest": "44c31152460240f29ee8b0e288c09bce875f33e834a048ae83f17130c21aa843",
+          "retained_dispatch_commit": {
+            "committed_version": 6,
+            "coordinator_lease_epoch": 1,
+            "coordinator_lease_id": "01a09d0f-07ef-7683-b76b-973a62267541",
+            "provider_attempt": {
+              "attempt_id": "attempt:fb5b2bced0c745819d0d543f0165febb948cc18082e2ee689fcd15229978fad4",
+              "operation_id": "fb5b2bced0c745819d0d543f0165febb948cc18082e2ee689fcd15229978fad4",
+              "transport_id": "kernel-tool-server:security-review-provider",
+              "transport_key_epoch": 1
+            },
+            "store_fence": {
+              "lease_id": "01a09d0f-07ef-7683-b76b-973a62267541",
+              "owner_epoch": 1,
+              "store_uuid": "01a09d0f-060f-7623-b600-e61560859191"
+            }
+          },
+          "schema": "chio.admission-receipt.v1",
+          "store_fence": {
+            "lease_id": "01a09d0f-07ef-7683-b76b-973a62267541",
+            "owner_epoch": 1,
+            "store_uuid": "01a09d0f-060f-7623-b600-e61560859191"
+          },
+          "tool_outcome_id": "ecfd5246d4d6bea2e0aab6330b32d36f96adcd3fd27aba157226fa2734cf67ea",
+          "tool_outcome_version": 2,
+          "trusted_time_unix_ms": 1789341405631
+        },
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "1272628d062c335db5f77011833c40323d391dfc58325991f1a647f67f1332c2",
+          "subject_key": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955"
+        },
+        "chio_receipt_signing_nonce": "rcpt-01a09d0f-125c-7d62-831b-e7d2c381fec5",
+        "financial": {
+          "budget_remaining": 0,
+          "budget_total": 100,
+          "cost_breakdown": {
+            "payment": {
+              "authorization_id": "hold:c140556f420c9079a5e9b5b49e7df097a8d8745ae16dc2e61e815d7eb3bfd82a",
+              "preauthorized_units": 100,
+              "rail": "finding-operator-ledger",
+              "rail_mode": "reversible_hold",
+              "recorded_units": 100,
+              "transaction_id": "capture:91c3d16d0032ddc1ff2319dce8ff6914f5bea3fe980eb4244d73f9e67fad7eb6"
+            }
+          },
+          "cost_charged": 100,
+          "currency": "TST",
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "payment_reference": "capture:91c3d16d0032ddc1ff2319dce8ff6914f5bea3fe980eb4244d73f9e67fad7eb6",
+          "root_budget_holder": "1272628d062c335db5f77011833c40323d391dfc58325991f1a647f67f1332c2",
+          "settlement_status": "settled"
+        },
+        "receipt_context": {
+          "request_id": "e642264ab363df7f39c6ca6346564fa5"
+        },
+        "route_selection": {
+          "candidates": [
+            {
+              "available": true,
+              "routeId": "native-route",
+              "selectedProtocols": [
+                "a2a",
+                "native"
+              ],
+              "targetProtocol": "native"
+            }
+          ],
+          "decision": "select",
+          "requestedTargetProtocol": "native",
+          "routeSelectionId": "9a0cb76316f8630556bf5b9c4564cc7d39dcf785dad729c3a9b74c07375b5a7f",
+          "selectedProtocols": [
+            "a2a",
+            "native"
+          ],
+          "selectedRouteId": "native-route",
+          "selectedTargetProtocol": "native",
+          "sourceProtocol": "a2a"
+        }
+      },
+      "policy_hash": "6cf455be7d7033f1577b67daec5dbbe66842e7da787182877725060e91439cbc",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "305e9a268475cde41cab979ddd7af56023d870bce72f91cf803564e8b9d8593098abbcab12e59f52643e36871ef7a14592b77ce559c5dd00d62566375726560d",
+      "timestamp": 1789341405,
+      "tool_name": "review",
+      "tool_origin": "caller_executed",
+      "tool_server": "security-review-provider",
+      "trust_level": "mediated"
+    },
+    "report": {
+      "body": {
+        "acceptedBidSha256": "9ca7acf79fba29751f11498a938da201e133f372bc5673c06d9599a408c76f3f",
+        "agreementSha256": "517d5582be78fb171098a4d98bde50b50edb733038b385d99720bcb5739f994c",
+        "checker": "openapi-explicit-auth-v1",
+        "inputSha256": "952c8a7286a67c8d9d67735bf05d3d083f70ad2d8d744346692de6c92d7ebeb6",
+        "operations": [
+          {
+            "authenticationRequired": true,
+            "method": "get",
+            "path": "/accounts"
+          },
+          {
+            "authenticationRequired": false,
+            "method": "get",
+            "path": "/health"
+          },
+          {
+            "authenticationRequired": false,
+            "method": "post",
+            "path": "/refunds"
+          },
+          {
+            "authenticationRequired": true,
+            "method": "delete",
+            "path": "/sessions"
+          }
+        ],
+        "schema": "chio.example.openapi-auth-review.v1"
+      },
+      "signature": "b8ef93ac4e2128d3d11083ae7b1c743ea1085d0ba6dc59db2f02a1b271d7d031ce8271b447c3a125b229d09d99aaa44f0cf559e00d12ed35160f7c9da2d3580f",
+      "signerKey": "1272628d062c335db5f77011833c40323d391dfc58325991f1a647f67f1332c2"
+    }
+  },
+  "externalFundsTransferred": false,
+  "localCreditSettled": true,
+  "request": {
+    "acceptance": {
+      "accepted": {
+        "body": {
+          "acceptedAt": 1789341404,
+          "agentId": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955",
+          "askDigest": "41480bd36326dd55b1671d4bfb44b3fb11bdfe8c7550f9a09391109a66fe92f2",
+          "bidDigest": "33eadd57d10f3b63a0012a4eddda70e6cda159232c753f8f4c85689b8a9fb20b",
+          "bidReceiptId": "hold-517d5582be78fb171098a4d98bde50b50edb733038b385d99720bcb5739f994c",
+          "listingId": "security-review-v1",
+          "quotedPrice": {
+            "currency": "TST",
+            "units": 100
+          },
+          "schema": "chio.marketplace.accepted-bid.v1",
+          "tokenExpiresAt": 1789342001,
+          "tokenId": "work-b21c8ce55c064471ab4d29b365da96d9ecfca495d4e5bab57231883e4b318ff0",
+          "tokenSubject": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955"
+        },
+        "signature": "1a3411f7a0569e809caa1ff4769d9838253a39e197b2f246b7faeaa03a24b9a2b2f16182a3e40742feacd4db8f001b90f99ac69abbc1c2bcc991375cdfe3d706",
+        "signerKey": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955"
+      },
+      "ask": {
+        "body": {
+          "agentId": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955",
+          "bidDigest": "33eadd57d10f3b63a0012a4eddda70e6cda159232c753f8f4c85689b8a9fb20b",
+          "expiresAt": 1789342001,
+          "issuedAt": 1789341404,
+          "listingId": "security-review-v1",
+          "quotedPrice": {
+            "currency": "TST",
+            "units": 100
+          },
+          "schema": "chio.marketplace.ask-response.v1",
+          "tokenOffer": {
+            "expires_at": 1789342001,
+            "id": "work-b21c8ce55c064471ab4d29b365da96d9ecfca495d4e5bab57231883e4b318ff0",
+            "issued_at": 1789341404,
+            "issuer": "1272628d062c335db5f77011833c40323d391dfc58325991f1a647f67f1332c2",
+            "schema": "chio.capability.v1",
+            "scope": {
+              "grants": [
+                {
+                  "dpop_required": true,
+                  "max_cost_per_invocation": {
+                    "currency": "TST",
+                    "units": 100
+                  },
+                  "max_invocations": 1,
+                  "max_total_cost": {
+                    "currency": "TST",
+                    "units": 100
+                  },
+                  "operations": [
+                    "invoke"
+                  ],
+                  "server_id": "security-review-provider",
+                  "tool_name": "review"
+                }
+              ]
+            },
+            "signature": "5a70f1829812e700f7c237848a63ef52f6db2f007c04ca1d0b64a0143a6fe791b05118713820a5f9dc6911c09d14ae720c78bfad6a7fb9e416053a6f136b6c04",
+            "subject": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955"
+          }
+        },
+        "signature": "d4c83779ff3097724e70d0445bdce7039f861bdd08913dc040dda624760a094bdbf347a33ba1de9e57233915d94430b9fbe83f4cc75d7c4ce5ef3f21b781c205",
+        "signerKey": "1272628d062c335db5f77011833c40323d391dfc58325991f1a647f67f1332c2"
+      },
+      "quote": {
+        "agreement": {
+          "buyer": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955",
+          "checker": "openapi-explicit-auth-v1",
+          "creditProfile": "provider-local-credit-checked-or-zero-v1",
+          "deadline": 1789342001,
+          "inputSha256": "952c8a7286a67c8d9d67735bf05d3d083f70ad2d8d744346692de6c92d7ebeb6",
+          "jobId": "security-review-001",
+          "priceCeiling": 200,
+          "profile": "chio.example.security-review-agreement.v3",
+          "provider": "1272628d062c335db5f77011833c40323d391dfc58325991f1a647f67f1332c2",
+          "subcontracting": false
+        },
+        "bid": {
+          "body": {
+            "agentId": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955",
+            "issuedAt": 1789341404,
+            "listingId": "security-review-v1",
+            "maxPricePerCall": {
+              "currency": "TST",
+              "units": 200
+            },
+            "requestedScope": {
+              "capabilityScopePrefix": "tools:security-review:517d5582be78fb171098a4d98bde50b50edb733038b385d99720bcb5739f994c",
+              "maxInvocations": 1,
+              "serverId": "security-review-provider",
+              "toolName": "review"
+            },
+            "schema": "chio.marketplace.bid-request.v1",
+            "windowSeconds": 597
+          },
+          "signature": "c43f64483f6fe22ba32a63686dc5a03b65830d47b02fb8a1f0b920a13f599db83d54e70719b935ead6f10c7b3552b7340d2053a68a76b1517740a2a20f57ad0b",
+          "signerKey": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955"
+        }
+      },
+      "reservation": {
+        "body": {
+          "agentId": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955",
+          "askDigest": "41480bd36326dd55b1671d4bfb44b3fb11bdfe8c7550f9a09391109a66fe92f2",
+          "listingId": "security-review-v1",
+          "receiptId": "hold-517d5582be78fb171098a4d98bde50b50edb733038b385d99720bcb5739f994c",
+          "reservedAmount": {
+            "currency": "TST",
+            "units": 100
+          },
+          "schema": "chio.marketplace.reservation-receipt.v1"
+        },
+        "signature": "e8fed8acf35f427414b133045799a403e7149483c22b7d98b603cc25dfbe5e3cb2684d4925b53e347ee5ab0957641112661a78cbaff5d9611d7ae3824d36250d",
+        "signerKey": "10155f4a1fc2cb40dc5a7e57853c165032b6ebfd14cf179f4594dbb916884955"
+      }
+    },
+    "input": "{\n  \"openapi\": \"3.1.0\",\n  \"info\": {\"title\": \"Example company payments API\", \"version\": \"1.0.0\"},\n  \"components\": {\"securitySchemes\": {\"serviceToken\": {\"type\": \"http\", \"scheme\": \"bearer\"}}},\n  \"security\": [{\"serviceToken\": []}],\n  \"paths\": {\n    \"/accounts\": {\"get\": {\"responses\": {\"200\": {\"description\": \"Accounts\"}}}},\n    \"/refunds\": {\"post\": {\"security\": [], \"responses\": {\"201\": {\"description\": \"Refund staged\"}}}},\n    \"/health\": {\"get\": {\"security\": [{}, {\"serviceToken\": []}], \"responses\": {\"200\": {\"description\": \"Healthy\"}}}},\n    \"/sessions\": {\"delete\": {\"security\": [{\"serviceToken\": []}], \"responses\": {\"204\": {\"description\": \"Session ended\"}}}}\n  }\n}\n"
+  },
+  "reserved": 0,
+  "reviewRejected": false,
+  "spent": 100,
+  "workExecuted": true
+}

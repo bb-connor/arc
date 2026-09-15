@@ -1,0 +1,25 @@
+{
+  "authorizations": [
+    {
+      "effect_json": "{\"artifactSha256\":\"dc9282887a7ddbc649c641e838fd71598ca982f46e907298bda31b2192a8261b\",\"resource\":\"refs/heads/verified-repair\"}",
+      "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"dd4edb64db8d332c9ee081904421a33ebbc3b7ec2de5872cc561fbf9029d9c1f\",\"workflowId\":\"recover-checked-git-repair\",\"stepId\":\"publish\"},\"predecessorStepId\":\"receiver-source-check\",\"contractSha256\":\"00fcbd8ae3ea5ede4af97bbf2a3c009a8d46eedbaa9a16ca89e2cce8bb963e30\",\"artifactSha256\":\"dc9282887a7ddbc649c641e838fd71598ca982f46e907298bda31b2192a8261b\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"b15d814cc8f78dfc47f38415b3bc0263069cba2417715f2a6c8f654da5d726b6a62774dcd9aeef5794e0b294092cf9b9a69f013b9fca8c61a7df2b1bb9322603\"}",
+      "handle": "fd5311cd1319a4ef29ee1e47791ded31f938a24fc546a243aea34b8a8dffa898",
+      "receiver": "dd4edb64db8d332c9ee081904421a33ebbc3b7ec2de5872cc561fbf9029d9c1f",
+      "step": "publish",
+      "workflow": "recover-checked-git-repair"
+    }
+  ],
+  "jobs": [
+    {
+      "claimed_handle": "fd5311cd1319a4ef29ee1e47791ded31f938a24fc546a243aea34b8a8dffa898",
+      "receiver": "dd4edb64db8d332c9ee081904421a33ebbc3b7ec2de5872cc561fbf9029d9c1f",
+      "result_json": "{\"artifactSha256\":\"7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4\",\"commit\":\"a831734e08a6fc8b0797236ccf24d7b9c3d51e6c3be6c9a201d9f99f3ea90cbd\",\"intentSha256\":\"dc9282887a7ddbc649c641e838fd71598ca982f46e907298bda31b2192a8261b\",\"observedPublished\":true,\"reference\":\"refs/heads/verified-repair\",\"schema\":\"observed-git-publication.experimental.v1\"}",
+      "revoked": 0,
+      "rule_digest": "f752a01cdd8db6dfcb4f35bc98458e2c8c29f82a55e322bcaa5d8f57caa8d1cb",
+      "rule_json": "{\"slot\":{\"receiverId\":\"dd4edb64db8d332c9ee081904421a33ebbc3b7ec2de5872cc561fbf9029d9c1f\",\"workflowId\":\"recover-checked-git-repair\",\"stepId\":\"publish\"},\"predecessorStepId\":\"receiver-source-check\",\"verifierKey\":\"dd4edb64db8d332c9ee081904421a33ebbc3b7ec2de5872cc561fbf9029d9c1f\",\"contractSha256\":\"00fcbd8ae3ea5ede4af97bbf2a3c009a8d46eedbaa9a16ca89e2cce8bb963e30\",\"serverId\":\"checked-git-publication\",\"toolName\":\"publish\",\"resource\":\"refs/heads/verified-repair\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+      "state": "completed",
+      "step": "publish",
+      "workflow": "recover-checked-git-repair"
+    }
+  ]
+}

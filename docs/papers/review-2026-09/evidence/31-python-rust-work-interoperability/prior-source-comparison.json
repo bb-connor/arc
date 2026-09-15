@@ -1,0 +1,13 @@
+{
+  "manifest": "docs/papers/review-2026-09/evidence/30-recoverable-checked-output-rejections/manifest.json",
+  "manifestSha256": "010ed09be99a3bc7f9470bb295a04d49b8637bab4dca02549788f5f6b8039964",
+  "previousSourceFiles": 1474,
+  "changedExistingSources": [
+    "docs/papers/evidence-crosses/paper.pdf",
+    "docs/papers/evidence-crosses/sections/01-rule.tex",
+    "docs/papers/review-2026-09/README.md",
+    "examples/federated-work/README.md"
+  ],
+  "nativeRustSourcesChangedSincePriorQualification": false,
+  "previousArtifactsVerified": 59
+}

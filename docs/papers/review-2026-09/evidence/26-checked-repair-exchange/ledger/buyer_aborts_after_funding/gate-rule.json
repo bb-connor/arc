@@ -1,0 +1,15 @@
+{
+  "slot": {
+    "receiverId": "20878c2c7e4fb0bd8109f0205a6ed2a1e8a557b6bd523ee0ae0afdef6bf34e0e",
+    "workflowId": "ledger-buyer_aborts_after_funding",
+    "stepId": "settle"
+  },
+  "predecessorStepId": "check-encrypted-repair",
+  "verifierKey": "20878c2c7e4fb0bd8109f0205a6ed2a1e8a557b6bd523ee0ae0afdef6bf34e0e",
+  "contractSha256": "85ccde4096875807635a07d3db23f28213f611983bc79e22475ffa18cfb60729",
+  "serverId": "local-repair-exchange",
+  "toolName": "settle",
+  "resource": "funded-trade",
+  "validFromUnixMs": 1799999999000,
+  "validUntilUnixMs": 1800000001000
+}
