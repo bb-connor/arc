@@ -76,7 +76,9 @@ def main():
             or response["request_id"] != item["request_id"]
         ):
             raise ValueError(f"{process}: planned read was not allowed")
-        result = response["output"]["structuredContent"]
+        if response["output"]["kind"] != "value":
+            raise ValueError(f"{process}: expected a completed value response")
+        result = response["output"]["value"]["structuredContent"]
         content = result["content"].encode("utf-8")
         digest = hashlib.sha256(content).hexdigest()
         if (result["path"], result["truncated"], len(content), digest) != (
