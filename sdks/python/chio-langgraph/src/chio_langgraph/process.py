@@ -105,6 +105,9 @@ class ChioProcessToolNode(Runnable[dict[str, Any], dict[str, Any]]):
     and control flow. Supply a host-bound ProcessClient; never put its bearer
     credential into graph state or RunnableConfig. Use a persistent LangGraph
     checkpointer and resume with the original thread id after worker restart.
+    The assistant-message checkpoint must commit before dispatch: select
+    durability="sync", or supply stable message and tool-call IDs from durable
+    caller-owned state. Asynchronous checkpointing alone cannot guarantee this.
 
     Supports value and fully materialized stream tool output. Local callbacks,
     injected state/store arguments and tool-produced LangGraph Commands are
@@ -225,8 +228,14 @@ class ChioProcessToolNode(Runnable[dict[str, Any], dict[str, Any]]):
         receipt_json = result.get("receipt_json")
         if not isinstance(receipt_json, str) or not receipt_json:
             raise ChioProcessToolError("missing_receipt")
-        if result.get("verdict") != "allow":
-            raise ChioProcessToolError("kernel_denied", receipt_json=receipt_json)
+        verdict = result.get("verdict")
+        if verdict not in ("allow", "deny", "pending_approval"):
+            raise ChioProcessToolError("invalid_response", receipt_json=receipt_json)
+        if verdict != "allow":
+            raise ChioProcessToolError(
+                "kernel_denied" if verdict == "deny" else "pending_approval",
+                receipt_json=receipt_json,
+            )
         terminal = result.get("terminal_state")
         if not isinstance(terminal, dict) or terminal.get("state") != "completed":
             raise ChioProcessToolError("incomplete", receipt_json=receipt_json)

@@ -152,12 +152,31 @@ def test_invalid_whole_batch_rejects_before_any_dispatch(invalid):
 
 
 @pytest.mark.parametrize(
-    "kind", ["deny", "pending", "incomplete", "missing_receipt", "missing_output", "transport"]
+    "kind",
+    [
+        "deny",
+        "pending",
+        "unknown_verdict",
+        "retained_unknown",
+        "incomplete",
+        "missing_receipt",
+        "missing_output",
+        "transport",
+    ],
 )
 def test_noncompletion_stops_graph_without_becoming_a_new_model_tool_request(kind):
     response = Invoker().invoke("key", "reports", "append", {})
     if kind in {"deny", "pending"}:
         response["verdict"] = "deny" if kind == "deny" else "pending_approval"
+    elif kind == "unknown_verdict":
+        response["verdict"] = "future_verdict"
+    elif kind == "retained_unknown":
+        response.update(
+            verdict="deny",
+            reason="retained_unknown",
+            terminal_state={"state": "completed"},
+            output=None,
+        )
     elif kind == "incomplete":
         response["terminal_state"] = {"state": "incomplete", "reason": "unknown"}
     elif kind == "missing_receipt":
@@ -174,9 +193,22 @@ def test_noncompletion_stops_graph_without_becoming_a_new_model_tool_request(kin
     graph.add_edge("tools", "model")
     graph.add_edge("model", END)
     app = graph.compile(checkpointer=InMemorySaver())
-    with pytest.raises((ChioProcessToolError, ConnectionError)):
+    with pytest.raises((ChioProcessToolError, ConnectionError)) as error:
         app.invoke(state(), {"configurable": {"thread_id": "thread-1"}})
     assert len(client.calls) == 1
+    if kind in {"deny", "pending", "unknown_verdict", "retained_unknown"}:
+        expected = {
+            "deny": "kernel_denied",
+            "pending": "pending_approval",
+            "unknown_verdict": "invalid_response",
+            "retained_unknown": "kernel_denied",
+        }
+        assert error.value.reason == expected[kind]
+        assert error.value.receipt_json == response["receipt_json"]
+        original_calls = list(client.calls)
+        with pytest.raises(ChioProcessToolError):
+            app.invoke(None, {"configurable": {"thread_id": "thread-1"}})
+        assert client.calls == original_calls * 2
 
 
 async def test_async_graph_dispatch_is_off_the_event_loop_and_parallel():

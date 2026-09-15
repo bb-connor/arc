@@ -56,10 +56,10 @@ class ConfiguredChatModel:
         options = {"timeout": config["timeout_seconds"]}
         if target.scheme == "https":
             connection = http.client.HTTPSConnection(
-                target.hostname, target.port, context=ssl.create_default_context(), **options
+                target.hostname, target.port or 443, context=ssl.create_default_context(), **options
             )
         else:
-            connection = http.client.HTTPConnection(target.hostname, target.port, **options)
+            connection = http.client.HTTPConnection(target.hostname, target.port or 80, **options)
         expired = threading.Event()
         active_socket = None
         response = None

@@ -32,3 +32,6 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["chio_mini_swe"]

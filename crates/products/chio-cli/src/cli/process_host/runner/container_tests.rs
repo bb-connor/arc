@@ -110,6 +110,14 @@ fn attachment_error_preserves_authoritative_exit_and_uncertainty(
         (serde_json::json!({}), true, 0),
         (serde_json::json!({"cleanup_failure": true}), true, 1),
         (serde_json::json!({"worker_status": "running"}), false, 0),
+        (serde_json::json!({"worker_status": "dead"}), false, 0),
+        (serde_json::json!({"worker_status": "paused"}), false, 0),
+        (
+            serde_json::json!({"oom_killed": true, "worker_exit": 137}),
+            false,
+            0,
+        ),
+        (serde_json::json!({"changed_identity": true}), false, 1),
         (serde_json::json!({"inspect_failure": true}), false, 1),
     ] {
         let engine = EngineDouble::new(scenario.clone())?;
@@ -117,6 +125,11 @@ fn attachment_error_preserves_authoritative_exit_and_uncertainty(
             .lock()
             .map_err(|_| "attachment lock poisoned")? = Some(attachment_error_after_request);
         let (state, plan) = engine.host()?;
+        if scenario.get("oom_killed").is_some() {
+            let mut definition: serde_json::Value = serde_json::from_slice(&std::fs::read(&plan)?)?;
+            definition["workers"][0]["max_attempts"] = serde_json::json!(1);
+            std::fs::write(&plan, serde_json::to_vec(&definition)?)?;
+        }
         let failure = super::super::run(&state, &plan)
             .err()
             .ok_or("client failure must fail the command")?;
@@ -140,6 +153,15 @@ fn attachment_error_preserves_authoritative_exit_and_uncertainty(
         assert_eq!(snapshot.1, 1, "{scenario}");
         if completed {
             assert_eq!(snapshot.2, "exit_0");
+        }
+        if scenario.get("oom_killed").is_some() {
+            assert_eq!(snapshot.2, "container_memory_ceiling");
+        }
+        if scenario
+            .get("worker_status")
+            .is_some_and(|status| status == "dead" || status == "paused")
+        {
+            assert_eq!(snapshot.2, "container_state_unknown");
         }
         assert!(
             std::fs::read_to_string(state.join("run-logs/root-1.stderr"))?

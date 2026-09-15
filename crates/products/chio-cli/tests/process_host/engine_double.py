@@ -63,8 +63,10 @@ elif args[0] == "start":
     worker_status = scenario.get("worker_status", "exited")
     record.update(
         status=worker_status,
-        running=worker_status == "running",
+        running=worker_status in ("running", "paused"),
         started_at="0001-01-01T00:00:00Z" if worker_status == "created" else "2026-01-01T00:00:00Z",
+        oom_killed=scenario.get("oom_killed", False),
+        exit_code=scenario.get("worker_exit", 0),
     )
     stored.write_text(json.dumps(record))
     print("x" * scenario.get("start_output", 16))
@@ -73,7 +75,10 @@ elif args[0] == "start":
 elif args[:2] == ["container", "inspect"]:
     if scenario.get("inspect_failure") and (root / "starts").exists():
         raise SystemExit("engine inspection unavailable")
-    print(stored.read_text())
+    record = json.loads(stored.read_text())
+    if scenario.get("changed_identity") and (root / "starts").exists():
+        record["id"] = "b" * 64
+    print(json.dumps(record))
 elif args[:2] == ["container", "ls"]:
     if stored.exists():
         print(identity)

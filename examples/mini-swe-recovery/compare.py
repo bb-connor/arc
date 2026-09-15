@@ -18,11 +18,12 @@ import time
 import uuid
 from pathlib import Path
 
+from chio_process.launch import provision_native_demo
+from compare_cleanup import cleanup as cleanup_upstream
+
 from chio_mini_swe.operator import protected_executable
 from chio_mini_swe.repository_archive import git
 from chio_mini_swe.repository_transport import DOCKER, docker
-from chio_process.launch import provision_native_demo
-from compare_cleanup import cleanup as cleanup_upstream
 
 HERE = Path(__file__).resolve().parent
 HARNESS = (

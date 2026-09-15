@@ -12,11 +12,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-from chio_mini_swe.repository_archive import git
-from chio_mini_swe.repository_store import Workspace
 from chio_process import ProcessClient
 from chio_process.launch import provision_native_demo
 from qualify_repository import command
+
+from chio_mini_swe.repository_archive import git
+from chio_mini_swe.repository_store import Workspace
 
 
 @contextlib.contextmanager

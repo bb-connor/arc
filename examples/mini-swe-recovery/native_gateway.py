@@ -17,8 +17,9 @@ args = parser.parse_args()
 # installed in the operator's private environment, not inherited from cwd.
 sys.path.insert(0, str(args.packages))
 
-from chio_mini_swe import gateway  # noqa: E402
 from worker import decisions  # noqa: E402
+
+from chio_mini_swe import gateway  # noqa: E402
 
 
 class SavedModel:

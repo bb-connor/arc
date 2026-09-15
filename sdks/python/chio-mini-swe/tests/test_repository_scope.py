@@ -1,12 +1,13 @@
 import json
 
 import pytest
+from test_repository import commit
+from test_repository import repository as repository
+
 from chio_mini_swe import repository_archive
 from chio_mini_swe import repository_store as store
 from chio_mini_swe.repository_archive import encode_entries, entries, git, import_revision
 from chio_mini_swe.repository_scope import SCOPED_SCHEMA, normalize_source_paths, require_scope
-from test_repository import commit
-from test_repository import repository as repository
 
 
 @pytest.mark.parametrize(
@@ -121,6 +122,7 @@ def test_outside_output_is_not_published_as_a_completed_revision(repository, tmp
     monkeypatch.setattr(store.Workspace, "containers", lambda *_: Outside())
     with store.Workspace(state) as workspace:
         assert workspace.config["schema"] == SCOPED_SCHEMA
+        assert workspace.status()["schema"] == SCOPED_SCHEMA
         original = workspace.status()["snapshot"]
         with pytest.raises(ValueError, match="outside"):
             workspace.execute("create outside file")

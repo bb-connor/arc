@@ -5,6 +5,12 @@ Experimental adapter for mini-SWE-agent 2.4.6. `ChioAgent` inherits the upstream
 commands through a host-selected Chio tool. Model selection, prompt formatting,
 command order, step/cost limits and submission handling remain with mini.
 
+Release note: `ChioExecutionError.reason` exposes the stop reason alongside the
+unchanged signed `receipt_json`. Tool verdict `deny` reports `denied`,
+`pending_approval` reports `pending_approval`, and an unrecognized verdict
+reports `invalid_response`. These failures stop the loop without another model
+request or operation identity. Resume the original durable agent decision.
+
 The [installed session workflow](SESSION.md) connects repository import,
 operator provisioning, native execution and verified patch export through
 `chio-mini-swe session`. It emits an unsigned provisioning request and consumes

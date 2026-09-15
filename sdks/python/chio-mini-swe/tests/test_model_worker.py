@@ -73,29 +73,21 @@ class GatewayProcess(MemoryProcess):
             # The denial decision completed; the retained provider operation did not.
             result["terminal_state"] = {"state": "completed"}
             result["output"] = None
-            result["receipt_json"] = json.dumps(
-                {
-                    "model_operation": key,
-                    "metadata": {
-                        "admission_operation": {
-                            "schema": "chio.admission-receipt.v1",
-                            "operation_id": "a" * 64,
-                            "request_id": key,
-                            "request_namespace_digest": "b" * 64,
-                            "request_binding_hash": "c" * 64,
-                            "projected_operation_version": 7,
-                            "projected_state": "outcome_unknown_after_dispatch",
-                            "projected_dispatch_state": "terminal",
-                            "trusted_time_unix_ms": 1_710_000_000_000,
-                            "coordinator_lease_id": "historical-dispatch",
-                            "coordinator_lease_epoch": 1,
-                            "store_fence": {
-                                "store_uuid": "11111111-1111-4111-8111-111111111111",
-                                "lease_id": "historical-store-owner",
-                                "owner_epoch": 1,
-                            },
-                            "retained_dispatch_commit": {
-                                "committed_version": 6,
+            result["receipt_json"] = (
+                json.dumps(
+                    {
+                        "model_operation": key,
+                        "metadata": {
+                            "admission_operation": {
+                                "schema": "chio.admission-receipt.v1",
+                                "operation_id": "a" * 64,
+                                "request_id": key,
+                                "request_namespace_digest": "b" * 64,
+                                "request_binding_hash": "c" * 64,
+                                "projected_operation_version": 7,
+                                "projected_state": "outcome_unknown_after_dispatch",
+                                "projected_dispatch_state": "terminal",
+                                "trusted_time_unix_ms": 1_710_000_000_000,
                                 "coordinator_lease_id": "historical-dispatch",
                                 "coordinator_lease_epoch": 1,
                                 "store_fence": {
@@ -103,16 +95,27 @@ class GatewayProcess(MemoryProcess):
                                     "lease_id": "historical-store-owner",
                                     "owner_epoch": 1,
                                 },
-                                "provider_attempt": None,
-                            },
-                            "compensation_status": "not_compensated",
-                            "tool_outcome_id": None,
-                            "tool_outcome_version": None,
-                        }
+                                "retained_dispatch_commit": {
+                                    "committed_version": 6,
+                                    "coordinator_lease_id": "historical-dispatch",
+                                    "coordinator_lease_epoch": 1,
+                                    "store_fence": {
+                                        "store_uuid": "11111111-1111-4111-8111-111111111111",
+                                        "lease_id": "historical-store-owner",
+                                        "owner_epoch": 1,
+                                    },
+                                    "provider_attempt": None,
+                                },
+                                "compensation_status": "not_compensated",
+                                "tool_outcome_id": None,
+                                "tool_outcome_version": None,
+                            }
+                        },
                     },
-                },
-                indent=2,
-            ) + "\n"
+                    indent=2,
+                )
+                + "\n"
+            )
         self.operations[key] = (payload, result)
         if self.model_fault is not None:
             error, self.model_fault = self.model_fault, None

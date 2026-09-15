@@ -12,6 +12,7 @@ import threading
 import time
 
 import pytest
+
 from chio_mini_swe.gateway import query
 from chio_mini_swe.model import QUERY_SCHEMA
 from chio_mini_swe.provider import ConfiguredChatModel
@@ -59,6 +60,32 @@ def completion():
         ],
         "usage": {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120},
     }
+
+
+@pytest.mark.parametrize(
+    "endpoint,constructor,host,port",
+    [
+        ("http://[::1]/v1", "HTTPConnection", "::1", 80),
+        ("https://[2001:db8::1]/v1", "HTTPSConnection", "2001:db8::1", 443),
+        ("http://[::1]:8080/v1", "HTTPConnection", "::1", 8080),
+        ("https://[2001:db8::1]:8443/v1", "HTTPSConnection", "2001:db8::1", 8443),
+    ],
+)
+def test_ipv6_connection_uses_explicit_default_or_selected_port(
+    monkeypatch, endpoint, constructor, host, port
+):
+    class ConstructorReached(Exception):
+        pass
+
+    def connect(actual_host, actual_port, **options):
+        assert (actual_host, actual_port) == (host, port)
+        assert options["timeout"] == 2
+        raise ConstructorReached
+
+    monkeypatch.setenv("CHIO_TEST_PROVIDER_KEY", "test-only")
+    monkeypatch.setattr(http.client, constructor, connect)
+    with pytest.raises(ConstructorReached):
+        ConfiguredChatModel(dict(config(endpoint), allow_loopback_http=True)).query([])
 
 
 @contextlib.contextmanager

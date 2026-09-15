@@ -240,7 +240,7 @@ class Workspace:
             )
         ]
         return {
-            "schema": SCHEMA,
+            "schema": self.config["schema"],
             "id": self.config["id"],
             "source_commit": self.config["source_commit"],
             **dict(current),

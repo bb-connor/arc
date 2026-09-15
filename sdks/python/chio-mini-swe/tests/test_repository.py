@@ -6,6 +6,7 @@ import sqlite3
 import tarfile
 
 import pytest
+
 from chio_mini_swe import repository_store as store
 from chio_mini_swe.repository import export, serve
 from chio_mini_swe.repository_archive import (
@@ -182,6 +183,7 @@ def test_legacy_workspace_still_reads_writes_and_exports_full_archives(
         workspace.execute("change")
     with store.Workspace(state) as workspace:
         assert workspace.config["schema"] == store.SCHEMA
+        assert workspace.status()["schema"] == "chio.repository.workspace.v1"
         assert workspace.snapshot(workspace.config["baseline"]) == baseline
         key = workspace.status()["snapshot"]
         assert (state / "snapshots" / key).read_bytes() == changed
@@ -212,6 +214,7 @@ def test_snapshot_storage_failure_never_advances_workspace(
     monkeypatch.setattr(store.Workspace, "containers", lambda *_: Completed())
     with store.Workspace(state) as workspace:
         before = workspace.status()
+        assert before["schema"] == "chio.repository.workspace.v2"
         original = workspace.snapshot(before["snapshot"])
         if failure == "admission_budget":
             monkeypatch.setattr(store, "MAX_STORAGE", workspace.snapshot_store.usage())

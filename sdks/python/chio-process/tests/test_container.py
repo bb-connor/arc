@@ -22,6 +22,36 @@ from chio_process.container import (
 
 
 class ContainerLifecycle(unittest.TestCase):
+    def test_terminal_state_and_exact_identity_matrix(self):
+        for status, oom, changed, completed in [
+            ("exited", True, False, True),
+            ("dead", False, False, False),
+            ("paused", False, False, False),
+            ("exited", False, True, False),
+        ]:
+            with self.subTest(status=status, oom=oom, changed=changed):
+                self.run_boundary(
+                    status,
+                    status == "paused",
+                    "2026-01-01T00:00:00Z",
+                    0,
+                    False,
+                    completed,
+                    oom=oom,
+                    changed_identity=changed,
+                )
+
+    def test_operator_environment_is_explicit_and_generic(self):
+        for environment in [
+            {"APPLICATION_MODE": "test", "EMPTY": ""},
+            {f"K{i}": "x" for i in range(64)},
+            {"A" * 128: "x" * 4096},
+            {key: "x" * 4093 for key in "ABCD"},
+        ]:
+            self.run_boundary(
+                "exited", False, "2026-01-01T00:00:00Z", 0, False, True, environment=environment
+            )
+
     def test_observed_worker_state_and_cleanup(self):
         cases = [
             ("created", False, "0001-01-01T00:00:00Z", 1, False, False),
@@ -65,12 +95,15 @@ class ContainerLifecycle(unittest.TestCase):
         completed,
         output_limit=False,
         wait_failure=False,
+        oom=False,
+        changed_identity=False,
+        environment=None,
     ):
         image = "sha256:" + "1" * 64
         identity = "2" * 64
         nonce = "3" * 32
         record = {
-            "Id": identity,
+            "Id": "4" * 64 if changed_identity else identity,
             "Name": f"/chio-worker-{nonce}",
             "Image": image,
             "Config": {"Labels": {"chio.worker.owner": nonce}, "User": "1000:1000"},
@@ -78,8 +111,8 @@ class ContainerLifecycle(unittest.TestCase):
                 "Status": status,
                 "Running": running,
                 "StartedAt": started,
-                "ExitCode": 0,
-                "OOMKilled": False,
+                "ExitCode": 137 if oom else 0,
+                "OOMKilled": oom,
             },
             "HostConfig": {
                 "NetworkMode": "none",
@@ -100,17 +133,24 @@ class ContainerLifecycle(unittest.TestCase):
             "SecurityOptions": ["name=seccomp,profile=builtin"],
         }
 
+        removed = []
+
         def docker(*args, **kwargs):
             if args[0] == "info":
                 value = engine
             elif args[:2] == ("image", "inspect"):
                 value = [{"Id": image, "Config": {}}]
             elif args[0] == "create":
+                values = [args[i + 1] for i, arg in enumerate(args) if arg == "--env"]
+                self.assertFalse(any(value.startswith("MSWEA_") for value in values))
+                for key, value in (environment or {}).items():
+                    self.assertIn(f"{key}={value}", values)
                 return SimpleNamespace(stdout=identity.encode(), returncode=0, stderr=b"")
             elif args[0] == "inspect":
                 value = [record]
             elif args[0] == "rm":
-                self.assertEqual(args, ("rm", "--force", "--volumes", identity))
+                removed.append(args[-1])
+                self.assertEqual(args, ("rm", "--force", "--volumes", record["Id"]))
                 if cleanup_failure:
                     raise ContainerWorkerError("cleanup unavailable")
                 return SimpleNamespace(stdout=b"", returncode=0, stderr=b"")
@@ -153,9 +193,13 @@ class ContainerLifecycle(unittest.TestCase):
                     connection={"socket_path": "/tmp/worker.sock", "credential": "test-only"},
                     program=b"pass",
                     max_output_bytes=32 if output_limit else 65536,
+                    **({"environment": environment} if environment is not None else {}),
                 )
             except ContainerWorkerError as failure:
                 result = getattr(failure, "result", None)
+                if changed_identity:
+                    self.assertEqual(removed, [], "replacement container must not be removed")
+                self.assertEqual(failure.cleanup_pending, cleanup_failure or changed_identity)
                 if output_limit:
                     self.assertIn("output limit", str(failure))
                 if not completed:
@@ -166,7 +210,7 @@ class ContainerLifecycle(unittest.TestCase):
                 self.assertTrue(completed, "never-started or unknown worker was reported completed")
                 self.assertFalse(cleanup_failure)
             self.assertIsNotNone(result, "known completion was discarded by cleanup")
-            self.assertEqual(result.exit_code, 0)
+            self.assertEqual(result.exit_code, 137 if oom else 0)
 
     def test_collect_timeout_and_output_bound(self):
         for code, timeout, maximum, message in [
@@ -237,9 +281,81 @@ class ContainerLifecycle(unittest.TestCase):
                             control.call_args.args, ("rm", "--force", "--volumes", identity)
                         )
 
+    def test_cleanup_checks_created_id_when_original_name_is_absent(self):
+        identity = "2" * 64
+        removed = []
+
+        def docker(*args, **kwargs):
+            if args == ("inspect", "old-name"):
+                return SimpleNamespace(returncode=1, stderr=b"No such object: old-name")
+            if args == ("inspect", identity):
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout=json.dumps(
+                        [
+                            {
+                                "Id": identity,
+                                "Name": "/renamed",
+                                "Config": {"Labels": {"chio.worker.owner": "ours"}},
+                            }
+                        ]
+                    ).encode(),
+                )
+            if args == ("rm", "--force", "--volumes", identity):
+                removed.append(identity)
+                return SimpleNamespace(returncode=0)
+            self.fail(args)
+
+        with patch("chio_process.container._docker", side_effect=docker):
+            _remove_owned("old-name", "ours", identity)
+        self.assertEqual(removed, [identity], "name absence cannot prove the created ID is gone")
+
 
 @unittest.skipUnless(platform.system() == "Linux", "Linux Docker worker profile")
 class ContainerBoundaryInputs(unittest.TestCase):
+    def test_missing_socket_is_uniform_invalid_input(self):
+        with patch("chio_process.container.os.getuid", return_value=1000):
+            for connection in (
+                {"credential": "test-only"},
+                {"socket_path": None, "credential": "test-only"},
+            ):
+                with self.subTest(connection=connection), self.assertRaises(ValueError):
+                    run_container_worker(
+                        image="sha256:" + "1" * 64, connection=connection, program=b"pass"
+                    )
+
+    def test_environment_validation_precedes_engine_access(self):
+        cases = [
+            [],
+            {"": "x"},
+            {"9BAD": "x"},
+            {"A=B": "x"},
+            {"A\0": "x"},
+            {"A" * 129: "x"},
+            {"A": 1},
+            {"A": "x\0"},
+            {"A": "x" * 4097},
+            {"A": "\ud800"},
+            {f"K{i}": "x" for i in range(65)},
+            {f"K{i}": "é" * 2048 for i in range(5)},
+        ]
+        with (
+            patch("chio_process.container.os.getuid", return_value=1000),
+            patch("chio_process.container._docker") as docker,
+        ):
+            for environment in cases:
+                with (
+                    self.subTest(environment=repr(environment)[:60]),
+                    self.assertRaises(ValueError),
+                ):
+                    run_container_worker(
+                        image="sha256:" + "1" * 64,
+                        connection={"socket_path": "/tmp/unopened.sock", "credential": "test-only"},
+                        program=b"pass",
+                        environment=environment,
+                    )
+            docker.assert_not_called()
+
     @unittest.skipIf(os.getuid() == 0, "non-root operator profile")
     def test_unenforceable_resource_limits_stop_before_image_or_worker_creation(self):
         engine = {

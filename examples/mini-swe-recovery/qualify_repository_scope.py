@@ -34,15 +34,16 @@ def main():
     print("Private scoped repository state: " + str(root), file=sys.stderr, flush=True)
     os.environ["MSWEA_GLOBAL_CONFIG_DIR"] = str(root / "mini-config")
     os.environ["MSWEA_SILENT_STARTUP"] = "1"
+    from chio_process import ProcessClient
+    from chio_process.launch import provision_native_demo
+    from qualify import command, serving
+
     from chio_mini_swe.repository import export
     from chio_mini_swe.repository_archive import entries, git, import_revision
     from chio_mini_swe.repository_proof import verified_receipts, verify
     from chio_mini_swe.repository_review import verify_export
     from chio_mini_swe.repository_store import Workspace, initialize
     from chio_mini_swe.repository_transport import docker
-    from chio_process import ProcessClient
-    from chio_process.launch import provision_native_demo
-    from qualify import command, serving
 
     binary = args.chio.resolve(strict=True)
     images = json.loads(args.worker_image_file.read_text())

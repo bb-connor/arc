@@ -64,6 +64,13 @@ host artifact directory and no persistent Docker log stream.
 
 ## Lifetime and recovery
 
+The optional `environment` argument is an operator-selected string dictionary:
+at most 64 entries, names matching `[A-Za-z_][A-Za-z0-9_]{0,127}`, values of at
+most 4096 UTF-8 bytes with no NUL, and at most 16384 total UTF-8 bytes including
+each `=` and terminating NUL. Proxy variables are cleared by the launcher.
+Generic workers receive no mini-SWE-specific variables; the mini-SWE launcher
+supplies its own configuration directory and silent-startup values explicitly.
+
 The operator removes the actual container on normal completion, nonzero exit,
 timeout or output overflow. It closes the Docker attachment before removing the
 container so an unread output pipe cannot block cleanup. Killing the Docker
@@ -71,6 +78,11 @@ client alone never establishes that the worker stopped. Completion requires the
 owned exact container ID, an actual start timestamp and an exited, non-running
 worker state. Never-started and unknown states cannot report success. An
 independently confirmed worker exit survives an attachment-client failure.
+
+An OOM-killed worker with a confirmed exited state returns the engine's exact
+exit code (commonly 137) in `ContainerResult`, including when an exception
+retains that result. Python does not normalize OOM into a separate success or
+retry classification. Dead or paused states cannot establish completion.
 
 Diagnostic and cleanup errors raise `ContainerWorkerError`. Its optional
 `result` retains an already observed `ContainerResult`; callers must reconcile
@@ -80,6 +92,10 @@ Successful completion does not waive that cleanup debt. The exception provides
 in-process evidence only; this helper still has no durable journal. Cleanup
 uses the inspected exact ID and treats only a specific missing-object reply as
 absence; unrelated daemon errors retain uncertainty.
+
+Release note: cleanup now also requires the validated create ID when available.
+A replacement container is retained and reported with `cleanup_pending=True`.
+Diagnostic failure after successful removal keeps `cleanup_pending=False`.
 
 The operator process must remain alive to enforce its wall-clock deadline and
 perform cleanup. Abrupt death of that operator, loss of Docker or loss of the

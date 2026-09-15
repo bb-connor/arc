@@ -6,6 +6,12 @@ or host failure. The adapter supplies AI SDK tool definitions and awaits the
 guarded result. Requires Node 22+, AI SDK 6 or 7, and the native Linux process
 host. This package is experimental; registry publication is a separate step.
 
+Release note: `ModelJournalError.code` adds `model_configuration_invalid` for
+invalid `maxModelCalls`, `maxCheckpointBytes`, `maxResponseBytes`, or
+`responseStorage`. Configuration refusal leaves persisted reservations unchanged.
+Actual capacity exhaustion remains `model_journal_full`; a valid blob mode
+without host support remains `model_storage_unavailable`.
+
 ## Install into an existing AI SDK application
 
 Install the local package tarballs alongside your application's AI SDK:

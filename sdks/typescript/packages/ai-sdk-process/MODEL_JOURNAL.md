@@ -7,6 +7,13 @@ The application supplies its model and original turn input. A worker restart
 replays recorded responses through the same SDK loop, recovers native tool
 results, and requests the next unrecorded model response.
 
+Inline stream capture cancels once encoded metadata and chunks exceed the
+smaller of `maxCheckpointBytes` and `maxResponseBytes`. The full checkpoint,
+including other retained state and response overhead, is also bounded before
+commit. Blob capture uses `maxResponseBytes` and retains the complete response
+in immutable bounded chunks. Capacity refusal preserves the pending model
+reservation; it does not authorize a replacement provider request.
+
 ## Application contract
 
 Construct a fresh `ChioProcessAgent` for each OS attempt and call `run` once.

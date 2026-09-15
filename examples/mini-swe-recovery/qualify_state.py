@@ -24,11 +24,12 @@ def main():
     os.environ["MSWEA_GLOBAL_CONFIG_DIR"] = str(root / "mini-config")
     os.environ["MSWEA_SILENT_STARTUP"] = "1"
     # Configure the fixture before importing upstream's global configuration.
-    from chio_mini_swe.operator import AdministrativeState
-    from chio_mini_swe.state import SCHEMA, Journal, encode
     from chio_process import ProcessClient, WorkerError
     from chio_process.launch import demo_python, provision_native_demo
     from qualify import command, serving
+
+    from chio_mini_swe.operator import AdministrativeState
+    from chio_mini_swe.state import SCHEMA, Journal, encode
 
     binary = args.chio.resolve(strict=True)
     policy = root / "policy.yaml"

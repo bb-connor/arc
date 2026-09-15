@@ -15,12 +15,13 @@ import tempfile
 import time
 from pathlib import Path
 
-from chio_mini_swe import ChioModel, ChioModelError
-from chio_mini_swe.state import Journal
-from chio_mini_swe.worker import SCHEMA, export_result
 from chio_process import ProcessClient
 from chio_process.launch import demo_python, provision_native_demo
 from qualify import command, serving
+
+from chio_mini_swe import ChioModel, ChioModelError
+from chio_mini_swe.state import Journal
+from chio_mini_swe.worker import SCHEMA, export_result
 
 HERE = Path(__file__).resolve().parent
 DOCKER = ["/usr/bin/docker", "--host", "unix:///var/run/docker.sock"]
@@ -303,7 +304,9 @@ def read_state(binary, directory, unknown=False):
         except ChioModelError as error:
             assert error.receipt_json
             receipt = json.loads(error.receipt_json)
-            assert receipt["metadata"]["admission_operation"]["schema"] == "chio.admission-receipt.v1"
+            assert (
+                receipt["metadata"]["admission_operation"]["schema"] == "chio.admission-receipt.v1"
+            )
             assert (
                 receipt["metadata"]["admission_operation"]["projected_state"]
                 == "outcome_unknown_after_dispatch"

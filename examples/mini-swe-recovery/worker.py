@@ -6,9 +6,10 @@ import os
 import signal
 from pathlib import Path
 
-from chio_mini_swe import ChioAgent, ChioEnvironment
 from chio_process import ProcessClient
 from minisweagent.models.test_models import DeterministicToolcallModel, make_toolcall_output
+
+from chio_mini_swe import ChioAgent, ChioEnvironment
 
 
 def decisions():

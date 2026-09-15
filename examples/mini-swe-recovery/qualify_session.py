@@ -14,9 +14,10 @@ import threading
 import time
 from pathlib import Path
 
+from chio_process.launch import provision_native_demo
+
 from chio_mini_swe.repository_archive import git
 from chio_mini_swe.repository_transport import docker
-from chio_process.launch import provision_native_demo
 
 DIAGNOSTICS = None
 

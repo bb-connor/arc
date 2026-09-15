@@ -11,6 +11,7 @@ from chio_mini_swe.state import digest, encode
 class ChioExecutionError(RuntimeError):
     def __init__(self, reason: str, receipt_json: str | None = None):
         super().__init__(f"Chio command stopped: {reason}")
+        self.reason = reason
         self.receipt_json = receipt_json
 
 
@@ -76,8 +77,11 @@ class ChioEnvironment:
         if not isinstance(receipt, str) or not receipt:
             raise ChioExecutionError("missing receipt")
         self.receipts.append(receipt)
-        if result.get("verdict") != "allow":
-            raise ChioExecutionError("denied", receipt)
+        verdict = result.get("verdict")
+        if verdict not in ("allow", "deny", "pending_approval"):
+            raise ChioExecutionError("invalid_response", receipt)
+        if verdict != "allow":
+            raise ChioExecutionError("denied" if verdict == "deny" else "pending_approval", receipt)
         if result.get("terminal_state", {}).get("state") != "completed":
             raise ChioExecutionError("unknown or incomplete outcome", receipt)
         output = result.get("output")

@@ -9,8 +9,9 @@ import sys
 import time
 from pathlib import Path
 
-from chio_mini_swe.worker import build_agent, load_bootstrap, run_bootstrap
 from minisweagent.agents.default import DefaultAgent
+
+from chio_mini_swe.worker import build_agent, load_bootstrap, run_bootstrap
 
 bootstrap = load_bootstrap(sys.stdin.buffer)
 assert not os.environ.get("CHIO_MODEL_QUALIFICATION_SECRET")

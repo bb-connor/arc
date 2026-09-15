@@ -8,10 +8,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from chio_mini_swe import repository_container, repository_store, session, session_security
-from chio_mini_swe.repository_archive import git
 from test_provider import config as provider_config
 from test_repository import commit
+
+from chio_mini_swe import repository_container, repository_store, session, session_security
+from chio_mini_swe.repository_archive import git
 
 
 @pytest.fixture

@@ -1,10 +1,11 @@
 import hashlib
 
 import pytest
-from chio_mini_swe.state import SCHEMA, Journal, encode
 from chio_process import WorkerError
 from chio_process.snapshot import SCHEMA as SNAPSHOT_SCHEMA
 from test_recovery import MemoryProcess
+
+from chio_mini_swe.state import SCHEMA, Journal, encode
 
 
 def state():

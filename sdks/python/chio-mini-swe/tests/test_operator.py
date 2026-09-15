@@ -3,8 +3,9 @@
 import json
 
 import pytest
-from chio_mini_swe.operator import prepare, prepared
 from test_provider import config
+
+from chio_mini_swe.operator import prepare, prepared
 
 
 @pytest.fixture

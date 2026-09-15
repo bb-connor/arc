@@ -6,6 +6,7 @@ import os
 import random
 
 import pytest
+
 from chio_mini_swe import repository_snapshots as snapshots
 from chio_mini_swe.repository_archive import encode_entries
 from chio_mini_swe.repository_store import atomic_bytes

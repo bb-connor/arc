@@ -4,10 +4,11 @@ import hashlib
 import json
 
 import pytest
-from chio_mini_swe import ChioAgent, ChioEnvironment, ChioExecutionError
-from chio_mini_swe.state import encode
 from minisweagent.exceptions import FormatError
 from minisweagent.models.test_models import DeterministicModel, make_output
+
+from chio_mini_swe import ChioAgent, ChioEnvironment, ChioExecutionError
+from chio_mini_swe.state import encode
 
 
 class MemoryProcess:
@@ -145,18 +146,37 @@ def test_changed_task_and_stale_writer_refuse_before_dispatch():
     assert stale.model.current_index == changed.model.current_index == -1
 
 
-def test_denial_cannot_become_an_observation_or_replanning_request():
+@pytest.mark.parametrize(
+    "verdict,reason",
+    [
+        ("deny", "denied"),
+        ("pending_approval", "pending_approval"),
+        ("future_verdict", "invalid_response"),
+    ],
+)
+def test_denial_cannot_become_an_observation_or_replanning_request(verdict, reason):
     client = MemoryProcess()
     client.denied = True
+    invoke = client.invoke
+
+    def refused(*args):
+        result = invoke(*args)
+        result.update(verdict=verdict, output=None)
+        return result
+
+    client.invoke = refused
     first = agent(client, [response("forbidden"), FINISH])
-    with pytest.raises(ChioExecutionError, match="denied") as error:
+    with pytest.raises(ChioExecutionError, match=reason) as error:
         first.run("Fix it")
     resumed = agent(client, [FINISH])
-    with pytest.raises(ChioExecutionError, match="denied") as again:
+    operations = dict(client.operations)
+    with pytest.raises(ChioExecutionError, match=reason) as again:
         resumed.run("Fix it")
     assert error.value.receipt_json == again.value.receipt_json
+    assert error.value.reason == again.value.reason == reason
     assert resumed.model.current_index == -1
     assert client.effects == ["forbidden"]
+    assert client.operations == operations
 
 
 def test_upstream_format_error_cost_limit_and_completion_semantics_survive():
@@ -186,16 +206,22 @@ def test_missing_blob_and_unbound_environment_fail_closed():
     assert len(client.effects) == 1
 
 
-def test_unknown_tool_outcome_stops_without_replanning():
+@pytest.mark.parametrize(
+    "verdict,terminal,reason", [("allow", "unknown", "unknown"), ("deny", "completed", "denied")]
+)
+def test_unknown_tool_outcome_stops_without_replanning(verdict, terminal, reason):
     client = MemoryProcess()
     client.interrupt = RuntimeError("lost reply")
     with pytest.raises(RuntimeError, match="lost reply"):
         agent(client, [response("append")]).run("Fix it")
     _, stored = next(iter(client.operations.values()))
-    stored["terminal_state"] = {"state": "unknown"}
+    # The denial decision completed, while the underlying operation remains unknown.
+    stored["terminal_state"] = {"state": terminal}
+    stored.update(verdict=verdict, reason="retained_unknown", output=None)
     resumed = agent(client, [FINISH])
-    with pytest.raises(ChioExecutionError, match="unknown"):
+    with pytest.raises(ChioExecutionError, match=reason) as error:
         resumed.run("Fix it")
+    assert error.value.receipt_json == stored["receipt_json"]
     assert client.effects == ["append"]
     assert resumed.model.current_index == -1
 

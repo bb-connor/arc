@@ -103,13 +103,14 @@ def _collect(process, timeout, maximum):
     return bytes(output)
 
 
-def _remove_owned(name, nonce):
-    inspected = _docker("inspect", name, check=False)
+def _remove_owned(name, nonce, expected_id=None):
+    target = expected_id or name
+    inspected = _docker("inspect", target, check=False)
     if inspected.returncode:
         # A daemon error is not proof that a possibly created worker is gone.
         message = inspected.stderr.decode("utf-8", errors="replace").strip()
         absent = {
-            f"{prefix}No such {kind}: {name}"
+            f"{prefix}No such {kind}: {target}"
             for prefix in ("", "Error: ", "Error response from daemon: ")
             for kind in ("object", "container")
         }
@@ -117,6 +118,8 @@ def _remove_owned(name, nonce):
             raise ContainerWorkerError(f"Could not confirm worker cleanup: {name}")
         return
     record = json.loads(inspected.stdout)[0]
+    if expected_id is not None and record.get("Id") != expected_id:
+        raise ContainerWorkerError("Refusing cleanup of a replacement container")
     if record["Config"]["Labels"].get("chio.worker.owner") != nonce:
         raise ContainerWorkerError("Refusing cleanup of a container with another owner")
     if not isinstance(record.get("Id"), str) or re.fullmatch(r"[a-f0-9]{64}", record["Id"]) is None:
@@ -130,6 +133,7 @@ def run_container_worker(
     connection: dict,
     program: bytes,
     arguments: list[str] | None = None,
+    environment: dict[str, str] | None = None,
     timeout: int = 120,
     max_output_bytes: int = 2 * 1024 * 1024,
 ) -> ContainerResult:
@@ -156,7 +160,32 @@ def run_container_worker(
         or any(not isinstance(arg, str) or "\0" in arg or len(arg) > 4096 for arg in arguments)
     ):
         raise ValueError("Invalid worker arguments")
-    socket_path = _private_socket(connection["socket_path"])
+    if environment is not None and (
+        not isinstance(environment, dict)
+        or len(environment) > 64
+        or any(
+            not isinstance(key, str)
+            or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", key) is None
+            or not isinstance(value, str)
+            or "\0" in value
+            for key, value in environment.items()
+        )
+    ):
+        raise ValueError("Invalid worker environment")
+    environment = dict(environment or {})
+    try:
+        sizes = [
+            len(key.encode("utf-8")) + len(value.encode("utf-8")) + 2
+            for key, value in environment.items()
+        ]
+        if (
+            any(len(value.encode("utf-8")) > 4096 for value in environment.values())
+            or sum(sizes) > 16384
+        ):
+            raise ValueError("Worker environment exceeds its byte limit")
+    except UnicodeEncodeError:
+        raise ValueError("Worker environment must contain valid UTF-8") from None
+    socket_path = _private_socket(connection.get("socket_path"))
     credential = connection.get("credential")
     if not isinstance(credential, str) or not credential or len(credential) > 8192:
         raise ValueError("A private process credential is required")
@@ -247,10 +276,6 @@ def run_container_worker(
             "--env",
             "HOME=/work",
             "--env",
-            "MSWEA_GLOBAL_CONFIG_DIR=/work/mini-config",
-            "--env",
-            "MSWEA_SILENT_STARTUP=1",
-            "--env",
             "PYTHONDONTWRITEBYTECODE=1",
             "--mount",
             f"type=bind,src={socket_path},dst=/run/chio/process.sock,readonly",
@@ -259,6 +284,8 @@ def run_container_worker(
             "--mount",
             f"type=bind,src={source},dst=/app/worker.py,readonly",
         ]
+        for key, value in environment.items():
+            create.extend(["--env", f"{key}={value}"])
         for key in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"):
             for spelling in (key, key.lower()):
                 create.extend(["--env", f"{spelling}="])
@@ -266,12 +293,14 @@ def run_container_worker(
             ["--entrypoint", "/usr/local/bin/python", image, "-u", "/app/worker.py", *arguments]
         )
         attached = None
+        owned_id = None
         result = None
         diagnostic = None
         try:
             container_id = _docker(*create).stdout.decode().strip()
             if re.fullmatch(r"[a-f0-9]{64}", container_id) is None:
                 raise ContainerWorkerError("Docker returned an invalid container identity")
+            owned_id = container_id
             attached = subprocess.Popen(
                 [*DOCKER, "start", "--attach", container_id],
                 stdout=subprocess.PIPE,
@@ -353,7 +382,7 @@ def run_container_worker(
                     attached.stdout.close()
                 # Killing the client never substitutes for killing the worker.
                 try:
-                    _remove_owned(name, nonce)
+                    _remove_owned(name, nonce, owned_id)
                 except Exception as failure:
                     raise ContainerWorkerError(
                         f"Worker cleanup remains unresolved: {failure}",

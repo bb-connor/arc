@@ -8,8 +8,9 @@ import signal
 import sys
 from pathlib import Path
 
-from chio_mini_swe.worker import build_agent, load_bootstrap, run_bootstrap
 from minisweagent.agents.default import DefaultAgent
+
+from chio_mini_swe.worker import build_agent, load_bootstrap, run_bootstrap
 
 
 def main():

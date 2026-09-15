@@ -60,11 +60,11 @@ export class ModelJournal {
     this.#maxBytes = options.maxCheckpointBytes ?? 1_048_576;
     this.#onFailure = onFailure;
     this.#maxResponseBytes = options.maxResponseBytes ?? 8_388_608;
-    if (!["auto", "checkpoint", "blobs"].includes(options.responseStorage ?? "auto")) throw new ModelJournalError("model_storage_unavailable");
+    if (!["auto", "checkpoint", "blobs"].includes(options.responseStorage ?? "auto")) throw new ModelJournalError("model_configuration_invalid");
     if (!Number.isInteger(this.#maxCalls) || this.#maxCalls < 1 || this.#maxCalls > 128 ||
         !Number.isInteger(this.#maxBytes) || this.#maxBytes < 4096 || this.#maxBytes > 1_048_576 || !Number.isInteger(this.#maxResponseBytes) ||
         this.#maxResponseBytes < 4096 || this.#maxResponseBytes > 67_108_864) {
-      throw new ModelJournalError("model_journal_full");
+      throw new ModelJournalError("model_configuration_invalid");
     }
   }
 
@@ -278,6 +278,9 @@ export class ModelJournal {
       const reader = ReadableStream.prototype.getReader.call(stream) as ReadableStreamDefaultReader<Part>;
       const chunks: Part[] = [], held: Part[] = [];
       let bytes = Buffer.byteLength(JSON.stringify(encode(metadata))), hold = false, finishes = 0;
+      // Inline capture cannot persist more than a checkpoint. The complete
+      // checkpoint is still bounded at write time, including all other state.
+      const captureLimit = this.#useBlobs ? this.#maxResponseBytes : Math.min(this.#maxBytes, this.#maxResponseBytes);
       const abort = () => { void reader.cancel().catch(() => {}); };
       options.params.abortSignal?.addEventListener("abort", abort, { once: true });
       if (options.params.abortSignal?.aborted) abort();
@@ -285,13 +288,14 @@ export class ModelJournal {
         start: controller => {
           const capture = this.#tracked((async () => {
             try {
+              if (bytes > captureLimit) throw new ModelJournalError("model_journal_full");
               while (true) {
                 const next = await reader.read();
                 if (options.params.abortSignal?.aborted) throw new ModelJournalError("model_aborted");
                 if (next.done) break;
                 const wire = encode(next.value);
                 bytes += Buffer.byteLength(JSON.stringify(wire));
-                if (bytes > this.#maxResponseBytes) throw new ModelJournalError("model_journal_full");
+                if (bytes > captureLimit) throw new ModelJournalError("model_journal_full");
                 const part = restored<Part>(wire);
                 if (part.type === "error" || ("providerExecuted" in part && part.providerExecuted) || part.type === "tool-result") {
                   throw new ModelJournalError("model_response_invalid");

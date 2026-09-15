@@ -5,12 +5,13 @@ import json
 import os
 
 import pytest
+from test_repository import commit, legacy_snapshots
+
 from chio_mini_swe import repository_review as review
 from chio_mini_swe import repository_store as store
 from chio_mini_swe.repository import export
 from chio_mini_swe.repository_archive import digest, encode_entries, entries, git
 from chio_mini_swe.repository_proof import bindings, output_digest
-from test_repository import commit, legacy_snapshots
 
 
 @pytest.fixture(params=["v1", "v2", "v3"])

@@ -65,6 +65,12 @@ reducer assigns message ids; a persistent checkpointer retains them across
 restart. Recreating an earlier prompt and asking the model for a new plan is
 a new operation, not recovery. Keep the namespace stable when resuming.
 
+Recovery requires the assistant-message checkpoint to commit before tool
+dispatch. Use `durability="sync"` with the persistent checkpointer, or supply
+stable assistant message and tool-call IDs from durable caller-owned state.
+An asynchronous checkpoint can be lost after a tool effect; regenerated IDs
+would identify a new operation and cannot recover the original effect.
+
 Tool name and arguments are excluded from the identity hash so changing them
 under a persisted call id produces a kernel conflict rather than another
 effect. Credential rotation likewise preserves the operation key. The host
@@ -78,6 +84,10 @@ pending approvals and incomplete results raise and stop the graph. They must
 not be converted to a new model tool request to retry an uncertain effect.
 Previously admitted siblings may finish; resume the original checkpoint to
 recover their results under the same identities.
+
+Release note: `ChioProcessToolError.reason` now distinguishes `pending_approval`
+from `kernel_denied`. An unrecognized verdict yields `invalid_response`. All
+three retain the signed receipt and stop graph execution without replanning.
 
 The node supports at most 64 calls per assistant message and up to 32 active
 client calls per batch, with a default of four. RunnableConfig's

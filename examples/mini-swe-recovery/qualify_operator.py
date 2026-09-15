@@ -15,10 +15,11 @@ import tempfile
 import threading
 from pathlib import Path
 
-from chio_mini_swe.provider_config import SCHEMA, identity
 from chio_process.launch import demo_python, provision_native_demo
 from qualify import command
 from worker import decisions
+
+from chio_mini_swe.provider_config import SCHEMA, identity
 
 HERE = Path(__file__).resolve().parent
 DOCKER = ["/usr/bin/docker", "--host", "unix:///var/run/docker.sock"]

@@ -24,6 +24,10 @@ class ContainerAttempts:
             image=self.image,
             connection=self.connection,
             program=program,
+            environment={
+                "MSWEA_GLOBAL_CONFIG_DIR": "/work/mini-config",
+                "MSWEA_SILENT_STARTUP": "1",
+            },
             **kwargs,
         )
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
-import { generateText, streamText, stepCountIs } from "ai";
+import { APICallError, generateText, streamText, stepCountIs } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { WorkerError } from "@chio-protocol/process";
 import { ChioProcessAgent, ModelJournalError, MODEL_JOURNAL_SLOT } from "../dist/index.js";
@@ -139,6 +139,100 @@ test("checkpoint conflicts and oversized responses fail before tool execution", 
   const large = new MockLanguageModelV4({ doGenerate: async () => response([toolCall(), { type: "text", text: "x".repeat(6000) }]) });
   await assert.rejects(agent(full, large, { maxCheckpointBytes: 4096 }).run(generate), code("model_journal_full"));
   assert.equal(full.publications, 0);
+});
+
+test("invalid journal configuration is distinct from capacity exhaustion and leaves reservations unchanged", async () => {
+  const host = client(), counter = { calls: 0 };
+  await assert.rejects(agent(host, new MockLanguageModelV4({ doGenerate: async () => { throw new Error("lost reply"); } })).run(generate), code("model_outcome_unknown"));
+  const reserved = host.value;
+  for (const options of [
+    { maxModelCalls: 0 }, { maxModelCalls: 129 }, { maxModelCalls: 1.5 },
+    { maxCheckpointBytes: 4095 }, { maxCheckpointBytes: 1_048_577 }, { maxCheckpointBytes: NaN },
+    { maxResponseBytes: 4095 }, { maxResponseBytes: 67_108_865 }, { maxResponseBytes: Infinity },
+    { responseStorage: "invalid" },
+  ]) {
+    await assert.rejects(async () => agent(host, model(counter), options).run(generate), code("model_configuration_invalid"));
+    assert.deepEqual(host.value, reserved);
+  }
+  assert.equal(counter.calls, 0);
+});
+
+test("inline stream capture cancels at its representation limit while blob storage retains the same response", async () => {
+  for (const [storage, host, blobs] of [
+    ["checkpoint", blobClient(), false], ["auto", client(), false],
+    ["blobs", blobClient(), true], ["auto", blobClient(), true],
+  ]) {
+    let reads = 0, cancelled = 0, calls = 0, releasedToolCalls = 0;
+    const supplied = [
+      toolCall(),
+      ...Array.from({ length: 32 }, () => ({ type: "text-delta", id: "text", delta: "x".repeat(1024) })),
+      { type: "finish", usage, finishReason: { unified: "tool-calls", raw: "fixture" } },
+    ];
+    const provider = new MockLanguageModelV4({ doStream: async () => {
+      calls++;
+      return { stream: new ReadableStream({
+        pull(controller) { reads++; if (reads <= supplied.length) controller.enqueue(supplied[reads - 1]); else controller.close(); },
+        cancel() { cancelled++; },
+      }, { highWaterMark: 0 }) };
+    } });
+    // Exercise middleware directly so consumption counts are independent of SDK buffering.
+    const { ModelJournal } = await import("../dist/model-journal.js");
+    const journal = new ModelJournal({ ...scope, client: host, maxCheckpointBytes: 4096, maxResponseBytes: 65536, responseStorage: storage }, () => {});
+    const middleware = journal.middleware();
+    const consume = async () => {
+      const result = await middleware.wrapStream({ model: provider, params: { prompt: [] }, doStream: () => provider.doStream({ prompt: [] }) });
+      for await (const part of result.stream) { if (part.type === "tool-call") releasedToolCalls++; }
+    };
+    if (blobs) {
+      await consume(); await journal.finish(true);
+      assert.equal(reads, supplied.length + 1);
+      assert.equal(cancelled, 0);
+      assert.equal(releasedToolCalls, 1);
+    } else {
+      await assert.rejects(consume(), code("model_journal_full"));
+      await assert.rejects(journal.finish(false), code("model_journal_full"));
+      assert.ok(reads <= 5, `read ${reads} chunks beyond the inline representation limit`);
+      assert.equal(cancelled, 1);
+      assert.equal(releasedToolCalls, 0, "no tool call may reach the executor before durable completion");
+      const reservation = host.value;
+      assert.equal(Object.values(reservation[MODEL_JOURNAL_SLOT].turns)[0].entries[0].state, "pending");
+      const resumed = new ModelJournal({ ...scope, client: host }, () => {});
+      await assert.rejects(resumed.middleware().wrapStream({ model: provider, params: { prompt: [] }, doStream: () => provider.doStream({ prompt: [] }) }), code("model_outcome_unknown"));
+      await assert.rejects(resumed.finish(false), code("model_outcome_unknown"));
+      assert.deepEqual(host.value, reservation);
+    }
+    assert.equal(calls, 1); assert.equal(host.publications, 0);
+  }
+});
+
+test("oversized inline stream metadata is cancelled before its first read", async () => {
+  const { ModelJournal } = await import("../dist/model-journal.js");
+  const host = client(); let reads = 0, cancelled = 0;
+  const provider = new MockLanguageModelV4({ doStream: async () => ({
+    request: { body: "x".repeat(8192) },
+    stream: new ReadableStream({ pull() { reads++; }, cancel() { cancelled++; } }, { highWaterMark: 0 }),
+  }) });
+  const journal = new ModelJournal({ ...scope, client: host, maxCheckpointBytes: 4096 }, () => {});
+  const result = await journal.middleware().wrapStream({ model: provider, params: { prompt: [] }, doStream: () => provider.doStream({ prompt: [] }) });
+  await assert.rejects(async () => { for await (const _ of result.stream) { /* consume */ } }, code("model_journal_full"));
+  await assert.rejects(journal.finish(false), code("model_journal_full"));
+  assert.equal(reads, 0); assert.equal(cancelled, 1); assert.equal(host.publications, 0);
+  assert.equal(Object.values(host.value[MODEL_JOURNAL_SLOT].turns)[0].entries[0].state, "pending");
+});
+
+test("HTTP 4xx SDK exceptions cannot authorize a provider retry", async () => {
+  for (const statusCode of [400, 401, 429]) {
+    const host = client(); let calls = 0;
+    const provider = new MockLanguageModelV4({ doGenerate: async () => {
+      calls++;
+      throw new APICallError({ message: "provider refusal", url: "https://provider.invalid/v1", requestBodyValues: {}, statusCode, isRetryable: true });
+    } });
+    await assert.rejects(agent(host, provider).run(bindings => generateText({ ...bindings, prompt: "Publish a report", maxRetries: 3 })), code("model_outcome_unknown"));
+    const reservation = host.value;
+    await assert.rejects(agent(host, provider).run(generate), code("model_outcome_unknown"));
+    assert.deepEqual(host.value, reservation);
+    assert.equal(calls, 1); assert.equal(host.publications, 0);
+  }
 });
 
 test("corrupted checkpoints and shortened replay cannot silently replace existing history", async () => {
