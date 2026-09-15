@@ -1144,7 +1144,7 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
             .next()
             .copied();
         return Err(ReceiptStoreError::Conflict(format!(
-            "checkpoint tree head projection drift detected (missing: {}, extra: {})",
+            "checkpoint tree head projection backfill drift detected (missing: {}, extra: {})",
             missing
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| "<none>".to_string()),

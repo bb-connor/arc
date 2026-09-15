@@ -4,6 +4,77 @@ struct MutatingPaymentAdapter {
     releases: std::sync::Arc<AtomicU64>,
 }
 
+async fn post_payment_without_dispatch_credentials(
+    nested: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mutable_state = std::sync::Arc::new(AtomicBool::new(false));
+    let authorizations = std::sync::Arc::new(AtomicU64::new(0));
+    let releases = std::sync::Arc::new(AtomicU64::new(0));
+    let revalidations = std::sync::Arc::new(AtomicU64::new(0));
+    let (mut kernel, capability, request, invocations) = make_post_payment_mutation_fixture(
+        "post-payment-no-dispatch-credentials",
+        mutable_state.clone(),
+        authorizations.clone(),
+        releases.clone(),
+    );
+    if nested {
+        kernel.set_runtime_admission_hook(std::sync::Arc::new(PostPaymentMutationRuntimeHook {
+            mutable_state,
+            evaluations: std::sync::Arc::new(AtomicU64::new(0)),
+            revalidations: revalidations.clone(),
+        }));
+    } else {
+        kernel.add_guard(Box::new(PostPaymentMutationGuard {
+            mutable_state,
+            revalidations: revalidations.clone(),
+        }));
+    }
+    assert!(request.execution_nonce.is_none());
+    assert!(request.dpop_proof.is_none());
+    assert!(request.governed_intent.is_none());
+    assert!(request.approval_token.is_none());
+    assert!(request.approval_tokens.is_empty());
+    let response = if nested {
+        let session = kernel.open_session(request.agent_id.clone(), vec![capability])?;
+        kernel.activate_session(&session)?;
+        let parent = make_operation_context(&session, "post-payment-parent", &request.agent_id);
+        kernel.begin_session_request(&parent, OperationKind::ToolCall, true)?;
+        kernel
+            .evaluate_tool_call_with_nested_flow_client_async(
+                &parent,
+                &request,
+                &mut NoopNestedFlowClient,
+                None,
+            )
+            .await?
+    } else {
+        kernel.evaluate_tool_call(&request).await?
+    };
+    assert_eq!(authorizations.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        0,
+        "payment-invalidated authority reached the tool"
+    );
+    assert_eq!(response.verdict, Verdict::Deny, "{response:?}");
+    assert!(response.receipt.verify_signature()?);
+    assert_eq!(revalidations.load(Ordering::SeqCst), 1);
+    assert_eq!(releases.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn payment_revalidation_does_not_require_dispatch_credentials(
+) -> Result<(), Box<dyn std::error::Error>> {
+    post_payment_without_dispatch_credentials(false).await
+}
+
+#[tokio::test]
+async fn nested_payment_revalidation_does_not_require_dispatch_credentials(
+) -> Result<(), Box<dyn std::error::Error>> {
+    post_payment_without_dispatch_credentials(true).await
+}
+
 impl PaymentAdapter for MutatingPaymentAdapter {
     fn authorize(
         &self,

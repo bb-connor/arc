@@ -1,0 +1,112 @@
+# Chio remote MCP edge: the bearer-authenticated HTTP edge that wraps one
+# MCP server under a signed native-launch policy.
+#
+# The four bearer roles arrive as credential files and reach the edge only
+# through the supervisor's environment; the environment file carries the
+# public pins and the wrapped command. Before the edge starts, the preflight
+# proves the host enforces the cage, the roles are distinct and the signed
+# launch material binds exactly the wrapped command below.
+
+[Unit]
+Description=Chio remote MCP edge
+Requires=chio-trust-control.service
+After=network-online.target chio-trust-control.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=chio-edge
+Group=chio-edge
+StateDirectory=chio-mcp-edge
+StateDirectoryMode=0700
+RuntimeDirectory=chio-mcp-edge
+RuntimeDirectoryMode=0700
+WorkingDirectory=/var/lib/chio-mcp-edge
+EnvironmentFile=/etc/chio/mcp-edge/chio-mcp-edge.env
+LoadCredential=session-token:/etc/chio/credentials/edge-session-token
+LoadCredential=admin-token:/etc/chio/credentials/edge-admin-token
+LoadCredential=control-token:/etc/chio/credentials/edge-control-token
+LoadCredential=workload-token:/etc/chio/credentials/edge-workload-token
+LoadCredential=resume-hmac-keyring:/etc/chio/credentials/edge-resume-hmac-keyring.json
+ExecStartPre=/usr/local/bin/chio security supervise --exec \
+  --credential-env CHIO_AUTH_TOKEN=session-token \
+  --credential-env CHIO_ADMIN_TOKEN=admin-token \
+  --credential-env CHIO_CONTROL_TOKEN=control-token \
+  --credential-env CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN=workload-token \
+  -- /usr/local/bin/chio \
+  --session-db /var/lib/chio-mcp-edge/sessions.sqlite3 \
+  security preflight \
+  --require-enforcement \
+  --signed-manifest /etc/chio/mcp-edge/launch/signed-manifest.json \
+  --manifest-public-key ${CHIO_MANIFEST_PUBLIC_KEY} \
+  --cage-policy /etc/chio/mcp-edge/launch/cage-launch-policy.json \
+  --cage-policy-signer ${CHIO_CAGE_POLICY_SIGNER} \
+  --server-id ${CHIO_MCP_SERVER_ID} \
+  -- $CHIO_MCP_UPSTREAM_COMMAND
+ExecStart=/usr/local/bin/chio security supervise \
+  --credential-env CHIO_AUTH_TOKEN=session-token \
+  --credential-env CHIO_ADMIN_TOKEN=admin-token \
+  --credential-env CHIO_CONTROL_TOKEN=control-token \
+  --credential-env CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN=workload-token \
+  --ready-http http://127.0.0.1:8931/admin/health \
+  --ready-http-bearer-env CHIO_ADMIN_TOKEN \
+  --ready-timeout 60 \
+  --stop-grace 30 \
+  -- /usr/local/bin/chio \
+  --control-url http://127.0.0.1:8940 \
+  --control-authority-public-key ${CHIO_CONTROL_AUTHORITY_PUBLIC_KEY} \
+  mcp serve-http \
+  --policy /etc/chio/mcp-edge/policy.yaml \
+  --server-id ${CHIO_MCP_SERVER_ID} \
+  --server-name ${CHIO_MCP_SERVER_NAME} \
+  --server-version ${CHIO_MCP_SERVER_VERSION} \
+  --listen 127.0.0.1:8931 \
+  --session-db /var/lib/chio-mcp-edge/sessions.sqlite3 \
+  --resume-hmac-keyring %d/resume-hmac-keyring \
+  --signed-manifest /etc/chio/mcp-edge/launch/signed-manifest.json \
+  --manifest-public-key ${CHIO_MANIFEST_PUBLIC_KEY} \
+  --cage-policy /etc/chio/mcp-edge/launch/cage-launch-policy.json \
+  --cage-policy-signer ${CHIO_CAGE_POLICY_SIGNER} \
+  -- $CHIO_MCP_UPSTREAM_COMMAND
+Restart=on-failure
+RestartSec=5s
+# SIGTERM starts the bounded drain (25s); the supervisor forwards it to the
+# edge alone and grants --stop-grace before SIGKILL. The wrapped server lives
+# in the same control group: with `mixed` the manager signals only the main
+# process first and escalates to the rest after TimeoutStopSec, so the edge
+# drains against a live upstream.
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=35s
+TimeoutStartSec=90s
+MemoryHigh=1G
+MemoryMax=1536M
+LimitNOFILE=65536
+LimitCORE=0
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ReadOnlyPaths=/etc/chio
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+RemoveIPC=true
+
+[Install]
+WantedBy=multi-user.target

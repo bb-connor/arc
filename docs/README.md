@@ -96,6 +96,8 @@ The primary live release documents. Auditors and operators start here.
 - [Agent Economy](reference/AGENT_ECONOMY.md) - technical design for governed transaction controls and payment interop
 - [Agent Reputation](reference/AGENT_REPUTATION.md) - local scoring, issuance gating, and reputation surfaces
 - [Cognition Market](market/README.md) - agents trading verified findings under kernel-governed delivery; qualified bounded single-operator market plus a hosted profile, with cross-organization escrow kept conditional
+- [Open agent work program](market/open-agent-work/README.md) - research and implementation plans for funded work across independent companies, bounded subcontracting, useful verification and a matched independent-operator trial
+- [Chio: A Peer-to-Peer Economy of Verifiable Work](papers/verifiable-work/README.md) - approved whitepaper title, thesis and manuscript/evidence status
 - [Competitive Landscape](reference/COMPETITIVE_LANDSCAPE.md) - agent protocols, payment rails, and identity standards in the surrounding space
 
 ## Protocol and architecture
@@ -114,7 +116,13 @@ The primary live release documents. Auditors and operators start here.
 
 ## Security
 
+- [Security launch ledger](security/launch-plan.md) - integrated roadmap, qualification results, remaining implementation and pilot gates
+- [Threshold approval collection](security/threshold-approval-collection.md) - trusted request context, retained-record migration and delivery retry contract
+- [Session report receipts](security/session-report-receipts.md) - kernel-owned failure observations, persisted conflict denials and execution-authority separation
+- [Cryptographic wire decoding](security/crypto-wire-decoding.md) - finite hybrid grammar, decode allocation bounds and verification boundaries
 - [Threat coverage](security/threat-coverage.md) - mapped threats and mitigations
+- [Active defense rollout](security/active-defense-rollout.md) - shadow evidence, staged promotion, and fail-closed rollback contract
+- [Committed Linux evidence](security/committed-linux-evidence.md) - trusted capture, publication, revocation, and merge-authority contract
 - [Expected identity migration](security/expected-identity-migration.md) - migrating expected-identity assertions
 - [Public witness semantics](security/public-witness-semantics.md)
 - [Corpus minimization](security/corpus-minimization.md)

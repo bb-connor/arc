@@ -71,6 +71,7 @@ sdks/python/**/.venv/
 examples/**/.gradle/
 sdks/**/.gradle/
 examples/**/bin/
+!examples/composed-baseline/src/bin/
 examples/**/obj/
 sdks/dotnet/**/bin/
 sdks/dotnet/**/obj/

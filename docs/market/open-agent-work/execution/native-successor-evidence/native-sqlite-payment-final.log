@@ -1,0 +1,23 @@
+    Finished `test` profile [unoptimized] target(s) in 0.83s
+     Running unittests src/lib.rs (target/debug/deps/chio_store_sqlite-5a6ec1936384c61e)
+
+running 17 tests
+test admission_operation_store::tests::budget_atomicity::combined_budget_authorization_payment_journal_and_operation_commit_are_atomic ... ok
+test budget_store::tests::composite_lifecycle::v10_payment_journal_migrates_to_accept_pre_authorization_cancellation ... ok
+test finding_operator_payment::tests::capture_is_restart_safe_and_exactly_once ... ok
+test finding_operator_payment::tests::changed_authorization_replay_is_rejected ... ok
+test finding_operator_payment::tests::every_pooled_connection_has_busy_timeout ... ok
+test finding_operator_payment::tests::expired_governed_intent_selects_the_exact_capture ... ok
+test finding_operator_payment::tests::expired_legacy_payment_uses_exact_journal_binding ... ok
+test finding_operator_payment::tests::expired_reconciliation_refunds_a_capture_exactly_once ... ok
+test finding_operator_payment::tests::expired_reconciliation_releases_a_hold_exactly_once ... ok
+test finding_operator_payment::tests::legacy_authorization_replay_backfills_governed_intent_binding ... ok
+test finding_operator_payment::tests::refund_accepts_capture_or_authorization_id_and_replays_exactly ... ok
+test finding_operator_payment::tests::refund_rejects_changed_payment_inputs ... ok
+test finding_operator_payment::tests::release_and_capture_are_mutually_exclusive ... ok
+test finding_operator_payment::tests::settlement_queries_survive_restart_without_mutating_the_rail ... ok
+test finding_purchase_store::tests::open_reservation_requires_contiguous_payment_through_the_current_epoch ... ok
+test serving_owner::global_commit_chain::tests::authority_snapshot_includes_payment_projection ... ok
+test serving_owner::global_commit_chain::tests::pre_payment_compatibility_requires_empty_payment_projection ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 1649 filtered out; finished in 4.42s

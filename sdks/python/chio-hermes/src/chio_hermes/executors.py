@@ -225,9 +225,7 @@ async def shell_run_executor(
     )
 
 
-async def _git(
-    *args: str, cwd: Path | None = None, stdin: str | None = None
-) -> dict[str, Any]:
+async def _git(*args: str, cwd: Path | None = None, stdin: str | None = None) -> dict[str, Any]:
     # Anchor git at `cwd` (`-C <root>` plus `--git-dir`/`--work-tree`
     # when present) so a workspace inside a larger worktree does not
     # silently pick up the parent's git config / .gitignore.
@@ -237,6 +235,9 @@ async def _git(
     if git_dir.is_dir():
         git_argv.extend(["--git-dir", str(git_dir), "--work-tree", str(root)])
     git_argv.extend(args)
+    # Apply the shared commit policy to both the dedicated commit executor
+    # and the generic Git entrypoint, after every caller-supplied global flag.
+    git_argv = _adapter_base_harden_git_argv(git_argv)
     return await asyncio.to_thread(
         _run_subprocess_impl,
         git_argv,
@@ -274,14 +275,9 @@ async def git_add_executor(
     return await _git("add", "--", *paths, cwd=cwd)
 
 
-async def git_commit_executor(
-    *, message: str, cwd: Path | None = None
-) -> dict[str, Any]:
-    # `--no-verify` is mandatory: pre-commit / commit-msg /
-    # prepare-commit-msg hooks execute repo-local scripts in the
-    # commit's working tree, escalating "model can call git_commit"
-    # to arbitrary code execution. Users who want hooks can dispatch
-    # them via `chio_shell_run` (gated by the shell deny list).
+async def git_commit_executor(*, message: str, cwd: Path | None = None) -> dict[str, Any]:
+    # _git also overrides core.hooksPath: --no-verify alone leaves
+    # prepare-commit-msg, post-commit and reference hooks executable.
     if not message:
         raise ValueError("git_commit requires a non-empty message")
     return await _git("commit", "--no-verify", "-m", message, cwd=cwd)

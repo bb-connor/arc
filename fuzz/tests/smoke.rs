@@ -26,6 +26,7 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "a2a_envelope_decode",
     "acp_envelope_decode",
     "anchor_bundle_verify",
+    "bilateral_dsse_verify",
     "chio_yaml_parse",
     "did_resolve",
     "eval_receipt_bundle",
@@ -316,6 +317,12 @@ fn federation_trust_establishment_smoke() {
         "federation_trust_establishment",
         federation_trust_establishment,
     );
+}
+
+#[test]
+fn bilateral_dsse_verify_smoke() {
+    use chio_fuzz::entries::bilateral_dsse_verify;
+    assert_seed_floor("bilateral_dsse_verify", bilateral_dsse_verify);
 }
 
 #[test]

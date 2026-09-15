@@ -1,0 +1,11 @@
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+{"output":"/tmp/chio-recovery-execution/standalone-child-final.json","scenario":"child","killPoint":"after_broadcast","accounting":{"escrowFunded":"160","paid":"60","refunded":"100","remaining":"0"},"transactionHash":"0xd657f223708142abbe3c0f63f9a0fa03328755d059a0da75335873c850a25fa1","workerSignal":"SIGKILL","broadcasts":1,"observedInclusions":1}

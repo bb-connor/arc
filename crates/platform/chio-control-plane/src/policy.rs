@@ -45,3 +45,11 @@ pub use types::{
 #[cfg(test)]
 #[path = "policy/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "policy/capability_budget_tests.rs"]
+mod capability_budget_tests;
+
+#[cfg(test)]
+#[path = "policy/swarm_admission_tests.rs"]
+mod swarm_admission_tests;

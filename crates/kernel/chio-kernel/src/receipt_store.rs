@@ -7,9 +7,30 @@ use chio_core::receipt::{
     lineage::{ChildRequestReceipt, ReceiptLineageStatement},
 };
 use chio_log_redact::redacted;
+use chio_security_types::ports::OpaqueReceiptRef;
 
 use crate::capability_lineage::CapabilitySnapshot;
 use crate::checkpoint::KernelCheckpoint;
+
+/// Durable logical active-defense evidence index backed by signed receipts.
+///
+/// Implementations append the receipt and publish the unique logical evidence
+/// mapping atomically. Repeating the same mapping is idempotent; rebinding an
+/// evidence identifier or receipt identifier must fail closed.
+pub trait IndexedSecurityEvidenceStore: Send + Sync {
+    fn ensure_indexed_security_evidence_ready(&self) -> Result<(), ReceiptStoreError>;
+
+    fn append_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+        receipt: &ChioReceipt,
+    ) -> Result<ChioReceipt, ReceiptStoreError>;
+
+    fn load_indexed_security_evidence(
+        &self,
+        evidence_id: &OpaqueReceiptRef,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError>;
+}
 
 /// Configuration for receipt retention and archival.
 ///
@@ -417,6 +438,11 @@ fn receipt_writer_liveness_unknown_label() -> String {
 
 pub trait ReceiptStore: Send + Sync {
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError>;
+    /// Whether this store is an authoritative durable sink for signed native
+    /// security release evidence such as cage and broker receipts.
+    fn supports_native_security_receipts(&self) -> bool {
+        false
+    }
     /// Stable identity of the durable sink across process restarts. Features
     /// with a single-delivery outbox must reject stores that cannot provide it.
     fn durable_sink_id(&self) -> Option<&str> {
@@ -922,6 +948,28 @@ pub struct AdmissionBudgetCapture {
     pub operation: crate::admission_operation::AdmissionOperationV1,
 }
 
+/// Dedicated native capture input. The credential proof borrows the actual
+/// kernel reservation; historical ledger data cannot construct that proof.
+pub struct AdmissionNativeDispatchCapture<'a> {
+    pub custody: crate::admission_operation::NativeSecurityEgressContext<'a>,
+    pub request: crate::budget_store::BudgetCaptureInvocationRequest,
+    pub credentials: &'a crate::VerifiedNativeDispatchCredentials<'a>,
+    pub ledger: &'a crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
+    pub policy_json: &'a [u8],
+}
+
+/// A kernel-produced private context accompanies the existing physical quota
+/// capture. Framing alone is not a complete admission snapshot or an execution
+/// permit. The configured authority must commit all three records atomically.
+pub struct AdmissionCallerDispatchCapture<'a> {
+    pub operation: &'a crate::admission_operation::AdmissionOperationV1,
+    pub recovery_lease: &'a crate::admission_operation::AdmissionRecoveryLease,
+    pub request: crate::budget_store::BudgetCaptureInvocationRequest,
+    pub context: &'a crate::admission_operation::AdmissionCallerDispatchContextV1,
+    pub active_fence: &'a crate::admission_operation::StoreMutationFence,
+    pub trusted_now_unix_ms: u64,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct AdmissionPaymentJournalAdvance<'a> {
     pub operation: &'a crate::admission_operation::AdmissionOperationV1,
@@ -1161,6 +1209,62 @@ pub trait QualifiedAdmissionProjectionStore:
         active_fence: &crate::admission_operation::StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError>;
+
+    fn capture_caller_invocation_and_commit_dispatch(
+        &self,
+        _capture: AdmissionCallerDispatchCapture<'_>,
+    ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+        Err(
+            crate::admission_operation::AdmissionCaptureError::Unavailable(
+                "atomic caller context and dispatch capture are unsupported".into(),
+            ),
+        )
+    }
+
+    fn capture_native_invocation_and_commit_dispatch(
+        &self,
+        _capture: AdmissionNativeDispatchCapture<'_>,
+    ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+        Err(
+            crate::admission_operation::AdmissionCaptureError::Unavailable(
+                "atomic native dispatch capture is unsupported".into(),
+            ),
+        )
+    }
+
+    /// Atomically retain native caller release custody with the actual native
+    /// credential and budget capture. Implementations default to fail-closed.
+    fn capture_native_caller_invocation_and_commit_dispatch(
+        &self,
+        _capture: AdmissionNativeDispatchCapture<'_>,
+        _context: &crate::admission_operation::AdmissionCallerDispatchContextV1,
+    ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError> {
+        Err(
+            crate::admission_operation::AdmissionCaptureError::Unavailable(
+                "atomic native caller release capture is unsupported".into(),
+            ),
+        )
+    }
+
+    /// Read the immutable native capture decision with its current operation.
+    /// The read must independently verify the physical budget projection and
+    /// its exact admission commitment. Historical data grants no execution or
+    /// retry authority. Absence after an acknowledged capture is an error.
+    fn load_native_dispatch_capture(
+        &self,
+        _operation_id: &crate::admission_operation::AdmissionOperationId,
+        _active_fence: &crate::admission_operation::StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<AdmissionBudgetCapture>,
+        crate::admission_operation::AdmissionOperationStoreError,
+    > {
+        Err(
+            crate::admission_operation::AdmissionOperationStoreError::Unavailable(
+                "native dispatch capture readback is unsupported".into(),
+            ),
+        )
+    }
 
     fn reserve_threshold_approval_and_commit_admission(
         &self,

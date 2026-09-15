@@ -26,9 +26,9 @@ aspirational; remaining boundaries are catalogued separately in
   timeout without an invariant or tool error and is not counted as a proof.
 - Mirror validation covers 57 registered mirrors over 171 bindings, including
   seven Lean module hashes and seven TLA+ module hashes. The proof manifest
-  contains 35 root imports, 14 gates, 12 model modules, 43 Rust symbols, and 15
+  contains 39 root imports, 14 gates, 12 model modules, 43 Rust symbols, and 15
   shell-bound checks.
-- Lean contains 149 catalogued declarations, one cryptographic axiom, thirteen
+- Lean contains 183 catalogued declarations, one cryptographic axiom, sixteen
   registered assumptions, and no placeholders.
 - Concurrency evidence includes all ten Loom models under three preemptions
   (229.86 seconds) and 10,000 deterministic schedules (63.24 seconds).
@@ -38,8 +38,16 @@ aspirational; remaining boundaries are catalogued separately in
   survivors with no timeout, for 73.333 percent activation. The retained Rust
   proof campaign enumerated 166 mutants, killed 160, left one survivor,
   classified five as unviable, and had no timeout, for 99.379 percent
-  activation and 96.988 percent viability. Issues #999 through #1010 track
-  the Lean survivors, and issue #1019 tracks the Rust survivor.
+  activation and 96.988 percent viability. Issues #999 through #1010 track the
+  Lean survivors of that run. The six in `Treaty/PredicateLang.lean` (#1005
+  through #1010) no longer elaborate against the current proof root:
+  `containsUnsupported_eq_not_supported`, `containsUndefined_eq_not_defined`,
+  `supported_eq_all_atoms`, and `defined_eq_all_atoms` observe every arm of
+  `supported` and `defined`, so those six await closure after the next
+  scheduled lane run. Issues #999 through #1004, in `Core/Revocation.lean` and
+  `Json/Value.lean`, remain open. The allowlisted Lean definitions now
+  enumerate 58 mutants; the next scheduled sample restates the activation
+  rate. Issue #1019 tracks the Rust survivor.
 - Fifteen formal gates are registered: ten scheduled and five pull-request
   gates. Six path-scoped gates remain frozen pending qualifying hosted runs.
 - All roadmap items are implemented except collection-level economy
@@ -76,8 +84,8 @@ what may be claimed publicly.
 - Toolchain: `leanprover/lean4:v4.28.0`, lake, the vendored Aeneas support
   library, and an exact Mathlib dependency closure recorded in
   `lake-manifest.json`.
-- 35 root-imported modules (all imported by `Chio.lean`; "root-imported" is a
-  release-evidence precondition), 149 catalogued theorems, exactly one
+- 39 root-imported modules (all imported by `Chio.lean`; "root-imported" is a
+  release-evidence precondition), 183 catalogued theorems, exactly one
   axiom, zero `sorry` (enforced by `scripts/check-formal-proofs.sh`: lake
   build plus a sorry scan plus manifest cross-ref sanity).
 - Core models: `Core/Capability.lean`, `Core/Scope.lean`, `Core/Receipt.lean`
@@ -95,7 +103,8 @@ what may be claimed publicly.
   closure theorems, P8 DPoP binding, P10 report truthfulness. A treaty lane
   (`Treaty/Intersection.lean`, `Treaty/PredicateLang.lean`,
   `Treaty/IntersectionSyntactic.lean`, `Treaty/IntersectionLegacy.lean`,
-  `Treaty/BridgeEquivalence.lean`, `Treaty/BilateralAccept.lean`) supports the
+  `Treaty/BridgeEquivalence.lean`, `Treaty/BilateralAccept.lean`,
+  `Treaty/ReceiptPredicate.lean`, `Treaty/PredicateShape.lean`) supports the
   governance/paper surface.
 - `Guards/WasmBoundary.lean` models the core-module dispatch boundary and proves
   typed-output confinement, no allow amplification, blocking resource-failure
@@ -333,7 +342,7 @@ differential-test joins, theorem status, and model-only Kani scope remain
 explicit there.
 
 - `formal/proof-manifest.toml` (schema `chio.proof-manifest.v1`) is the hub:
-  `root_modules` (35 Lean files), `gate_commands` (15 commands), 12
+  `root_modules` (39 Lean files), `gate_commands` (15 commands), 12
   `covered_rust_modules`, 41 `covered_rust_symbols`, 14 `shell_entrypoints`,
   the P1-P10 `property_matrix` with per-property evidence-lane tags,
   `rust_refinement_lanes`, `allowed_axioms` (exactly one),
@@ -343,7 +352,7 @@ explicit there.
   are labeled as transliterations or abstraction anchors; TLA+ entries are
   abstraction anchors. `cargo xtask check formal-mirrors` enforces those hashes
   in required PR CI.
-- `formal/theorem-inventory.json` (149 theorem entries plus a separate
+- `formal/theorem-inventory.json` (183 theorem entries plus a separate
   assumptions block): per-theorem id, Lean name,
   file, kind, `rootImported` flag, claim class, `mapsTo` property ids.
 - `formal/MAPPING.md`: the cross-reference table from required model safety
@@ -351,7 +360,7 @@ explicit there.
   delegation theorems to Rust call sites. `scripts/check-mapping.sh` discovers
   each enforced registry and source entry and fails CI unless every one has a
   literal row.
-- `formal/assumptions.toml`: 13 required audited assumptions. SQLite
+- `formal/assumptions.toml`: 16 required audited assumptions. SQLite
   atomicity is scoped to single-row commits; cross-row recovery remains outside
   the formal claim boundary until implementation trace validation and
   crash-reopen conservation establish refinement.

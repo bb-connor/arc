@@ -3,8 +3,8 @@ use std::collections::HashSet;
 use chio_core::capability::scope::MonetaryAmount;
 
 use crate::{
-    ManifestError, PricingModel, RequiredPermissions, ToolDefinition, ToolManifest, ToolPricing,
-    TOOL_MANIFEST_SCHEMA,
+    EnvironmentVariableName, ManifestError, NetworkDestination, PricingModel, RequiredPermissions,
+    ToolDefinition, ToolManifest, ToolPricing, TOOL_MANIFEST_SCHEMA,
 };
 
 /// Validate that a manifest is structurally well-formed.
@@ -62,6 +62,7 @@ fn validate_tool(tool: &ToolDefinition) -> Result<(), ManifestError> {
     if tool.name.trim().is_empty()
         || tool.name.trim() != tool.name
         || tool.name.chars().any(char::is_control)
+        || crate::ServerTool::from_anthropic_wire_name(&tool.name).is_some()
     {
         return Err(ManifestError::InvalidToolName(tool.name.clone()));
     }
@@ -76,6 +77,15 @@ fn validate_tool(tool: &ToolDefinition) -> Result<(), ManifestError> {
         return Err(ManifestError::InvalidOutputSchema(tool.name.clone()));
     }
     validate_tool_pricing(tool.pricing.as_ref())?;
+    if let Some(flow) = tool.flow.as_ref() {
+        flow.validate()
+            .map_err(|_| ManifestError::InvalidManifestField("tools.flow"))?;
+        if flow.egress && flow.input_clearance.is_none() {
+            return Err(ManifestError::InvalidManifestField(
+                "tools.flow.input_clearance",
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -165,36 +175,58 @@ fn validate_required_permissions(
         return Ok(());
     };
 
-    validate_permission_values(
+    validate_path_permission_values(
         "required_permissions.read_paths",
         permissions.read_paths.as_deref(),
     )?;
-    validate_permission_values(
+    validate_path_permission_values(
         "required_permissions.write_paths",
         permissions.write_paths.as_deref(),
     )?;
-    validate_permission_values(
-        "required_permissions.network_hosts",
-        permissions.network_hosts.as_deref(),
-    )?;
-    validate_permission_values(
-        "required_permissions.environment_variables",
-        permissions.environment_variables.as_deref(),
-    )?;
+    validate_network_destinations(permissions.network_destinations.as_deref())?;
+    validate_environment_variables(permissions.environment_variables.as_deref())?;
     Ok(())
 }
 
-fn validate_permission_values(
+fn validate_path_permission_values(
     field: &'static str,
     values: Option<&[String]>,
 ) -> Result<(), ManifestError> {
     let Some(values) = values else {
         return Ok(());
     };
+    if values.is_empty() {
+        return Err(ManifestError::InvalidRequiredPermission {
+            field,
+            value: "[]".to_string(),
+        });
+    }
 
     let mut seen = HashSet::new();
     for value in values {
-        if value.trim().is_empty() || value.trim() != value || value.chars().any(char::is_control) {
+        let path = std::path::Path::new(value);
+        let components_are_canonical = value.strip_prefix('/').is_some_and(|suffix| {
+            !suffix.is_empty()
+                && !suffix.ends_with('/')
+                && suffix
+                    .split('/')
+                    .all(|component| !component.is_empty() && component != "." && component != "..")
+        });
+        let normalized = path.is_absolute()
+            && path != std::path::Path::new("/")
+            && components_are_canonical
+            && path.components().all(|component| {
+                matches!(
+                    component,
+                    std::path::Component::RootDir | std::path::Component::Normal(_)
+                )
+            });
+        if !normalized
+            || value.trim().is_empty()
+            || value.trim() != value
+            || value.chars().any(char::is_control)
+            || value.as_bytes().contains(&0)
+        {
             return Err(ManifestError::InvalidRequiredPermission {
                 field,
                 value: value.clone(),
@@ -208,5 +240,60 @@ fn validate_permission_values(
         }
     }
 
+    Ok(())
+}
+
+fn validate_network_destinations(
+    destinations: Option<&[NetworkDestination]>,
+) -> Result<(), ManifestError> {
+    let Some(destinations) = destinations else {
+        return Ok(());
+    };
+    if destinations.is_empty() {
+        return Err(ManifestError::InvalidRequiredPermission {
+            field: "required_permissions.network_destinations",
+            value: "[]".to_string(),
+        });
+    }
+    let mut seen = HashSet::new();
+    for destination in destinations {
+        if destination.port() == 0 {
+            return Err(ManifestError::InvalidRequiredPermission {
+                field: "required_permissions.network_destinations.port",
+                value: destination.port().to_string(),
+            });
+        }
+        let key = (destination.host().as_str(), destination.port());
+        if !seen.insert(key) {
+            return Err(ManifestError::DuplicateRequiredPermission {
+                field: "required_permissions.network_destinations",
+                value: format!("{}:{}", destination.host().as_str(), destination.port()),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_environment_variables(
+    variables: Option<&[EnvironmentVariableName]>,
+) -> Result<(), ManifestError> {
+    let Some(variables) = variables else {
+        return Ok(());
+    };
+    if variables.is_empty() {
+        return Err(ManifestError::InvalidRequiredPermission {
+            field: "required_permissions.environment_variables",
+            value: "[]".to_string(),
+        });
+    }
+    let mut seen = HashSet::new();
+    for variable in variables {
+        if !seen.insert(variable.as_str()) {
+            return Err(ManifestError::DuplicateRequiredPermission {
+                field: "required_permissions.environment_variables",
+                value: variable.as_str().to_string(),
+            });
+        }
+    }
     Ok(())
 }

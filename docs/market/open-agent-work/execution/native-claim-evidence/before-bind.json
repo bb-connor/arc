@@ -1,0 +1,61 @@
+{
+  "after": {
+    "holdCount": 1,
+    "holdDisposition": "reversed",
+    "holdId": "admission-budget:9d3b4c92efa649001b67032c7eab0e568112585c384f2f8e857cd29eecabcdec:0",
+    "operationCount": 1,
+    "operationId": "9d3b4c92efa649001b67032c7eab0e568112585c384f2f8e857cd29eecabcdec"
+  },
+  "before": {
+    "holdCount": 1,
+    "holdDisposition": "open",
+    "holdId": "admission-budget:9d3b4c92efa649001b67032c7eab0e568112585c384f2f8e857cd29eecabcdec:0",
+    "operationCount": 1,
+    "operationId": "9d3b4c92efa649001b67032c7eab0e568112585c384f2f8e857cd29eecabcdec"
+  },
+  "chain": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "100",
+    "events": {
+      "ClaimSubmitted": 0,
+      "DecisionRecorded": 0,
+      "Funded": 1,
+      "Paid": 0,
+      "Refunded": 0,
+      "TimedOut": 0
+    },
+    "fundingTransaction": "0xf550930bde345745e65bb15b78b37f01300f66249d4dd694cd6b497baeaaa2ea",
+    "paid": "0",
+    "payerBalance": "900",
+    "refunded": "0",
+    "state": "Funded",
+    "transactions": {
+      "pay": [],
+      "record": [],
+      "refund": [],
+      "submit": []
+    }
+  },
+  "checkpoint": "before-bind",
+  "killedSignal": 9,
+  "replay": {
+    "allocationId": "0x85481ef81de194b05e3ab2540d8da5002fdcf77f31460097102c6300f431d069",
+    "authorityUuid": "01a0a22a-369c-7381-884c-10c452325cee",
+    "authorizationId": null,
+    "executions": 0,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "not_authorized",
+    "holdId": "admission-budget:9d3b4c92efa649001b67032c7eab0e568112585c384f2f8e857cd29eecabcdec:0",
+    "nativeAuthorizationId": null,
+    "nativePaymentAction": null,
+    "nativePaymentState": "Closed",
+    "nativeState": "CompensatedBeforeDispatch",
+    "operationId": "9d3b4c92efa649001b67032c7eab0e568112585c384f2f8e857cd29eecabcdec",
+    "paymentState": "not_authorized",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": null,
+    "startupReconciliationError": null
+  }
+}

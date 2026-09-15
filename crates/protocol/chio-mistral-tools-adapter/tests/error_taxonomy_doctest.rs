@@ -1,6 +1,11 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+use chio_core::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+    TOOL_MANIFEST_SCHEMA,
+};
 use chio_mistral_tools_adapter::transport::MockTransport;
 use chio_mistral_tools_adapter::{MistralAdapter, MistralAdapterConfig};
 use chio_tool_call_fabric::{ProviderError, ProviderRequest, ReceiptId, Redaction, VerdictResult};
@@ -15,15 +20,57 @@ struct TaxonomyRow {
     envelope: Value,
 }
 
-fn adapter() -> MistralAdapter {
+fn adapter() -> Result<MistralAdapter, String> {
+    let signer = Keypair::from_seed(&[75; 32]);
     let config = MistralAdapterConfig::new(
         "mistral-1",
         "Mistral chat/completions",
         "0.1.0",
-        "deadbeef",
+        signer.public_key().to_hex(),
         "org_chio_demo",
     );
-    MistralAdapter::new(config, Arc::new(MockTransport::new()))
+    let manifest = taxonomy_manifest(
+        &config.server_id,
+        &config.server_name,
+        &config.server_version,
+        &config.public_key,
+    );
+    let signed = chio_manifest::sign_manifest(&manifest, &signer)
+        .map_err(|error| format!("failed to sign Mistral taxonomy manifest: {error}"))?;
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .map_err(|error| format!("failed to admit Mistral taxonomy manifest: {error}"))?;
+    MistralAdapter::new_with_registry(config, Arc::new(MockTransport::new()), &registry)
+        .map_err(|error| format!("failed to bind Mistral taxonomy adapter: {error}"))
+}
+
+fn taxonomy_manifest(server_id: &str, name: &str, version: &str, public_key: &str) -> ToolManifest {
+    ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: server_id.to_string(),
+        name: name.to_string(),
+        description: None,
+        version: version.to_string(),
+        tools: vec![ToolDefinition {
+            name: "get_weather".to_string(),
+            description: "Get weather".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: true,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: public_key.to_string(),
+    }
 }
 
 fn raw(value: Value) -> Result<ProviderRequest, String> {
@@ -92,7 +139,7 @@ fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
         }
     }
 
-    let adapter = adapter();
+    let adapter = adapter()?;
 
     let content_policy = adapter.lift_batch(raw(json!({
         "id": "chatcmpl_safety",

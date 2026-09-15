@@ -1,0 +1,900 @@
+    Finished `test` profile [unoptimized] target(s) in 2.35s
+     Running tests/consumer_boundary.rs (target/debug/deps/consumer_boundary-6f6a2b947afbffc8)
+a2a_aggregate_capture_survives_consumer_restart: test
+a2a_threshold_proposal_approval_and_restart_preserve_one_capture: test
+acp_aggregate_capture_survives_consumer_restart: test
+acp_threshold_proposal_approval_and_restart_preserve_one_capture: test
+mcp_aggregate_capture_survives_consumer_restart: test
+mcp_threshold_proposal_approval_and_restart_preserve_one_capture: test
+native_aggregate_capture_survives_consumer_restart: test
+native_threshold_proposal_approval_and_restart_preserve_one_capture: test
+
+8 tests, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 1.11s
+     Running tests/consumer_boundary.rs (target/debug/deps/consumer_boundary-6f6a2b947afbffc8)
+
+running 8 tests
+test a2a_aggregate_capture_survives_consumer_restart ... ok
+test a2a_threshold_proposal_approval_and_restart_preserve_one_capture ... ok
+test acp_aggregate_capture_survives_consumer_restart ... ok
+test acp_threshold_proposal_approval_and_restart_preserve_one_capture ... ok
+test mcp_aggregate_capture_survives_consumer_restart ... ok
+test mcp_threshold_proposal_approval_and_restart_preserve_one_capture ... ok
+test native_aggregate_capture_survives_consumer_restart ... ok
+test native_threshold_proposal_approval_and_restart_preserve_one_capture ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.07s
+
+durable consumer boundaries passed (8 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 0.86s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+runtime::runtime_tests::authorization::mcp_authorization_negotiation_rejects_malformed_profiles_before_session_acquisition: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.86s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+
+running 1 test
+test runtime::runtime_tests::authorization::mcp_authorization_negotiation_rejects_malformed_profiles_before_session_acquisition ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 112 filtered out; finished in 0.07s
+
+MCP malformed profile before acquisition passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 0.87s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+runtime::runtime_tests::authorization::restored_mcp_authorization_profile_is_exact_and_legacy_sessions_do_not_upgrade: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.88s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+
+running 1 test
+test runtime::runtime_tests::authorization::restored_mcp_authorization_profile_is_exact_and_legacy_sessions_do_not_upgrade ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 112 filtered out; finished in 0.04s
+
+MCP profile recovery without upgrade passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 0.86s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+runtime::source_receipt_tests::mcp_target_executor_carries_source_receipt_context_into_kernel_receipt_metadata: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.88s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+
+running 1 test
+test runtime::source_receipt_tests::mcp_target_executor_carries_source_receipt_context_into_kernel_receipt_metadata ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 112 filtered out; finished in 0.03s
+
+MCP bound target authority passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 1.33s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_remote-ce856780fb500dc0)
+tests::session_runtime::remote_session_factory_rejects_flow_before_launch_authority_or_store_acquisition: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.95s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_remote-ce856780fb500dc0)
+
+running 1 test
+test tests::session_runtime::remote_session_factory_rejects_flow_before_launch_authority_or_store_acquisition ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 59 filtered out; finished in 1.80s
+
+remote MCP early profile rejection passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 0.96s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_remote-ce856780fb500dc0)
+tests::restored_authorization_matches_the_handshake_without_upgrading_legacy_sessions: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.97s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_remote-ce856780fb500dc0)
+
+running 1 test
+test tests::restored_authorization_matches_the_handshake_without_upgrading_legacy_sessions ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 59 filtered out; finished in 0.00s
+
+remote MCP retained authorization passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 1.25s
+     Running tests/mcp_serve_http.rs (target/debug/deps/mcp_serve_http-9e149b1eec78f843)
+mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 1.19s
+     Running tests/mcp_serve_http.rs (target/debug/deps/mcp_serve_http-9e149b1eec78f843)
+
+running 1 test
+test mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 34.28s
+
+remote MCP ready-session restart passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 1.27s
+     Running tests/mcp_serve_http.rs (target/debug/deps/mcp_serve_http-9e149b1eec78f843)
+mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 1.24s
+     Running tests/mcp_serve_http.rs (target/debug/deps/mcp_serve_http-9e149b1eec78f843)
+
+running 1 test
+test mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 34.51s
+
+remote MCP restart policy tightening passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 1.30s
+     Running tests/mcp_startup_security.rs (target/debug/deps/mcp_startup_security-1dbbef0f5623b02e)
+mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 1.25s
+     Running tests/mcp_startup_security.rs (target/debug/deps/mcp_startup_security-1dbbef0f5623b02e)
+
+running 1 test
+test mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.15s
+
+stdio MCP early profile rejection passed (1 exact tests)
+   Compiling chio-cli v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/products/chio-cli)
+    Finished `test` profile [unoptimized] target(s) in 1m 19s
+     Running unittests src/bin/chio.rs (target/debug/deps/chio-d05a08a537f1feee)
+supervise::readiness::tests::an_http_endpoint_is_ready_only_on_a_success_status: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 1.28s
+     Running unittests src/bin/chio.rs (target/debug/deps/chio-d05a08a537f1feee)
+
+running 1 test
+test supervise::readiness::tests::an_http_endpoint_is_ready_only_on_a_success_status ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 614 filtered out; finished in 0.08s
+
+supervisor HTTP readiness positive control passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 1.25s
+     Running unittests src/bin/chio.rs (target/debug/deps/chio-d05a08a537f1feee)
+supervise::readiness::security_tests::readiness_never_follows_same_or_cross_origin_redirects: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 1.29s
+     Running unittests src/bin/chio.rs (target/debug/deps/chio-d05a08a537f1feee)
+
+running 1 test
+test supervise::readiness::security_tests::readiness_never_follows_same_or_cross_origin_redirects ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 614 filtered out; finished in 0.50s
+
+supervisor readiness redirect denial passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 1.22s
+     Running unittests src/bin/chio.rs (target/debug/deps/chio-d05a08a537f1feee)
+supervise::readiness::security_tests::readiness_caps_declared_and_streamed_response_bodies: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 1.25s
+     Running unittests src/bin/chio.rs (target/debug/deps/chio-d05a08a537f1feee)
+
+running 1 test
+test supervise::readiness::security_tests::readiness_caps_declared_and_streamed_response_bodies ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 614 filtered out; finished in 0.10s
+
+supervisor readiness response bounds passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 1.24s
+     Running unittests src/bin/chio.rs (target/debug/deps/chio-d05a08a537f1feee)
+supervise::readiness::security_tests::readiness_accepts_a_response_at_its_exact_byte_limit: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 1.24s
+     Running unittests src/bin/chio.rs (target/debug/deps/chio-d05a08a537f1feee)
+
+running 1 test
+test supervise::readiness::security_tests::readiness_accepts_a_response_at_its_exact_byte_limit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 614 filtered out; finished in 0.06s
+
+supervisor readiness exact response limit passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 1.33s
+     Running unittests src/bin/chio.rs (target/debug/deps/chio-d05a08a537f1feee)
+supervise::readiness::security_tests::readiness_rejects_invalid_targets_and_headers_before_launch: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 1.27s
+     Running unittests src/bin/chio.rs (target/debug/deps/chio-d05a08a537f1feee)
+
+running 1 test
+test supervise::readiness::security_tests::readiness_rejects_invalid_targets_and_headers_before_launch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 614 filtered out; finished in 0.05s
+
+supervisor readiness invalid configuration passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 1.27s
+     Running unittests src/bin/chio.rs (target/debug/deps/chio-d05a08a537f1feee)
+supervise::readiness::security_tests::readiness_accepts_operator_selected_private_addresses: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 1.25s
+     Running unittests src/bin/chio.rs (target/debug/deps/chio-d05a08a537f1feee)
+
+running 1 test
+test supervise::readiness::security_tests::readiness_accepts_operator_selected_private_addresses ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 614 filtered out; finished in 0.34s
+
+supervisor readiness private addresses passed (1 exact tests)
+   Compiling bytes v1.11.1
+   Compiling aws-lc-rs v1.16.2
+   Compiling zeroize v1.9.0
+   Compiling tokio-macros v2.6.1
+   Compiling rustls-pki-types v1.14.0
+   Compiling http v1.4.0
+   Compiling tokio v1.50.0
+   Compiling http-body v1.0.1
+   Compiling slab v0.4.12
+   Compiling futures-task v0.3.32
+   Compiling rustls v0.23.37
+   Compiling rustls-webpki v0.103.13
+   Compiling futures-util v0.3.32
+   Compiling icu_normalizer v2.1.1
+   Compiling futures-channel v0.3.32
+   Compiling tracing v0.1.44
+   Compiling idna_adapter v1.2.1
+   Compiling rustls-native-certs v0.8.3
+   Compiling hyper v1.8.1
+   Compiling hyper-util v0.1.20
+   Compiling tokio-rustls v0.26.4
+   Compiling tower v0.5.3
+   Compiling idna v1.1.0
+   Compiling bitflags v2.11.0
+   Compiling rustls-platform-verifier v0.6.2
+   Compiling tower-http v0.6.8
+   Compiling url v2.5.8
+   Compiling hyper-rustls v0.27.7
+   Compiling http-body-util v0.1.3
+   Compiling serde_json v1.0.149
+   Compiling reqwest v0.13.2
+   Compiling chio-egress-contract v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-egress-contract)
+    Finished `test` profile [unoptimized] target(s) in 15.76s
+     Running unittests src/lib.rs (target/debug/deps/chio_egress_contract-9b8f6520645327f9)
+operator_readiness::tests::dns_uses_the_async_resolver_inside_the_deadline: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.65s
+     Running unittests src/lib.rs (target/debug/deps/chio_egress_contract-9b8f6520645327f9)
+
+running 1 test
+test operator_readiness::tests::dns_uses_the_async_resolver_inside_the_deadline ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 2.12s
+
+operator readiness DNS deadline passed (1 exact tests)
+   Compiling chio-cli v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/products/chio-cli)
+    Finished `test` profile [unoptimized] target(s) in 1.91s
+     Running tests/security_supervise.rs (target/debug/deps/security_supervise-9a6ee99c3bd93e35)
+invalid_http_readiness_refuses_to_start_the_service: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 1.27s
+     Running tests/security_supervise.rs (target/debug/deps/security_supervise-9a6ee99c3bd93e35)
+
+running 1 test
+test invalid_http_readiness_refuses_to_start_the_service ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.11s
+
+supervisor readiness rejects before child launch passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 0.70s
+     Running tests/manifest_v2.rs (target/debug/deps/manifest_v2-3e0839aa5d468a61)
+current_manifest_consumer_corpus_preserves_wire_and_registered_signature: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.70s
+     Running tests/manifest_v2.rs (target/debug/deps/manifest_v2-3e0839aa5d468a61)
+
+running 1 test
+test current_manifest_consumer_corpus_preserves_wire_and_registered_signature ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s
+
+current signed manifest corpus passed (1 exact tests)
+   Compiling syn v2.0.117
+   Compiling ahash v0.8.12
+   Compiling toml_edit v0.22.27
+   Compiling referencing v0.46.0
+   Compiling fancy-regex v0.17.0
+   Compiling typify-impl v0.4.3
+   Compiling jsonschema v0.46.0
+   Compiling prettyplease v0.2.37
+   Compiling typify v0.4.3
+   Compiling toml v0.8.23
+   Compiling proptest v1.10.0
+   Compiling chio-spec-codegen v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-spec-codegen)
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+    Finished `test` profile [unoptimized] target(s) in 44.70s
+     Running tests/protocol_primitives_generated.rs (target/debug/deps/protocol_primitives_generated-d80f55024a3d6816)
+generated_rust_shapes_parse_reject_and_round_trip_shared_fixtures: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.71s
+     Running tests/protocol_primitives_generated.rs (target/debug/deps/protocol_primitives_generated-d80f55024a3d6816)
+
+running 1 test
+test generated_rust_shapes_parse_reject_and_round_trip_shared_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+Rust generated protocol corpus passed (1 exact tests)
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+    Finished `test` profile [unoptimized] target(s) in 2.95s
+     Running tests/wire_protocol_schema.rs (target/debug/deps/wire_protocol_schema-0974058bd48fdb1f)
+protocol_primitives_shared_fixtures_match_authoritative_schemas: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.64s
+     Running tests/wire_protocol_schema.rs (target/debug/deps/wire_protocol_schema-0974058bd48fdb1f)
+
+running 1 test
+test protocol_primitives_shared_fixtures_match_authoritative_schemas ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 4.49s
+
+authoritative protocol schema corpus passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 0.67s
+     Running tests/wire_protocol_schema.rs (target/debug/deps/wire_protocol_schema-0974058bd48fdb1f)
+receipt_schemas_accept_signed_internal_origin_and_keep_closed_vocabulary: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.64s
+     Running tests/wire_protocol_schema.rs (target/debug/deps/wire_protocol_schema-0974058bd48fdb1f)
+
+running 1 test
+test receipt_schemas_accept_signed_internal_origin_and_keep_closed_vocabulary ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.95s
+
+signed receipt origin vocabulary passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 1.00s
+     Running unittests src/lib.rs (target/debug/deps/chio_kernel-ece71a10790b9ed1)
+admission_operation::tests::attachment_capacity::rich_native_caller_attachments_survive_outcome_append_and_persistence: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.90s
+     Running unittests src/lib.rs (target/debug/deps/chio_kernel-ece71a10790b9ed1)
+
+running 1 test
+test admission_operation::tests::attachment_capacity::rich_native_caller_attachments_survive_outcome_append_and_persistence ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1439 filtered out; finished in 0.09s
+
+retained caller attachment capacity passed (1 exact tests)
+   Compiling serde_core v1.0.228
+   Compiling futures-util v0.3.32
+   Compiling serde v1.0.228
+   Compiling serde_json v1.0.149
+   Compiling const-hex v1.18.1
+   Compiling ruint v1.20.0
+   Compiling zeroize v1.9.0
+   Compiling generic-array v0.14.7
+   Compiling der v0.7.10
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling block-padding v0.3.3
+   Compiling inout v0.1.4
+   Compiling sha2 v0.10.9
+   Compiling cipher v0.4.4
+   Compiling hmac v0.12.1
+   Compiling salsa20 v0.10.2
+   Compiling pbkdf2 v0.12.2
+   Compiling spki v0.7.3
+   Compiling scrypt v0.11.0
+   Compiling aes v0.8.4
+   Compiling cbc v0.1.2
+   Compiling url v2.5.8
+   Compiling signature v2.2.0
+   Compiling pkcs5 v0.7.1
+   Compiling bytes v1.11.1
+   Compiling pkcs8 v0.10.2
+   Compiling curve25519-dalek v4.1.3
+   Compiling chio-security-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-security-types)
+   Compiling ed25519 v2.2.3
+   Compiling http v1.4.0
+   Compiling ed25519-dalek v2.2.0
+   Compiling tokio v1.50.0
+   Compiling rs_merkle v1.5.0
+   Compiling rustls-pki-types v1.14.0
+   Compiling heapless v0.7.17
+   Compiling postcard v1.1.3
+   Compiling sha3 v0.10.8
+   Compiling serdect v0.2.0
+   Compiling frost-core v3.0.0
+   Compiling alloy-primitives v1.5.7
+   Compiling tokio-util v0.7.18
+   Compiling aws-lc-rs v1.16.2
+   Compiling frost-rerandomized v3.0.0
+   Compiling http-body v1.0.1
+   Compiling frost-ed25519 v3.0.0
+   Compiling rustls-webpki v0.103.13
+   Compiling sec1 v0.7.3
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling hkdf v0.12.4
+   Compiling crypto-bigint v0.5.5
+   Compiling rustls v0.23.37
+   Compiling elliptic-curve v0.13.8
+   Compiling h2 v0.4.16
+   Compiling hyper v1.8.1
+   Compiling http-body-util v0.1.3
+   Compiling tower v0.5.3
+   Compiling tokio-rustls v0.26.4
+   Compiling rustls-native-certs v0.8.3
+   Compiling hyper-util v0.1.20
+   Compiling serde_urlencoded v0.7.1
+   Compiling rustls-platform-verifier v0.6.2
+   Compiling tower-http v0.6.8
+   Compiling chrono v0.4.44
+   Compiling hyper-rustls v0.27.7
+   Compiling reqwest v0.13.2
+   Compiling rfc6979 v0.4.0
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling prost v0.14.3
+   Compiling chio-listing v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-finding)
+   Compiling chio-fiscal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone)
+   Compiling chio-open-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-appraisal)
+   Compiling chio-fincred v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fincred)
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation)
+   Compiling chio-underwriting v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-underwriting)
+   Compiling chio-did v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-did)
+   Compiling universal-hash v0.5.1
+   Compiling alloy-sol-type-parser v1.5.7
+   Compiling serde-value v0.7.0
+   Compiling pem v3.0.6
+   Compiling serde_path_to_error v0.1.20
+   Compiling alloy-json-abi v1.5.7
+   Compiling poly1305 v0.8.0
+   Compiling prost-types v0.14.3
+   Compiling pkcs1 v0.7.5
+   Compiling chio-credit v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-credit)
+   Compiling aead v0.5.2
+   Compiling olpc-cjson v0.1.4
+   Compiling num-bigint-dig v0.8.6
+   Compiling serde_plain v1.0.2
+   Compiling base64urlsafedata v0.5.2
+   Compiling futures-executor v0.3.32
+   Compiling uuid v1.22.0
+   Compiling futures v0.3.32
+   Compiling rsa v0.9.10
+   Compiling prost-reflect v0.16.3
+   Compiling alloy-sol-types v1.5.7
+   Compiling oauth2 v5.0.0
+   Compiling p256 v0.13.2
+   Compiling p384 v0.13.1
+   Compiling jsonwebtoken v10.4.0
+   Compiling sha1 v0.10.6
+   Compiling oci-spec v0.9.0
+   Compiling serde_with v3.18.0
+   Compiling tls_codec v0.4.2
+   Compiling chio-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-market)
+   Compiling chio-web3 v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3)
+   Compiling chio-autonomy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-autonomy)
+   Compiling toml_datetime v0.6.11
+   Compiling ahash v0.8.12
+   Compiling serde_spanned v0.6.9
+   Compiling fluent-uri v0.4.1
+   Compiling chio-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core)
+   Compiling toml_edit v0.22.27
+   Compiling referencing v0.46.0
+   Compiling oci-client v0.17.0
+   Compiling x509-cert v0.2.5
+   Compiling openidconnect v4.0.1
+   Compiling alloy-core v1.5.7
+   Compiling sigstore_protobuf_specs v0.5.1
+   Compiling webauthn-attestation-ca v0.5.2
+   Compiling tough v0.22.0
+   Compiling webauthn-rs-proto v0.5.2
+   Compiling crypto_secretbox v0.1.1
+   Compiling webbrowser v1.2.2
+   Compiling serde_json_canonicalizer v0.3.2
+   Compiling serde_cbor_2 v0.12.0-dev
+   Compiling email_address v0.2.9
+   Compiling jsonschema v0.46.0
+   Compiling sigstore v0.14.0
+   Compiling webauthn-rs-core v0.5.2
+   Compiling alloy v1.8.3
+   Compiling toml v0.8.23
+   Compiling chio-egress-contract v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-egress-contract)
+   Compiling webpki-roots v1.0.6
+   Compiling ciborium v0.2.2
+   Compiling webpki-roots v0.26.11
+   Compiling chio-web3-bindings v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3-bindings)
+   Compiling coset v0.4.2
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-verify)
+   Compiling webauthn-rs v0.5.2
+   Compiling chio-manifest v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-manifest)
+   Compiling jsonwebtoken v9.3.1
+   Compiling chio-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-lineage)
+   Compiling chio-data-guards-redactors-default v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-data-guards/redactors/default)
+   Compiling chio-log-redact v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-log-redact)
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-weights)
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-custody-hw)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-settle)
+   Compiling ureq v2.12.1
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-link)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-swarm-authority)
+   Compiling chio-supervisor v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-supervisor)
+   Compiling bls12_381_plus v0.8.13
+   Compiling chio-workflow-preflight v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-workflow-preflight)
+   Compiling affinidi-bbs v0.1.0
+   Compiling chio-workflow v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-workflow)
+   Compiling chio-disclosure-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-disclosure-lineage)
+   Compiling chacha20 v0.9.1
+   Compiling chacha20poly1305 v0.10.1
+   Compiling chio-selective-disclosure v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-selective-disclosure)
+   Compiling r2d2_sqlite v0.33.0
+   Compiling axum-core v0.5.6
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling chio-attest-buyer-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-buyer-core)
+   Compiling chio-federation-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation-authority)
+   Compiling axum v0.8.8
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-cross-protocol v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-cross-protocol)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-http-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-http-core)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+   Compiling chio-tower v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-tower)
+    Finished `test` profile [unoptimized] target(s) in 3m 17s
+     Running unittests src/lib.rs (target/debug/deps/chio_tower-a4858d9b6e4e58ba)
+kernel_service::tests::kernel_service_rejects_unnegotiated_extensions_before_effect_or_receipt: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.87s
+     Running unittests src/lib.rs (target/debug/deps/chio_tower-a4858d9b6e4e58ba)
+
+running 1 test
+test kernel_service::tests::kernel_service_rejects_unnegotiated_extensions_before_effect_or_receipt ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 55 filtered out; finished in 0.04s
+
+Tower peer boundary passed (1 exact tests)
+   Compiling tokio-util v0.7.18
+   Compiling tower v0.5.3
+   Compiling num_cpus v1.17.0
+   Compiling deadpool v0.12.3
+   Compiling h2 v0.4.16
+   Compiling tower-http v0.6.8
+   Compiling tough v0.22.0
+   Compiling assert-json-diff v2.0.2
+   Compiling hyper v1.8.1
+   Compiling hyper-util v0.1.20
+   Compiling hyper-rustls v0.27.7
+   Compiling wiremock v0.6.5
+   Compiling reqwest v0.13.2
+   Compiling oci-client v0.17.0
+   Compiling chio-egress-contract v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-egress-contract)
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-link)
+   Compiling sigstore v0.14.0
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-settle)
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-verify)
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-weights)
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling chio-cross-protocol v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-cross-protocol)
+   Compiling chio-openai-adapter v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-openai-adapter)
+    Finished `test` profile [unoptimized] target(s) in 1m 11s
+     Running unittests src/lib.rs (target/debug/deps/chio_openai-8b8b5a8a7b18bdc9)
+tests::openai_host_rejects_unnegotiated_authority_before_effect_or_receipt: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.90s
+     Running unittests src/lib.rs (target/debug/deps/chio_openai-8b8b5a8a7b18bdc9)
+
+running 1 test
+test tests::openai_host_rejects_unnegotiated_authority_before_effect_or_receipt ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 45 filtered out; finished in 0.04s
+
+OpenAI peer boundary passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 0.85s
+     Running unittests src/lib.rs (target/debug/deps/chio_openai-8b8b5a8a7b18bdc9)
+tests::openai_ordinary_host_rejects_flow_required_manifest_before_exposure: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.87s
+     Running unittests src/lib.rs (target/debug/deps/chio_openai-8b8b5a8a7b18bdc9)
+
+running 1 test
+test tests::openai_ordinary_host_rejects_flow_required_manifest_before_exposure ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 45 filtered out; finished in 0.00s
+
+OpenAI ordinary host flow rejection passed (1 exact tests)
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [unoptimized] target(s) in 1.16s
+     Running unittests src/lib.rs (target/debug/deps/chio_kernel-ece71a10790b9ed1)
+provider_verdict::tests::provider_fabric_rejects_unnegotiated_authorization_before_lowering: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.92s
+     Running unittests src/lib.rs (target/debug/deps/chio_kernel-ece71a10790b9ed1)
+
+running 1 test
+test provider_verdict::tests::provider_fabric_rejects_unnegotiated_authorization_before_lowering ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1439 filtered out; finished in 0.05s
+
+provider fabric bounded profile passed (1 exact tests)
+   Compiling chio-cross-protocol v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-cross-protocol)
+    Finished `test` profile [unoptimized] target(s) in 11.81s
+     Running unittests src/lib.rs (target/debug/deps/chio_cross_protocol-5012b588cead6a12)
+tests::cross_protocol_kernel_request_preserves_complete_authorization_context: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.85s
+     Running unittests src/lib.rs (target/debug/deps/chio_cross_protocol-5012b588cead6a12)
+
+running 1 test
+test tests::cross_protocol_kernel_request_preserves_complete_authorization_context ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 34 filtered out; finished in 0.04s
+
+native negotiated authorization preservation passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 0.83s
+     Running unittests src/lib.rs (target/debug/deps/chio_cross_protocol-5012b588cead6a12)
+tests::native_cross_protocol_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.85s
+     Running unittests src/lib.rs (target/debug/deps/chio_cross_protocol-5012b588cead6a12)
+
+running 1 test
+test tests::native_cross_protocol_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 34 filtered out; finished in 0.06s
+
+native unnegotiated authorization denial passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 0.88s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+runtime::runtime_tests::authorization::bridge_mcp_kernel_request_preserves_complete_authorization_context: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.87s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+
+running 1 test
+test runtime::runtime_tests::authorization::bridge_mcp_kernel_request_preserves_complete_authorization_context ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 112 filtered out; finished in 0.02s
+
+MCP bridge authorization preservation passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 0.84s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+runtime::runtime_tests::authorization::tools_call_meta_preserves_complete_authorization_context: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.84s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+
+running 1 test
+test runtime::runtime_tests::authorization::tools_call_meta_preserves_complete_authorization_context ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 112 filtered out; finished in 0.04s
+
+MCP negotiated authorization preservation passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 0.85s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+runtime::runtime_tests::authorization::mcp_unnegotiated_authorization_extensions_deny_before_receipt_or_dispatch: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.87s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+
+running 1 test
+test runtime::runtime_tests::authorization::mcp_unnegotiated_authorization_extensions_deny_before_receipt_or_dispatch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 112 filtered out; finished in 0.05s
+
+MCP unnegotiated authorization denial passed (1 exact tests)
+   Compiling chio-mcp-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-edge)
+   Compiling chio-a2a-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-a2a-edge)
+    Finished `test` profile [unoptimized] target(s) in 14.33s
+     Running unittests src/lib.rs (target/debug/deps/chio_a2a_edge-65a81884f62a9739)
+tests::a2a_execution_request_preserves_complete_authorization_context: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.92s
+     Running unittests src/lib.rs (target/debug/deps/chio_a2a_edge-65a81884f62a9739)
+
+running 1 test
+test tests::a2a_execution_request_preserves_complete_authorization_context ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 101 filtered out; finished in 0.04s
+
+A2A negotiated authorization preservation passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 0.87s
+     Running unittests src/lib.rs (target/debug/deps/chio_a2a_edge-65a81884f62a9739)
+tests::a2a_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.86s
+     Running unittests src/lib.rs (target/debug/deps/chio_a2a_edge-65a81884f62a9739)
+
+running 1 test
+test tests::a2a_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 101 filtered out; finished in 0.07s
+
+A2A unnegotiated authorization denial passed (1 exact tests)
+   Compiling chio-acp-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-acp-edge)
+    Finished `test` profile [unoptimized] target(s) in 11.77s
+     Running unittests src/lib.rs (target/debug/deps/chio_acp_edge-5b626cd22a092e2e)
+tests::acp_execution_request_preserves_complete_authorization_context: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.85s
+     Running unittests src/lib.rs (target/debug/deps/chio_acp_edge-5b626cd22a092e2e)
+
+running 1 test
+test tests::acp_execution_request_preserves_complete_authorization_context ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 92 filtered out; finished in 0.04s
+
+ACP negotiated authorization preservation passed (1 exact tests)
+    Finished `test` profile [unoptimized] target(s) in 0.87s
+     Running unittests src/lib.rs (target/debug/deps/chio_acp_edge-5b626cd22a092e2e)
+tests::acp_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.85s
+     Running unittests src/lib.rs (target/debug/deps/chio_acp_edge-5b626cd22a092e2e)
+
+running 1 test
+test tests::acp_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 92 filtered out; finished in 0.06s
+
+ACP unnegotiated authorization denial passed (1 exact tests)
+   Compiling libc v0.2.189
+   Compiling percent-encoding v2.3.2
+   Compiling signature v2.2.0
+   Compiling ed25519 v2.2.3
+   Compiling form_urlencoded v1.2.2
+   Compiling serde_json v1.0.149
+   Compiling curve25519-dalek v4.1.3
+   Compiling idna v1.1.0
+   Compiling serde v1.0.228
+   Compiling cpufeatures v0.2.17
+   Compiling getrandom v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling rand_core v0.6.4
+   Compiling chio-security-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-security-types)
+   Compiling ed25519-dalek v2.2.0
+   Compiling url v2.5.8
+   Compiling hex v0.4.3
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling chio-kernel-browser v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-browser)
+    Finished `test` profile [unoptimized] target(s) in 27.83s
+     Running unittests src/lib.rs (target/debug/deps/chio_kernel_browser-188cf3156a6088cb)
+tests::browser_rejects_unnegotiated_approval_set_proposal_and_governed_intent: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.61s
+     Running unittests src/lib.rs (target/debug/deps/chio_kernel_browser-188cf3156a6088cb)
+
+running 1 test
+test tests::browser_rejects_unnegotiated_approval_set_proposal_and_governed_intent ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.01s
+
+browser unnegotiated authorization denial passed (1 exact tests)
+   Compiling semver v1.0.27
+   Compiling serde v1.0.228
+   Compiling indexmap v2.14.1
+   Compiling getrandom v0.4.2
+   Compiling tempfile v3.27.0
+   Compiling serde_json v1.0.149
+   Compiling uniffi_internal_macros v0.32.0
+   Compiling askama_parser v0.16.0
+   Compiling camino v1.2.2
+   Compiling basic-toml v0.1.10
+   Compiling uniffi_pipeline v0.32.0
+   Compiling uniffi_meta v0.32.0
+   Compiling nom v7.1.3
+   Compiling serde_spanned v1.1.1
+   Compiling toml_datetime v0.7.5+spec-1.1.0
+   Compiling winnow v0.7.15
+   Compiling askama_derive v0.16.0
+   Compiling getrandom v0.2.17
+   Compiling rustc_version v0.4.1
+   Compiling toml_parser v1.1.1+spec-1.1.0
+   Compiling sha2 v0.10.9
+   Compiling toml v0.9.12+spec-1.1.0
+   Compiling curve25519-dalek v4.1.3
+   Compiling cargo-platform v0.3.3
+   Compiling cc v1.2.57
+   Compiling askama_macros v0.16.0
+   Compiling askama v0.16.0
+   Compiling ring v0.17.14
+   Compiling num-bigint v0.4.6
+   Compiling uniffi_udl v0.32.0
+   Compiling rand_core v0.6.4
+   Compiling rusticata-macros v4.1.0
+   Compiling uniffi_core v0.32.0
+   Compiling asn1-rs v0.6.2
+   Compiling uniffi_bindgen v0.32.0
+   Compiling ed25519-dalek v2.2.0
+   Compiling url v2.5.8
+   Compiling uniffi_macros v0.32.0
+   Compiling chio-security-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-security-types)
+   Compiling cargo_metadata v0.23.1
+   Compiling weedle2 v5.0.0
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling clap_builder v4.6.0
+   Compiling pem v3.0.6
+   Compiling oid-registry v0.7.1
+   Compiling der-parser v9.0.0
+   Compiling simple_asn1 v0.6.4
+   Compiling rs_merkle v1.5.0
+   Compiling chrono v0.4.44
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-revocation-oracle)
+   Compiling x509-parser v0.16.0
+   Compiling clap v4.6.0
+   Compiling jsonwebtoken v9.3.1
+   Compiling der v0.7.10
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-custody-hw)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling uniffi_build v0.32.0
+   Compiling uniffi v0.32.0
+   Compiling chio-kernel-mobile v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-mobile)
+    Finished `test` profile [unoptimized] target(s) in 2m 17s
+     Running tests/ffi_roundtrip.rs (target/debug/deps/ffi_roundtrip-461356dcad7c49d0)
+evaluate_rejects_unnegotiated_approval_set_proposal_and_governed_intent: test
+
+1 test, 0 benchmarks
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [unoptimized] target(s) in 1.16s
+     Running tests/ffi_roundtrip.rs (target/debug/deps/ffi_roundtrip-461356dcad7c49d0)
+
+running 1 test
+test evaluate_rejects_unnegotiated_approval_set_proposal_and_governed_intent ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.02s
+
+mobile unnegotiated authorization denial passed (1 exact tests)
+   Compiling chio-security-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-security-types)
+   Compiling ed25519-dalek v2.2.0
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling chio-cpp-kernel-ffi v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/sdk/chio-cpp-kernel-ffi)
+    Finished `test` profile [unoptimized] target(s) in 27.64s
+     Running unittests src/lib.rs (target/debug/deps/chio_cpp_kernel_ffi-5c14b2b0ce242f09)
+tests::evaluate_rejects_unnegotiated_approval_set_proposal_and_governed_intent: test
+
+1 test, 0 benchmarks
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [unoptimized] target(s) in 0.95s
+     Running unittests src/lib.rs (target/debug/deps/chio_cpp_kernel_ffi-5c14b2b0ce242f09)
+
+running 1 test
+test tests::evaluate_rejects_unnegotiated_approval_set_proposal_and_governed_intent ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.01s
+
+C++ FFI unnegotiated authorization denial passed (1 exact tests)
+Protocol peer-negotiation gate passed
+adapter-no-bypass: structured mediation contracts passed
+HttpEgressContract coverage OK across the workspace.
+Consumer boundary Rust gate passed (SDK, M3 and composed gates remain separate)

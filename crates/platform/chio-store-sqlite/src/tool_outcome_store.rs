@@ -7,10 +7,11 @@ use chio_kernel::admission_operation::{
     AdmissionOperationV1, AdmissionRecoveryLease, StoreMutationFence,
 };
 use chio_kernel::tool_outcome::{
-    CanonicalInvocationBlobV1, CanonicalResolvedOutputBlobV1,
-    PersistedPostReturnEvaluationRecordV1, PersistedToolOutcomeRecordV1,
-    PostReturnEvaluationRecordV1, QualifiedToolOutcomeStore, RawInvocationOutcomeV1,
-    ToolOutcomeInsertResultV1, ToolOutcomeRecordV1, ToolOutcomeStore, ToolOutcomeStoreError,
+    AcknowledgedSecurityReleaseV1, CanonicalInvocationBlobV1, CanonicalResolvedOutputBlobV1,
+    ExecutionEvidenceRecordV1, PersistedPostReturnEvaluationRecordV1, PersistedToolOutcomeRecordV1,
+    PostReturnEvaluationRecordV1, QualifiedExecutionEvidenceV1, QualifiedToolOutcomeStore,
+    RawInvocationOutcomeV1, SecurityReleaseRecordV1, ToolOutcomeInsertResultV1,
+    ToolOutcomeRecordV1, ToolOutcomeStore, ToolOutcomeStoreError,
 };
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use serde::Serialize;
@@ -22,13 +23,23 @@ use crate::admission_operation_store::{
 use crate::serving_owner::SqliteServingOwner;
 
 const TOOL_OUTCOME_SCHEMA_KEY: &str = "tool_outcome";
-pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 2;
+pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 4;
 const TOOL_OUTCOME_SCHEMA_ANCHORS: &[&str] = &[
     "tool_outcomes",
     "admission_operations",
     "chio_serving_owner",
 ];
 const TOOL_OUTCOME_SCHEMA: &str = include_str!("tool_outcome_store.sql");
+const EXECUTION_EVIDENCE_SCHEMA: &str = include_str!("tool_outcome_execution_evidence.sql");
+#[path = "tool_outcome_execution_evidence.rs"]
+mod execution_evidence;
+const SECURITY_RELEASE_SCHEMA: &str = include_str!("tool_outcome_security_release.sql");
+#[path = "tool_outcome_native_output.rs"]
+mod native_output;
+#[path = "tool_outcome_security_release.rs"]
+mod security_release;
+pub(crate) use native_output::verify_native_output_artifacts;
+pub(crate) use security_release::require_terminal_release;
 const MAX_OUTCOME_RECORD_BYTES: usize = 1024 * 1024;
 const MAX_EVALUATION_RECORD_BYTES: usize = 64 * 1024 * 1024;
 
@@ -126,7 +137,8 @@ impl SqliteToolOutcomeStore {
     /// verification depends on. The caller supplies the cutoff (for example from
     /// a retention policy); this store never reads kernel configuration on its
     /// own. Blobs whose owning operation is still live are left untouched, which
-    /// the schema triggers independently enforce.
+    /// the schema triggers independently enforce. Execution evidence also keeps
+    /// its original raw payload for authenticated receipt replay.
     pub fn compact_retained_invocation_blobs(
         &self,
         retention_cutoff_unix_ms: u64,
@@ -145,6 +157,11 @@ impl SqliteToolOutcomeStore {
                   AND recorded_at_unix_ms <= ?1
                   AND EXISTS (
                       SELECT 1 FROM tool_outcomes o
+                      WHERE o.raw_output_digest = tool_outcome_blobs.digest
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM tool_outcomes o
+                      JOIN tool_outcome_execution_evidence e ON e.operation_id = o.operation_id
                       WHERE o.raw_output_digest = tool_outcome_blobs.digest
                   )
                   AND NOT EXISTS (
@@ -188,6 +205,63 @@ impl SqliteToolOutcomeStore {
 }
 
 impl ToolOutcomeStore for SqliteToolOutcomeStore {
+    fn record_execution_evidence(
+        &self,
+        evidence: &QualifiedExecutionEvidenceV1,
+        recovery_lease: &AdmissionRecoveryLease,
+    ) -> Result<ExecutionEvidenceRecordV1, ToolOutcomeStoreError> {
+        self.persist_execution_evidence(evidence, recovery_lease)
+    }
+
+    fn lookup_execution_evidence(
+        &self,
+        operation_id: &AdmissionOperationId,
+    ) -> Result<Option<ExecutionEvidenceRecordV1>, ToolOutcomeStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let record = execution_evidence::load(&transaction, operation_id.as_str())?;
+        if record.is_some() || load_outcome_tx(&transaction, operation_id)?.is_some() {
+            verify_outcome_projection(&transaction, operation_id.as_str())?;
+        }
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(record)
+    }
+
+    fn require_security_release_checkpoint_support(&self) -> Result<(), ToolOutcomeStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let _: i64 = transaction
+            .query_row(
+                "SELECT COUNT(*) FROM tool_outcome_security_releases WHERE 0",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        transaction.commit().map_err(sqlite_error)
+    }
+
+    fn record_security_release(
+        &self,
+        release: &AcknowledgedSecurityReleaseV1,
+        recovery_lease: &AdmissionRecoveryLease,
+    ) -> Result<SecurityReleaseRecordV1, ToolOutcomeStoreError> {
+        self.persist_security_release(release, recovery_lease)
+    }
+
+    fn lookup_security_release(
+        &self,
+        operation_id: &AdmissionOperationId,
+    ) -> Result<Option<SecurityReleaseRecordV1>, ToolOutcomeStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let record = security_release::load(&transaction, operation_id.as_str())?;
+        if load_outcome_tx(&transaction, operation_id)?.is_some() {
+            verify_outcome_projection(&transaction, operation_id.as_str())?;
+        }
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(record)
+    }
+
     fn record_tool_returned(
         &self,
         operation: &AdmissionOperationV1,
@@ -528,19 +602,23 @@ impl QualifiedToolOutcomeStore for SqliteToolOutcomeStore {}
 pub(crate) fn initialize_tool_outcome_schema(
     connection: &mut Connection,
 ) -> Result<(), ToolOutcomeStoreError> {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(sqlite_error)?;
+    security_release::verify_unstamped_source(&transaction)?;
+    execution_evidence::verify_unstamped_source(&transaction)?;
     let on_disk = crate::check_schema_version(
-        connection,
+        &transaction,
         TOOL_OUTCOME_SCHEMA_KEY,
         TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
         TOOL_OUTCOME_SCHEMA_ANCHORS,
     )
     .map_err(|error| invariant(error.to_string()))?;
     if on_disk == TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION {
-        return verify_tool_outcome_invariants(connection);
+        verify_tool_outcome_invariants(&transaction)?;
+        return transaction.commit().map_err(sqlite_error);
     }
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
+    execution_evidence::verify_pre_migration(&transaction, on_disk)?;
     // Version 2 permits a compacted payload to be restored when a later owner
     // supplies the same digest- and size-verified canonical bytes. Recreate the
     // trigger transactionally before applying the canonical schema definition.
@@ -549,6 +627,12 @@ pub(crate) fn initialize_tool_outcome_schema(
         .map_err(sqlite_error)?;
     transaction
         .execute_batch(TOOL_OUTCOME_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(SECURITY_RELEASE_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(EXECUTION_EVIDENCE_SCHEMA)
         .map_err(sqlite_error)?;
     crate::stamp_schema_version(
         &transaction,
@@ -566,6 +650,12 @@ pub(crate) fn verify_tool_outcome_invariants(
     let expected = Connection::open_in_memory().map_err(sqlite_error)?;
     expected
         .execute_batch(TOOL_OUTCOME_SCHEMA)
+        .map_err(sqlite_error)?;
+    expected
+        .execute_batch(SECURITY_RELEASE_SCHEMA)
+        .map_err(sqlite_error)?;
+    expected
+        .execute_batch(EXECUTION_EVIDENCE_SCHEMA)
         .map_err(sqlite_error)?;
     if tool_outcome_schema_catalog(connection)? != tool_outcome_schema_catalog(&expected)? {
         return Err(invariant(
@@ -604,6 +694,24 @@ pub(crate) fn verify_tool_outcome_invariants(
     drop(statement);
     for operation_id in operation_ids {
         verify_outcome_projection(connection, &operation_id)?;
+    }
+    let orphan: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM tool_outcome_security_releases AS release LEFT JOIN tool_outcomes AS outcome USING(operation_id) WHERE outcome.operation_id IS NULL)",
+        [], |row| row.get(0),
+    ).map_err(sqlite_error)?;
+    if orphan {
+        return Err(invariant(
+            "security release is not owned by a retained tool outcome",
+        ));
+    }
+    let orphan: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM tool_outcome_execution_evidence AS evidence LEFT JOIN tool_outcomes AS outcome USING(operation_id) WHERE outcome.operation_id IS NULL)",
+        [], |row| row.get(0),
+    ).map_err(sqlite_error)?;
+    if orphan {
+        return Err(invariant(
+            "execution evidence is not owned by a retained tool outcome",
+        ));
     }
     Ok(())
 }
@@ -656,7 +764,7 @@ fn verify_outcome_projection(
         )
         .map_err(sqlite_error)?;
     let evaluation = load_evaluation_connection(connection, operation_id)?;
-    let (expected_outcome_digest, expected_evaluation_digest, expected_latest_digest) =
+    let (expected_outcome_digest, expected_evaluation_digest, mut expected_latest_digest) =
         if let Some(evaluation) = &evaluation {
             evaluation
                 .validate_against(&operation, &outcome)
@@ -705,6 +813,19 @@ fn verify_outcome_projection(
         return Err(invariant(
             "post-return evaluation row has an invalid participant commitment",
         ));
+    }
+    if let Some(digest) =
+        security_release::verify_projection(connection, &operation, &outcome, evaluation.as_ref())?
+    {
+        expected_latest_digest = digest;
+    }
+    if let Some(digest) = execution_evidence::verify_projection(
+        connection,
+        &operation,
+        &outcome,
+        evaluation.as_ref(),
+    )? {
+        expected_latest_digest = digest;
     }
     let latest: Option<String> = connection
         .query_row(
@@ -1293,10 +1414,10 @@ fn tool_outcome_schema_catalog(
             r#"
             SELECT type, name, tbl_name, sql
             FROM sqlite_schema
-            WHERE name GLOB 'tool_outcome*'
-               OR tbl_name GLOB 'tool_outcome*'
-               OR name GLOB 'post_return_evaluation*'
-               OR tbl_name GLOB 'post_return_evaluation*'
+            WHERE lower(name) GLOB 'tool_outcome*'
+               OR lower(tbl_name) GLOB 'tool_outcome*'
+               OR lower(name) GLOB 'post_return_evaluation*'
+               OR lower(tbl_name) GLOB 'post_return_evaluation*'
             ORDER BY type, name, tbl_name
             "#,
         )

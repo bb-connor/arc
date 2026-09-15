@@ -1,0 +1,116 @@
+{
+  "after": {
+    "holdCount": 1,
+    "holdDisposition": "reconciled",
+    "holdId": "admission-budget:59b3ebf7659b673cb6230914008ee08e4ebf72314db0c44d796cf5bb7aabf5e0:0",
+    "operationCount": 1,
+    "operationId": "59b3ebf7659b673cb6230914008ee08e4ebf72314db0c44d796cf5bb7aabf5e0"
+  },
+  "before": {
+    "holdCount": 1,
+    "holdDisposition": "reconciled",
+    "holdId": "admission-budget:59b3ebf7659b673cb6230914008ee08e4ebf72314db0c44d796cf5bb7aabf5e0:0",
+    "operationCount": 1,
+    "operationId": "59b3ebf7659b673cb6230914008ee08e4ebf72314db0c44d796cf5bb7aabf5e0"
+  },
+  "chain": {
+    "beneficiaryBalance": "100",
+    "escrowBalance": "0",
+    "events": {
+      "ClaimSubmitted": 1,
+      "DecisionRecorded": 1,
+      "Funded": 1,
+      "Paid": 1,
+      "Refunded": 0,
+      "TimedOut": 0
+    },
+    "fundingTransaction": "0x85b85a54ca3163ee932bbb2582fc75034ff563300bac06b058c36888ee28fa9b",
+    "paid": "100",
+    "payerBalance": "900",
+    "refunded": "0",
+    "state": "Paid",
+    "transactions": {
+      "pay": [
+        {
+          "hash": "0xa0843e2f10fe38d32bd9102dce62fc1785c87dd314f8fc2fe45ea7a402ce2920",
+          "nonce": 1,
+          "status": 1
+        }
+      ],
+      "record": [
+        {
+          "hash": "0xd6ae38f55e828ac5640b24bd960ea4dff5cbe713f0281a23613e1f0ca9257f46",
+          "nonce": 0,
+          "status": 1
+        }
+      ],
+      "refund": [],
+      "submit": [
+        {
+          "hash": "0xb083c20169cefe2f8953f62bb950ebfc2294e413cc983df39391a5fc37653b79",
+          "nonce": 0,
+          "status": 1
+        }
+      ]
+    }
+  },
+  "checkpoint": "after-decision",
+  "first": {
+    "allocationId": "0xc3b9db77dce417f0e637f4e7aadd927f5429d85156b0cec6743fdb61daa7a1ca",
+    "authorityUuid": "01a0a22b-5b28-7892-865f-89477e38c00c",
+    "authorizationId": "funded-c3b9db77dce417f0e637f4e7aadd927f5429d85156b0cec6743fdb61daa7a1ca",
+    "executions": 1,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:59b3ebf7659b673cb6230914008ee08e4ebf72314db0c44d796cf5bb7aabf5e0:0",
+    "nativeAuthorizationId": "funded-c3b9db77dce417f0e637f4e7aadd927f5429d85156b0cec6743fdb61daa7a1ca",
+    "nativeEvaluationError": "durable admission failed: payment rail unavailable: exact ERC20 payout has not been observed; capture remains pending",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "59b3ebf7659b673cb6230914008ee08e4ebf72314db0c44d796cf5bb7aabf5e0",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": null,
+    "startupReconciliationError": null
+  },
+  "killedSignal": 9,
+  "replay": {
+    "allocationId": "0xc3b9db77dce417f0e637f4e7aadd927f5429d85156b0cec6743fdb61daa7a1ca",
+    "authorityUuid": "01a0a22b-5b28-7892-865f-89477e38c00c",
+    "authorizationId": "funded-c3b9db77dce417f0e637f4e7aadd927f5429d85156b0cec6743fdb61daa7a1ca",
+    "executions": 1,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:59b3ebf7659b673cb6230914008ee08e4ebf72314db0c44d796cf5bb7aabf5e0:0",
+    "nativeAuthorizationId": "funded-c3b9db77dce417f0e637f4e7aadd927f5429d85156b0cec6743fdb61daa7a1ca",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settled",
+    "nativeState": "Completed",
+    "operationId": "59b3ebf7659b673cb6230914008ee08e4ebf72314db0c44d796cf5bb7aabf5e0",
+    "paymentState": "paid",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": "0xa0843e2f10fe38d32bd9102dce62fc1785c87dd314f8fc2fe45ea7a402ce2920",
+    "startupReconciliationError": null
+  },
+  "verification": {
+    "accepted": true,
+    "commitment": "0x0da109b0583f403e1228b6e832292d9dcaf594ae751f3f357575db333ef6c084",
+    "decision": "verified",
+    "decisionSha256": "a3f83535940b1c508c5182a33748e68782fce0b8edffa37a167b6ed682a994ad",
+    "financial": "payout",
+    "findingAssurance": "asserted-native-artifact-with-experimental-w0-checks",
+    "findingId": "7f91dc0e11364bf23c11a064f5a73f9aeffea9b1f987ec1e36f2c3c4a9bb2db4",
+    "observationSha256": "ad0b72304092e5cac8c807af096254fa4b28744bb284b1988d7caa18d3403ce2",
+    "transactionHash": "0xa0843e2f10fe38d32bd9102dce62fc1785c87dd314f8fc2fe45ea7a402ce2920"
+  },
+  "retainedTransactions": {
+    "submit": "0xb083c20169cefe2f8953f62bb950ebfc2294e413cc983df39391a5fc37653b79",
+    "record": "0xd6ae38f55e828ac5640b24bd960ea4dff5cbe713f0281a23613e1f0ca9257f46",
+    "pay": "0xa0843e2f10fe38d32bd9102dce62fc1785c87dd314f8fc2fe45ea7a402ce2920"
+  }
+}

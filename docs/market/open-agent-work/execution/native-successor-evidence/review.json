@@ -1,0 +1,27 @@
+{
+  "reviewedAtUTC": "2026-09-15T00:46:57.917023+00:00",
+  "baseCommit": "5257f963d869d89c7a54384ea88628cf727c32c8",
+  "reviews": [
+    {
+      "scope": "Shared native kernel and SQLite waiver authority, schema, source validation and financial receipt",
+      "verdict": "No open findings after follow-up",
+      "corrections": [
+        "Use current store authority time at initial waiver acceptance and completion.",
+        "Compare the complete financial resolution binding in kernel replay and SQLite participant validation.",
+        "Extract financial replay verification to preserve existing source file size limit."
+      ],
+      "boundary": "Read-only source review. Runtime results are separately recorded in command logs; no synchronized concurrent rail-capture race or exhaustive SQL-column mutation proof claimed."
+    },
+    {
+      "scope": "Funded adapter, signed dependency, actual parent loss and child collection",
+      "verdict": "No implementation blocker found; identified test false-positive corrected",
+      "corrections": [
+        "Run child blocking kernel on a scoped thread joined within parent tool invocation.",
+        "Assert waiver agreement validation itself rejects altered terms, independently of funding observation.",
+        "Add focused authority/dependency tests and refund observation/key substitution cases."
+      ],
+      "boundary": "Read-only review. The refund-specific private-chain regression was added after the adapter review and is separately qualified in Rust test logs."
+    }
+  ],
+  "hosting": "No hosted CI, PR review or release approval claimed."
+}

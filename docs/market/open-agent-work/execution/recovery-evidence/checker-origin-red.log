@@ -1,0 +1,15 @@
+test_shadow_checker_module_cannot_satisfy_a_pin_for_different_source (test_verifier.VerifierTests.test_shadow_checker_module_cannot_satisfy_a_pin_for_different_source) ... FAIL
+
+======================================================================
+FAIL: test_shadow_checker_module_cannot_satisfy_a_pin_for_different_source (test_verifier.VerifierTests.test_shadow_checker_module_cannot_satisfy_a_pin_for_different_source)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_verifier.py", line 58, in test_shadow_checker_module_cannot_satisfy_a_pin_for_different_source
+    self.assertNotEqual(result.returncode,0,'a shadow checker certified false output: '+result.stdout)
+AssertionError: 0 == 0 : a shadow checker certified false output: True
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.151s
+
+FAILED (failures=1)

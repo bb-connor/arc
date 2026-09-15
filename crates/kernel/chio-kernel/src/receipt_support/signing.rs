@@ -1,4 +1,5 @@
 use crate::*;
+use chio_core::SigningAlgorithm;
 
 // ---------------------------------------------------------------------------
 // Hybrid receipt signing path
@@ -29,6 +30,25 @@ pub enum KernelCryptoFloor {
 }
 
 impl KernelCryptoFloor {
+    /// Algorithms permitted on authority-bearing envelopes. A wire algorithm
+    /// claim must still match its key and signature, and verification must pass.
+    pub(crate) const fn allowed_signing_algorithms(self) -> &'static [SigningAlgorithm] {
+        match self {
+            Self::AllowClassical => &[
+                SigningAlgorithm::Ed25519,
+                SigningAlgorithm::P256,
+                SigningAlgorithm::P384,
+            ],
+            Self::AllowHybrid => &[
+                SigningAlgorithm::Ed25519,
+                SigningAlgorithm::P256,
+                SigningAlgorithm::P384,
+                SigningAlgorithm::Hybrid,
+            ],
+            Self::PqRequired => &[SigningAlgorithm::Hybrid],
+        }
+    }
+
     /// Whether the floor permits hybrid envelopes on the wire.
     #[must_use]
     pub fn allows_hybrid(&self) -> bool {
@@ -71,9 +91,9 @@ impl KernelCryptoFloor {
 /// empty output the literal `null` canonicalization). The signer recomputes
 /// `sha256_hex(canonical_content)` and refuses to sign when it disagrees with
 /// `body.content_hash`, closing the render-A / sign-B forgery on the hybrid path
-/// too rather than leaving it as a caller-hash-trust seam. Receipts produced via
-/// this wrapper are byte-identical to receipts produced via the inline classical
-/// path when the same backend and content are used.
+/// too rather than leaving it as a caller-hash-trust seam. This wrapper and the
+/// ordinary inline path bind the same canonical body for the same backend and
+/// content. Fresh randomized signatures need not be byte-identical.
 ///
 /// Callers that genuinely cannot carry the content preimage (the thin transport
 /// adapters relaying an already-minted body across an FFI/WASM boundary) must

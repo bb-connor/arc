@@ -16,6 +16,19 @@ impl SqliteRuntimeOrchestrationStore {
                     raw_json TEXT NOT NULL,
                     created_at_unix_ms INTEGER NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS runtime_outcome_effect_slots (
+                    slot_sha256 TEXT PRIMARY KEY NOT NULL,
+                    rule_sha256 TEXT NOT NULL,
+                    rule_json TEXT NOT NULL,
+                    revoked INTEGER NOT NULL DEFAULT 0 CHECK (revoked IN (0, 1)),
+                    claim_sha256 TEXT,
+                    claim_json TEXT,
+                    result_sha256 TEXT,
+                    result_json TEXT,
+                    CHECK ((claim_sha256 IS NULL) = (claim_json IS NULL)),
+                    CHECK ((result_sha256 IS NULL) = (result_json IS NULL)),
+                    CHECK (result_sha256 IS NULL OR claim_sha256 IS NOT NULL)
+                );
                 CREATE TABLE IF NOT EXISTS runtime_consumed_leases (
                     lease_id TEXT PRIMARY KEY NOT NULL,
                     admission_id TEXT NOT NULL

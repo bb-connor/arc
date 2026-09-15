@@ -1,0 +1,7 @@
+{
+  "witnessBinarySha256": "46826d4cebcf6d5727313d6ed57a1e9c8681fc0c46660c9271b9a83e696d5101",
+  "rebuiltBinarySha256": "d5f1fc4dd103370f7a3b865278008d2c56a284eb720c4684b9467354154d0185",
+  "byteIdentical": false,
+  "sourceChange": "Remove a redundant unit expression from the accepted completion-fence branch; control flow and returned value unchanged.",
+  "finalProcessWitnessesReexecuted": true
+}

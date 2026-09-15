@@ -1,0 +1,323 @@
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✖ accepted claim survives deadlines, funding pause and future verifier rotation (2.255531ms)
+✖ only a timely provider commitment opens the verifier decision window (0.424562ms)
+▶ verifier outage and absent submission reach refund only strictly after timeout
+  ✖ false (0.461882ms)
+  ✖ true (0.260082ms)
+✖ verifier outage and absent submission reach refund only strictly after timeout (1.373607ms)
+✖ rejected work refunds without creating a payment right (0.382602ms)
+✖ still-unpaid earned child withdraws after the parent is refunded (0.458882ms)
+✖ funding binds every term and cannot allocate the same agreement twice (0.458043ms)
+✖ invalid amounts, roles, deadlines and administrative callers cannot create backing (0.454843ms)
+✖ maximum supported integer deposits and refunds without rounding (1.353727ms)
+✖ a release signature cannot substitute its domain, claim, decision, asset or beneficiary (0.532003ms)
+✖ future verifier rotation does not replace a funded agreements decision key (0.436762ms)
+✖ competing mined withdrawals produce one payment and no refund (0.475563ms)
+✖ failed, taxed or malformed token transfers cannot consume a payable claim (0.419162ms)
+✖ inexact deposits and failed refunds roll back allocation and terminal state (0.397842ms)
+✖ token callbacks cannot reenter the financial transition (0.399842ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 0
+ℹ fail 16
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8972.089985
+
+✖ failing tests:
+
+test at contracts/scripts/work-claim-escrow.test.mjs:6:1
+✖ accepted claim survives deadlines, funding pause and future verifier rotation (2.255531ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:7:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.start (node:internal/test_runner/test:1177:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-escrow.test.mjs:32:1
+✖ only a timely provider commitment opens the verifier decision window (0.424562ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:33:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-escrow.test.mjs:52:50
+✖ false (0.461882ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:53:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.start (node:internal/test_runner/test:1177:17)
+      at TestContext.test (node:internal/test_runner/test:380:20)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:52:50)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-escrow.test.mjs:52:50
+✖ true (0.260082ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:53:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.start (node:internal/test_runner/test:1177:17)
+      at TestContext.test (node:internal/test_runner/test:380:20)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:52:50)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-escrow.test.mjs:73:1
+✖ rejected work refunds without creating a payment right (0.382602ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:74:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-escrow.test.mjs:86:1
+✖ still-unpaid earned child withdraws after the parent is refunded (0.458882ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:87:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-escrow.test.mjs:107:1
+✖ funding binds every term and cannot allocate the same agreement twice (0.458043ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:108:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-escrow.test.mjs:128:1
+✖ invalid amounts, roles, deadlines and administrative callers cannot create backing (0.454843ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:129:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-escrow.test.mjs:151:1
+✖ maximum supported integer deposits and refunds without rounding (1.353727ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:152:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-escrow.test.mjs:163:1
+✖ a release signature cannot substitute its domain, claim, decision, asset or beneficiary (0.532003ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:164:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-escrow.test.mjs:190:1
+✖ future verifier rotation does not replace a funded agreements decision key (0.436762ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:191:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-escrow.test.mjs:203:1
+✖ competing mined withdrawals produce one payment and no refund (0.475563ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:204:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-escrow.test.mjs:227:1
+✖ failed, taxed or malformed token transfers cannot consume a payable claim (0.419162ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:228:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-escrow.test.mjs:247:1
+✖ inexact deposits and failed refunds roll back allocation and terminal state (0.397842ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:248:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-escrow.test.mjs:268:1
+✖ token callbacks cannot reenter the financial transition (0.399842ms)
+  AssertionError [ERR_ASSERTION]: experimental work claim escrow is not implemented
+      at fixture (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:60:10)
+      at TestContext.<anonymous> (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-escrow.test.mjs:269:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:897:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

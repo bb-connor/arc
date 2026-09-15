@@ -23,6 +23,16 @@ use crate::runtime_attestation::{
 };
 use crate::session::{CHIO_REQUEST_LINEAGE_RECORD_SCHEMA, CHIO_SESSION_ANCHOR_SCHEMA};
 
+/// Bounded native funded-work signed wire families. Registration grants no trust.
+pub const CHIO_EXPERIMENTAL_NATIVE_FUNDED_AGREEMENT_V2_SCHEMA: &str =
+    "chio.experimental.native-funded-w0-agreement.v2";
+pub const CHIO_EXPERIMENTAL_NATIVE_FUNDED_SUBMISSION_V1_SCHEMA: &str =
+    "chio.experimental.native-funded-submission.v1";
+pub const CHIO_EXPERIMENTAL_NATIVE_FUNDED_DEPENDENCY_V1_SCHEMA: &str =
+    "chio.experimental.native-funded-dependency.v1";
+pub const CHIO_EXPERIMENTAL_NATIVE_FUNDED_DECISION_V2_SCHEMA: &str =
+    "chio.experimental.native-funded-decision.v2";
+
 /// Anchor-batch signed artifact schema. Defined here so non-anchor verifiers
 /// can reject unknown signed artifacts before loading the `chio-anchor` crate.
 pub const CHIO_ANCHOR_BATCH_V1_SCHEMA: &str = "chio.anchor_batch.v1";
@@ -309,10 +319,36 @@ pub const CHIO_SWARM_BUDGET_POOL_V1_SCHEMA: &str = "chio.swarm.budget-pool.v1";
 pub const CHIO_SWARM_REVOCATION_EPOCH_V1_SCHEMA: &str = "chio.swarm.revocation-epoch.v1";
 pub const CHIO_SWARM_AUTHORITY_VERIFIER_REPORT_V1_SCHEMA: &str =
     "chio.swarm.authority-verifier-report.v1";
+pub const CHIO_TOOL_MANIFEST_V2_SCHEMA: &str = "chio.manifest.v2";
 
 type SignedArtifactSchemaSpec = (&'static str, Option<(&'static str, &'static str)>);
 
 const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
+    (
+        CHIO_EXPERIMENTAL_NATIVE_FUNDED_AGREEMENT_V2_SCHEMA,
+        Some((
+            "native_funded_agreement",
+            "registered-native-funded-work-v1",
+        )),
+    ),
+    (
+        CHIO_EXPERIMENTAL_NATIVE_FUNDED_SUBMISSION_V1_SCHEMA,
+        Some((
+            "native_funded_submission",
+            "registered-native-funded-work-v1",
+        )),
+    ),
+    (
+        CHIO_EXPERIMENTAL_NATIVE_FUNDED_DEPENDENCY_V1_SCHEMA,
+        Some((
+            "native_funded_dependency",
+            "registered-native-funded-work-v1",
+        )),
+    ),
+    (
+        CHIO_EXPERIMENTAL_NATIVE_FUNDED_DECISION_V2_SCHEMA,
+        Some(("native_funded_decision", "registered-native-funded-work-v1")),
+    ),
     (
         AGGREGATE_BUDGET_ROOT_SCHEMA,
         Some(("aggregate_budget_root_binding", "protocol-primitives-v1")),
@@ -1199,6 +1235,10 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         CHIO_SWARM_AUTHORITY_VERIFIER_REPORT_V1_SCHEMA,
         Some(("swarm_authority_verifier_report", "swarm-authority-v1")),
     ),
+    (
+        CHIO_TOOL_MANIFEST_V2_SCHEMA,
+        Some(("tool_manifest", "manifest-v2")),
+    ),
     (AZURE_MAA_ATTESTATION_SCHEMA, None),
     (AWS_NITRO_ATTESTATION_SCHEMA, None),
     (GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA, None),
@@ -1260,4 +1300,36 @@ pub fn built_in_signed_artifact_registry() -> Vec<SignedArtifactSchemaEntry> {
             })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod funded_work_registration_tests {
+    use super::*;
+
+    #[test]
+    fn funded_work_registers_only_current_authority_versions() {
+        for schema in [
+            CHIO_EXPERIMENTAL_NATIVE_FUNDED_AGREEMENT_V2_SCHEMA,
+            CHIO_EXPERIMENTAL_NATIVE_FUNDED_SUBMISSION_V1_SCHEMA,
+            CHIO_EXPERIMENTAL_NATIVE_FUNDED_DEPENDENCY_V1_SCHEMA,
+            CHIO_EXPERIMENTAL_NATIVE_FUNDED_DECISION_V2_SCHEMA,
+        ] {
+            assert!(validate_signed_artifact_schema(schema).is_ok());
+            assert_eq!(
+                built_in_signed_artifact_registry()
+                    .iter()
+                    .filter(|entry| entry.schema == schema)
+                    .count(),
+                1
+            );
+        }
+        for schema in [
+            "chio.experimental.native-funded-w0-agreement.v1",
+            "chio.experimental.native-funded-decision.v1",
+            "chio.experimental.native-funded-submission.v2",
+            "chio.experimental.native-funded-dependency.v2",
+        ] {
+            assert!(validate_signed_artifact_schema(schema).is_err());
+        }
+    }
 }

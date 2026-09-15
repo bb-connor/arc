@@ -58,8 +58,10 @@ fn interceptor_required_attestation_blocks_when_signer_is_missing_or_fails() {
 #[test]
 fn kernel_capability_checker_denies_missing_and_malformed_tokens() {
     let issuer = Keypair::generate();
-    let checker =
-        KernelCapabilityChecker::new(ChioKernel::new(test_kernel_config(&issuer)), "proxy-server");
+    let checker = test_kernel_capability_checker(
+        ChioKernel::new(test_kernel_config(&issuer)),
+        "proxy-server",
+    );
     let request = AcpCapabilityRequest {
         session_id: "session-1".to_string(),
         tool_call_id: None,
@@ -105,7 +107,7 @@ fn kernel_capability_checker_enforces_time_bounds_and_scope() {
             supports_checkpoints: false,
         }))
         .expect("test receipt store should install");
-    let checker = KernelCapabilityChecker::new(kernel, "proxy-server");
+    let checker = test_kernel_capability_checker(kernel, "proxy-server");
 
     let valid = make_capability_token(
         &issuer,
@@ -277,8 +279,10 @@ fn kernel_capability_checker_supports_wildcard_terminal_grants() {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
     let now = now_secs();
-    let checker =
-        KernelCapabilityChecker::new(ChioKernel::new(test_kernel_config(&issuer)), "proxy-server");
+    let checker = test_kernel_capability_checker(
+        ChioKernel::new(test_kernel_config(&issuer)),
+        "proxy-server",
+    );
     let token = make_capability_token(
         &issuer,
         &subject,
@@ -332,7 +336,7 @@ fn kernel_capability_checker_requires_and_forwards_execution_nonce_in_strict_mod
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
     );
-    let checker = KernelCapabilityChecker::new(kernel, "proxy-server");
+    let checker = test_kernel_capability_checker(kernel, "proxy-server");
     let token = make_capability_token(
         &issuer,
         &subject,
@@ -390,7 +394,7 @@ fn interceptor_strict_nonce_preflight_returns_nonce_then_forwards_once() {
         cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
     );
-    let checker = KernelCapabilityChecker::new(kernel, "proxy-server");
+    let checker = test_kernel_capability_checker(kernel, "proxy-server");
     let token = make_capability_token(
         &issuer,
         &subject,
@@ -471,8 +475,10 @@ fn kernel_capability_checker_rejects_untrusted_and_tampered_tokens() {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
     let now = now_secs();
-    let trusted_checker =
-        KernelCapabilityChecker::new(ChioKernel::new(test_kernel_config(&issuer)), "proxy-server");
+    let trusted_checker = test_kernel_capability_checker(
+        ChioKernel::new(test_kernel_config(&issuer)),
+        "proxy-server",
+    );
 
     let token = make_capability_token(
         &issuer,
@@ -485,7 +491,7 @@ fn kernel_capability_checker_rejects_untrusted_and_tampered_tokens() {
     );
 
     let untrusted_issuer = Keypair::generate();
-    let untrusted_checker = KernelCapabilityChecker::new(
+    let untrusted_checker = test_kernel_capability_checker(
         ChioKernel::new(test_kernel_config(&untrusted_issuer)),
         "proxy-server",
     );

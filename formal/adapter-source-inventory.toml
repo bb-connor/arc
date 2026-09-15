@@ -11,14 +11,916 @@ explicit_roots = [
   "crates/products/chio-api-protect/src",
   "crates/protocol/chio-cross-protocol/src",
   "crates/protocol/chio-openapi/src",
+  "crates/protocol/chio-tower/src",
 ]
 
 contract_sources = [
+  "crates/kernel/chio-kernel/src/provider_verdict.rs",
   "crates/kernel/chio-kernel/src/kernel/validation.rs",
+  "crates/kernel/chio-kernel/src/kernel/validation/caller_budget.rs",
   "crates/kernel/chio-runtime-core/src/admission_hook.rs",
+  "crates/kernel/chio-runtime-core/src/admission_hook/preparation.rs",
+  "crates/kernel/chio-runtime-core/src/admission_hook/reservation.rs",
   "crates/kernel/chio-runtime-core/src/admission_hook/swarm_authority.rs",
   "crates/kernel/chio-runtime-core/src/admission_hook/swarm_ref.rs",
   "crates/products/chio-api-protect/src/evaluator.rs",
+  "crates/products/chio-cli/src/cli/runtime.rs",
+  "crates/protocol/chio-a2a-edge/src/edge.rs",
+  "crates/protocol/chio-cross-protocol/src/execution.rs",
+  "crates/protocol/chio-cross-protocol/src/orchestrator.rs",
   "crates/protocol/chio-acp-edge/src/edge.rs",
+  "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc",
   "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
+  "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs",
+  "crates/protocol/chio-openai-adapter/src/lib.rs",
+  "crates/protocol/chio-tower/src/kernel_service.rs",
 ]
+
+# Exact construction references. Profiles and acceptance evidence are tracked by
+# the stable IDs in docs/security/consumer-support.md.
+
+[[constructor_sites]]
+id = "C01"
+path = "crates/platform/chio-control-plane/src/lib.rs"
+symbol = "build_kernel"
+target = "build_kernel_components"
+references = 1
+
+[[constructor_sites]]
+id = "C02"
+path = "crates/platform/chio-control-plane/src/lib.rs"
+symbol = "build_kernel_components"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C03"
+path = "crates/platform/chio-control-plane/src/lib.rs"
+symbol = "build_kernel_with_active_defense"
+target = "build_kernel_components"
+references = 1
+
+[[constructor_sites]]
+id = "C04"
+path = "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs"
+symbol = "RemoteSessionFactory::spawn_session"
+target = "build_kernel"
+references = 1
+
+[[constructor_sites]]
+id = "C05"
+path = "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs"
+symbol = "RemoteSessionFactory::restore_session"
+target = "build_kernel"
+references = 1
+
+[[constructor_sites]]
+id = "C06"
+path = "crates/platform/chio-http-core/src/authority.rs"
+symbol = "HttpAuthority::assemble"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C07"
+path = "crates/platform/chio-http-core/src/authority.rs"
+symbol = "HttpAuthorityBuilder::build"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C08"
+path = "crates/products/chio-api-protect/src/proxy/mediated.rs"
+symbol = "build_mediation_kernel"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C09"
+path = "crates/products/chio-cli/src/cli/runtime.rs"
+symbol = "build_mcp_edge_kernel"
+target = "build_kernel"
+references = 1
+
+[[constructor_sites]]
+id = "C10"
+path = "crates/products/chio-cli/src/cli/runtime.rs"
+symbol = "cmd_mcp_serve"
+target = "build_mcp_edge_kernel"
+references = 1
+
+[[constructor_sites]]
+id = "C11"
+path = "crates/products/chio-cli/src/cli/runtime.rs"
+symbol = "cmd_run"
+target = "build_kernel"
+references = 1
+
+[[constructor_sites]]
+id = "C12"
+path = "crates/products/chio-cli/src/cli/runtime.rs"
+symbol = "cmd_check"
+target = "build_kernel"
+references = 1
+
+[[constructor_sites]]
+id = "C13"
+path = "crates/products/chio-cli/src/cli/mcp/wrap.rs"
+symbol = "KernelMediatedMcpTransport::new"
+target = "chio_kernel::ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C14"
+path = "crates/products/chio-cli/src/cli/mcp/governed_sim.rs"
+symbol = "cmd_mcp_governed_sim"
+target = "chio_kernel::ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C15"
+path = "crates/products/chio-cli/src/cli/replay/execute.rs"
+symbol = "run_traffic_replay"
+target = "build_kernel"
+references = 1
+
+[[constructor_sites]]
+id = "C16"
+path = "crates/kernel/chio-runtime-harness/src/kernel.rs"
+symbol = "execute_runtime_loopback_step"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C17"
+path = "crates/platform/chio-control-plane/src/trust_control/finding_operator_purchase.rs"
+symbol = "FindingOperatorPurchaseExecutor::build_kernel"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C18"
+path = "examples/hello-mcp/src/lib.rs"
+symbol = "build_demo_state"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C19"
+path = "examples/hello-a2a/src/lib.rs"
+symbol = "build_demo_state"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C20"
+path = "examples/hello-acp/src/lib.rs"
+symbol = "build_demo_state"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C21"
+path = "crates/tooling/chio-conformance/src/native_suite.rs"
+symbol = "capture_runtime_revocation_trace_with_store"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C22"
+path = "crates/tooling/chio-conformance/verdict_matrix/src/driver.rs"
+symbol = "evaluate_scenario"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C23"
+path = "crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_fixture.rs"
+symbol = "TreatyPredispatchDenyFixture::new"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C24"
+path = "crates/kernel/chio-kernel/benches/fixtures/dispatch_request_fixture.rs"
+symbol = "DispatchAllowFixture::new"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C25"
+path = "bench/chio-loadgen/src/stack.rs"
+symbol = "StackHarness::boot_inner"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C26"
+path = "crates/protocol/chio-mcp-edge/src/fuzz.rs"
+symbol = "make_kernel"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C27"
+path = "crates/protocol/chio-acp-edge/src/fuzz.rs"
+symbol = "make_kernel"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C28"
+path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_test_support.rs"
+symbol = "open_kernel"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C29"
+path = "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_06.inc"
+symbol = "build_real_adapter_runtime"
+target = "ChioKernel::new"
+references = 1
+
+# Exact physical dispatch/caller references. D IDs include policy probes and
+# harnesses, which are classified separately from production execution hosts.
+
+# Research harnesses and the bounded funded-work example, reviewed during M4 integration.
+[[constructor_sites]]
+id = "C30"
+path = "crates/kernel/chio-runtime-core/benches/fixtures/admission_scaling_fixture.rs"
+symbol = "AdmissionScalingFixture::new"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C31"
+path = "crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_allow_fixture.rs"
+symbol = "TreatyPredispatchAllowFixture::new"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C32"
+path = "crates/kernel/chio-runtime-core/examples/outcome_artifact_workflow.rs"
+symbol = "kernel"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C33"
+path = "crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs"
+symbol = "run_receiver"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C34"
+path = "examples/federated-work/src/provider.rs"
+symbol = "serve_transport"
+target = "ChioKernel::new"
+references = 1
+
+[[constructor_sites]]
+id = "C35"
+path = "examples/outcome-ledger-comparison/src/workload.rs"
+symbol = "configured_kernel"
+target = "ChioKernel::new"
+references = 1
+
+[[dispatch_sites]]
+id = "D001"
+path = "bench/chio-loadgen/src/stack.rs"
+symbol = "StackHarness::dispatch_allow_once"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D002"
+path = "bench/chio-loadgen/src/stack.rs"
+symbol = "StackHarness::dispatch_once_verdict"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D003"
+path = "crates/core/chio-arena/src/link/multiplex.rs"
+symbol = "KernelMultiplexer::route"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D004"
+path = "crates/core/chio-arena/src/runtime.rs"
+symbol = "ArenaRuntime::run"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D005"
+path = "crates/core/chio-arena/src/runtime.rs"
+symbol = "ArenaRuntime::run_multi_agent"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D006"
+path = "crates/guards/chio-policy/src/evaluate/engine.rs"
+symbol = "evaluate"
+target = "evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D007"
+path = "crates/guards/chio-policy/src/evaluate/engine.rs"
+symbol = "evaluate_with_context"
+target = "evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D008"
+path = "crates/kernel/chio-kernel/benches/fixtures/dispatch_request_fixture.rs"
+symbol = "DispatchAllowFixture::dispatch_allow_once"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D009"
+path = "crates/kernel/chio-kernel/benches/fixtures/dispatch_request_fixture.rs"
+symbol = "DispatchAllowFixture::dispatch_deny_once"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D010"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs"
+symbol = "ChioKernel::reconcile_caller_execution_blocking"
+target = ".evaluate_tool_call_async_with_session_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D011"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs"
+symbol = "ChioKernel::reserve_caller_execution_step"
+target = ".evaluate_tool_call_async_with_session_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D012"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs"
+symbol = "ChioKernel::start_caller_execution_blocking"
+target = ".start_caller_execution_with_credentials_blocking"
+references = 1
+
+[[dispatch_sites]]
+id = "D013"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs"
+symbol = "ChioKernel::start_caller_execution_blocking_with_security_context"
+target = ".start_caller_execution_inner"
+references = 1
+
+[[dispatch_sites]]
+id = "D014"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs"
+symbol = "ChioKernel::start_caller_execution_inner"
+target = ".evaluate_tool_call_async_with_session_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D015"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs"
+symbol = "ChioKernel::start_caller_execution_with_credentials_blocking"
+target = ".start_caller_execution_inner"
+references = 1
+
+[[dispatch_sites]]
+id = "D016"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_entry.rs"
+symbol = "ChioKernel::evaluate_tool_call"
+target = ".evaluate_tool_call_async_with_session_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D017"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_entry.rs"
+symbol = "ChioKernel::evaluate_tool_call_async_with_session_context"
+target = ".evaluate_tool_call_async_with_session_context_scoped"
+references = 1
+
+[[dispatch_sites]]
+id = "D018"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_entry.rs"
+symbol = "ChioKernel::evaluate_tool_call_with_manifest_security"
+target = ".evaluate_tool_call_async_with_session_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D019"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_entry.rs"
+symbol = "ChioKernel::evaluate_tool_call_with_manifest_security_and_security_context"
+target = ".evaluate_tool_call_async_with_session_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D020"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_entry.rs"
+symbol = "ChioKernel::evaluate_tool_call_with_metadata"
+target = ".evaluate_tool_call_async_with_session_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D021"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_entry.rs"
+symbol = "ChioKernel::evaluate_tool_call_with_metadata_and_security_context"
+target = ".evaluate_tool_call_async_with_session_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D022"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_entry.rs"
+symbol = "ChioKernel::evaluate_tool_call_with_security_context"
+target = ".evaluate_tool_call_async_with_session_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D023"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs"
+symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_and_security_context"
+target = ".evaluate_tool_call_with_nested_flow_client_async_and_security_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D024"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs"
+symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_and_security_context"
+target = ".evaluate_tool_call_with_nested_flow_client_async_scoped"
+references = 1
+
+[[dispatch_sites]]
+id = "D025"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
+symbol = "ChioKernel::authorize_tool_call_reserving_blocking_with_metadata"
+target = ".evaluate_tool_call_async_with_session_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D026"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
+symbol = "ChioKernel::evaluate_tool_call_blocking"
+target = ".evaluate_tool_call_sync_inner"
+references = 1
+
+[[dispatch_sites]]
+id = "D027"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
+symbol = "ChioKernel::evaluate_tool_call_blocking_with_manifest_security"
+target = ".evaluate_tool_call_sync_inner"
+references = 1
+
+[[dispatch_sites]]
+id = "D028"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
+symbol = "ChioKernel::evaluate_tool_call_blocking_with_manifest_security_and_authenticated_session_context"
+target = ".evaluate_tool_call_sync_with_session_and_security_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D029"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
+symbol = "ChioKernel::evaluate_tool_call_blocking_with_manifest_security_and_security_context"
+target = ".evaluate_tool_call_sync_with_session_and_security_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D030"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
+symbol = "ChioKernel::evaluate_tool_call_blocking_with_metadata"
+target = ".evaluate_tool_call_sync_inner"
+references = 1
+
+[[dispatch_sites]]
+id = "D031"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
+symbol = "ChioKernel::evaluate_tool_call_blocking_with_security_context"
+target = ".evaluate_tool_call_sync_with_session_and_security_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D032"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
+symbol = "ChioKernel::evaluate_tool_call_sync"
+target = ".evaluate_tool_call_sync_inner"
+references = 1
+
+[[dispatch_sites]]
+id = "D033"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
+symbol = "ChioKernel::evaluate_tool_call_sync_inner"
+target = ".evaluate_tool_call_sync_with_session_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D034"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
+symbol = "ChioKernel::evaluate_tool_call_sync_with_session_and_security_context"
+target = ".evaluate_tool_call_async_with_session_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D035"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
+symbol = "ChioKernel::evaluate_tool_call_sync_with_session_context"
+target = ".evaluate_tool_call_sync_with_session_and_security_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D036"
+path = "crates/kernel/chio-kernel/src/kernel/evaluator.rs"
+symbol = "<BlockingToolEvaluator as ToolEvaluator>::evaluate"
+target = ".evaluate_tool_call_sync"
+references = 2
+
+[[dispatch_sites]]
+id = "D037"
+path = "crates/kernel/chio-kernel/src/kernel/evaluator.rs"
+symbol = "<BlockingToolEvaluator as ToolEvaluator>::evaluate_with_metadata"
+target = ".evaluate_tool_call_blocking_with_metadata"
+references = 2
+
+[[dispatch_sites]]
+id = "D038"
+path = "crates/kernel/chio-kernel/src/kernel/session_ops.rs"
+symbol = "ChioKernel::evaluate_session_operation"
+target = ".evaluate_tool_call_sync_with_session_and_security_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D039"
+path = "crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs"
+symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client"
+target = ".evaluate_tool_call_operation_with_nested_flow_client_and_proofs"
+references = 1
+
+[[dispatch_sites]]
+id = "D040"
+path = "crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs"
+symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_and_proofs"
+target = ".evaluate_tool_call_with_nested_flow_client_and_security_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D041"
+path = "crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs"
+symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_and_proofs_async"
+target = ".evaluate_tool_call_with_nested_flow_client_async_and_security_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D042"
+path = "crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs"
+symbol = "ChioKernel::evaluate_tool_call_operation_with_nested_flow_client_async"
+target = ".evaluate_tool_call_operation_with_nested_flow_client_and_proofs_async"
+references = 1
+
+[[dispatch_sites]]
+id = "D043"
+path = "crates/kernel/chio-kernel/src/provider_verdict.rs"
+symbol = "ChioKernel::verdict_for_provider_invocation_inner"
+target = ".evaluate_tool_call_blocking_with_manifest_security"
+references = 1
+
+[[dispatch_sites]]
+id = "D044"
+path = "crates/kernel/chio-kernel/src/provider_verdict.rs"
+symbol = "ChioKernel::verdict_for_provider_invocation_inner"
+target = ".evaluate_tool_call_blocking_with_manifest_security_and_security_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D045"
+path = "crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_fixture.rs"
+symbol = "TreatyPredispatchDenyFixture::evaluate_once"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D046"
+path = "crates/kernel/chio-runtime-harness/src/kernel.rs"
+symbol = "execute_runtime_loopback_step"
+target = ".evaluate_tool_call_with_metadata"
+references = 1
+
+[[dispatch_sites]]
+id = "D047"
+path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_races.rs"
+symbol = "race"
+target = ".evaluate_tool_call_blocking_with_security_context"
+references = 4
+
+[[dispatch_sites]]
+id = "D048"
+path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_recovery.rs"
+symbol = "run_child"
+target = ".evaluate_tool_call_blocking_with_security_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D049"
+path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_restart.rs"
+symbol = "verify"
+target = ".evaluate_tool_call_blocking_with_security_context"
+references = 2
+
+[[dispatch_sites]]
+id = "D050"
+path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_restart.rs"
+symbol = "verify"
+target = ".reconcile_caller_execution_blocking"
+references = 1
+
+[[dispatch_sites]]
+id = "D051"
+path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_test_support.rs"
+symbol = "Fixture::deny_native"
+target = ".evaluate_tool_call_blocking_with_security_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D052"
+path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_test_support.rs"
+symbol = "Fixture::run_policy"
+target = ".evaluate_tool_call_blocking_with_security_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D053"
+path = "crates/platform/chio-control-plane/src/trust_control/finding_operator_purchase.rs"
+symbol = "FindingOperatorPurchaseExecutor::execute_new"
+target = ".evaluate_tool_call_blocking"
+references = 1
+
+[[dispatch_sites]]
+id = "D054"
+path = "crates/platform/chio-http-core/src/authority.rs"
+symbol = "HttpAuthority::authorize_via_kernel"
+target = ".evaluate_tool_call_blocking_with_metadata"
+references = 1
+
+[[dispatch_sites]]
+id = "D055"
+path = "crates/products/chio-api-protect/src/proxy/mediated.rs"
+symbol = "sidecar_reconcile_handler"
+target = ".reconcile_caller_execution_blocking"
+references = 1
+
+[[dispatch_sites]]
+id = "D056"
+path = "crates/products/chio-api-protect/src/proxy/mediated/authenticated.rs"
+symbol = "start"
+target = ".start_caller_execution_with_credentials_blocking"
+references = 1
+
+[[dispatch_sites]]
+id = "D057"
+path = "crates/products/chio-cli/src/cli/mcp/governed_sim.rs"
+symbol = "cmd_mcp_governed_sim"
+target = ".evaluate_tool_call_blocking"
+references = 1
+
+[[dispatch_sites]]
+id = "D058"
+path = "crates/products/chio-cli/src/cli/mcp/wrap.rs"
+symbol = "<KernelMediatedMcpTransport as chio_mcp_adapter::edge::McpTransport>::call_tool"
+target = ".evaluate_tool_call_blocking"
+references = 2
+
+[[dispatch_sites]]
+id = "D059"
+path = "crates/protocol/chio-cross-protocol/src/execution.rs"
+symbol = "evaluate_bound_kernel_request"
+target = ".evaluate_tool_call_blocking_with_manifest_security"
+references = 1
+
+[[dispatch_sites]]
+id = "D060"
+path = "crates/protocol/chio-cross-protocol/src/execution.rs"
+symbol = "evaluate_bound_kernel_request"
+target = ".evaluate_tool_call_blocking_with_manifest_security_and_authenticated_session_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D061"
+path = "crates/protocol/chio-cross-protocol/src/execution.rs"
+symbol = "evaluate_bound_kernel_request"
+target = ".evaluate_tool_call_blocking_with_manifest_security_and_security_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D062"
+path = "crates/protocol/chio-mcp-edge/src/runtime/tasks.rs"
+symbol = "ChioMcpEdge::handle_tasks_result"
+target = ".evaluate_tool_call_operation"
+references = 1
+
+[[dispatch_sites]]
+id = "D063"
+path = "crates/protocol/chio-mcp-edge/src/runtime/tasks.rs"
+symbol = "ChioMcpEdge::handle_tasks_result_with_transport"
+target = ".evaluate_tool_call_operation_with_transport"
+references = 1
+
+[[dispatch_sites]]
+id = "D064"
+path = "crates/protocol/chio-mcp-edge/src/runtime/tasks.rs"
+symbol = "ChioMcpEdge::handle_tasks_result_with_transport_channel"
+target = ".evaluate_tool_call_operation_with_transport_channel"
+references = 1
+
+[[dispatch_sites]]
+id = "D065"
+path = "crates/protocol/chio-mcp-edge/src/runtime/tasks.rs"
+symbol = "ChioMcpEdge::process_background_tasks"
+target = ".evaluate_tool_call_operation"
+references = 1
+
+[[dispatch_sites]]
+id = "D066"
+path = "crates/protocol/chio-mcp-edge/src/runtime/tasks.rs"
+symbol = "ChioMcpEdge::process_background_tasks_with_channel"
+target = ".evaluate_tool_call_operation_with_transport_channel"
+references = 1
+
+[[dispatch_sites]]
+id = "D067"
+path = "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs"
+symbol = "ChioMcpEdge::evaluate_tool_call_operation_with_transport"
+target = ".evaluate_tool_call_operation_with_nested_flow_client"
+references = 1
+
+[[dispatch_sites]]
+id = "D068"
+path = "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs"
+symbol = "ChioMcpEdge::evaluate_tool_call_operation_with_transport_channel"
+target = ".evaluate_tool_call_operation_with_nested_flow_client"
+references = 1
+
+[[dispatch_sites]]
+id = "D069"
+path = "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs"
+symbol = "ChioMcpEdge::handle_tools_call"
+target = ".evaluate_tool_call_operation"
+references = 1
+
+[[dispatch_sites]]
+id = "D070"
+path = "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs"
+symbol = "ChioMcpEdge::handle_tools_call_with_transport"
+target = ".evaluate_tool_call_operation_with_transport"
+references = 1
+
+[[dispatch_sites]]
+id = "D071"
+path = "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs"
+symbol = "ChioMcpEdge::handle_tools_call_with_transport_channel"
+target = ".evaluate_tool_call_operation_with_transport_channel"
+references = 1
+
+[[dispatch_sites]]
+id = "D072"
+path = "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs"
+symbol = "execute_bridge_mcp_tool_call"
+target = ".evaluate_tool_call_blocking_with_metadata"
+references = 1
+
+[[dispatch_sites]]
+id = "D073"
+path = "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs"
+symbol = "execute_bridge_mcp_tool_call_async"
+target = ".evaluate_tool_call_with_metadata"
+references = 1
+
+[[dispatch_sites]]
+id = "D074"
+path = "crates/protocol/chio-openai-adapter/src/lib.rs"
+symbol = "ChioOpenAiAdapter::execute_tool_call"
+target = ".evaluate_tool_call_blocking_with_metadata"
+references = 1
+
+[[dispatch_sites]]
+id = "D075"
+path = "crates/protocol/chio-tower/src/kernel_service.rs"
+symbol = "<KernelService as Service<KernelRequest>>::call"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D076"
+path = "crates/tooling/chio-conformance/src/native_suite.rs"
+symbol = "capture_runtime_revocation_trace_with_store"
+target = ".evaluate_tool_call_blocking"
+references = 2
+
+[[dispatch_sites]]
+id = "D077"
+path = "crates/tooling/chio-conformance/verdict_matrix/src/driver.rs"
+symbol = "evaluate_replay_scenario"
+target = ".evaluate_tool_call_blocking_with_metadata"
+references = 1
+
+[[dispatch_sites]]
+id = "D078"
+path = "crates/tooling/chio-conformance/verdict_matrix/src/driver.rs"
+symbol = "evaluate_scenario"
+target = ".evaluate_tool_call_blocking_with_metadata"
+references = 1
+
+[[dispatch_sites]]
+id = "D079"
+path = "examples/hello-mcp/src/lib.rs"
+symbol = "bridge_call_value"
+target = ".evaluate_tool_call_blocking_with_metadata"
+references = 1
+
+[[dispatch_sites]]
+id = "D080"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs"
+symbol = "ChioKernel::reserve_caller_execution_blocking"
+target = ".reserve_caller_execution_inner"
+references = 1
+
+[[dispatch_sites]]
+id = "D081"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs"
+symbol = "ChioKernel::reserve_caller_execution_blocking_with_security_context"
+target = ".reserve_caller_execution_inner"
+references = 1
+
+[[dispatch_sites]]
+id = "D082"
+path = "crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs"
+symbol = "ChioKernel::reserve_caller_execution_inner"
+target = ".reserve_caller_execution_step"
+references = 2
+
+[[dispatch_sites]]
+id = "D083"
+path = "crates/kernel/chio-kernel/src/provider_verdict.rs"
+symbol = "ChioKernel::verdict_for_provider_invocation"
+target = ".verdict_for_provider_invocation_inner"
+references = 1
+
+[[dispatch_sites]]
+id = "D084"
+path = "crates/kernel/chio-kernel/src/provider_verdict.rs"
+symbol = "ChioKernel::verdict_for_provider_invocation_with_security_context"
+target = ".verdict_for_provider_invocation_inner"
+references = 1
+
+[[dispatch_sites]]
+id = "D085"
+path = "crates/products/chio-api-protect/src/proxy/mediated.rs"
+symbol = "sidecar_evaluate_tool_call_mediated_handler"
+target = ".authorize_tool_call_reserving_blocking_with_metadata"
+references = 1
+
+[[dispatch_sites]]
+id = "D086"
+path = "crates/products/chio-api-protect/src/proxy/mediated.rs"
+symbol = "sidecar_evaluate_tool_call_mediated_handler"
+target = ".reserve_caller_execution_blocking"
+references = 1
+
+[[dispatch_sites]]
+id = "D087"
+path = "crates/kernel/chio-runtime-core/benches/fixtures/admission_scaling_fixture.rs"
+symbol = "AdmissionScalingFixture::evaluate_once"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D088"
+path = "crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_allow_fixture.rs"
+symbol = "TreatyPredispatchAllowFixture::evaluate_once"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D089"
+path = "crates/kernel/chio-runtime-core/examples/outcome_artifact_workflow.rs"
+symbol = "invoke"
+target = ".evaluate_tool_call_blocking"
+references = 1
+
+[[dispatch_sites]]
+id = "D090"
+path = "crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs"
+symbol = "Receiver::call"
+target = ".evaluate_tool_call"
+references = 1
+
+[[dispatch_sites]]
+id = "D091"
+path = "examples/outcome-ledger-comparison/src/workload.rs"
+symbol = "invoke_authorized"
+target = ".evaluate_tool_call_blocking"
+references = 1

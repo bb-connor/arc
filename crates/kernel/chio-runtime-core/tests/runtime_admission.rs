@@ -57,11 +57,26 @@ use std::io;
 use chio_runtime_core::ChioRuntimeError;
 
 mod support;
+
+#[path = "support/treaty_presentation.rs"]
+mod treaty_presentation;
 use support::treaty::{treaty_action_class, treaty_manifest, treaty_scope};
 
 #[path = "runtime_admission/swarm_request_support.rs"]
 mod swarm_request_support;
 use swarm_request_support::{chio_swarm_runtime_request, swarm_runtime_context};
+
+#[path = "runtime_admission/swarm_binding.rs"]
+mod swarm_binding;
+
+#[path = "runtime_admission/swarm_fixtures.rs"]
+mod swarm_fixtures;
+use swarm_fixtures::{
+    canonical_test_hash, runtime_swarm_continuation, runtime_swarm_join_parent_set_hash,
+    runtime_swarm_revocation_root, runtime_swarm_route_plan_receipt, runtime_swarm_scope,
+    runtime_swarm_terminal_graph_receipt, runtime_swarm_witness_chain, swarm_witness_issuer,
+    swarm_witness_keypair, trusted_swarm_witness_keys,
+};
 
 fn emit_threat_matrix_code(code: &str) {
     if std::env::var_os("CHIO_THREAT_MATRIX_EMIT_CODE").is_some() {
@@ -140,6 +155,13 @@ fn bundle() -> RuntimeAdmissionBundle {
 }
 
 include!("runtime_admission/fault_cases.rs");
+
+#[path = "runtime_admission/preparation.rs"]
+mod preparation;
+
+#[path = "runtime_admission/operation_owned.rs"]
+#[cfg(unix)]
+mod operation_owned;
 
 #[test]
 fn chio_native_runtime_admission_schema_emits_chio_report() -> Result<(), Box<dyn std::error::Error>>
@@ -343,11 +365,18 @@ fn runtime_failure_code_registry_covers_hook_surface_codes() {
     assert_eq!(registry.len(), CHIO_RUNTIME_FAILURE_CODES.len());
 
     for code in [
+        "admission_bundle_id_mismatch",
+        "runtime_trust_floor_store_unsupported",
+        "runtime_replay_source_invalid",
+        "runtime_replay_source_inventory_limit",
+        "runtime_replay_source_sealed",
         "missing_governed_intent",
         "missing_chio_admission_context",
         "invalid_chio_admission_context",
         "missing_admission_id",
         "invalid_chio_swarm_context",
+        "missing_chio_swarm_context",
+        "runtime_admission_swarm_unsupported",
         "invalid_chio_swarm_evidence_ref",
         "missing_chio_swarm_evidence_ref",
         "missing_chio_swarm_authority_bundle",
@@ -1093,6 +1122,7 @@ fn chio_runtime_hook_releases_chio_native_reserved_state_after_kernel_abort(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let hook = allowing_chio_policy_hook(store)?;
     let context = RuntimeAdmissionContext {
@@ -1177,6 +1207,7 @@ fn chio_runtime_hook_denies_swarm_context_without_required_evidence_refs(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let hook = allowing_chio_policy_hook(store)?;
     let decision = hook.evaluate(&RuntimeAdmissionContext {
@@ -1250,6 +1281,7 @@ fn chio_runtime_hook_denies_stale_swarm_continuation_before_dispatch(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let hook =
         allowing_chio_policy_hook(store)?.with_swarm_witness_keys(trusted_swarm_witness_keys());
@@ -1766,36 +1798,7 @@ fn kernel_hook_uses_configured_runtime_policy_to_deny() -> Result<(), Box<dyn st
     bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
     let bundle_hash = runtime_admission_bundle_sha256(&bundle)?;
     store.insert_bundle(bundle)?;
-    store.insert_treaty_runtime_artifact(
-        "treaty_scope",
-        &fixture.treaty_scope.treaty_id,
-        &fixture.treaty_scope,
-    )?;
-    store.insert_treaty_runtime_artifact(
-        "ladder_intersection",
-        &fixture.ladder_intersection.intersection_id,
-        &fixture.ladder_intersection,
-    )?;
-    store.insert_treaty_runtime_artifact(
-        "cross_kernel_continuation",
-        &fixture.continuation.continuation_id,
-        &fixture.continuation,
-    )?;
-    store.insert_treaty_runtime_artifact(
-        "receipt_lineage_bundle",
-        &fixture.lineage_bundle.bundle_id,
-        &fixture.lineage_bundle,
-    )?;
-    store.insert_treaty_runtime_artifact(
-        "bilateral_invocation",
-        &fixture.bilateral_invocation.invocation_id,
-        &fixture.bilateral_invocation,
-    )?;
-    store.insert_treaty_runtime_artifact(
-        "bilateral_dsse_envelope",
-        &fixture.bilateral_dsse_id,
-        &fixture.bilateral_dsse,
-    )?;
+    insert_in_memory_treaty_runtime_fixture(&store, &fixture)?;
     let request = treaty_runtime_request(args, bundle_hash, treaty_runtime_context(&fixture))?;
 
     let verifier = Keypair::generate();
@@ -2020,6 +2023,18 @@ fn treaty_runtime_fixture() -> Result<TreatyRuntimeFixture, Box<dyn std::error::
 fn treaty_runtime_fixture_with_policy(
     policy_evaluation_summary: PolicyEvaluationSummary,
 ) -> Result<TreatyRuntimeFixture, Box<dyn std::error::Error>> {
+    treaty_runtime_fixture_with_signers(
+        policy_evaluation_summary,
+        Keypair::generate(),
+        Keypair::generate(),
+    )
+}
+
+fn treaty_runtime_fixture_with_signers(
+    policy_evaluation_summary: PolicyEvaluationSummary,
+    signer_a: Keypair,
+    signer_b: Keypair,
+) -> Result<TreatyRuntimeFixture, Box<dyn std::error::Error>> {
     let buyer = treaty_manifest(
         "kernel.buyer",
         treaty_action_class(
@@ -2038,8 +2053,6 @@ fn treaty_runtime_fixture_with_policy(
             vec!["bilateral_dsse", "bilateral_invocation", "receipt_lineage"],
         ),
     );
-    let signer_a = Keypair::generate();
-    let signer_b = Keypair::generate();
     let mut treaty_scope = treaty_scope();
     treaty_scope.participant_public_keys = vec![signer_a.public_key(), signer_b.public_key()];
     treaty_scope.ladder_manifest_sha256s = vec![
@@ -2230,6 +2243,13 @@ fn insert_treaty_runtime_fixture(
     store: &SqliteRuntimeOrchestrationStore,
     fixture: &TreatyRuntimeFixture,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let (lease, governance) = treaty_presentation::records(&fixture.bilateral_dsse)?;
+    store.insert_treaty_runtime_artifact("capability_lease", &lease.lease.lease_id, &lease)?;
+    store.insert_treaty_runtime_artifact(
+        "governance_receipt",
+        &governance.receipt.receipt_id,
+        &governance,
+    )?;
     store.insert_treaty_runtime_artifact(
         "treaty_scope",
         &fixture.treaty_scope.treaty_id,
@@ -2267,6 +2287,13 @@ fn insert_in_memory_treaty_runtime_fixture(
     store: &InMemoryRuntimeAdmissionStore,
     fixture: &TreatyRuntimeFixture,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let (lease, governance) = treaty_presentation::records(&fixture.bilateral_dsse)?;
+    store.insert_treaty_runtime_artifact("capability_lease", &lease.lease.lease_id, &lease)?;
+    store.insert_treaty_runtime_artifact(
+        "governance_receipt",
+        &governance.receipt.receipt_id,
+        &governance,
+    )?;
     store.insert_treaty_runtime_artifact(
         "treaty_scope",
         &fixture.treaty_scope.treaty_id,
@@ -2369,6 +2396,7 @@ fn treaty_runtime_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
+        declassification_grant: None,
     };
     request.governed_intent = Some(GovernedTransactionIntent {
         id: "intent-live-1".to_string(),
@@ -2649,199 +2677,58 @@ fn runtime_swarm_bundle(
 
     Ok(bundle)
 }
-
-fn runtime_swarm_continuation(
-    token_id: &str,
-    child_task_id: &str,
-    route_plan_receipt_id: &str,
-    budget_allocation_id: &str,
-    graph_sha256: &str,
-    revocation_epoch_root_hash: &str,
-    stale: bool,
-) -> Result<SwarmContinuationToken, Box<dyn std::error::Error>> {
-    let mut token = SwarmContinuationToken {
-        schema: CHIO_SWARM_CONTINUATION_TOKEN_SCHEMA.to_string(),
-        token_id: token_id.to_string(),
-        graph_id: "swarm-graph-runtime".to_string(),
-        child_task_id: child_task_id.to_string(),
-        parent_task_id: Some("task-root".to_string()),
-        join_receipt_id: None,
-        parent_receipt_ids: vec!["receipt-root".to_string()],
-        graph_sha256: graph_sha256.to_string(),
-        route_plan_receipt_id: route_plan_receipt_id.to_string(),
-        budget_allocation_id: budget_allocation_id.to_string(),
-        witness_chain_ref: None,
-        witness_chain_sha256: None,
-        revocation_epoch_ref: "revocation-epoch-runtime".to_string(),
-        revocation_epoch_root_hash: revocation_epoch_root_hash.to_string(),
-        session_anchor_ref: "session-anchor-runtime".to_string(),
-        nonce: format!("nonce-{child_task_id}"),
-        mode: SwarmContinuationMode::SingleUse,
-        issued_at_unix_ms: 1_800_000_000_000,
-        expires_at_unix_ms: if stale {
-            1_800_000_000_999
-        } else {
-            1_800_003_600_000
-        },
-        issuer: swarm_witness_issuer(),
-        signature: String::new(),
-    };
-    token.signature = sign_swarm_continuation_token(&token, &swarm_witness_keypair())?;
-    Ok(token)
-}
-
-fn runtime_swarm_witness_chain(
-    chain_id: &str,
-    child_task_id: &str,
-    parent_scope_hash: &str,
-    child_scope_hash: &str,
-    scope_subset_proof: chio_core_types::capability::attenuation::AttenuationWitness,
-) -> Result<SwarmDelegationWitnessChain, Box<dyn std::error::Error>> {
-    let mut chain = SwarmDelegationWitnessChain {
-        schema: CHIO_SWARM_DELEGATION_WITNESS_CHAIN_SCHEMA.to_string(),
-        chain_id: chain_id.to_string(),
-        graph_id: "swarm-graph-runtime".to_string(),
-        parent_task_id: "task-root".to_string(),
-        child_task_id: child_task_id.to_string(),
-        hops: vec![SwarmDelegationWitnessHop {
-            parent_capability_digest: sha256_hex(b"parent-capability"),
-            child_capability_digest: sha256_hex(child_task_id.as_bytes()),
-            parent_scope_hash: parent_scope_hash.to_string(),
-            child_scope_hash: child_scope_hash.to_string(),
-            attenuation_rule_id: "rule-subset-tool-invocation".to_string(),
-            scope_subset_proof,
-            expires_at_unix_ms: 1_800_003_600_000,
-            issuer: swarm_witness_issuer(),
-            policy_digest: sha256_hex(b"swarm-policy"),
-            witness_signature: String::new(),
-        }],
-    };
-    chain.hops[0].witness_signature =
-        sign_swarm_delegation_witness_hop(&chain, &chain.hops[0], &swarm_witness_keypair())?;
-    Ok(chain)
-}
-
-fn runtime_swarm_scope(max_invocations: u32) -> ChioScope {
-    ChioScope {
-        grants: vec![ToolGrant {
-            server_id: "vendor-ledger".to_string(),
-            tool_name: "close_account".to_string(),
-            operations: vec![Operation::Invoke],
-            constraints: Vec::new(),
-            max_invocations: Some(max_invocations),
-            max_cost_per_invocation: None,
-            max_total_cost: None,
-            dpop_required: None,
-        }],
-        ..ChioScope::default()
+#[test]
+fn treaty_record_revocation_is_rechecked_after_admission() -> Result<(), Box<dyn std::error::Error>>
+{
+    for (kind, id) in [
+        ("capability_lease_revocation", "lease-live-1"),
+        ("governance_receipt_revocation", "gov-live-1"),
+    ] {
+        let store = InMemoryRuntimeAdmissionStore::new();
+        let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
+        let fixture = treaty_runtime_fixture()?;
+        let mut admission_bundle = bundle();
+        admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
+        let bundle_hash = runtime_admission_bundle_sha256(&admission_bundle)?;
+        store.insert_bundle(admission_bundle)?;
+        insert_in_memory_treaty_runtime_fixture(&store, &fixture)?;
+        let request = treaty_runtime_request(args, bundle_hash, treaty_runtime_context(&fixture))?;
+        let hook = allowing_policy_hook(store.clone())?;
+        let first = hook.evaluate(&RuntimeAdmissionContext {
+            request: &request,
+            extra_metadata: None,
+            now_unix_secs: 1_800_000_001,
+            now_unix_ms: 1_800_000_001_000,
+            matched_grant_index: Some(0),
+            local_kernel_id: "kernel.vendor-b".to_string(),
+        })?;
+        assert!(first.allowed, "{first:?}");
+        let metadata = first.metadata.ok_or("missing admitted metadata")?;
+        let context = RuntimeAdmissionRevalidationContext {
+            request: &request,
+            admission_metadata: Some(&metadata),
+            now_unix_secs: 1_800_000_001,
+            now_unix_ms: 1_800_000_001_000,
+            matched_grant_index: Some(0),
+            local_kernel_id: "kernel.vendor-b".to_string(),
+        };
+        hook.revalidate_before_dispatch(&context)?;
+        store.insert_treaty_runtime_artifact(
+            kind,
+            id,
+            &serde_json::json!({"reason": "revoked during admission"}),
+        )?;
+        let error = hook
+            .revalidate_before_dispatch(&context)
+            .err()
+            .ok_or("revoked record survived revalidation")?;
+        assert!(
+            error
+                .to_string()
+                .contains("chio_treaty_unverified_required_evidence"),
+            "{error}"
+        );
+        hook.release_reserved(&metadata)?;
     }
-}
-
-fn swarm_witness_keypair() -> Keypair {
-    Keypair::from_seed(&[31u8; 32])
-}
-
-fn trusted_swarm_witness_keys() -> Vec<PublicKey> {
-    vec![swarm_witness_keypair().public_key()]
-}
-
-fn swarm_witness_issuer() -> String {
-    format!("did:chio:{}", swarm_witness_keypair().public_key().to_hex())
-}
-
-fn runtime_swarm_join_parent_set_hash(
-    chain_id: &str,
-    receipt_ids: &[&str],
-) -> Result<String, Box<dyn std::error::Error>> {
-    let mut sorted_receipt_ids = receipt_ids.to_vec();
-    sorted_receipt_ids.sort();
-    let body = serde_json::json!({
-        "chainId": chain_id,
-        "parentReceiptIds": sorted_receipt_ids,
-    });
-    Ok(sha256_hex(&canonical_json_bytes(&body)?))
-}
-
-fn runtime_swarm_route_plan_receipt(
-    route_plan_id: &str,
-    task_id: &str,
-    bridge_id: &str,
-    protocol_target: &str,
-    candidate_seed: &[u8],
-) -> Result<SwarmRoutePlanReceipt, Box<dyn std::error::Error>> {
-    let mut receipt = SwarmRoutePlanReceipt {
-        schema: CHIO_SWARM_ROUTE_PLAN_RECEIPT_SCHEMA.to_string(),
-        route_plan_id: route_plan_id.to_string(),
-        graph_id: "swarm-graph-runtime".to_string(),
-        task_id: task_id.to_string(),
-        selected_route: format!("{bridge_id}:{task_id}"),
-        candidate_set_digest: sha256_hex(candidate_seed),
-        registry_snapshot_hash: sha256_hex(b"runtime-swarm-registry"),
-        bridge_id: bridge_id.to_string(),
-        protocol_target: protocol_target.to_string(),
-        egress_contract_id: format!("{bridge_id}:egress-contract-{task_id}"),
-        egress_constraints: vec!["deny-private-network".to_string()],
-        attenuation_decision: "accepted".to_string(),
-        policy_digest: sha256_hex(b"swarm-route-policy"),
-        expires_at_unix_ms: 1_800_003_600_000,
-        issuer: swarm_witness_issuer(),
-        signature: String::new(),
-    };
-    receipt.signature = sign_swarm_route_plan_receipt(&receipt, &swarm_witness_keypair())?;
-    Ok(receipt)
-}
-
-fn runtime_swarm_terminal_graph_receipt(
-) -> Result<SwarmTerminalGraphReceipt, Box<dyn std::error::Error>> {
-    let mut receipt = SwarmTerminalGraphReceipt {
-        schema: CHIO_SWARM_TERMINAL_GRAPH_RECEIPT_SCHEMA.to_string(),
-        receipt_id: "terminal-swarm-runtime".to_string(),
-        graph_id: "swarm-graph-runtime".to_string(),
-        chain_id: "swarm-chain-swarm-graph-runtime".to_string(),
-        terminal_task_ids: vec!["task-root".to_string()],
-        completed_task_ids: vec![
-            "task-root".to_string(),
-            "task-child-a".to_string(),
-            "task-child-b".to_string(),
-        ],
-        join_receipt_ids: vec!["join-child-results".to_string()],
-        route_plan_receipt_ids: vec!["route-child-a".to_string(), "route-child-b".to_string()],
-        budget_pool_id: "budget-pool-runtime".to_string(),
-        budget_rollups: vec![SwarmTerminalBudgetRollup {
-            dimension_id: "usd_minor".to_string(),
-            reserved_units: 0,
-            active_units: 2_000,
-            consumed_units: 0,
-            released_units: 0,
-            reversed_units: 0,
-            total_units: 2_000,
-        }],
-        revocation_epoch_ref: "revocation-epoch-runtime".to_string(),
-        result_digest: sha256_hex(b"joined-child-results"),
-        completed_at_unix_ms: 1_800_000_000_500,
-        issuer: swarm_witness_issuer(),
-        signature: String::new(),
-    };
-    receipt.signature = sign_swarm_terminal_graph_receipt(&receipt, &swarm_witness_keypair())?;
-    Ok(receipt)
-}
-
-fn canonical_test_hash<T: serde::Serialize>(
-    value: &T,
-) -> Result<String, Box<dyn std::error::Error>> {
-    Ok(sha256_hex(&canonical_json_bytes(value)?))
-}
-
-fn runtime_swarm_revocation_root(
-    revoked_subjects: &[&str],
-    revoked_task_ids: &[&str],
-) -> Result<String, Box<dyn std::error::Error>> {
-    let mut revoked_subjects = revoked_subjects.to_vec();
-    let mut revoked_task_ids = revoked_task_ids.to_vec();
-    revoked_subjects.sort_unstable();
-    revoked_task_ids.sort_unstable();
-    canonical_test_hash(&serde_json::json!({
-        "revokedSubjects": revoked_subjects,
-        "revokedTaskIds": revoked_task_ids,
-    }))
+    Ok(())
 }

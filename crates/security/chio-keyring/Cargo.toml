@@ -1,0 +1,28 @@
+[package]
+name = "chio-keyring"
+description = "Witnessed authority key transparency and transactional key-log state for Chio"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_keyring"
+
+[dependencies]
+chio-core-types = { workspace = true }
+rusqlite = { workspace = true }
+rustix = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+chio-test-support = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

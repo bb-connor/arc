@@ -1,0 +1,33 @@
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 2m 03s
+     Running unittests src/lib.rs (target/debug/deps/chio_store_sqlite-5a6ec1936384c61e)
+
+running 20 tests
+test admission_operation_store::tests::schema::applied_assignment_result_requires_the_exact_participant_head ... ok
+test admission_operation_store::tests::schema::caller_wait::populated_v33_caller_wait_upgrade_preserves_original_rows_and_commit_chain ... ok
+test admission_operation_store::tests::schema::canonical_schema_rejects_a_same_name_no_op_trigger ... ok
+test admission_operation_store::tests::schema::canonical_schema_rejects_a_weakened_table_definition ... ok
+test admission_operation_store::tests::schema::canonical_schema_rejects_an_unexpected_trigger_with_an_unrelated_name ... ok
+test admission_operation_store::tests::schema::current_schema_reopen_rejects_assignment_results_without_evidence_columns ... ok
+test admission_operation_store::tests::schema::fresh_provision_creates_the_operation_schema_after_serving_lease_schema ... ok
+test admission_operation_store::tests::schema::not_applied_assignment_result_retains_exact_artifacts_and_head ... ok
+test admission_operation_store::tests::schema::persisted_operations_use_rfc_8785_bytes ... ok
+test admission_operation_store::tests::schema::provision_migrates_v1_operation_state_without_losing_replay_identity ... ok
+test admission_operation_store::tests::schema::provision_migrates_v2_commit_chain_across_closed_serving_epochs ... ok
+test admission_operation_store::tests::schema::provision_migrates_v4_channel_commit_kind_without_changing_history ... ok
+test admission_operation_store::tests::schema::provision_migrates_v8_threshold_token_ids_to_proposal_scope ... ok
+test admission_operation_store::tests::schema::v34_release_schema_migration_preserves_existing_admission_history ... ok
+test admission_operation_store::tests::schema_v35::v35_rejects_research_v10_release_namespace_without_mutation ... ok
+test admission_operation_store::tests::schema_v35::v35_rejects_weakened_or_future_v34_catalog_without_mutation ... ok
+test admission_operation_store::tests::schema_v35::v35_reopen_rejects_missing_immutable_release_barrier ... ok
+test admission_operation_store::tests::schema_v35::v35_upgrades_exact_v34_without_rewriting_operation_or_anchored_history ... ok
+test admission_operation_store::tests::schema_v35::v36_rejects_future_namespace_or_weakened_v35_without_mutation ... ok
+test admission_operation_store::tests::schema_v35::v36_upgrades_exact_v35_without_rewriting_authority_history ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 1646 filtered out; finished in 74.83s

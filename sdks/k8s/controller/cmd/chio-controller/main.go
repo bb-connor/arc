@@ -70,7 +70,7 @@ func run() error {
 		"Base URL of the Chio sidecar HTTP API.")
 	flag.StringVar(&chioSidecarControlToken, "chio-sidecar-control-token",
 		envDefault("CHIO_SIDECAR_CONTROL_TOKEN", ""),
-		"Optional bearer token used for remote Chio sidecar control endpoints.")
+		"Required bearer token for Chio sidecar control endpoints, including loopback.")
 	flag.DurationVar(&chioRequestTimeout, "chio-request-timeout", 10*time.Second,
 		"HTTP timeout for requests to the Chio sidecar.")
 	flag.IntVar(&reconcileConcurrency, "max-concurrent-reconciles", 4,

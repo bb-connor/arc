@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-enforcement-failure-v1.schema.json",
+  "title": "Chio cage enforcement failure v1",
+  "description": "Closed failure code and bounded stage identifier for a rejected, unsupported, or bootstrap-failed cage launch.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "stage"],
+  "properties": {
+    "code": {
+      "enum": [
+        "unsupported_kernel",
+        "helper_identity_mismatch",
+        "invalid_plan_seals",
+        "invalid_plan",
+        "descriptor_count_mismatch",
+        "descriptor_identity_mismatch",
+        "privileged_executable",
+        "non_single_threaded_helper",
+        "execution_identity_invalid",
+        "execution_identity_apply_failed",
+        "execution_identity_mismatch",
+        "trace_handshake_failed",
+        "landlock_unavailable",
+        "landlock_partial",
+        "seccomp_unavailable",
+        "seccomp_architecture_mismatch",
+        "seccomp_install_failed",
+        "prepared_record_invalid",
+        "exec_event_missing",
+        "exec_identity_mismatch",
+        "status_protocol_violation",
+        "timeout",
+        "child_exited_before_exec"
+      ]
+    },
+    "stage": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    }
+  }
+}

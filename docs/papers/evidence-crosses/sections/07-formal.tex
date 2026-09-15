@@ -1,0 +1,40 @@
+\section{What is mechanized}
+\label{sec:formal}
+
+The decision core is a pure function: verify a capability, resolve grants,
+evaluate, sign. It is modeled in Lean 4 \cite{lean4}, whose theorem
+inventory carries \PSTheoremCount{} declarations and one explicit axiom, a
+collision-resistance idealization for ASSUME-SHA256. No serializer, protocol step, or kernel behavior is axiomatized;
+an unproved property is an assumption-registry entry.
+
+Two results bear on this paper. Occurrence theorems make the predicate language
+fail closed: an atom unsupported, or undefined for the admission view, anywhere
+in a predicate forces denial on every view, by induction. The second is the
+comparison set of Section~\ref{sec:security}: the classification of every leaf of the co-signed
+predicate is total by exhaustiveness over the leaf type, and acceptance
+holds exactly when the statement gate and those comparisons do.
+
+The classification is cross-checked, not transcribed: the executed corpus
+derives its enumeration from the wire type and fails unless the Lean module
+agrees leaf for leaf on the wire path and the comparison kind. What each leaf is
+compared against is prose on both sides, checked on neither, so a
+classification naming the wrong quantity would pass.
+
+\dfn{Lean does not verify the running Rust.} These theorems are about the
+modelled predicate and classification; that the shipped hook realizes them
+is a corpus over one fixture, not a theorem. Four tripwires fail
+loudly when the two drift apart: named Rust functions mirrored to Lean
+definitions by content hash; \PSAeneasFunctionCount{} production functions
+extracted through a Rust-to-Lean pipeline with equivalence theorems that must
+rebuild byte-identically; \PSKaniHarnessCount{} bounded model-checking harnesses
+over public entry points; and the cross-language encoder corpus of
+Section~\ref{sec:eval}.
+
+We report survivors, not percentages. Of \PSLeanMutants{} Lean
+mutants \PSLeanMutantsKilled{} were killed and \PSLeanMutantsSurvived{} survived, each
+with an open issue; of \PSProofMutants{} in the Rust proof-facing sources
+\PSProofMutantsKilled{} were killed, \PSProofMutantsUnviable{} were unviable,
+and \PSProofMutantsSurvived{} survived.
+That campaign predates the classification's entry in the mutation allowlist, so
+it bears on the occurrence theorems and not the classification, and the
+largest group of its survivors sits on the predicate language they are about.

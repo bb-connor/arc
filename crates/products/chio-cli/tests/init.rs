@@ -42,6 +42,7 @@ fn init_creates_expected_project_files() {
         project_dir.join("Cargo.toml"),
         project_dir.join("README.md"),
         project_dir.join("policy.yaml"),
+        project_dir.join("tools.json"),
         project_dir.join(".gitignore"),
         project_dir.join("src/bin/hello_server.rs"),
         project_dir.join("src/bin/demo.rs"),

@@ -31,7 +31,12 @@ use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 mod authorization;
 mod composite;
-pub(crate) use composite::{AdmissionAuthorizationBinding, AdmissionCaptureBinding};
+pub(crate) use composite::{
+    preflight_authorization_commit_index, verify_compensated_budget_hold_tx,
+    verify_nonce_budget_phase_tx, verify_preflight_hold, AdmissionAuthorizationBinding,
+    AdmissionCaptureBinding, NonceBudgetPhase, NoncePreflightAuthorizationBinding,
+    NoncePreflightHoldState,
+};
 pub(crate) mod composite_schema;
 mod import_hold_state;
 mod import_validation;
@@ -39,7 +44,8 @@ mod joint_guard;
 mod model;
 mod payment_journal;
 pub(crate) use payment_journal::{
-    advance_payment_journal, insert_payment_journal, load_payment_journal,
+    advance_payment_journal, insert_payment_journal, load_original_payment_journal,
+    load_payment_journal,
 };
 mod reaper;
 mod replication;

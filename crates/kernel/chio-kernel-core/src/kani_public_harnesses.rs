@@ -23,12 +23,12 @@ use crate::clock::FixedClock;
 use crate::evaluate::EvaluateInput;
 use crate::formal_aeneas::{ledger_apply, ledger_is_terminal, ReservationLedger};
 use crate::formal_core::{
-    budget_charge_admits, budget_increment_admits, composite_quota_authorize,
-    delivery_contract_admits, delivery_denies_settlement, family_binding_preserved,
-    monetary_cap_is_subset_by_parts, optional_u32_cap_is_subset, quota_maximum_compatible,
-    required_true_is_preserved, revocation_lookup_denies, revocation_snapshot_denies,
-    threshold_distinct_eligible_signers, time_window_valid, BudgetAdmissionProjectionError,
-    DeliveryVerdict, RevocationCheckTarget,
+    budget_charge_admits, budget_increment_admits, captured_invocation_count_after,
+    composite_quota_authorize, delivery_contract_admits, delivery_denies_settlement,
+    family_binding_preserved, monetary_cap_is_subset_by_parts, optional_u32_cap_is_subset,
+    quota_maximum_compatible, replay_fingerprints_equal, required_true_is_preserved,
+    revocation_lookup_denies, revocation_snapshot_denies, threshold_distinct_eligible_signers,
+    time_window_valid, BudgetAdmissionProjectionError, DeliveryVerdict, RevocationCheckTarget,
 };
 use crate::guard::PortableToolCallRequest;
 use crate::normalized::{NormalizedOperation, NormalizedScope, NormalizedToolGrant};
@@ -1342,6 +1342,53 @@ pub fn verify_quota_maximum_immutable() {
     assert_eq!(compatible, !initialized || existing == presented);
     if initialized && existing != presented {
         assert!(!compatible);
+    }
+}
+
+#[kani::proof]
+pub fn verify_captured_invocation_count_monotonic() {
+    let captured = kani::any::<u32>();
+    let max_invocations = kani::any::<Option<u32>>();
+    let capture = kani::any::<bool>();
+    let after = captured_invocation_count_after(captured, max_invocations, capture);
+
+    match after {
+        Some(after) => {
+            assert!(after >= captured);
+            assert!(after <= captured.saturating_add(1));
+            if capture {
+                assert_eq!(after, captured + 1);
+                if let Some(max) = max_invocations {
+                    assert!(after <= max);
+                }
+            } else {
+                assert_eq!(after, captured);
+            }
+        }
+        None => {
+            assert!(capture);
+            assert!(captured == u32::MAX || !budget_increment_admits(captured, max_invocations));
+        }
+    }
+}
+
+#[kani::proof]
+pub fn verify_replay_fingerprint_uniqueness() {
+    let namespace = kani::any::<u64>();
+    let request_id = kani::any::<u64>();
+    let other_namespace = kani::any::<u64>();
+    let other_request_id = kani::any::<u64>();
+    let equal = replay_fingerprints_equal(namespace, request_id, other_namespace, other_request_id);
+
+    assert_eq!(
+        equal,
+        namespace == other_namespace && request_id == other_request_id
+    );
+    assert!(replay_fingerprints_equal(
+        namespace, request_id, namespace, request_id
+    ));
+    if namespace != other_namespace || request_id != other_request_id {
+        assert!(!equal);
     }
 }
 

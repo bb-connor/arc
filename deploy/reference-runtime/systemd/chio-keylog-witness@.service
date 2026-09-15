@@ -1,0 +1,65 @@
+# Chio key-log witness, one instance per witness identity.
+#
+# The witness signing seed arrives as a credential file; the service config
+# names it at the fixed credentials path the manager mounts for this unit.
+# The socket lives in the runtime directory, which the manager removes when
+# the instance stops, so a witness never meets its own stale socket.
+
+[Unit]
+Description=Chio key-log witness %i
+After=local-fs.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=chio-keylog
+Group=chio-keylog
+StateDirectory=chio-keylog/witness-%i
+StateDirectoryMode=0700
+RuntimeDirectory=chio-keylog/witness-%i
+RuntimeDirectoryMode=0700
+WorkingDirectory=/var/lib/chio-keylog/witness-%i
+LoadCredential=seed:/etc/chio/credentials/keylog-witness-%i.seed
+ExecStart=/usr/local/bin/chio security supervise \
+  --ready-unix-socket /run/chio-keylog/witness-%i/witness.sock \
+  --ready-timeout 30 \
+  --stop-grace 10 \
+  -- /usr/local/bin/chio-keylog-witness \
+  --config /etc/chio/keylog/witness-%i.json
+Restart=on-failure
+RestartSec=5s
+KillSignal=SIGTERM
+TimeoutStopSec=15s
+TimeoutStartSec=45s
+MemoryHigh=256M
+MemoryMax=384M
+LimitNOFILE=4096
+LimitCORE=0
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateNetwork=true
+ProtectHome=true
+ProtectSystem=strict
+ReadOnlyPaths=/etc/chio
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+RemoveIPC=true
+
+[Install]
+WantedBy=multi-user.target

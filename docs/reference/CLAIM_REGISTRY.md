@@ -53,6 +53,7 @@ and does not license claim wording.
 | `ASSUME-WASM-ENGINE` | approved_with_scope | Wasm boundary proofs rely on wasmtime enforcing its documented verdict, trap, fuel, memory-limiter, and in-process sandbox semantics. | `audited_assumption` |
 | `ASSUME-FINDING-STATUS-OPERATOR-COMPLETENESS` | approved_with_scope | A fresh authentic finding-status proof does not prove the external operator inserted every required retraction. The qualified profile depends on the operator completeness contract. | `audited_assumption` |
 | `ASSUME-FINDING-SELLER-TOOL-SERVER` | approved_with_scope | A delivery digest proves the kernel-observed seller response bytes, not effects the seller tool server claims outside Chio's observation boundary. | `audited_assumption` |
+| `ASSUME-FEDERATED-ORIGIN-CLASSIFICATION` | approved_with_scope | Cross-organization admission relies on the receiving edge classifying each request's federated origin from transport-authenticated peer identity; a request misclassified as local takes the local admission path and bypasses treaty admission. | `audited_assumption` |
 
 The sole explicit root-imported Lean axiom is machine-readably enumerated as
 `Chio.Json.hash_collision_resistant` in `formal/theorem-inventory.json` and

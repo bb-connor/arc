@@ -1,0 +1,1 @@
+[{"authenticationRequired":true,"method":"get","path":"/accounts"},{"authenticationRequired":false,"method":"get","path":"/health"},{"authenticationRequired":false,"method":"post","path":"/refunds"},{"authenticationRequired":true,"method":"delete","path":"/sessions"}]

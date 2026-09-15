@@ -20,8 +20,8 @@ use chio_core_types::canonical_json_bytes_from_str;
 use chio_core_types::capability::runtime_attestation::RuntimeAttestationEvidence;
 use chio_core_types::capability::trust_policy::AttestationTrustPolicy;
 use chio_core_types::crypto::{sha256_hex, Keypair, PublicKey};
-use chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt;
 use chio_core_types::receipt::body::{chio_receipt_id, ChioReceipt};
+use chio_core_types::receipt::execution_evidence::PRE_SETTLEMENT_EXECUTION_PROFILE;
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
 use chio_core_types::receipt::metadata::{
     DeliveryResult, FindingDelivery, FindingMediaTypeCheck, FINDING_DELIVERY_METADATA_KEY,
@@ -52,7 +52,9 @@ use crate::receipts::verify_receipt_strict;
 
 mod bond;
 mod draft;
+mod receipt_semantics;
 use bond::{collateral_authority_failure, verify_bond_requirement};
+use receipt_semantics::verify_required_receipt_semantics;
 
 /// Size bound on the raw finding submitted to the verifier. Matches the
 /// publish surface's route-level cap so both boundaries reject the same
@@ -126,7 +128,7 @@ pub struct FindingVerifierTrustRoots {
     pub governance_authority_policy: FindingAuthorityKeyPolicy,
     /// The admitted reusable verifier profile.
     pub profile: SignedFindingChallengeVerifierProfile,
-    /// Kernel keys admitted for authoritative-spend accounting.
+    /// Kernel keys admitted for production and delivery receipt semantics.
     pub admitted_kernel_keys: Vec<PublicKey>,
     /// Collateral signer and lifecycle policy required for allocation evidence.
     pub collateral_authority: FindingAuthorityKeyPolicy,
@@ -304,8 +306,10 @@ pub fn validate_supported_finding_verifier_profile(
             .skip(index.saturating_add(1))
             .any(|candidate| candidate == key)
     });
-    if profile.required_receipt_semantics != MEDIATED_SPEND_PROFILE
-        || profile.predicate_engine != FINDING_PREDICATE_ENGINE_CHIO_REPLAY_V1
+    if !matches!(
+        profile.required_receipt_semantics.as_str(),
+        MEDIATED_SPEND_PROFILE | PRE_SETTLEMENT_EXECUTION_PROFILE
+    ) || profile.predicate_engine != FINDING_PREDICATE_ENGINE_CHIO_REPLAY_V1
         || authority_roles_alias
         || profile
             .receipt_signers
@@ -332,30 +336,6 @@ pub fn validate_supported_finding_verifier_profile(
         })
     {
         return Err(FindingVerifierError::ProfileInvalid);
-    }
-    Ok(())
-}
-
-fn verify_required_receipt_semantics(
-    receipt: &ChioReceipt,
-    required_semantics: &str,
-    admitted_kernel_keys: &[PublicKey],
-    nonce_resolver: &dyn FindingNonceResolver,
-) -> Result<(), String> {
-    if required_semantics != MEDIATED_SPEND_PROFILE {
-        return Err("unsupported receipt semantics profile".to_string());
-    }
-    let nonce = nonce_resolver
-        .nonce_for(receipt)
-        .ok_or_else(|| "execution nonce evidence not supplied".to_string())?;
-    is_authoritative_spend_receipt(receipt, admitted_kernel_keys, nonce)
-        .map_err(|reason| format!("receipt is not authoritative mediated spend: {reason:?}"))?;
-    let issued_at = u64::try_from(nonce.nonce.issued_at)
-        .map_err(|_| "execution nonce validity interval is invalid".to_string())?;
-    let expires_at = u64::try_from(nonce.nonce.expires_at)
-        .map_err(|_| "execution nonce validity interval is invalid".to_string())?;
-    if issued_at >= expires_at || receipt.timestamp < issued_at || receipt.timestamp >= expires_at {
-        return Err("execution nonce was not active at receipt issuance".to_string());
     }
     Ok(())
 }
@@ -535,7 +515,9 @@ fn verify_finding_delivery_receipt(
     .map_err(|error| format!("delivery receipt {} {error}", receipt.id))?;
     verify_required_receipt_semantics(
         receipt,
-        &profile.required_receipt_semantics,
+        // Delivery establishes a separate financial obligation even when
+        // production evidence establishes execution before settlement.
+        MEDIATED_SPEND_PROFILE,
         admitted_kernel_keys,
         nonce_resolver,
     )
@@ -1004,7 +986,11 @@ pub fn verify_finding_evidence(
         .iter()
         .map(|index| &bundle.receipts[*index].receipt)
         .collect();
-    let metered = if receipts_ok {
+    let metered = if profile.required_receipt_semantics == PRE_SETTLEMENT_EXECUTION_PROFILE {
+        CostFacetOutcome::Unavailable {
+            reason: "execution-only production receipts do not establish financial backing",
+        }
+    } else if receipts_ok {
         evaluate_metered_exposure(
             &receipts,
             &trust.admitted_kernel_keys,

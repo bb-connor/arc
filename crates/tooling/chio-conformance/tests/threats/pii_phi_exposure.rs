@@ -5,11 +5,15 @@
 //! before raw identifiers reach downstream consumers.
 //!
 //! Revert-to-prove-it-fails recipe: swap the `Block` action branch in
-//! `crates/chio-guards/src/response_sanitization.rs` to fall through
+//! `crates/guards/chio-guards/src/response_sanitization/simple.rs` to fall through
 //! to a permissive `Allow` outcome (or short-circuit the scanner so
 //! it returns `ScanResult::Clean`). The deny-arm assertions below
 //! fail because the production guard stops blocking the PHI/PII
 //! markers.
+//!
+//! Targeted mutation recipe: replace `ResponseSanitizationGuard::scan` with
+//! `vec![]`. The sensitive payload is then classified as clean, and the block
+//! assertion MUST fail. The benign-response positive control MUST remain clean.
 
 use chio_guards::{ResponseSanitizationGuard, SanitizationAction, ScanResult, SensitivityLevel};
 
@@ -24,6 +28,9 @@ fn threat_pii_phi_exposure_is_covered() {
 
     let blocking =
         ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
+    let benign = serde_json::json!({"message": "operation completed successfully"});
+    assert!(matches!(blocking.scan_response(&benign), ScanResult::Clean));
+
     match blocking.scan_response(&payload) {
         ScanResult::Blocked(findings) => {
             assert!(findings.iter().any(|(name, _)| name == "MRN"));

@@ -1,0 +1,493 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling subtle v2.6.1
+   Compiling smallvec v1.15.1
+   Compiling serde_json v1.0.149
+   Compiling digest v0.10.7
+   Compiling portable-atomic v1.13.1
+   Compiling critical-section v1.2.0
+   Compiling icu_normalizer v2.1.1
+   Compiling idna_adapter v1.2.1
+   Compiling idna v1.1.0
+   Compiling once_cell v1.21.4
+   Compiling url v2.5.8
+   Compiling sha2 v0.10.9
+   Compiling hmac v0.12.1
+   Compiling parking_lot_core v0.9.12
+   Compiling pbkdf2 v0.12.2
+   Compiling scrypt v0.11.0
+   Compiling parking_lot v0.12.5
+   Compiling pkcs5 v0.7.1
+   Compiling signature v2.2.0
+   Compiling tracing-core v0.1.36
+   Compiling tokio v1.50.0
+   Compiling pkcs8 v0.10.2
+   Compiling tracing v0.1.44
+   Compiling curve25519-dalek v4.1.3
+   Compiling derive_more-impl v2.1.1
+   Compiling slab v0.4.12
+   Compiling ed25519 v2.2.3
+   Compiling futures-util v0.3.32
+   Compiling ed25519-dalek v2.2.0
+   Compiling chio-security-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-security-types)
+   Compiling either v1.15.0
+   Compiling derive_more v2.1.1
+   Compiling tokio-util v0.7.18
+   Compiling rustls v0.23.37
+   Compiling heapless v0.7.17
+   Compiling postcard-derive v0.2.2
+   Compiling rustc-hash v2.1.1
+   Compiling postcard v1.1.3
+   Compiling ipnet v2.12.0
+   Compiling rs_merkle v1.5.0
+   Compiling sha3 v0.10.8
+   Compiling ruint v1.20.0
+   Compiling tokio-rustls v0.26.4
+   Compiling itertools v0.14.0
+   Compiling hyper v1.8.1
+   Compiling frost-core v3.0.0
+   Compiling alloy-primitives v1.5.7
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling ff v0.13.1
+   Compiling group v0.13.0
+   Compiling frost-rerandomized v3.0.0
+   Compiling hyper-util v0.1.20
+   Compiling tower v0.5.3
+   Compiling universal-hash v0.5.1
+   Compiling frost-ed25519 v3.0.0
+   Compiling sec1 v0.7.3
+   Compiling hkdf v0.12.4
+   Compiling crypto-bigint v0.5.5
+   Compiling tower-http v0.6.8
+   Compiling hyper-rustls v0.27.7
+   Compiling rustls-platform-verifier v0.6.2
+   Compiling reqwest v0.13.2
+   Compiling elliptic-curve v0.13.8
+   Compiling signature v3.0.0
+   Compiling futures-executor v0.3.32
+   Compiling futures v0.3.32
+   Compiling syn v1.0.109
+   Compiling alloy-json-abi v1.5.7
+   Compiling alloy-sol-macro-input v1.5.7
+   Compiling rfc6979 v0.4.0
+   Compiling ecdsa v0.16.9
+   Compiling prost v0.14.3
+   Compiling ahash v0.8.12
+   Compiling alloy-sol-macro-expander v1.5.7
+   Compiling tempfile v3.27.0
+   Compiling chio-listing v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-finding)
+   Compiling chio-fiscal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone)
+   Compiling chio-open-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-appraisal)
+   Compiling chio-fincred v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fincred)
+   Compiling chio-did v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-did)
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation)
+   Compiling chio-underwriting v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-underwriting)
+   Compiling primeorder v0.13.6
+   Compiling rusqlite v0.39.0
+   Compiling referencing v0.46.0
+   Compiling futures-lite v2.6.1
+   Compiling olpc-cjson v0.1.4
+   Compiling chio-credit v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-credit)
+   Compiling alloy-sol-macro v1.5.7
+   Compiling prost-types v0.14.3
+   Compiling num-bigint-dig v0.8.6
+   Compiling poly1305 v0.8.0
+   Compiling pkcs1 v0.7.5
+   Compiling pem-rfc7468 v1.0.0
+   Compiling spez v0.1.2
+   Compiling n0-error-macros v1.0.0
+   Compiling jsonschema v0.46.0
+   Compiling n0-error v1.0.0
+   Compiling oci-spec v0.9.0
+   Compiling prost-reflect v0.16.3
+   Compiling openssl v0.10.78
+   Compiling chio-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-market)
+   Compiling chio-web3 v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3)
+   Compiling rsa v0.9.10
+   Compiling der v0.8.2
+   Compiling alloy-sol-types v1.5.7
+   Compiling chio-autonomy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-autonomy)
+   Compiling serde_with v3.18.0
+   Compiling p384 v0.13.1
+   Compiling chio-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core)
+   Compiling p256 v0.13.2
+   Compiling oauth2 v5.0.0
+   Compiling jsonwebtoken v10.4.0
+   Compiling itertools v0.10.5
+   Compiling sha1 v0.10.6
+   Compiling tough v0.22.0
+   Compiling oci-client v0.17.0
+   Compiling openidconnect v4.0.1
+   Compiling serde_json_canonicalizer v0.3.2
+   Compiling sigstore_protobuf_specs v0.5.1
+   Compiling x509-cert v0.2.5
+   Compiling alloy-core v1.5.7
+   Compiling spki v0.8.0
+   Compiling webauthn-attestation-ca v0.5.2
+   Compiling crypto_secretbox v0.1.1
+   Compiling webauthn-rs-proto v0.5.2
+   Compiling n0-future v0.3.2
+   Compiling vergen-lib v9.1.0
+   Compiling tracing-log v0.2.0
+   Compiling webbrowser v1.2.2
+   Compiling curve25519-dalek v5.0.0-rc.0
+   Compiling base16ct v1.0.0
+   Compiling winnow v1.0.1
+   Compiling spin v0.10.1
+   Compiling diatomic-waker v0.2.3
+   Compiling cordyceps v0.3.4
+   Compiling sigstore v0.14.0
+   Compiling futures-buffered v0.2.13
+   Compiling serdect v0.4.3
+   Compiling tracing-subscriber v0.3.23
+   Compiling toml_parser v1.1.1+spec-1.1.0
+   Compiling webauthn-rs-core v0.5.2
+   Compiling pkcs8 v0.11.0
+   Compiling alloy v1.8.3
+   Compiling ciborium v0.2.2
+   Compiling chio-egress-contract v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-egress-contract)
+   Compiling polyval v0.6.2
+   Compiling noq-udp v1.0.1
+   Compiling vergen v9.1.0
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling crossbeam-epoch v0.9.20
+   Compiling data-encoding v2.11.0
+   Compiling toml_edit v0.25.9+spec-1.1.0
+   Compiling data-encoding-macro-internal v0.1.18
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-verify)
+   Compiling ghash v0.5.1
+   Compiling jsonwebtoken v9.3.1
+   Compiling coset v0.4.2
+   Compiling webauthn-rs v0.5.2
+   Compiling chio-web3-bindings v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3-bindings)
+   Compiling ed25519 v3.0.0
+   Compiling chio-manifest v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-manifest)
+   Compiling chio-sqlite-file-identity v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-sqlite-file-identity)
+   Compiling chio-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-lineage)
+   Compiling chio-data-guards-redactors-default v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-data-guards/redactors/default)
+   Compiling pairing v0.23.0
+   Compiling vergen-gitcl v9.1.0
+   Compiling prefix-trie v0.8.4
+   Compiling ctr v0.9.2
+   Compiling num_threads v0.1.7
+   Compiling siphasher v1.0.2
+   Compiling fastbloom v0.17.0
+   Compiling hickory-proto v0.26.1
+   Compiling dashmap v6.1.0
+   Compiling time v0.3.47
+   Compiling aes-gcm v0.10.3
+   Compiling bls12_381_plus v0.8.13
+   Compiling chio-log-redact v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-log-redact)
+   Compiling ureq v2.12.1
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-weights)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-custody-hw)
+   Compiling ed25519-dalek v3.0.0-rc.0
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-settle)
+   Compiling data-encoding-macro v0.1.20
+   Compiling proc-macro-crate v3.5.0
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-link)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-swarm-authority)
+   Compiling crossbeam-channel v0.5.15
+   Compiling h2 v0.4.16
+   Compiling rustls-platform-verifier v0.7.0
+   Compiling noq v1.0.1
+   Compiling netlink-packet-core v0.8.1
+   Compiling rand_pcg v0.10.2
+   Compiling chio-workflow-preflight v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-workflow-preflight)
+   Compiling blake3 v1.8.5
+   Compiling enum-assoc v1.3.0
+   Compiling sorted-index-buffer v0.2.1
+   Compiling tagptr v0.2.0
+   Compiling identity-hash v0.1.0
+   Compiling lru-slab v0.1.2
+   Compiling moka v0.12.15
+   Compiling noq-proto v1.0.1
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling hickory-net v0.26.1
+   Compiling chio-workflow v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-workflow)
+   Compiling iroh-base v1.0.1
+   Compiling affinidi-bbs v0.1.0
+   Compiling chio-disclosure-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-disclosure-lineage)
+   Compiling iroh-dns v1.0.1
+   Compiling strum_macros v0.28.0
+   Compiling tokio-stream v0.1.18
+   Compiling netlink-sys v0.8.8
+   Compiling proc-macro-error-attr v0.4.12
+   Compiling resolv-conf v0.7.6
+   Compiling arrayvec v0.7.6
+   Compiling netdev v0.45.0
+   Compiling constant_time_eq v0.4.2
+   Compiling hickory-resolver v0.26.1
+   Compiling strum v0.28.0
+   Compiling chio-selective-disclosure v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-selective-disclosure)
+   Compiling iroh-relay v1.0.1
+   Compiling netlink-packet-route v0.31.0
+   Compiling num_enum_derive v0.7.6
+   Compiling syn-mid v0.5.4
+   Compiling netwatch v0.19.1
+   Compiling iroh-metrics-derive v1.0.1
+   Compiling simple-dns v0.11.3
+   Compiling proc-macro-error v0.4.12
+   Compiling mac-addr v0.3.0
+   Compiling simdutf8 v0.1.5
+   Compiling sha1_smol v1.0.1
+   Compiling proc-macro-hack v0.5.20+deprecated
+   Compiling tokio-websockets v0.13.3
+   Compiling iroh-metrics v1.0.1
+   Compiling num_enum v0.7.6
+   Compiling chio-attest-buyer-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-buyer-core)
+   Compiling netlink-proto v0.12.0
+   Compiling n0-watcher v1.0.0
+   Compiling iroh v1.0.1
+   Compiling seize v0.5.1
+   Compiling serde_bytes v0.11.19
+   Compiling papaya v0.2.4
+   Compiling yasna v0.6.0
+   Compiling backon v1.6.0
+   Compiling rcgen v0.14.8
+   Compiling genawaiter-proc-macro v0.99.1
+   Compiling axum-core v0.5.6
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-risk-comptroller)
+   Compiling scheduled-thread-pool v0.2.7
+   Compiling inplace-vec-builder v0.1.1
+   Compiling irpc-derive v0.17.0
+   Compiling genawaiter-macro v0.99.1
+   Compiling binary-merge v0.1.2
+   Compiling redb v4.1.0
+   Compiling axum v0.8.8
+   Compiling range-collections v0.4.6
+   Compiling genawaiter v0.99.1
+   Compiling irpc v0.17.0
+   Compiling r2d2 v0.8.10
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-commerce-order)
+   Compiling iroh-io v0.6.2
+   Compiling iroh-blobs v0.103.0
+   Compiling positioned-io v0.3.5
+   Compiling fixedbitset v0.5.7
+   Compiling self_cell v1.2.2
+   Compiling bao-tree v0.16.0
+   Compiling rusty-fork v0.3.1
+   Compiling futures-concurrency v7.7.1
+   Compiling chacha20poly1305 v0.10.1
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-agent-web-interop)
+   Compiling r2d2_sqlite v0.33.0
+   Compiling chio-http-serve v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-http-serve)
+   Compiling iroh-util v0.6.0
+   Compiling chio-federation-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation-authority)
+   Compiling chio-pheromone-runtime v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone-runtime)
+   Compiling iroh-tickets v1.0.0
+   Compiling nested_enum_utils v0.2.3
+   Compiling chio-runtime-proof-parity v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-runtime-proof-parity)
+   Compiling reflink-copy v0.1.30
+   Compiling loom v0.7.2
+   Compiling proptest v1.10.0
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-runtime-core)
+   Compiling chio-pheromone-relay v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone-relay)
+   Compiling iroh-gossip v0.101.0
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+   Compiling chio-federation-transport-iroh v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation-transport-iroh)
+    Finished `test` profile [unoptimized] target(s) in 5m 00s
+     Running unittests src/lib.rs (target/debug/deps/chio_federation_transport_iroh-be9bcddf739603b6)
+
+running 190 tests
+test admission::tests::admitted_endpoint_accepts_and_resolves_kernel_id ... ok
+test admission::tests::empty_deny_all_admits_nothing ... ok
+test admission::tests::removed_endpoint_is_rejected_403 ... ok
+test admission::tests::swap_flips_admission_without_reconstructing_the_gate ... ok
+test admission::tests::transport_key_rotation_flips_admitted_endpoint_at_the_gate ... ok
+test admission::tests::unadmitted_endpoint_bumps_403_counter_and_is_still_rejected ... ok
+test admission::tests::unbound_endpoint_is_rejected_403 ... ok
+test catchup::tests::blob_backed_history_serves_verified_roots ... ok
+test catchup::tests::blob_transfer_that_never_completes_fails_closed_at_the_bound ... ok
+test catchup::tests::contiguous_run_passes_ordering ... ok
+test catchup::tests::derived_binding_rejects_unknown_signer_and_wrong_authority ... ok
+test catchup::tests::derived_binding_resolves_and_verifies_a_root ... ok
+test catchup::tests::epoch_gap_bumps_gap_counter_and_is_still_rejected ... ok
+test catchup::tests::epoch_gap_is_detected ... ok
+test catchup::tests::fsstore_publish_read_verify_round_trip ... ok
+test catchup::tests::integrity_mismatch_is_rejected ... ok
+test catchup::tests::manifest_advertises_the_blob_addresses_the_follower_will_fetch ... ok
+test catchup::tests::manifest_carries_signer_id_and_binds_to_one_signer ... ok
+test catchup::tests::manifest_json_round_trips_and_validate_rejects_a_gap ... ok
+test catchup::tests::manifest_mixing_signer_ids_is_rejected_fail_closed ... ok
+test catchup::tests::manifest_over_cap_is_rejected ... ok
+test catchup::tests::manifest_serves_the_contiguous_suffix_and_stops_at_a_gap ... ok
+test catchup::tests::manifest_skips_pre_history_and_serves_the_retained_suffix ... ok
+test catchup::tests::over_cap_blob_size_is_rejected_before_read ... ok
+test catchup::tests::publish_and_build_manifest_publishes_every_advertised_root ... ok
+test catchup::tests::publish_manifest_stops_at_gap_and_only_publishes_served_roots ... ok
+test catchup::tests::signed_root_accepted_from_pinned_signer ... ok
+test catchup::tests::tampered_signature_is_rejected_bad_signature ... ok
+test catchup::tests::wrong_signer_key_is_rejected_bad_signature ... ok
+test identity::tests::directory_document_without_treaties_field_deserializes_back_compat ... ok
+test identity::tests::duplicate_revocation_signer_id_is_rejected ... ok
+test identity::tests::duplicate_treaty_party_is_rejected ... ok
+test identity::tests::empty_directory_is_rejected ... ok
+test identity::tests::empty_treaty_party_set_is_rejected ... ok
+test identity::tests::eviction_bundle_verifies_when_removed_entry_transport_endorsement_is_invalid ... ok
+test identity::tests::missing_passport_endorsement_is_rejected ... ok
+test identity::tests::non_ed25519_oracle_key_is_rejected_even_with_valid_endorsement ... ok
+test identity::tests::oracle_endorsement_is_not_replayable_as_transport_endorsement ... ok
+test identity::tests::out_of_window_bundle_bumps_identity_verify_failure_and_is_still_rejected ... ok
+test identity::tests::out_of_window_bundle_is_rejected ... ok
+test identity::tests::removed_entry_does_not_resolve ... ok
+test identity::tests::removed_entry_suppresses_its_revocation_signer ... ok
+test identity::tests::removed_entry_with_malformed_oracle_endorsement_does_not_fail_the_bundle ... ok
+test identity::tests::resolve_passport_key_is_directory_bound_and_fails_closed ... ok
+test identity::tests::resolve_transport_endpoint_is_the_reverse_of_authorize_and_fails_closed ... ok
+test identity::tests::revocation_signer_binding_verifies_and_projects ... ok
+test identity::tests::revocation_signers_field_defaults_when_absent_on_the_wire ... ok
+test identity::tests::rolled_back_version_is_rejected ... ok
+test identity::tests::rotation_to_unendorsed_new_endpoint_is_rejected ... ok
+test identity::tests::signerless_bundle_yields_empty_signer_directory ... ok
+test identity::tests::tampered_directory_fails_body_hash_pin ... ok
+test identity::tests::tampered_oracle_public_key_is_rejected ... ok
+test identity::tests::tampered_treaty_party_set_fails_body_hash_pin ... ok
+test identity::tests::transport_endorsement_is_not_replayable_as_oracle_endorsement ... ok
+test identity::tests::transport_key_rotation_end_to_end ... ok
+test identity::tests::treaty_party_set_is_indexed_and_membership_is_fail_closed ... ok
+test identity::tests::unknown_issuer_is_rejected ... ok
+test identity::tests::valid_bundle_verifies_and_resolves_endpoints ... ok
+test identity::tests::wrong_issuer_signature_is_rejected ... ok
+test identity::tests::wrong_passport_endorsement_is_rejected ... ok
+test identity::tests::wrong_passport_oracle_endorsement_is_rejected ... ok
+test identity::tests::wrong_previous_version_hash_is_rejected ... ok
+test lanes::bilateral::tests::bad_org_b_signature_is_rejected_without_signing ... ok
+test lanes::bilateral::tests::client_read_bound_drops_an_org_a_that_never_replies ... ok
+test lanes::bilateral::tests::connection_counter_counts_each_dial_and_ignores_a_refusal ... ok
+test lanes::bilateral::tests::cosign_over_the_sync_protocol_trait_contract ... ok
+test lanes::bilateral::tests::cosign_unit_rejects_endpoint_absent_from_the_current_directory_snapshot ... ok
+test lanes::bilateral::tests::cosign_unit_rejects_wrong_origin_without_signing ... ok
+test lanes::bilateral::tests::cosign_unit_verifies_against_the_directory_bound_passport_key ... ok
+test lanes::bilateral::tests::dsse_cosign_refuses_a_receipt_signing_preimage ... ok
+test lanes::bilateral::tests::full_cosign_succeeds_and_response_verifies_over_pae_bytes ... ok
+test lanes::bilateral::tests::hop_timers_split_the_handshake_from_the_exchange ... ok
+test lanes::bilateral::tests::lagging_pinned_passport_key_is_rejected_without_signing ... ok
+test lanes::bilateral::tests::legit_cosign_within_tight_bounds_is_still_fully_verified_and_accepted ... ok
+test lanes::bilateral::tests::mismatched_org_b_kernel_id_is_rejected_without_signing ... ok
+test lanes::bilateral::tests::peer_that_completes_exchange_but_never_closes_does_not_hang_past_linger ... ok
+test lanes::bilateral::tests::peer_that_never_opens_a_stream_is_dropped_within_accept_bi_bound ... ok
+test lanes::bilateral::tests::receipt_cosign_completes_the_kernel_contract_over_the_lane ... ok
+test lanes::bilateral::tests::receipt_cosign_fails_closed_on_a_schema_mismatch ... ok
+test lanes::bilateral::tests::receipt_cosign_refuses_a_receipt_signing_preimage ... ok
+test lanes::bilateral::tests::receipt_cosign_refuses_a_tampered_org_b_signature_without_signing ... ok
+test lanes::bilateral::tests::receipt_cosign_rejects_an_org_b_that_claims_another_kernel_id ... ok
+test lanes::bilateral::tests::saturated_concurrency_cap_sheds_an_additional_dialer_over_quic ... ok
+test lanes::bilateral::tests::slowloris_length_prefix_without_body_is_dropped_within_read_bound ... ok
+test lanes::bilateral::tests::sync_cosign_on_current_thread_runtime_fails_closed_without_panicking ... ok
+test lanes::bilateral::tests::unbound_endpoint_is_rejected_at_the_gate ... ok
+test lanes::bilateral::tests::wrong_origin_bumps_verify_failure_counter_and_is_still_rejected ... ok
+test lanes::fanout::tests::bad_deposit_signature_rejected_even_from_admitted_neighbor ... ok
+test lanes::fanout::tests::broadcast_rejects_wrong_treaty_frame_before_send ... ok
+test lanes::fanout::tests::concurrent_sender_enforces_treaty_and_size_checks ... ok
+test lanes::fanout::tests::fanout_membership_gate_rejects_non_party_at_join_and_receive ... ok
+test lanes::fanout::tests::frame_from_a_foreign_treaty_is_rejected_on_this_swarm ... ok
+test lanes::fanout::tests::lagged_event_is_metered_and_surfaced ... ok
+test lanes::fanout::tests::lane_verifies_a_real_chio_pheromone_deposit_signature ... ok
+test lanes::fanout::tests::new_derives_local_identity_from_the_spawned_endpoint ... ok
+test lanes::fanout::tests::origin_key_mismatch_bumps_verify_failure_counter_and_is_still_rejected ... ok
+test lanes::fanout::tests::oversized_frame_is_rejected_before_broadcast ... ok
+test lanes::fanout::tests::raw_decode_rejects_a_foreign_treaty_frame ... ok
+test lanes::fanout::tests::receive_accepts_a_party_origin_frame ... ok
+test lanes::fanout::tests::receive_accepts_when_resolver_matches_the_directory ... ok
+test lanes::fanout::tests::receive_binds_origin_key_to_the_directory_even_with_an_empty_resolver ... ok
+test lanes::fanout::tests::receive_rejects_a_non_party_origin_frame ... ok
+test lanes::fanout::tests::receive_rejects_a_resolver_key_that_lags_the_directory ... ok
+test lanes::fanout::tests::small_frame_encodes_under_cap ... ok
+test lanes::fanout::tests::subscribe_admits_a_party_past_the_membership_gate ... ok
+test lanes::fanout::tests::subscribe_join_fails_closed_on_timeout ... ok
+test lanes::fanout::tests::subscribe_rejects_a_non_party_local_operator ... ok
+test lanes::fanout::tests::subscribe_rejects_a_non_party_spoofing_a_real_party_kernel_id ... ok
+test lanes::fanout::tests::topic_bound_decoder_rejects_a_foreign_treaty_frame ... ok
+test lanes::fanout::tests::topic_derivation_is_deterministic_and_distinct_per_treaty ... ok
+test lanes::fanout::tests::treaty_mismatch_bumps_verify_failure_counter_and_is_still_rejected ... ok
+test lanes::fanout::tests::unknown_origin_bumps_verify_failure_counter_and_is_still_rejected ... ok
+test lanes::fanout::tests::unknown_origin_is_rejected ... ok
+test lanes::fanout::tests::valid_self_signed_frame_is_accepted ... ok
+test lanes::limits::tests::bounded_returns_inner_output_when_fast ... ok
+test lanes::limits::tests::bounded_times_out_a_stalled_future ... ok
+test lanes::limits::tests::cancelled_admission_releases_the_per_peer_slot ... ok
+test lanes::limits::tests::cap_admits_up_to_the_limit_then_sheds ... ok
+test lanes::limits::tests::default_config_is_generous_and_bounded ... ok
+test lanes::limits::tests::distinct_close_codes ... ok
+test lanes::limits::tests::per_peer_cap_bounds_single_peer_below_lane_cap ... ok
+test lanes::limits::tests::per_peer_never_exceeds_cap ... ok
+test lanes::limits::tests::recommended_receive_window_has_headroom_over_batch_cap ... ok
+test lanes::limits::tests::zero_cap_is_clamped_to_one_permit ... ok
+test lanes::pheromone::tests::admitted_dialer_batch_accepted_over_quic ... ok
+test lanes::pheromone::tests::admitted_endpoint_resolves_to_its_kernel_id ... ok
+test lanes::pheromone::tests::client_read_bound_drops_a_recipient_that_never_returns_the_report ... ok
+test lanes::pheromone::tests::deny_all_swap_between_admission_and_receive_admits_nothing ... ok
+test lanes::pheromone::tests::full_receive_report_validates_and_carries_accepted ... ok
+test lanes::pheromone::tests::incremental_read_holds_only_delivered_bytes ... ok
+test lanes::pheromone::tests::len_delimited_frame_round_trips ... ok
+test lanes::pheromone::tests::loser_path_rejects_recovered_verdict_from_a_different_sender ... ok
+test lanes::pheromone::tests::outbound_scope_rejection_skips_dial_and_folds_into_retry ... ok
+test lanes::pheromone::tests::outbox_retry_and_dead_letter_bump_outbox_counters ... ok
+test lanes::pheromone::tests::outbox_reuse_enqueues_leases_and_dead_letters ... ok
+test lanes::pheromone::tests::over_cap_frame_is_rejected_before_allocation ... ok
+test lanes::pheromone::tests::partial_accepted_response_is_rejected_before_delivery ... ok
+test lanes::pheromone::tests::per_peer_cap_one_still_admits_a_single_dialer ... ok
+test lanes::pheromone::tests::read_len_delimited_enforces_the_configured_ingress_cap ... ok
+test lanes::pheromone::tests::real_verifier_accepts_admitted_senders_own_batch_over_quic ... ok
+test lanes::pheromone::tests::real_verifier_rejects_batch_whose_author_is_not_the_authenticated_sender_over_quic ... ok
+test lanes::pheromone::tests::receive_fail_releases_slot_for_reclaim ... ok
+test lanes::pheromone::tests::record_fail_leaves_slot_held_so_redelivery_never_re_receives ... ok
+test lanes::pheromone::tests::record_ok_release_frees_slot_and_bounds_growth ... ok
+test lanes::pheromone::tests::removed_endpoint_is_rejected_fail_closed ... ok
+test lanes::pheromone::tests::resolved_sender_feeds_verifier_and_batch_is_accepted ... ok
+test lanes::pheromone::tests::sender_mismatch_row_is_requeued_not_dead_lettered ... ok
+test lanes::pheromone::tests::unbound_dialer_is_rejected_at_handshake ... ok
+test lanes::pheromone::tests::unbound_endpoint_is_rejected_fail_closed ... ok
+test lanes::pheromone::tests::verdict_recovery_converges_after_commit_before_record_crash ... ok
+test lanes::pheromone::tests::verifier_rejects_when_authenticated_sender_differs ... ok
+test lanes::pheromone::tests::winner_path_adopts_durable_verdict_after_commit_before_mark_crash ... ok
+test lanes::pheromone::tests::winner_path_rejects_recovered_verdict_from_a_different_sender ... ok
+test lanes::pheromone::tests::winning_the_reservation_does_not_prove_the_batch_is_unreceived ... ok
+test lanes::revocation::tests::batch_merge_applies_all_when_every_root_succeeds ... ok
+test lanes::revocation::tests::batch_merge_is_atomic_when_a_later_root_fails ... ok
+test lanes::revocation::tests::catchup_manifest_async_requester_mismatch_rejected_and_nothing_published ... ok
+test lanes::revocation::tests::catchup_manifest_request_serves_published_blob_addresses ... ok
+test lanes::revocation::tests::catchup_manifest_requester_mismatch_is_rejected_and_not_served ... ok
+test lanes::revocation::tests::catchup_manifest_without_publisher_falls_back_to_inline ... ok
+test lanes::revocation::tests::catchup_request_serves_from_history ... ok
+test lanes::revocation::tests::catchup_requester_mismatch_is_rejected_and_not_served ... ok
+test lanes::revocation::tests::client_read_bound_drops_an_authority_that_never_replies ... ok
+test lanes::revocation::tests::default_merge_batch_fails_closed_with_no_partial_apply ... ok
+test lanes::revocation::tests::derived_signer_directory_resolves_binding ... ok
+test lanes::revocation::tests::forged_root_bumps_verify_failure_counter_and_is_still_rejected ... ok
+test lanes::revocation::tests::forged_root_rejected_through_derived_binding ... ok
+test lanes::revocation::tests::lane_request_round_trips_externally_tagged ... ok
+test lanes::revocation::tests::one_bad_frame_rejects_whole_batch_all_or_nothing ... ok
+test lanes::revocation::tests::push_addressed_to_another_responder_is_rejected_and_not_merged ... ok
+test lanes::revocation::tests::push_batch_over_iroh_accepts_a_dialable_endpoint_addr ... ok
+test lanes::revocation::tests::real_handler_accepts_pinned_signer_over_quic ... ok
+test lanes::revocation::tests::real_handler_rejects_forged_signer_root_before_merge_over_quic ... ok
+test lanes::revocation::tests::request_manifest_catchup_over_iroh_falls_back_to_inline_without_publisher ... ok
+test lanes::revocation::tests::request_manifest_catchup_over_iroh_returns_published_manifest ... ok
+test lanes::revocation::tests::shipped_client_closes_connection_after_reading_reply ... ok
+test lanes::revocation::tests::signed_root_accepted_through_derived_binding ... ok
+test lanes::revocation::tests::signer_directory_rejects_duplicate_and_key_mismatch ... ok
+test lanes::revocation::tests::signer_pinned_to_other_endpoint_is_rejected ... ok
+test lanes::revocation::tests::tampered_signature_is_rejected_bad_signature ... ok
+test lanes::revocation::tests::unbound_endpoint_is_rejected_at_the_gate ... ok
+test lanes::revocation::tests::unpinned_signer_id_is_rejected ... ok
+test lanes::revocation::tests::view_sink_installs_only_the_highest_epoch_of_a_batch ... ok
+test lanes::revocation::tests::view_sink_installs_the_root_epoch_hash_and_issue_time ... ok
+test lanes::revocation::tests::view_sink_stamps_the_locally_materialised_leaf_set ... ok
+test metrics::tests::directory_reload_fail_closed_outcome_is_counted ... ok
+test metrics::tests::record_and_render_round_trip ... ok
+test metrics::tests::registry_constants_match_spec ... ok
+test metrics::tests::render_emits_the_reload_and_liveness_series ... ok
+test metrics::tests::router_alive_gauge_reflects_liveness ... ok
+
+test result: ok. 190 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.55s
+

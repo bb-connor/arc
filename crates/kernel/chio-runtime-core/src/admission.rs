@@ -1,9 +1,15 @@
 use crate::error::ChioRuntimeError;
 use crate::hash::runtime_verifier_trust_bundle_sha256;
-use crate::pheromone_policy::{evaluate_runtime_pheromone_policy, RuntimePolicyEvaluationInput};
 use crate::schema::*;
 use crate::store::RuntimeAdmissionStore;
 use crate::types::*;
+
+mod operation_owned;
+mod preparation;
+
+pub(crate) use preparation::{
+    prepare_runtime_admission_from_bundle, PreparedRuntimeAdmission, RuntimeAdmissionPreparation,
+};
 
 pub struct RuntimeAdmissionInput<'a> {
     pub profile: &'a RuntimeAdmissionProfile,
@@ -48,179 +54,37 @@ pub(crate) fn evaluate_runtime_admission_tracked(
     input: RuntimeAdmissionInput<'_>,
     reservation_tracker: Option<&RuntimeAdmissionReservationTracker>,
 ) -> Result<RuntimeAdmissionReport, ChioRuntimeError> {
-    let mut checks = Vec::new();
-    let report_schema = runtime_admission_report_schema(&input.profile.schema);
-    if !is_runtime_admission_profile_schema(&input.profile.schema) {
-        return Ok(rejected_report(
-            report_schema,
-            input.admission_id,
-            "unsupported_profile_schema",
-            checks,
-        ));
-    }
-    checks.push(passed("profile.schema"));
-    if input.now_unix_ms < input.profile.issued_at_unix_ms
-        || input.now_unix_ms >= input.profile.expires_at_unix_ms
-    {
-        return Ok(rejected_report(
-            report_schema,
-            input.admission_id,
-            "stale_profile",
-            checks,
-        ));
-    }
-    checks.push(passed("profile.freshness"));
-
-    let bundle = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        input.store.bundle(input.admission_id)
-    })) {
-        Ok(Ok(Some(bundle))) => bundle,
-        Ok(Ok(None)) => {
-            return Ok(rejected_report(
-                report_schema,
-                input.admission_id,
-                "missing_admission_bundle",
-                checks,
-            ));
-        }
-        Ok(Err(error)) => return Err(error),
-        Err(_) => {
-            return Ok(rejected_report(
-                report_schema,
-                input.admission_id,
-                "admission_bundle_store_error",
-                checks,
-            ));
-        }
-    };
-    if !is_runtime_admission_bundle_schema(&bundle.schema) {
-        return Ok(rejected_report(
-            report_schema,
-            input.admission_id,
-            "unsupported_bundle_schema",
-            checks,
-        ));
-    }
-    checks.push(passed("bundle.schema"));
-
-    let mut trust_floor_update = None;
-    if let Some(runtime_trust_input) = input.runtime_trust_input {
-        if runtime_trust_input.body.verifier_id != input.profile.verifier_id {
-            return Ok(rejected_report(
-                report_schema,
-                input.admission_id,
-                "runtime_trust_input_verifier_mismatch",
-                checks,
-            ));
-        }
-        checks.push(passed("runtime_trust.profile_verifier"));
-        match validate_runtime_trust_input(
-            runtime_trust_input,
-            input.trusted_verifier_keys,
-            &bundle,
-            input.now_unix_ms,
-            &mut checks,
-        ) {
-            Ok(entry) => {
-                trust_floor_update = Some((
-                    entry,
-                    runtime_trust_input.body.previous_hash_sha256.as_deref(),
-                ));
-            }
-            Err(code) => {
-                return Ok(rejected_report(
-                    report_schema,
-                    input.admission_id,
-                    code,
-                    checks,
-                ))
-            }
-        }
-    } else if !input.trusted_verifier_keys.is_empty() {
-        return Ok(rejected_report(
-            report_schema,
-            input.admission_id,
-            "missing_runtime_trust_input",
-            checks,
-        ));
-    }
-
-    if bundle.binding.host_kernel_id != input.profile.local_kernel_id {
-        return Ok(rejected_report(
-            report_schema,
-            input.admission_id,
-            "host_kernel_mismatch",
-            checks,
-        ));
-    }
-    checks.push(passed("bundle.host_kernel"));
-
-    if &bundle.binding != input.request {
-        return Ok(rejected_report(
-            report_schema,
-            input.admission_id,
-            "request_binding_mismatch",
-            checks,
-        ));
-    }
-    checks.push(passed("request.binding"));
-
-    if input.pheromone_query_report.is_some() {
-        checks.push(passed("pheromone.query_report_signed"));
-    }
-    let (policy_decision, pheromone_advisory) =
-        match evaluate_runtime_pheromone_policy(RuntimePolicyEvaluationInput {
-            policy: input.runtime_pheromone_policy,
-            peer_weights: input.runtime_peer_weights,
-            query_report: input.pheromone_query_report,
-            runtime_trust_input: input.runtime_trust_input,
-            trusted_verifier_keys: input.trusted_verifier_keys,
-            bundle: &bundle,
-            action_class_id: input.action_class_id,
-            now_unix_ms: input.now_unix_ms,
-            checks: &mut checks,
-        }) {
-            Ok(result) => result,
-            Err(code) => {
-                return Ok(rejected_report_with_policy(
-                    report_schema,
-                    input.admission_id,
-                    code,
-                    checks,
-                    None,
-                ));
-            }
-        };
-    if pheromone_advisory.is_some() {
-        checks.push(passed("pheromone.observe_only"));
-    }
-    if let Some(decision) = policy_decision.as_ref() {
-        if decision.decision == "deny" {
-            return Ok(rejected_report_with_policy(
-                report_schema,
-                input.admission_id,
-                "runtime_pheromone_policy_deny",
-                checks,
-                Some(decision.clone()),
-            ));
-        }
-        if decision.decision == "escalate" {
-            return Ok(rejected_report_with_policy(
-                report_schema,
-                input.admission_id,
-                "runtime_pheromone_policy_escalate",
-                checks,
-                Some(decision.clone()),
-            ));
+    let store = input.store;
+    match preparation::prepare_runtime_admission(input)? {
+        RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
+        RuntimeAdmissionPreparation::Prepared(prepared) => {
+            commit_prepared_runtime_admission(prepared, store, reservation_tracker)
         }
     }
+}
 
+pub(crate) fn commit_prepared_runtime_admission(
+    prepared: PreparedRuntimeAdmission,
+    store: &dyn RuntimeAdmissionStore,
+    reservation_tracker: Option<&RuntimeAdmissionReservationTracker>,
+) -> Result<RuntimeAdmissionReport, ChioRuntimeError> {
+    let PreparedRuntimeAdmission {
+        material_digest: _,
+        bundle_digest: _,
+        report_schema,
+        admission_id,
+        bundle,
+        mut checks,
+        pheromone_advisory,
+        policy_decision,
+        trust_floor_update,
+    } = prepared;
     let mut consumed_destructive_lease_id = None;
     if bundle.destructive {
         let Some(lease_id) = bundle.lease_id.as_deref() else {
             return Ok(rejected_report(
                 report_schema,
-                input.admission_id,
+                &admission_id,
                 "missing_destructive_lease",
                 checks,
             ));
@@ -228,20 +92,18 @@ pub(crate) fn evaluate_runtime_admission_tracked(
         if bundle.governance_receipt_id.is_none() {
             return Ok(rejected_report(
                 report_schema,
-                input.admission_id,
+                &admission_id,
                 "missing_governance_receipt",
                 checks,
             ));
         }
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            input
-                .store
-                .consume_destructive_lease(lease_id, input.admission_id)
+            store.consume_destructive_lease(lease_id, &admission_id)
         })) {
             Err(_) => {
                 return Ok(rejected_report_with_ambiguous_destructive_consumption(
                     report_schema,
-                    input.admission_id,
+                    &admission_id,
                     checks,
                     lease_id,
                     "destructive lease consume callback panicked",
@@ -257,17 +119,12 @@ pub(crate) fn evaluate_runtime_admission_tracked(
                 checks.push(passed("destructive.lease_reserved"));
             }
             Ok(Err(ChioRuntimeError::Rejected { code, .. })) => {
-                return Ok(rejected_report(
-                    report_schema,
-                    input.admission_id,
-                    code,
-                    checks,
-                ));
+                return Ok(rejected_report(report_schema, &admission_id, code, checks));
             }
             Ok(Err(error)) => {
                 return Ok(rejected_report_with_ambiguous_destructive_consumption(
                     report_schema,
-                    input.admission_id,
+                    &admission_id,
                     checks,
                     lease_id,
                     &error.to_string(),
@@ -277,21 +134,17 @@ pub(crate) fn evaluate_runtime_admission_tracked(
     }
     if let Some((entry, previous_hash_sha256)) = trust_floor_update {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            input
-                .store
-                .validate_and_record_runtime_trust_floor(entry, previous_hash_sha256)
+            store.validate_and_record_runtime_trust_floor(entry, previous_hash_sha256.as_deref())
         })) {
             Err(_) => {
                 let failure_code = "runtime_trust_floor_error";
                 if let Some(lease_id) = consumed_destructive_lease_id.as_deref() {
-                    if let Err(reason) = release_destructive_lease_best_effort(
-                        input.store,
-                        lease_id,
-                        input.admission_id,
-                    ) {
+                    if let Err(reason) =
+                        release_destructive_lease_best_effort(store, lease_id, &admission_id)
+                    {
                         return Ok(rejected_report_with_destructive_release_failure(
                             report_schema,
-                            input.admission_id,
+                            &admission_id,
                             failure_code,
                             checks,
                             lease_id,
@@ -304,7 +157,7 @@ pub(crate) fn evaluate_runtime_admission_tracked(
                 }
                 return Ok(rejected_report(
                     report_schema,
-                    input.admission_id,
+                    &admission_id,
                     failure_code,
                     checks,
                 ));
@@ -312,14 +165,12 @@ pub(crate) fn evaluate_runtime_admission_tracked(
             Ok(Ok(())) => checks.push(passed("runtime_trust.floor")),
             Ok(Err(ChioRuntimeError::Rejected { code, .. })) => {
                 if let Some(lease_id) = consumed_destructive_lease_id.as_deref() {
-                    if let Err(reason) = release_destructive_lease_best_effort(
-                        input.store,
-                        lease_id,
-                        input.admission_id,
-                    ) {
+                    if let Err(reason) =
+                        release_destructive_lease_best_effort(store, lease_id, &admission_id)
+                    {
                         return Ok(rejected_report_with_destructive_release_failure(
                             report_schema,
-                            input.admission_id,
+                            &admission_id,
                             code,
                             checks,
                             lease_id,
@@ -330,23 +181,16 @@ pub(crate) fn evaluate_runtime_admission_tracked(
                         tracker.clear_destructive_lease();
                     }
                 }
-                return Ok(rejected_report(
-                    report_schema,
-                    input.admission_id,
-                    code,
-                    checks,
-                ));
+                return Ok(rejected_report(report_schema, &admission_id, code, checks));
             }
             Ok(Err(error)) => {
                 if let Some(lease_id) = consumed_destructive_lease_id.as_deref() {
-                    if let Err(reason) = release_destructive_lease_best_effort(
-                        input.store,
-                        lease_id,
-                        input.admission_id,
-                    ) {
+                    if let Err(reason) =
+                        release_destructive_lease_best_effort(store, lease_id, &admission_id)
+                    {
                         return Ok(rejected_report_with_destructive_release_failure(
                             report_schema,
-                            input.admission_id,
+                            &admission_id,
                             "runtime_trust_floor_error",
                             checks,
                             lease_id,
@@ -364,7 +208,7 @@ pub(crate) fn evaluate_runtime_admission_tracked(
 
     Ok(RuntimeAdmissionReport {
         schema: report_schema.to_string(),
-        admission_id: input.admission_id.to_string(),
+        admission_id,
         accepted: true,
         failure_code: None,
         checks,

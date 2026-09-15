@@ -1,0 +1,8 @@
+{
+  "baseCommit": "2b3b5af8cbfbc6f16ce6005de3f97cd149803b81",
+  "sourceSha256": {
+    "sdks/python/chio-adapter-base/src/chio_adapter_base/security.py": "8b5ee6ac0f62c065c22719bba446ececff1584689cf7a4bb7160d4cabcf769b0",
+    "sdks/python/chio-hermes/src/chio_hermes/executors.py": "103407888daf53bc19e7ec074f996da9e7162e5fe9763b91b46cbc21a81adcba"
+  },
+  "purpose": "Historical production sources for a real Git hook regression; not a newly inserted defect."
+}

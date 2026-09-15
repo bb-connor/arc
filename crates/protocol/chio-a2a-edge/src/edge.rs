@@ -7,6 +7,7 @@ struct DeferredA2aTask {
     request: CrossProtocolExecutionRequest,
     response: TaskResponse,
     expires_at_ms: u64,
+    v1_output_mode: Option<V1OutputMode>,
 }
 
 /// The A2A edge server.
@@ -14,6 +15,7 @@ struct DeferredA2aTask {
 /// Wraps a set of Chio tool manifests and exposes them as A2A skills.
 pub struct ChioA2aEdge {
     config: A2aEdgeConfig,
+    manifest_registry: Option<VerifiedManifestRegistry>,
     skills: Vec<A2aSkillEntry>,
     skill_fidelity: BTreeMap<String, BridgeFidelity>,
     /// Maps skill ID to authoritative target binding metadata.
@@ -21,6 +23,7 @@ pub struct ChioA2aEdge {
     /// Maps ambiguous unqualified tool names to the qualified published IDs.
     ambiguous_skill_ids: BTreeMap<String, Vec<String>>,
     task_counter: u64,
+    task_namespace: String,
     tasks: BTreeMap<String, DeferredA2aTask>,
 }
 
@@ -33,7 +36,10 @@ pub struct ChioA2aEdgeCompatibility<'a> {
     edge: &'a mut ChioA2aEdge,
 }
 
-fn validate_execution_context(execution: &A2aKernelExecutionContext) -> Result<(), A2aEdgeError> {
+fn validate_execution_context(
+    execution: &A2aKernelExecutionContext,
+    peer: &chio_core::capability::features::CapabilityNegotiation,
+) -> Result<(), A2aEdgeError> {
     validate_execution_agent_id(&execution.agent_id)?;
     if execution.approval_token.is_some() && !execution.approval_tokens.is_empty() {
         return Err(A2aEdgeError::InvalidRequest(
@@ -53,6 +59,14 @@ fn validate_execution_context(execution: &A2aKernelExecutionContext) -> Result<(
             "A2A threshold approval tokens and proposal must be supplied together".to_string(),
         ));
     }
+    peer.validate_invocation_features(
+        &execution.capability,
+        &execution.approval_tokens,
+        execution.threshold_approval_proposal.as_ref(),
+        execution.governed_intent.as_ref(),
+        execution.supplemental_authorization.as_ref(),
+    )
+    .map_err(|error| A2aEdgeError::InvalidRequest(error.to_string()))?;
     Ok(())
 }
 
@@ -92,9 +106,71 @@ fn reject_request_bound_artifacts_without_stable_request_id(
     ))
 }
 
+#[cfg(test)]
+fn test_registry_from_unverified_manifests(
+    manifests: &[ToolManifest],
+) -> Result<VerifiedManifestRegistry, A2aEdgeError> {
+    let mut registry = VerifiedManifestRegistry::default();
+    for manifest in manifests {
+        let signer = (0..=u8::MAX)
+            .map(|seed| chio_core::crypto::Keypair::from_seed(&[seed; 32]))
+            .find(|candidate| candidate.public_key().to_hex() == manifest.public_key)
+            .ok_or_else(|| {
+                A2aEdgeError::InvalidRequest(format!(
+                    "unit-test manifest signer is unavailable for {}",
+                    manifest.server_id
+                ))
+            })?;
+        let signed = chio_manifest::sign_manifest(manifest, &signer)?;
+        registry
+            .register_public_only(
+                signed,
+                &signer.public_key(),
+                chio_manifest::RuntimeToolTopology::local(),
+            )
+            .map_err(|error| A2aEdgeError::InvalidRequest(error.to_string()))?;
+    }
+    Ok(registry)
+}
+
 impl ChioA2aEdge {
-    /// Create a new A2A edge from Chio tool manifests.
-    pub fn new(config: A2aEdgeConfig, manifests: Vec<ToolManifest>) -> Result<Self, A2aEdgeError> {
+    /// Create a new A2A edge from authenticated, policy-admitted manifests.
+    #[cfg(not(test))]
+    pub fn new(
+        config: A2aEdgeConfig,
+        registry: &VerifiedManifestRegistry,
+    ) -> Result<Self, A2aEdgeError> {
+        Self::new_with_registry(config, registry)
+    }
+
+    /// Create a new A2A edge from authenticated, policy-admitted manifests.
+    pub fn new_with_registry(
+        config: A2aEdgeConfig,
+        registry: &VerifiedManifestRegistry,
+    ) -> Result<Self, A2aEdgeError> {
+        let manifests = registry
+            .verified_manifests()
+            .map(|signed| signed.manifest.clone())
+            .collect();
+        Self::new_internal(config, manifests, Some(registry.clone()))
+    }
+
+    /// Preserve the legacy unit-test constructor without exposing unverified
+    /// manifests to production authoritative execution.
+    #[cfg(test)]
+    pub(crate) fn new(
+        config: A2aEdgeConfig,
+        manifests: Vec<ToolManifest>,
+    ) -> Result<Self, A2aEdgeError> {
+        let test_registry = test_registry_from_unverified_manifests(&manifests).ok();
+        Self::new_internal(config, manifests, test_registry)
+    }
+
+    fn new_internal(
+        config: A2aEdgeConfig,
+        manifests: Vec<ToolManifest>,
+        manifest_registry: Option<VerifiedManifestRegistry>,
+    ) -> Result<Self, A2aEdgeError> {
         config.validate_for_agent_card()?;
 
         let mut skills = Vec::new();
@@ -116,10 +192,15 @@ impl ChioA2aEdge {
 
         for manifest in &manifests {
             for tool in &manifest.tools {
+                let security = manifest_registry
+                    .as_ref()
+                    .and_then(|registry| registry.bridge_security(&manifest.server_id, &tool.name))
+                    .unwrap_or_else(|| BridgeSecurityMetadata::from_tool(tool));
                 let mut skill_candidate = build_skill_candidate(
                     manifest,
                     tool,
                     tool_name_counts.get(&tool.name).copied().unwrap_or(0) > 1,
+                    security,
                 )?;
 
                 let published_id_count = published_id_counts
@@ -158,8 +239,8 @@ impl ChioA2aEdge {
                         description: skill_candidate.description.clone(),
                         tags: skill_candidate.tags.clone(),
                         examples: None,
-                        input_modes: vec!["text".to_string()],
-                        output_modes: vec!["text".to_string()],
+                        input_modes: vec!["text/plain".to_string(), "application/json".to_string()],
+                        output_modes: vec!["text/plain".to_string(), "application/json".to_string()],
                         bridge_fidelity: skill_candidate.fidelity.clone(),
                     });
                 }
@@ -191,12 +272,25 @@ impl ChioA2aEdge {
 
         Ok(Self {
             config,
+            manifest_registry,
             skills,
             skill_fidelity,
             skill_bindings,
             ambiguous_skill_ids,
             task_counter: 0,
+            // A random identifier prevents stale client task records from
+            // aliasing unrelated work after this process loses its task table.
+            // This public value is not a trust root.
+            task_namespace: chio_core::crypto::Keypair::generate().public_key().to_hex(),
             tasks: BTreeMap::new(),
+        })
+    }
+
+    fn manifest_registry(&self) -> Result<&VerifiedManifestRegistry, A2aEdgeError> {
+        self.manifest_registry.as_ref().ok_or_else(|| {
+            A2aEdgeError::InvalidRequest(
+                "authoritative A2A execution requires a verified manifest registry".to_string(),
+            )
         })
     }
 
@@ -261,12 +355,12 @@ impl ChioA2aEdge {
                 protocol_version: "1.0".to_string(),
             }],
             capabilities: AgentCapabilities {
-                streaming: true,
+                streaming: false,
                 push_notifications: false,
                 state_transition_history: false,
             },
-            default_input_modes: vec!["text".to_string()],
-            default_output_modes: vec!["text".to_string()],
+            default_input_modes: vec!["text/plain".to_string(), "application/json".to_string()],
+            default_output_modes: vec!["text/plain".to_string(), "application/json".to_string()],
             skills: self.skills.clone(),
         }
     }
@@ -302,7 +396,7 @@ impl ChioA2aEdge {
     /// Allocate a new task ID.
     fn next_task_id(&mut self) -> String {
         self.task_counter += 1;
-        format!("a2a-task-{}", self.task_counter)
+        format!("a2a-task-{}-{}", self.task_namespace, self.task_counter)
     }
 
     fn prune_deferred_tasks(&mut self) {
@@ -353,6 +447,9 @@ impl ChioA2aEdge {
             threshold_approval_proposal: execution.threshold_approval_proposal.clone(),
             supplemental_authorization: execution.supplemental_authorization.clone(),
             model_metadata: execution.model_metadata.clone(),
+            authenticated_session_id: None,
+            security_context: None,
+            bridge_security: binding.security,
         })
     }
 
@@ -368,7 +465,7 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.resolve_skill_binding(skill_id)?;
 
@@ -383,7 +480,12 @@ impl ChioA2aEdge {
             task_id.clone(),
             format!("a2a-{task_id}"),
         )?;
-        let orchestrated = execute_orchestrated_a2a_request(kernel, request)?;
+        let orchestrated = execute_orchestrated_a2a_request(
+            &self.config.peer_capabilities,
+            kernel,
+            self.manifest_registry()?,
+            request,
+        )?;
         Ok(task_response_from_orchestrated(task_id, orchestrated))
     }
 
@@ -401,7 +503,7 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         let binding = self.resolve_skill_binding(skill_id)?;
 
         let arguments = extract_arguments_from_message(&request.message)?;
@@ -415,7 +517,12 @@ impl ChioA2aEdge {
             task_id.clone(),
             request_id.to_string(),
         )?;
-        let orchestrated = execute_orchestrated_a2a_request(kernel, execution_request)?;
+        let orchestrated = execute_orchestrated_a2a_request(
+            &self.config.peer_capabilities,
+            kernel,
+            self.manifest_registry()?,
+            execution_request,
+        )?;
         Ok(task_response_from_orchestrated(task_id, orchestrated))
     }
 
@@ -433,7 +540,7 @@ impl ChioA2aEdge {
         execution: &A2aKernelExecutionContext,
         reason: impl Into<String>,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
         let binding = self.resolve_skill_binding(skill_id)?;
         let arguments = extract_arguments_from_message(&request.message)?;
@@ -447,7 +554,12 @@ impl ChioA2aEdge {
             task_id.clone(),
             format!("a2a-{task_id}"),
         )?;
-        let mut orchestrated = execute_orchestrated_a2a_request(kernel, request)?;
+        let mut orchestrated = execute_orchestrated_a2a_request(
+            &self.config.peer_capabilities,
+            kernel,
+            self.manifest_registry()?,
+            request,
+        )?;
         let reason = reason.into();
         orchestrated.response.verdict = KernelVerdict::PendingApproval;
         orchestrated.response.output = None;
@@ -463,7 +575,7 @@ impl ChioA2aEdge {
         request: &SendMessageRequest,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         reject_request_bound_artifacts_without_stable_request_id(execution)?;
         self.handle_stream_message_with_optional_request_id(skill_id, request, execution, None)
     }
@@ -476,7 +588,7 @@ impl ChioA2aEdge {
         request: &SendMessageRequest,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
         self.handle_stream_message_with_optional_request_id(
             skill_id,
             request,
@@ -525,6 +637,7 @@ impl ChioA2aEdge {
                 request: orchestrated_request,
                 response: response.clone(),
                 expires_at_ms,
+                v1_output_mode: None,
             },
         );
         Ok(response)
@@ -601,13 +714,17 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> A2aJsonRpcResponse {
-        let A2aJsonRpcEnvelope { id, method, params } =
-            match Self::parse_jsonrpc_envelope(&message) {
-                Ok(envelope) => envelope,
-                Err(response) => return A2aJsonRpcResponse::from_optional(response),
-            };
+        let A2aJsonRpcEnvelope { id, method, params } = match Self::parse_jsonrpc_envelope(&message)
+        {
+            Ok(envelope) => envelope,
+            Err(response) => return A2aJsonRpcResponse::from_optional(response),
+        };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
+        if matches!(method.as_str(), "SendMessage" | "GetTask" | "CancelTask") {
+            let response = self.handle_v1_jsonrpc(id, &method, params, kernel, execution);
+            return A2aJsonRpcResponse::from_optional(should_respond.then_some(response));
+        }
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
             &id,
             &method,
@@ -645,11 +762,11 @@ impl ChioA2aEdge {
         message: Value,
         server: &dyn ToolServerConnection,
     ) -> A2aJsonRpcResponse {
-        let A2aJsonRpcEnvelope { id, method, params } =
-            match Self::parse_jsonrpc_envelope(&message) {
-                Ok(envelope) => envelope,
-                Err(response) => return A2aJsonRpcResponse::from_optional(response),
-            };
+        let A2aJsonRpcEnvelope { id, method, params } = match Self::parse_jsonrpc_envelope(&message)
+        {
+            Ok(envelope) => envelope,
+            Err(response) => return A2aJsonRpcResponse::from_optional(response),
+        };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
@@ -756,7 +873,7 @@ impl ChioA2aEdge {
             Ok(task_id) => task_id,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
-        if let Err(error) = validate_execution_context(execution) {
+        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
             return Self::jsonrpc_error_response(id, error);
         }
 
@@ -780,7 +897,7 @@ impl ChioA2aEdge {
         execution: &A2aKernelExecutionContext,
         id: Value,
     ) -> Value {
-        if let Err(error) = validate_execution_context(execution) {
+        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
             return Self::jsonrpc_error_response(id, error);
         }
         let Some(task) = self.tasks.get(task_id).cloned() else {
@@ -803,7 +920,15 @@ impl ChioA2aEdge {
             });
         }
 
-        let orchestrated = match execute_orchestrated_a2a_request(kernel, task.request) {
+        let orchestrated = match execute_orchestrated_a2a_request(
+            &self.config.peer_capabilities,
+            kernel,
+            match self.manifest_registry() {
+                Ok(registry) => registry,
+                Err(error) => return Self::jsonrpc_error_response(id, error),
+            },
+            task.request,
+        ) {
             Ok(orchestrated) => orchestrated,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
@@ -839,7 +964,7 @@ impl ChioA2aEdge {
             Ok(task_id) => task_id,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
-        if let Err(error) = validate_execution_context(execution) {
+        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
             return Self::jsonrpc_error_response(id, error);
         }
 
@@ -936,5 +1061,4 @@ impl ChioA2aEdgeCompatibility<'_> {
     ) -> A2aJsonRpcResponse {
         self.edge.handle_jsonrpc_passthrough(message, server)
     }
-
 }

@@ -1,0 +1,19 @@
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+error[E0369]: binary operation `!=` cannot be applied to type `chio_core::receipt::decision::ToolCallAction`
+   --> /home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs:103:31
+    |
+103 |               || receipt.action != chio_core::receipt::decision::ToolCallAction::from_parameters(request.arguments)
+    |  ________________--------------_^^_-
+    | |                |
+    | |                chio_core::receipt::decision::ToolCallAction
+104 | |                 .map_err(|e| ToolOutcomeError::Canonical(e.to_string()))?
+    | |_________________________________________________________________________- chio_core::receipt::decision::ToolCallAction
+    |
+note: `chio_core::receipt::decision::ToolCallAction` does not implement `PartialEq`
+   --> /home/connor/backbay/arc-funded-integration/crates/core/chio-core-types/src/receipt/decision.rs:35:1
+    |
+ 35 | pub struct ToolCallAction {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^ `chio_core::receipt::decision::ToolCallAction` is defined in another crate
+
+For more information about this error, try `rustc --explain E0369`.
+error: could not compile `chio-kernel` (lib) due to 1 previous error

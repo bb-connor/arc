@@ -45,7 +45,7 @@ export interface ChioReceipt {
   receipt_kind: "mediated_decision" | "trace_observation" | "advisory_evaluation";
   boundary_class: "prevent" | "detect_only" | "advisory_only";
   observation_outcome?: string | undefined;
-  tool_origin: "caller_executed" | "host_executed_provider_reported" | "host_executed_unmediated";
+  tool_origin: "caller_executed" | "host_executed_provider_reported" | "host_executed_unmediated" | "chio_internal";
   redaction_mode: "none" | "summary" | "redacted";
   trust_level: "mediated" | "verified" | "advisory";
   // Additional fields (tool_server, tool_name, signature, ...) are ignored
@@ -533,7 +533,8 @@ function hasStructuralAuthorityFields(receipt: ChioReceipt): boolean {
       || receipt.boundary_class === "advisory_only")
     && (receipt.tool_origin === "caller_executed"
       || receipt.tool_origin === "host_executed_provider_reported"
-      || receipt.tool_origin === "host_executed_unmediated")
+      || receipt.tool_origin === "host_executed_unmediated"
+      || receipt.tool_origin === "chio_internal")
     && (receipt.redaction_mode === "none"
       || receipt.redaction_mode === "summary"
       || receipt.redaction_mode === "redacted")

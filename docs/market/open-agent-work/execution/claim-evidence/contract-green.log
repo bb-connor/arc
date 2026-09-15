@@ -1,0 +1,84 @@
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ [
++   {
++     component: 'general',
++     formattedMessage: 'CompilerError: Stack too deep. Try compiling with `--via-ir` (cli) or the equivalent `viaIR: true` (standard JSON) while enabling the optimizer. Otherwise, try removing local variables.\n' +
++       '   --> src/experimental/ChioWorkClaimEscrow.sol:245:56:\n' +
++       '    |\n' +
++       '245 |             work.commitment, decisionDigest, accepted, work.terms.beneficiary, work.terms.token, work.terms.amount));\n' +
++       '    |                                                        ^^^^\n' +
++       '\n',
++     message: 'Compiler error (/solidity/libsolidity/codegen/LValue.cpp:54): Stack too deep. Try compiling with `--via-ir` (cli) or the equivalent `viaIR: true` (standard JSON) while enabling the optimizer. Otherwise, try removing local variables.',
++     severity: 'error',
++     sourceLocation: {
++       end: 10762,
++       file: 'src/experimental/ChioWorkClaimEscrow.sol',
++       start: 10758
++     },
++     type: 'CompilerError'
++   }
++ ]
+- []
+
+    at file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-fixture.mjs:36:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:633:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [
+    {
+      component: 'general',
+      formattedMessage: 'CompilerError: Stack too deep. Try compiling with `--via-ir` (cli) or the equivalent `viaIR: true` (standard JSON) while enabling the optimizer. Otherwise, try removing local variables.\n' +
+        '   --> src/experimental/ChioWorkClaimEscrow.sol:245:56:\n' +
+        '    |\n' +
+        '245 |             work.commitment, decisionDigest, accepted, work.terms.beneficiary, work.terms.token, work.terms.amount));\n' +
+        '    |                                                        ^^^^\n' +
+        '\n',
+      message: 'Compiler error (/solidity/libsolidity/codegen/LValue.cpp:54): Stack too deep. Try compiling with `--via-ir` (cli) or the equivalent `viaIR: true` (standard JSON) while enabling the optimizer. Otherwise, try removing local variables.',
+      severity: 'error',
+      sourceLocation: {
+        end: 10762,
+        file: 'src/experimental/ChioWorkClaimEscrow.sol',
+        start: 10758
+      },
+      type: 'CompilerError'
+    }
+  ],
+  expected: [],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.16.0
+✖ contracts/scripts/work-claim-escrow.test.mjs (6892.674246ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6903.005697
+
+✖ failing tests:
+
+test at contracts/scripts/work-claim-escrow.test.mjs:1:1
+✖ contracts/scripts/work-claim-escrow.test.mjs (6892.674246ms)
+  'test failed'

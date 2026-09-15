@@ -73,6 +73,14 @@ pub(crate) fn finding_status_delivery_denial() -> DeliveryDenial {
     }
 }
 
+pub(crate) fn output_guard_delivery_denial() -> DeliveryDenial {
+    DeliveryDenial {
+        reason: crate::admission_operation::DeliveryDenialReason::OutputGuardRejected,
+        message: crate::admission_operation::OUTPUT_GUARD_REJECTION_REASON,
+        guard: "checked_output",
+    }
+}
+
 /// Make a persisted delivery denial monotonic across replay. Deterministic
 /// delivery checks are recomputed first; if they now allow while the signed
 /// terminal receipt denied, the only mutable gate was current finding status.

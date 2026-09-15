@@ -51,6 +51,32 @@ pub(crate) fn load_payment_journal(
     transaction: &rusqlite::Connection,
     operation_id: &str,
 ) -> Result<Option<PaymentJournalRecord>, BudgetStoreError> {
+    let original = load_original_payment_journal(transaction, operation_id)?;
+    let Some(original) = original else {
+        return Ok(None);
+    };
+    let resolution = crate::admission_operation_store::unknown_release::load_effective_journal(
+        transaction,
+        &original,
+    )
+    .map_err(|e| BudgetStoreError::Invariant(e.to_string()))?;
+    let waiver = crate::admission_operation_store::contractual_resolution::load_effective_journal(
+        transaction,
+        &original,
+    )
+    .map_err(|e| BudgetStoreError::Invariant(e.to_string()))?;
+    if resolution.is_some() && waiver.is_some() {
+        return Err(BudgetStoreError::Invariant(
+            "conflicting monetary successors".into(),
+        ));
+    }
+    Ok(Some(waiver.or(resolution).unwrap_or(original)))
+}
+
+pub(crate) fn load_original_payment_journal(
+    transaction: &rusqlite::Connection,
+    operation_id: &str,
+) -> Result<Option<PaymentJournalRecord>, BudgetStoreError> {
     transaction
         .query_row(
             r#"
@@ -346,6 +372,8 @@ pub(super) const fn payment_journal_state_text(state: PaymentJournalState) -> &'
         PaymentJournalState::Settling => "settling",
         PaymentJournalState::Settled => "settled",
         PaymentJournalState::Closed => "closed",
+        PaymentJournalState::Resolving => "resolving",
+        PaymentJournalState::Resolved => "resolved",
         PaymentJournalState::ReconcileFailed => "reconcile_failed",
     }
 }
@@ -399,6 +427,8 @@ pub(super) const fn payment_release_authority_kind_text(
         PaymentReleaseAuthorityKind::PreDispatchNoEffect => "pre_dispatch_no_effect",
         PaymentReleaseAuthorityKind::TransportNotAccepted => "transport_not_accepted",
         PaymentReleaseAuthorityKind::ContractualZeroCharge => "contractual_zero_charge",
+        PaymentReleaseAuthorityKind::MutuallyAgreedUnknown => "mutually_agreed_unknown",
+        PaymentReleaseAuthorityKind::ContractualCaptureWaiver => "contractual_capture_waiver",
     }
 }
 
@@ -409,6 +439,7 @@ fn payment_release_authority_kind(
         "pre_dispatch_no_effect" => Ok(PaymentReleaseAuthorityKind::PreDispatchNoEffect),
         "transport_not_accepted" => Ok(PaymentReleaseAuthorityKind::TransportNotAccepted),
         "contractual_zero_charge" => Ok(PaymentReleaseAuthorityKind::ContractualZeroCharge),
+        "mutually_agreed_unknown" => Ok(PaymentReleaseAuthorityKind::MutuallyAgreedUnknown),
         _ => Err(invalid_payment_column("release_authority_kind")),
     }
 }

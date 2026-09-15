@@ -14,7 +14,7 @@ use chio_core::sha256_hex;
 use chio_kernel::payment::GovernedPaymentContext;
 use chio_kernel::payment::{
     PaymentAdapter, PaymentAuthorization, PaymentAuthorizationState, PaymentAuthorizeRequest,
-    PaymentError, PaymentRailMode, PaymentResult, RailSettlementStatus,
+    PaymentError, PaymentRailMode, PaymentResult, RailSettlementState, RailSettlementStatus,
 };
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
@@ -547,6 +547,48 @@ fn bind_legacy_payment_from_journal(
 }
 
 impl PaymentAdapter for SqliteFindingOperatorPaymentAdapter {
+    fn settlement_state(
+        &self,
+        reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<RailSettlementState, PaymentError> {
+        let query = || -> Result<RailSettlementState, String> {
+            validate_text(reference, "reference")?;
+            if let Some(id) = authorization_id {
+                validate_text(id, "authorization_id")?;
+            }
+            let conn = self.pool.get().map_err(|error| error.to_string())?;
+            let Some(record) = load_by_reference(&conn, reference)? else {
+                if authorization_id.is_some() {
+                    return Err("authorization does not belong to the queried reference".to_owned());
+                }
+                return Ok(RailSettlementState::NoAuthorization);
+            };
+            if authorization_id.is_some_and(|id| id != record.authorization_id) {
+                return Err("authorization does not belong to the queried reference".to_owned());
+            }
+            if record.state == "held" {
+                return Ok(RailSettlementState::Held {
+                    authorization_id: record.authorization_id,
+                });
+            }
+            let status = match record.state.as_str() {
+                "captured" => RailSettlementStatus::Settled,
+                "released" => RailSettlementStatus::Released,
+                "refunded" => RailSettlementStatus::Refunded,
+                _ => return Err("unrecognized durable payment state".to_owned()),
+            };
+            let transaction_id = record
+                .transaction_id
+                .ok_or("terminal payment lacks transaction id")?;
+            Ok(RailSettlementState::Settled {
+                authorization_id: record.authorization_id,
+                result: payment_result(transaction_id, status, true),
+            })
+        };
+        query().map_err(PaymentError::RailError)
+    }
+
     fn rail_id(&self) -> &'static str {
         RAIL_ID
     }
@@ -870,6 +912,76 @@ fn now_secs() -> i64 {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn settlement_queries_survive_restart_without_mutating_the_rail() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("operator.db");
+        let adapter = SqliteFindingOperatorPaymentAdapter::open(&path).unwrap();
+        assert_eq!(
+            adapter.settlement_state("purchase-1", None).unwrap(),
+            RailSettlementState::NoAuthorization
+        );
+        let held = adapter.authorize(&request("purchase-1")).unwrap();
+        assert_eq!(
+            adapter.settlement_state("purchase-1", None).unwrap(),
+            RailSettlementState::Held {
+                authorization_id: held.authorization_id.clone()
+            }
+        );
+        assert!(adapter
+            .settlement_state("purchase-1", Some("another-hold"))
+            .is_err());
+        assert!(adapter
+            .settlement_state("missing", Some(&held.authorization_id))
+            .is_err());
+        let captured = adapter
+            .capture(&held.authorization_id, 25, "USD", "purchase-1")
+            .unwrap();
+        drop(adapter);
+        let adapter = SqliteFindingOperatorPaymentAdapter::open(&path).unwrap();
+        for _ in 0..3 {
+            let RailSettlementState::Settled {
+                authorization_id,
+                result,
+            } = adapter.settlement_state("purchase-1", None).unwrap()
+            else {
+                panic!("missing settled state");
+            };
+            assert_eq!(authorization_id, held.authorization_id);
+            assert_eq!(result.transaction_id, captured.transaction_id);
+            assert_eq!(result.settlement_status, RailSettlementStatus::Settled);
+        }
+        assert_eq!(adapter.capture_count().unwrap(), 1);
+        adapter
+            .refund(&captured.transaction_id, 25, "USD", "purchase-1")
+            .unwrap();
+        assert!(matches!(
+            adapter.settlement_state("purchase-1", None).unwrap(),
+            RailSettlementState::Settled {
+                result: PaymentResult {
+                    settlement_status: RailSettlementStatus::Refunded,
+                    ..
+                },
+                ..
+            }
+        ));
+        let second = adapter.authorize(&request("purchase-2")).unwrap();
+        adapter
+            .release(&second.authorization_id, "purchase-2")
+            .unwrap();
+        assert!(matches!(
+            adapter.settlement_state("purchase-2", None).unwrap(),
+            RailSettlementState::Settled {
+                result: PaymentResult {
+                    settlement_status: RailSettlementStatus::Released,
+                    ..
+                },
+                ..
+            }
+        ));
+        assert_eq!(adapter.capture_count().unwrap(), 1);
+    }
 
     fn request(reference: &str) -> PaymentAuthorizeRequest {
         PaymentAuthorizeRequest {

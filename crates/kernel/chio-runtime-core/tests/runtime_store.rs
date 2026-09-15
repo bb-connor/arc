@@ -11,9 +11,21 @@ use chio_swarm_authority::{
     SwarmJoinReceipt, SwarmRevocationEpoch, SwarmRoutePlanReceipt, SwarmTaskGraph,
 };
 
+#[cfg(unix)]
+#[path = "runtime_store/replay_source.rs"]
+mod replay_source;
+#[cfg(not(unix))]
+#[path = "runtime_store/replay_source_unsupported.rs"]
+mod replay_source_unsupported;
+#[path = "runtime_store/trust_floor_defaults.rs"]
+mod trust_floor_defaults;
+#[path = "runtime_store/trust_floor_races.rs"]
+mod trust_floor_races;
+
 #[derive(Default)]
 struct StoreWithoutTreatyContinuationSupport {
     inner: InMemoryRuntimeAdmissionStore,
+    floor_callbacks: std::sync::atomic::AtomicUsize,
 }
 
 impl RuntimeAdmissionStore for StoreWithoutTreatyContinuationSupport {
@@ -45,6 +57,8 @@ impl RuntimeAdmissionStore for StoreWithoutTreatyContinuationSupport {
         verifier_id: &str,
         key_id: &str,
     ) -> Result<Option<RuntimeTrustFloorEntry>, ChioRuntimeError> {
+        self.floor_callbacks
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         self.inner.runtime_trust_floor(verifier_id, key_id)
     }
 
@@ -52,6 +66,8 @@ impl RuntimeAdmissionStore for StoreWithoutTreatyContinuationSupport {
         &self,
         entry: RuntimeTrustFloorEntry,
     ) -> Result<(), ChioRuntimeError> {
+        self.floor_callbacks
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         self.inner.record_runtime_trust_floor(entry)
     }
 }

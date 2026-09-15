@@ -23,7 +23,9 @@ mod error;
 mod hash;
 mod ops;
 mod orchestration;
+pub mod outcome_continuation;
 mod pheromone_policy;
+mod replay_source;
 mod schema;
 mod serde_io;
 mod store;
@@ -31,11 +33,12 @@ pub(crate) mod treaty;
 mod types;
 mod validation;
 
-pub use admission::{evaluate_runtime_admission, RuntimeAdmissionInput};
 pub(crate) use admission::{
-    evaluate_runtime_admission_tracked, trust_floor_identity,
-    validate_runtime_trust_floor_transition, RuntimeAdmissionReservationTracker,
+    commit_prepared_runtime_admission, prepare_runtime_admission_from_bundle, trust_floor_identity,
+    validate_runtime_trust_floor_transition, PreparedRuntimeAdmission, RuntimeAdmissionPreparation,
+    RuntimeAdmissionReservationTracker,
 };
+pub use admission::{evaluate_runtime_admission, RuntimeAdmissionInput};
 pub use admission_hook::ChioRuntimeAdmissionHook;
 pub use buyer::{
     verify_buyer_attestation_packet, verify_buyer_attestation_review_package,
@@ -61,6 +64,10 @@ pub use orchestration::{
     runtime_orchestration_evidence_sink_healthy, validate_runtime_orchestration_evidence_binding,
     validate_runtime_orchestration_evidence_integrity, RuntimeOrchestrationEvidence,
     RuntimeOrchestrationEvidenceFailure,
+};
+pub use replay_source::{
+    RuntimeReplayMarker, RuntimeReplayMarkerKind, RuntimeReplaySourceBinding,
+    RuntimeReplaySourceSeal, MAX_RUNTIME_REPLAY_SOURCE_BYTES, MAX_RUNTIME_REPLAY_SOURCE_MARKERS,
 };
 pub use schema::{
     CHIO_ATTEST_BUYER_ATTESTATION_PACKET_SCHEMA,
@@ -165,11 +172,11 @@ pub use types::{
     RuntimeProviderHealthCheck, RuntimeProviderHealthReport, RuntimeProviderLoadedWeightsEvidence,
     RuntimeRecoveryDrillReport, RuntimeRequestBinding, RuntimeRunContract, RuntimeRunLease,
     RuntimeSchedulerTickReport, RuntimeStepEvidence, RuntimeSupervisorProfile,
-    RuntimeTrustFloorEntry, RuntimeTrustFloorState, RuntimeTrustedVerifierKey,
-    RuntimeTrustedVerifierKeysDocument, RuntimeVerifierTrustBundleV4, RuntimeWorkflowRunReport,
-    SignedRuntimeAdmissionReport, SignedRuntimePeerWeights, SignedRuntimePheromonePolicy,
-    SignedRuntimePheromoneQueryReport, SignedRuntimeVerifierTrustBundle,
-    TreatyRuntimeArtifactRecord, TreatyScope, WeightsBindingMode,
+    RuntimeTreatyGovernanceRecord, RuntimeTreatyLeaseRecord, RuntimeTrustFloorEntry,
+    RuntimeTrustFloorState, RuntimeTrustedVerifierKey, RuntimeTrustedVerifierKeysDocument,
+    RuntimeVerifierTrustBundleV4, RuntimeWorkflowRunReport, SignedRuntimeAdmissionReport,
+    SignedRuntimePeerWeights, SignedRuntimePheromonePolicy, SignedRuntimePheromoneQueryReport,
+    SignedRuntimeVerifierTrustBundle, TreatyRuntimeArtifactRecord, TreatyScope, WeightsBindingMode,
 };
 pub(crate) use validation::{ensure_sha256_hash, is_sha256_hex, rejected};
 pub use validation::{

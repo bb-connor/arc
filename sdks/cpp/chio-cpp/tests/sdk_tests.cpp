@@ -464,6 +464,52 @@ void test_dpop_proof() {
   require_contains(built.value().body_json, "\"nonce\":\"fixed-nonce\"", "dpop builder");
 }
 
+void test_authority_dpop_proof() {
+  const auto vector = chio::detail::parse_json(read_file("tests/bindings/fixtures/dpop-authority-v2.json"));
+  require(vector && vector->is_object(), "expected durable DPoP vector");
+  chio::DpopSignParams params;
+  params.capability_id = "capability";
+  params.tool_server = "server";
+  params.tool_name = "tool";
+  params.action_args_json = "{}";
+  params.agent_seed_hex = vector->string_field("agent_seed_hex");
+  params.nonce = "nonce";
+  params.issued_at = 1800000000;
+  chio::DpopReplayAuthority authority;
+  authority.destination_store_uuid = "018f9878-7047-7abc-8c98-120dc65700ea";
+  authority.dpop_authority_id = "configured-dpop";
+  authority.expectation_id = std::string(64, 'a');
+  const auto proof = chio::sign_authority_dpop_proof(params, authority);
+  require(proof.ok(), proof.error().message);
+  require_eq(proof.value().body_json, vector->string_field("canonical_body"), "durable DPoP canonical body");
+  const auto* expected = vector->get("proof");
+  require(expected && expected->is_object(), "expected durable signed proof");
+  require_eq(proof.value().signature_hex, expected->string_field("signature"), "cross-language durable DPoP signature");
+  const auto canonical_proof = chio::invariants::canonicalize_json(proof.value().to_json());
+  require(canonical_proof.ok(), canonical_proof.error().message);
+  const auto proof_digest = chio::invariants::sha256_hex_utf8(canonical_proof.value());
+  require(proof_digest.ok(), proof_digest.error().message);
+  require_eq(proof_digest.value(), vector->string_field("proof_sha256"), "cross-language durable DPoP digest");
+  const auto legacy = chio::sign_dpop_proof(params);
+  require(legacy.ok(), legacy.error().message);
+  require(legacy.value().body_json.find("replay_authority") == std::string::npos, "legacy preimage has no durable domain");
+  for (const auto* name : {u8"\ufeffauthority", u8"authority\ufeff", u8"authority\u2000name"}) {
+    auto exact = authority;
+    exact.dpop_authority_id = name;
+    require(chio::sign_authority_dpop_proof(params, exact).ok(), "non-padding names must remain valid");
+  }
+  for (const auto& name : {std::string(" padded"), std::string(u8"\u3000padded"), std::string("bad\x01name"), std::string(513, 'x')}) {
+    auto invalid = authority;
+    invalid.dpop_authority_id = name;
+    require(!chio::sign_authority_dpop_proof(params, invalid).ok(), "invalid authority name must fail");
+  }
+  auto invalid = authority;
+  invalid.proof_ttl_secs = 3601;
+  require(!chio::sign_authority_dpop_proof(params, invalid).ok(), "unbounded durable TTL must fail");
+  params.issued_at = 9007199254740ULL;
+  require(!chio::sign_authority_dpop_proof(params, authority).ok(), "unbounded durable horizon must fail");
+}
+
 void test_client_session_with_fake_transport() {
   auto transport = std::make_shared<FakeTransport>(std::vector<chio::HttpResponse>{
       {200, {{"MCP-Session-Id", "sess-1"}},
@@ -1433,6 +1479,7 @@ int main() {
     test_curl_sse_helpers_abort_after_terminal_message();
     test_transport_policy_respects_retryable_flag();
     test_dpop_proof();
+    test_authority_dpop_proof();
     test_client_session_with_fake_transport();
     test_initialize_handles_sse_and_rejects_invalid_handshakes();
     test_typed_list_helpers_reject_jsonrpc_errors();

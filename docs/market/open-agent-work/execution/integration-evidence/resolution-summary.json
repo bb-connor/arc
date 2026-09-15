@@ -1,0 +1,178 @@
+{
+  "passed": 7,
+  "scenarios": [
+    {
+      "scenario": "after-review",
+      "fault": "none",
+      "beforeRecovery": null,
+      "afterRecovery": {
+        "reviews": 1,
+        "payments": {
+          "released": 1
+        },
+        "buyerExpenses": 0
+      },
+      "buyerAccount": {
+        "available": 1000,
+        "reserved": 0,
+        "spent": 0
+      },
+      "originalIncidentUnchanged": true,
+      "originalInvocationCount": 1,
+      "releaseVerified": true
+    },
+    {
+      "scenario": "before-review",
+      "fault": "none",
+      "beforeRecovery": null,
+      "afterRecovery": {
+        "reviews": 0,
+        "payments": {
+          "released": 1
+        },
+        "buyerExpenses": 0
+      },
+      "buyerAccount": {
+        "available": 1000,
+        "reserved": 0,
+        "spent": 0
+      },
+      "originalIncidentUnchanged": true,
+      "originalInvocationCount": 1,
+      "releaseVerified": true
+    },
+    {
+      "scenario": "release-before-rail",
+      "fault": "release-before-rail",
+      "beforeRecovery": {
+        "reviews": 1,
+        "payments": {
+          "held": 1
+        },
+        "buyerExpenses": 0
+      },
+      "afterRecovery": {
+        "reviews": 1,
+        "payments": {
+          "released": 1
+        },
+        "buyerExpenses": 0
+      },
+      "buyerAccount": {
+        "available": 1000,
+        "reserved": 0,
+        "spent": 0
+      },
+      "originalIncidentUnchanged": true,
+      "originalInvocationCount": 1,
+      "releaseVerified": true
+    },
+    {
+      "scenario": "release-after-rail",
+      "fault": "release-after-rail",
+      "beforeRecovery": {
+        "reviews": 1,
+        "payments": {
+          "released": 1
+        },
+        "buyerExpenses": 0
+      },
+      "afterRecovery": {
+        "reviews": 1,
+        "payments": {
+          "released": 1
+        },
+        "buyerExpenses": 0
+      },
+      "buyerAccount": {
+        "available": 1000,
+        "reserved": 0,
+        "spent": 0
+      },
+      "originalIncidentUnchanged": true,
+      "originalInvocationCount": 1,
+      "releaseVerified": true
+    },
+    {
+      "scenario": "release-after-receipt",
+      "fault": "release-after-receipt",
+      "beforeRecovery": {
+        "reviews": 1,
+        "payments": {
+          "released": 1
+        },
+        "buyerExpenses": 0
+      },
+      "afterRecovery": {
+        "reviews": 1,
+        "payments": {
+          "released": 1
+        },
+        "buyerExpenses": 0
+      },
+      "buyerAccount": {
+        "available": 1000,
+        "reserved": 0,
+        "spent": 0
+      },
+      "originalIncidentUnchanged": true,
+      "originalInvocationCount": 1,
+      "releaseVerified": true
+    },
+    {
+      "scenario": "buyer-after-intent",
+      "fault": "buyer-after-intent",
+      "beforeRecovery": {
+        "reviews": 1,
+        "payments": {
+          "held": 1
+        },
+        "buyerExpenses": 0
+      },
+      "afterRecovery": {
+        "reviews": 1,
+        "payments": {
+          "released": 1
+        },
+        "buyerExpenses": 0
+      },
+      "buyerAccount": {
+        "available": 1000,
+        "reserved": 0,
+        "spent": 0
+      },
+      "originalIncidentUnchanged": true,
+      "originalInvocationCount": 1,
+      "releaseVerified": true
+    },
+    {
+      "scenario": "buyer-after-check",
+      "fault": "buyer-after-check",
+      "beforeRecovery": {
+        "reviews": 1,
+        "payments": {
+          "released": 1
+        },
+        "buyerExpenses": 0
+      },
+      "afterRecovery": {
+        "reviews": 1,
+        "payments": {
+          "released": 1
+        },
+        "buyerExpenses": 0
+      },
+      "buyerAccount": {
+        "available": 1000,
+        "reserved": 0,
+        "spent": 0
+      },
+      "originalIncidentUnchanged": true,
+      "originalInvocationCount": 1,
+      "releaseVerified": true
+    }
+  ],
+  "independentOperators": false,
+  "externalFundsTransferred": false,
+  "transport": "TLS 1.3"
+}

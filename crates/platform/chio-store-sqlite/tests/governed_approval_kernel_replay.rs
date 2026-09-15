@@ -178,6 +178,7 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let pre_dispatch_denial = first_kernel

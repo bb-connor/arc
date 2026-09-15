@@ -1,0 +1,195 @@
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 1m 39s
+     Running tests/execution_nonce_caller_execution.rs (target/debug/deps/execution_nonce_caller_execution-71d6c8a702a53ef3)
+a_nonce_of_an_unreserved_operation_cannot_reconcile: test
+a_report_for_other_arguments_is_refused_and_keeps_the_reservation: test
+a_second_reservation_is_bounded_by_the_shared_budget: test
+an_expired_caller_reservation_is_compensated_by_startup_recovery: test
+authenticated::authenticated_report_finalizes_after_expiry_and_restart_without_readmission: test
+authenticated::monetary::monetary_exposure_survives_lost_report_and_settles_original_authenticated_cost: test
+authenticated::negative_controls::authenticated_executor_pin_does_not_bypass_native_release_custody: test
+authenticated::negative_controls::changed_executor_pin_cannot_adopt_original_start_or_report: test
+authenticated::negative_controls::revocation_blocks_historical_output_and_completed_receipt_replay: test
+authenticated::negative_controls::unused_expired_reservation_cannot_publish_start_authority: test
+authenticated::private_evidence::private_delivery_evidence_rejects_tampering_and_schema_confusion: test
+authenticated::process_loss::process_loss_retains_capture_and_never_reexecutes_original_attempt: test
+authenticated::schema_migration::v34_waiting_report_migrates_without_replacing_custody_or_renewing_authority: test
+authenticated::start_captures_before_publication_and_retries_original_authorization: test
+caller_reservation_holds_the_budget_until_the_report_settles: test
+delegated_share::an_expired_caller_share_stays_owned_until_recovery_compensates_it: test
+delegated_share::authenticated::lost_authenticated_report_retains_sibling_share_until_original_settlement: test
+delegated_share::boundaries::a_caller_share_also_blocks_ordinary_kernel_dispatch_until_settlement: test
+delegated_share::boundaries::an_out_of_band_terminal_edit_cannot_hide_a_live_caller_share: test
+delegated_share::boundaries::concurrent_siblings_cannot_oversubscribe_and_denied_claims_do_not_leak: test
+delegated_share::caller_share_snapshot_is_complete_scoped_and_fenced: test
+delegated_share::outcome_unknown::an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_expiry: test
+delegated_share::pending::a_later_funded_sibling_cannot_displace_an_existing_caller_owner: test
+delegated_share::pending::an_interrupted_funded_caller_is_compensated_without_displacing_a_reserved_owner: test
+delegated_share::restart_preserves_the_delegated_share_of_a_live_caller_reservation: test
+delegated_share::settling_a_durable_caller_reservation_releases_its_delegated_share: test
+delegated_share::two_caller_operations_share_one_child_edge_until_both_settle: test
+dispatch_context::caller_context_capture_rejects_out_of_band_schema_changes: test
+dispatch_context::caller_context_survives_interruption_after_capture_before_report_recording: test
+dispatch_context::caller_report_retains_typed_private_context_with_capture_and_exact_restart_replay: test
+external_delivery::an_external_effect_with_a_lost_report_cannot_be_refunded_at_nonce_expiry: test
+external_delivery::reservation_only_effect_reproduces_the_original_refund_counterexample: test
+kernel_dispatch_cannot_resume_a_caller_reservation: test
+restart_keeps_a_live_caller_reservation: test
+
+34 tests, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.90s
+     Running tests/execution_nonce_caller_execution.rs (target/debug/deps/execution_nonce_caller_execution-71d6c8a702a53ef3)
+
+running 34 tests
+test a_nonce_of_an_unreserved_operation_cannot_reconcile ... ok
+test a_report_for_other_arguments_is_refused_and_keeps_the_reservation ... ok
+test a_second_reservation_is_bounded_by_the_shared_budget ... ok
+test an_expired_caller_reservation_is_compensated_by_startup_recovery ... ok
+test authenticated::authenticated_report_finalizes_after_expiry_and_restart_without_readmission ... ok
+test authenticated::monetary::monetary_exposure_survives_lost_report_and_settles_original_authenticated_cost ... ok
+test authenticated::negative_controls::authenticated_executor_pin_does_not_bypass_native_release_custody ... ok
+test authenticated::negative_controls::changed_executor_pin_cannot_adopt_original_start_or_report ... ok
+test authenticated::negative_controls::revocation_blocks_historical_output_and_completed_receipt_replay ... ok
+test authenticated::negative_controls::unused_expired_reservation_cannot_publish_start_authority ... ok
+test authenticated::private_evidence::private_delivery_evidence_rejects_tampering_and_schema_confusion ... ok
+test authenticated::process_loss::process_loss_retains_capture_and_never_reexecutes_original_attempt ... ok
+test authenticated::schema_migration::v34_waiting_report_migrates_without_replacing_custody_or_renewing_authority ... ok
+test authenticated::start_captures_before_publication_and_retries_original_authorization ... ok
+test caller_reservation_holds_the_budget_until_the_report_settles ... ok
+test delegated_share::an_expired_caller_share_stays_owned_until_recovery_compensates_it ... ok
+test delegated_share::authenticated::lost_authenticated_report_retains_sibling_share_until_original_settlement ... ok
+test delegated_share::boundaries::a_caller_share_also_blocks_ordinary_kernel_dispatch_until_settlement ... ok
+test delegated_share::boundaries::an_out_of_band_terminal_edit_cannot_hide_a_live_caller_share ... ok
+test delegated_share::boundaries::concurrent_siblings_cannot_oversubscribe_and_denied_claims_do_not_leak ... ok
+test delegated_share::caller_share_snapshot_is_complete_scoped_and_fenced ... ok
+test delegated_share::outcome_unknown::an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_expiry ... ok
+test delegated_share::pending::a_later_funded_sibling_cannot_displace_an_existing_caller_owner ... ok
+test delegated_share::pending::an_interrupted_funded_caller_is_compensated_without_displacing_a_reserved_owner ... ok
+test delegated_share::restart_preserves_the_delegated_share_of_a_live_caller_reservation ... ok
+test delegated_share::settling_a_durable_caller_reservation_releases_its_delegated_share ... ok
+test delegated_share::two_caller_operations_share_one_child_edge_until_both_settle ... ok
+test dispatch_context::caller_context_capture_rejects_out_of_band_schema_changes ... ok
+test dispatch_context::caller_context_survives_interruption_after_capture_before_report_recording ... ok
+test dispatch_context::caller_report_retains_typed_private_context_with_capture_and_exact_restart_replay ... ok
+test external_delivery::an_external_effect_with_a_lost_report_cannot_be_refunded_at_nonce_expiry ... ok
+test external_delivery::reservation_only_effect_reproduces_the_original_refund_counterexample ... ok
+test kernel_dispatch_cannot_resume_a_caller_reservation ... ok
+test restart_keeps_a_live_caller_reservation ... ok
+
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 181.14s
+
+authenticated caller lifecycle passed (34 exact tests)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 10.68s
+     Running tests/caller_execution_ledger.rs (target/debug/deps/caller_execution_ledger-3b40799109e52170)
+another_attempt_or_kernel_signing_key_cannot_create_a_second_execution: test
+claimed_attempt_survives_process_death_without_redispatch: test
+completed_delivery_replays_the_exact_report_after_reopen_without_another_effect: test
+expired_or_untrusted_authorization_never_claims_or_invokes: test
+expired_permission_can_replay_a_retained_report_but_cannot_execute: test
+failed_or_panicking_effect_retains_an_unknown_attempt_across_restart: test
+full_ledger_and_changed_schema_do_not_reset_retained_claims: test
+independent_connections_race_one_operation_without_holding_sqlite_across_effect: test
+substituted_key_epoch_or_physical_ledger_fails_closed: test
+
+9 tests, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 0.85s
+     Running tests/caller_execution_ledger.rs (target/debug/deps/caller_execution_ledger-3b40799109e52170)
+
+running 9 tests
+test another_attempt_or_kernel_signing_key_cannot_create_a_second_execution ... ok
+test claimed_attempt_survives_process_death_without_redispatch ... ok
+test completed_delivery_replays_the_exact_report_after_reopen_without_another_effect ... ok
+test expired_or_untrusted_authorization_never_claims_or_invokes ... ok
+test expired_permission_can_replay_a_retained_report_but_cannot_execute ... ok
+test failed_or_panicking_effect_retains_an_unknown_attempt_across_restart ... ok
+test full_ledger_and_changed_schema_do_not_reset_retained_claims ... ok
+test independent_connections_race_one_operation_without_holding_sqlite_across_effect ... ok
+test substituted_key_epoch_or_physical_ledger_fails_closed ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.38s
+
+durable authenticated executor passed (9 exact tests)
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-http-session v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-http-session)
+   Compiling chio-guards v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-guards)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-commerce-order)
+   Compiling chio-cross-protocol v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-cross-protocol)
+   Compiling chio-edge-metrics v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-edge-metrics)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-agent-web-interop)
+   Compiling chio-mcp-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-edge)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+   Compiling chio-trace-validate v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-trace-validate)
+   Compiling chio-mcp-adapter v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-adapter)
+   Compiling chio-trust-market-context v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-trust-market-context)
+   Compiling chio-enterprise-export v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-enterprise-export)
+   Compiling chio-policy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-policy)
+   Compiling chio-data-guards v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-data-guards)
+   Compiling chio-external-guards v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-external-guards)
+   Compiling chio-finding-challenge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-challenge)
+   Compiling chio-anchor v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-anchor)
+   Compiling chio-siem v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-siem)
+   Compiling chio-security-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-security-kernel)
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-runtime-core)
+   Compiling chio-finding-hosted-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-hosted-edge)
+   Compiling chio-conformance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-conformance)
+   Compiling chio-control-plane v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 3m 21s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-c608ca76d0a26201)
+security::adapters::tests::native_flow::support::caller::denial::native_caller_changed_input_cannot_replace_original_reserved_join: test
+security::adapters::tests::native_flow::support::caller::denial::native_caller_output_refusal_revocation_and_stop_never_release_raw_delivery: test
+security::adapters::tests::native_flow::support::caller::denial::native_caller_preflight_requires_fresh_host_flow_state_before_reservation: test
+security::adapters::tests::native_flow::support::caller::native_caller_composes_local_egress_declassification_and_complete_credentials: test
+security::adapters::tests::native_flow::support::caller::native_caller_releases_only_the_authenticated_original_guarded_output: test
+security::adapters::tests::native_flow::support::caller::restart::native_caller_original_delivery_survives_restart_and_authority_expiry: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_atomic_capture: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_claim_before_effect: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_durable_report: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_effect_without_report: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_output_join: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_raw_report: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_acknowledgement: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_checkpoint: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_terminal_projection: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_before_atomic_capture: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_combined_disclosure_abort_after_release: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_combined_disclosure_abort_after_report: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_output_recovery_rejects_changed_classification: test
+
+19 tests, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 1.01s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-c608ca76d0a26201)
+
+running 19 tests
+test security::adapters::tests::native_flow::support::caller::denial::native_caller_changed_input_cannot_replace_original_reserved_join ... ok
+test security::adapters::tests::native_flow::support::caller::denial::native_caller_output_refusal_revocation_and_stop_never_release_raw_delivery ... ok
+test security::adapters::tests::native_flow::support::caller::denial::native_caller_preflight_requires_fresh_host_flow_state_before_reservation ... ok
+test security::adapters::tests::native_flow::support::caller::native_caller_composes_local_egress_declassification_and_complete_credentials ... ok
+test security::adapters::tests::native_flow::support::caller::native_caller_releases_only_the_authenticated_original_guarded_output ... ok
+test security::adapters::tests::native_flow::support::caller::restart::native_caller_original_delivery_survives_restart_and_authority_expiry ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_atomic_capture ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_claim_before_effect ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_durable_report ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_effect_without_report ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_output_join ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_raw_report ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_acknowledgement ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_checkpoint ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_terminal_projection ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_before_atomic_capture ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_combined_disclosure_abort_after_release ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_combined_disclosure_abort_after_report ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_output_recovery_rejects_changed_classification ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 1115 filtered out; finished in 1139.32s
+
+native authenticated caller custody passed (19 exact tests)

@@ -90,6 +90,10 @@ a real bilateral deployment; the artifact schemas exist, the lane does not.
 
 ## Design record
 
+- [Open agent work program](open-agent-work/README.md): proposed research and
+  implementation plans for independently operated, funded, verifiable agent
+  work and subcontracting, with explicit breakthrough and comparison gates.
+  This program does not extend the qualified release boundary above.
 - [ARCHITECTURE.md](ARCHITECTURE.md): artifact data model, market flows,
   kernel enforcement points, schema governance, deployment topology.
 - [MECHANISMS.md](MECHANISMS.md): pricing, elicitation, bonds, fees, and the

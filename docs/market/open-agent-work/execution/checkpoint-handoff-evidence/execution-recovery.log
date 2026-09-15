@@ -1,0 +1,6 @@
+test_sigkill_around_execution_evidence_and_custody (__main__.FundedLifecycle.test_sigkill_around_execution_evidence_and_custody) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 118.002s
+
+OK

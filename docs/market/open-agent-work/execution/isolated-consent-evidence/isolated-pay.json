@@ -1,0 +1,126 @@
+{
+  "buyerConsentReplayWithoutKey": true,
+  "chain": {
+    "beneficiaryBalance": "100",
+    "escrowBalance": "0",
+    "events": {
+      "ClaimSubmitted": 1,
+      "DecisionRecorded": 1,
+      "Funded": 1,
+      "Paid": 1,
+      "Refunded": 0,
+      "TimedOut": 0
+    },
+    "fundingTransaction": "0xfa4ad134fd157304eab4c0296329944195dc89f1a22f53dbf9ef17f9c51e365e",
+    "paid": "100",
+    "payerBalance": "900",
+    "refunded": "0",
+    "state": "Paid",
+    "transactions": {
+      "pay": [
+        {
+          "hash": "0xa054b94af994787a386fe3ff62037eba3cca8503e432051e08319d9eea88fac4",
+          "nonce": 1,
+          "status": 1
+        }
+      ],
+      "record": [
+        {
+          "hash": "0x52030134898db3bc5e66c7eb300a898b43305cedd0e42472c3a4c90884db8352",
+          "nonce": 0,
+          "status": 1
+        }
+      ],
+      "refund": [],
+      "submit": [
+        {
+          "hash": "0x6c7c2b75a1e6d7913ade850653c821e474f80c2d224aa1f94c5af92443cac991",
+          "nonce": 0,
+          "status": 1
+        }
+      ]
+    }
+  },
+  "decisionReplayWithoutDependencies": true,
+  "evaluatedAt": 1789489219,
+  "first": {
+    "allocationId": "0x37f1d2bf481180c6ee1bbfeea0ff9b641ed8ae4ddcc28e2390e587f748d15809",
+    "authorityUuid": "01a0a5de-4baa-7191-987d-3ea3ac7d7da4",
+    "authorizationId": "funded-37f1d2bf481180c6ee1bbfeea0ff9b641ed8ae4ddcc28e2390e587f748d15809",
+    "executions": 1,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:e46ec9bbce542c551e2e3fddfdd80747867be9a30955b0ccfd7abc75bc8a656a:0",
+    "nativeAuthorizationId": "funded-37f1d2bf481180c6ee1bbfeea0ff9b641ed8ae4ddcc28e2390e587f748d15809",
+    "nativeEvaluationError": "durable admission failed: payment rail unavailable: exact ERC20 payout has not been observed; capture remains pending",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "e46ec9bbce542c551e2e3fddfdd80747867be9a30955b0ccfd7abc75bc8a656a",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "isolated-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": null,
+    "startupReconciliationError": null
+  },
+  "independentAdministration": false,
+  "isolation": [
+    {
+      "blockedPeerStates": 4,
+      "hostNetworkUnreachable": true,
+      "hostSentinelAbsent": true,
+      "inputReadOnly": true,
+      "role": "buyer"
+    },
+    {
+      "blockedPeerStates": 4,
+      "hostNetworkUnreachable": true,
+      "hostSentinelAbsent": true,
+      "inputReadOnly": true,
+      "role": "provider"
+    },
+    {
+      "blockedPeerStates": 4,
+      "hostNetworkUnreachable": true,
+      "hostSentinelAbsent": true,
+      "inputReadOnly": true,
+      "role": "verifier"
+    },
+    {
+      "blockedPeerStates": 4,
+      "hostNetworkUnreachable": true,
+      "hostSentinelAbsent": true,
+      "inputReadOnly": true,
+      "role": "governance"
+    },
+    {
+      "blockedPeerStates": 4,
+      "hostNetworkUnreachable": true,
+      "hostSentinelAbsent": true,
+      "inputReadOnly": true,
+      "role": "operator"
+    }
+  ],
+  "replay": {
+    "allocationId": "0x37f1d2bf481180c6ee1bbfeea0ff9b641ed8ae4ddcc28e2390e587f748d15809",
+    "authorityUuid": "01a0a5de-4baa-7191-987d-3ea3ac7d7da4",
+    "authorizationId": "funded-37f1d2bf481180c6ee1bbfeea0ff9b641ed8ae4ddcc28e2390e587f748d15809",
+    "executions": 1,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:e46ec9bbce542c551e2e3fddfdd80747867be9a30955b0ccfd7abc75bc8a656a:0",
+    "nativeAuthorizationId": "funded-37f1d2bf481180c6ee1bbfeea0ff9b641ed8ae4ddcc28e2390e587f748d15809",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settled",
+    "nativeState": "Completed",
+    "operationId": "e46ec9bbce542c551e2e3fddfdd80747867be9a30955b0ccfd7abc75bc8a656a",
+    "paymentState": "paid",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "isolated-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": "0xa054b94af994787a386fe3ff62037eba3cca8503e432051e08319d9eea88fac4",
+    "startupReconciliationError": null
+  },
+  "tamperedConsentDenied": true
+}

@@ -1,0 +1,61 @@
+{
+  "after": {
+    "holdCount": 1,
+    "holdDisposition": "open",
+    "holdId": "admission-budget:06f8312196e6f46f63096327416393e30fa2ae9d99622f8b51def4767711b37c:0",
+    "operationCount": 1,
+    "operationId": "06f8312196e6f46f63096327416393e30fa2ae9d99622f8b51def4767711b37c"
+  },
+  "before": {
+    "holdCount": 1,
+    "holdDisposition": "open",
+    "holdId": "admission-budget:06f8312196e6f46f63096327416393e30fa2ae9d99622f8b51def4767711b37c:0",
+    "operationCount": 1,
+    "operationId": "06f8312196e6f46f63096327416393e30fa2ae9d99622f8b51def4767711b37c"
+  },
+  "chain": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "100",
+    "events": {
+      "ClaimSubmitted": 0,
+      "DecisionRecorded": 0,
+      "Funded": 1,
+      "Paid": 0,
+      "Refunded": 0,
+      "TimedOut": 0
+    },
+    "fundingTransaction": "0x7929b3cc481f571e9f9a14d654bdda6fa7523c028aff22710a18c7dce7e09d13",
+    "paid": "0",
+    "payerBalance": "900",
+    "refunded": "0",
+    "state": "Funded",
+    "transactions": {
+      "pay": [],
+      "record": [],
+      "refund": [],
+      "submit": []
+    }
+  },
+  "checkpoint": "after-tool",
+  "killedSignal": 9,
+  "replay": {
+    "allocationId": "0x43318bf9acb7779925d3cd935d5dd648a2805c43f6cfb223a0d84445ef6bf28c",
+    "authorityUuid": "01a0a2a4-d249-71e3-9e26-860a2c9da67f",
+    "authorizationId": "funded-43318bf9acb7779925d3cd935d5dd648a2805c43f6cfb223a0d84445ef6bf28c",
+    "executions": 1,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:06f8312196e6f46f63096327416393e30fa2ae9d99622f8b51def4767711b37c:0",
+    "nativeAuthorizationId": "funded-43318bf9acb7779925d3cd935d5dd648a2805c43f6cfb223a0d84445ef6bf28c",
+    "nativePaymentAction": null,
+    "nativePaymentState": "Authorized",
+    "nativeState": "OutcomeUnknownAfterDispatch",
+    "operationId": "06f8312196e6f46f63096327416393e30fa2ae9d99622f8b51def4767711b37c",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": null,
+    "startupReconciliationError": null
+  }
+}

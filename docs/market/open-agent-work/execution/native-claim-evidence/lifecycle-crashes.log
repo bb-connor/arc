@@ -1,0 +1,6 @@
+test_sigkill_around_original_claim_decision_and_money (__main__.FundedLifecycle.test_sigkill_around_original_claim_decision_and_money) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 340.726s
+
+OK

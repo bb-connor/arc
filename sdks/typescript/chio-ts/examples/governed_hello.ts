@@ -10,11 +10,11 @@ function requireEnv(name: string): string {
 
 async function sessionCapabilityId(
   baseUrl: string,
-  authToken: string,
+  adminToken: string,
   sessionId: string,
 ): Promise<string> {
   const response = await fetch(`${baseUrl}/admin/sessions/${sessionId}/trust`, {
-    headers: { Authorization: `Bearer ${authToken}` },
+    headers: { Authorization: `Bearer ${adminToken}` },
   });
   if (!response.ok) {
     throw new Error(`session trust query failed with HTTP ${response.status}`);
@@ -32,6 +32,8 @@ async function sessionCapabilityId(
 const baseUrl = requireEnv("CHIO_BASE_URL");
 const controlUrl = process.env.CHIO_CONTROL_URL ?? baseUrl;
 const authToken = requireEnv("CHIO_AUTH_TOKEN");
+const adminToken = requireEnv("CHIO_ADMIN_TOKEN");
+const controlToken = requireEnv("CHIO_CONTROL_TOKEN");
 const message = process.argv[2] ?? "hello from the TypeScript SDK";
 
 const client = ChioClient.withStaticBearer(baseUrl, authToken);
@@ -44,12 +46,12 @@ const session = await client.initialize({
 
 try {
   const tools = (await session.listTools()) as { tools?: Array<{ name: string }> };
-  const capabilityId = await sessionCapabilityId(baseUrl, authToken, session.sessionId);
+  const capabilityId = await sessionCapabilityId(baseUrl, adminToken, session.sessionId);
   const toolResult = (await session.callTool("echo_text", { message })) as {
     content?: Array<{ text?: string }>;
     structuredContent?: { echo?: string };
   };
-  const receipts = await new ReceiptQueryClient(controlUrl, authToken).query({
+  const receipts = await new ReceiptQueryClient(controlUrl, controlToken).query({
     capabilityId,
     limit: 10,
   });

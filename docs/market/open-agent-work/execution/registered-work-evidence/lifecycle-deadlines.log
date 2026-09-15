@@ -1,0 +1,6 @@
+test_deadline_loss_refunds_even_with_retained_unrecorded_artifacts (__main__.FundedLifecycle.test_deadline_loss_refunds_even_with_retained_unrecorded_artifacts) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 135.842s
+
+OK

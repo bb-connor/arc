@@ -1,0 +1,24 @@
+{
+  "kind": "read-only committed security delta audit",
+  "fundedBase": "5257f963d869d89c7a54384ea88628cf727c32c8",
+  "securityCommittedHead": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+  "securityWorktreeCleanAtRead": true,
+  "selected": [
+    {
+      "commit": "9d398d0186f19bf0724085b6aa82c47c27bde7f5",
+      "selection": "Refresh trusted time under the mutation lock before terminalizing dispatch-committed admission. Preserve exact successor no-op invariants in the new API.",
+      "wholeCommitImported": false
+    }
+  ],
+  "deferred": [
+    {
+      "commit": "deb9b8a85623f7eb4bebd65eeb608af76f11d125",
+      "reason": "Broad process foundation outside the selected native witness."
+    },
+    {
+      "commit": "1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d",
+      "reason": "WAL-backed relocation export/import only. This witness reopens original owners at the same path; it neither relocates nor imports an authority."
+    }
+  ],
+  "remoteQualification": "Not refreshed or claimed; no fetch, PR action, push or merge."
+}

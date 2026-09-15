@@ -60,7 +60,9 @@ use chio_kernel::ToolServerConnection;
 use chio_kernel::{
     dpop, ChioKernel, SignedExecutionNonce, ToolCallOutput, Verdict as KernelVerdict,
 };
-use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::{
+    BridgeSecurityMetadata, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+};
 use chio_mcp_edge::McpTargetExecutor;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -92,6 +94,7 @@ include!("bridge.rs");
 include!("conversion.rs");
 include!("edge.rs");
 include!("jsonrpc.rs");
+include!("v1.rs");
 include!("tests/all.rs");
 
 #[cfg(test)]

@@ -9,10 +9,12 @@ pub mod checkpoint;
 pub mod crypto_floor;
 pub mod decision;
 pub mod economics;
+pub mod execution_evidence;
 pub mod governance;
 pub mod kinds;
 pub mod lineage;
 pub mod metadata;
+pub mod security;
 pub mod signing;
 pub(crate) mod validation;
 

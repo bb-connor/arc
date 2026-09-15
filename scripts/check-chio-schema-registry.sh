@@ -138,6 +138,7 @@ checked_chio_schema_roots = (
     "spec/schemas/chio-enterprise/",
     "spec/schemas/chio-federation/",
     "spec/schemas/chio-finding/",
+    "spec/schemas/chio-work/",
     "spec/schemas/chio-frost/",
     "spec/schemas/chio-lineage/",
     "spec/schemas/chio-oracle/",

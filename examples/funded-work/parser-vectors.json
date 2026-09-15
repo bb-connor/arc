@@ -1,0 +1,75 @@
+{
+  "schema": "chio.experimental.funded-w0-parser-vectors.v1",
+  "positive": {
+    "agreement": {
+      "body": {
+        "schema": "chio.experimental.funded-w0-agreement.v1",
+        "workId": "test-work",
+        "buyerKey": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "providerKey": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+        "verifierKey": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+        "custodianKey": "ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c",
+        "inputSha256": "f537df22e6a09f38e70cf4991d3474081855cb4f668d7ab0d83389732d4600f1",
+        "checkerSha256": "d412a85c82c0e3334f0f8b783e39ffb1a06ea93c3ddac3bdb53bf31cdca49ca7",
+        "assurance": "artifact-only-v1",
+        "parentAgreementSha256": null,
+        "rail": {
+          "chainId": "31337",
+          "escrow": "0x1010101010101010101010101010101010101010",
+          "runtimeKeccak256": "0x2020202020202020202020202020202020202020202020202020202020202020",
+          "token": "0x3030303030303030303030303030303030303030",
+          "payer": "0x4040404040404040404040404040404040404040",
+          "beneficiary": "0x5050505050505050505050505050505050505050",
+          "verifier": "0x6060606060606060606060606060606060606060",
+          "amount": "100"
+        },
+        "deadlines": {
+          "submitBy": 100,
+          "challengeUntil": 110,
+          "resolveBy": 120,
+          "refundAfter": 130
+        },
+        "custody": {
+          "policy": "local-retain-indefinitely-v1",
+          "retainUntil": 2592130
+        }
+      },
+      "buyerSignature": "cd9fe721e62c8399ae9abd582a2caa7519ccfe29fb980692f913cc7c43639bd92453156b9fbf8a325c855c09f9ce51b570f13319b6d038bbd1eddcb480df5d05",
+      "providerSignature": "422efc5ac3de59aa263ec3338213ae11e89f1277a3368d491b2dac0f357e0df958e0e81682e779fa21bbbae90110da6c4b30060c80d6ef747d239789922ee001"
+    },
+    "pins": {
+      "buyer": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "provider": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "verifier": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+      "custodian": "ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c"
+    },
+    "canonicalBase64": "eyJib2R5Ijp7ImFzc3VyYW5jZSI6ImFydGlmYWN0LW9ubHktdjEiLCJidXllcktleSI6IjhhODhlM2RkNzQwOWYxOTVmZDUyZGIyZDNjYmE1ZDcyY2E2NzA5YmYxZDk0MTIxYmYzNzQ4ODAxYjQwZjZmNWMiLCJjaGVja2VyU2hhMjU2IjoiZDQxMmE4NWM4MmMwZTMzMzRmMGY4Yjc4M2UzOWZmYjFhMDZlYTkzYzNkZGFjM2JkYjUzYmYzMWNkY2E0OWNhNyIsImN1c3RvZGlhbktleSI6ImNhOTNhYzE3MDUxODcwNzFkNjdiODNjN2ZmMGVmZTgxMDhlOGVjNDUzMDU3NWQ3NzI2ODc5MzMzZGJkYWJlN2MiLCJjdXN0b2R5Ijp7InBvbGljeSI6ImxvY2FsLXJldGFpbi1pbmRlZmluaXRlbHktdjEiLCJyZXRhaW5VbnRpbCI6MjU5MjEzMH0sImRlYWRsaW5lcyI6eyJjaGFsbGVuZ2VVbnRpbCI6MTEwLCJyZWZ1bmRBZnRlciI6MTMwLCJyZXNvbHZlQnkiOjEyMCwic3VibWl0QnkiOjEwMH0sImlucHV0U2hhMjU2IjoiZjUzN2RmMjJlNmEwOWYzOGU3MGNmNDk5MWQzNDc0MDgxODU1Y2I0ZjY2OGQ3YWIwZDgzMzg5NzMyZDQ2MDBmMSIsInBhcmVudEFncmVlbWVudFNoYTI1NiI6bnVsbCwicHJvdmlkZXJLZXkiOiI4MTM5NzcwZWE4N2QxNzVmNTZhMzU0NjZjMzRjN2VjY2NiOGQ4YTkxYjRlZTM3YTI1ZGY2MGY1YjhmYzliMzk0IiwicmFpbCI6eyJhbW91bnQiOiIxMDAiLCJiZW5lZmljaWFyeSI6IjB4NTA1MDUwNTA1MDUwNTA1MDUwNTA1MDUwNTA1MDUwNTA1MDUwNTA1MCIsImNoYWluSWQiOiIzMTMzNyIsImVzY3JvdyI6IjB4MTAxMDEwMTAxMDEwMTAxMDEwMTAxMDEwMTAxMDEwMTAxMDEwMTAxMCIsInBheWVyIjoiMHg0MDQwNDA0MDQwNDA0MDQwNDA0MDQwNDA0MDQwNDA0MDQwNDA0MDQwIiwicnVudGltZUtlY2NhazI1NiI6IjB4MjAyMDIwMjAyMDIwMjAyMDIwMjAyMDIwMjAyMDIwMjAyMDIwMjAyMDIwMjAyMDIwMjAyMDIwMjAyMDIwMjAyMCIsInRva2VuIjoiMHgzMDMwMzAzMDMwMzAzMDMwMzAzMDMwMzAzMDMwMzAzMDMwMzAzMDMwIiwidmVyaWZpZXIiOiIweDYwNjA2MDYwNjA2MDYwNjA2MDYwNjA2MDYwNjA2MDYwNjA2MDYwNjAifSwic2NoZW1hIjoiY2hpby5leHBlcmltZW50YWwuZnVuZGVkLXcwLWFncmVlbWVudC52MSIsInZlcmlmaWVyS2V5IjoiZWQ0OTI4YzYyOGQxYzJjNmVhZTkwMzM4OTA1OTk1NjEyOTU5MjczYTVjNjNmOTM2MzZjMTQ2MTRhYzg3MzdkMSIsIndvcmtJZCI6InRlc3Qtd29yayJ9LCJidXllclNpZ25hdHVyZSI6ImNkOWZlNzIxZTYyYzgzOTlhZTlhYmQ1ODJhMmNhYTc1MTljY2ZlMjlmYjk4MDY5MmY5MTNjYzdjNDM2MzliZDkyNDUzMTU2YjlmYmY4YTMyNWM4NTVjMDlmOWNlNTFiNTcwZjEzMzE5YjZkMDM4YmJkMWVkZGNiNDgwZGY1ZDA1IiwicHJvdmlkZXJTaWduYXR1cmUiOiI0MjJlZmM1YWMzZGU1OWFhMjYzZWMzMzM4MjEzYWUxMWU4OWYxMjc3YTMzNjhkNDkxYjJkYWMwZjM1N2UwZGY5NThlMGU4MTY4MmU3NzlmYTIxYmJiYWU5MDExMGRhNmM0YjMwMDYwYzgwZDZlZjc0N2QyMzk3ODk5MjJlZTAwMSJ9",
+    "agreementBodySha256": "c1f9161e1903702e126a2cf14bcb72616c463fdd89743decf2c73fa31e52e054"
+  },
+  "malformed": [
+    {
+      "name": "duplicate-key",
+      "wireHex": "7b2261223a312c2261223a327d"
+    },
+    {
+      "name": "nonfinite",
+      "wireHex": "7b2261223a4e614e7d"
+    },
+    {
+      "name": "nonfinite-exponent",
+      "wireHex": "7b2261223a31653939397d"
+    },
+    {
+      "name": "invalid-utf8",
+      "wireHex": "22ff22"
+    },
+    {
+      "name": "unpaired-surrogate",
+      "wireHex": "225c756438303022"
+    },
+    {
+      "name": "depth-17",
+      "wireHex": "5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b305d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d"
+    }
+  ]
+}

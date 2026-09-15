@@ -1,0 +1,25 @@
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+node:fs:1734
+  const stats = binding.stat(
+                        ^
+
+Error: ENOENT: no such file or directory, stat '/tmp/chio-recovery-execution/retained-child-final'
+    at Object.statSync (node:fs:1734:25)
+    at runW0 (file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-w0.mjs:21:19)
+    at file:///home/connor/backbay/arc-funded-work/contracts/scripts/work-claim-recovery-demo.mjs:11:20 {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'stat',
+  path: '/tmp/chio-recovery-execution/retained-child-final'
+}
+
+Node.js v24.16.0

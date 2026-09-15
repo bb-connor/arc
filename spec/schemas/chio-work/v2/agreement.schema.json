@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Chio experimental native funded agreement v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "buyerSignature",
+    "providerSignature"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "policySha256",
+        "authorityUuid",
+        "buyerKey",
+        "providerKey",
+        "requestId",
+        "requestSha256",
+        "domain",
+        "work",
+        "findingContextSha256",
+        "requiredFindingFacets"
+      ],
+      "properties": {
+        "schema": {
+          "const": "chio.experimental.native-funded-w0-agreement.v2"
+        },
+        "policySha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "authorityUuid": {
+          "$ref": "#/$defs/identifier"
+        },
+        "buyerKey": {
+          "$ref": "#/$defs/publicKey"
+        },
+        "providerKey": {
+          "$ref": "#/$defs/publicKey"
+        },
+        "requestId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "requestSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "domain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profile",
+            "chainId",
+            "genesisHash",
+            "escrow",
+            "escrowCodeHash",
+            "token",
+            "tokenCodeHash"
+          ],
+          "properties": {
+            "profile": {
+              "const": "chio.experimental.local-confirmed-funding.v1"
+            },
+            "chainId": {
+              "const": "31337"
+            },
+            "genesisHash": {
+              "$ref": "#/$defs/hash32"
+            },
+            "escrow": {
+              "$ref": "#/$defs/address"
+            },
+            "escrowCodeHash": {
+              "$ref": "#/$defs/hash32"
+            },
+            "token": {
+              "$ref": "#/$defs/address"
+            },
+            "tokenCodeHash": {
+              "$ref": "#/$defs/hash32"
+            }
+          }
+        },
+        "work": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "payer",
+            "beneficiary",
+            "verifier",
+            "amount",
+            "submitBy",
+            "challengeUntil",
+            "resolveBy",
+            "refundAfter"
+          ],
+          "properties": {
+            "payer": {
+              "$ref": "#/$defs/address"
+            },
+            "beneficiary": {
+              "$ref": "#/$defs/address"
+            },
+            "verifier": {
+              "$ref": "#/$defs/address"
+            },
+            "amount": {
+              "$ref": "#/$defs/positiveDecimal"
+            },
+            "submitBy": {
+              "$ref": "#/$defs/safeInteger"
+            },
+            "challengeUntil": {
+              "$ref": "#/$defs/safeInteger"
+            },
+            "resolveBy": {
+              "$ref": "#/$defs/safeInteger"
+            },
+            "refundAfter": {
+              "$ref": "#/$defs/safeInteger"
+            }
+          }
+        },
+        "captureWaiverTerms": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "body",
+            "receiverSignature",
+            "counterpartySignature"
+          ],
+          "properties": {
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "schema",
+                "policyDigest",
+                "contractContextDigest",
+                "capabilityDigest",
+                "requestId",
+                "issuedAtUnixMs",
+                "expiresAtUnixMs"
+              ],
+              "properties": {
+                "schema": {
+                  "const": "chio.contractual-capture-waiver.v1"
+                },
+                "policyDigest": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "contractContextDigest": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "capabilityDigest": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "requestId": {
+                  "$ref": "#/$defs/identifier"
+                },
+                "issuedAtUnixMs": {
+                  "$ref": "#/$defs/safeInteger"
+                },
+                "expiresAtUnixMs": {
+                  "$ref": "#/$defs/safeInteger"
+                }
+              }
+            },
+            "receiverSignature": {
+              "$ref": "#/$defs/signature"
+            },
+            "counterpartySignature": {
+              "$ref": "#/$defs/signature"
+            }
+          }
+        },
+        "findingContextSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "requiredFindingFacets": {
+          "$ref": "#/$defs/facetKinds"
+        }
+      }
+    },
+    "buyerSignature": {
+      "$ref": "#/$defs/signature"
+    },
+    "providerSignature": {
+      "$ref": "#/$defs/signature"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "signature": {
+      "type": "string",
+      "minLength": 128,
+      "maxLength": 128,
+      "pattern": "^[0-9a-f]{128}$"
+    },
+    "publicKey": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "hash32": {
+      "type": "string",
+      "minLength": 66,
+      "maxLength": 66,
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "address": {
+      "type": "string",
+      "minLength": 42,
+      "maxLength": 42,
+      "pattern": "^0x[0-9a-f]{40}$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\s\\u0000-\\u001f\\u007f-\\u009f]+$"
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "facetKinds": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 13,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "artifact_integrity",
+          "receipt_authenticity",
+          "checkpoint_membership",
+          "kernel_and_revocation_trust",
+          "issuer_lineage",
+          "recipe_binding",
+          "intent_binding",
+          "metered_exposure_backing",
+          "settled_spend_backing",
+          "runtime_assurance_backing",
+          "bond_backing",
+          "status_liveness",
+          "guarantee_consistency"
+        ]
+      },
+      "allOf": [
+        {
+          "contains": {
+            "const": "artifact_integrity"
+          }
+        },
+        {
+          "contains": {
+            "const": "guarantee_consistency"
+          }
+        }
+      ]
+    },
+    "positiveDecimal": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 16,
+      "pattern": "^[1-9][0-9]*$"
+    }
+  },
+  "$id": "https://chio.world/schemas/chio-work/v2/agreement.schema.json"
+}

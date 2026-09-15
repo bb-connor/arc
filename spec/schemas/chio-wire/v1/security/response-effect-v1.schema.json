@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/response-effect-v1.schema.json",
+  "title": "Chio response effect v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "effect_id",
+    "ordinal",
+    "kind",
+    "target",
+    "canonical_contribution",
+    "contribution_hash",
+    "observed_base_version_hash"
+  ],
+  "properties": {
+    "effect_id": { "$ref": "#/$defs/identifier" },
+    "ordinal": { "type": "integer", "minimum": 0, "maximum": 65535 },
+    "kind": { "$ref": "#/$defs/kind" },
+    "target": { "$ref": "#/$defs/target" },
+    "canonical_contribution": {
+      "type": "array",
+      "maxItems": 1048576,
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 }
+    },
+    "contribution_hash": { "$ref": "#/$defs/digest" },
+    "observed_base_version_hash": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    },
+    "digest": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 }
+    },
+    "kind": {
+      "enum": [
+        "escalate_alert",
+        "throttle_session",
+        "restrict_egress",
+        "suspend_session",
+        "suspend_capability_set",
+        "freeze_issuance"
+      ]
+    },
+    "target": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target_type", "tenant_id"],
+          "properties": {
+            "target_type": { "const": "tenant" },
+            "tenant_id": { "$ref": "#/$defs/identifier" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target_type", "session_id"],
+          "properties": {
+            "target_type": { "const": "session" },
+            "session_id": { "$ref": "#/$defs/identifier" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target_type", "lineage_id"],
+          "properties": {
+            "target_type": { "const": "lineage" },
+            "lineage_id": { "$ref": "#/$defs/identifier" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target_type", "affected_set_hash"],
+          "properties": {
+            "target_type": { "const": "capability_set" },
+            "affected_set_hash": { "$ref": "#/$defs/digest" }
+          }
+        }
+      ]
+    }
+  }
+}

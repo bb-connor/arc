@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+export CARGO_INCREMENTAL=0
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
+# Match the native/flow gates: permission-sensitive startup fixtures must not
+# inherit group-writable ancestry from the invoking shell.
+umask 022
+
+# The whole target is an exact inventory. Adding, removing, ignoring or renaming
+# an acceptance case requires reviewing this gate, not merely changing a filter.
+./scripts/run-exact-cargo-test-inventory.sh --label "durable consumer boundaries" --expected \
+  a2a_aggregate_capture_survives_consumer_restart \
+  a2a_threshold_proposal_approval_and_restart_preserve_one_capture \
+  acp_aggregate_capture_survives_consumer_restart \
+  acp_threshold_proposal_approval_and_restart_preserve_one_capture \
+  mcp_aggregate_capture_survives_consumer_restart \
+  mcp_threshold_proposal_approval_and_restart_preserve_one_capture \
+  native_aggregate_capture_survives_consumer_restart \
+  native_threshold_proposal_approval_and_restart_preserve_one_capture \
+  -- cargo test -p chio-conformance --test consumer_boundary --locked
+
+run_case() {
+  local label="$1" expected="$2"
+  shift 2
+  ./scripts/run-exact-cargo-test-inventory.sh --label "${label}" \
+    --allow-filtered --expected "${expected}" -- "$@" --locked "${expected}"
+}
+
+run_target() {
+  local label="$1" expected="$2"
+  shift 2
+  ./scripts/run-exact-cargo-test-inventory.sh --label "${label}" \
+    --expected "${expected}" -- "$@" --locked
+}
+
+run_case "MCP malformed profile before acquisition" runtime::runtime_tests::authorization::mcp_authorization_negotiation_rejects_malformed_profiles_before_session_acquisition cargo test -p chio-mcp-edge --lib
+run_case "MCP profile recovery without upgrade" runtime::runtime_tests::authorization::restored_mcp_authorization_profile_is_exact_and_legacy_sessions_do_not_upgrade cargo test -p chio-mcp-edge --lib
+run_case "MCP bound target authority" runtime::source_receipt_tests::mcp_target_executor_carries_source_receipt_context_into_kernel_receipt_metadata cargo test -p chio-mcp-edge --lib
+run_case "remote MCP early profile rejection" tests::session_runtime::remote_session_factory_rejects_flow_before_launch_authority_or_store_acquisition cargo test -p chio-mcp-remote --lib
+run_case "remote MCP retained authorization" tests::restored_authorization_matches_the_handshake_without_upgrading_legacy_sessions cargo test -p chio-mcp-remote --lib
+run_case "remote MCP ready-session restart" mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls cargo test -p chio-cli --test mcp_serve_http
+run_case "remote MCP restart policy tightening" mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening cargo test -p chio-cli --test mcp_serve_http
+run_target "stdio MCP early profile rejection" mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading cargo test -p chio-cli --test mcp_startup_security
+run_case "supervisor HTTP readiness positive control" supervise::readiness::tests::an_http_endpoint_is_ready_only_on_a_success_status cargo test -p chio-cli --bin chio
+run_case "supervisor readiness redirect denial" supervise::readiness::security_tests::readiness_never_follows_same_or_cross_origin_redirects cargo test -p chio-cli --bin chio
+run_case "supervisor readiness response bounds" supervise::readiness::security_tests::readiness_caps_declared_and_streamed_response_bodies cargo test -p chio-cli --bin chio
+run_case "supervisor readiness exact response limit" supervise::readiness::security_tests::readiness_accepts_a_response_at_its_exact_byte_limit cargo test -p chio-cli --bin chio
+run_case "supervisor readiness invalid configuration" supervise::readiness::security_tests::readiness_rejects_invalid_targets_and_headers_before_launch cargo test -p chio-cli --bin chio
+run_case "supervisor readiness private addresses" supervise::readiness::security_tests::readiness_accepts_operator_selected_private_addresses cargo test -p chio-cli --bin chio
+run_case "operator readiness DNS deadline" operator_readiness::tests::dns_uses_the_async_resolver_inside_the_deadline cargo test -p chio-egress-contract --features reqwest-egress --lib
+run_case "supervisor readiness rejects before child launch" invalid_http_readiness_refuses_to_start_the_service cargo test -p chio-cli --test security_supervise
+run_case "current signed manifest corpus" current_manifest_consumer_corpus_preserves_wire_and_registered_signature cargo test -p chio-manifest --test manifest_v2
+run_target "Rust generated protocol corpus" generated_rust_shapes_parse_reject_and_round_trip_shared_fixtures cargo test -p chio-core-types --test protocol_primitives_generated
+run_case "authoritative protocol schema corpus" protocol_primitives_shared_fixtures_match_authoritative_schemas cargo test -p chio-core-types --test wire_protocol_schema
+run_case "signed receipt origin vocabulary" receipt_schemas_accept_signed_internal_origin_and_keep_closed_vocabulary cargo test -p chio-core-types --test wire_protocol_schema
+run_case "retained caller attachment capacity" admission_operation::tests::attachment_capacity::rich_native_caller_attachments_survive_outcome_append_and_persistence cargo test -p chio-kernel --lib
+run_case "Tower peer boundary" kernel_service::tests::kernel_service_rejects_unnegotiated_extensions_before_effect_or_receipt cargo test -p chio-tower --lib
+run_case "OpenAI peer boundary" tests::openai_host_rejects_unnegotiated_authority_before_effect_or_receipt cargo test -p chio-openai-adapter --lib
+run_case "OpenAI ordinary host flow rejection" tests::openai_ordinary_host_rejects_flow_required_manifest_before_exposure cargo test -p chio-openai-adapter --lib
+run_case "provider fabric bounded profile" provider_verdict::tests::provider_fabric_rejects_unnegotiated_authorization_before_lowering cargo test -p chio-kernel --lib
+
+./scripts/check-protocol-peer-negotiation.sh
+./scripts/check-adapter-no-bypass.sh
+./scripts/check-http-egress-contract.sh
+echo "Consumer boundary Rust gate passed (SDK, M3 and composed gates remain separate)"

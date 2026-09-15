@@ -8,7 +8,10 @@ mod nested_flow;
 mod stdio;
 mod utils;
 
-pub use stdio::StdioMcpTransport;
+pub use stdio::{
+    CageReceiptPersistence, CageRequiredLaunch, LegacyNativeLaunchAuthorization, NativeMcpLaunch,
+    NativeMcpLaunchFactory, StdioMcpTransport,
+};
 
 #[cfg(test)]
 use std::io::BufReader;
@@ -318,9 +321,11 @@ for line in sys.stdin:
         let script_path = dir.join("mock_mcp_server.py");
         std::fs::write(&script_path, script).expect("write mock script");
 
-        let transport =
-            StdioMcpTransport::spawn("python3", &[script_path.to_str().expect("path to str")])
-                .expect("spawn mock server");
+        let transport = StdioMcpTransport::spawn_legacy_unchecked_for_test(
+            "python3",
+            &[script_path.to_str().expect("path to str")],
+        )
+        .expect("spawn mock server");
 
         let tools = transport.list_tools().expect("list_tools");
         assert_eq!(tools.len(), 1);

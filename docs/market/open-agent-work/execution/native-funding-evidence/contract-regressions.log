@@ -1,0 +1,38 @@
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✔ accepted claim survives deadlines, funding pause and future verifier rotation (5509.36644ms)
+✔ only a timely provider commitment opens the verifier decision window (3561.934006ms)
+▶ verifier outage and absent submission reach refund only strictly after timeout
+  ✔ false (2761.08501ms)
+  ✔ true (2787.141779ms)
+✔ verifier outage and absent submission reach refund only strictly after timeout (5549.235915ms)
+✔ rejected work refunds without creating a payment right (3297.345362ms)
+✔ still-unpaid earned child withdraws after the parent is refunded (6850.80252ms)
+ℹ {"case":"unpaid-earned-child-survives-parent-refund","parentRefunded":"100","childPaidAfterParentRefund":"60","intermediaryLoss":"60"}
+✔ funding binds every term and cannot allocate the same agreement twice (2592.813207ms)
+✔ another payer cannot squat a publicly known agreement digest (4315.902916ms)
+✔ fixed allocation and authorization vectors are accepted by the deployed bytecode (3238.213943ms)
+✔ invalid amounts, roles, deadlines and administrative callers cannot create backing (1296.697824ms)
+✔ maximum supported integer deposits and refunds without rounding (2448.881167ms)
+✔ a release signature cannot substitute its domain, claim, decision, asset or beneficiary (3803.016116ms)
+✔ future verifier rotation does not replace a funded agreements decision key (2743.936597ms)
+✔ competing mined withdrawals produce one payment and no refund (3452.824689ms)
+✔ failed, taxed or malformed token transfers cannot consume a payable claim (7963.803728ms)
+✔ inexact deposits and failed refunds roll back allocation and terminal state (4716.448462ms)
+✔ token callbacks cannot reenter the financial transition (4289.860655ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 76666.545077

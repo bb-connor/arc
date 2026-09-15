@@ -13,9 +13,11 @@ It sits under `crates/kernel` because both of its consumers are
 admission-adjacent rather than protocol-transport code: `chio-runtime-core`
 calls `verify_swarm_authority_bundle` from a trusted pre-dispatch admission
 hook, and `chio-proof-room` calls the same function from an untrusted-input,
-post-hoc public proof path. Both call sites get identical acceptance criteria
-because they call the same function against the same bundle shape, so the
-workspace has one definition of delegation authority rather than two.
+post-hoc public proof path. Both call sites share the same bundle-validity
+checks against the same bundle shape. Runtime admission additionally binds the
+selected task to the exact request capability and scope, checks route metadata,
+and handles continuation reservations. Offline bundle validity alone is not
+evidence that a live tool call used the capability attested by its task witness.
 
 ## Module map
 
