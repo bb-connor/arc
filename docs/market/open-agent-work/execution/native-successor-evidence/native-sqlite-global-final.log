@@ -1,0 +1,17 @@
+    Finished `test` profile [unoptimized] target(s) in 0.83s
+     Running unittests src/lib.rs (target/debug/deps/chio_store_sqlite-5a6ec1936384c61e)
+
+running 11 tests
+test serving_owner::global_commit_chain::schema_tests::ignored_check_cannot_smuggle_future_projection_into_a_supported_predecessor ... ok
+test serving_owner::global_commit_chain::schema_tests::nonhistorical_runtime_kind_without_status_is_not_an_upgrade_predecessor ... ok
+test serving_owner::global_commit_chain::schema_tests::supported_previous_global_schemas_preserve_history_when_adding_replay_kinds ... ok
+test serving_owner::global_commit_chain::schema_tests::unexpected_trigger_on_previous_global_schema_is_not_repaired ... ok
+test serving_owner::global_commit_chain::tests::authority_snapshot_includes_payment_projection ... ok
+test serving_owner::global_commit_chain::tests::channel_release_projection_references_are_exact_and_unknown_kinds_stay_closed ... ok
+test serving_owner::global_commit_chain::tests::factor_assignment_authority_coverage_is_exact_and_closed ... ok
+test serving_owner::global_commit_chain::tests::factor_assignment_authority_reference_is_exact ... ok
+test serving_owner::global_commit_chain::tests::pre_channel_compatibility_requires_every_channel_table_to_be_empty ... ok
+test serving_owner::global_commit_chain::tests::pre_factor_assignment_compatibility_requires_empty_projection ... ok
+test serving_owner::global_commit_chain::tests::pre_payment_compatibility_requires_empty_payment_projection ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 1655 filtered out; finished in 0.30s

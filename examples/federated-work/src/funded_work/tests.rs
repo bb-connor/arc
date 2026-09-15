@@ -3,7 +3,9 @@ use crate::common::Result;
 mod evidence;
 mod native;
 mod observer;
+mod resolution;
 mod settlement;
+mod successors;
 
 #[test]
 fn allocation_matches_the_independent_contract_vector() -> Result<()> {

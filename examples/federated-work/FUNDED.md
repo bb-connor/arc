@@ -1,4 +1,4 @@
-# Verified funding, native Finding and observed settlement
+# Verified funding, native settlement and surviving child obligations
 
 The experimental entry point connects a private-chain `ChioWorkClaimEscrow`
 allocation to one durable native operation and one budget hold. The kernel
@@ -9,7 +9,10 @@ acknowledgement reaches the native journal.
 The admission-only command leaves the contract **Funded** and native payment
 **pending**. The lifecycle command continues through a native Finding artifact,
 custody retrieval, independent W0 verification, observed claim and decision,
-and an actual mock ERC20 payout or refund on those same identities.
+and an actual mock ERC20 payout or refund on those same identities. The resolution
+command completes explicitly authorized capture waivers while retaining consumed
+work cost. The child command proves an earned child can collect after its native
+parent dies and the parent allocation refunds.
 
 ## Reproduce
 
@@ -29,6 +32,8 @@ For the lifecycle, set `CHIO_FUNDED_PYTHON` to a Python environment installed fr
 ```sh
 export CHIO_FUNDED_PYTHON=/absolute/path/to/venv/bin/python
 python3 -B examples/federated-work/funded_lifecycle.py
+python3 -B examples/federated-work/funded_resolution.py
+python3 -B examples/federated-work/funded_child.py
 CHIO_FUNDED_PYTHON="$CHIO_FUNDED_PYTHON" CARGO_TARGET_DIR=target cargo test --locked \
   --manifest-path examples/federated-work/Cargo.toml funded_work::tests -- --ignored --test-threads=1
 ```
@@ -198,8 +203,67 @@ original signed artifacts and prepared transactions remain retained. A recorded
 acceptance remains payable after deadlines. Public `expire()` followed by a
 separate refund transaction is also supported. No database edits are needed.
 
-Remaining Task 4 work includes a native authority for resolving an externally
-rejected/timed-out positive capture, registered general work artifact/facet
-integration, the funded parent-loss/earned-child trial and broader disclosure,
-manifest, independent-operator and sustained-capacity qualification. The current
-experimental schemas are example-local, not additions to the public registry.
+## Contractual capture resolution
+
+`experimental-funded-resolution STATE MODE FAULT` supports `reject`, `absent`,
+`unavailable` and `preexpired`. `FAULT` is `none`, `after-resolution-retained`,
+`after-resolution-accepted` or `after-resolution-completed`. Every crash case
+kills a real worker, reopens its original authority and repeats the exact request.
+
+Before funding, buyer and provider separately sign the original native capture
+waiver terms. Their digest enters the exact capability-bearing request; the
+funding agreement commits that entire request. Terms pin the contract context,
+capability, request ID, separate observer policy and a bounded validity window.
+A fresh observation verifies the exact successful refund. The pinned observer
+then signs its binding to the original native journal, raw outcome, agreement,
+allocation and refund transaction. A legacy agreement cannot acquire this
+waiver after execution.
+
+The resolution owner deliberately skips ordinary capture recovery. Any recovery
+claim from the current serving owner, even expired, prevents initial waiver
+acceptance because lease expiry cannot establish that an in-flight payment call
+has stopped. Exclusive owner handoff precedes acceptance. SQLite appends accepted
+and completed successor records with global commit coverage. Schema v36 accepts
+only its exact supported predecessor. No original journal or budget event is
+rewritten; exact replay appends no new successor or global commit.
+
+The effective payment becomes `Resolved`, with original action `capture` and
+recorded cost 100 intact. Ordinary finalization completes the known operation.
+Its signed financial receipt reports `cost_charged: 0`, `settlement_status:
+failed`, positive `cost_breakdown.payment.recorded_units` and explicit
+`contractual_resolution` authority. A contractual waiver does not replenish
+consumed native budget. The ordinary lifecycle command still leaves positive
+capture pending until this explicit resolution is accepted. Unknown execution
+is ineligible and retains its original uncertainty and budget exposure.
+
+## Earned child after native parent loss
+
+`experimental-funded-child STATE FAULT` supports `none`, `pay-after-prepare`,
+`pay-after-broadcast` and `pay-after-observation`. The parent and child receive
+separate 100-unit allocations, native stores, keys, capabilities and requests.
+The intermediary signs a dependency binding both original agreements, requests,
+authority UUIDs and the shared input digest. The parent tool invokes the child's
+kernel on a scoped thread; it joins the child before returning. This is explicit
+separately funded orchestration, not native capability attenuation or host isolation.
+
+The child runs W0 once, produces its native Finding, passes the pinned Python
+checker and reaches observed `Payable` while still unpaid. Actual SIGKILL then
+kills the parent process after its tool invocation but before native outcome
+recording. The parent remains `OutcomeUnknownAfterDispatch` with one invocation;
+its allocation refunds without replay. Parent action signing and all new verifier
+decisions are disabled in the owned fixture, with attempted-signing negative
+controls. A child-only collector consumes retained child artifacts and beneficiary
+authority, pays once and completes the original child capture. Its three payment
+crash boundaries reuse the original signed transaction bytes.
+
+The final token balances are buyer 1,000, intermediary 900, child 100 and escrow
+zero, with total supply 2,000. The intermediary absorbs the 100-unit child cost.
+The parent invocation counter measures orchestration; the actual W0 checker ran
+in the child. One owned host and chain contain all roles. The witness does not
+establish independent operators, independent custody or public-chain finality.
+
+Remaining Task 4 work includes registered general work artifact and Finding-facet
+integration, broader disclosure and manifest attacks, independent operators and
+sustained capacity. Experimental agreement/submission/decision schemas remain
+example-local. See the [execution report](../../docs/market/open-agent-work/execution/21-native-resolution-earned-child.md)
+for selected qualification and security-sync provenance.

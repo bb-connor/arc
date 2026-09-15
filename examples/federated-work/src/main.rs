@@ -23,6 +23,16 @@ fn run() -> Result<serde_json::Value> {
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
         ["experimental-funded-smoke",state] => funded_work::smoke(Path::new(state)),
         #[cfg(unix)]
+        ["experimental-funded-child",state,fault] => funded_work::child(Path::new(state),fault),
+        #[cfg(unix)]
+        ["experimental-funded-parent-worker",state] => funded_work::parent_worker(Path::new(state)),
+        #[cfg(unix)]
+        ["experimental-funded-child-collector",state,socket,fault] => funded_work::child_collector(Path::new(state),Path::new(socket),fault),
+        #[cfg(unix)]
+        ["experimental-funded-resolution",state,mode,fault] => funded_work::resolution(Path::new(state),mode,fault),
+        #[cfg(unix)]
+        ["experimental-funded-resolution-worker",state,socket,fault] => funded_work::resolution_worker(Path::new(state),Path::new(socket),fault),
+        #[cfg(unix)]
         ["experimental-funded-lifecycle",state,"unknown"] => funded_work::admission_loss(Path::new(state),true),
         #[cfg(unix)]
         ["experimental-funded-lifecycle",state,"undispatched"] => funded_work::admission_loss(Path::new(state),false),

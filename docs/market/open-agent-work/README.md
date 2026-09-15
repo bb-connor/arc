@@ -186,3 +186,10 @@ silently change the qualified release boundary documented in the market
 README, replace the existing transparency program, or declare hosted public
 activation complete. Operators must separately choose and qualify any eventual
 real-funds deployment.
+
+The [native resolution and earned-child slice](execution/21-native-resolution-earned-child.md)
+adds jointly authorized capture waivers with immutable consumed work history,
+and an actual native parent death after its separately funded child earns an
+unpaid claim. The child can collect using retained authority after parent refund.
+This advances the local composition witness. Registered work artifacts, complete
+Finding facets, independent operators and sustained capacity remain open gates.

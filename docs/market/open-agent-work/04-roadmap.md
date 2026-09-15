@@ -323,3 +323,13 @@ P40, P45, P47 and P53 are protocol-lead work. P41-P44 are kernel/store and
 settlement work. P48/P51/P52/P55 need operator/security support. P46/P50 need
 the independent implementer, while P49/P54 join the verifier and workload
 engineer's responsibilities. No package requires a new crate by default.
+
+## Current bounded native delivery
+
+The [resolution and earned-child execution](execution/21-native-resolution-earned-child.md)
+advances P11/P12/P14/P44: original native funding and outcome identity survives
+contractual refund resolution, and separately funded earned child work survives
+actual native parent death. P45 registered artifact/facet integration, P48 signing
+and rotation profiles, P49 disclosure, P53 sustained retention, and P22/P31
+independent implementations/operators remain separate gates. The new native
+financial authority does not qualify those broader packages by itself.

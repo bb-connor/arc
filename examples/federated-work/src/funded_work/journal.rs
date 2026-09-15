@@ -257,6 +257,7 @@ impl Journal {
             || !matches!(
                 kind,
                 "submission"
+                    | "capture-waiver"
                     | "decision"
                     | "submit"
                     | "record"

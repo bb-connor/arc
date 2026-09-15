@@ -1,0 +1,61 @@
+{
+  "after": {
+    "holdCount": 1,
+    "holdDisposition": "open",
+    "holdId": "admission-budget:0d6da053c3411b9ecadabf89dd093514a5b1efef8da3a0fd7d0a5f54a4981e51:0",
+    "operationCount": 1,
+    "operationId": "0d6da053c3411b9ecadabf89dd093514a5b1efef8da3a0fd7d0a5f54a4981e51"
+  },
+  "before": {
+    "holdCount": 1,
+    "holdDisposition": "open",
+    "holdId": "admission-budget:0d6da053c3411b9ecadabf89dd093514a5b1efef8da3a0fd7d0a5f54a4981e51:0",
+    "operationCount": 1,
+    "operationId": "0d6da053c3411b9ecadabf89dd093514a5b1efef8da3a0fd7d0a5f54a4981e51"
+  },
+  "chain": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "100",
+    "events": {
+      "ClaimSubmitted": 0,
+      "DecisionRecorded": 0,
+      "Funded": 1,
+      "Paid": 0,
+      "Refunded": 0,
+      "TimedOut": 0
+    },
+    "fundingTransaction": "0x36a2bb1cf7f82ed8c878dddd98961af600e75c6e66b9ad0222b65fc5ee1b9f7b",
+    "paid": "0",
+    "payerBalance": "900",
+    "refunded": "0",
+    "state": "Funded",
+    "transactions": {
+      "pay": [],
+      "record": [],
+      "refund": [],
+      "submit": []
+    }
+  },
+  "checkpoint": "after-hold",
+  "killedSignal": 9,
+  "replay": {
+    "allocationId": "0xdede1fb929ebfc5814d256c15eeae6037bf18a85db610b33727e248cebe39b40",
+    "authorityUuid": "01a0a2a4-7f2c-74d0-9787-6b608c9542cb",
+    "authorizationId": "funded-dede1fb929ebfc5814d256c15eeae6037bf18a85db610b33727e248cebe39b40",
+    "executions": 0,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:0d6da053c3411b9ecadabf89dd093514a5b1efef8da3a0fd7d0a5f54a4981e51:0",
+    "nativeAuthorizationId": "funded-dede1fb929ebfc5814d256c15eeae6037bf18a85db610b33727e248cebe39b40",
+    "nativePaymentAction": "release",
+    "nativePaymentState": "Settling",
+    "nativeState": "CapturePending",
+    "operationId": "0d6da053c3411b9ecadabf89dd093514a5b1efef8da3a0fd7d0a5f54a4981e51",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": null,
+    "startupReconciliationError": "durable admission failed: payment rail unavailable: exact allocation refund has not been observed"
+  }
+}

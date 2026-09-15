@@ -82,13 +82,31 @@ fn migrate_schema(
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
+    if on_disk == 35 {
+        // Only an exact qualified predecessor may acquire this new namespace.
+        verify_admission_operation_invariants_at_version(&transaction, 35)?;
+        transaction
+            .execute_batch(include_str!("../admission_operation_capture_waiver.sql"))
+            .map_err(sqlite_error)?;
+        crate::stamp_schema_version(
+            &transaction,
+            ADMISSION_OPERATION_SCHEMA_KEY,
+            ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|e| invariant(e.to_string()))?;
+        verify_admission_operation_invariants(&transaction)?;
+        transaction.commit().map_err(sqlite_error)?;
+        return Ok(());
+    }
     // Research v10 and native security v10 have different histories. No
     // pre-v35 native predecessor owns this namespace, even when it is empty.
     let future_release: bool = transaction
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM sqlite_schema
          WHERE lower(name) GLOB 'unknown_payment_release_*'
-            OR lower(tbl_name) GLOB 'unknown_payment_release_*')",
+            OR lower(tbl_name) GLOB 'unknown_payment_release_*'
+            OR lower(name) GLOB 'capture_waiver_*'
+            OR lower(tbl_name) GLOB 'capture_waiver_*')",
             [],
             |row| row.get(0),
         )
@@ -203,7 +221,11 @@ fn migrate_schema(
         .execute_batch(ADMISSION_OPERATION_SCHEMA)
         .map_err(sqlite_error)?;
     transaction
-        .execute_batch(UNKNOWN_PAYMENT_RELEASE_SCHEMA)
+        .execute_batch(&format!(
+            "{}\n{}",
+            UNKNOWN_PAYMENT_RELEASE_SCHEMA,
+            include_str!("../admission_operation_capture_waiver.sql")
+        ))
         .map_err(sqlite_error)?;
     transaction
         .execute_batch(include_str!("../admission_operation_nonce.sql"))
@@ -724,6 +746,11 @@ fn expected_admission_operation_schema(
             .execute_batch(UNKNOWN_PAYMENT_RELEASE_SCHEMA)
             .map_err(sqlite_error)?;
     }
+    if version >= 36 {
+        expected
+            .execute_batch(include_str!("../admission_operation_capture_waiver.sql"))
+            .map_err(sqlite_error)?;
+    }
     Ok(expected)
 }
 
@@ -903,6 +930,10 @@ fn verify_admission_operation_data_invariants(
     super::retained_request::verify_retained_request_ownership(connection)?;
     super::caller_dispatch_context::verify_ownership(connection)?;
     super::execution_nonce::verify_ownership(connection)?;
+    if table_exists(connection, "capture_waiver_records")? {
+        super::contractual_resolution::verify_invariants(connection)
+            .map_err(|e| invariant(e.to_string()))?;
+    }
     if table_exists(connection, "unknown_payment_release_records")? {
         super::unknown_release::verify_invariants(connection)
             .map_err(|error| invariant(error.to_string()))?;
@@ -1003,6 +1034,8 @@ fn admission_operation_schema_catalog(
                OR lower(tbl_name) GLOB 'admission_operation_native_dispatch*'
                OR lower(name) GLOB 'unknown_payment_release_*'
                OR lower(tbl_name) GLOB 'unknown_payment_release_*'
+            OR lower(name) GLOB 'capture_waiver_*'
+            OR lower(tbl_name) GLOB 'capture_waiver_*'
             ORDER BY type, name, tbl_name
             "#,
         )

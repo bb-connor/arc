@@ -5,7 +5,14 @@ use super::{
 use chio_kernel::{KernelError, NestedFlowBridge, ToolInvocationCost, ToolServerConnection};
 use std::sync::Arc;
 
-pub struct W0Tool(pub Arc<Journal>, pub super::Checkpoint);
+pub(super) type Subcontract =
+    Arc<dyn Fn(&str) -> crate::common::Result<serde_json::Value> + Send + Sync>;
+
+pub struct W0Tool(
+    pub Arc<Journal>,
+    pub super::Checkpoint,
+    pub Option<Subcontract>,
+);
 
 #[async_trait::async_trait]
 impl ToolServerConnection for W0Tool {
@@ -23,11 +30,14 @@ impl ToolServerConnection for W0Tool {
         _bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError> {
         let run = || -> crate::common::Result<serde_json::Value> {
-            if tool != "review" || arguments.as_object().is_none_or(|value| value.len() != 1) {
+            if tool != "review" || !super::waiver_terms::supported_arguments(&arguments) {
                 return Err("unsupported funded W0 invocation".into());
             }
             let input = arguments["input"].as_str().ok_or("W0 input missing")?;
-            let output = serde_json::to_value(crate::review::check_openapi(input)?)?;
+            let output = match &self.2 {
+                Some(subcontract) => subcontract(input)?,
+                None => serde_json::to_value(crate::review::check_openapi(input)?)?,
+            };
             // Deliberately records every invocation. Duplicate prevention belongs
             // to native admission, not an idempotent mock tool.
             self.0.record_output(&output)?;

@@ -20,16 +20,34 @@ pub(super) struct Scenario {
 pub(super) fn setup(state: &Path) -> Result<Scenario> {
     let chain = Arc::new(LocalChain::start()?);
     let setup = chain.request(json!({"method": "initialize"}))?;
+    setup_on_chain(
+        state,
+        chain,
+        &setup,
+        &Keypair::generate(),
+        "funded-native-w0",
+    )
+}
+
+pub(super) fn setup_on_chain(
+    state: &Path,
+    chain: Arc<LocalChain>,
+    setup: &serde_json::Value,
+    buyer: &Keypair,
+    request_id: &str,
+) -> Result<Scenario> {
     let domain: Domain = serde_json::from_value(setup["domain"].clone())?;
     let work: WorkTerms = serde_json::from_value(setup["work"].clone())?;
-    let buyer = Keypair::generate();
     Native::provision(state, buyer.public_key(), domain.clone())?;
     let native = Native::open(state, chain.clone())?;
-    let request = native.request(
-        "funded-native-w0",
+    let mut request = native.request(
+        request_id,
         include_str!("../../fixtures/openapi.json"),
         work.submit_by,
     )?;
+    let receiver = crate::common::key(state)?;
+    let waiver =
+        super::waiver_terms::authorize(&native.policy, &work, &mut request, &receiver, buyer)?;
     let agreement = Agreement {
         schema: AGREEMENT_SCHEMA.into(),
         policy_sha256: digest(&native.policy)?,
@@ -40,8 +58,9 @@ pub(super) fn setup(state: &Path) -> Result<Scenario> {
         request_sha256: digest(&request)?,
         domain,
         work,
+        capture_waiver_terms: Some(waiver),
     }
-    .sign(&buyer, &crate::common::key(state)?)?;
+    .sign(buyer, &crate::common::key(state)?)?;
     let funding = chain.request(json!({"method": "fund", "terms": agreement.body.terms()?}))?;
     Ok(Scenario {
         chain,

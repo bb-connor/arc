@@ -1817,13 +1817,22 @@ rust_symbols = [
   "ChioKernel::validate_completed_durable_receipt",
   "ChioKernel::finalize_durable_tool_return_with_security_release",
 ]
-normalized_sha256 = "3704f5ae3eadf6d87bcb82578d144b44569c1ef6d6c024fbdc009a336d5c89c3"
+normalized_sha256 = "6d1cf02b50a8d9e5ee5f9ec5bec37cc3dcbc57fb21068a65d7eaa80f923fe74f"
 symbol_sha256 = [
   { symbol = "ChioKernel::record_durable_tool_return", sha256 = "3beb0aedea4eb11504d03b0ed1e41b93152948af10ee22964a8098179f2533db" },
   { symbol = "ChioKernel::completed_durable_tool_response", sha256 = "9635c85a7b1250ebb0babe0dcfb65b39f2d605a5ca9e801540c8329ed151543f" },
-  { symbol = "ChioKernel::validate_completed_durable_receipt", sha256 = "b521c72598c8defec14bea2070cab3f4361b0bf5f573515ae55171559313c7f5" },
-  { symbol = "ChioKernel::finalize_durable_tool_return_with_security_release", sha256 = "816adaed19eed28988f4a9254c3063458b32b94f92ae6eabc2b691a9e1a1a2ea" },
+  { symbol = "ChioKernel::validate_completed_durable_receipt", sha256 = "cff3aa1e96ac3a3e802b5cbd2da1fc82fe8c7fbe2718662416c73e783751d6cc" },
+  { symbol = "ChioKernel::finalize_durable_tool_return_with_security_release", sha256 = "edee20182aba777936ea89933dd5b97c9d679ac1c0cc52bb20302a7cd9cfa2e3" },
 ]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/payment_receipt.rs"
+rust_symbols = ["verify_replayed_financial"]
+normalized_sha256 = "9c1c6dc517f55e8365253cdab5309f04946afede7e4a3fe98cebbb2ecf8e11b7"
+symbol_sha256 = [{ symbol = "verify_replayed_financial", sha256 = "249a4cffeb01fd8445893dc3fe81affa68cc4218878b79537fce73b9781f91b7" }]
 
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -3145,13 +3154,13 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs"
 rust_symbols = ["initialize_admission_operation_schema","migrate_schema","verify_admission_operation_invariants","verify_admission_operation_schema","admission_operation_schema_catalog"]
-normalized_sha256 = "1fd6f8c8c4c47f816fa15d6a0904ca9e70b7acbf686da789694dc758af215f47"
+normalized_sha256 = "4582decfc53cc96f4793ce4f8c40dd18ec9de60879bf35e06fef4932a0e5a22a"
 symbol_sha256 = [
   { symbol = "initialize_admission_operation_schema", sha256 = "3300140793f096b312bb38b8f914f620cf13e0e75b65ec2fac5c469079e6e69b" },
-  { symbol = "migrate_schema", sha256 = "e1273f920bee888f09f467630f27b27f4a0db92cc0ff875ea60c2e9b8a24b297" },
+  { symbol = "migrate_schema", sha256 = "fd7927bd4964dfb8f48e64727aeaa9f3721b7dce8fe80fabf7e0bc372ce9c601" },
   { symbol = "verify_admission_operation_invariants", sha256 = "206720f61b65a7b72ecb82e35859919dabc074a4cf215a63a884f25e3a89220a" },
   { symbol = "verify_admission_operation_schema", sha256 = "a668153da33e6b5518dd1de6053bf6e8de089238180a476ccc776ca27db6db5c" },
-  { symbol = "admission_operation_schema_catalog", sha256 = "2f4e6c00f515983b4f28db3905d3bcb61197ea638dc3971f6313ff73cb91e77a" },
+  { symbol = "admission_operation_schema_catalog", sha256 = "58b447a492becd4a291ee224973eb7557a22b7a75df7a23acc5c147d01a5fea8" },
 ]
 
 [[mirror]]
@@ -3174,9 +3183,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store.rs"
 rust_symbols = ["ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION","SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch"]
-normalized_sha256 = "304fd57f61830c34dd5cd2c0e0859316a32754f8145a11f7bb8fb182b88f8bd5"
+normalized_sha256 = "3dedc5c4b6460569ffa136bfefa3337e7c6841a56970808907f1426d98db659b"
 symbol_sha256 = [
-  { symbol = "ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION", sha256 = "9fc6b239e4c45cd811f73626e73c289ddcd00aa3fbc9d77cd034018675fc5bce" },
+  { symbol = "ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION", sha256 = "ef242e61776f850c43dce9c69093d05b75012231ef1098994a705a1993470f40" },
   { symbol = "SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch", sha256 = "deaac50e9990fa4ae3b07274654b432549acbfd8ce86cd2b0a6cd1b4a6fea160" },
 ]
 

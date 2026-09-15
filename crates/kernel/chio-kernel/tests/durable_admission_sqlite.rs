@@ -1825,3 +1825,6 @@ fn stream_delivery_cannot_satisfy_a_committed_output_digest() -> Result<(), Box<
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     Ok(())
 }
+
+#[path = "durable_admission_sqlite/contractual_resolution.rs"]
+mod contractual_resolution;

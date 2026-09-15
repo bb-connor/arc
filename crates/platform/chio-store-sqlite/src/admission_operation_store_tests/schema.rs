@@ -1446,7 +1446,7 @@ fn v34_release_schema_migration_preserves_existing_admission_history() -> Anchor
         [],
         |r| r.get(0),
     )?;
-    db.execute_batch("DROP TABLE unknown_payment_release_records; UPDATE chio_store_schema_versions SET version=34 WHERE store_key='admission_operation';")?;
+    db.execute_batch("DROP TABLE capture_waiver_records; DROP TABLE unknown_payment_release_records; UPDATE chio_store_schema_versions SET version=34 WHERE store_key='admission_operation';")?;
     drop(db);
     SqliteAuthorityStore::provision(&database, &lock_root)?;
     let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;

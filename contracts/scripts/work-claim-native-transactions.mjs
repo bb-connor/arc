@@ -26,6 +26,7 @@ export function transactions({ rpc, provider, escrow, domain, payer, beneficiary
   const owners = { submit: beneficiary, record: verifier, pay: beneficiary, refund: payer };
   const included = new Map();
   let verifierKey;
+  let allowed = new Set(Object.keys(owners));
   const policyFor = action => ({ owner: owners[action].address.toLowerCase(), domain: scope });
   function retainedPolicy(prepared) {
     const action = prepared.intent.action === 'decision' ? 'record' : prepared.intent.action;
@@ -33,6 +34,10 @@ export function transactions({ rpc, provider, escrow, domain, payer, beneficiary
     return policyFor(action);
   }
   return {
+    restrict(actions) {
+      assert.ok(actions.every(action => allowed.has(action)), 'authority cannot widen after retirement');
+      allowed = new Set(actions);
+    },
     pin(key) {
       assert.match(key, /^[0-9a-f]{64}$/);
       assert.ok(!verifierKey || verifierKey === key, 'verifier pin is immutable');
@@ -42,6 +47,7 @@ export function transactions({ rpc, provider, escrow, domain, payer, beneficiary
       assert.deepEqual(Object.keys(request).sort(), ['action', 'allocationId', 'commitment', 'decision', 'terms']);
       assert.ok(Object.hasOwn(owners, request.action));
       const { action, allocationId, terms, commitment, decision } = request;
+      assert.ok(allowed.has(action), 'signing authority retired');
       assert.equal(await escrow.deriveAllocationId(terms), allocationId);
       const work = await escrow.getWork(allocationId);
       for (const name of Object.keys(terms)) assert.equal(String(work.terms[name]).toLowerCase(), String(terms[name]).toLowerCase(), 'immutable term ' + name);
@@ -75,6 +81,7 @@ export function transactions({ rpc, provider, escrow, domain, payer, beneficiary
       return prepared;
     },
     async transact(prepared) {
+      assert.ok(allowed.has(prepared.intent.action === 'decision' ? 'record' : prepared.intent.action), 'transaction authority retired');
       const policy = retainedPolicy(prepared);
       const observed = await reconcile(prepared, policy, send, included.get(prepared.transactionHash), async () => {});
       included.set(prepared.transactionHash, observed);

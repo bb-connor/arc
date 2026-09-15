@@ -103,6 +103,8 @@ pub use security_participant_state::{
     SecurityParticipantEgressHistory, SecurityParticipantFlowJoinHistory,
     SecurityParticipantStateInitialization,
 };
+pub(crate) mod contractual_resolution;
+mod contractual_resolution_read;
 mod store;
 mod threshold_approval;
 pub(crate) mod unknown_release;
@@ -173,7 +175,7 @@ pub use security_participant_migration::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 35;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 36;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
@@ -1203,6 +1205,17 @@ fn load_by_operation_id_tx(
     transaction: &Connection,
     operation_id: &AdmissionOperationId,
 ) -> Result<Option<StoredOperation>, AdmissionOperationStoreError> {
+    let stored = load_by_operation_id_without_terminal_projection_tx(transaction, operation_id)?;
+    if let Some(stored) = &stored {
+        verify_stored_terminal_projection(transaction, stored)?;
+    }
+    Ok(stored)
+}
+
+fn load_by_operation_id_without_terminal_projection_tx(
+    transaction: &Connection,
+    operation_id: &AdmissionOperationId,
+) -> Result<Option<StoredOperation>, AdmissionOperationStoreError> {
     let raw = transaction
         .query_row(
             r#"
@@ -1232,7 +1245,6 @@ fn load_by_operation_id_tx(
         runtime_participant::verify_operation(transaction, &stored.operation)?;
         governed_approval_claim::verify_stored_operation(transaction, &stored.operation)?;
         dpop_claim::verify_stored_operation(transaction, &stored.operation)?;
-        verify_stored_terminal_projection(transaction, stored)?;
     }
     Ok(stored)
 }

@@ -33,6 +33,21 @@ pub(in crate::admission_operation_store::tests) fn remove_caller_wait_state(
 }
 
 fn rebuild_predecessor(connection: &Connection) -> rusqlite::Result<()> {
+    let has_waiver: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='capture_waiver_records')",
+        [],
+        |r| r.get(0),
+    )?;
+    if has_waiver {
+        assert_eq!(
+            connection.query_row("SELECT COUNT(*) FROM capture_waiver_records", [], |r| r
+                .get::<_, i64>(0))?,
+            0,
+            "predecessor cannot discard waiver authority"
+        );
+        connection.execute_batch("DROP TABLE capture_waiver_records")?;
+    }
+
     let has_release: bool = connection.query_row(
         "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name = 'unknown_payment_release_records')",
         [],

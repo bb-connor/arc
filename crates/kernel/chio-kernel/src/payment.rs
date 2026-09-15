@@ -17,6 +17,11 @@ pub use types::*;
 mod journal;
 pub use journal::*;
 
+mod contractual_resolution;
+pub use contractual_resolution::*;
+mod contractual_resolution_record;
+pub use contractual_resolution_record::*;
+
 mod unknown_release;
 pub use unknown_release::*;
 

@@ -60,7 +60,17 @@ pub(crate) fn load_payment_journal(
         &original,
     )
     .map_err(|e| BudgetStoreError::Invariant(e.to_string()))?;
-    Ok(Some(resolution.unwrap_or(original)))
+    let waiver = crate::admission_operation_store::contractual_resolution::load_effective_journal(
+        transaction,
+        &original,
+    )
+    .map_err(|e| BudgetStoreError::Invariant(e.to_string()))?;
+    if resolution.is_some() && waiver.is_some() {
+        return Err(BudgetStoreError::Invariant(
+            "conflicting monetary successors".into(),
+        ));
+    }
+    Ok(Some(waiver.or(resolution).unwrap_or(original)))
 }
 
 pub(crate) fn load_original_payment_journal(
@@ -362,6 +372,8 @@ pub(super) const fn payment_journal_state_text(state: PaymentJournalState) -> &'
         PaymentJournalState::Settling => "settling",
         PaymentJournalState::Settled => "settled",
         PaymentJournalState::Closed => "closed",
+        PaymentJournalState::Resolving => "resolving",
+        PaymentJournalState::Resolved => "resolved",
         PaymentJournalState::ReconcileFailed => "reconcile_failed",
     }
 }
@@ -416,6 +428,7 @@ pub(super) const fn payment_release_authority_kind_text(
         PaymentReleaseAuthorityKind::TransportNotAccepted => "transport_not_accepted",
         PaymentReleaseAuthorityKind::ContractualZeroCharge => "contractual_zero_charge",
         PaymentReleaseAuthorityKind::MutuallyAgreedUnknown => "mutually_agreed_unknown",
+        PaymentReleaseAuthorityKind::ContractualCaptureWaiver => "contractual_capture_waiver",
     }
 }
 

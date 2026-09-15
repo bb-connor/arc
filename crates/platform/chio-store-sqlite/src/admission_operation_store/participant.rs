@@ -533,7 +533,8 @@ pub(super) fn validate_payment_reconcile_binding(
             (
                 chio_kernel::payment::PaymentRailMode::ReversibleHold,
                 chio_kernel::payment::PaymentJournalState::Settling
-                | chio_kernel::payment::PaymentJournalState::Settled,
+                | chio_kernel::payment::PaymentJournalState::Settled
+                | chio_kernel::payment::PaymentJournalState::Resolved,
                 Some(chio_kernel::payment::PaymentSettleAction::Capture),
             ) => journal.settle_amount_units.ok_or_else(|| {
                 AdmissionPaymentJournalError::Invariant(
@@ -846,6 +847,7 @@ pub(super) fn verify_payment_terminal_source<'a>(
         journal.state,
         chio_kernel::payment::PaymentJournalState::Settled
             | chio_kernel::payment::PaymentJournalState::Closed
+            | chio_kernel::payment::PaymentJournalState::Resolved
     ) {
         return Err(AdmissionOperationStoreError::Invariant(
             "terminal payment source journal is not settled".to_owned(),
@@ -911,6 +913,44 @@ fn verify_payment_terminal_record(
             "terminal payment consumer receipt is invalid JSON: {error}"
         ))
     })?;
+    if journal.state == chio_kernel::payment::PaymentJournalState::Resolved {
+        let financial: chio_core::receipt::economics::FinancialReceiptMetadata =
+            serde_json::from_value(
+                receipt
+                    .metadata
+                    .as_ref()
+                    .and_then(|m| m.get("financial"))
+                    .cloned()
+                    .ok_or_else(|| invariant("waived payment has no financial metadata"))?,
+            )
+            .map_err(|e| invariant(e.to_string()))?;
+        let resolution = journal
+            .release_authority
+            .as_ref()
+            .ok_or_else(|| invariant("waived payment has no resolution authority"))?;
+        if financial.cost_charged != 0
+            || financial.settlement_status
+                != chio_core::receipt::economics::SettlementStatus::Failed
+            || financial
+                .cost_breakdown
+                .as_ref()
+                .and_then(|b| b.pointer("/payment/recorded_units"))
+                .and_then(|v| v.as_u64())
+                != journal.settle_amount_units
+            || financial
+                .cost_breakdown
+                .as_ref()
+                .and_then(|b| b.pointer("/payment/contractual_resolution"))
+                != Some(
+                    &serde_json::to_value(resolution)
+                        .map_err(|error| invariant(error.to_string()))?,
+                )
+        {
+            return Err(invariant(
+                "waived payment receipt falsifies payment or consumed budget",
+            ));
+        }
+    }
     let expected_source_record_id = format!("payment:{}", journal.operation_id);
     let journal_digest = sha256_hex(
         &canonical_json_bytes(&journal)

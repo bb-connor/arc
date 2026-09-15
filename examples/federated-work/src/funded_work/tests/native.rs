@@ -42,6 +42,7 @@ pub(super) fn fixture() -> Result<Fixture> {
         terms.submit_by,
     )?;
     let agreement = Agreement {
+        capture_waiver_terms: None,
         schema: AGREEMENT_SCHEMA.into(),
         policy_sha256: crate::common::digest(&native.policy)?,
         authority_uuid: native.policy.authority_uuid.clone(),
@@ -73,7 +74,7 @@ pub(super) fn fixture() -> Result<Fixture> {
     })
 }
 
-fn bind_observation(source: &Source, agreement: &SignedAgreement) -> Result<()> {
+pub(super) fn bind_observation(source: &Source, agreement: &SignedAgreement) -> Result<()> {
     let domain = &agreement.body.domain;
     let terms = agreement.body.terms()?;
     let id = allocation_id(&domain.chain_id, &domain.escrow, &terms)?;
@@ -107,7 +108,7 @@ fn verified_funding_creates_one_native_operation_and_hold() -> Result<()> {
     Ok(())
 }
 
-fn native_counts(f: &Fixture) -> Result<(i64, i64)> {
+pub(super) fn native_counts(f: &Fixture) -> Result<(i64, i64)> {
     let connection = rusqlite::Connection::open_with_flags(
         f.directory.path().join("authority.sqlite"),
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,

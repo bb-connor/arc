@@ -42,6 +42,8 @@ pub struct Agreement {
     pub request_sha256: String,
     pub domain: Domain,
     pub work: WorkTerms,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capture_waiver_terms: Option<chio_kernel::payment::SignedContractualCaptureWaiverTermsV1>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -106,6 +108,7 @@ impl SignedAgreement {
             return Err("funding agreement signature invalid".into());
         }
         let terms = body.terms()?;
+        super::waiver_terms::validate(body, policy, request)?;
         terms.abi(&policy.domain.escrow)?;
         if terms.amount != "100" {
             return Err("native W0 profile requires exactly 100 mock units".into());

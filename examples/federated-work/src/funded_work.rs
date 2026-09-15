@@ -1,12 +1,24 @@
 //! Experimental, receiver-owned funding admission. Local development chain only.
 
 mod agreement;
+#[cfg(unix)]
+mod child;
+#[cfg(unix)]
+mod child_process;
 mod evidence;
+#[cfg(unix)]
+pub use child_process::{collect_worker as child_collector, parent_worker, run as child};
+mod capture_resolution;
 mod lifecycle;
+#[cfg(unix)]
+mod resolution_process;
 mod settlement;
 mod settlement_observer;
 mod verification;
+mod waiver_terms;
 pub use lifecycle::run as lifecycle;
+#[cfg(unix)]
+pub use resolution_process::{run as resolution, worker as resolution_worker};
 mod allocation;
 mod journal;
 mod local_chain;

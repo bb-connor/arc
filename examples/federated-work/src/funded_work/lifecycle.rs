@@ -187,6 +187,12 @@ pub(super) fn progress(
     checkpoint("after-decision")?;
     drive(Action::Record)?;
     checkpoint("after-recorded-decision")?;
+    if mode == "earn" {
+        if !decision.body.accepted {
+            return Err("earned child requires accepted work".into());
+        }
+        return Ok(json!({"financial":"payable","findingId":submission.body.finding.finding_id}));
+    }
     let paid = decision.body.accepted;
     let observed = drive(if paid { Action::Pay } else { Action::Refund })?;
     checkpoint("before-native-acknowledgement")?;

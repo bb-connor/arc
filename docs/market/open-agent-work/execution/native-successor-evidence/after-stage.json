@@ -1,0 +1,61 @@
+{
+  "after": {
+    "holdCount": 1,
+    "holdDisposition": "reconciled",
+    "holdId": "admission-budget:89fd2cbf0e40e24257f06a5bd9ba092174cea6ba7cad7717a96daa3e7939e96a:0",
+    "operationCount": 1,
+    "operationId": "89fd2cbf0e40e24257f06a5bd9ba092174cea6ba7cad7717a96daa3e7939e96a"
+  },
+  "before": {
+    "holdCount": 0,
+    "holdDisposition": null,
+    "holdId": null,
+    "operationCount": 0,
+    "operationId": null
+  },
+  "chain": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "100",
+    "events": {
+      "ClaimSubmitted": 0,
+      "DecisionRecorded": 0,
+      "Funded": 1,
+      "Paid": 0,
+      "Refunded": 0,
+      "TimedOut": 0
+    },
+    "fundingTransaction": "0xa24e0c9471b0028a9b3ee912373fec08c5c62c1f5ed19b0e87b6f95a8d651d69",
+    "paid": "0",
+    "payerBalance": "900",
+    "refunded": "0",
+    "state": "Funded",
+    "transactions": {
+      "pay": [],
+      "record": [],
+      "refund": [],
+      "submit": []
+    }
+  },
+  "checkpoint": "after-stage",
+  "killedSignal": 9,
+  "replay": {
+    "allocationId": "0xa5947983bb92c22b7beda735379894b575fec8e584f896199e39b425a977928b",
+    "authorityUuid": "01a0a2a3-ddaa-7eb3-8ebb-76b07e03a68e",
+    "authorizationId": "funded-a5947983bb92c22b7beda735379894b575fec8e584f896199e39b425a977928b",
+    "executions": 1,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:89fd2cbf0e40e24257f06a5bd9ba092174cea6ba7cad7717a96daa3e7939e96a:0",
+    "nativeAuthorizationId": "funded-a5947983bb92c22b7beda735379894b575fec8e584f896199e39b425a977928b",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "89fd2cbf0e40e24257f06a5bd9ba092174cea6ba7cad7717a96daa3e7939e96a",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": null,
+    "startupReconciliationError": null
+  }
+}

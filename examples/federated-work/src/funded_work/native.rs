@@ -50,6 +50,13 @@ pub fn implementation_digest() -> String {
             include_bytes!("settlement_observer.rs").as_slice(),
             include_bytes!("lifecycle.rs").as_slice(),
             include_bytes!("local_chain.rs").as_slice(),
+            include_bytes!("waiver_terms.rs").as_slice(),
+            include_bytes!("capture_resolution.rs").as_slice(),
+            include_bytes!("child.rs").as_slice(),
+            include_bytes!("child_process.rs").as_slice(),
+            include_bytes!("process.rs").as_slice(),
+            include_bytes!("lifecycle_process.rs").as_slice(),
+            include_bytes!("resolution_process.rs").as_slice(),
             super::local_chain::implementation_digest().as_bytes(),
             super::verification::checker_digest().as_bytes(),
             include_bytes!("../review.rs").as_slice(),
@@ -107,6 +114,34 @@ impl Native {
         source: Arc<dyn FundingSource>,
         checkpoint: super::Checkpoint,
     ) -> Result<Self> {
+        Self::open_configured(state, source, checkpoint, None)
+    }
+
+    pub(super) fn open_configured(
+        state: &Path,
+        source: Arc<dyn FundingSource>,
+        checkpoint: super::Checkpoint,
+        subcontract: Option<super::tool::Subcontract>,
+    ) -> Result<Self> {
+        Self::open_mode(state, source, checkpoint, subcontract, true)
+    }
+
+    /// Take a new exclusive owner without starting another capture attempt.
+    /// This handle is for the qualified financial successor; it denies new work.
+    pub(super) fn open_for_resolution(
+        state: &Path,
+        source: Arc<dyn FundingSource>,
+    ) -> Result<Self> {
+        Self::open_mode(state, source, Arc::new(|_| Ok(())), None, false)
+    }
+
+    fn open_mode(
+        state: &Path,
+        source: Arc<dyn FundingSource>,
+        checkpoint: super::Checkpoint,
+        subcontract: Option<super::tool::Subcontract>,
+        recover: bool,
+    ) -> Result<Self> {
         let policy: Policy = common::read(state.join("funding-policy.json"))?;
         let key = common::key(state)?;
         let authority = SqliteAuthorityStore::open_serving(
@@ -140,17 +175,25 @@ impl Native {
             source: source.clone(),
             checkpoint: checkpoint.clone(),
         }));
-        kernel.register_tool_server(Box::new(W0Tool(journal.clone(), checkpoint.clone())));
+        kernel.register_tool_server(Box::new(W0Tool(
+            journal.clone(),
+            checkpoint.clone(),
+            subcontract,
+        )));
         kernel.set_durable_admission_store(
             Arc::new(authority.admission_operation_store()),
             Arc::new(authority.tool_outcome_store()),
             authority.mutation_fence(),
         )?;
         kernel.configure_durable_admission(DurableAdmissionMode::All, false)?;
-        let recovery_error = kernel
-            .reconcile_durable_admission_startup()
-            .err()
-            .map(|error| error.to_string());
+        let recovery_error = if recover {
+            kernel
+                .reconcile_durable_admission_startup()
+                .err()
+                .map(|error| error.to_string())
+        } else {
+            Some("exclusive financial resolution handle cannot admit new work".into())
+        };
         Ok(Self {
             kernel,
             authority,
@@ -298,10 +341,7 @@ impl Native {
             || request.model_metadata.is_some()
             || request.federated_origin_kernel_id.is_some()
             || request.declassification_grant.is_some()
-            || request
-                .arguments
-                .as_object()
-                .is_none_or(|object| object.len() != 1)
+            || !super::waiver_terms::supported_arguments(&request.arguments)
             || request.arguments["input"]
                 .as_str()
                 .is_none_or(|input| input.len() > 64 * 1024)

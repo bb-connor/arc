@@ -11,7 +11,8 @@ fn predecessor() -> AnchoredTestResult<(Fixture, Connection)> {
     fixture.store.begin(&operation, &fixture.fence, now_ms())?;
     let connection = Connection::open(&fixture.database)?;
     connection.execute_batch(
-        "DROP TABLE IF EXISTS unknown_payment_release_records;
+        "DROP TABLE IF EXISTS capture_waiver_records;
+         DROP TABLE IF EXISTS unknown_payment_release_records;
          UPDATE chio_store_schema_versions SET version = 34
          WHERE store_key = 'admission_operation';",
     )?;
@@ -50,7 +51,7 @@ fn v35_upgrades_exact_v34_without_rewriting_operation_or_anchored_history() -> A
         [],
         |row| row.get(0),
     )?;
-    assert_eq!(version, 35);
+    assert_eq!(version, ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION);
     let count: i64 = connection.query_row(
         "SELECT COUNT(*) FROM unknown_payment_release_records",
         [],
@@ -111,5 +112,41 @@ fn v35_reopen_rejects_missing_immutable_release_barrier() -> AnchoredTestResult 
     let catalog = snapshot(&connection, "sqlite_schema")?;
     assert!(initialize_admission_operation_schema(&mut connection).is_err());
     assert_eq!(snapshot(&connection, "sqlite_schema")?, catalog);
+    Ok(())
+}
+
+#[test]
+fn v36_upgrades_exact_v35_without_rewriting_authority_history() -> AnchoredTestResult {
+    let fixture = fixture();
+    let mut connection = Connection::open(&fixture.database)?;
+    connection.execute_batch("DROP TABLE capture_waiver_records; UPDATE chio_store_schema_versions SET version=35 WHERE store_key='admission_operation';")?;
+    let before = history(&connection)?;
+    initialize_admission_operation_schema(&mut connection)?;
+    assert_eq!(history(&connection)?, before);
+    assert_eq!(
+        connection.query_row("SELECT COUNT(*) FROM capture_waiver_records", [], |r| r
+            .get::<_, i64>(0))?,
+        0
+    );
+    initialize_admission_operation_schema(&mut connection)?;
+    assert_eq!(history(&connection)?, before);
+    Ok(())
+}
+#[test]
+fn v36_rejects_future_namespace_or_weakened_v35_without_mutation() -> AnchoredTestResult {
+    for sql in [
+        "CREATE TABLE capture_waiver_foreign(value INTEGER)",
+        "DROP TRIGGER unknown_payment_release_records_immutable",
+    ] {
+        let fixture = fixture();
+        let mut connection = Connection::open(&fixture.database)?;
+        connection.execute_batch("DROP TABLE capture_waiver_records; UPDATE chio_store_schema_versions SET version=35 WHERE store_key='admission_operation';")?;
+        connection.execute_batch(sql)?;
+        let catalog = snapshot(&connection, "sqlite_schema")?;
+        let before = history(&connection)?;
+        assert!(initialize_admission_operation_schema(&mut connection).is_err());
+        assert_eq!(snapshot(&connection, "sqlite_schema")?, catalog);
+        assert_eq!(history(&connection)?, before);
+    }
     Ok(())
 }

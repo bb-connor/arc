@@ -155,4 +155,14 @@ The isolated combined checkpoint is complete under the [M4 integration plan](202
 
 Task 4 now includes the [native Finding and settlement slice](../../market/open-agent-work/execution/19-native-finding-claim-settlement.md): retained native output, bounded custody, a signed asserted-class Finding, independent Python W0 verification, observed claim/decision and actual mock-token payout/refund on the original operation, hold and authorization. Actual worker SIGKILL recovery retains those identities and exact transaction bytes. This is the bounded private-chain profile, with example-local submission/decision schemas; it does not complete the registered-artifact, full Finding-facet or public-finality requirements above.
 
-Successful payout completes the original native capture. Financial refund preserves a recorded positive capture or unknown execution; an undispatched operation can complete its existing release. Next implement explicit native authority for contractual rejection/timeout of a positive capture, then the separately funded earned child surviving native parent loss. General artifact/facet integration and the remaining disclosure, substitution, capacity and independent-operator gates stay open. The full Task 4 checklist remains open where its scope exceeds this local witness.
+Successful payout completes the original native capture. The [native resolution
+and earned-child extension](../../market/open-agent-work/execution/21-native-resolution-earned-child.md)
+now supplies explicit original contractual authority for rejection/timeout of a
+recorded positive capture. It retains consumed budget while completing zero-paid
+financial resolution. Its separately funded child earns an unpaid claim before
+actual parent SIGKILL, then collects after parent refund using retained child
+authority. The parent remains outcome-unknown and is never replayed.
+
+General artifact/facet integration and the remaining disclosure, substitution,
+capacity and independent-operator gates stay open. The full Task 4 checklist
+remains open where its scope exceeds this one-host private-chain witness.
