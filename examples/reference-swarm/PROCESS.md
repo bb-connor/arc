@@ -121,6 +121,50 @@ identity, original request, verdict and returned content. A fresh output directo
 is required on every attempt. Preserve the same state, worker command and run
 plan when resuming an interrupted run.
 
+## Review real files through an Enforced reader
+
+On the supported Linux x86_64 cage host, build the static PIE cage helper and
+reference reader with the repository's confinement build recipe. Run as a
+non-root operator. Keep the input directory separate from the output directory,
+which contains private signing keys and administrative state. Select 2-32 UTF-8
+files, at most 256 KiB each and 4 MiB together:
+
+```sh
+python3 examples/reference-swarm/process-prepare.py \
+  --chio /absolute/path/to/chio \
+  --cage-init /absolute/path/to/chio-cage-init \
+  --reader /absolute/path/to/chio-tool-repo-reader \
+  --input-dir "$PWD/review-input" --file README.md --file DESIGN.md \
+  --output "$PWD/review-host"
+python3 examples/reference-swarm/process-run.py \
+  --chio /absolute/path/to/chio --state "$PWD/review-host/state" \
+  --output "$PWD/review-evidence" --worker-image "$WORKER_IMAGE"
+python3 examples/reference-swarm/process-collect.py \
+  --chio /absolute/path/to/chio --evidence "$PWD/review-evidence" \
+  --inputs "$PWD/review-host/inputs.json" \
+  --trusted-kernel-pubkey "$PWD/review-host/state/authority.db.kernel.pub" \
+  --output "$PWD/repository-report.json"
+```
+
+Preparation invokes `security provision-reference-runtime` in its Enforced
+stage, discovers the supplied trusted reader's tool surface, and initializes the
+governed host. Initialization launches the actual confined tool and refuses a
+missing prerequisite. Each worker receives one exact planned read. The native
+tool has a signed read grant for the input directory and no network grant.
+Use an x86_64 worker image built from the same scripts/SDK on this host. Omitting
+the image selects cooperative native workers with the filesystem limitation
+described above.
+
+The collector independently verifies every response with the explicitly
+supplied operator key, checks the initialized runtime/capability/request identity,
+and compares the returned bytes with the input hashes recorded before launch.
+The report contains verified file sizes, line counts, hashes and request IDs.
+Changed files, substituted worker identity and modified signed output refuse
+collection. Preserve `inputs.json` and the key through an operator-trusted
+channel; neither should be selected from an untrusted submitted evidence bundle.
+This result check does not yet verify M5's complete accounting, confinement
+chain or signed terminal artifact, and its output records that limit.
+
 ## Current boundary
 
 The mailbox-only host regression exercises actual authenticated socket calls,
