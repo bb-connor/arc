@@ -311,6 +311,12 @@ not sufficient to mark a repair complete or discard valuable functionality.
 
 ## Task 5: Qualify the combined foundation
 
+Current local results and remaining boundaries are recorded in the
+[combined qualification checkpoint](process-security-qualification.md).
+A draft PR may collect ordinary CI while these gates run, but does not satisfy
+Task 5 or authorize merge. Per the user's no-subagents instruction, the primary
+agent performs direct review; it must not be described as independent review.
+
 **Files:** Existing process/security CI inventories, evidence scripts, proof
 source inventories and qualification documentation. Dependencies change only
 when a reproduced build/audit failure requires a scoped reviewed correction.
