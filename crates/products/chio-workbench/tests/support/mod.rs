@@ -69,6 +69,7 @@ pub fn config(root: &std::path::Path) -> Result<WorkbenchConfig> {
         )?;
     }
     Ok(WorkbenchConfig {
+        git_worktrees: false,
         workspace,
         state_dir: root.join("state"),
         check_command: vec![

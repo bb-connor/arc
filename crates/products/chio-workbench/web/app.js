@@ -11,6 +11,8 @@ let selected = null;
 let loading = false;
 let stopping = false;
 let lastBody = "";
+let latestChanges = null;
+let changeRequest = 0;
 const escape = (value) =>
   String(value ?? "").replace(
     /[&<>"']/g,
@@ -49,6 +51,13 @@ function select(id) {
   selected = id;
   lastBody = "";
   stopping = false;
+  latestChanges = null;
+  changeRequest += 1;
+  $("change-review").hidden = true;
+  $("change-patch").hidden = true;
+  $("download-patch").hidden = true;
+  $("untracked-files").hidden = true;
+  $("change-status").textContent = "";
   $("compose").hidden = Boolean(id);
   $("run").hidden = !id;
   $("error").hidden = true;
@@ -70,6 +79,11 @@ function render(run) {
   $("stop").hidden = !["running", "stopping"].includes(run.status);
   $("stop").disabled = stopping;
   $("stop").textContent = stopping ? "Stopping…" : "Stop task";
+  $("change-review").hidden = !run.git;
+  if (run.git) {
+    $("git-origin").textContent = `Task worktree: ${run.git.worktree}\nBase revision: ${run.git.base_revision}`;
+    $("review-changes").disabled = ["running", "stopping"].includes(run.status);
+  }
   const actions = run.tasks.flatMap((task) => task.actions);
   const input = run.tasks.reduce((sum, task) => sum + task.input_tokens, 0);
   const output = run.tasks.reduce((sum, task) => sum + task.output_tokens, 0);
@@ -113,6 +127,8 @@ async function refresh() {
 $("task-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   $("start").disabled = true;
+  const startLabel = $("start").innerHTML;
+  $("start").textContent = "Preparing task…";
   $("error").hidden = true;
   try {
     const run = await api("/api/runs", {
@@ -127,6 +143,7 @@ $("task-form").addEventListener("submit", async (event) => {
     showError(error);
   } finally {
     $("start").disabled = false;
+    $("start").innerHTML = startLabel;
   }
 });
 $("stop").addEventListener("click", async () => {
@@ -144,6 +161,37 @@ $("stop").addEventListener("click", async () => {
   refresh();
 });
 $("new-task").addEventListener("click", () => select(null));
+$("review-changes").addEventListener("click", async () => {
+  const id = selected;
+  const request = ++changeRequest;
+  $("review-changes").disabled = true;
+  try {
+    const changes = await api(`/api/runs/${id}/changes`);
+    if (id !== selected || request !== changeRequest) return;
+    latestChanges = changes;
+    $("change-status").textContent = changes.patch
+      ? `Patch SHA-256: ${changes.patch_sha256}`
+      : "No tracked changes.";
+    $("change-patch").textContent = changes.patch;
+    $("change-patch").hidden = !changes.patch;
+    $("download-patch").hidden = !changes.patch;
+    $("untracked-files").hidden = !changes.untracked_files.length;
+    $("untracked-files").textContent = `Untracked files are separate from this patch:\n${changes.untracked_files.join("\n")}`;
+  } catch (error) {
+    if (id === selected && request === changeRequest) showError(error);
+  } finally {
+    if (id === selected && request === changeRequest) $("review-changes").disabled = false;
+  }
+});
+$("download-patch").addEventListener("click", () => {
+  if (!latestChanges?.patch) return;
+  const url = URL.createObjectURL(new Blob([latestChanges.patch], { type: "text/x-diff;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `chio-${selected}.patch`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
 async function boot() {
   if (!token) {
     $("access").hidden = false;
@@ -154,6 +202,7 @@ async function boot() {
     const config = await api("/api/config");
     $("workspace").textContent = config.workspace;
     $("model").textContent = config.model;
+    $("workspace-mode").hidden = !config.git_worktrees;
     await refresh();
   } catch (error) {
     showError(error);

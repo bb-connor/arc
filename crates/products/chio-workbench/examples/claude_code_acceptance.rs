@@ -39,6 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The check lives outside model-editable files and tests several inputs.
     let check = "import runpy; f = runpy.run_path('calc.py')['add']; assert all(f(a,b) == a+b for a,b in [(2,3),(-2,3),(0,1),(-3,-4)])";
     let config = WorkbenchConfig {
+        git_worktrees: false,
         workspace: workspace.clone(),
         state_dir: output.join("state"),
         check_command: vec!["python3".into(), "-I".into(), "-c".into(), check.into()],
@@ -51,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             args.turn_budget_usd,
         )?),
     )?;
-    let id = workbench.start("Fix the addition bug in calc.py. Establish the failing checks, make a focused correction, and have the reviewer inspect the change and run checks independently.".into(), 36)?;
+    let id = workbench.start("Fix the addition bug in calc.py. Establish the failing checks, make a focused correction, and have the reviewer inspect the change and run checks independently.".into(), 36).await?;
     let completion = tokio::time::timeout(Duration::from_secs(600), async {
         loop {
             let run = workbench.get(&id)?;

@@ -17,10 +17,18 @@ use std::{
 };
 use tokio::sync::watch;
 
+mod start;
+
 pub struct WorkbenchConfig {
     pub workspace: PathBuf,
     pub state_dir: PathBuf,
     pub check_command: Vec<String>,
+    pub git_worktrees: bool,
+}
+
+struct ActiveRun {
+    id: String,
+    kernel: Option<Arc<ChioKernel>>,
 }
 
 pub struct Workbench {
@@ -28,8 +36,11 @@ pub struct Workbench {
     authority: Keypair,
     store: Store,
     workspace: PathBuf,
+    state_dir: PathBuf,
+    check_command: Vec<String>,
+    git_worktrees: bool,
     provider: Arc<dyn Provider>,
-    active: Mutex<Option<String>>,
+    active: Mutex<Option<ActiveRun>>,
     stop: watch::Sender<bool>,
     _lock: File,
 }
@@ -46,6 +57,7 @@ impl Workbench {
             .recursive(true)
             .mode(0o700)
             .create(&config.state_dir)?;
+        let state_dir = config.state_dir.canonicalize()?;
         let lock = OpenOptions::new()
             .read(true)
             .write(true)
@@ -57,13 +69,31 @@ impl Workbench {
             |_| Error::Invalid("this workbench state directory is already in use".into()),
         )?;
         let (stop, _) = watch::channel(false);
-        let tools = WorkspaceTools::new(&workspace, config.check_command, stop.clone())?;
+        let tools = WorkspaceTools::new(&workspace, config.check_command.clone(), stop.clone())?;
         let authority = kernel::signing_key(&config.state_dir)?;
         let kernel = kernel::build(&config.state_dir, tools, authority.clone())?;
         let store = Store::open(&config.state_dir.join("runs.sqlite"))?;
         for run in store.list()? {
             if run.status == RunStatus::Interrupted {
-                kernel.revoke_capability(&run.root_capability.id)?;
+                if run.git.is_some() {
+                    let id = uuid::Uuid::parse_str(&run.id)
+                        .map_err(|_| Error::Invalid("invalid retained Git task id".into()))?;
+                    let tools = WorkspaceTools::new(
+                        &workspace,
+                        config.check_command.clone(),
+                        stop.clone(),
+                    )?;
+                    // Recovery only revokes authority. It never dispatches a
+                    // workspace call or retries an interrupted effect.
+                    let recovered = kernel::build(
+                        &state_dir.join("tasks").join(id.to_string()).join("kernel"),
+                        tools,
+                        authority.clone(),
+                    )?;
+                    recovered.revoke_capability(&run.root_capability.id)?;
+                } else {
+                    kernel.revoke_capability(&run.root_capability.id)?;
+                }
             }
         }
         Ok(Arc::new(Self {
@@ -71,6 +101,9 @@ impl Workbench {
             authority,
             store,
             workspace,
+            state_dir,
+            check_command: config.check_command,
+            git_worktrees: config.git_worktrees,
             provider,
             active: Mutex::new(None),
             stop,
@@ -84,6 +117,34 @@ impl Workbench {
     pub fn model(&self) -> &str {
         self.provider.model()
     }
+    pub fn git_worktrees(&self) -> bool {
+        self.git_worktrees
+    }
+    pub async fn changes(&self, id: &str) -> Result<crate::Changes> {
+        let run = self.get(id)?;
+        if matches!(run.status, RunStatus::Running | RunStatus::Stopping) {
+            return Err(Error::Invalid(
+                "wait for the task to finish before reviewing its changes".into(),
+            ));
+        }
+        let snapshot = run
+            .git
+            .ok_or_else(|| Error::Invalid("this task did not use a Git worktree".into()))?;
+        let id = uuid::Uuid::parse_str(&run.id)
+            .map_err(|_| Error::Invalid("invalid Git task id".into()))?;
+        if snapshot.worktree
+            != self
+                .state_dir
+                .join("tasks")
+                .join(id.to_string())
+                .join("worktree")
+        {
+            return Err(Error::Invalid(
+                "task worktree is outside its recorded state directory".into(),
+            ));
+        }
+        crate::git::changes(&snapshot).await
+    }
     pub fn list(&self) -> Result<Vec<Run>> {
         self.store.list()
     }
@@ -91,132 +152,16 @@ impl Workbench {
         self.store.get(id)
     }
 
-    pub fn start(self: &Arc<Self>, prompt: String, call_limit: u32) -> Result<String> {
-        if prompt.trim().is_empty() || prompt.len() > 16000 || !(6..=120).contains(&call_limit) {
-            return Err(Error::Invalid(
-                "provide a task up to 16000 bytes and a tool-call allowance between 6 and 120"
-                    .into(),
-            ));
-        }
-        let mut active = self.active.lock().map_err(|_| Error::Lock)?;
-        if active.is_some() {
-            return Err(Error::Busy);
-        }
-        if self.store.list()?.len() >= 100 {
-            return Err(Error::Invalid(
-                "this state directory has 100 runs; archive it and choose a new state directory"
-                    .into(),
-            ));
-        }
-        self.stop.send_replace(false);
-        let key = Keypair::generate();
-        let root = self.kernel.issue_capability(
-            &key.public_key(),
-            kernel::scope(Role::Editor, call_limit, true),
-            3600,
-        )?;
-        self.kernel.set_capability_trust_root(
-            self.authority.public_key(),
-            chio_core::capability::attenuation::scope_hash(&root.scope)
-                .map_err(|error| Error::Invalid(error.to_string()))?,
-        );
-        self.kernel
-            .register_budget_parent(root.id.clone(), 10_000)
-            .map_err(|error| Error::Invalid(error.to_string()))?;
-        let quarter = call_limit / 4;
-        let tasks = [
-            (Role::Investigator, quarter),
-            (Role::Editor, call_limit - 2 * quarter),
-            (Role::Reviewer, quarter),
-        ]
-        .into_iter()
-        .map(|(role, calls)| {
-            Ok(Task {
-                role,
-                status: TaskStatus::Queued,
-                capability: kernel::child(&root, &key, &self.authority, role, calls)?,
-                call_limit: calls,
-                turns: 0,
-                input_tokens: 0,
-                output_tokens: 0,
-                summary: None,
-                actions: vec![],
-            })
-        })
-        .collect::<Result<Vec<_>>>()?;
-        let run = Run {
-            id: uuid::Uuid::new_v4().to_string(),
-            prompt,
-            workspace: self.workspace.display().to_string(),
-            model: self.provider.model().into(),
-            status: RunStatus::Running,
-            started_at: crate::now(),
-            finished_at: None,
-            call_limit,
-            root_capability: root,
-            tasks,
-            error: None,
-        };
-        self.store.save(&run)?;
-        let id = run.id.clone();
-        *active = Some(id.clone());
-        let owner = Arc::clone(self);
-        tokio::spawn(async move {
-            // Join the worker so a panic is visible and never leaves the active
-            // slot silently occupied. Pending effects remain explicitly unknown.
-            let worker = Arc::clone(&owner);
-            let work = run.clone();
-            let outcome = tokio::spawn(async move { worker.execute(work).await }).await;
-            let failure = match outcome {
-                Ok(Ok(())) => None,
-                Ok(Err(error)) => Some(error.to_string()),
-                Err(_) => Some("task worker interrupted; review pending effects".into()),
-            };
-            if let Some(error) = failure {
-                let _ = owner.kernel.revoke_capability(&run.root_capability.id);
-                if let Ok(mut current) = owner.store.get(&run.id) {
-                    current.status = if *owner.stop.borrow() {
-                        RunStatus::Stopped
-                    } else {
-                        RunStatus::Failed
-                    };
-                    current.error = Some(error);
-                    current.finished_at = Some(crate::now());
-                    for task in &mut current.tasks {
-                        if matches!(task.status, TaskStatus::Running | TaskStatus::Queued) {
-                            task.status = if current.status == RunStatus::Stopped {
-                                TaskStatus::Stopped
-                            } else {
-                                TaskStatus::Failed
-                            };
-                        }
-                        for action in &mut task.actions {
-                            if action.state == "running" {
-                                action.state = "unknown".into();
-                            }
-                        }
-                    }
-                    if let Err(error) = owner.store.save(&current) {
-                        eprintln!("workbench could not persist terminal task state: {error}");
-                    }
-                }
-            }
-            if let Ok(mut active) = owner.active.lock() {
-                *active = None;
-            }
-            owner.kernel.evict_budget_parent(&run.root_capability.id);
-        });
-        Ok(id)
-    }
-
     pub fn stop(&self, id: &str) -> Result<()> {
         let active = self.active.lock().map_err(|_| Error::Lock)?;
-        if active.as_deref() != Some(id) {
+        if active.as_ref().map(|active| active.id.as_str()) != Some(id) {
             return Err(Error::Invalid("run is not active".into()));
         }
-        let run = self.store.get(id)?;
-        self.kernel.revoke_capability(&run.root_capability.id)?;
         self.stop.send_replace(true);
+        if let Some(kernel) = active.as_ref().and_then(|active| active.kernel.as_ref()) {
+            let run = self.store.get(id)?;
+            kernel.revoke_capability(&run.root_capability.id)?;
+        }
         // The worker is the sole writer of the run body. Returning here means
         // future authority is revoked; an admitted call may still be finalizing.
         Ok(())
@@ -224,9 +169,9 @@ impl Workbench {
 
     pub async fn shutdown(&self) {
         if let Ok(active) = self.active.lock() {
-            if let Some(id) = active.as_ref() {
-                if let Ok(run) = self.store.get(id) {
-                    let _ = self.kernel.revoke_capability(&run.root_capability.id);
+            if let Some(active) = active.as_ref() {
+                if let (Some(kernel), Ok(run)) = (&active.kernel, self.store.get(&active.id)) {
+                    let _ = kernel.revoke_capability(&run.root_capability.id);
                 }
             }
         }
@@ -245,14 +190,14 @@ impl Workbench {
         self.kernel.shutdown().await;
     }
 
-    async fn execute(&self, mut run: Run) -> Result<()> {
+    async fn execute(&self, mut run: Run, kernel: Arc<ChioKernel>) -> Result<()> {
         for index in 0..run.tasks.len() {
             if *self.stop.borrow() {
                 return Err(Error::Invalid("stopped by operator".into()));
             }
             run.tasks[index].status = TaskStatus::Running;
             self.store.save(&run)?;
-            self.execute_role(&mut run, index).await?;
+            self.execute_role(&mut run, index, &kernel).await?;
             run.tasks[index].status = TaskStatus::Succeeded;
             self.store.save(&run)?;
         }
@@ -277,13 +222,13 @@ impl Workbench {
         if *self.stop.borrow() {
             return Err(Error::Invalid("stopped by operator".into()));
         }
-        self.kernel.revoke_capability(&run.root_capability.id)?;
+        kernel.revoke_capability(&run.root_capability.id)?;
         run.status = RunStatus::Succeeded;
         run.finished_at = Some(crate::now());
         self.store.save(&run)
     }
 
-    async fn execute_role(&self, run: &mut Run, index: usize) -> Result<()> {
+    async fn execute_role(&self, run: &mut Run, index: usize, kernel: &ChioKernel) -> Result<()> {
         let role = run.tasks[index].role;
         let prior: Vec<_> = run.tasks[..index]
             .iter()
@@ -359,7 +304,7 @@ impl Workbench {
             }
             let mut results = vec![];
             for (id, name, arguments) in validated {
-                let output = self.invoke(run, index, name, arguments).await?;
+                let output = self.invoke(run, index, name, arguments, kernel).await?;
                 results.push(json!({"type":"tool_result","tool_use_id":id,"is_error":output["is_error"] == true,"content":serde_json::to_string(&output)?}));
             }
             messages.push(json!({"role":"user","content":results}));
@@ -375,6 +320,7 @@ impl Workbench {
         index: usize,
         name: &str,
         arguments: Value,
+        kernel: &ChioKernel,
     ) -> Result<Value> {
         if *self.stop.borrow() {
             return Err(Error::Invalid("stopped by operator".into()));
@@ -419,11 +365,14 @@ impl Workbench {
             model_metadata: None,
             federated_origin_kernel_id: None,
         };
-        let response = self
-            .kernel
+        let response = kernel
             .evaluate_tool_call_with_metadata(
                 &request,
-                Some(json!({"workbench_run_id":run.id,"workbench_role":run.tasks[index].role})),
+                Some(
+                    json!({"workbench_run_id":run.id,"workbench_role":run.tasks[index].role,
+                    "workbench_workspace":run.workspace,
+                    "workbench_git_base":run.git.as_ref().map(|snapshot| &snapshot.base_revision)}),
+                ),
             )
             .await?;
         let output = match response.output {

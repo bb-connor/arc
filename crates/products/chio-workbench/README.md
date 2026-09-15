@@ -7,7 +7,9 @@ page shows the task tree, tool allowances, model usage, results, and authority.
 
 ## Run
 
-The initial platform is Linux with Rust and a trusted project check command.
+The initial platform is Linux with a trusted project check command. See the
+[installation guide](../../../docs/guides/INSTALL.md) for native developer previews.
+Building from source requires Rust.
 Set `ANTHROPIC_API_KEY` in your environment and select the model you want to use:
 
 ```bash
@@ -68,6 +70,48 @@ The reviewer must run passing checks before the run can finish successfully.
 That result establishes successful execution and passing checks, not proof that
 an arbitrary natural-language task is correct.
 
+## Review work in separate Git worktrees
+
+For a committed Git project, add `--git-worktrees` and choose a state directory
+outside the repository:
+
+```bash
+chio-workbench --provider claude-code --model haiku --git-worktrees \
+  --workspace /absolute/path/to/project \
+  --state-dir /absolute/path/to/private/workbench-state \
+  -- python3 -m unittest discover -s tests
+```
+
+Each task gets a detached worktree at the source repository's current committed
+revision and its own kernel stores. Tracked local edits reject preparation;
+commit or stash them first. Untracked files, ignored build outputs, and initialized
+submodule contents are not copied. A workspace inside a repository subdirectory
+keeps that same relative location in the task worktree. Git must be installed.
+
+After the task finishes, select **Review changes** to inspect its tracked diff
+and download the patch. The view identifies the base revision, task directory,
+and patch SHA-256. Untracked files are listed separately. The patch includes
+tracked changes made by the configured checks as well as the editor. Review it
+before applying it from your source repository root:
+
+```bash
+git apply --check /path/to/chio-TASK.patch
+git apply /path/to/chio-TASK.patch
+```
+
+Git worktrees and their changes remain available after completion or failure.
+They are not merged or removed automatically. Failed preparation can leave a
+partial task directory under `STATE/tasks`; inspect it before removing it with
+Git. Diff output is bounded to 2 MiB and 1024 untracked paths; larger changes must
+be inspected directly. Git operations time out after 30 seconds and use the
+trusted repository's local settings with hooks and external diff programs disabled.
+
+Git worktrees separate working files. The check command retains the operator's
+OS permissions and can execute project code; this mode is not an OS sandbox.
+Tool receipts sign the task workspace and base revision alongside the run and
+role identifiers. The downloaded diff is a current Git view, not a signed receipt
+or an immutable snapshot of all later external changes.
+
 ## Local operating boundary
 
 - File tools accept relative paths within the workspace, reject symlinks and
@@ -116,6 +160,8 @@ node crates/products/chio-workbench/tests/browser-smoke.mjs 'PRINTED_URL'
 The script submits the repair through the browser, checks the seven receipted
 calls and final passing checks, reloads persisted history, checks the mobile
 layout, and writes screenshots under `/tmp/chio-workbench-*.png`.
+Run the fixture with `-- --git-worktrees` and set `CHIO_BROWSER_GIT=1` for the
+browser script to also verify source preservation and the downloaded patch.
 
 For an opt-in live Claude Code acceptance run:
 

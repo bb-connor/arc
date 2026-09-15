@@ -12,6 +12,9 @@ or a direct workspace handle. The application owns orchestration and UI.
 - Optional Claude Code transport using the installed client's authentication,
   with its own tools and customizations disabled. The client emits structured
   proposals and Chio retains workspace execution.
+- Optional Git worktree mode creates a detached working tree and kernel state
+  per task, retaining the source revision and a bounded diff for operator review.
+  Receipts sign the task workspace and Git base revision.
 - Investigator and reviewer can inspect files and invoke an operator-configured
   check command. Only the editor can replace exact text in existing files.
 - Signed child capabilities narrow a persisted parent capability. Kernel receipts,
@@ -66,3 +69,9 @@ The dedicated Workbench workflow runs the Rust tests, Clippy, and scripted brows
 repair on stacked PRs as well as PRs targeting main. Browser output includes a
 long unbroken digest to exercise narrow-screen wrapping. Hosted browser tests
 use scripted proposals and require no model credentials.
+
+Git task tests cover source preservation, independent task worktrees, signed
+workspace/base bindings, patch applicability, retained diffs across restart,
+dirty-input rejection, cancellation of checkout descendants, and interrupted
+task recovery when a worktree is missing. Git worktrees provide filesystem
+organization; the configured check command still has the operator's OS permissions.

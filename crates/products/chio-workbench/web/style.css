@@ -98,6 +98,33 @@ aside {
   color: #84907f;
   margin: 8px 0 25px;
 }
+#workspace-mode {
+  font-size: 11px;
+  color: #b5ca9d;
+  margin: -12px 0 24px;
+}
+#change-review {
+  border: 1px solid #34402e;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 32px;
+  font-size: 12px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+#change-status,
+#untracked-files {
+  color: #a3ad9d;
+  white-space: pre-wrap;
+}
+#change-patch {
+  max-height: 500px;
+}
 .secondary {
   background: #20291e;
   color: #ccd7c6;

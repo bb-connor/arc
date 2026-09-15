@@ -23,7 +23,7 @@ use support::{calls, config, done, repair_script, Scripted};
 async fn restart_preserves_unknown_effects_without_replaying_them() -> Result<()> {
     let root = tempfile::tempdir()?;
     let workbench = Workbench::open(config(root.path())?, repair_script())?;
-    let id = workbench.start("Repair addition".into(), 36)?;
+    let id = workbench.start("Repair addition".into(), 36).await?;
     let mut run = finished(&workbench, &id).await?;
     assert_eq!(run.status, RunStatus::Succeeded, "{:#?}", run);
     workbench.shutdown().await;
@@ -65,7 +65,9 @@ async fn finished(workbench: &Workbench, id: &str) -> Result<Run> {
 async fn repairs_a_real_file_and_runs_checks_through_signed_delegation() -> Result<()> {
     let root = tempfile::tempdir()?;
     let workbench = Workbench::open(config(root.path())?, repair_script())?;
-    let id = workbench.start("Fix add and verify the result".into(), 36)?;
+    let id = workbench
+        .start("Fix add and verify the result".into(), 36)
+        .await?;
     let run = finished(&workbench, &id).await?;
     assert_eq!(run.status, RunStatus::Succeeded, "{:#?}", run);
     assert!(
@@ -152,7 +154,9 @@ async fn investigator_cannot_edit_even_when_the_model_requests_it() -> Result<()
         done(),
     ]))));
     let workbench = Workbench::open(config(root.path())?, provider)?;
-    let id = workbench.start("Attempt an unauthorized edit".into(), 12)?;
+    let id = workbench
+        .start("Attempt an unauthorized edit".into(), 12)
+        .await?;
     let run = finished(&workbench, &id).await?;
     assert_eq!(run.tasks[0].actions[0].state, "denied");
     assert!(run.tasks[0].actions[0].receipt.is_some());
@@ -170,7 +174,7 @@ async fn role_allowance_stops_dispatch_before_the_next_effect() -> Result<()> {
         ("read_file", json!({"path":"calc.py"})),
     ])]))));
     let workbench = Workbench::open(config(root.path())?, provider)?;
-    let id = workbench.start("Exhaust allowance".into(), 6)?;
+    let id = workbench.start("Exhaust allowance".into(), 6).await?;
     let run = finished(&workbench, &id).await?;
     assert_eq!(run.status, RunStatus::Failed);
     assert_eq!(run.tasks[0].actions.len(), 1);
@@ -204,7 +208,9 @@ async fn invalid_model_batches_cannot_partially_edit_the_workspace() -> Result<(
         }
         let provider = Arc::new(Scripted(Mutex::new(VecDeque::from([done(), batch]))));
         let workbench = Workbench::open(config(root.path())?, provider)?;
-        let id = workbench.start("Reject an invalid edit batch".into(), 12)?;
+        let id = workbench
+            .start("Reject an invalid edit batch".into(), 12)
+            .await?;
         let run = finished(&workbench, &id).await?;
         assert_eq!(run.status, RunStatus::Failed);
         assert!(run.tasks[1].actions.is_empty());
@@ -230,7 +236,7 @@ async fn stopping_checks_terminates_the_process_group_and_records_the_outcome() 
         json!({}),
     )])]))));
     let workbench = Workbench::open(settings, provider)?;
-    let id = workbench.start("Run a slow check".into(), 12)?;
+    let id = workbench.start("Run a slow check".into(), 12).await?;
     let pid_file = workbench.workspace().join("child.pid");
     tokio::time::timeout(Duration::from_secs(5), async {
         while !pid_file.exists() {
@@ -281,12 +287,12 @@ async fn stopping_a_model_wait_revokes_work_and_releases_the_slot() -> Result<()
     let root = tempfile::tempdir()?;
     let provider = Arc::new(Waiting(tokio::sync::Notify::new()));
     let workbench = Workbench::open(config(root.path())?, provider.clone())?;
-    let id = workbench.start("Wait for model".into(), 12)?;
+    let id = workbench.start("Wait for model".into(), 12).await?;
     tokio::time::timeout(Duration::from_secs(5), provider.0.notified())
         .await
         .map_err(|_| Error::Invalid("provider did not start".into()))?;
     assert!(matches!(
-        workbench.start("second".into(), 12),
+        workbench.start("second".into(), 12).await,
         Err(Error::Busy)
     ));
     workbench.stop(&id)?;

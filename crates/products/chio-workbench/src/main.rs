@@ -26,6 +26,9 @@ struct Args {
     /// Trusted checkout to inspect and edit.
     #[arg(long)]
     workspace: PathBuf,
+    /// Create a detached Git worktree for each task, starting from committed HEAD.
+    #[arg(long, requires = "state_dir")]
+    git_worktrees: bool,
     /// Private local state directory. Defaults to WORKSPACE/.chio-workbench.
     #[arg(long)]
     state_dir: Option<PathBuf>,
@@ -73,6 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             workspace: args.workspace,
             state_dir,
             check_command: args.check_command,
+            git_worktrees: args.git_worktrees,
         },
         provider,
     )?;
