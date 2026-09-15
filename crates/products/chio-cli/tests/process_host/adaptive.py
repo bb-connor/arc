@@ -286,12 +286,8 @@ def fair(binary, directory):
     }
     events = sorted(leaves.values())
     assert len(events) == 6, events
-    # The root submitted its leaves first, so submission order would launch
-    # two of its leaves before any of the second parent's. Fair slots launch
-    # one leaf of each first, and thereafter a parent's leaf starts only while
-    # that parent has no more leaves running than the other parent whose
-    # leaves are still waiting.
-    assert {events[0][2], events[1][2]} == {"root", "second"}, events
+    # Parent arrival is not synchronized. Check fairness at each launch while
+    # the other parent's subtree has leaves waiting for a shared slot.
     for started, _, owner in events:
         other = "second" if owner == "root" else "root"
         running = {

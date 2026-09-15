@@ -196,13 +196,13 @@ async fn drive(
             }
             if snapshots.iter().all(|s| s.state == "completed") && active.is_empty() { return journal.check_publication(); }
             let pending: BTreeSet<_> = snapshots.iter().filter(|s| s.state == "pending").map(|s| s.process.as_str()).collect();
-            let mut ready = Vec::new();
-            for (index, worker) in journal.workers.iter().enumerate() {
+            let mut ready = ready_indices(active.len(), plan.max_parallel, journal.workers.len(), |index| {
+                let worker = &journal.workers[index];
                 if active_ids.contains(&index) || !pending.contains(worker.process.as_str())
                     || !journal.unresolved(worker, &snapshots)?.is_empty()
-                    || retry_at.get(&index).is_some_and(|when| *when > Instant::now()) { continue; }
-                ready.push(index);
-            }
+                    || retry_at.get(&index).is_some_and(|when| *when > Instant::now()) { return Ok(false); }
+                Ok(true)
+            })?;
             // Slots are shared across declared subtrees: the next launch goes to
             // the ready worker whose root has the fewest active workers, then the
             // fewest recorded attempts, then the earliest plan position, so one
@@ -451,9 +451,47 @@ fn retain_logs(
     Ok(())
 }
 
+fn ready_indices(
+    active: usize,
+    maximum: usize,
+    count: usize,
+    mut is_ready: impl FnMut(usize) -> Result<bool, CliError>,
+) -> Result<Vec<usize>, CliError> {
+    let mut ready = Vec::new();
+    if active >= maximum {
+        return Ok(ready);
+    }
+    for index in 0..count {
+        if is_ready(index)? {
+            ready.push(index);
+        }
+    }
+    Ok(ready)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn saturated_slots_do_not_query_worker_dependencies() -> Result<(), CliError> {
+        let mut queried = Vec::new();
+        let ready = ready_indices(2, 2, 3, |index| {
+            queried.push(index);
+            Ok(true)
+        })?;
+        assert!(queried.is_empty());
+        assert!(ready.is_empty());
+        assert_eq!(
+            ready_indices(1, 2, 3, |index| {
+                queried.push(index);
+                Ok(index != 1)
+            })?,
+            vec![0, 2]
+        );
+        assert_eq!(queried, vec![0, 1, 2]);
+        Ok(())
+    }
 
     #[tokio::test]
     async fn known_completion_precedes_ready_interruption() -> Result<(), Box<dyn std::error::Error>>

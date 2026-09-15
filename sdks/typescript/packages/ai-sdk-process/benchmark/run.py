@@ -470,7 +470,7 @@ def baseline_trial(consumer, directory, scenario, spec, endpoint):
     )
 
 
-def check(scenario, mode, summary):
+def check(scenario, mode, summary, specification=None):
     """Behavior each configuration must reproduce; deviations fail the benchmark."""
     completes = scenario in COMPLETING or scenario.startswith("random")
     if mode == "chio":
@@ -484,6 +484,17 @@ def check(scenario, mode, summary):
         if scenario == "conflict":
             assert summary["denials"] >= 1, summary
         return
+    if scenario.startswith("random"):
+        assert summary["completed"] and summary["publications"] >= 1, summary
+        kill = (specification or {}).get("kill", {})
+        if kill.get("tool") == "publish":
+            assert summary["publications"] == 2, summary
+        elif kill:
+            assert summary["publications"] == 1, summary
+        if kill.get("tool") == "read":
+            assert summary["duplicate_reads"] >= kill["ordinal"], summary
+        if kill.get("tool") == "send_findings":
+            assert summary["duplicate_messages"] >= 1, summary
     if scenario in ("steady", "cancel", "budget"):
         assert summary["completed"] and summary["publications"] == 1, summary
     if scenario in ("worker-death", "host-death"):
@@ -536,7 +547,7 @@ def exercise(binary, output, temporary, packages, majors, trials, seed, only=Non
                         summary = chio_trial(binary, consumer, directory, scenario, spec, endpoint)
                     else:
                         summary = baseline_trial(consumer, directory, scenario, spec, endpoint)
-                check(scenario, mode, summary)
+                check(scenario, mode, summary, spec)
                 case = destination / scenario / mode
                 case.mkdir(parents=True)
                 write(case / "summary.json", summary)

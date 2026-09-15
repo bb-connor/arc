@@ -73,6 +73,9 @@ and the kernel key. CI runs AI SDK 7 with one random trial.
 
 ## Where the kernel's time goes
 
+This is a historical trace, not a qualification of the current source. Its
+original per-file trace artifact was not retained with this table.
+
 Tracing the host during one steady run attributes its durable writes. The
 serving owner syncs its rollback anchor after every authority commit, and each
 sync used to clear the slot marker, write the slot body and write the marker
@@ -88,6 +91,7 @@ invocations plus the model journal's checkpoints and response blobs:
 | `process.db` (checkpoints, response blobs, waits) | 126 | 126 |
 | `receipts.db` | 39 | 39 |
 | Host process (initialization, run setup, status) | 429 | 426 |
+| Other calls omitted from the original file breakdown (unattributed) | 11 | 11 |
 | Total | 2,830 | 1,725 |
 
 That is roughly 85 `fsync` calls per invocation before and 50 after. Each costs
@@ -132,12 +136,17 @@ changing those contracts, which is tracked in the
 
 ## Results
 
-Measured at commit `03e9f4778f` with the release build (`f777f283`) on a 12-core Linux
+Historical, unqualified measurements reported at commit `03e9f4778f` with the release build (`f777f283`) on a 12-core Linux
 aarch64 host under a load average above 12 from unrelated builds, Node 22.23.2, AI SDK
 6.0.277 and 7.0.93, three seeded random trials per SDK. Chio's outcomes were identical
 for both SDKs; the baseline's duplicate counts vary with timing, so both SDK rows are
 listed where they differ. An earlier run of the same code on a quieter machine put
-every mediated call at 200-235 ms median; the loaded run below is the evidence of record.
+every mediated call at 200-235 ms median. These tables predate the current checksum
+and benchmark source and have not been rerun at the integrated source. They are
+historical observations, not qualification of the current implementation. The
+original run artifacts do not establish current-source reproducibility. The
+fsync totals retain eleven unattributed calls in each column rather than assigning
+them to an unmeasured file.
 
 | Scenario | Chio | Baseline (AI SDK 7) | Baseline (AI SDK 6) |
 | --- | --- | --- | --- |
