@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
-use std::path::{Path as FsPath, PathBuf};
+use std::path::Path as FsPath;
+#[cfg(target_os = "linux")]
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -72,14 +74,6 @@ pub(super) fn canonical_session_database_path(path: &FsPath) -> Result<PathBuf, 
     })?;
     validate_trusted_session_database_ancestors(&canonical_parent)?;
     Ok(canonical_parent.join(file_name))
-}
-
-#[cfg(not(target_os = "linux"))]
-pub(super) fn canonical_session_database_path(path: &FsPath) -> Result<PathBuf, CliError> {
-    Err(CliError::cli_other_error(format!(
-        "remote MCP session database {} requires Linux retained-dirfd pathname custody",
-        path.display()
-    )))
 }
 
 #[cfg(target_os = "linux")]

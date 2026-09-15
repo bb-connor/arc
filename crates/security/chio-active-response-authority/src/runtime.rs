@@ -1,37 +1,56 @@
+#[cfg(target_os = "linux")]
 use std::fs::File;
+#[cfg(target_os = "linux")]
 use std::io::{Read, Seek, SeekFrom};
+#[cfg(target_os = "linux")]
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(target_os = "linux")]
 use std::sync::mpsc::{self, Receiver, SyncSender, TrySendError};
+#[cfg(target_os = "linux")]
 use std::sync::{Arc, Mutex};
+#[cfg(target_os = "linux")]
 use std::thread;
+#[cfg(target_os = "linux")]
 use std::time::Duration;
 
+#[cfg(target_os = "linux")]
 use chio_control_plane::security::{
     ActiveResponseAuthorityProtocolServer, ActiveResponseAuthorityProtocolServerConfig,
 };
+#[cfg(target_os = "linux")]
 use chio_core::{Ed25519Backend, Keypair, SigningBackend};
-use chio_secure_ipc::{
-    InheritedSecretFile, SecureIpcError, SecureUnixListener, SecureUnixListenerConfig,
-};
+use chio_secure_ipc::InheritedSecretFile;
+#[cfg(target_os = "linux")]
+use chio_secure_ipc::{SecureIpcError, SecureUnixListener, SecureUnixListenerConfig};
+#[cfg(target_os = "linux")]
 use zeroize::Zeroizing;
 
-use crate::{
-    AuthorityError, AuthorityRuntimeConfig, AuthorityStore, PreAdmittedAuthorityHandler, Result,
-};
+use crate::{AuthorityError, AuthorityRuntimeConfig, Result};
+#[cfg(target_os = "linux")]
+use crate::{AuthorityStore, PreAdmittedAuthorityHandler};
 
 pub struct AuthorityDaemonRuntime {
+    #[cfg(target_os = "linux")]
     config: AuthorityRuntimeConfig,
+    #[cfg(target_os = "linux")]
     listener: Arc<SecureUnixListener>,
+    #[cfg(target_os = "linux")]
     server: Arc<ActiveResponseAuthorityProtocolServer>,
 }
 
 impl AuthorityDaemonRuntime {
+    #[cfg(not(target_os = "linux"))]
+    pub fn build(
+        _config: AuthorityRuntimeConfig,
+        _signing_key: InheritedSecretFile,
+    ) -> Result<Self> {
+        Err(AuthorityError::Runtime(
+            "active-response authority runtime requires Linux".to_string(),
+        ))
+    }
+
+    #[cfg(target_os = "linux")]
     pub fn build(config: AuthorityRuntimeConfig, signing_key: InheritedSecretFile) -> Result<Self> {
-        if !cfg!(target_os = "linux") {
-            return Err(AuthorityError::Runtime(
-                "active-response authority runtime requires Linux".to_string(),
-            ));
-        }
         config.validate_for_current_process()?;
         signing_key
             .validate_private_regular_file(config.trusted_service_uid, "authority signing key")
@@ -162,6 +181,7 @@ impl AuthorityDaemonRuntime {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn read_keypair(mut file: File) -> Result<Keypair> {
     let metadata = file.metadata().map_err(|error| {
         AuthorityError::Custody(format!("authority signing key metadata failed: {error}"))
@@ -270,6 +290,7 @@ fn worker_loop(
     }
 }
 
+#[cfg(target_os = "linux")]
 fn set_fatal(fatal: &Mutex<Option<String>>, stop: &AtomicBool, message: String) {
     if let Ok(mut state) = fatal.lock() {
         if state.is_none() {
