@@ -240,9 +240,28 @@ profiles passed the selected tool/recovery, journal and pressure scenarios.
 The broader interrupted invocation is not full qualification: complete swarm
 and supervision runs remain required in Task 5 after artifact/example repairs.
 Inherited LangGraph package typing/style failures and its compatibility warning
-also remain Task 5 work. Artifact/example and CI/classifier repairs and the
-final 109-thread disposition record are still pending; no merge or hosted
-qualification is claimed by these subgroup checkpoints.
+also remain Task 5 work.
+
+The installed-artifact and example subgroup is complete at
+`bb338d9e5160cdad5984bf334b65bf2fc15ed34d`, with all 26 assigned threads
+reconciled. Repairs preserve exact package selection, isolated Python startup,
+bounded adaptive handoffs/publication, canonical ownership checks, signed
+publication integrity and truthful scheduler/evidence assertions. A separately
+committed caller-share clock repair sequences the snapshot observation with
+existing admission mutations, without weakening expiry or retained-unknown
+accounting. Concurrent physical-clock legacy and adaptive profiles passed.
+
+Independent review closed an additional socket-path preflight defect with
+exact byte-boundary refusal/fallback tests and real maximum-length socket binds.
+The affected 62-case review suite passed after that correction. Earlier native
+and installed qualification retains its recorded source identity at
+`0def619be29c4da48a94d21f66b033c12a10b0ca`; the final two-file qualifier fix did
+not change the native binary or rerun those full profiles. Task 5 still owns
+combined final-source qualification and the minor standalone authorization
+check's unnecessary ambient mini-SWE initialization.
+
+CI/classifier repairs and the final 109-thread disposition record remain pending.
+No merge or hosted qualification is claimed by these subgroup checkpoints.
 
 **Files:** The committed review-disposition record beside this plan, and only the
 source/tests owned by verified findings in the process/security integration.
