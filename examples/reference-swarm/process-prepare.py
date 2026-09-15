@@ -20,6 +20,7 @@ def main():
     for name in ["chio", "cage-init", "reader", "input-dir", "output"]:
         parser.add_argument(f"--{name}", type=Path, required=True)
     parser.add_argument("--file", action="append", required=True)
+    parser.add_argument("--max-artifact-bytes", type=int, default=1024 * 1024)
     args = parser.parse_args()
     if platform.system() != "Linux" or platform.machine() != "x86_64":
         parser.error("the Enforced native-tool profile requires Linux x86_64")
@@ -31,6 +32,10 @@ def main():
     chio = args.chio.resolve(strict=True)
     helper = args.cage_init.resolve(strict=True)
     reader = args.reader.resolve(strict=True)
+    if not 1 <= args.max_artifact_bytes <= 256 * 1024 * 1024:
+        parser.error("max-artifact-bytes must be in 1..268435456")
+    if max(helper.stat().st_size, reader.stat().st_size) > args.max_artifact_bytes:
+        parser.error("helper or reader exceeds the chosen max-artifact-bytes")
     source = args.input_dir.resolve(strict=True)
     if not source.is_dir():
         parser.error("input-dir must be a directory")
@@ -71,6 +76,8 @@ def main():
         str(launch),
         "--cage-init",
         str(helper),
+        "--max-artifact-bytes",
+        str(args.max_artifact_bytes),
         "--target",
         str(reader),
         "--target-arg=--root",

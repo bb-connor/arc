@@ -133,6 +133,7 @@ files, at most 256 KiB each and 4 MiB together:
 python3 examples/reference-swarm/process-prepare.py \
   --chio /absolute/path/to/chio \
   --cage-init /absolute/path/to/chio-cage-init \
+  --max-artifact-bytes 2097152 \
   --reader /absolute/path/to/chio-tool-repo-reader \
   --input-dir "$PWD/review-input" --file README.md --file DESIGN.md \
   --output "$PWD/review-host"
@@ -151,6 +152,11 @@ stage, discovers the supplied trusted reader's tool surface, and initializes the
 governed host. Initialization launches the actual confined tool and refuses a
 missing prerequisite. Each worker receives one exact planned read. The native
 tool has a signed read grant for the input directory and no network grant.
+`--max-artifact-bytes` is an explicit operator resource bound recorded in the
+signed launch policy. The example uses 2 MiB for optimized static binaries;
+check the sizes of your built helper and reader before selecting it. The
+provisioner refuses oversized inputs before creating state. Its default remains
+1 MiB and the cage's global maximum remains 256 MiB.
 Use an x86_64 worker image built from the same scripts/SDK on this host. Omitting
 the image selects cooperative native workers with the filesystem limitation
 described above.

@@ -48,6 +48,11 @@ pub(crate) struct ProvisionReferenceRuntimeArgs {
     #[arg(long, value_name = "PATH")]
     pub cage_init: PathBuf,
 
+    /// Signed per-artifact retention ceiling for the helper, target and runtime files.
+    /// Choose a reviewed bound that fits the compiled binaries (at most 256 MiB).
+    #[arg(long, default_value_t = 1024 * 1024, value_parser = clap::value_parser!(u64).range(1..=268_435_456))]
+    pub max_artifact_bytes: u64,
+
     /// Reviewed `tools/list` fixture of the target.
     #[arg(
         long,
@@ -113,6 +118,17 @@ pub(crate) struct ProvisionReferenceRuntimeArgs {
 pub(crate) fn cmd_provision_reference_runtime(
     args: &ProvisionReferenceRuntimeArgs,
 ) -> Result<(), CliError> {
+    for path in [&args.cage_init, &args.target]
+        .into_iter()
+        .chain(args.runtime_files.iter())
+    {
+        if std::fs::metadata(path)?.len() > args.max_artifact_bytes {
+            return Err(CliError::cli_other_error(format!(
+                "runtime artifact {} exceeds --max-artifact-bytes {}; select a reviewed bound that fits the binary before provisioning",
+                path.display(), args.max_artifact_bytes
+            )));
+        }
+    }
     let ceilings = ProvisionedCeilings {
         read_paths: grant_set(&args.read_paths, "read path")?,
         write_paths: grant_set(&args.write_paths, "write path")?,
@@ -141,6 +157,7 @@ pub(crate) fn cmd_provision_reference_runtime(
         ),
     };
     let profile = ProvisionProfile {
+        max_artifact_bytes: args.max_artifact_bytes,
         report_schema: REPORT_SCHEMA,
         security_mode,
         warning,

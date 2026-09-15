@@ -88,6 +88,7 @@ pub(super) enum CageInitSource {
 /// manifest declares, and how the report names itself.
 #[derive(Clone, Debug)]
 pub(super) struct ProvisionProfile {
+    pub(super) max_artifact_bytes: u64,
     pub(super) report_schema: &'static str,
     pub(super) security_mode: &'static str,
     pub(super) warning: &'static str,
@@ -103,6 +104,7 @@ impl ProvisionProfile {
     /// The demo: Disabled stage, no grants, the Chio executable as helper.
     pub(super) fn native_mcp_demo() -> Self {
         Self {
+            max_artifact_bytes: 1024 * 1024,
             report_schema: DEMO_REPORT_SCHEMA,
             security_mode: DEMO_SECURITY_MODE,
             warning: DEMO_SECURITY_WARNING,
@@ -1139,6 +1141,7 @@ fn build_policy_factory(
     deployment_id: chio_security_types::ports::RecordId,
 ) -> Result<ProvisionedCagePolicyFactory, CliError> {
     ProvisionedCagePolicyFactory::new(ProvisionedCagePolicyInput {
+        max_artifact_bytes: inputs.profile.max_artifact_bytes,
         signed_manifest,
         registered_public_key: signers.manifest.public_key(),
         policy_signer_public_key: signers.policy.public_key(),

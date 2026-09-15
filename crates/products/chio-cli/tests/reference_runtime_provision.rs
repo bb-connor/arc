@@ -187,6 +187,42 @@ fn read_json(path: &Path) -> Value {
 }
 
 #[test]
+fn an_explicit_artifact_ceiling_is_signed_and_cannot_change_on_reopen() {
+    let fixture = Fixture::new();
+    static_executable(
+        &fixture.helper,
+        ELF_TYPE_SHARED_OBJECT,
+        &vec![0_u8; 1024 * 1024],
+    );
+    let output = fixture.output("bounded");
+    let denied = fixture.provision(&output, &[]);
+    assert!(!denied.status.success());
+    assert!(stderr(&denied).contains("exceeds --max-artifact-bytes"));
+    assert!(!output.exists());
+    for limit in ["0", "268435457"] {
+        let denied = fixture.provision(&output, &["--max-artifact-bytes", limit]);
+        assert!(!denied.status.success());
+        assert!(!output.exists());
+    }
+    let accepted = fixture.provision(&output, &["--max-artifact-bytes", "2097152"]);
+    assert!(accepted.status.success(), "{}", stderr(&accepted));
+    let policy_path = output.join("cage-launch-policy.json");
+    let retained = std::fs::read(&policy_path).expect("signed policy");
+    assert_eq!(
+        read_json(&policy_path)["body"]["limits"]["max_artifact_bytes"],
+        2097152
+    );
+    let same = fixture.provision(&output, &["--max-artifact-bytes", "2097152"]);
+    assert!(same.status.success(), "{}", stderr(&same));
+    let changed = fixture.provision(&output, &["--max-artifact-bytes", "3145728"]);
+    assert!(!changed.status.success());
+    assert_eq!(
+        std::fs::read(policy_path).expect("retained policy"),
+        retained
+    );
+}
+
+#[test]
 fn an_enforced_provision_binds_the_helper_the_grants_and_a_promoted_ledger() {
     let fixture = Fixture::new();
     let output = fixture.output("enforced");

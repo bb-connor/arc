@@ -196,6 +196,7 @@ pub(super) struct ProvisionedCeilings {
 
 #[allow(dead_code)]
 pub(super) struct ProvisionedCagePolicyInput {
+    pub(super) max_artifact_bytes: u64,
     pub(super) signed_manifest: chio_manifest::SignedManifest,
     pub(super) registered_public_key: chio_core::PublicKey,
     pub(super) policy_signer_public_key: chio_core::PublicKey,
@@ -231,6 +232,11 @@ pub(super) struct ProvisionedCagePolicyFactory {
 #[allow(dead_code)]
 impl ProvisionedCagePolicyFactory {
     pub(super) fn new(input: ProvisionedCagePolicyInput) -> Result<Self, CliError> {
+        if !(1..=256 * 1024 * 1024).contains(&input.max_artifact_bytes) {
+            return Err(CliError::cli_other_error(
+                "provisioned cage artifact ceiling must be in 1..268435456".to_string(),
+            ));
+        }
         input.execution_identity.validate().map_err(|error| {
             CliError::cli_other_error(format!(
                 "demo cage execution identity is invalid: {error}"
@@ -390,7 +396,7 @@ impl ProvisionedCagePolicyFactory {
                 execution_identity: self.input.execution_identity.clone(),
             },
             limits: CageLimitPolicy {
-                max_artifact_bytes: 1024 * 1024,
+                max_artifact_bytes: self.input.max_artifact_bytes,
                 launch_timeout_ms: 10_000,
                 nofile_soft: 192,
                 nofile_hard: 192,
