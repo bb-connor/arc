@@ -278,9 +278,13 @@ ratchet, which already differed from the subgroup base. Task 5 must reconcile
 final candidate image inputs and the separate trusted-execution authorization;
 neither assertion nor controller pin was changed in this subgroup.
 
-The final 109-thread disposition record remains pending. Focused preparation
+The [109-thread disposition record](process-security-review-dispositions.md)
+now accounts for every original thread, with exact source checkpoints and
+owning tests. Deterministic checks verified membership, uniqueness, cited file
+and regression existence, and checkpoint ancestry. Focused current-source tests
 confirmed timeout default/override preservation, rich native caller attachments,
-signed caller schemas and selected-native enforcement before Optional fallback.
+signed caller and internal-origin schemas, and selected-native enforcement
+before Optional fallback. Historical scopes and Task 5 gaps remain explicit.
 No merge or hosted qualification is claimed by these subgroup checkpoints.
 
 **Files:** The committed review-disposition record beside this plan, and only the
@@ -290,15 +294,15 @@ source/tests owned by verified findings in the process/security integration.
 source, violated invariant, regression and disposition. Review text alone is
 not sufficient to mark a repair complete or discard valuable functionality.
 
-- [ ] Enumerate the inherited process PRs by actual ancestry and load their
+- [x] Enumerate the inherited process PRs by actual ancestry and load their
   review threads. Include #1117's still-open findings in the combined audit.
-- [ ] For each finding, record fixed-with-evidence, reproduced-and-repaired,
+- [x] For each finding, record fixed-with-evidence, reproduced-and-repaired,
   technically-inapplicable-with-reason, or unresolved. Prior fixes remain fixes;
   do not redo them merely because the old thread is unresolved.
-- [ ] Repair reproduced security, recovery, correctness and validation defects
+- [x] Repair reproduced security, recovery, correctness and validation defects
   through focused TDD tasks, grouping only closely related changes. Preserve
   supported adapters, process ABI handling, mailbox semantics and resource bounds.
-- [ ] Add the reconciliation review's remaining expiry oracles through joint
+- [x] Add the reconciliation review's remaining expiry oracles through joint
   budget authorization/capture, post-return claims, approved-caller replay and
   reserved-terminal active claims. Refusal must preserve participant, claim,
   commit-chain and anchor state, without charging a replay.
