@@ -483,11 +483,18 @@ def uncertain_create(binary, root, image):
             "INSERT INTO run_containers(owner,process,attempt,engine) VALUES(?,?,?,?)",
             (owner, "root", 2, engine),
         )
-    report = finished(launch(binary, state, plan), success=False)
-    assert not report["complete"] and report["workers"][0]["attempts"] == 1
-    assert report["pending_container_records"] == 1
+    refused = cli(binary, "run", "--state", state, "--plan", plan, success=False)
+    assert "unresolved container ownership blocks worker replacement" in refused.stderr, (
+        refused.stderr
+    )
+    # Reconciliation refuses before a replacement runner or report is created.
+    # The durable rows, not an absent run report, establish retained custody.
+    assert not refused.stdout.strip(), refused.stdout
     with sqlite3.connect(state / "runner.db") as db:
-        assert db.execute("SELECT container_id FROM run_containers").fetchone() == (None,)
+        assert db.execute("SELECT state,attempts FROM run_workers").fetchall() == [("completed", 1)]
+        assert db.execute(
+            "SELECT owner,process,attempt,engine,container_id FROM run_containers"
+        ).fetchall() == [(owner, "root", 2, engine, None)]
     assert (
         "container ownership is unresolved"
         in cli(binary, "export", "--state", state, success=False).stderr
