@@ -211,6 +211,23 @@ dispatch authority.
 
 ## Task 4: Reconcile the remaining inherited review findings
 
+The durable-store and administration subgroup is complete at
+`1f2c8c3e9d8c074d4e50181201ce4e788bc47d0d`, with all 29 assigned threads
+reconciled against current source. Repairs preserve cancelled-process inspection,
+legacy mailbox ownership, authority-time refusal, truthful no-op accounting and
+mutation-safe administration. Ordinary-clock threshold recovery now runs in the
+normal test inventory. Independent review identified and closed two relocation
+ordering defects: valid committed imports remain recoverable with live WAL, and
+orphan sidecars refuse before authority retirement. Real WAL, filesystem and
+callback-refusal tests cover both recovery and unchanged-state boundaries.
+
+Affected kernel, process, SQLite, control-plane and CLI gates passed, with strict
+Clippy and formatting. This is a reviewed local subgroup checkpoint, not combined
+workspace or hosted qualification. SDK, artifact/example and CI/classifier groups
+remain pending, as does the final 109-thread disposition record. The inherited
+2,005-line admission coordinator hygiene failure is assigned to the CI/hygiene
+group for a focused structural repair without changing the limit.
+
 **Files:** The committed review-disposition record beside this plan, and only the
 source/tests owned by verified findings in the process/security integration.
 
