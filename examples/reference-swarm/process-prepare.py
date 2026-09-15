@@ -21,6 +21,7 @@ def main():
         parser.add_argument(f"--{name}", type=Path, required=True)
     parser.add_argument("--file", action="append", required=True)
     parser.add_argument("--max-artifact-bytes", type=int, default=1024 * 1024)
+    parser.add_argument("--receipt-rollback-anchor-root", type=Path, required=True)
     args = parser.parse_args()
     if platform.system() != "Linux" or platform.machine() != "x86_64":
         parser.error("the Enforced native-tool profile requires Linux x86_64")
@@ -37,6 +38,15 @@ def main():
     if max(helper.stat().st_size, reader.stat().st_size) > args.max_artifact_bytes:
         parser.error("helper or reader exceeds the chosen max-artifact-bytes")
     source = args.input_dir.resolve(strict=True)
+    anchor = args.receipt_rollback_anchor_root.resolve(strict=True)
+    if not anchor.is_dir() or anchor.stat().st_mode & 0o077:
+        parser.error(
+            "receipt rollback anchor must be an existing private (0700) directory"
+        )
+    if anchor.is_relative_to(source):
+        parser.error(
+            "receipt rollback anchor must be outside the tool's input directory"
+        )
     if not source.is_dir():
         parser.error("input-dir must be a directory")
     inputs = []
@@ -78,6 +88,8 @@ def main():
         str(helper),
         "--max-artifact-bytes",
         str(args.max_artifact_bytes),
+        "--receipt-rollback-anchor-root",
+        str(anchor),
         "--target",
         str(reader),
         "--target-arg=--root",

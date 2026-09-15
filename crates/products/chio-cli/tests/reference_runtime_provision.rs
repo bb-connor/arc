@@ -102,7 +102,10 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Self {
-        let root = tempfile::tempdir().expect("fixture root");
+        let parent = std::env::temp_dir()
+            .canonicalize()
+            .expect("canonical temporary root");
+        let root = tempfile::tempdir_in(parent).expect("fixture root");
         std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700))
             .expect("private root");
         let helper = root.path().join("chio-cage-init");
@@ -220,6 +223,54 @@ fn an_explicit_artifact_ceiling_is_signed_and_cannot_change_on_reopen() {
         std::fs::read(policy_path).expect("retained policy"),
         retained
     );
+}
+
+#[test]
+fn the_receipt_anchor_is_signed_and_cannot_change_on_reopen() {
+    let fixture = Fixture::new();
+    let first_anchor = fixture.output("anchor-one");
+    let second_anchor = fixture.output("anchor-two");
+    for path in [&first_anchor, &second_anchor] {
+        std::fs::create_dir(path).expect("anchor directory");
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
+            .expect("private anchor");
+    }
+    // These synthetic binaries exercise policy binding. Native sink qualification
+    // separately requires an anchor on a different filesystem snapshot domain.
+    let output = fixture.output("anchored");
+    let accepted = fixture.provision(
+        &output,
+        &[
+            "--receipt-rollback-anchor-root",
+            first_anchor.to_str().unwrap(),
+        ],
+    );
+    assert!(accepted.status.success(), "{}", stderr(&accepted));
+    let path = output.join("cage-launch-policy.json");
+    let retained = std::fs::read(&path).expect("policy");
+    assert_eq!(
+        read_json(&path)["body"]["receipt"]["rollback_anchor_root"],
+        first_anchor.to_str().unwrap()
+    );
+    let same = fixture.provision(
+        &output,
+        &[
+            "--receipt-rollback-anchor-root",
+            first_anchor.to_str().unwrap(),
+        ],
+    );
+    assert!(same.status.success(), "{}", stderr(&same));
+    for extra in [
+        vec![],
+        vec![
+            "--receipt-rollback-anchor-root",
+            second_anchor.to_str().unwrap(),
+        ],
+    ] {
+        let refused = fixture.provision(&output, &extra);
+        assert!(!refused.status.success());
+        assert_eq!(std::fs::read(&path).expect("retained policy"), retained);
+    }
 }
 
 #[test]
@@ -409,7 +460,10 @@ fn the_preflight_treats_enforced_material_as_cage_required() {
         .expect("run preflight");
     let text = String::from_utf8_lossy(&preflight.stdout).into_owned();
     assert!(!text.contains("legacy_authorized"), "{text}");
-    if cfg!(target_arch = "x86_64") {
+    if !cfg!(target_os = "linux") {
+        assert!(!preflight.status.success());
+        assert!(text.contains("unsupported on this platform"), "{text}");
+    } else if cfg!(target_arch = "x86_64") {
         assert!(text.contains("cage"), "{text}");
     } else {
         assert!(text.contains("architecture"), "{text}");

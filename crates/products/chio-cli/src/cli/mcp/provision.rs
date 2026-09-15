@@ -89,6 +89,7 @@ pub(super) enum CageInitSource {
 #[derive(Clone, Debug)]
 pub(super) struct ProvisionProfile {
     pub(super) max_artifact_bytes: u64,
+    pub(super) receipt_rollback_anchor_root: Option<PathBuf>,
     pub(super) report_schema: &'static str,
     pub(super) security_mode: &'static str,
     pub(super) warning: &'static str,
@@ -105,6 +106,7 @@ impl ProvisionProfile {
     pub(super) fn native_mcp_demo() -> Self {
         Self {
             max_artifact_bytes: 1024 * 1024,
+            receipt_rollback_anchor_root: None,
             report_schema: DEMO_REPORT_SCHEMA,
             security_mode: DEMO_SECURITY_MODE,
             warning: DEMO_SECURITY_WARNING,
@@ -1142,6 +1144,7 @@ fn build_policy_factory(
 ) -> Result<ProvisionedCagePolicyFactory, CliError> {
     ProvisionedCagePolicyFactory::new(ProvisionedCagePolicyInput {
         max_artifact_bytes: inputs.profile.max_artifact_bytes,
+        receipt_rollback_anchor_root: inputs.profile.receipt_rollback_anchor_root.clone(),
         signed_manifest,
         registered_public_key: signers.manifest.public_key(),
         policy_signer_public_key: signers.policy.public_key(),

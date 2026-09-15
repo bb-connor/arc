@@ -134,6 +134,7 @@ python3 examples/reference-swarm/process-prepare.py \
   --chio /absolute/path/to/chio \
   --cage-init /absolute/path/to/chio-cage-init \
   --max-artifact-bytes 2097152 \
+  --receipt-rollback-anchor-root "$RECEIPT_ANCHOR" \
   --reader /absolute/path/to/chio-tool-repo-reader \
   --input-dir "$PWD/review-input" --file README.md --file DESIGN.md \
   --output "$PWD/review-host"
@@ -157,6 +158,11 @@ signed launch policy. The example uses 2 MiB for optimized static binaries;
 check the sizes of your built helper and reader before selecting it. The
 provisioner refuses oversized inputs before creating state. Its default remains
 1 MiB and the cage's global maximum remains 256 MiB.
+`RECEIPT_ANCHOR` must name an existing operator-owned private directory on a
+different filesystem snapshot domain from the receipt database. Keep this anchor
+outside worker grants and preserve it across recovery. The signed policy pins
+its path; the existing qualified receipt store verifies its generation. A
+missing anchor or one on the database filesystem refuses Enforced launch.
 Use an x86_64 worker image built from the same scripts/SDK on this host. Omitting
 the image selects cooperative native workers with the filesystem limitation
 described above.

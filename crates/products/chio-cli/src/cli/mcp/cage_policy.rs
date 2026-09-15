@@ -10,6 +10,10 @@ use serde::{Deserialize, Serialize};
 pub(crate) const MCP_CAGE_LAUNCH_POLICY_SCHEMA: &str = "chio.mcp.cage-launch-policy.v2";
 const MAX_CAGE_POLICY_BYTES: usize = 4 * 1024 * 1024;
 
+#[cfg(all(test, target_os = "linux"))]
+#[path = "cage_receipt_tests.rs"]
+mod receipt_tests;
+
 #[derive(Clone)]
 pub(crate) struct SignedCagePolicyLaunchFactory {
     path: PathBuf,
@@ -176,6 +180,8 @@ struct CageBrokerBinding {
 #[serde(deny_unknown_fields)]
 struct CageReceiptRuntimePolicy {
     database_path: PathBuf,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rollback_anchor_root: Option<PathBuf>,
     signer_seed_path: PathBuf,
     trusted_signer_public_key: String,
     capability_id: String,
@@ -197,6 +203,7 @@ pub(super) struct ProvisionedCeilings {
 #[allow(dead_code)]
 pub(super) struct ProvisionedCagePolicyInput {
     pub(super) max_artifact_bytes: u64,
+    pub(super) receipt_rollback_anchor_root: Option<PathBuf>,
     pub(super) signed_manifest: chio_manifest::SignedManifest,
     pub(super) registered_public_key: chio_core::PublicKey,
     pub(super) policy_signer_public_key: chio_core::PublicKey,
@@ -403,6 +410,7 @@ impl ProvisionedCagePolicyFactory {
             },
             receipt: CageReceiptRuntimePolicy {
                 database_path: self.input.receipt_database_path.clone(),
+                rollback_anchor_root: self.input.receipt_rollback_anchor_root.clone(),
                 signer_seed_path: self.input.receipt_signer_seed_path.clone(),
                 trusted_signer_public_key: self.input.receipt_signer_public_key.to_hex(),
                 capability_id: self.input.receipt_capability_id.clone(),
@@ -1107,8 +1115,18 @@ fn cage_receipt_persistence(
                 "invalid cage receipt trusted signer public key: {error}"
             ))
         })?;
+    let anchor = policy.rollback_anchor_root.as_ref().ok_or_else(|| {
+        CliError::cli_other_error(
+            "Enforced cage receipt storage requires a signed receipt rollback anchor on a separate filesystem snapshot domain".to_string(),
+        )
+    })?;
+    if !anchor.is_absolute() {
+        return Err(CliError::cli_other_error("cage receipt rollback anchor must be absolute".to_string()));
+    }
+    // Reuse the existing independently anchored sink qualification. Opening an
+    // ordinary SQLite store must never substitute for its rollback authority.
     let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = Arc::new(
-        chio_store_sqlite::SqliteReceiptStore::open(&policy.database_path).map_err(|error| {
+        chio_store_sqlite::SqliteReceiptStore::open_for_finding_pool(&policy.database_path, anchor).map_err(|error| {
             CliError::cli_other_error(format!("failed to open cage receipt store: {error}"))
         })?,
     );
@@ -1310,6 +1328,7 @@ mod tests {
             },
             receipt: CageReceiptRuntimePolicy {
                 database_path: PathBuf::from("/operator/cage-receipts.sqlite3"),
+                rollback_anchor_root: None,
                 signer_seed_path: PathBuf::from("/operator/cage-receipt-seed"),
                 trusted_signer_public_key: keypair.public_key().to_hex(),
                 capability_id: "cage-launch-capability".to_string(),

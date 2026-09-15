@@ -53,6 +53,11 @@ pub(crate) struct ProvisionReferenceRuntimeArgs {
     #[arg(long, default_value_t = 1024 * 1024, value_parser = clap::value_parser!(u64).range(1..=268_435_456))]
     pub max_artifact_bytes: u64,
 
+    /// Private external receipt rollback anchor directory. Required for Enforced
+    /// launch; it must be on a different filesystem from the receipt database.
+    #[arg(long, value_name = "PATH")]
+    pub receipt_rollback_anchor_root: Option<PathBuf>,
+
     /// Reviewed `tools/list` fixture of the target.
     #[arg(
         long,
@@ -158,6 +163,9 @@ pub(crate) fn cmd_provision_reference_runtime(
     };
     let profile = ProvisionProfile {
         max_artifact_bytes: args.max_artifact_bytes,
+        receipt_rollback_anchor_root: args.receipt_rollback_anchor_root.as_ref()
+            .map(|path| require_exact_canonical_path(path, "receipt rollback anchor"))
+            .transpose()?,
         report_schema: REPORT_SCHEMA,
         security_mode,
         warning,
