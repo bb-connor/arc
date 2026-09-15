@@ -6,7 +6,7 @@ from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.types import interrupt
 
-from .common import bounded_text, plan_message, tool_messages, value
+from .common import bounded_text, plan_message, plan_payload, tool_messages, value
 from .planning import inventory_plan, inventory_text, parse_plan, validate_plan
 
 
@@ -141,10 +141,7 @@ def coordinator(settings, saver, tools, model_schemas):
                     "plan-handoff",
                     {
                         "message_key": "review-plan",
-                        "payload": {
-                            "reviews": state["reviews"],
-                            "children": state["children"],
-                        },
+                        "payload": plan_payload(state["reviews"], state["children"]),
                     },
                 )
             ],

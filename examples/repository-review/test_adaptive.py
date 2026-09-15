@@ -3,9 +3,11 @@
 import json
 
 import pytest
+from langchain_core.messages import ToolMessage
 
 from adaptive import cli, configuration
 from adaptive.common import SCHEMA, persist
+from adaptive.common import plan_payload, report_text
 from adaptive.planning import inventory_plan, parse_plan, validate_plan
 from snapshot import digest
 
@@ -47,6 +49,98 @@ def test_plan_limit_and_overlapping_reviews():
     assert len(validate_plan(plan, ["a", "b"], 2)) == 2
     with pytest.raises(ValueError):
         validate_plan(plan, ["a", "b"], 1)
+
+
+def test_overlapping_long_paths_refuse_canonical_handoff_before_spawn():
+    paths = [str(index) + "x" * 240 for index in range(128)]
+    plan = {"reviews": [{"paths": paths, "focus": "inspect"}] * 3}
+    with pytest.raises(ValueError, match="plan handoff exceeds mailbox"):
+        validate_plan(plan, paths, 3)
+
+
+def test_maximum_paths_and_full_text_refuse_publication_during_planning():
+    paths = [str(index) + "x" * 240 for index in range(128)]
+    with pytest.raises(ValueError, match="planned report exceeds publication"):
+        validate_plan({"reviews": [{"paths": paths, "focus": "inspect"}]}, paths, 1)
+
+
+def test_escaped_overlapping_paths_refuse_publication_during_planning():
+    paths = [str(index) + '<&"' * 60 for index in range(30)]
+    with pytest.raises(ValueError, match="planned report exceeds publication"):
+        validate_plan({"reviews": [{"paths": paths, "focus": "inspect"}] * 2}, paths, 2)
+
+
+def test_oversized_inventory_plan_stops_before_child_or_publication_dispatch():
+    from adaptive.graphs import coordinator
+
+    paths = [str(index) + "x" * 240 for index in range(128)]
+    dispatched = []
+
+    def tools(stage):
+        def invoke(state):
+            dispatched.append(stage)
+            assert stage == "inventory", "invalid plan dispatched child work"
+            return {
+                "messages": [
+                    ToolMessage(
+                        content=json.dumps(
+                            {
+                                "structuredContent": {
+                                    "files": [{"path": path} for path in paths]
+                                }
+                            }
+                        ),
+                        name="repo__changes",
+                        tool_call_id="inventory",
+                    )
+                ]
+            }
+
+        return invoke
+
+    graph = coordinator(
+        {"max_reviews": 1, "model_factory": "inventory"}, None, tools, []
+    )
+    with pytest.raises(ValueError, match="planned report exceeds publication"):
+        graph.invoke({"messages": []})
+    assert dispatched == ["inventory"]
+
+
+def test_accepted_unicode_escaping_and_full_maximum_text_fit_the_publication():
+    paths = [f'dir/{index}-é<&\\"' for index in range(128)]
+    # One full-size review and overlapping reviews exercise both allocations.
+    for maximum in (1, 16):
+        jobs = validate_plan(
+            {
+                "reviews": [
+                    {"paths": paths[:8] if maximum == 16 else paths, "focus": 'é<&\\"'}
+                ]
+                * maximum
+            },
+            paths[:8] if maximum == 16 else paths,
+            maximum,
+        )
+        payload = plan_payload(
+            jobs, [f"dyn_{index}" for index in range(113, 113 + maximum)]
+        )
+        assert [job["slot"] for job in payload["reviews"]] == list(
+            range(1, maximum + 1)
+        )
+        report = report_text(
+            {
+                "base": "a" * 64,
+                "head": "b" * 64,
+                "snapshot_hash": "c" * 64,
+                "model_factory": "model",
+            },
+            jobs,
+            ["é" * (24000 // maximum)] * maximum,
+        )
+        assert len(report.encode()) <= 65536
+        assert report.count("## Review ") == maximum
+        assert "&lt;&amp;" in report
+    with pytest.raises(ValueError, match="invalid native child identity"):
+        plan_payload(jobs, ["dyn_129"] * len(jobs))
 
 
 @pytest.mark.parametrize(

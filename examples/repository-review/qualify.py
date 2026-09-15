@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import sqlite3
+import stat
 import subprocess
 import sys
 import tempfile
@@ -180,6 +181,32 @@ def exercise(binary, output, temporary):
                 repeated["workers"][role]["receipts"]
                 == evidence["workers"][role]["receipts"]
             )
+        # The local publication row is not itself signed. Its full report must
+        # still match the parameters of the verified original invocation.
+        with sqlite3.connect(directory / "publications.db") as db:
+            original_report = db.execute(
+                "SELECT report FROM reports WHERE id=1"
+            ).fetchone()[0]
+            db.execute(
+                "UPDATE reports SET report=? WHERE id=1",
+                (original_report + "\ntampered",),
+            )
+        try:
+            rejected = command(*app, "run", "--run-dir", directory, success=False)
+            assert (
+                "published report does not match its signed invocation"
+                in rejected.stderr
+            )
+            with sqlite3.connect(directory / "publications.db") as db:
+                assert db.execute("SELECT count(*) FROM reports").fetchone()[0] == 1
+                assert (
+                    db.execute("SELECT report FROM reports WHERE id=1").fetchone()[0]
+                    == original_report + "\ntampered"
+                )
+        finally:
+            with sqlite3.connect(directory / "publications.db") as db:
+                db.execute("UPDATE reports SET report=? WHERE id=1", (original_report,))
+        command(*app, "run", "--run-dir", directory)
         secrets = [
             json.loads(p.read_text())["credential"]
             for p in (directory / "connections").glob("*.json")
@@ -250,14 +277,50 @@ def exercise(binary, output, temporary):
     print(json.dumps(summary))
 
 
+def work_directory(requested):
+    # Reserve the longest profile and socket suffix before preparing any host.
+    suffix = "inventory/sockets/123456789012.sock"
+    parent = (requested.parent if requested else Path(tempfile.gettempdir())).resolve(
+        strict=True
+    )
+    if (
+        requested is None
+        and len(os.fsencode(parent / "chio-rv-xxxxxxxx" / suffix)) >= 104
+    ):
+        parent = Path("/tmp").resolve(strict=True)
+    for ancestor in (parent, *parent.parents):
+        metadata = ancestor.lstat()
+        if (
+            not stat.S_ISDIR(metadata.st_mode)
+            or metadata.st_uid not in {0, os.getuid()}
+            or (
+                metadata.st_mode & 0o022
+                and not (metadata.st_uid == 0 and metadata.st_mode & stat.S_ISVTX)
+            )
+        ):
+            raise ValueError("qualification work parent is not protected")
+    candidate = parent / (requested.name if requested else "chio-rv-xxxxxxxx")
+    if len(os.fsencode(candidate / suffix)) >= 104:
+        raise ValueError("qualification work directory exceeds the socket path budget")
+    if requested is not None:
+        candidate.mkdir(mode=0o700, exist_ok=False)
+        return candidate
+    return Path(tempfile.mkdtemp(prefix="chio-rv-", dir=parent))
+
+
 def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser()
     parser.add_argument("--chio", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--work-dir",
+        type=Path,
+        help="new short private work directory with an existing protected parent",
+    )
     args = parser.parse_args()
     args.output.mkdir(mode=0o700, parents=True, exist_ok=False)
-    temporary = Path(tempfile.mkdtemp(prefix="chio-rv-"))
+    temporary = work_directory(args.work_dir)
     try:
         exercise(args.chio.resolve(strict=True), args.output, temporary)
     except BaseException:

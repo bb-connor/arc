@@ -51,6 +51,11 @@ identities, three worker PIDs, publication count and measured setup/recovery
 time. It contains no worker credential. Report history lives in
 `publications.db`; exported Markdown and JSON can be regenerated.
 
+Full response artifacts in `evidence.json` include repository read outputs and
+may contain private source code. Keep these full-fidelity artifacts private,
+including copies retained after qualification failures. Review their contents
+before sharing; credential omission does not make repository data public.
+
 On Linux, let the native host own worker lifecycle and automatic restarts:
 
 ```bash

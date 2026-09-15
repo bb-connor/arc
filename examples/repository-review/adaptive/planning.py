@@ -4,7 +4,7 @@ import html
 import json
 from collections import defaultdict
 
-from .common import bounded_text
+from .common import bounded_text, plan_payload, report_text
 
 
 def parse_plan(text):
@@ -51,6 +51,21 @@ def validate_plan(plan, paths, maximum):
         normalized.append({"slot": index, "paths": selected, "focus": focus})
     if covered != available:
         raise ValueError("review plan leaves changed paths unassigned")
+    plan_payload(normalized, ["dyn_128"] * len(normalized))
+    # Git object names and the snapshot digest occupy at most 64 ASCII bytes.
+    # Use the longer mode label and each review's full UTF-8 text allocation.
+    # report_text owns path JSON escaping, HTML escaping and all header bytes.
+    ceiling = {
+        "base": "f" * 64,
+        "head": "f" * 64,
+        "snapshot_hash": "f" * 64,
+        "model_factory": "model",
+    }
+    report = report_text(
+        ceiling, normalized, ["x" * (48000 // maximum)] * len(normalized)
+    )
+    if len(report.encode()) > 65536:
+        raise ValueError("planned report exceeds publication limit")
     return normalized
 
 

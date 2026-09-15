@@ -1,11 +1,8 @@
 """Publication authority consumes guarded handoffs after all children complete."""
 
-import html
-import json
-
 from langgraph.graph import END, START, MessagesState, StateGraph
 
-from .common import bounded_text, one_handoff, plan_message
+from .common import bounded_text, one_handoff, plan_message, report_text
 
 
 def graph(settings, saver, tools):
@@ -51,40 +48,17 @@ def graph(settings, saver, tools):
         )
 
     def publication(state):
-        lines = [
-            "# Delegated repository review",
-            "",
-            f"Base: `{settings['base']}`",
-            f"Head: `{settings['head']}`",
-            f"Snapshot: `{settings['snapshot_hash']}`",
-            "",
-            "Mode: "
-            + (
-                "deterministic inventory; no model review"
-                if settings["model_factory"] == "inventory"
-                else "model review; findings require human verification"
-            ),
-            "",
-        ]
-        for job in reviews(state):
+        jobs = reviews(state)
+        texts = []
+        for job in jobs:
             payload = one_handoff(state, f"review_{job['slot']}")
             if payload.get("slot") != job["slot"]:
                 raise ValueError("review handoff slot mismatch")
             text = bounded_text(
                 payload.get("text"), 48000 // settings["max_reviews"], "review handoff"
             )
-            lines += [
-                f"## Review {job['slot']}",
-                "",
-                html.escape(job["focus"]),
-                "",
-                "Assigned paths: "
-                + html.escape(json.dumps(job["paths"], ensure_ascii=False)),
-                "",
-                text,
-                "",
-            ]
-        report = bounded_text("\n".join(lines), 65536, "report")
+            texts.append(text)
+        report = bounded_text(report_text(settings, jobs, texts), 65536, "report")
         return plan_message(
             "publication-plan",
             [
