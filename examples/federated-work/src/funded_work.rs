@@ -74,3 +74,15 @@ pub mod isolated_process;
 mod isolated_roles;
 #[cfg(unix)]
 pub mod provider_files;
+
+#[cfg(unix)]
+pub mod peer_verifier;
+
+#[cfg(unix)]
+pub mod peer_https;
+
+#[cfg(unix)]
+pub mod peer_client;
+
+#[cfg(unix)]
+mod peer_process;

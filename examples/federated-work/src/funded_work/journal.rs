@@ -278,6 +278,7 @@ impl Journal {
                 "submission"
                     | "execution-request"
                     | "verifier-request"
+                    | "verifier-call"
                     | "execution-evidence"
                     | "execution-checkpoint"
                     | "capture-waiver"

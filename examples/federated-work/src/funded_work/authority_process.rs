@@ -33,6 +33,14 @@ fn generate(state: &Path) -> Result<PublicKey> {
 }
 
 pub fn run(root: &Path, mode: &str) -> Result<Value> {
+    run_inner(root, mode, false)
+}
+
+pub fn run_peer(root: &Path, mode: &str) -> Result<Value> {
+    run_inner(root, mode, true)
+}
+
+fn run_inner(root: &Path, mode: &str, peer: bool) -> Result<Value> {
     if !["pay", "reject"].contains(&mode) {
         return Err("authority lifecycle supports pay or reject".into());
     }
@@ -194,73 +202,80 @@ pub fn run(root: &Path, mode: &str) -> Result<Value> {
         socket.as_os_str(),
         handoff.as_os_str(),
     ])?;
-    let missing = root.join("unavailable");
-    let no_observer = Command::new(std::env::current_exe()?)
-        .args([
-            "experimental-verifier-decide".as_ref(),
-            verifier.as_os_str(),
-            handoff.as_os_str(),
-            missing.as_os_str(),
-            root.join("unavailable.json").as_os_str(),
-        ])
-        .output()?;
-    if no_observer.status.success() {
-        return Err("unavailable observer authorized a verifier decision".into());
-    }
-    let no_checker = Command::new(std::env::current_exe()?)
-        .env("CHIO_FUNDED_PYTHON", &missing)
-        .args([
-            "experimental-verifier-decide".as_ref(),
-            verifier.as_os_str(),
-            handoff.as_os_str(),
-            socket.as_os_str(),
-            root.join("unavailable-checker.json").as_os_str(),
-        ])
-        .output()?;
-    if no_checker.status.success() {
-        return Err("unavailable checker authorized a verifier decision".into());
-    }
-    // Force publication failure after the operator commits its first decision.
-    let occupied = root.join("occupied.json");
-    fs::write(&occupied, b"preserve original file")?;
-    let publication = Command::new(std::env::current_exe()?)
-        .args([
-            "experimental-verifier-decide".as_ref(),
-            verifier.as_os_str(),
-            handoff.as_os_str(),
-            socket.as_os_str(),
-            occupied.as_os_str(),
-        ])
-        .output()?;
-    if publication.status.success() || fs::read(&occupied)? != b"preserve original file" {
-        return Err("exclusive publication did not preserve existing output".into());
-    }
-    fs::remove_file(verifier.join("key.seed"))?;
-    server.finish()?;
     let decision_file = root.join("decision.json");
-    let repeated = root.join("decision-replay.json");
-    for output in [&decision_file, &repeated] {
-        let replayed = Command::new(std::env::current_exe()?)
-            .env("CHIO_FUNDED_PYTHON", &missing)
+    let peer_transport = if peer {
+        let report = super::peer_process::exchange(root, &request.request_id, &socket)?;
+        server.finish()?;
+        report
+    } else {
+        let missing = root.join("unavailable");
+        let no_observer = Command::new(std::env::current_exe()?)
             .args([
                 "experimental-verifier-decide".as_ref(),
                 verifier.as_os_str(),
                 handoff.as_os_str(),
                 missing.as_os_str(),
-                output.as_os_str(),
+                root.join("unavailable.json").as_os_str(),
             ])
             .output()?;
-        if !replayed.status.success() {
-            return Err(format!(
-                "verifier historical custody replay failed: {}",
-                String::from_utf8_lossy(&replayed.stderr)
-            )
-            .into());
+        if no_observer.status.success() {
+            return Err("unavailable observer authorized a verifier decision".into());
         }
-    }
-    if fs::read(&decision_file)? != fs::read(&repeated)? {
-        return Err("verifier historical custody changed original decision".into());
-    }
+        let no_checker = Command::new(std::env::current_exe()?)
+            .env("CHIO_FUNDED_PYTHON", &missing)
+            .args([
+                "experimental-verifier-decide".as_ref(),
+                verifier.as_os_str(),
+                handoff.as_os_str(),
+                socket.as_os_str(),
+                root.join("unavailable-checker.json").as_os_str(),
+            ])
+            .output()?;
+        if no_checker.status.success() {
+            return Err("unavailable checker authorized a verifier decision".into());
+        }
+        // Force publication failure after the operator commits its first decision.
+        let occupied = root.join("occupied.json");
+        fs::write(&occupied, b"preserve original file")?;
+        let publication = Command::new(std::env::current_exe()?)
+            .args([
+                "experimental-verifier-decide".as_ref(),
+                verifier.as_os_str(),
+                handoff.as_os_str(),
+                socket.as_os_str(),
+                occupied.as_os_str(),
+            ])
+            .output()?;
+        if publication.status.success() || fs::read(&occupied)? != b"preserve original file" {
+            return Err("exclusive publication did not preserve existing output".into());
+        }
+        fs::remove_file(verifier.join("key.seed"))?;
+        server.finish()?;
+        let repeated = root.join("decision-replay.json");
+        for output in [&decision_file, &repeated] {
+            let replayed = Command::new(std::env::current_exe()?)
+                .env("CHIO_FUNDED_PYTHON", &missing)
+                .args([
+                    "experimental-verifier-decide".as_ref(),
+                    verifier.as_os_str(),
+                    handoff.as_os_str(),
+                    missing.as_os_str(),
+                    output.as_os_str(),
+                ])
+                .output()?;
+            if !replayed.status.success() {
+                return Err(format!(
+                    "verifier historical custody replay failed: {}",
+                    String::from_utf8_lossy(&replayed.stderr)
+                )
+                .into());
+            }
+        }
+        if fs::read(&decision_file)? != fs::read(&repeated)? {
+            return Err("verifier historical custody changed original decision".into());
+        }
+        Value::Null
+    };
     let import_socket = root.join("provider-observer.sock");
     let mut server =
         super::process::Server::start_readonly(&import_socket, allocation.clone(), chain.clone())?;
@@ -297,7 +312,7 @@ pub fn run(root: &Path, mode: &str) -> Result<Value> {
         .iter()
         .all(|role| !provider.join(role).exists());
     Ok(
-        json!({"first":first,"replay":replay,"chain":chain_summary,"verification":step,
+        json!({"peerTransport":peer_transport,"first":first,"replay":replay,"chain":chain_summary,"verification":step,
         "keysGeneratedInRoleDirectories":true,"decisionReplayWithoutSignerObserverOrChecker":true,
         "providerHasOnlyProviderSeed":provider_has_only_seed,"independentAdministration":false,
         "observerAndCheckerOutagesDenied":true,"publicationFailureRecoveredWithoutDependencies":true,"observerIsReadOnly":true,

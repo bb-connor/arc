@@ -7,7 +7,7 @@ use crate::{
 use chio_finding::FindingFacetKind;
 use serde_json::json;
 
-fn fixture() -> Result<(
+pub(super) fn fixture() -> Result<(
     super::native::Fixture,
     operator::Enrollment,
     handoff::Request,

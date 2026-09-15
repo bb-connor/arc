@@ -187,3 +187,9 @@ exports a funded native execution receipt to a separately enrolled signer and
 imports its verified checkpoint bundle. It includes actual payout/refund process
 reproductions and Python public-witness verification. The fixture remains under
 one local administrator with one allocation per checkpoint log.
+
+The experimental [authenticated verifier transport](../../docs/market/open-agent-work/execution/33-authenticated-verifier-transport.md)
+delivers the original funded-work request over TLS 1.3 with provider authentication,
+receiver-selected observation and durable decision replay. Its Rust client pins
+origin, connect address and CA certificates. The local peer lifecycle qualifies
+payout/refund and response loss; separate-host administration remains open.

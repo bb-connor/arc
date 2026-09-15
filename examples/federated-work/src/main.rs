@@ -2,6 +2,7 @@ mod buyer;
 mod common;
 mod funded_work;
 mod https;
+mod https_bounds;
 mod incident;
 mod market;
 mod payment;
@@ -21,6 +22,17 @@ use std::path::Path;
 fn run() -> Result<serde_json::Value> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        #[cfg(unix)]
+        ["experimental-peer-lifecycle",root,mode] => funded_work::authority_process::run_peer(Path::new(root),mode),
+        #[cfg(unix)]
+        ["experimental-verifier-call",state,id,socket,origin,output] => funded_work::peer_verifier::export(Path::new(state),id,Path::new(socket),origin,Path::new(output)),
+        #[cfg(unix)]
+        ["experimental-verifier-send",endpoint,enrollment,call,output] => funded_work::peer_client::send(Path::new(endpoint),Path::new(enrollment),Path::new(call),Path::new(output)),
+        #[cfg(unix)]
+        ["experimental-verifier-serve",state,socket,bind,origin,certificate,private_key] => {
+            funded_work::peer_https::serve(Path::new(state),Path::new(socket),crate::https::HttpsConfig{bind:bind.parse()?,origin,certificate:Path::new(certificate),private_key:Path::new(private_key)})?;
+            Ok(json!({}))
+        },
         ["experimental-context-draft",state,pins,expires,output] => funded_work::authority_enrollment::draft_file(Path::new(state),Path::new(pins),expires.parse()?,Path::new(output)),
         ["experimental-context-attest",state,pins,draft,output] => funded_work::authority_enrollment::attest_file(Path::new(state),Path::new(pins),Path::new(draft),Path::new(output)),
         #[cfg(unix)]

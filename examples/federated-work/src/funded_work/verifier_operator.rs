@@ -83,6 +83,23 @@ pub fn initialize(state: &Path, enrollment: &Enrollment) -> Result<()> {
     Ok(())
 }
 
+/// Read only existing custody; never create a database on service startup.
+pub(super) fn enrollment(state: &Path) -> Result<Enrollment> {
+    let path = state.join(DATABASE);
+    if !fs::symlink_metadata(&path)?.file_type().is_file() {
+        return Err("verifier custody must be an existing regular file".into());
+    }
+    let db = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let version: u32 = db.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    if version != 1 {
+        return Err("verifier custody version mismatch".into());
+    }
+    let raw: Vec<u8> = db.query_row("SELECT enrollment FROM custody WHERE id=1", [], |r| {
+        r.get(0)
+    })?;
+    evidence::decode(&raw)
+}
+
 struct Stored {
     enrollment: Vec<u8>,
     request: Option<Vec<u8>>,

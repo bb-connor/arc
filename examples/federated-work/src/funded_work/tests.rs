@@ -48,3 +48,6 @@ mod checkpoint_handoff;
 mod verifier_handoff;
 
 mod work_consent;
+
+#[cfg(unix)]
+mod peer_verifier;

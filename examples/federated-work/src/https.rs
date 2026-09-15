@@ -131,6 +131,22 @@ pub(crate) fn public_certificates(bytes: &[u8]) -> Result<String> {
 }
 
 pub fn listen(state: &Path, config: HttpsConfig<'_>) -> Result<HttpsListener> {
+    listen_inner(state, config, None)
+}
+
+pub(crate) fn listen_bounded(
+    state: &Path,
+    config: HttpsConfig<'_>,
+    body_limit: usize,
+) -> Result<HttpsListener> {
+    listen_inner(state, config, Some(body_limit))
+}
+
+fn listen_inner(
+    state: &Path,
+    config: HttpsConfig<'_>,
+    body_limit: Option<usize>,
+) -> Result<HttpsListener> {
     let certificates = rustls_pemfile::certs(&mut Cursor::new(read_pem(config.certificate)?))
         .collect::<std::result::Result<Vec<_>, _>>()?;
     let private_key = rustls_pemfile::private_key(&mut Cursor::new(read_pem(config.private_key)?))?
@@ -178,7 +194,7 @@ pub fn listen(state: &Path, config: HttpsConfig<'_>) -> Result<HttpsListener> {
             let backend = socket_path.clone();
             tokio::spawn(async move {
                 let _permit = permit;
-                let _ = forward(stream, acceptor, backend).await;
+                let _ = forward(stream, acceptor, backend, body_limit).await;
             });
         }
     });
@@ -193,8 +209,25 @@ async fn forward(
     stream: tokio::net::TcpStream,
     acceptor: TlsAcceptor,
     backend: PathBuf,
+    body_limit: Option<usize>,
 ) -> Result<()> {
     let mut tls = tokio::time::timeout(Duration::from_secs(5), acceptor.accept(stream)).await??;
+    if let Some(limit) = body_limit {
+        // Bound raw headers and body before tiny_http allocates/parses them.
+        // Forward one request only; remaining client bytes cannot pipeline a
+        // second operation into the private backend.
+        use tokio::io::AsyncWriteExt;
+        tokio::time::timeout(Duration::from_secs(30), async {
+            let raw = crate::https_bounds::read(&mut tls, limit).await?;
+            let mut http = tokio::net::UnixStream::connect(backend).await?;
+            http.write_all(&raw).await?;
+            tokio::io::copy(&mut http, &mut tls).await?;
+            tls.shutdown().await?;
+            Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+        })
+        .await??;
+        return Ok(());
+    }
     let mut http = tokio::net::UnixStream::connect(backend).await?;
     // TLS handshakes and connections are bounded separately. Neither a slow
     // peer nor unauthenticated TLS bytes can occupy an unbounded worker pool.
