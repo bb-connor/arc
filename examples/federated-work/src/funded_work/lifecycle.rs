@@ -93,7 +93,7 @@ pub(super) fn progress(
         drive(Action::Refund)?;
         return Ok(json!({"decision":"absent","finding":null,"financial":"refund"}));
     }
-    let original = native.evidence(request)?;
+    let original = native.evidence_with_checkpoint(request, checkpoint)?;
     let submission: Submission = match native.journal.retained(&entry.allocation, "submission")? {
         Some(submission) => submission,
         None => {
@@ -160,7 +160,7 @@ pub(super) fn progress(
     }
     let decision: Decision = match native.journal.retained(&entry.allocation, "decision")? {
         Some(decision) => {
-            verification::verify_decision(&decision, &submission, &native.policy)?;
+            verification::verify_decision(&decision, &submission, &native.policy, &native.journal)?;
             decision
         }
         None => {

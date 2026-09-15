@@ -1945,7 +1945,7 @@ rust_symbols = [
   "RawInvocationOutcomeV1::requires_security_release",
   "ToolOutcomeStore",
 ]
-normalized_sha256 = "d017f7ceaee36cbcd423c40f743e9044c6fe19cce2bfa9cc22946beac0078262"
+normalized_sha256 = "f5053b376122f2bb9043bf799536cdcf8e66d158478e81f0f96bb1fc977cc995"
 symbol_sha256 = [
   { symbol = "RawInvocationOutcomeV1", sha256 = "39381c0bfb606c8e59a273296e337dc572d989232404ff20b09dc65be16deddf" },
   { symbol = "PersistedRawInvocationOutcomeV1", sha256 = "f7082c827b455b7f7fcd10d176ba4ad562f3889941d034fdeb93107218a532fb" },
@@ -1956,7 +1956,7 @@ symbol_sha256 = [
   { symbol = "RawInvocationOutcomeV1::with_federation_context_json", sha256 = "4cfa9ea3f9f6af1209c85a95f46089481d9e023da39d515b874207bce27dadff" },
   { symbol = "RawInvocationOutcomeV1::with_security_release_requirement", sha256 = "d3d9a90bd299575199e6babc05df6d89baf95923e4420c71f4c8624dbec9f181" },
   { symbol = "RawInvocationOutcomeV1::requires_security_release", sha256 = "46116d09d1d842b8adfd24cae358fa9fd35d579be525bc7df19995f362610b9e" },
-  { symbol = "ToolOutcomeStore", sha256 = "60b0845aa9d033bdb94f729505d135576b0d0c419a96d985639d27f5f03f210b" },
+  { symbol = "ToolOutcomeStore", sha256 = "52ef16e737a422a2c722e0a40bbf37e07407804e2a3372fce884b025b000b9d8" },
 ]
 
 [[mirror]]
@@ -2001,14 +2001,14 @@ rust_symbols = [
   "verify_tool_outcome_invariants",
   "verify_outcome_projection",
 ]
-normalized_sha256 = "e95251e3d80dd7d97303bdef54946c4e79b1b5999c9a237a2a8135a2cf456453"
+normalized_sha256 = "4a5869b18cae3e4758fabc6b64250d1798bf1b90ce3264f3bbbb96d4224b26b7"
 symbol_sha256 = [
   { symbol = "SqliteToolOutcomeStore::require_security_release_checkpoint_support", sha256 = "cbf49359b0aa14f5549fe6e1fb787b9fe1565ca27319ef120cb0baa20f9c75df" },
   { symbol = "SqliteToolOutcomeStore::record_security_release", sha256 = "d95908fa37f96e5c10dbda7d8b7f396ddc99420e3ad86c08a1a394610a909a65" },
   { symbol = "SqliteToolOutcomeStore::lookup_security_release", sha256 = "3315ac8508a69f3aa77e42d00c478dcc98b734e98d5a5265e1d076fa8517da1e" },
-  { symbol = "initialize_tool_outcome_schema", sha256 = "0f485f42d0fcecdba24dd55e5267c3c172a24a5e353a97599d402049228f4b7f" },
-  { symbol = "verify_tool_outcome_invariants", sha256 = "426da34443b27932c9e0a1445c7679a60f556d9c778fce37080dda77d29a235a" },
-  { symbol = "verify_outcome_projection", sha256 = "7af404d205108de098c93d2cccd176bf4c0e0cdf8fcaf30993be5d3b286a4efa" },
+  { symbol = "initialize_tool_outcome_schema", sha256 = "44b67eba2c8c7d781b6889f67135f0a891e51d07a9acbfeeb0bd97bbdeb6e767" },
+  { symbol = "verify_tool_outcome_invariants", sha256 = "2671c0dc1ae026800df839a67c4272e0c83719ddccb82e72a4e8a1a246df82ce" },
+  { symbol = "verify_outcome_projection", sha256 = "f531034023b077a51b442e9c057ecbfee8bd0780b6366b8026cdd750215c9106" },
 ]
 
 [[mirror]]

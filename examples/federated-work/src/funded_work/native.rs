@@ -17,7 +17,11 @@ use chio_kernel::{
     ChioKernel, ToolCallRequest,
 };
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteReceiptStore};
-use std::{fs, path::Path, sync::Arc};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 pub(super) const SERVER: &str = "experimental-funded-w0";
 // Native receipts require a three-letter denomination. The pinned local
@@ -30,6 +34,7 @@ pub struct Native {
     pub(super) policy: Policy,
     pub(super) source: Arc<dyn FundingSource>,
     pub(super) journal: Arc<Journal>,
+    state: PathBuf,
     checkpoint: super::Checkpoint,
     recovery_error: Option<String>,
 }
@@ -45,8 +50,10 @@ pub fn implementation_digest() -> String {
             include_bytes!("rail.rs").as_slice(),
             include_bytes!("tool.rs").as_slice(),
             include_bytes!("evidence.rs").as_slice(),
+            include_bytes!("execution_evidence.rs").as_slice(),
             include_bytes!("verification.rs").as_slice(),
             include_bytes!("finding_acceptance.rs").as_slice(),
+            include_bytes!("finding_context.rs").as_slice(),
             include_bytes!("wire.rs").as_slice(),
             include_bytes!("settlement.rs").as_slice(),
             include_bytes!("settlement_observer.rs").as_slice(),
@@ -81,11 +88,22 @@ impl Native {
         )
     }
 
+    #[cfg(test)]
     pub(super) fn provision_with_requirements(
         state: &Path,
         buyer: PublicKey,
         domain: Domain,
         required_finding_facets: Vec<chio_finding::FindingFacetKind>,
+    ) -> Result<()> {
+        Self::provision_profile(state, buyer, domain, required_finding_facets, false)
+    }
+
+    pub(super) fn provision_profile(
+        state: &Path,
+        buyer: PublicKey,
+        domain: Domain,
+        required_finding_facets: Vec<chio_finding::FindingFacetKind>,
+        execution: bool,
     ) -> Result<()> {
         super::wire::requirements(&required_finding_facets)?;
         domain.validate()?;
@@ -111,13 +129,23 @@ impl Native {
         SqliteAuthorityStore::provision(&database, &locks)?;
         let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
         let now = common::now()?;
-        let finding_context = super::finding_acceptance::fixture_context(
-            &verifier,
-            &provider,
-            now,
-            now.checked_add(86400)
-                .ok_or("Finding context expiry overflow")?,
-        )?;
+        let expires = now
+            .checked_add(86400)
+            .ok_or("Finding context expiry overflow")?;
+        let finding_context = if execution {
+            let checkpoint = common::init(&state.join("checkpoint"))?;
+            common::init(&state.join("status"))?;
+            super::finding_acceptance::fixture_execution_context(
+                &verifier,
+                &provider,
+                checkpoint,
+                &common::key(&state.join("status"))?,
+                now,
+                expires,
+            )?
+        } else {
+            super::finding_acceptance::fixture_context(&verifier, &provider, now, expires)?
+        };
         let policy = Policy {
             authority_uuid: authority.mutation_fence().store_uuid,
             implementation_sha256: implementation_digest(),
@@ -226,6 +254,7 @@ impl Native {
             Some("exclusive financial resolution handle cannot admit new work".into())
         };
         Ok(Self {
+            state: state.to_owned(),
             kernel,
             authority,
             policy,
@@ -408,6 +437,14 @@ impl Native {
     }
 
     pub fn evidence(&self, request: &ToolCallRequest) -> Result<super::evidence::Evidence> {
+        self.evidence_with_checkpoint(request, &self.checkpoint)
+    }
+
+    pub(super) fn evidence_with_checkpoint(
+        &self,
+        request: &ToolCallRequest,
+        checkpoint: &super::Checkpoint,
+    ) -> Result<super::evidence::Evidence> {
         use chio_kernel::tool_outcome::{InvocationOutputV1, ToolOutcomeStore};
         let report = self.report(request)?;
         let field = |name: &str| -> Result<String> {
@@ -446,7 +483,7 @@ impl Native {
             .journal
             .by_request(&request.request_id)?
             .ok_or("original funding entry missing")?;
-        Ok(super::evidence::Evidence {
+        let mut evidence = super::evidence::Evidence {
             binding: super::evidence::Binding {
                 allocation_id: field("allocationId")?,
                 agreement_sha256: digest(&entry.agreement.body)?,
@@ -464,7 +501,19 @@ impl Native {
                 .ok_or("original W0 input missing")?
                 .to_owned(),
             output,
-        })
+            execution: None,
+        };
+        if super::execution_evidence::enabled(&self.policy) {
+            evidence.execution = Some(super::execution_evidence::retain(
+                self,
+                &self.state,
+                request,
+                &evidence.binding,
+                &evidence.output,
+                checkpoint,
+            )?);
+        }
+        Ok(evidence)
     }
 
     pub fn report(&self, request: &ToolCallRequest) -> Result<serde_json::Value> {

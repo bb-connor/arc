@@ -14,6 +14,8 @@ use crate::tool_outcome::{
     ToolOutcomeStoreError,
 };
 
+#[path = "durable_admission/execution_evidence.rs"]
+mod execution_evidence;
 #[path = "durable_admission/authority_profile.rs"]
 mod authority_profile;
 #[path = "durable_admission/delivery_revalidation.rs"]
@@ -192,6 +194,7 @@ struct TestAdmissionState {
     retained_request: Option<crate::admission_operation::RetainedToolAdmissionRequestV1>,
     claim: Option<UntrustedAdmissionRecoveryClaim>,
     raw_outcome: Option<RawInvocationOutcomeV1>,
+    execution_evidence: Option<crate::tool_outcome::ExecutionEvidenceRecordV1>,
     tool_outcome: Option<ToolOutcomeRecordV1>,
     post_return_evaluation: Option<PostReturnEvaluationRecordV1>,
     resolved_output: Option<CanonicalResolvedOutputBlobV1>,
@@ -960,6 +963,26 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
 }
 
 impl ToolOutcomeStore for TestAdmissionOperationStore {
+    fn lookup_execution_evidence(
+        &self,
+        operation_id: &AdmissionOperationId,
+    ) -> Result<Option<crate::tool_outcome::ExecutionEvidenceRecordV1>, ToolOutcomeStoreError> {
+        let state = self.state.lock().expect("test admission state lock");
+        Ok(state
+            .execution_evidence
+            .as_ref()
+            .filter(|record| record.operation_id() == operation_id)
+            .cloned())
+    }
+
+    fn record_execution_evidence(
+        &self,
+        qualified: &crate::tool_outcome::QualifiedExecutionEvidenceV1,
+        lease: &crate::admission_operation::AdmissionRecoveryLease,
+    ) -> Result<crate::tool_outcome::ExecutionEvidenceRecordV1, ToolOutcomeStoreError> {
+        self.retain_execution_evidence(qualified, lease)
+    }
+
     fn record_tool_returned(
         &self,
         operation: &AdmissionOperationV1,

@@ -79,11 +79,38 @@ class FundedLifecycle(unittest.TestCase):
                     self.assertNotIn('decision', records)
                 if mode == 'reject':
                     self.assertFalse(records['decision']['body']['accepted'])
+                if 'decision' in records:
+                    assessment = records['decision']['body']['findingAssessment']
+                    self.assertEqual(assessment['outcome'], 'accepted')
+                    facets = {facet['facet']: facet['outcome'] for facet in assessment['facets']}
+                    for facet in ('artifact_integrity', 'receipt_authenticity',
+                                  'checkpoint_membership', 'guarantee_consistency'):
+                        self.assertEqual(facets[facet], 'verified', facet)
+                    for facet in ('metered_exposure_backing', 'settled_spend_backing'):
+                        self.assertEqual(facets[facet], 'unavailable', facet)
+                    self.assertIn('execution-evidence', records)
+                    self.assertIn('execution-checkpoint', records)
                 report['retainedTransactions'] = transactions
             if fault:
                 self.assertEqual(report['killedSignal'], 9)
                 self.assertEqual(report['after']['operationCount'], 1)
                 self.assertEqual(report['after']['holdCount'], 1)
+                for field in ('executionProjectionSha256', 'executionBundleSha256',
+                              'executionCheckpointSha256'):
+                    if report['before'][field] is not None:
+                        self.assertEqual(report['before'][field], report['after'][field], field)
+                if fault in ('before-execution-evidence', 'after-execution-evidence',
+                             'after-execution-checkpoint', 'after-execution-custody'):
+                    self.assertEqual(report['after']['executionReceiptCount'], 1)
+                    for field in ('executionProjectionSha256', 'executionBundleSha256',
+                                  'executionCheckpointSha256'):
+                        self.assertIsNotNone(report['after'][field], field)
+                    self.assertEqual(report['before']['executionReceiptCount'],
+                                     0 if fault == 'before-execution-evidence' else 1)
+                    self.assertEqual(report['before']['executionCheckpointSha256'] is not None,
+                                     fault in ('after-execution-checkpoint', 'after-execution-custody'))
+                    self.assertEqual(report['before']['executionBundleSha256'] is not None,
+                                     fault == 'after-execution-custody')
             if destination := os.environ.get('CHIO_FUNDED_EVIDENCE_DIR'):
                 path = Path(destination)
                 path.mkdir(parents=True, exist_ok=True)
@@ -101,6 +128,16 @@ class FundedLifecycle(unittest.TestCase):
                      'pay-after-prepare', 'pay-after-broadcast', 'pay-after-observation')),
             ('reject', ('refund-after-prepare', 'refund-after-broadcast', 'refund-after-observation')),
             ('absent', ('refund-after-broadcast',)),
+        ):
+            for point in points:
+                with self.subTest(mode=mode, point=point):
+                    self.run_case(mode, point)
+
+    def test_sigkill_around_execution_evidence_and_custody(self):
+        for mode, points in (
+            ('pay', ('before-execution-evidence', 'after-execution-evidence',
+                     'after-execution-checkpoint', 'after-execution-custody')),
+            ('reject', ('after-execution-custody',)),
         ):
             for point in points:
                 with self.subTest(mode=mode, point=point):

@@ -39,14 +39,22 @@ pub(super) fn fixture() -> Result<Fixture> {
 pub(super) fn fixture_with_requirements(
     requirements: Vec<chio_finding::FindingFacetKind>,
 ) -> Result<Fixture> {
+    fixture_profile(requirements, false)
+}
+
+pub(super) fn fixture_profile(
+    requirements: Vec<chio_finding::FindingFacetKind>,
+    execution: bool,
+) -> Result<Fixture> {
     let (domain, terms, observation, _) = super::observer::fixture()?;
     let directory = tempfile::tempdir()?;
     let buyer = Keypair::generate();
-    Native::provision_with_requirements(
+    Native::provision_profile(
         directory.path(),
         buyer.public_key(),
         domain.clone(),
         requirements,
+        execution,
     )?;
     let source = Arc::new(Source(Mutex::new(observation), AtomicBool::new(true)));
     let native = Native::open(directory.path(), source.clone())?;
@@ -428,43 +436,52 @@ fn resigning_another_request_cannot_reuse_the_original_deposit() -> Result<()> {
 
 #[test]
 fn retention_capacity_denies_before_an_additional_native_reservation() -> Result<()> {
-    let f = fixture()?;
-    let provider = crate::common::key(f.directory.path())?;
-    for index in 0..=63 {
-        let request = f.native.request(
-            &format!("capacity-{index}"),
-            include_str!("../../../fixtures/openapi.json"),
-            f.agreement.body.work.submit_by,
+    for execution in [false, true] {
+        let f = fixture_profile(
+            vec![
+                chio_finding::FindingFacetKind::ArtifactIntegrity,
+                chio_finding::FindingFacetKind::GuaranteeConsistency,
+            ],
+            execution,
         )?;
-        let mut body = f.agreement.body.clone();
-        body.request_id = request.request_id.clone();
-        body.request_sha256 = crate::common::digest(&request)?;
-        let agreement = body.sign(&f.buyer, &provider)?;
-        let terms = agreement.validate(&f.native.policy, &request)?;
-        bind_observation(&f.source, &agreement)?;
-        let observed = f.source.0.lock().map_err(|_| "fixture lock")?.clone();
-        let now = crate::common::now()?;
-        let verified = crate::funded_work::observer::verify(
-            &f.native.policy.domain,
-            &terms,
-            &observed,
-            now,
-            now,
-        )?;
-        if index < 63 {
-            f.native.journal.stage(&verified, &agreement, &request)?;
-        } else {
-            let error = f
-                .native
-                .execute(&agreement, &request)
-                .err()
-                .ok_or("capacity overflow admitted")?;
-            assert!(
-                error.to_string().contains("retention capacity exhausted"),
-                "{error}"
-            );
-            assert_eq!(native_counts(&f)?, (0, 0));
-            assert_eq!(f.native.journal.execution_count()?, 0);
+        let capacity = if execution { 1 } else { 63 };
+        let provider = crate::common::key(f.directory.path())?;
+        for index in 0..=capacity {
+            let request = f.native.request(
+                &format!("capacity-{index}"),
+                include_str!("../../../fixtures/openapi.json"),
+                f.agreement.body.work.submit_by,
+            )?;
+            let mut body = f.agreement.body.clone();
+            body.request_id = request.request_id.clone();
+            body.request_sha256 = crate::common::digest(&request)?;
+            let agreement = body.sign(&f.buyer, &provider)?;
+            let terms = agreement.validate(&f.native.policy, &request)?;
+            bind_observation(&f.source, &agreement)?;
+            let observed = f.source.0.lock().map_err(|_| "fixture lock")?.clone();
+            let now = crate::common::now()?;
+            let verified = crate::funded_work::observer::verify(
+                &f.native.policy.domain,
+                &terms,
+                &observed,
+                now,
+                now,
+            )?;
+            if index < capacity {
+                f.native.journal.stage(&verified, &agreement, &request)?;
+            } else {
+                let error = f
+                    .native
+                    .execute(&agreement, &request)
+                    .err()
+                    .ok_or("capacity overflow admitted")?;
+                assert!(
+                    error.to_string().contains("retention capacity exhausted"),
+                    "{error}"
+                );
+                assert_eq!(native_counts(&f)?, (0, 0));
+                assert_eq!(f.native.journal.execution_count()?, 0);
+            }
         }
     }
     Ok(())

@@ -438,6 +438,30 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         self.begin_retained_request(operation, request, fence)
     }
 
+    fn load_unambiguous_retained_tool_request(
+        &self,
+        request_id: &AdmissionIdentifier,
+        fence: &StoreMutationFence,
+        _: u64,
+    ) -> Result<
+        Option<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)>,
+        AdmissionOperationStoreError,
+    > {
+        self.require_fence(fence)?;
+        let state = self.state.lock().expect("test admission state lock");
+        let Some(operation) = state
+            .operation
+            .as_ref()
+            .filter(|operation| operation.replay_key().request_id == *request_id)
+        else {
+            return Ok(None);
+        };
+        Ok(state
+            .retained_request
+            .as_ref()
+            .map(|request| (operation.clone(), request.clone())))
+    }
+
     fn load_retained_tool_request(
         &self,
         operation_id: &AdmissionOperationId,

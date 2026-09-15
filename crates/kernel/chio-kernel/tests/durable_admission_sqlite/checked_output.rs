@@ -46,6 +46,7 @@ fn checked_output_denial_recovers_before_and_after_release_without_becoming_a_ca
             let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
             let operations = Arc::new(authority.admission_operation_store());
             let mut kernel = ChioKernel::new(kernel_config(key.clone()));
+            kernel.require_durable_request_retention();
             kernel.set_budget_store_handle(Arc::new(authority.budget_store()));
             kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
                 calls: Some(calls.clone()),
@@ -75,6 +76,32 @@ fn checked_output_denial_recovers_before_and_after_release_without_becoming_a_ca
             } else {
                 Some(response?)
             };
+            let before_calls = (
+                calls.captures.load(Ordering::SeqCst),
+                calls.releases.load(Ordering::SeqCst),
+            );
+            let denied = kernel
+                .export_durable_execution_evidence(&request)
+                .err()
+                .ok_or("denied output was exported")?;
+            assert!(denied.to_string().contains("execution.verdict"), "{denied}");
+            assert_eq!(
+                before_calls,
+                (
+                    calls.captures.load(Ordering::SeqCst),
+                    calls.releases.load(Ordering::SeqCst)
+                )
+            );
+            assert_eq!(invocations.load(Ordering::SeqCst), 1);
+            let connection = rusqlite::Connection::open(&database)?;
+            assert_eq!(
+                connection.query_row(
+                    "SELECT COUNT(*) FROM tool_outcome_execution_evidence",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )?,
+                0
+            );
             (request, original)
         };
         // A later permissive checker must not change a durably resolved denial.
@@ -82,6 +109,7 @@ fn checked_output_denial_recovers_before_and_after_release_without_becoming_a_ca
         let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
         let operations = Arc::new(authority.admission_operation_store());
         let mut kernel = ChioKernel::new(kernel_config(key));
+        kernel.require_durable_request_retention();
         kernel.set_budget_store_handle(Arc::new(authority.budget_store()));
         kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
             calls: Some(calls.clone()),

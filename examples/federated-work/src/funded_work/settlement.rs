@@ -144,6 +144,18 @@ pub fn request(
             decision,
             submission.as_ref().ok_or("decision has no submission")?,
             policy,
+            journal,
+        )?;
+    }
+    if action == Action::Submit && decision.is_none() && super::execution_evidence::enabled(policy)
+    {
+        super::execution_evidence::verify_claim(
+            policy,
+            journal,
+            entry,
+            submission
+                .as_ref()
+                .ok_or("claim requires original submission")?,
         )?;
     }
     if matches!(action, Action::Submit | Action::Record | Action::Pay) && submission.is_none() {

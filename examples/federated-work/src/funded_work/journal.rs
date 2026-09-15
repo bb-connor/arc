@@ -14,7 +14,7 @@ use std::{
 // Leave one native retention slot available for recovery administration.
 pub const CAPACITY: usize = 63;
 
-pub struct Journal(Mutex<Connection>);
+pub struct Journal(Mutex<Connection>, usize);
 
 pub struct Entry {
     pub allocation: String,
@@ -79,7 +79,14 @@ impl Journal {
         if version != 2 || pins != [digest(policy)?] {
             return Err("funding journal owner or version mismatch".into());
         }
-        Ok(Self(Mutex::new(connection)))
+        // The execution profile pins one single-leaf checkpoint log before
+        // agreement. Refuse a second allocation before any native dispatch.
+        let capacity = if super::execution_evidence::enabled(policy) {
+            1
+        } else {
+            CAPACITY
+        };
+        Ok(Self(Mutex::new(connection), capacity))
     }
 
     pub(super) fn connection(&self) -> Result<MutexGuard<'_, Connection>> {
@@ -113,7 +120,7 @@ impl Journal {
         } else {
             let count: i64 =
                 transaction.query_row("SELECT count(*) FROM allocations", [], |r| r.get(0))?;
-            if usize::try_from(count)? >= CAPACITY {
+            if usize::try_from(count)? >= self.1 {
                 return Err("funding retention capacity exhausted".into());
             }
             transaction.execute("INSERT INTO allocations(allocation,request_id,agreement,request,observation_digest,observed_at)
@@ -257,6 +264,8 @@ impl Journal {
             || !matches!(
                 kind,
                 "submission"
+                    | "execution-evidence"
+                    | "execution-checkpoint"
                     | "capture-waiver"
                     | "decision"
                     | "submit"

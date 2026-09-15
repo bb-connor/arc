@@ -34,6 +34,8 @@ use chio_store_sqlite::{SqliteAuthorityStore, SqliteToolOutcomeStore};
 
 #[path = "durable_admission_sqlite/checked_output.rs"]
 mod checked_output;
+#[path = "durable_admission_sqlite/execution_evidence.rs"]
+mod execution_evidence;
 #[path = "durable_admission_sqlite/federation_context.rs"]
 mod federation_context;
 #[path = "durable_admission_sqlite/payment_acknowledgement.rs"]

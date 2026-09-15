@@ -34,8 +34,9 @@ an existing retained request and returns one persisted `ChioReceipt`. It cannot
 create an operation, execute a tool, reserve a hold or settle money. First export
 requires a Finalizing native operation with retained original signing identity,
 a resolved post-return evaluation, exact resolved output bytes and an allow
-verdict. Unsupported caller, security-release or incomplete-output provenance
-fails closed. Historical records lacking the frozen signing identity cannot use
+verdict. This first profile accepts complete native `InvocationOutputV1::Value`
+only. Streams and caller, security-release or incomplete-output provenance fail
+closed. Historical records lacking the frozen signing identity cannot use
 a current replacement signer.
 
 The signer runs outside the mutation sequencer. After it returns, the original
@@ -64,21 +65,36 @@ another facet.
 
 The funded surface provisions a v2 verifier context before signing the agreement:
 separate checkpoint and status signers, pinned production/checkpoint/governance
-standing, and required artifact-integrity, receipt-authenticity,
+authority policies, and required artifact-integrity, receipt-authenticity,
 checkpoint-membership and guarantee-consistency facets. Its private checkpoint
-key stays in the private state directory. The original agreement's existing
+and status keys stay in separate private fixture directories. Governance standing
+is fixed before agreement; production/checkpoint standing is signed after those
+artifacts exist and retained in the exact evidence bundle under the pre-agreed
+status-authority pin. No future standing is fabricated at bootstrap. The original agreement's existing
 context digest and ordered requirements bind this profile. Historical v1 contexts
 and their empty-evidence assessments retain their original meaning.
 
 The provider retains a bounded canonical evidence bundle containing the kernel
-receipt, checkpoint prefix, exact inclusion wrapper and transparency records.
+receipt, one checkpoint, exact inclusion wrapper and transparency records. This
+v2 local profile admits one allocation per native authority and one receipt in
+its separate execution checkpoint log. Sequence, range and tree size are all
+one. A second allocation needs another pre-agreed authority context. Historical
+v1 retention capacity is unchanged. The native SQLite receipt log preserves its same-signer checkpoint rule. The
+separately pinned log uses the existing checkpoint builder over exact
+kernel-signed bytes and retains the first signed checkpoint in the original
+funding journal. It does not change the native receipt store signer invariant.
 The Finding references this receipt/checkpoint and remains asserted-class with
 explicit verified facets. Submission and decision envelope fields remain stable.
 Both decision creation and replay derive the complete assessment from the exact
 retained bundle at the original evaluation time. Receipt source identities and
 input/output hashes must equal the original native binding before any claim.
 Independent Python verification checks the public receipt, signature, original
-binding and checkpoint proof rather than trusting a Rust success flag.
+binding and checkpoint proof. Its public witness includes the submitted output
+preimage, allowing independent validation of the Finding payload hash. A signed
+submission that differs from the executed output remains an authenticated
+negative result and cannot receive a positive financial decision. The public
+witness authenticates the kernel's private request-binding commitment; it does
+not claim to recompute that commitment without its retained private preimages.
 
 ## Failure and recovery
 

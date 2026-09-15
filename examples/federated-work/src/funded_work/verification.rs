@@ -172,18 +172,24 @@ pub fn decide(
     }
     let raw = canonical_json_bytes(submission)?;
     let matches_native = evidence::verify(&raw, original, policy, custody)?;
-    let finding_assessment = super::finding_acceptance::evaluate(
+    let execution = super::execution_evidence::retained(policy, &original.binding, custody)?;
+    if digest(&execution)? != digest(&original.execution)? {
+        return Err("original execution evidence differs from retained custody".into());
+    }
+    let finding_assessment = super::finding_acceptance::evaluate_with_evidence(
         &canonical_json_bytes(&submission.body.finding)?,
         &policy.finding_context,
         &entry.agreement.body.finding_context_sha256,
         &entry.agreement.body.required_finding_facets,
         crate::common::now()?,
+        execution.as_ref(),
     )?;
     use super::finding_acceptance::Outcome;
     if matches!(
         finding_assessment.outcome,
         Outcome::Unavailable | Outcome::Unsupported
-    ) {
+    ) || (execution.is_some() && finding_assessment.outcome != Outcome::Accepted)
+    {
         return Err(format!(
             "Finding requirements cannot authorize a decision: {:?}",
             finding_assessment.outcome
@@ -216,20 +222,31 @@ pub fn verify_decision(
     decision: &Decision,
     submission: &Submission,
     policy: &Policy,
+    custody: &Journal,
 ) -> Result<()> {
     let body = &decision.body;
     super::wire::decision(decision)?;
-    super::finding_acceptance::validate_assessment(
+    let execution = super::execution_evidence::retained(policy, &submission.body.binding, custody)?;
+    if body.accepted
+        && execution
+            .as_ref()
+            .is_some_and(|bundle| bundle.receipt.content_hash != submission.body.output_sha256)
+    {
+        return Err("accepted decision changes the original executed output".into());
+    }
+    super::finding_acceptance::validate_assessment_with_evidence(
         &body.finding_assessment,
         &submission.body.finding,
         &policy.finding_context,
         &policy.required_finding_facets,
+        execution.as_ref(),
     )?;
     use super::finding_acceptance::Outcome;
     if matches!(
         body.finding_assessment.outcome,
         Outcome::Unavailable | Outcome::Unsupported
-    ) || (body.accepted && body.finding_assessment.outcome != Outcome::Accepted)
+    ) || ((body.accepted || execution.is_some())
+        && body.finding_assessment.outcome != Outcome::Accepted)
     {
         return Err("decision contradicts required Finding assessment".into());
     }

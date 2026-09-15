@@ -207,7 +207,41 @@ pub(super) fn counts(state: &Path) -> Result<Value> {
             |row| row.get(0),
         )
         .optional()?;
+    let projection: Option<Vec<u8>> = connection
+        .query_row(
+            "SELECT canonical_record FROM tool_outcome_execution_evidence",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?;
+    let projection_count: i64 = connection.query_row(
+        "SELECT count(*) FROM tool_outcome_execution_evidence",
+        [],
+        |r| r.get(0),
+    )?;
+    let journal = rusqlite::Connection::open_with_flags(
+        state.join("funding.sqlite"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
+    let bundle: Option<Vec<u8>> = journal
+        .query_row(
+            "SELECT payload FROM records WHERE kind='execution-evidence'",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?;
+    let checkpoint: Option<Vec<u8>> = journal
+        .query_row(
+            "SELECT payload FROM records WHERE kind='execution-checkpoint'",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?;
     Ok(json!({"operationCount": operations, "holdCount": holds,
+        "executionReceiptCount":projection_count,
+        "executionProjectionSha256":projection.as_ref().map(|v| chio_core_types::sha256_hex(v)),
+        "executionBundleSha256":bundle.as_ref().map(|v| chio_core_types::sha256_hex(v)),
+        "executionCheckpointSha256":checkpoint.as_ref().map(|v| chio_core_types::sha256_hex(v)),
         "holdDisposition": disposition,
         "operationId": ids.as_ref().map(|v| &v.0), "holdId": ids.as_ref().map(|v| &v.1)}))
 }

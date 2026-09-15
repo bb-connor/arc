@@ -78,6 +78,7 @@ fn sqlite_retained_federation_context_survives_owner_restart_without_redispatch(
         let outcomes = Arc::new(authority.tool_outcome_store());
         let mut kernel = ChioKernel::new(kernel_config(keypair.clone()))
             .with_federation_peers(vec![peer.clone()]);
+        kernel.require_durable_request_retention();
         kernel.set_federation_local_kernel_id("kernel.org-b");
         let receipt_store = SqliteReceiptStore::open(&receipts)?;
         receipt_store.flush_receipt_writes()?;
@@ -120,6 +121,18 @@ fn sqlite_retained_federation_context_survives_owner_restart_without_redispatch(
             .ok_or("raw outcome")?;
         let raw_before = raw.canonical_blob()?.bytes().to_vec();
         assert!(raw.to_persisted().federation_context_json.is_some());
+        let denied = kernel
+            .export_durable_execution_evidence(&request)
+            .err()
+            .ok_or("federated outcome was exported")?;
+        assert!(
+            denied
+                .to_string()
+                .contains("execution.unsupported_provenance"),
+            "{denied}"
+        );
+        assert!(outcomes.lookup_execution_evidence(&operation_id)?.is_none());
+        assert_eq!(invocations.load(Ordering::SeqCst), 1);
         assert_eq!(
             authority
                 .budget_store()
@@ -136,6 +149,7 @@ fn sqlite_retained_federation_context_survives_owner_restart_without_redispatch(
     let outcomes = Arc::new(authority.tool_outcome_store());
     let mut kernel =
         ChioKernel::new(kernel_config(keypair.clone())).with_federation_peers(vec![peer]);
+    kernel.require_durable_request_retention();
     kernel.set_federation_local_kernel_id("kernel.org-b");
     let receipt_store = Arc::new(SqliteReceiptStore::open(&receipts)?);
     // Wait on the actor's verification barrier, not a timing-dependent sleep.

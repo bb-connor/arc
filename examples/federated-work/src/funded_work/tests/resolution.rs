@@ -60,8 +60,6 @@ fn refund_substitution_cannot_authorize_a_native_waiver() -> Result<()> {
     drop(scenario.native);
     let source = Arc::new(RefundSource(Mutex::new(valid.clone())));
     let native = Native::open_for_resolution(directory.path(), source.clone())?;
-    let before =
-        capture_resolution::original_sources(directory.path(), &native, &scenario.request)?;
     let connection = rusqlite::Connection::open_with_flags(
         directory.path().join("authority.sqlite"),
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
@@ -78,6 +76,13 @@ fn refund_substitution_cannot_authorize_a_native_waiver() -> Result<()> {
     };
     let original_counts = counts()?;
     assert_eq!(original_counts.0, 0);
+    let before =
+        capture_resolution::original_sources(directory.path(), &native, &scenario.request)?;
+    assert_eq!(
+        counts()?,
+        original_counts,
+        "reading original sources must not mutate authority or reclaim the finalizer"
+    );
     for case in 0..5 {
         let mut changed = valid.clone();
         match case {

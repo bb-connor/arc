@@ -163,7 +163,7 @@ impl SqliteAdmissionOperationStore {
 
 /// The begin participant digest is immutable even as the operation progresses.
 /// Missing material is allowed only for legacy operations with no such digest.
-pub(super) fn load_retained_request_tx(
+pub(crate) fn load_retained_request_tx(
     connection: &Connection,
     operation: &AdmissionOperationV1,
 ) -> Result<Option<RetainedToolAdmissionRequestV1>, AdmissionOperationStoreError> {

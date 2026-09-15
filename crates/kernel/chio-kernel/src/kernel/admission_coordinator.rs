@@ -21,6 +21,8 @@ mod caller_execution_checkpoint;
 pub use caller_execution_checkpoint::{CallerExecutionCheckpoint, CallerExecutionCheckpointHook};
 #[path = "admission_coordinator/collection_context.rs"]
 mod collection_context;
+#[path = "admission_coordinator/execution_evidence.rs"]
+mod execution_evidence;
 #[path = "admission_coordinator/execution_nonce.rs"]
 mod execution_nonce;
 pub(crate) use execution_nonce::require_live_nonce;

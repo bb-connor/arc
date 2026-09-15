@@ -194,5 +194,8 @@ unpaid claim. The child can collect using retained authority after parent refund
 This advances the local composition witness. The subsequent
 [registered work and Finding acceptance slice](execution/23-registered-work-finding-acceptance.md)
 registers four bounded envelopes and binds original required facets to the actual
-Finding verifier. Full Finding evidence backing, independent operators and
-sustained capacity remain open gates.
+Finding verifier. The [pre-settlement execution slice](execution/25-pre-settlement-execution.md)
+adds an immutable native execution receipt and a separately pinned checkpoint
+before claim or payment. Actual receipt authenticity and membership can verify;
+financial backing remains unavailable. Independent operators, broader Finding
+assurance and sustained capacity remain open gates.

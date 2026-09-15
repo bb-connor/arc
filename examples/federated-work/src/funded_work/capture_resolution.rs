@@ -115,6 +115,7 @@ pub(super) fn original_sources(
     native: &Native,
     request: &ToolCallRequest,
 ) -> Result<Value> {
+    use chio_kernel::tool_outcome::ToolOutcomeStore;
     use rusqlite::{types::ValueRef, Connection, OpenFlags};
     let connection = Connection::open_with_flags(
         state.join("authority.sqlite"),
@@ -145,10 +146,17 @@ pub(super) fn original_sources(
             .collect::<rusqlite::Result<Vec<_>>>()?;
         hashes.insert(table.into(), json!(digest(&rows)?));
     }
-    hashes.insert(
-        "rawOutcome".into(),
-        json!(native.evidence(request)?.binding.raw_outcome_sha256),
-    );
+    // Auditing source identity must not export a receipt or claim a finalizer
+    // lease on the exclusive financial-resolution handle.
+    let operation = native
+        .operation(request)?
+        .ok_or("original operation missing")?;
+    let raw = native
+        .authority
+        .tool_outcome_store()
+        .load_raw_invocation_by_operation(operation.binding().operation_id())?
+        .ok_or("original native return missing")?;
+    hashes.insert("rawOutcome".into(), json!(digest(&raw.to_persisted())?));
     Ok(Value::Object(hashes))
 }
 

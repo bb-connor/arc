@@ -58,6 +58,10 @@ impl SecurityPreDispatchHook for Release {
 }
 
 fn run(zero_charge: bool, allowed: bool) -> TestResult {
+    run_with_migration(zero_charge, allowed, false)
+}
+
+fn run_with_migration(zero_charge: bool, allowed: bool, migrate_v3: bool) -> TestResult {
     let temp = tempfile::tempdir()?;
     secure_directory(temp.path())?;
     let database = temp.path().join("authority.db");
@@ -71,6 +75,7 @@ fn run(zero_charge: bool, allowed: bool) -> TestResult {
     let open = || -> Result<(SqliteAuthorityStore, ChioKernel), Box<dyn Error>> {
         let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
         let mut kernel = ChioKernel::new(kernel_config(keypair.clone()));
+        kernel.require_durable_request_retention();
         kernel.set_durable_admission_store(
             Arc::new(authority.admission_operation_store()),
             Arc::new(authority.tool_outcome_store()),
@@ -138,6 +143,37 @@ fn run(zero_charge: bool, allowed: bool) -> TestResult {
         );
         None
     };
+    let before_calls = (
+        payments.captures.load(Ordering::SeqCst),
+        payments.releases.load(Ordering::SeqCst),
+    );
+    let denied = kernel
+        .export_durable_execution_evidence(&request)
+        .err()
+        .ok_or("security outcome was exported")?;
+    assert!(
+        denied
+            .to_string()
+            .contains("execution.unsupported_provenance"),
+        "{denied}"
+    );
+    assert_eq!(
+        before_calls,
+        (
+            payments.captures.load(Ordering::SeqCst),
+            payments.releases.load(Ordering::SeqCst)
+        )
+    );
+    let connection = rusqlite::Connection::open(&database)?;
+    assert_eq!(
+        connection.query_row(
+            "SELECT COUNT(*) FROM tool_outcome_execution_evidence",
+            [],
+            |row| row.get::<_, i64>(0)
+        )?,
+        0
+    );
+    drop(connection);
     let retry = kernel.evaluate_tool_call_blocking_with_security_context(&request, &context);
     if let Some(expected) = &receipt {
         assert_eq!(&retry?.receipt.id, expected);
@@ -166,7 +202,36 @@ fn run(zero_charge: bool, allowed: bool) -> TestResult {
     }
     drop(kernel);
     drop(authority);
+    let original_release = if migrate_v3 {
+        let connection = rusqlite::Connection::open(&database)?;
+        let bytes: Vec<u8> = connection.query_row(
+            "SELECT canonical_record FROM tool_outcome_security_releases",
+            [],
+            |row| row.get(0),
+        )?;
+        connection.execute_batch("DROP TABLE tool_outcome_execution_evidence; UPDATE chio_store_schema_versions SET version = 3 WHERE store_key = 'tool_outcome';")?;
+        Some(bytes)
+    } else {
+        None
+    };
     let (_authority, kernel) = open()?;
+    if let Some(original) = original_release {
+        let connection = rusqlite::Connection::open(&database)?;
+        let migrated: Vec<u8> = connection.query_row(
+            "SELECT canonical_record FROM tool_outcome_security_releases",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(migrated, original);
+        assert_eq!(
+            connection.query_row(
+                "SELECT version FROM chio_store_schema_versions WHERE store_key = 'tool_outcome'",
+                [],
+                |row| row.get::<_, i64>(0)
+            )?,
+            4
+        );
+    }
     let recovered = kernel.reconcile_durable_admission_startup();
     if let Some(expected) = receipt {
         recovered?;
@@ -213,4 +278,9 @@ fn security_refusal_cannot_repeat_or_reverse_captured_payment() -> TestResult {
 #[test]
 fn security_refusal_cannot_repeat_zero_charge_release() -> TestResult {
     run(true, false)
+}
+
+#[test]
+fn exact_v3_migration_retains_real_security_release_and_final_receipt() -> TestResult {
+    run_with_migration(false, true, true)
 }

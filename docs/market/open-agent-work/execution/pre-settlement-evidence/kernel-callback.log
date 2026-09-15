@@ -1,0 +1,16 @@
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+    Finished `test` profile [unoptimized] target(s) in 1m 14s
+     Running unittests src/lib.rs (target/debug/deps/chio_kernel-ece71a10790b9ed1)
+
+running 9 tests
+test kernel::tests::execution_evidence::execution_export_contains_signer_panic_without_publishing ... ok
+test kernel::tests::execution_evidence::execution_export_identity_callback_runs_outside_mutation_sequencer ... ok
+test kernel::tests::execution_evidence::execution_export_rejects_fence_change_during_signing ... ok
+test kernel::tests::execution_evidence::execution_export_rejects_retained_request_change_during_signing ... ok
+test kernel::tests::execution_evidence::execution_export_rejects_signer_identity_substitution ... ok
+test kernel::tests::execution_evidence::execution_export_replay_respects_the_current_crypto_floor ... ok
+test kernel::tests::execution_evidence::execution_export_replays_original_receipt_after_signer_replacement ... ok
+test kernel::tests::execution_evidence::execution_export_revalidates_original_lease_after_signer_callback ... ok
+test kernel::tests::execution_evidence::execution_export_signer_runs_outside_mutation_sequencer ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 1445 filtered out; finished in 0.80s

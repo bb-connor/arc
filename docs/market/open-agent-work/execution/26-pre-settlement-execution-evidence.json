@@ -1,0 +1,1434 @@
+{
+  "schema": "chio.experimental.pre-settlement-execution-evidence.v1",
+  "createdAtUTC": "2026-09-15T04:30:31.897854+00:00",
+  "baseCommit": "df2e7ef0ed1e1ba3ba5ef244e2247347b2c0f3e0",
+  "designCommit": "ad3dedbf37dfe732771d4458721156fc543fd524",
+  "branch": "feat/funded-native-admission",
+  "status": "locally-qualified",
+  "scope": "Complete native Value execution evidence before claim or payment, actual Finding receipt and checkpoint verification, original identities and retained financial successors",
+  "profile": {
+    "receiptSemantics": "chio.pre_settlement_execution.v1",
+    "context": "chio.experimental.funded-finding-context.v2",
+    "nativeAllocationsPerAuthority": 1,
+    "checkpointLeaves": 1,
+    "administrativelyIndependent": false,
+    "financialBacking": false
+  },
+  "sourceObjects": {
+    "crates": "874362eedd6c5386f3d3d18c073b6bfcfc9d59b8",
+    "examples/federated-work": "5fa142b5eb097890b0f088fcfd70e64d23cb7e0b",
+    "examples/funded-work": "0d1dabaa87d2d799ff41bfb88b31d90903cef3b1",
+    "contracts": "58f7afe7d555427c21262458479acc471cd66c3d",
+    "fuzz": "5fc396a603eccfd406026bbbdf02d769729f09bd",
+    "spec": "eed0d9bdefef8add8c2c30dca7cbfa94a49c209a",
+    "formal": "3ee0662473ea72489f77629c4d941150ff23aa58",
+    "Cargo.toml": "f622b684573a9e01d2807f6eb95a8f74bfdb6b23",
+    "Cargo.lock": "3beee23ddc1b00265130dc87b135da0b1cc2a0a3",
+    "rust-toolchain.toml": "b1dd491cdce6f8b98cfe02f6807980c0dfe48784",
+    "scripts": "97dd52130b59988086f7f50c9bfa8a44246dc311",
+    "xtask": "82dde61cbe5b4c77858cc05e7d4ad859da151203",
+    "docs/formal": "64855a449309da7a86e8438177a86b5151f6750b"
+  },
+  "sourceBinding": "Compare source tree objects with the containing commit. Objects avoid a self-referential commit hash. The built executable is retained by SHA-256. The final executable was rebuilt after the audit-side-effect repair, and all 52 owned scenarios were rerun against that executable.",
+  "binarySha256": "1801856aa1c153430ae57d503494ad63a58243925f7b215e8bd3d8e7aa351d06",
+  "qualificationOnlyChanges": [],
+  "buildSourceObjects": {
+    "crates": "874362eedd6c5386f3d3d18c073b6bfcfc9d59b8",
+    "examples/federated-work": "5fa142b5eb097890b0f088fcfd70e64d23cb7e0b",
+    "examples/funded-work": "0d1dabaa87d2d799ff41bfb88b31d90903cef3b1",
+    "contracts": "58f7afe7d555427c21262458479acc471cd66c3d",
+    "fuzz": "5fc396a603eccfd406026bbbdf02d769729f09bd",
+    "spec": "eed0d9bdefef8add8c2c30dca7cbfa94a49c209a",
+    "formal": "3ee0662473ea72489f77629c4d941150ff23aa58",
+    "Cargo.toml": "f622b684573a9e01d2807f6eb95a8f74bfdb6b23",
+    "Cargo.lock": "3beee23ddc1b00265130dc87b135da0b1cc2a0a3",
+    "rust-toolchain.toml": "b1dd491cdce6f8b98cfe02f6807980c0dfe48784",
+    "scripts": "97dd52130b59988086f7f50c9bfa8a44246dc311",
+    "xtask": "82dde61cbe5b4c77858cc05e7d4ad859da151203",
+    "docs/formal": "64855a449309da7a86e8438177a86b5151f6750b"
+  },
+  "environment": {
+    "rust": "rustc 1.94.1 (e408947bf 2026-03-25)",
+    "node": "v24.16.0",
+    "ganacheBackend": "JavaScript fallback; optional native uWS and bigint bindings unavailable on this Node/architecture",
+    "python": "Python 3.13.13",
+    "pythonDependencies": "examples/federated-work/python_buyer/requirements.txt installed with --require-hashes",
+    "chainId": "31337",
+    "token": "private mock ERC20",
+    "confirmations": "two descendant blocks",
+    "fundingUnitsPerAllocation": 100,
+    "CARGO_TARGET_DIR": "target",
+    "CARGO_BUILD_JOBS": "3",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "RUST_TEST_THREADS": "1",
+    "umask": "022",
+    "coreDumps": "disabled",
+    "pinnedBuyerPython": "Python 3.12.3",
+    "ownedProcessHarnessConcurrency": 3
+  },
+  "requiredChecks": [
+    "funded-tests",
+    "funded-chain",
+    "standalone-clippy",
+    "build",
+    "core-tests",
+    "finding-tests",
+    "sqlite-outcomes",
+    "kernel-sqlite",
+    "kernel-callback",
+    "workspace-clippy",
+    "fuzz-check",
+    "python-buyer",
+    "python-funded",
+    "python-wire",
+    "python-execution",
+    "python-execution-witness",
+    "schema-shapes",
+    "schema-registry",
+    "node-contracts",
+    "node-wire",
+    "wire-cli",
+    "rust-hygiene",
+    "formal-mirrors",
+    "standalone-fmt",
+    "workspace-fmt",
+    "proof-coverage",
+    "child",
+    "resolution",
+    "admission",
+    "lifecycle-nominal",
+    "lifecycle-crashes",
+    "lifecycle-execution-crashes",
+    "lifecycle-deadlines",
+    "native-refunds",
+    "source-preservation",
+    "diff-check"
+  ],
+  "counts": {
+    "standaloneRustTests": 62,
+    "coreTypeUnitTests": 406,
+    "findingAndVerifierTests": 279,
+    "sqliteOutcomeTests": 23,
+    "kernelSqliteIntegrationTests": 24,
+    "kernelSignerBoundaryTests": 9,
+    "findingFixtureRegeneratorsIntentionallyIgnored": 2,
+    "sharedWireByteVectors": 57,
+    "schemaShapeCases": 126,
+    "pythonRegressionTests": 102,
+    "independentExecutionPythonTests": 28,
+    "contractAndInventoryTests": 19,
+    "nodeCanonicalWireTests": 2,
+    "baselineOwnedProcessScenarios": 43,
+    "additionalExecutionSIGKILLScenarios": 5,
+    "additionalRequiredFacetChainScenarios": 4,
+    "totalOwnedChainAndProcessScenarios": 52,
+    "totalSIGKILL": 41,
+    "fuzzTargetsCompiled": 30
+  },
+  "artifacts": [
+    {
+      "path": "pre-settlement-evidence/absent-complete.json",
+      "sha256": "dfdb722be48dab040d29c5c0e11d8458eb8d1d5bb6380061e9a1da458a466604",
+      "bytes": 3246,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/absent-refund-after-broadcast.json",
+      "sha256": "522e286c61542773e8f0e1c919cb7c76c5dc6c84f192d49da67a1949f5d7f2cb",
+      "bytes": 4153,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/admission.log",
+      "sha256": "0c466429a84914ee044f48a91d7bf1a11c97caeebde70069a83e0f28bc389aae",
+      "bytes": 409,
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_smoke.py"
+      ],
+      "startedAt": "2026-09-15T04:16:01.136547+00:00",
+      "completedAt": "2026-09-15T04:17:38.503553+00:00",
+      "elapsedSeconds": 97.367,
+      "exitCode": 0,
+      "rawSha256": "0c466429a84914ee044f48a91d7bf1a11c97caeebde70069a83e0f28bc389aae",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/after-hold.json",
+      "sha256": "f2df6363170bef912a4422bfdf302ecc2f9dbc7c361052a00151289232e2f37d",
+      "bytes": 2536,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/after-stage.json",
+      "sha256": "a264238a35a0af69f3e23bd5e9068320222f969101c186a81270d902dddcbaee",
+      "bytes": 2299,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/after-tool.json",
+      "sha256": "3218d76a593433ae854b2517cf53008c7a408051dfbbc16cd3b3969eea7d26df",
+      "bytes": 2451,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/before-bind.json",
+      "sha256": "8a8b1b4f59191a8f9a33efde6a2ea5620a0f43d14c456db581577344b040a072",
+      "bytes": 2328,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/build.log",
+      "sha256": "28be159eb660e6080020fd6b3d5cb4d2caae8333434999db523ae665e00d83f3",
+      "bytes": 171,
+      "command": [
+        "cargo",
+        "build",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked"
+      ],
+      "startedAt": "2026-09-15T04:14:31.609784+00:00",
+      "completedAt": "2026-09-15T04:14:52.356222+00:00",
+      "elapsedSeconds": 20.746,
+      "exitCode": 0,
+      "rawSha256": "28be159eb660e6080020fd6b3d5cb4d2caae8333434999db523ae665e00d83f3",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/child.log",
+      "sha256": "ac5cff488d6c45a0e8ccb26b0fef8a7327700b76a4a4111e389d653e31a8bbaf",
+      "bytes": 233,
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_child.py"
+      ],
+      "startedAt": "2026-09-15T04:16:01.140130+00:00",
+      "completedAt": "2026-09-15T04:18:37.061817+00:00",
+      "elapsedSeconds": 155.922,
+      "exitCode": 0,
+      "rawSha256": "ac5cff488d6c45a0e8ccb26b0fef8a7327700b76a4a4111e389d653e31a8bbaf",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/core-tests.log",
+      "sha256": "a662947172d1cc63df32eb9c7b722a34cf99d5e6919f15f0dd9e8384acd1ce06",
+      "bytes": 33534,
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "chio-core-types",
+        "--lib",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T03:54:25.138975+00:00",
+      "completedAt": "2026-09-15T03:54:30.790089+00:00",
+      "elapsedSeconds": 5.651,
+      "exitCode": 0,
+      "rawSha256": "f64204134a0b567f39962a7e7b436de1b034d314f069cfaae618ccd21edb9864",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/development-audit-side-effect-red.log",
+      "sha256": "bbdc3081fd639a7a39654a1a62e645da98c26431f245bdb1cee225fd97843ac7",
+      "bytes": 5998,
+      "qualificationRole": "development"
+    },
+    {
+      "path": "pre-settlement-evidence/development-finding-red.log",
+      "sha256": "ce930fa48e188301f510a31b74a34ac499735a8dfc639381e7078b8192aa129e",
+      "bytes": 3892,
+      "qualificationRole": "development"
+    },
+    {
+      "path": "pre-settlement-evidence/development-kernel-red.log",
+      "sha256": "1bb117d7aa4f0d74e67d1cc0953910d48c705de1b273e71e56c4c3fa6e9de5ff",
+      "bytes": 5813,
+      "qualificationRole": "development"
+    },
+    {
+      "path": "pre-settlement-evidence/diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "command": [
+        "git",
+        "diff",
+        "--cached",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T04:30:31.693875+00:00",
+      "completedAt": "2026-09-15T04:30:31.725943+00:00",
+      "elapsedSeconds": 0.032,
+      "exitCode": 0,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/earned-child-none.json",
+      "sha256": "76ff427020f546991b1d8d82116ed26a43ff80824939815f6d69529d313ccfbf",
+      "bytes": 9076,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/earned-child-pay-after-broadcast.json",
+      "sha256": "7ec39af8f7ef761efa6bc7e9d023d25c213a1894a6c51611de7359f62902d6f3",
+      "bytes": 9073,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/earned-child-pay-after-observation.json",
+      "sha256": "11a60862aab8375d01cfca5e3c0009ce6c59a25226b60c15878cfcb621a3fe05",
+      "bytes": 9073,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/earned-child-pay-after-prepare.json",
+      "sha256": "db797658dd3a23fcfa1455ca76f8c3370c78a9235170692a1a51e1ab77ade049",
+      "bytes": 9073,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/execution-assessment.json",
+      "sha256": "f99443453d1b3ed0adde757a3d91875937c87da9746bd259b3bf570905bcb6f7",
+      "bytes": 1998,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/execution-pins.json",
+      "sha256": "755bc13f25c8484195c58980b6c70ede3236c1996cf88182db981add9b146484",
+      "bytes": 371,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/execution-python-verification.json",
+      "sha256": "9ece351f572f7acdc729715916953ac66d6e35630cebabd7f9d18b399ff48516",
+      "bytes": 1058,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/execution-witness.json",
+      "sha256": "b2a54d9779011b9804dc0e315202d0f6c789f2a09de8376b628e60408011760a",
+      "bytes": 16243,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/finding-tests.log",
+      "sha256": "1954ff22de0a7c73e71a9e06fb2dbd6b545af260231515b0e9ae0728e313e437",
+      "bytes": 21991,
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "chio-finding",
+        "-p",
+        "chio-finding-verifier",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T03:57:12.602179+00:00",
+      "completedAt": "2026-09-15T03:57:30.539110+00:00",
+      "elapsedSeconds": 17.937,
+      "exitCode": 0,
+      "rawSha256": "0d9cd5849b9f21b4457071caba910b1d95a35a36a0a68633553072fe8128d3df",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/formal-mirrors.log",
+      "sha256": "039c435a81d3345f94a044979165f19c28dda441658640c4061aa8126df0af86",
+      "bytes": 41,
+      "command": [
+        "target/debug/xtask",
+        "check",
+        "formal-mirrors"
+      ],
+      "startedAt": "2026-09-15T03:50:49.194372+00:00",
+      "completedAt": "2026-09-15T03:50:53.043281+00:00",
+      "elapsedSeconds": 3.849,
+      "exitCode": 0,
+      "rawSha256": "039c435a81d3345f94a044979165f19c28dda441658640c4061aa8126df0af86",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/formal-review.log",
+      "sha256": "d62fc5f36c45836c91af8d8ef33224a9211eb1a4c21bb0b57a9dd71c2522945d",
+      "bytes": 48,
+      "command": [
+        "target/debug/xtask",
+        "check",
+        "formal-mirrors",
+        "--bless"
+      ],
+      "startedAt": "2026-09-15T03:50:45.253267+00:00",
+      "completedAt": "2026-09-15T03:50:49.145917+00:00",
+      "elapsedSeconds": 3.893,
+      "exitCode": 0,
+      "rawSha256": "d62fc5f36c45836c91af8d8ef33224a9211eb1a4c21bb0b57a9dd71c2522945d",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "development"
+    },
+    {
+      "path": "pre-settlement-evidence/funded-chain.log",
+      "sha256": "a2975555b7c7cf86a3cccaf2bb04e460081a4ec06ae984e1a6a830ce0f2f4d58",
+      "bytes": 5730,
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "--",
+        "--ignored",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T04:14:52.401901+00:00",
+      "completedAt": "2026-09-15T04:17:44.111111+00:00",
+      "elapsedSeconds": 171.709,
+      "exitCode": 0,
+      "rawSha256": "2de3fd99fc18510ff416577fe2e8d77d1b7df56c5ef50c0a441a66737a06d1a4",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/funded-execution-green.log",
+      "sha256": "6503001b87337fcadcd00499e8a50a278b1dfa683a3412e5c80caf57283cded5",
+      "bytes": 6039,
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "--",
+        "--include-ignored",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T03:23:43.664384+00:00",
+      "completedAt": "2026-09-15T03:26:17.689464+00:00",
+      "elapsedSeconds": 154.025,
+      "exitCode": 101,
+      "rawSha256": "6503001b87337fcadcd00499e8a50a278b1dfa683a3412e5c80caf57283cded5",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "development"
+    },
+    {
+      "path": "pre-settlement-evidence/funded-execution-green2.log",
+      "sha256": "bff573900de77c94bcf81b29af9ec349508dde27dc73cf68065a71d8b2936ded",
+      "bytes": 14725,
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "--",
+        "--include-ignored",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T03:26:36.200180+00:00",
+      "completedAt": "2026-09-15T03:30:46.094201+00:00",
+      "elapsedSeconds": 249.894,
+      "exitCode": 101,
+      "rawSha256": "bff573900de77c94bcf81b29af9ec349508dde27dc73cf68065a71d8b2936ded",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "development"
+    },
+    {
+      "path": "pre-settlement-evidence/funded-execution-green3.log",
+      "sha256": "a69bacbe588b1fd52282dc39c1ccc9da3677902812cab996fd749650ccf463bb",
+      "bytes": 2375,
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "execution",
+        "--",
+        "--include-ignored",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T03:31:18.659709+00:00",
+      "completedAt": "2026-09-15T03:32:25.147531+00:00",
+      "elapsedSeconds": 66.488,
+      "exitCode": 0,
+      "rawSha256": "ca6fb823293e1ca59b02db495c9935682678f32b92f80b76ef782a9e749bfde0",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "development"
+    },
+    {
+      "path": "pre-settlement-evidence/funded-execution-red.log",
+      "sha256": "f41780cc186a9fd178a0cfc5c0024a2dee7d9757344982831f27afca372cfffa",
+      "bytes": 5573,
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "execution",
+        "--",
+        "--include-ignored",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T03:01:45.351195+00:00",
+      "completedAt": "2026-09-15T03:03:17.007571+00:00",
+      "elapsedSeconds": 91.656,
+      "exitCode": 101,
+      "rawSha256": "f41780cc186a9fd178a0cfc5c0024a2dee7d9757344982831f27afca372cfffa",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "development"
+    },
+    {
+      "path": "pre-settlement-evidence/funded-execution-red2.log",
+      "sha256": "fdd2a3af508c21e7c582c2130040d70f4f8be3df3d64a1876e4ab0901377508b",
+      "bytes": 1292,
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "execution",
+        "--",
+        "--include-ignored",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T03:03:33.436939+00:00",
+      "completedAt": "2026-09-15T03:04:01.829471+00:00",
+      "elapsedSeconds": 28.393,
+      "exitCode": 101,
+      "rawSha256": "fdd2a3af508c21e7c582c2130040d70f4f8be3df3d64a1876e4ab0901377508b",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "development"
+    },
+    {
+      "path": "pre-settlement-evidence/funded-execution-red3.log",
+      "sha256": "7a74ce0a3c0734adb8e5f024fd29cf110d2860300c02bf09e46934cd51b6746e",
+      "bytes": 2761,
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "execution",
+        "--",
+        "--include-ignored",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T03:04:34.628687+00:00",
+      "completedAt": "2026-09-15T03:06:02.652950+00:00",
+      "elapsedSeconds": 88.024,
+      "exitCode": 101,
+      "rawSha256": "7a74ce0a3c0734adb8e5f024fd29cf110d2860300c02bf09e46934cd51b6746e",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "development"
+    },
+    {
+      "path": "pre-settlement-evidence/funded-execution-red4.log",
+      "sha256": "5ae0cf40c66b1e65c9b43271cda3a10674d8d2c8b03f04f13f698c70e4344261",
+      "bytes": 5352,
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "execution",
+        "--",
+        "--include-ignored",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T03:06:41.645953+00:00",
+      "completedAt": "2026-09-15T03:08:06.841004+00:00",
+      "elapsedSeconds": 85.195,
+      "exitCode": 101,
+      "rawSha256": "5ae0cf40c66b1e65c9b43271cda3a10674d8d2c8b03f04f13f698c70e4344261",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "development"
+    },
+    {
+      "path": "pre-settlement-evidence/funded-tests.log",
+      "sha256": "64310fb037cb22939174e3c43e740a40e33dca1592a4e83dbcff209e6f1c52fb",
+      "bytes": 7003,
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T04:17:44.178535+00:00",
+      "completedAt": "2026-09-15T04:20:03.500040+00:00",
+      "elapsedSeconds": 139.322,
+      "exitCode": 0,
+      "rawSha256": "e20b258e8c7e3737c7786a81d7fe3b55b4638d05c07f47bb90870e63c13d8e34",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/fuzz-check.log",
+      "sha256": "18517839771abd1457c1afea91840ae6c2667513f5f301dad25d04446016e1d2",
+      "bytes": 5959,
+      "command": [
+        "cargo",
+        "check",
+        "--manifest-path",
+        "fuzz/Cargo.toml",
+        "--bins",
+        "--locked",
+        "--offline"
+      ],
+      "startedAt": "2026-09-15T04:27:27.352265+00:00",
+      "completedAt": "2026-09-15T04:28:48.760555+00:00",
+      "elapsedSeconds": 81.408,
+      "exitCode": 0,
+      "rawSha256": "18517839771abd1457c1afea91840ae6c2667513f5f301dad25d04446016e1d2",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/happy.json",
+      "sha256": "679b6a677614644baecabd1110dc449d56e901e291b74718bff85bc8cbc9ad0b",
+      "bytes": 2806,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/kernel-callback.log",
+      "sha256": "afaae4271503b2976602f9180a85933a9f80152f7d3498dbfdd990cb61ca7dff",
+      "bytes": 1330,
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "chio-kernel",
+        "--lib",
+        "execution_evidence",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T04:05:27.680021+00:00",
+      "completedAt": "2026-09-15T04:06:43.395353+00:00",
+      "elapsedSeconds": 75.715,
+      "exitCode": 0,
+      "rawSha256": "74e587518483204dc43dc20d0bc4c5f16b1c88b9a78b4990eb357309b782e46e",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/kernel-sqlite.log",
+      "sha256": "8be36498b2eaca942935914f2c0cb95daffd37eb88402a4b60eb87b3337893d9",
+      "bytes": 3247,
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "chio-kernel",
+        "--test",
+        "durable_admission_sqlite",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T04:02:34.493353+00:00",
+      "completedAt": "2026-09-15T04:05:27.635338+00:00",
+      "elapsedSeconds": 173.142,
+      "exitCode": 0,
+      "rawSha256": "09c50b61503bfd73db5db013de6e0a03d8cd8468882f441194c49e2418e3f7dd",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/lifecycle-crashes.log",
+      "sha256": "933412e80e8d59b9fa2637b51ce600d2f0f1b010ca5f6f2d92116bd8ca3f799a",
+      "bytes": 241,
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_sigkill_around_original_claim_decision_and_money"
+      ],
+      "startedAt": "2026-09-15T04:18:37.116656+00:00",
+      "completedAt": "2026-09-15T04:24:38.201246+00:00",
+      "elapsedSeconds": 361.085,
+      "exitCode": 0,
+      "rawSha256": "933412e80e8d59b9fa2637b51ce600d2f0f1b010ca5f6f2d92116bd8ca3f799a",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/lifecycle-deadlines.log",
+      "sha256": "88f003009a30737500968c9d90f42a244c372a5894c21e5b95317e9da9ac4f40",
+      "bytes": 267,
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_deadline_loss_refunds_even_with_retained_unrecorded_artifacts"
+      ],
+      "startedAt": "2026-09-15T04:19:44.887780+00:00",
+      "completedAt": "2026-09-15T04:21:43.227983+00:00",
+      "elapsedSeconds": 118.34,
+      "exitCode": 0,
+      "rawSha256": "88f003009a30737500968c9d90f42a244c372a5894c21e5b95317e9da9ac4f40",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/lifecycle-execution-crashes.log",
+      "sha256": "b0100bd4640c62bc8ac5e03953fad7183aff7ad8490c0e3d13dd1ed9d84e241f",
+      "bytes": 235,
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_sigkill_around_execution_evidence_and_custody"
+      ],
+      "startedAt": "2026-09-15T04:16:01.123816+00:00",
+      "completedAt": "2026-09-15T04:18:03.224288+00:00",
+      "elapsedSeconds": 122.1,
+      "exitCode": 0,
+      "rawSha256": "b0100bd4640c62bc8ac5e03953fad7183aff7ad8490c0e3d13dd1ed9d84e241f",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/lifecycle-nominal.log",
+      "sha256": "b18b205e6910e61afd4e7f1b198205d1056e82c59fa861e62171af0267966ae7",
+      "bytes": 229,
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_payout_rejection_and_missing_work_timeouts"
+      ],
+      "startedAt": "2026-09-15T04:18:03.269710+00:00",
+      "completedAt": "2026-09-15T04:19:44.835595+00:00",
+      "elapsedSeconds": 101.566,
+      "exitCode": 0,
+      "rawSha256": "b18b205e6910e61afd4e7f1b198205d1056e82c59fa861e62171af0267966ae7",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/native-refunds.log",
+      "sha256": "6dfe4cf78a71f0ff76e2920a5274f1c88d7b97eb6404e9603a7344e8e6602b86",
+      "bytes": 272,
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_refund_preserves_unknown_execution_and_unwinds_undispatched_hold"
+      ],
+      "startedAt": "2026-09-15T04:20:59.071726+00:00",
+      "completedAt": "2026-09-15T04:21:42.819494+00:00",
+      "elapsedSeconds": 43.748,
+      "exitCode": 0,
+      "rawSha256": "6dfe4cf78a71f0ff76e2920a5274f1c88d7b97eb6404e9603a7344e8e6602b86",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/node-contracts.log",
+      "sha256": "e205b78c2b8e4806159c46f5dc6a3ac5f6dd98252070800f170a172f9842f68a",
+      "bytes": 3173,
+      "command": [
+        "node",
+        "--test",
+        "contracts/scripts/work-claim-escrow.test.mjs",
+        "contracts/scripts/work-claim-native-inventory.test.mjs"
+      ],
+      "startedAt": "2026-09-15T03:47:16.373697+00:00",
+      "completedAt": "2026-09-15T03:48:29.107116+00:00",
+      "elapsedSeconds": 72.733,
+      "exitCode": 0,
+      "rawSha256": "e205b78c2b8e4806159c46f5dc6a3ac5f6dd98252070800f170a172f9842f68a",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/node-wire.log",
+      "sha256": "ae4770e295a227773b39dd9585d46252422222eba5d9412c991d6a88fff2e262",
+      "bytes": 298,
+      "command": [
+        "node",
+        "--test",
+        "contracts/scripts/work-claim-native-wire.test.mjs"
+      ],
+      "startedAt": "2026-09-15T03:48:29.149804+00:00",
+      "completedAt": "2026-09-15T03:48:29.505920+00:00",
+      "elapsedSeconds": 0.356,
+      "exitCode": 0,
+      "rawSha256": "ae4770e295a227773b39dd9585d46252422222eba5d9412c991d6a88fff2e262",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-after-claim.json",
+      "sha256": "0f6fd8cd1171aee86a01cac36acd3a9e785dc64de4904133f8ea4c7752802e66",
+      "bytes": 8283,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-after-decision.json",
+      "sha256": "5b775932edabbca1a4087e20b5da47f7e1bca54e529636d6fce3908cd1241174",
+      "bytes": 8286,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-after-execution-checkpoint.json",
+      "sha256": "a27a918ebcf3ec34cb20db9a818f62c408dd34c0a814a1011342016a66a34aa5",
+      "bytes": 8236,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-after-execution-custody.json",
+      "sha256": "d772ffa00b7d7e60287b80079855b4ba62eec9c23d6a0eef6c665c483194b37f",
+      "bytes": 8295,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-after-execution-evidence.json",
+      "sha256": "dd2cae547d20f0ae05990004e48499c80afcc393ac2a30e0fe51d72fdc034f8b",
+      "bytes": 8172,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-after-recorded-decision.json",
+      "sha256": "71b773dd0c86e86d3819c6b64b97329f88f98ff3a09ddf62356ab4d1203cca21",
+      "bytes": 8295,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-after-submission.json",
+      "sha256": "f6e55aa1964c08b2ddc4c8db150949024cd1004ba5cd351ac9c60265e46c0447",
+      "bytes": 8288,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-before-execution-evidence.json",
+      "sha256": "7d2b76d58d471338d95fef494005e6a339ed278e4cc8aa8248bc13be6a94591d",
+      "bytes": 8111,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-claim-after-broadcast.json",
+      "sha256": "a9db46c3b5790752a85f1df741b738c3e08da5af40715969d5f1d015f0866935",
+      "bytes": 8293,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-claim-after-prepare.json",
+      "sha256": "545f236098c64510e58400455d13befa458694c28107e0dbdeee07fae48421f5",
+      "bytes": 8291,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-complete.json",
+      "sha256": "b9f3b87768afb26f602a74cbd985e4756d69329f7f839a8837e1ca910b2817f6",
+      "bytes": 6994,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-decision-after-broadcast.json",
+      "sha256": "193260893237685cb624bc95fd3398c98f3b9f0d9f9bb1f1ec884656451c5698",
+      "bytes": 8296,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-decision-after-prepare.json",
+      "sha256": "56969644697c0ac6496c9e88c711c2401af2455b703c5c17bb43f9c69c007457",
+      "bytes": 8294,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-expired-after-decision.json",
+      "sha256": "1c26e7b9ca7c2a52198b0e21ec3b553d6310abe5c1795053df658b68db5725b4",
+      "bytes": 4772,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-expired-after-submission.json",
+      "sha256": "fe657f26eeea1e43426189d2aac6640f6d86590a4ca65292158d3d9e62a6f06b",
+      "bytes": 4531,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-expired-claim-after-prepare.json",
+      "sha256": "56bd0d738c539ba7eb2c829b4d56fd05014be9eddef98811f9c40b59febe3cd8",
+      "bytes": 4618,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-expired-decision-after-prepare.json",
+      "sha256": "b8071dd640ba987f9ca9568215e8c830c0cf03b7ede85e179da4869191e3a073",
+      "bytes": 4864,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-pay-after-broadcast.json",
+      "sha256": "50c32494bd70fdec180b68e2e8dae02ac254be107ca0ae46be922f575e8e273c",
+      "bytes": 8291,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-pay-after-observation.json",
+      "sha256": "1a0cbefb173e3eea894be8005e2232047d46b746b069c3ea94a298f68c9487e9",
+      "bytes": 8293,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/pay-pay-after-prepare.json",
+      "sha256": "86dcc4cba377f7a097d9b5fbbdb7a91f72a1b50b13d06b49ed47bf4ffd0b0bb1",
+      "bytes": 8289,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/preexpired-complete.json",
+      "sha256": "9b07d47ca4803866c25cbaa8f72419132ddf7b94da3758e5aa9cee7b462bdd65",
+      "bytes": 3225,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/proof-coverage.log",
+      "sha256": "f6f7e4ae12d9b3e0a3a8053be9604fdeebda525034915e4aecdd99f11c985c60",
+      "bytes": 48,
+      "command": [
+        "target/debug/xtask",
+        "gen",
+        "proof-coverage",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T04:18:05.348696+00:00",
+      "completedAt": "2026-09-15T04:18:11.232250+00:00",
+      "elapsedSeconds": 5.884,
+      "exitCode": 0,
+      "rawSha256": "f6f7e4ae12d9b3e0a3a8053be9604fdeebda525034915e4aecdd99f11c985c60",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/proof-update.log",
+      "sha256": "caa1f58a0fb4b5dce3569e0273bf4a472ae9f8e893b562b8938738597877d446",
+      "bytes": 103,
+      "command": [
+        "target/debug/xtask",
+        "gen",
+        "proof-coverage"
+      ],
+      "startedAt": "2026-09-15T03:50:53.091937+00:00",
+      "completedAt": "2026-09-15T03:50:58.814947+00:00",
+      "elapsedSeconds": 5.723,
+      "exitCode": 0,
+      "rawSha256": "caa1f58a0fb4b5dce3569e0273bf4a472ae9f8e893b562b8938738597877d446",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "development"
+    },
+    {
+      "path": "pre-settlement-evidence/python-buyer.log",
+      "sha256": "b75fcf55a3c353b6e4e271276a82732ab96c052a3ff24c819f3d1dadd3f601fc",
+      "bytes": 4637,
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/federated-work/python_buyer",
+        "-v"
+      ],
+      "startedAt": "2026-09-15T03:46:10.106115+00:00",
+      "completedAt": "2026-09-15T03:46:11.322394+00:00",
+      "elapsedSeconds": 1.216,
+      "exitCode": 0,
+      "rawSha256": "b75fcf55a3c353b6e4e271276a82732ab96c052a3ff24c819f3d1dadd3f601fc",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/python-execution-witness.log",
+      "sha256": "9ece351f572f7acdc729715916953ac66d6e35630cebabd7f9d18b399ff48516",
+      "bytes": 1058,
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "examples/federated-work/execution_evidence.py",
+        "docs/market/open-agent-work/execution/pre-settlement-evidence/execution-witness.json",
+        "--pins",
+        "docs/market/open-agent-work/execution/pre-settlement-evidence/execution-pins.json",
+        "--evaluated-at",
+        "1789445747"
+      ],
+      "startedAt": "2026-09-15T04:18:51.474476+00:00",
+      "completedAt": "2026-09-15T04:18:51.615880+00:00",
+      "elapsedSeconds": 0.141,
+      "exitCode": 0,
+      "rawSha256": "9ece351f572f7acdc729715916953ac66d6e35630cebabd7f9d18b399ff48516",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/python-execution.log",
+      "sha256": "d54209e12cce6a2e925c3338352c3bcfaed2778f3864595478ff3057bb91d123",
+      "bytes": 4543,
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/federated-work",
+        "-p",
+        "test_execution_evidence.py",
+        "-v"
+      ],
+      "startedAt": "2026-09-15T03:44:39.758319+00:00",
+      "completedAt": "2026-09-15T03:44:44.664257+00:00",
+      "elapsedSeconds": 4.906,
+      "exitCode": 0,
+      "rawSha256": "d54209e12cce6a2e925c3338352c3bcfaed2778f3864595478ff3057bb91d123",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/python-funded.log",
+      "sha256": "3a14517ba21b61ced2485e2a46fce2f44218850b245ac03b1d2e9c0d3a214e7e",
+      "bytes": 5976,
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/funded-work",
+        "-v"
+      ],
+      "startedAt": "2026-09-15T03:47:06.482645+00:00",
+      "completedAt": "2026-09-15T03:47:15.273198+00:00",
+      "elapsedSeconds": 8.791,
+      "exitCode": 0,
+      "rawSha256": "3a14517ba21b61ced2485e2a46fce2f44218850b245ac03b1d2e9c0d3a214e7e",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/python-wire.log",
+      "sha256": "dcc62eeb831853515bbd8af1ff54987e3df204dc8f3318a10dfc543cedf04d7a",
+      "bytes": 782,
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/federated-work",
+        "-p",
+        "test_funded_wire.py",
+        "-v"
+      ],
+      "startedAt": "2026-09-15T03:47:15.319664+00:00",
+      "completedAt": "2026-09-15T03:47:15.452157+00:00",
+      "elapsedSeconds": 0.132,
+      "exitCode": 0,
+      "rawSha256": "dcc62eeb831853515bbd8af1ff54987e3df204dc8f3318a10dfc543cedf04d7a",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/reject-after-execution-custody.json",
+      "sha256": "1b5303ec4a0bab0234f96d8a550f6aff2b457532b2d9af5e383d2293b5563fc6",
+      "bytes": 8423,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/reject-complete.json",
+      "sha256": "a440c24053403936369289675107d4c9fd762d9c36f4e996265f613eb3305137",
+      "bytes": 7122,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/reject-expired-after-decision.json",
+      "sha256": "4e5cc964a30666e9f78d3526a66ae7dd5a15f751f8ef87bd20134807d06648f5",
+      "bytes": 4772,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/reject-refund-after-broadcast.json",
+      "sha256": "ea5deacf5cd11f76dafd5b80b236972182485a04ea93567bcd4e2789bd0730ee",
+      "bytes": 5023,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/reject-refund-after-observation.json",
+      "sha256": "fd2b2e31b70d94f439b6bd61c3480f71af10495c7dcd1dc3b820b10f38bde895",
+      "bytes": 5025,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/reject-refund-after-prepare.json",
+      "sha256": "0b9ad47ecdcf199e7d3b61e53e5207614668f06abd8211411b962b6ae8edaf02",
+      "bytes": 8420,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/required-execution-metered-unavailable.json",
+      "sha256": "e1c991cada3f6bafab6942cab56562fbc3cc17291e7a76a6f2b0f9f90b1722f5",
+      "bytes": 5047,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/required-execution-settled-unavailable.json",
+      "sha256": "809ffbf4a3143f9544735cc669ba1c4a2dc98d466ba2a4edacdd1bba3c5a982c",
+      "bytes": 5041,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/required-lineage-unsupported.json",
+      "sha256": "44b3b24144d6209493cfb90cda7595545c2d7d5a956c331a0fd1565185e8b215",
+      "bytes": 4827,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/required-receipt-unavailable.json",
+      "sha256": "2cff9fae3df775d5d8d8a33867db7e32946ce36454b0ad43aa8a7bb3a2c75da1",
+      "bytes": 4839,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/resolution-absent-none.json",
+      "sha256": "2bbfde390e0908551b06f2adb3115cb4e90bdf9becd1944971da500b4aba20cd",
+      "bytes": 5191,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/resolution-preexpired-none.json",
+      "sha256": "e74c3ee389768769962ba2f5e1db13779afe73fa7bb6a48325fbfd75265628a7",
+      "bytes": 5191,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/resolution-reject-after-resolution-accepted.json",
+      "sha256": "6715833b803ad939bf7d6fd2c6b8240b22663bc684d96a2fffcda5cdf0c1274a",
+      "bytes": 5506,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/resolution-reject-after-resolution-completed.json",
+      "sha256": "481e8c6721fdb074e12a9ea80f2e37850d424fe51acbe164db567cb0f6a52093",
+      "bytes": 5506,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/resolution-reject-after-resolution-retained.json",
+      "sha256": "1876598d0979f602279ff2aa9423138dd58022991c9167793df7305bedbaf80e",
+      "bytes": 5506,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/resolution-reject-none.json",
+      "sha256": "40ed5d343d4718a74ba8fca3fe353e567fefb73b4ce127c98f01e80ed1b09d46",
+      "bytes": 5509,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/resolution-unavailable-none.json",
+      "sha256": "2c0f0e162d85aa76d3c20c628e4ef3cf3794dd4872f1e2b5a82510af2d4528ca",
+      "bytes": 5350,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/resolution.log",
+      "sha256": "18137cb632ae5c715cd3deb6a171ebb81050b165e7d221e8c372f26627113185",
+      "bytes": 418,
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_resolution.py"
+      ],
+      "startedAt": "2026-09-15T04:17:38.560257+00:00",
+      "completedAt": "2026-09-15T04:20:59.023588+00:00",
+      "elapsedSeconds": 200.463,
+      "exitCode": 0,
+      "rawSha256": "18137cb632ae5c715cd3deb6a171ebb81050b165e7d221e8c372f26627113185",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/review-closeout.md",
+      "sha256": "534896be88fe4a0bb7851f31038988469bfd0bc911a7663d6266fd887bb19cc8",
+      "bytes": 4232,
+      "qualificationRole": "primary-closeout-review"
+    },
+    {
+      "path": "pre-settlement-evidence/review-funded-initial.md",
+      "sha256": "9ee09f2ec9097111a71537df735da76d5f96318b690141cc51cd3b8a7c9ca2f0",
+      "bytes": 7585,
+      "qualificationRole": "historical-review"
+    },
+    {
+      "path": "pre-settlement-evidence/review-kernel-initial.md",
+      "sha256": "6055ec9dbd2530042a08166268068980ae52901610bb12705be6487bd8c11cfb",
+      "bytes": 5607,
+      "qualificationRole": "historical-review"
+    },
+    {
+      "path": "pre-settlement-evidence/review-python-fixes.md",
+      "sha256": "07ef2eb504d871c3b3b3d0d64b5376b0b408afe16b602ca7149129f9ffcc9683",
+      "bytes": 2954,
+      "qualificationRole": "historical-review"
+    },
+    {
+      "path": "pre-settlement-evidence/review-python-initial.md",
+      "sha256": "4df36f6609f1ba26293f49d6f0a5a16e660e07883cd81a357b6a77b67515800f",
+      "bytes": 7095,
+      "qualificationRole": "historical-review"
+    },
+    {
+      "path": "pre-settlement-evidence/rust-hygiene.log",
+      "sha256": "f0e8fa0ef0ca6d8cde8b420c7e7237ccc93cc95db4a6ea3d06b495c1ebf053ce",
+      "bytes": 43432,
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "startedAt": "2026-09-15T04:18:04.025729+00:00",
+      "completedAt": "2026-09-15T04:18:05.282771+00:00",
+      "elapsedSeconds": 1.257,
+      "exitCode": 0,
+      "rawSha256": "f0e8fa0ef0ca6d8cde8b420c7e7237ccc93cc95db4a6ea3d06b495c1ebf053ce",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/schema-registry.log",
+      "sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553",
+      "bytes": 33,
+      "command": [
+        "bash",
+        "scripts/check-chio-schema-registry.sh"
+      ],
+      "startedAt": "2026-09-15T03:47:16.041018+00:00",
+      "completedAt": "2026-09-15T03:47:16.331689+00:00",
+      "elapsedSeconds": 0.291,
+      "exitCode": 0,
+      "rawSha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/schema-shapes.log",
+      "sha256": "ba150935afe83d28ce87209867e19524be41d17c16039228f4437a18e92520dd",
+      "bytes": 138,
+      "command": [
+        "env",
+        "CHIO_WORK_PYTHON=/tmp/chio-python31-locked-venv/bin/python",
+        "python3",
+        "scripts/tests/check-registered-work-schemas.py"
+      ],
+      "startedAt": "2026-09-15T03:47:15.499345+00:00",
+      "completedAt": "2026-09-15T03:47:15.994508+00:00",
+      "elapsedSeconds": 0.495,
+      "exitCode": 0,
+      "rawSha256": "ba150935afe83d28ce87209867e19524be41d17c16039228f4437a18e92520dd",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/source-preservation.log",
+      "sha256": "a4dd52a4b378d29974960aa856f198d03018e0cf283494f2682db23010ee5c52",
+      "bytes": 332,
+      "command": [
+        "python",
+        "/tmp/chio-presettlement/check-preservation.py"
+      ],
+      "startedAt": "2026-09-15T04:29:05.072494+00:00",
+      "completedAt": "2026-09-15T04:29:05.372276+00:00",
+      "elapsedSeconds": 0.3,
+      "exitCode": 0,
+      "rawSha256": "a4dd52a4b378d29974960aa856f198d03018e0cf283494f2682db23010ee5c52",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/sqlite-outcomes.log",
+      "sha256": "d9eef6a2c272db6b9781a6734962c6d34d28ba70005ae545d268877be799e731",
+      "bytes": 3061,
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "tool_outcome",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T04:01:04.565467+00:00",
+      "completedAt": "2026-09-15T04:02:34.448002+00:00",
+      "elapsedSeconds": 89.883,
+      "exitCode": 0,
+      "rawSha256": "2954883d74b094f1a873113b47a3973e15f1b0ae16fa16124f75a8498da271bb",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/standalone-clippy.log",
+      "sha256": "d8f08a9956c16a42303e41281d7f9edad09dfd4279afac656c9e8854a57e4253",
+      "bytes": 170,
+      "command": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "startedAt": "2026-09-15T04:14:25.137109+00:00",
+      "completedAt": "2026-09-15T04:14:31.560025+00:00",
+      "elapsedSeconds": 6.423,
+      "exitCode": 0,
+      "rawSha256": "d8f08a9956c16a42303e41281d7f9edad09dfd4279afac656c9e8854a57e4253",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/standalone-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "command": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T04:17:38.960671+00:00",
+      "completedAt": "2026-09-15T04:17:39.322912+00:00",
+      "elapsedSeconds": 0.362,
+      "exitCode": 0,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/unavailable-complete.json",
+      "sha256": "344e626e6eaa88407dc17dd6b460f5fd4e6bd0e09f4b67b15085cca3b7d71d2b",
+      "bytes": 3558,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/undispatched-complete.json",
+      "sha256": "863d8f5a95177e095ce83bc8e8d09575600547ce04c9dc94aa4f4d85e14d3c26",
+      "bytes": 4002,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/unknown-complete.json",
+      "sha256": "23efc32dc2ba36fefb392a171f569923344b449e6052194827f1c0aef07dab02",
+      "bytes": 3913,
+      "qualificationRole": "public-witness"
+    },
+    {
+      "path": "pre-settlement-evidence/wire-cli.log",
+      "sha256": "3fe4a6eeb4bdb91365e0dc5ce273cc87644932bec7b8ad8cf796cce87782f2de",
+      "bytes": 9285,
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-c",
+        "import hashlib,json,pathlib,subprocess,sys\nsys.path.insert(0,'examples/federated-work')\nimport funded_wire\nmanifest=pathlib.Path('examples/federated-work/fixtures/registered-work/manifest.json')\ncases=json.loads(manifest.read_text())['cases']; shapes=funded_wire.Shapes(); results=[]\nfor case in cases:\n path=manifest.parent/case['file']; raw=path.read_bytes()\n rust=subprocess.run(['target/debug/chio-federated-work','experimental-funded-wire-check',str(path)],capture_output=True,text=True,timeout=10)\n try:\n  python=funded_wire.parse(raw,shapes); accepted=True\n except (ValueError,UnicodeError,OverflowError,RecursionError):\n  python=None; accepted=False\n assert accepted==case['accepted']==(rust.returncode==0),case['name']\n if accepted: assert python==json.loads(rust.stdout),case['name']\n results.append(dict(name=case['name'],accepted=accepted,sha256=hashlib.sha256(raw).hexdigest()))\nprint(json.dumps(dict(cases=len(results),passed=True,authorityVerified=False,results=results),indent=2))\n"
+      ],
+      "startedAt": "2026-09-15T04:21:42.865473+00:00",
+      "completedAt": "2026-09-15T04:21:43.363414+00:00",
+      "elapsedSeconds": 0.498,
+      "exitCode": 0,
+      "rawSha256": "3fe4a6eeb4bdb91365e0dc5ce273cc87644932bec7b8ad8cf796cce87782f2de",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/workspace-clippy.log",
+      "sha256": "fbe6d393e1e3a99566b2f2b455178d1bf035c9b551464d439d161cfade980bc3",
+      "bytes": 16976,
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "startedAt": "2026-09-15T04:20:03.550545+00:00",
+      "completedAt": "2026-09-15T04:27:27.305467+00:00",
+      "elapsedSeconds": 443.755,
+      "exitCode": 0,
+      "rawSha256": "fbe6d393e1e3a99566b2f2b455178d1bf035c9b551464d439d161cfade980bc3",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    },
+    {
+      "path": "pre-settlement-evidence/workspace-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T04:17:39.380889+00:00",
+      "completedAt": "2026-09-15T04:18:03.966747+00:00",
+      "elapsedSeconds": 24.586,
+      "exitCode": 0,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs",
+      "qualificationRole": "required"
+    }
+  ],
+  "notes": [
+    "Execution evidence creates no dispatch, hold, settlement observer, output release or terminal transition.",
+    "The separate checkpoint signer uses the existing builder and original journal custody; native receipt-store checkpoint semantics are unchanged.",
+    "Native SQLite anti-rollback protection covers its projection. The funding journal is a distinct local custody boundary.",
+    "The original 43 process scenarios passed alongside five new evidence SIGKILL cases and four agreed-facet denial/refund cases.",
+    "Preliminary failures are development records, not passing qualification evidence.",
+    "The formal abstraction note and source anchors were reviewed and refreshed. No new formal proof, full workspace test suite, fuzz campaign, remote CI, public finality or release qualification is claimed."
+  ],
+  "remaining": [
+    "Independently administered operators and a separately implemented funded-work participant.",
+    "Qualified multi-allocation checkpoint log and sustained capacity.",
+    "Full source replay, broader Finding assurance and W1 linkage.",
+    "Matched baseline measurements, public activation and real-funds qualification."
+  ]
+}

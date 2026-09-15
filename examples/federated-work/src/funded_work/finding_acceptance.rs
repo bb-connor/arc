@@ -1,6 +1,6 @@
 //! Pre-agreement fixture trust and actual Finding evidence assessment.
-//! Fixture authority standing covers profile governance only. It supplies no
-//! receipt, collateral, Finding status, or runtime-assurance evidence.
+//! Pre-agreement standing covers governance. Execution contexts additionally
+//! evaluate the exact retained receipt, checkpoint and signer standing bundle.
 use crate::common::{digest, Result};
 use chio_core_types::{
     canonical_json_bytes, receipt::lineage::SignedExportEnvelope, Keypair, PublicKey,
@@ -8,13 +8,19 @@ use chio_core_types::{
 use chio_finding::*;
 use chio_finding_verifier::{
     verify_finding_evidence, FindingCheckpointSignerStatusTrust, FindingEvidenceBundle,
-    FindingVerifierTrustRoots, NoNonceEvidence,
+    FindingVerifierTrustRoots, NoNonceEvidence, ResolvedReceiptEvidence,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 pub const CONTEXT_SCHEMA: &str = "chio.experimental.funded-finding-context.v1";
 pub const ASSESSMENT_SCHEMA: &str = "chio.experimental.funded-finding-assessment.v1";
+
+pub const EXECUTION_CONTEXT_SCHEMA: &str = "chio.experimental.funded-finding-context.v2";
+
+#[path = "finding_context.rs"]
+mod context_bootstrap;
+pub use context_bootstrap::{fixture_context, fixture_execution_context};
 
 /// Persist before agreement signing. The independently loaded agreement policy
 /// pins the digest of this complete context, including every authority key.
@@ -44,120 +50,10 @@ pub struct Assessment {
     pub outcome: Outcome,
 }
 
-fn authority(key: PublicKey, role: &str, now: u64, expires_at: u64) -> FindingAuthorityKeyPolicy {
-    FindingAuthorityKeyPolicy {
-        authority_id: format!("funded-w0-fixture/{role}"),
-        key,
-        key_epoch: 1,
-        valid_from: now,
-        valid_until: expires_at,
-        rotation_policy_ref: format!("funded-w0-fixture/rotation/{role}"),
-        revocation_status_ref: format!("funded-w0-fixture/status/{role}"),
-    }
-}
-
-/// Local fixture bootstrap, called once before buyer/provider agreement.
-/// Distinct generated signers authenticate governance and its standing. Their
-/// private keys are discarded; the persisted context cannot refresh itself.
-pub fn fixture_context(
-    verifier_key: &PublicKey,
-    kernel_key: &PublicKey,
-    now: u64,
-    expires_at: u64,
-) -> Result<AcceptanceContext> {
-    if now >= expires_at || expires_at - now > 86400 {
-        return Err("Finding fixture trust requires a bounded one-day window".into());
-    }
-    let governance = Keypair::generate();
-    let status = Keypair::generate();
-    let new_authority = |role| authority(Keypair::generate().public_key(), role, now, expires_at);
-    let governance_authority = authority(governance.public_key(), "governance", now, expires_at);
-    let checkpoint = new_authority("checkpoint");
-    let mut body = FindingChallengeVerifierProfile {
-        schema: FINDING_CHALLENGE_VERIFIER_PROFILE_SCHEMA_V1.into(),
-        profile_id: String::new(),
-        governance_authority: governance.public_key(),
-        operator: "funded-w0-fixture".into(),
-        receipt_signers: vec![
-            FindingReceiptSignerRole {
-                role: FindingReceiptRole::Production,
-                policy: authority(kernel_key.clone(), "production", now, expires_at),
-            },
-            FindingReceiptSignerRole {
-                role: FindingReceiptRole::Delivery,
-                policy: new_authority("delivery"),
-            },
-            FindingReceiptSignerRole {
-                role: FindingReceiptRole::Replay,
-                policy: new_authority("replay"),
-            },
-        ],
-        checkpoint_logs: vec![FindingCheckpointLogPolicy {
-            log_id: finding_checkpoint_log_id(&checkpoint.key),
-            signer: checkpoint,
-        }],
-        bbs_projection_issuer: FindingBbsIssuerPolicy {
-            issuer_fingerprint: "unavailable:funded-w0-fixture".into(),
-            key_hex: "00".repeat(32),
-            registry_ref: "unavailable:funded-w0-fixture".into(),
-            key_epoch: 1,
-            valid_from: now,
-            valid_until: expires_at,
-            revocation_status_ref: "unavailable:funded-w0-fixture".into(),
-        },
-        allowed_runner_manifests: vec![digest(&"funded-w0-no-replay-runner")?],
-        required_receipt_semantics: "chio.mediated_spend.v1".into(),
-        resolver_policy_ref: "funded-w0-empty-evidence-v1".into(),
-        retention_policy_ref: "funded-w0-journal-v1".into(),
-        resource_caps: FindingResourceCaps {
-            max_recipe_bytes: 262144,
-            max_evidence_receipts: 1,
-            max_runtime_secs: 60,
-            max_memory_bytes: 16777216,
-        },
-        predicate_engine: FINDING_PREDICATE_ENGINE_CHIO_REPLAY_V1.into(),
-        allowed_predicates: vec![FindingPredicate::BaselineFailsCandidatePassesV1],
-        required_facets: vec![
-            FindingFacetKind::ArtifactIntegrity,
-            FindingFacetKind::GuaranteeConsistency,
-        ],
-        verifier_report_signer: authority(verifier_key.clone(), "verifier", now, expires_at),
-        purchase_authority: new_authority("purchase"),
-        failed_delivery_authority: new_authority("failed-delivery"),
-        issued_at: now,
-        expires_at,
-    };
-    body.profile_id = compute_profile_id(&body)?;
-    let profile = SignedExportEnvelope::sign(body, &governance)?;
-    let standing = SignedExportEnvelope::sign(
-        FindingAuthorityStatus {
-            schema: FINDING_AUTHORITY_STATUS_SCHEMA_V1.into(),
-            status_ref: governance_authority.revocation_status_ref.clone(),
-            authority_id: governance_authority.authority_id.clone(),
-            key: governance.public_key(),
-            key_epoch: 1,
-            revoked_from: None,
-            observed_at: now,
-        },
-        &status,
-    )?;
-    Ok(AcceptanceContext {
-        schema: CONTEXT_SCHEMA.into(),
-        governance_authority,
-        profile,
-        governance_standing: FindingCheckpointSignerStatusTrust {
-            signed_statuses: vec![standing],
-            status_authority: authority(status.public_key(), "authority-status", now, expires_at),
-            max_age_secs: expires_at - now,
-        },
-        admitted_kernel_key: kernel_key.clone(),
-        collateral_authority: new_authority("collateral"),
-    })
-}
-
 /// The pin and requirements must come from the original signed agreement's
 /// policy, never from the submission. Raw Finding bytes are checked canonically
 /// by the actual verifier before any facet is evaluated.
+#[cfg(test)]
 pub fn evaluate(
     raw_finding: &[u8],
     context: &AcceptanceContext,
@@ -165,7 +61,26 @@ pub fn evaluate(
     requirements: &[FindingFacetKind],
     now: u64,
 ) -> Result<Assessment> {
-    if context.schema != CONTEXT_SCHEMA || digest(context)? != pinned_context_sha256 {
+    evaluate_with_evidence(
+        raw_finding,
+        context,
+        pinned_context_sha256,
+        requirements,
+        now,
+        None,
+    )
+}
+
+/// Evaluate the original retained evidence under the agreement-pinned context.
+pub fn evaluate_with_evidence(
+    raw_finding: &[u8],
+    context: &AcceptanceContext,
+    pinned_context_sha256: &str,
+    requirements: &[FindingFacetKind],
+    now: u64,
+    evidence: Option<&super::execution_evidence::Bundle>,
+) -> Result<Assessment> {
+    if digest(context)? != pinned_context_sha256 {
         return Err("Finding verifier context differs from the pre-agreement pin".into());
     }
     validate_context(
@@ -177,6 +92,13 @@ pub fn evaluate(
     let mut required: BTreeSet<_> = requirements.iter().copied().collect();
     if required.len() != requirements.len() {
         return Err("Finding facet requirements contain duplicates".into());
+    }
+    let mut standing = context.governance_standing.clone();
+    if let Some(evidence) = evidence {
+        validate_execution_bundle(context, evidence)?;
+        standing
+            .signed_statuses
+            .extend(evidence.signer_statuses.iter().cloned());
     }
     let trust = FindingVerifierTrustRoots {
         governance_authority: context.governance_authority.key.clone(),
@@ -190,16 +112,29 @@ pub fn evaluate(
         attestation_trust_policy: None,
         status_operator_authorization: None,
         status_freshness_policy: None,
-        checkpoint_signer_status: Some(context.governance_standing.clone()),
+        checkpoint_signer_status: Some(standing),
         trusted_time: now,
         trust_root_snapshot_sha256: pinned_context_sha256.into(),
         resolver_policy_sha256: digest(&context.profile.body.resolver_policy_ref)?,
         trusted_time_input_sha256: digest(&("funded-w0-local-clock-v1", now))?,
     };
     let bundle = FindingEvidenceBundle {
-        receipts: Vec::new(),
-        checkpoints: Vec::new(),
-        checkpoint_transparency: Default::default(),
+        receipts: evidence
+            .map(|evidence| -> Result<_> {
+                Ok(vec![ResolvedReceiptEvidence {
+                    receipt: evidence.receipt.clone(),
+                    canonical_receipt_bytes: canonical_json_bytes(&evidence.receipt)?,
+                    inclusion_proof: evidence.inclusion.clone(),
+                }])
+            })
+            .transpose()?
+            .unwrap_or_default(),
+        checkpoints: evidence
+            .map(|evidence| evidence.checkpoints.clone())
+            .unwrap_or_default(),
+        checkpoint_transparency: evidence
+            .map(|evidence| evidence.transparency.clone())
+            .unwrap_or_default(),
         finding_delivery: None,
         recipe_preimage: None,
         status_proof_input: None,
@@ -226,6 +161,7 @@ pub fn evaluate(
 }
 
 /// Convenience for trusted typed Finding values already decoded at ingress.
+#[cfg(test)]
 pub fn evaluate_finding(
     finding: &Finding,
     context: &AcceptanceContext,
@@ -284,11 +220,23 @@ fn classify(facets: &[FindingFacetResult], required: &[FindingFacetKind]) -> Out
 
 /// Check the signed assessment's shape and Finding/policy bindings at ingress.
 /// This does not authenticate its enclosing verifier signature.
+#[cfg(test)]
 pub fn validate_assessment(
     assessment: &Assessment,
     finding: &Finding,
     context: &AcceptanceContext,
     requirements: &[FindingFacetKind],
+) -> Result<()> {
+    validate_assessment_with_evidence(assessment, finding, context, requirements, None)
+}
+
+/// Replay the exact assessment at its original time using original evidence.
+pub fn validate_assessment_with_evidence(
+    assessment: &Assessment,
+    finding: &Finding,
+    context: &AcceptanceContext,
+    requirements: &[FindingFacetKind],
+    evidence: Option<&super::execution_evidence::Bundle>,
 ) -> Result<()> {
     validate_context(
         context,
@@ -331,15 +279,15 @@ pub fn validate_assessment(
     {
         return Err("Finding assessment structure, binding or outcome invalid".into());
     }
-    // This profile resolves no external evidence. Re-derive the exact retained
-    // draft at its original evaluation instant so even a freshly signed row
-    // cannot invent optional backing, reasons, or resolved evidence digests.
-    let derived = evaluate_finding(
-        finding,
+    // Re-derive the original draft so even a freshly signed row cannot invent
+    // optional backing, reasons or a different resolved evidence commitment.
+    let derived = evaluate_with_evidence(
+        &canonical_json_bytes(finding)?,
         context,
         &digest(context)?,
         requirements,
         assessment.evaluated_at,
+        evidence,
     )?;
     if canonical_json_bytes(assessment)? != canonical_json_bytes(&derived)? {
         return Err("Finding assessment differs from derived evidence verification".into());
@@ -357,15 +305,15 @@ pub fn validate_context(
     now: u64,
 ) -> Result<()> {
     let profile = &context.profile.body;
-    if context.schema != CONTEXT_SCHEMA
-        || profile.verifier_report_signer.key != *verifier_key
+    let execution = match context.schema.as_str() {
+        CONTEXT_SCHEMA if profile.required_receipt_semantics == "chio.mediated_spend.v1" => false,
+        EXECUTION_CONTEXT_SCHEMA if profile.required_receipt_semantics == chio_core_types::receipt::execution_evidence::PRE_SETTLEMENT_EXECUTION_PROFILE => true,
+        _ => return Err("Finding context schema and receipt semantics disagree".into()),
+    };
+    if profile.verifier_report_signer.key != *verifier_key
         || context.admitted_kernel_key != *kernel_key
         || profile.governance_authority != context.governance_authority.key
-        || profile.required_facets
-            != [
-                FindingFacetKind::ArtifactIntegrity,
-                FindingFacetKind::GuaranteeConsistency,
-            ]
+        || profile.required_facets != context_floor(execution)
         || now < profile.issued_at
         || now >= profile.expires_at
         || now < profile.verifier_report_signer.valid_from
@@ -381,6 +329,38 @@ pub fn validate_context(
     {
         return Err("Finding fixture context changes pinned roles, floor or validity".into());
     }
+    if execution {
+        let status_key = &context.governance_standing.status_authority.key;
+        if profile.checkpoint_logs.len() != 1
+            || profile
+                .receipt_signers
+                .iter()
+                .filter(|r| r.role == FindingReceiptRole::Production)
+                .count()
+                != 1
+            || profile
+                .receipt_signers
+                .iter()
+                .any(|r| r.policy.key == *status_key)
+            || profile
+                .checkpoint_logs
+                .iter()
+                .any(|c| c.signer.key == *status_key)
+            || [
+                &context.governance_authority.key,
+                &context.collateral_authority.key,
+                &profile.purchase_authority.key,
+                &profile.failed_delivery_authority.key,
+            ]
+            .contains(&status_key)
+            || profile.resource_caps.max_evidence_receipts != 1
+        {
+            return Err(
+                "Execution context requires independent bounded receipt and checkpoint authorities"
+                    .into(),
+            );
+        }
+    }
     verify_signed_profile(&context.profile, &context.governance_authority.key)?;
     chio_finding_verifier::validate_supported_finding_verifier_profile(profile)?;
     chio_finding_verifier::verify_status_operator_standing(
@@ -390,5 +370,78 @@ pub fn validate_context(
         Some(&context.governance_standing),
     )
     .map_err(|reason| format!("Finding governance standing invalid: {reason}"))?;
+    Ok(())
+}
+
+fn context_floor(execution: bool) -> Vec<FindingFacetKind> {
+    if execution {
+        vec![
+            FindingFacetKind::ArtifactIntegrity,
+            FindingFacetKind::ReceiptAuthenticity,
+            FindingFacetKind::CheckpointMembership,
+            FindingFacetKind::GuaranteeConsistency,
+        ]
+    } else {
+        vec![
+            FindingFacetKind::ArtifactIntegrity,
+            FindingFacetKind::GuaranteeConsistency,
+        ]
+    }
+}
+
+/// Enforce the local one-receipt profile before general cryptographic checks.
+fn validate_execution_bundle(
+    context: &AcceptanceContext,
+    evidence: &super::execution_evidence::Bundle,
+) -> Result<()> {
+    if context.schema != EXECUTION_CONTEXT_SCHEMA
+        || evidence.schema != super::execution_evidence::BUNDLE_SCHEMA
+        || evidence.checkpoints.len() != 1
+        || evidence.signer_statuses.len() != 2
+        || canonical_json_bytes(evidence)?.len() > super::wire::MAX_ARTIFACT_BYTES
+    {
+        return Err("Execution evidence is outside the agreement-pinned bounded profile".into());
+    }
+    let checkpoint = &evidence.checkpoints[0];
+    if checkpoint.body.checkpoint_seq != 1
+        || checkpoint.body.batch_start_seq != 1
+        || checkpoint.body.batch_end_seq != 1
+        || checkpoint.body.tree_size != 1
+        || evidence.inclusion.checkpoint_seq != 1
+        || evidence.inclusion.receipt_seq != 1
+        || evidence.inclusion.leaf_index != 0
+    {
+        return Err("Execution checkpoint does not cover the original single receipt".into());
+    }
+    let production = context
+        .profile
+        .body
+        .receipt_signers
+        .iter()
+        .find(|r| r.role == FindingReceiptRole::Production)
+        .ok_or("Execution profile production signer missing")?;
+    let checkpoint_policy = context
+        .profile
+        .body
+        .checkpoint_logs
+        .first()
+        .ok_or("Execution profile checkpoint signer missing")?;
+    for ((policy, acted_at), signed) in [
+        (&production.policy, evidence.receipt.timestamp),
+        (&checkpoint_policy.signer, checkpoint.body.issued_at),
+    ]
+    .into_iter()
+    .zip(&evidence.signer_statuses)
+    {
+        let status = &signed.body;
+        if status.authority_id != policy.authority_id
+            || status.key != policy.key
+            || status.key_epoch != policy.key_epoch
+            || status.status_ref != policy.revocation_status_ref
+            || status.observed_at < acted_at
+        {
+            return Err("Execution signer standing does not match the pre-agreement role".into());
+        }
+    }
     Ok(())
 }

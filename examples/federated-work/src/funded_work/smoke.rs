@@ -36,7 +36,7 @@ pub(super) fn setup_on_chain(
     buyer: &Keypair,
     request_id: &str,
 ) -> Result<Scenario> {
-    setup_with_requirements(
+    setup_profile(
         state,
         chain,
         setup,
@@ -44,22 +44,32 @@ pub(super) fn setup_on_chain(
         request_id,
         vec![
             chio_finding::FindingFacetKind::ArtifactIntegrity,
+            chio_finding::FindingFacetKind::ReceiptAuthenticity,
+            chio_finding::FindingFacetKind::CheckpointMembership,
             chio_finding::FindingFacetKind::GuaranteeConsistency,
         ],
+        true,
     )
 }
 
-pub(super) fn setup_with_requirements(
+pub(super) fn setup_profile(
     state: &Path,
     chain: Arc<LocalChain>,
     setup: &serde_json::Value,
     buyer: &Keypair,
     request_id: &str,
     requirements: Vec<chio_finding::FindingFacetKind>,
+    execution: bool,
 ) -> Result<Scenario> {
     let domain: Domain = serde_json::from_value(setup["domain"].clone())?;
     let work: WorkTerms = serde_json::from_value(setup["work"].clone())?;
-    Native::provision_with_requirements(state, buyer.public_key(), domain.clone(), requirements)?;
+    Native::provision_profile(
+        state,
+        buyer.public_key(),
+        domain.clone(),
+        requirements,
+        execution,
+    )?;
     let native = Native::open(state, chain.clone())?;
     let mut request = native.request(
         request_id,

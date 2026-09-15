@@ -279,6 +279,12 @@ impl RetainedToolAdmissionRequestV1 {
     }
 
     #[must_use]
+    /// Original frozen evaluation plan, retained with the admission binding.
+    pub fn post_return_steps(&self) -> &[FrozenEvaluationStepV1] {
+        &self.wire.post_return_steps
+    }
+
+    #[must_use]
     pub fn canonical_bytes(&self) -> &[u8] {
         &self.canonical
     }

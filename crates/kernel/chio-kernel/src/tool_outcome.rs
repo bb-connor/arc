@@ -1531,6 +1531,8 @@ impl ToolOutcomeTransitionV1 {
 
 mod post_return;
 pub use post_return::*;
+mod execution_evidence;
+pub use execution_evidence::*;
 mod security_release;
 pub use security_release::*;
 
@@ -1589,6 +1591,27 @@ pub enum ToolOutcomeStoreError {
 
 /// Storage boundary for insert-once return recording and atomic finalization.
 pub trait ToolOutcomeStore: Send + Sync {
+    /// Retain one immutable execution-only receipt without terminalizing payment.
+    fn record_execution_evidence(
+        &self,
+        _evidence: &QualifiedExecutionEvidenceV1,
+        _recovery_lease: &AdmissionRecoveryLease,
+    ) -> Result<ExecutionEvidenceRecordV1, ToolOutcomeStoreError> {
+        Err(ToolOutcomeStoreError::Unavailable(
+            "execution evidence is unsupported".into(),
+        ))
+    }
+
+    /// Read the anchored original receipt; decoding grants no write authority.
+    fn lookup_execution_evidence(
+        &self,
+        _operation_id: &AdmissionOperationId,
+    ) -> Result<Option<ExecutionEvidenceRecordV1>, ToolOutcomeStoreError> {
+        Err(ToolOutcomeStoreError::Unavailable(
+            "execution evidence is unsupported".into(),
+        ))
+    }
+
     /// Check the configured backend before a lifecycle-bearing dispatch is
     /// committed. This readiness check is not release or execution authority.
     fn require_security_release_checkpoint_support(&self) -> Result<(), ToolOutcomeStoreError> {

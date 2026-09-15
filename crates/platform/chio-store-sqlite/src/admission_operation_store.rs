@@ -79,6 +79,7 @@ mod obligation;
 mod participant;
 mod projection;
 mod retained_request;
+pub(crate) use retained_request::load_retained_request_tx;
 mod runtime_participant;
 mod runtime_replay;
 mod schema;

@@ -6,6 +6,7 @@ mod child;
 #[cfg(unix)]
 mod child_process;
 mod evidence;
+pub mod execution_evidence;
 #[cfg(unix)]
 pub use child_process::{collect_worker as child_collector, parent_worker, run as child};
 mod capture_resolution;

@@ -1,0 +1,61 @@
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling chio-listing v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-finding)
+   Compiling chio-fiscal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone)
+   Compiling chio-open-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-appraisal)
+   Compiling chio-did v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-did)
+   Compiling chio-fincred v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fincred)
+   Compiling chio-underwriting v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-underwriting)
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation)
+   Compiling chio-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-lineage)
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-verify)
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-weights)
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-custody-hw)
+   Compiling chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-swarm-authority)
+   Compiling chio-credit v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-credit)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling chio-disclosure-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-disclosure-lineage)
+   Compiling chio-web3 v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-market)
+   Compiling chio-autonomy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core)
+   Compiling chio-manifest v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-manifest)
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-settle)
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-link)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-workflow v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-workflow)
+   Compiling chio-selective-disclosure v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-selective-disclosure)
+   Compiling chio-attest-buyer-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-buyer-core)
+   Compiling chio-federation-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation-authority)
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-edge-metrics v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-edge-metrics)
+   Compiling chio-cross-protocol v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-cross-protocol)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-mcp-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-edge)
+   Compiling chio-a2a-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-a2a-edge)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-a2a-adapter v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-a2a-adapter)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+   Compiling chio-federated-work v0.1.0 (/home/connor/backbay/arc-funded-integration/examples/federated-work)
+error[E0716]: temporary value dropped while borrowed
+  --> src/funded_work/tests/execution_authority.rs:44:22
+   |
+39 |             bundle.signer_statuses[role] = SignedExportEnvelope::sign(
+   |                                            -------------------------- borrow later used by call
+...
+44 |                     &Keypair::generate()
+   |                      ^^^^^^^^^^^^^^^^^^^ creates a temporary value which is freed while still in use
+45 |                 },
+   |                 - temporary value is freed at the end of this statement
+   |
+   = note: consider using a `let` binding to create a longer lived value
+
+For more information about this error, try `rustc --explain E0716`.
+error: could not compile `chio-federated-work` (bin "chio-federated-work" test) due to 1 previous error

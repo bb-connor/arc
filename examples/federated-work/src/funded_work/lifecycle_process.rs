@@ -16,6 +16,10 @@ use std::{
 };
 
 const POINTS: &[&str] = &[
+    "before-execution-evidence",
+    "after-execution-evidence",
+    "after-execution-checkpoint",
+    "after-execution-custody",
     "after-submission",
     "claim-after-prepare",
     "claim-after-broadcast",
@@ -142,8 +146,24 @@ pub fn run(state: &Path, mode: &str, fault: &str) -> Result<Value> {
         return Err("settlement recovery changed native identity or executed twice".into());
     }
     let chain = chain.request(json!({"method":"summary","allocation":allocation}))?;
+    let after = counts(state)?;
+    for field in [
+        "executionProjectionSha256",
+        "executionBundleSha256",
+        "executionCheckpointSha256",
+    ] {
+        if !before[field].is_null() && before[field] != after[field] {
+            return Err("restart changed retained original execution evidence".into());
+        }
+    }
+    if after["executionReceiptCount"]
+        .as_u64()
+        .is_none_or(|count| count > 1)
+    {
+        return Err("restart duplicated native execution evidence".into());
+    }
     Ok(
-        json!({"checkpoint":fault,"killedSignal":9,"first":first,"before":before,"after":counts(state)?,"verification":recovered,"replay":replay,"chain":chain}),
+        json!({"checkpoint":fault,"killedSignal":9,"first":first,"before":before,"after":after,"verification":recovered,"replay":replay,"chain":chain}),
     )
 }
 

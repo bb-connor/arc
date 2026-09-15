@@ -93,7 +93,7 @@ impl super::super::verification::Checker for LocalChecker {
     }
 }
 
-fn candidate(
+pub(super) fn candidate(
     f: &super::native::Fixture,
 ) -> Result<(
     super::super::evidence::Evidence,
@@ -202,7 +202,7 @@ fn signed_decision_cannot_override_missing_or_changed_finding_authority() -> Res
             checker: &checker,
         },
     )?;
-    verification::verify_decision(&decision, &submission, &f.native.policy)?;
+    verification::verify_decision(&decision, &submission, &f.native.policy, &f.native.journal)?;
     for mutation in 0..7 {
         let mut body = decision.body.clone();
         match mutation {
@@ -227,7 +227,13 @@ fn signed_decision_cannot_override_missing_or_changed_finding_authority() -> Res
         }
         let signed = evidence::sign(body, &key)?;
         assert!(
-            verification::verify_decision(&signed, &submission, &f.native.policy).is_err(),
+            verification::verify_decision(
+                &signed,
+                &submission,
+                &f.native.policy,
+                &f.native.journal
+            )
+            .is_err(),
             "mutation {mutation}"
         );
     }
@@ -235,7 +241,9 @@ fn signed_decision_cannot_override_missing_or_changed_finding_authority() -> Res
     changed
         .required_finding_facets
         .insert(1, chio_finding::FindingFacetKind::ReceiptAuthenticity);
-    assert!(verification::verify_decision(&decision, &submission, &changed).is_err());
+    assert!(
+        verification::verify_decision(&decision, &submission, &changed, &f.native.journal).is_err()
+    );
     Ok(())
 }
 
@@ -328,24 +336,54 @@ fn required_facet_failure_times_out_without_a_chain_decision_or_payment() -> Res
     use chio_finding::FindingFacetKind::*;
     use serde_json::json;
     use std::sync::Arc;
-    for (name, required, expected) in [
+    for (name, required, expected, execution) in [
         (
             "required-receipt-unavailable",
             ReceiptAuthenticity,
             "Unavailable",
+            false,
         ),
-        ("required-lineage-unsupported", IssuerLineage, "Unsupported"),
+        (
+            "required-lineage-unsupported",
+            IssuerLineage,
+            "Unsupported",
+            false,
+        ),
+        (
+            "required-execution-metered-unavailable",
+            MeteredExposureBacking,
+            "Unavailable",
+            true,
+        ),
+        (
+            "required-execution-settled-unavailable",
+            SettledSpendBacking,
+            "Unavailable",
+            true,
+        ),
     ] {
         let state = tempfile::tempdir()?;
         let chain = Arc::new(LocalChain::start()?);
         let setup = chain.request(json!({"method":"initialize"}))?;
-        let scenario = smoke::setup_with_requirements(
+        let requirements = if execution {
+            vec![
+                ArtifactIntegrity,
+                ReceiptAuthenticity,
+                CheckpointMembership,
+                required,
+                GuaranteeConsistency,
+            ]
+        } else {
+            vec![ArtifactIntegrity, required, GuaranteeConsistency]
+        };
+        let scenario = smoke::setup_profile(
             state.path(),
             chain.clone(),
             &setup,
             &chio_core_types::Keypair::generate(),
             "funded-facet-denial",
-            vec![ArtifactIntegrity, required, GuaranteeConsistency],
+            requirements,
+            execution,
         )?;
         let native = &scenario.native;
         chain
@@ -378,12 +416,14 @@ fn required_facet_failure_times_out_without_a_chain_decision_or_payment() -> Res
             .journal
             .retained(allocation, "submission")?
             .ok_or("submission missing")?;
-        let assessment = finding_acceptance::evaluate_finding(
-            &submission.body.finding,
+        let original = native.evidence(&scenario.request)?;
+        let assessment = finding_acceptance::evaluate_with_evidence(
+            &chio_core_types::canonical_json_bytes(&submission.body.finding)?,
             &native.policy.finding_context,
             &scenario.agreement.body.finding_context_sha256,
             &scenario.agreement.body.required_finding_facets,
             crate::common::now()?,
+            original.execution.as_ref(),
         )?;
         assert_ne!(assessment.outcome, finding_acceptance::Outcome::Accepted);
         advance("refund")?;

@@ -29,6 +29,7 @@ pub struct Evidence {
     pub binding: Binding,
     pub input: String,
     pub output: Value,
+    pub execution: Option<super::execution_evidence::Bundle>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -102,8 +103,17 @@ pub fn submit(
         guarantee_class: FindingGuaranteeClass::Asserted,
         payload_sha256: digest(&reveal(&output))?,
         payload_media_type: "application/json".into(),
-        evidence_receipt_ids: Vec::new(),
-        evidence_checkpoint_ref: "unavailable:pre-settlement".into(),
+        evidence_receipt_ids: original
+            .execution
+            .as_ref()
+            .map(|b| vec![b.receipt.id.clone()])
+            .unwrap_or_default(),
+        evidence_checkpoint_ref: original
+            .execution
+            .as_ref()
+            .map(super::execution_evidence::checkpoint_ref)
+            .transpose()?
+            .unwrap_or_else(|| "unavailable:pre-settlement".into()),
         evidence_cost: chio_core_types::capability::scope::MonetaryAmount {
             units: 100,
             currency: CURRENCY.into(),
@@ -149,6 +159,28 @@ pub fn verify(raw: &[u8], original: &Evidence, policy: &Policy, custody: &Journa
         return Err("submission changed original authority or native binding".into());
     }
     let finding = &body.finding;
+    if super::execution_evidence::enabled(policy) {
+        let bundle = original
+            .execution
+            .as_ref()
+            .ok_or("original execution evidence unavailable")?;
+        if bundle.receipt.content_hash != digest(&original.output)? {
+            return Err("original output differs from signed native execution".into());
+        }
+    } else if original.execution.is_some() {
+        return Err("legacy Finding cannot claim native execution evidence".into());
+    }
+    let expected_receipts = original
+        .execution
+        .as_ref()
+        .map(|b| vec![b.receipt.id.clone()])
+        .unwrap_or_default();
+    let expected_checkpoint = original
+        .execution
+        .as_ref()
+        .map(super::execution_evidence::checkpoint_ref)
+        .transpose()?
+        .unwrap_or_else(|| "unavailable:pre-settlement".into());
     verify_finding(finding)?;
     if finding.issuer != policy.provider_key
         || finding.descriptor.context_sha256 != digest(&original.binding)?
@@ -156,8 +188,8 @@ pub fn verify(raw: &[u8], original: &Evidence, policy: &Policy, custody: &Journa
         || finding.descriptor.outcome_class != FindingOutcomeClass::PositiveResult
         || finding.guarantee_class != FindingGuaranteeClass::Asserted
         || finding.evidence_class != FindingEvidenceClass::Asserted
-        || !finding.evidence_receipt_ids.is_empty()
-        || finding.evidence_checkpoint_ref != "unavailable:pre-settlement"
+        || finding.evidence_receipt_ids != expected_receipts
+        || finding.evidence_checkpoint_ref != expected_checkpoint
         || finding.runtime_assurance_tier.is_some()
         || finding.replay_recipe_sha256.is_some()
         || finding.intent_commitment_receipt_id.is_some()

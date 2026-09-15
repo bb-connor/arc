@@ -1,0 +1,70 @@
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling chio-listing v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-finding)
+   Compiling chio-fiscal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone)
+   Compiling chio-appraisal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-appraisal)
+   Compiling chio-open-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-open-market)
+   Compiling chio-underwriting v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-underwriting)
+   Compiling chio-fincred v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fincred)
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation)
+   Compiling chio-did v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-did)
+   Compiling chio-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-lineage)
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-verify)
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-weights)
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-custody-hw)
+   Compiling chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-swarm-authority)
+   Compiling chio-credit v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-credit)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling chio-disclosure-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-disclosure-lineage)
+   Compiling chio-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-market)
+   Compiling chio-web3 v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3)
+   Compiling chio-autonomy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core)
+   Compiling chio-manifest v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-manifest)
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-link)
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-settle)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-workflow v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-workflow)
+   Compiling chio-selective-disclosure v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-selective-disclosure)
+   Compiling chio-attest-buyer-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-buyer-core)
+   Compiling chio-federation-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation-authority)
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+warning: associated function `qualify` is never used
+  --> crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs:31:19
+   |
+29 | impl QualifiedExecutionEvidenceV1 {
+   | --------------------------------- associated function in this implementation
+30 |     #[allow(clippy::too_many_arguments)]
+31 |     pub(crate) fn qualify(
+   |                   ^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-agent-web-interop)
+warning: `chio-kernel` (lib) generated 1 warning
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 2m 42s
+     Running tests/durable_admission_sqlite.rs (target/debug/deps/durable_admission_sqlite-e5c253aea567000a)
+
+running 1 test
+test execution_evidence::sqlite_execution_evidence_precedes_payment_and_replays_after_restart ... FAILED
+
+failures:
+
+---- execution_evidence::sqlite_execution_evidence_precedes_payment_and_replays_after_restart stdout ----
+Error: DurableAdmission("execution evidence is not implemented")
+
+
+failures:
+    execution_evidence::sqlite_execution_evidence_precedes_payment_and_replays_after_restart
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 23 filtered out; finished in 2.16s
+
+error: test failed, to rerun pass `-p chio-kernel --test durable_admission_sqlite`
