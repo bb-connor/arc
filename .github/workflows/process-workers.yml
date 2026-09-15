@@ -223,6 +223,7 @@ jobs:
           npm test --prefix sdks/typescript --workspace @chio-protocol/ai-sdk-process
           uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff check --config sdks/python/chio-process/pyproject.toml sdks/typescript/packages/ai-sdk-process/qualification
           uv run --project sdks/python/chio-langgraph --locked --extra dev --extra process ruff format --check --config sdks/python/chio-process/pyproject.toml sdks/typescript/packages/ai-sdk-process/qualification
+          python3 -m unittest discover -s sdks/typescript/packages/ai-sdk-process/qualification -p 'test_*.py'
           python3 sdks/typescript/packages/ai-sdk-process/qualification/qualify.py --chio target/debug/chio --output "$RUNNER_TEMP/ai-sdk-process-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
       - name: Research swarm benchmark against a local-callback baseline
         run: |

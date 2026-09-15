@@ -205,6 +205,10 @@ typechecks a consumer against pinned AI SDK **6.0.277** and **7.0.93**, and runs
 both real SDK execution loops against the native host and a non-idempotent
 SQLite publication tool. Dependency installation initially needs registry
 access or a populated npm cache. Installing the Chio tarballs uses offline mode.
+The harness retains a private executable snapshot at `bin/chio` inside the
+evidence directory and records its SHA256. Every profile and receipt verifier
+uses that snapshot, so rebuilding the original CLI path cannot change the
+executable halfway through qualification.
 
 | Profile, repeated for both SDK versions | Publications | Final run |
 | --- | ---: | --- |

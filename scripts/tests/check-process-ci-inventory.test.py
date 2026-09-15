@@ -30,4 +30,14 @@ gate_step = next(
 assert "python3 scripts/tests/check-process-dependencies.test.py" in gate_step["run"], (
     "dependency parser fixtures must run beside the gate"
 )
+assert [
+    "python3",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "sdks/typescript/packages/ai-sdk-process/qualification",
+    "-p",
+    "test_*.py",
+] in commands, "installed AI SDK qualification must test executable snapshot integrity"
 print("process CI inventory passed")

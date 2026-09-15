@@ -44,6 +44,16 @@ def write(path, value):
     path.write_text(json.dumps(value, indent=2) + "\n")
 
 
+def snapshot_executable(source, output):
+    """Retain and execute one binary even if Cargo replaces the source path."""
+    directory = output / "bin"
+    directory.mkdir(mode=0o700, exist_ok=False)
+    binary = directory / "chio"
+    shutil.copyfile(source.resolve(strict=True), binary)
+    binary.chmod(0o700)
+    return binary
+
+
 def count(directory):
     path = directory / "publications.db"
     if not path.exists():
@@ -404,6 +414,7 @@ def main():
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(mode=0o700, exist_ok=False)
+    binary = snapshot_executable(args.chio, output)
     package_dir = output / "packages"
     package_dir.mkdir()
     command(
@@ -417,7 +428,6 @@ def main():
         )
         packages.append(package_dir / packed[0]["filename"])
     temporary = Path(tempfile.mkdtemp(prefix="chio-aip-"))
-    binary = args.chio.resolve(strict=True)
     inputs = {
         "qualification_checkout": {
             "commit": command(["git", "rev-parse", "HEAD"], PACKAGE).stdout.strip(),
@@ -427,6 +437,7 @@ def main():
         "node": command(["node", "--version"], PACKAGE).stdout.strip(),
         "npm": command(["npm", "--version"], PACKAGE).stdout.strip(),
         "python": platform.python_version(),
+        "binary": str(binary.relative_to(output)),
         "sha256": {},
     }
     for path in [binary, *packages]:
