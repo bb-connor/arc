@@ -1,6 +1,15 @@
 # Security launch: current execution status
 
-Updated 2026-09-14 UTC. This is the short working index for the accepted
+Updated 2026-09-15 UTC. Current work is on `integration/process-security-m4` in
+`/tmp/arc-security-launch`, published as [draft PR #1160](https://github.com/bb-connor/arc/pull/1160).
+The complete process ancestry is reconciled locally with M4. Combined
+qualification and protected merge remain open; M5 is not complete. See the
+[integration order](process-security-integration.md) and
+[current qualification results](process-security-qualification.md).
+
+The following checkpoint and milestone closeouts describe the earlier M4
+candidate, not qualification of the combined process branch. This is the working
+index for the accepted
 [execution plan](launch-execution-plan.md), not another qualification campaign.
 Candidate: `/tmp/arc-security-launch`, `security/launch-integration`, base HEAD
 `8b9f9243905dfa61acac82d83438684940777fe3`. The accumulated 722-path checkpoint
