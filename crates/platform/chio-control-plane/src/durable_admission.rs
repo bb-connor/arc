@@ -8,8 +8,8 @@ use chio_kernel::admission_operation::{DurableAdmissionMode, StoreMutationFence}
 use chio_kernel::tool_outcome::QualifiedToolOutcomeStore;
 use chio_kernel::{BudgetStore, ChioKernel, QualifiedAdmissionProjectionStore, RevocationStore};
 use chio_store_sqlite::{
-    RelocationImport, RelocationSeal, SqliteAuthorityStore, SqliteBudgetStore,
-    SqliteRevocationStore,
+    RelocationImport, RelocationImportPhase, RelocationSeal, SqliteAuthorityStore,
+    SqliteBudgetStore, SqliteRevocationStore,
 };
 
 use crate::{load_or_create_authority_keypair, CliError};
@@ -90,6 +90,22 @@ impl DurableAdmissionRuntime {
         expected: &RelocationSeal,
         verify_exported: impl FnOnce() -> Result<(), CliError>,
     ) -> Result<RelocationImport, CliError> {
+        Self::import_relocation_checked_with_phase(path, expected, |phase| {
+            if phase == RelocationImportPhase::Exported {
+                verify_exported()?;
+            }
+            Ok(())
+        })
+    }
+
+    /// Check relocated files against the owning store's verified import phase.
+    /// A committed retry may retain its authority commit in WAL; only the store
+    /// qualifies that state, before the callback or any recovery mutation.
+    pub fn import_relocation_checked_with_phase(
+        path: &Path,
+        expected: &RelocationSeal,
+        verify_files: impl FnOnce(RelocationImportPhase) -> Result<(), CliError>,
+    ) -> Result<RelocationImport, CliError> {
         SqliteAuthorityStore::ensure_serving_supported()?;
         let lock_root = durable_admission_lock_root(path)?;
         create_private_directory(&lock_root)?;
@@ -98,12 +114,12 @@ impl DurableAdmissionRuntime {
                 "the durable admission kernel seed did not move with its database".to_string(),
             ));
         }
-        Ok(SqliteAuthorityStore::import_relocated_checked(
+        Ok(SqliteAuthorityStore::import_relocated_checked_with_phase(
             path,
             &lock_root,
             expected,
-            || {
-                verify_exported().map_err(|failure| {
+            |phase| {
+                verify_files(phase).map_err(|failure| {
                     chio_store_sqlite::SqliteServingOwnerError::Invalid(failure.to_string())
                 })
             },

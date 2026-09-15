@@ -481,7 +481,8 @@ pub use security_admission_operation_store::SqliteAdmissionOperationStore as Sql
 pub use security_state::SqliteSecurityStateStore;
 pub use serving_owner::{
     scope_fixed_authority_ids_for_current_thread, FixedAuthorityIdScope, RelocationImport,
-    RelocationSeal, SqliteAuthorityStore, SqliteServingOwnerError, RELOCATION_SEAL_FORMAT,
+    RelocationImportPhase, RelocationSeal, SqliteAuthorityStore, SqliteServingOwnerError,
+    RELOCATION_SEAL_FORMAT,
 };
 
 impl chio_kernel::QualifiedAdmissionProjectionStore

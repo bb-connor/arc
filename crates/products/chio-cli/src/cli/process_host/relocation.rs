@@ -12,7 +12,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use chio_control_plane::DurableAdmissionRuntime;
-use chio_store_sqlite::RelocationSeal;
+use chio_store_sqlite::{RelocationImportPhase, RelocationSeal};
 use rusqlite::{Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -29,6 +29,13 @@ const CHECKPOINTED: [&str; 4] = ["receipts.db", "process.db", "mailboxes.db", "r
 const EXCLUDED: [&str; 2] = ["host.lock", MANIFEST];
 const EXCLUDED_DIRECTORIES: [&str; 1] = ["run-sockets"];
 const SQLITE_SIDECARS: [&str; 2] = ["-wal", "-shm"];
+
+#[derive(Clone, Copy)]
+enum SidecarPolicy {
+    Checkpointable,
+    Sealed,
+    CommittedImport,
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -49,7 +56,7 @@ pub(super) fn export(state: &Path) -> Result<(), CliError> {
     super::state::require_abi(&record.abi, "host state")?;
     // Reject unreadable files and symlinks before retiring a usable authority.
     // Retirement itself is resumable if a later write or the host fails.
-    digests(&directory, false)?;
+    digests(&directory, SidecarPolicy::Checkpointable)?;
     let runner = directory.join("runner.db");
     if runner.try_exists()? {
         let db = Connection::open_with_flags(
@@ -82,7 +89,7 @@ pub(super) fn export(state: &Path) -> Result<(), CliError> {
         }
     }
     let seal = DurableAdmissionRuntime::export_relocation(&directory.join("authority.db"))?;
-    let files = digests(&directory, true)?;
+    let files = digests(&directory, SidecarPolicy::Sealed)?;
     let manifest = Manifest {
         schema: SCHEMA.to_owned(),
         abi: record.abi,
@@ -123,8 +130,13 @@ pub(super) fn import(state: &Path) -> Result<(), CliError> {
     // They are not an authority for the new location, and an interrupted
     // replacement must be retryable. The database still has to match its
     // exported bytes until commit; application files must match on every try.
-    let verify_files = |all: bool| -> Result<(), CliError> {
-        let actual = digests(&directory, true)?;
+    let verify_files = |phase: RelocationImportPhase| -> Result<(), CliError> {
+        let all = phase == RelocationImportPhase::Exported;
+        let policy = match phase {
+            RelocationImportPhase::Exported => SidecarPolicy::Sealed,
+            RelocationImportPhase::Committed => SidecarPolicy::CommittedImport,
+        };
+        let actual = digests(&directory, policy)?;
         let authoritative = |name: &&String| !name.starts_with("authority.db.locks/");
         if actual
             .keys()
@@ -149,11 +161,10 @@ pub(super) fn import(state: &Path) -> Result<(), CliError> {
         }
         Ok(())
     };
-    verify_files(false)?;
-    let imported = DurableAdmissionRuntime::import_relocation_checked(
+    let imported = DurableAdmissionRuntime::import_relocation_checked_with_phase(
         &directory.join("authority.db"),
         &manifest.seal,
-        || verify_files(true),
+        verify_files,
     )?;
     lease.directory.validate_path_identity()?;
     std::fs::remove_file(directory.join(MANIFEST))?;
@@ -190,7 +201,7 @@ fn checkpoint(path: &Path) -> Result<(), CliError> {
 
 /// SHA-256 of every regular file that travels with the directory, keyed by
 /// its slash-separated relative path.
-fn digests(directory: &Path, sealed: bool) -> Result<BTreeMap<String, String>, CliError> {
+fn digests(directory: &Path, policy: SidecarPolicy) -> Result<BTreeMap<String, String>, CliError> {
     let mut files = BTreeMap::new();
     let mut pending = vec![directory.to_path_buf()];
     while let Some(current) = pending.pop() {
@@ -227,7 +238,17 @@ fn digests(directory: &Path, sealed: bool) -> Result<BTreeMap<String, String>, C
             {
                 let known = current == directory
                     && (database == "authority.db" || CHECKPOINTED.contains(&database));
-                if !known || (sealed && name.ends_with("-wal") && entry.metadata()?.len() != 0) {
+                let regular_database = known
+                    && directory
+                        .join(database)
+                        .symlink_metadata()
+                        .is_ok_and(|metadata| metadata.is_file());
+                let accepts_wal = matches!(policy, SidecarPolicy::Checkpointable)
+                    || (matches!(policy, SidecarPolicy::CommittedImport)
+                        && database == "authority.db");
+                if !regular_database
+                    || (!accepts_wal && name.ends_with("-wal") && entry.metadata()?.len() != 0)
+                {
                     return Err(error(format!(
                         "unverified SQLite sidecar: {}",
                         relative(directory, &path)?

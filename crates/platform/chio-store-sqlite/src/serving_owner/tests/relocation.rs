@@ -152,3 +152,124 @@ fn import_checks_external_manifest_before_retiring_the_export() {
     SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || Ok(()))
         .expect("verified import");
 }
+
+#[test]
+fn refused_wal_backed_import_does_not_checkpoint_foreign_state_on_close() {
+    let (temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    let seal = SqliteAuthorityStore::export_for_relocation(&database, &lock_root).expect("export");
+    let (moved, locks) = copy_store(temp.path(), &temp.path().join("moved"));
+    let reader = Connection::open(&moved).expect("reader");
+    reader
+        .execute_batch("BEGIN; SELECT * FROM chio_serving_relocation;")
+        .expect("pin export");
+    let before = fs::read(&moved).expect("exported bytes");
+    let imported =
+        SqliteAuthorityStore::import_relocated_checked_with_phase(&moved, &locks, &seal, |phase| {
+            assert_eq!(phase, RelocationImportPhase::Exported);
+            Ok(())
+        })
+        .expect("import");
+    assert!(
+        fs::read(&moved).expect("main bytes") == before,
+        "fixture must retain the import in WAL"
+    );
+    let wal = fs::read(moved.with_extension("db-wal")).expect("committed WAL");
+    assert!(wal.len() > 32);
+    assert_eq!(
+        SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || panic!(
+            "already imported"
+        ))
+        .expect("valid owning retry"),
+        imported
+    );
+    let lock = locks.join(format!("{}.lock", seal.store_uuid));
+    let anchor = fs::read(&lock).expect("anchor before callback refusal");
+    let snapshot =
+        crate::tests::authority_snapshot(&Connection::open(&moved).expect("snapshot connection"))
+            .expect("snapshot");
+    let refused =
+        SqliteAuthorityStore::import_relocated_checked_with_phase(&moved, &locks, &seal, |phase| {
+            assert_eq!(phase, RelocationImportPhase::Committed);
+            Err(SqliteServingOwnerError::Invalid(
+                "application files refused".into(),
+            ))
+        });
+    assert!(refused.is_err());
+    assert!(fs::read(&moved).expect("refused main") == before);
+    assert!(fs::read(moved.with_extension("db-wal")).expect("refused WAL") == wal);
+    assert_eq!(fs::read(&lock).expect("refused anchor"), anchor);
+    assert_eq!(
+        crate::tests::authority_snapshot(&Connection::open(&moved).expect("snapshot connection"))
+            .expect("snapshot"),
+        snapshot
+    );
+    for wrong_seal in [true, false] {
+        let destination = temp.path().join(if wrong_seal {
+            "wrong-seal"
+        } else {
+            "foreign-location"
+        });
+        let (foreign, foreign_locks) = copy_store(&temp.path().join("moved"), &destination);
+        let foreign_wal = foreign.with_extension("db-wal");
+        fs::write(&foreign_wal, &wal).expect("foreign WAL");
+        let main_before = fs::read(&foreign).expect("foreign main");
+        let lock = foreign_locks.join(format!("{}.lock", seal.store_uuid));
+        let anchor = fs::read(&lock).expect("foreign anchor");
+        let mut expected = seal.clone();
+        if wrong_seal {
+            expected.export_id = uuid::Uuid::now_v7().to_string();
+        }
+        let refused = SqliteAuthorityStore::import_relocated_checked_with_phase(
+            &foreign,
+            &foreign_locks,
+            &expected,
+            |_| panic!("foreign imported state must not reach file verification"),
+        );
+        assert!(refused.is_err());
+        assert!(
+            fs::read(&foreign).expect("refused main") == main_before,
+            "refusal checkpointed foreign WAL"
+        );
+        assert!(fs::read(&foreign_wal).expect("retained foreign WAL") == wal);
+        assert_eq!(fs::read(&lock).expect("retained anchor"), anchor);
+    }
+}
+
+#[test]
+fn verified_import_retries_after_lock_artifact_io_refusal() {
+    let (temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    let seal = SqliteAuthorityStore::export_for_relocation(&database, &lock_root).expect("export");
+    let (moved, locks) = copy_store(temp.path(), &temp.path().join("moved"));
+    let obstruction = path_identity_marker(&moved, &locks);
+    fs::create_dir(&obstruction).expect("block lock artifact replacement");
+    let verified = std::cell::Cell::new(false);
+    let refused =
+        SqliteAuthorityStore::import_relocated_checked_with_phase(&moved, &locks, &seal, |phase| {
+            assert_eq!(phase, RelocationImportPhase::Exported);
+            verified.set(true);
+            Ok(())
+        });
+    assert!(
+        verified.get(),
+        "failure must follow successful file verification"
+    );
+    assert!(
+        matches!(refused, Err(SqliteServingOwnerError::Invalid(ref reason)) if reason.contains("previous lock artifact is not a regular file")),
+        "{refused:?}"
+    );
+    // Authorized work may have partially replaced the old locks. Remove only
+    // the test-owned obstruction and retry the same export at the same path.
+    fs::remove_dir(&obstruction).expect("remove owned obstruction");
+    let imported = SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || Ok(()))
+        .expect("retry authorized import");
+    assert_eq!(imported.seal, seal);
+    assert_eq!(
+        SqliteAuthorityStore::import_relocated_checked(&moved, &locks, &seal, || panic!(
+            "committed retry"
+        ))
+        .expect("stable import identity"),
+        imported
+    );
+}

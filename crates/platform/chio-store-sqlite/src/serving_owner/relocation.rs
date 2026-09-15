@@ -13,7 +13,7 @@
 use std::fs::{self, File};
 use std::path::Path;
 
-use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+use rusqlite::{config::DbConfig, params, Connection, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 
 use super::global_commit_chain::verify_global_commit_chain;
@@ -71,6 +71,16 @@ pub struct RelocationSeal {
 pub struct RelocationImport {
     pub seal: RelocationSeal,
     pub import_id: String,
+}
+
+/// Import state qualified under the relocation lock before caller verification.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RelocationImportPhase {
+    /// The authority must still match its original exported file bytes.
+    Exported,
+    /// The same seal has committed at this inode/location with verified custody.
+    /// Its authority WAL may contain that commit; application files still need verification.
+    Committed,
 }
 
 pub(super) enum RelocationState {
@@ -349,7 +359,7 @@ impl SqliteAuthorityStore {
         database_path: impl AsRef<Path>,
         lock_root: impl AsRef<Path>,
     ) -> Result<RelocationImport, SqliteServingOwnerError> {
-        Self::import_relocated_inner(database_path, lock_root, None, || Ok(()))
+        Self::import_relocated_inner(database_path, lock_root, None, |_| Ok(()))
     }
 
     /// Verify an external manifest before the first import mutation. A retry
@@ -363,14 +373,32 @@ impl SqliteAuthorityStore {
         expected: &RelocationSeal,
         verify_exported: impl FnOnce() -> Result<(), SqliteServingOwnerError>,
     ) -> Result<RelocationImport, SqliteServingOwnerError> {
-        Self::import_relocated_inner(database_path, lock_root, Some(expected), verify_exported)
+        Self::import_relocated_inner(database_path, lock_root, Some(expected), |phase| {
+            if phase == RelocationImportPhase::Exported {
+                verify_exported()?;
+            }
+            Ok(())
+        })
+    }
+
+    /// Verify all relocated files after the store qualifies the import phase.
+    /// The callback runs before import or recovery writes, including checkpoint
+    /// on close. Only a verified same-location committed import receives
+    /// `Committed`; callers must still verify application files on that path.
+    pub fn import_relocated_checked_with_phase(
+        database_path: impl AsRef<Path>,
+        lock_root: impl AsRef<Path>,
+        expected: &RelocationSeal,
+        verify_files: impl FnOnce(RelocationImportPhase) -> Result<(), SqliteServingOwnerError>,
+    ) -> Result<RelocationImport, SqliteServingOwnerError> {
+        Self::import_relocated_inner(database_path, lock_root, Some(expected), verify_files)
     }
 
     fn import_relocated_inner(
         database_path: impl AsRef<Path>,
         lock_root: impl AsRef<Path>,
         expected: Option<&RelocationSeal>,
-        verify_exported: impl FnOnce() -> Result<(), SqliteServingOwnerError>,
+        verify_files: impl FnOnce(RelocationImportPhase) -> Result<(), SqliteServingOwnerError>,
     ) -> Result<RelocationImport, SqliteServingOwnerError> {
         Self::ensure_serving_supported()?;
         let database_path = database_path.as_ref();
@@ -382,6 +410,9 @@ impl SqliteAuthorityStore {
         validate_secure_directory(database_parent(&database_path), "authority database parent")?;
         let expected_database = fs::metadata(&database_path)?;
         let mut connection = open_existing_database(&database_path)?;
+        // Merely reading a WAL can make an ordinary connection checkpoint it
+        // during drop. A refused seal/location/file check must not do that.
+        connection.set_db_config(DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, true)?;
         validate_database_identity(&database_path, &expected_database)?;
         if !owner_table_exists(&connection)? {
             return Err(SqliteServingOwnerError::NotProvisioned(path_text(
@@ -406,14 +437,6 @@ impl SqliteAuthorityStore {
                 "authority seal differs from the relocation manifest".to_string(),
             ));
         }
-        if imported_id.is_none() {
-            verify_exported()?;
-        }
-        connection.execute_batch(
-            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;"
-        )?;
-        initialize_serving_lease_schema(&connection)?;
-        initialize_serving_relocation_schema(&connection)?;
         let admission = verify_admission_commit_chain(&connection)?;
         let global = verify_global_commit_chain(&connection)?;
         if record.store_uuid != seal.store_uuid
@@ -443,6 +466,9 @@ impl SqliteAuthorityStore {
                 record.lock_device,
                 record.lock_inode,
             )?;
+            anchor.verify_extends(&connection, &anchor.committed_record()?)?;
+            verify_files(RelocationImportPhase::Committed)?;
+            connection.set_db_config(DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, false)?;
             anchor.reconcile_startup(&connection)?;
             path_identity::ensure(&lock_root, &database_path, &record.store_uuid)?;
             File::open(&database_path)?.sync_all()?;
@@ -451,6 +477,13 @@ impl SqliteAuthorityStore {
             return Ok(RelocationImport { seal, import_id });
         }
 
+        verify_files(RelocationImportPhase::Exported)?;
+        // Verification refusals are read-only. From here, authorized I/O can
+        // partially complete and retains the normal import retry semantics.
+        connection.set_db_config(DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, false)?;
+        connection.execute_batch(
+            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON;",
+        )?;
         // Lock artifacts belong to the previous location; nothing serves an
         // exported store, so they are replaced rather than reused.
         let lock_path = lock_root.join(format!("{}.lock", record.store_uuid));

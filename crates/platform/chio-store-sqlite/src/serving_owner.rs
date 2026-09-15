@@ -37,7 +37,9 @@ use global_commit_chain::{
     seed_global_baseline, verify_global_commit_schema, verify_pristine_authority_tables,
 };
 use lease_history::{initialize_serving_lease_schema, verify_serving_lease_history};
-pub use relocation::{RelocationImport, RelocationSeal, RELOCATION_SEAL_FORMAT};
+pub use relocation::{
+    RelocationImport, RelocationImportPhase, RelocationSeal, RELOCATION_SEAL_FORMAT,
+};
 #[cfg(feature = "fuzz")]
 pub(crate) use rollback_anchor::exercise_slot_image;
 use rollback_anchor::{AnchorRecord, RollbackAnchor};

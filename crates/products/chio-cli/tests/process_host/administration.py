@@ -37,7 +37,13 @@ def init_nonempty(binary, directory):
 def relocation_files(binary, directory):
     state, _, _ = prepare(binary, directory / "prepared")
     command(binary, "export", "--state", state)
-    for name in ["extra", "extra.tmp", "receipts.db-wal", "unknown.db-wal"]:
+    for name in [
+        "extra",
+        "extra.tmp",
+        "receipts.db-wal",
+        "authority.db-wal",
+        "unknown.db-wal",
+    ]:
         moved = directory / name.replace(".", "-")
         shutil.copytree(state, moved)
         before = (moved / "authority.db").read_bytes()
@@ -90,6 +96,88 @@ def busy_reader(binary, directory):
         assert (state / "authority.db").read_bytes() == before
         reader.rollback()
     command(binary, "export", "--state", state)
+
+
+def orphan_sidecar(binary, directory):
+    state, _, _ = prepare(binary, directory / "prepared")
+    assert not (state / "runner.db").exists()
+    orphan = state / "runner.db-wal"
+    orphan.write_bytes(b"foreign orphan WAL")
+    authority = state / "authority.db"
+    before = authority.read_bytes()
+    locks = {p.name: p.read_bytes() for p in (state / "authority.db.locks").iterdir()}
+    command(binary, "export", "--state", state, success=False)
+    assert authority.read_bytes() == before, "orphan WAL refusal retired authority"
+    assert orphan.read_bytes() == b"foreign orphan WAL"
+    assert {
+        p.name: p.read_bytes() for p in (state / "authority.db.locks").iterdir()
+    } == locks
+    orphan.unlink()
+    assert json.loads(command(binary, "export", "--state", state).stdout)["exported"]
+
+
+def committed_import_wal(binary, directory):
+    state, _, _ = prepare(binary, directory / "prepared")
+    command(binary, "export", "--state", state)
+    moved = directory / "moved"
+    shutil.copytree(state, moved)
+    authority = moved / "authority.db"
+    original = authority.read_bytes()
+    manifest = (moved / "relocation.json").read_bytes()
+    # Pin the exported snapshot across the real import commit. Connection
+    # teardown cannot fold that commit into the main file while this reader lives.
+    with sqlite3.connect(authority) as reader:
+        reader.execute("BEGIN")
+        assert reader.execute(
+            "SELECT state FROM chio_serving_relocation"
+        ).fetchone() == ("exported",)
+        imported = json.loads(command(binary, "import", "--state", moved).stdout)
+        wal = moved / "authority.db-wal"
+        assert wal.stat().st_size > 32
+        assert authority.read_bytes() == original, (
+            "fixture must retain the import only in WAL"
+        )
+        (moved / "relocation.json").write_bytes(manifest)
+        # The same committed WAL at another location is foreign recovery state.
+        foreign = directory / "foreign"
+        shutil.copytree(state, foreign)
+        shutil.copyfile(wal, foreign / "authority.db-wal")
+        before = {
+            p.name: p.read_bytes() for p in foreign.glob("authority.db*") if p.is_file()
+        }
+        locks = {
+            p.name: p.read_bytes() for p in (foreign / "authority.db.locks").iterdir()
+        }
+        command(binary, "import", "--state", foreign, success=False)
+        assert all(
+            (foreign / name).read_bytes() == value for name, value in before.items()
+        ), "foreign WAL refusal changed authority bytes"
+        assert {
+            p.name: p.read_bytes() for p in (foreign / "authority.db.locks").iterdir()
+        } == locks
+        anchor = {
+            p.name: p.read_bytes() for p in (moved / "authority.db.locks").iterdir()
+        }
+        host = moved / "host.json"
+        host_bytes = host.read_bytes()
+        wal_bytes = wal.read_bytes()
+        host.write_bytes(host_bytes + b"\n")
+        command(binary, "import", "--state", moved, success=False)
+        assert authority.read_bytes() == original
+        assert wal.read_bytes() == wal_bytes
+        assert {
+            p.name: p.read_bytes() for p in (moved / "authority.db.locks").iterdir()
+        } == anchor
+        host.write_bytes(host_bytes)
+        assert (
+            json.loads(command(binary, "import", "--state", moved).stdout) == imported
+        )
+        assert {
+            p.name: p.read_bytes() for p in (moved / "authority.db.locks").iterdir()
+        } == anchor
+        assert authority.read_bytes() == original
+        assert not (moved / "relocation.json").exists()
+        reader.rollback()
 
 
 def diagnostic_pipe(binary, directory):
@@ -186,6 +274,8 @@ if __name__ == "__main__":
         "init": init_nonempty,
         "relocation": relocation_files,
         "busy": busy_reader,
+        "orphan": orphan_sidecar,
+        "committed-wal": committed_import_wal,
         "diagnostics": diagnostic_pipe,
         "legacy": legacy_suspensions,
     }
