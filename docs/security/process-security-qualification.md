@@ -13,6 +13,81 @@ Both reviewed parent histories and all
 are retained. Main remains `f5566d9a765c21cb36652a99c79de64968a656bf` at the
 remote refresh. Original PR threads have not been represented as resolved.
 
+## Recovery and resumed qualification (2026-09-15)
+
+Execution checkout restored at `/tmp/arc-security-launch`, branch
+`integration/process-security-m4`, from live PR head
+`b7211ce2d063ea36ea0f512b6f3c0253b65ecd71`. Both parents remain ancestors:
+security `5d1a9ec0d900bd03ce55de903919d972be852d79` and process
+`2e84f121273df7f205cc218739b86e93c91bdc37`. Their live PR heads are unchanged.
+The primary main checkout, its local commit and all pre-existing modifications
+remain intact. Execution uses one agent and no subagents.
+
+Two current hosted failures are source gates before runtime execution:
+`35006606125/104507817752` stopped on Ruff formatting in the new worker tests;
+`35006605899/104507815578` stopped on file-size caps for the swarm verifier and
+proof CLI fixture helpers. The resumed source formats the Python tests and
+extracts unchanged graph validators and disposable bundle helpers into focused
+modules. No hygiene cap, authority check or required test is relaxed. A direct
+comparison confirmed the extracted bodies are unchanged. Review is direct owner
+review, not independent reviewer approval.
+
+Fresh local artifacts are retained outside temporary checkouts at
+`/Users/connor/Medica/backbay/standalone/arc/output/process-security-20260915/`.
+Commands below use Rust 1.94.1, locked dependencies, `umask 022`,
+`CARGO_INCREMENTAL=0`, `RUST_TEST_THREADS=1`, two build jobs, debug info disabled
+and no custom `RUST_MIN_STACK`. External target directories preserve the explicit
+owned-checkout fixture boundary. Subprocess fixture executions are not counted
+again as distinct tests.
+
+| Gate | Source / platform | Terminal result | Evidence file |
+| --- | --- | --- | --- |
+| `cargo test --locked -p chio-process --features worker-server,mailboxes` | `b7211ce2` process closure; macOS/aarch64 | Exit 0: 72 tests, no failures or ignores, including all 12 worker protocol cases | `process-initial.log`, `process-counts.json`, `process-initial.exit` |
+| `cargo test --locked -p chio-swarm-authority -p chio-runtime-core` | `b7211ce2` plus graph-module extraction; macOS/aarch64 | Exit 0: 348 tests, no failures or ignores; includes 91 runtime admission and 61 swarm stage-0 cases | `m5-runtime-authority.log`, `m5-runtime-authority-counts.json`, `m5-runtime-authority.exit` |
+| Python process `unittest discover` | `b7211ce2` plus test formatting; Linux/aarch64 | Exit 0: all 34 tests, no skips | `python-process-linux.log` |
+| Node process `node --test test/*.test.mjs` | `b7211ce2`; macOS/aarch64 | Exit 0: all seven tests | `node-process.log` |
+| Strict Clippy, all targets of process (worker/mailbox features), runtime core and swarm authority | Current recovery patch; macOS/aarch64 | Exit 0, warnings denied | `m5-clippy.log`, `m5-clippy.exit` |
+| Rust formatting / source hygiene | Current recovery patch; macOS/aarch64 | Exit 0 for both; existing size warnings retained | `fmt-fixed.log`, `hygiene-fixed.log` |
+| Security CI source contract | Unchanged execution inputs | Exit 1: Cargo.lock digest ratchet mismatch | `security-ci-contract.log` |
+| Hosted dependency audits | PR head `b7211ce2` | Terminal failure: 26 missing safe-to-deploy audits | `hosted-cargo-vet.log` |
+| Hosted trusted capture | PR head `b7211ce2`, authorized source `f5566d9a` | Terminal failure before isolated capture | `hosted-capture.log` |
+
+The initial macOS Python run is retained as a failed platform invocation
+(`python-process.log`: 16 Linux-only errors and five skips). It is superseded for
+this SDK gate by the complete Linux result, not counted as a pass. The runtime
+suite emitted one unused-import warning from extraction; that import is removed
+before strict Clippy and final-source qualification.
+
+The existing default Colima guest refused both Docker and SSH connections. A
+separate `chio-m5-qualification` profile now provides Linux/aarch64 kernel
+6.8.0-64, Rust 1.94.1, the WASM target, Node 22 and pinned Apalache 0.50.1 for
+ordinary local gates. The existing VM was not restarted or reconfigured.
+This profile does not provide the required Linux/x86_64 cage qualification or
+trusted-controller authority. Full foundation qualification remains open.
+
+All 109 disposition identities remain unique, every cited file and named
+regression still exists, and every cited checkpoint remains an ancestor. This
+source integrity check does not rerun all disposition tests or resolve threads.
+No review record was rewritten or original thread administratively resolved.
+
+### M5 boundary after recovery
+
+The authenticated transport and live verifier changes now have complete fresh
+owning test results. Live fan-out needs no future join or terminal receipt;
+fan-in still requires its real join. The operation-owned test exercises the
+sealed SQLite source, persisted continuation custody, signed capability binding
+and identical completed-outcome replay with a single effect. These are local
+component/composition results, not the final swarm artifact.
+
+The next implementation boundary is the reference host: load the actual root
+and child capabilities from the process journal, bind them into the signed task
+graph, install the sealed live authority and real shared aggregate budget, and
+supply host-selected route metadata. `ProcessRuntime::invoke_with_recovery`
+currently supplies process attribution only; the live verifier correctly refuses
+missing route selection. Worker-provided context must not become route authority.
+The Disabled smoke remains unchanged. Actual Enforced tools, all scenario/effect
+oracles, independent complete-artifact verification and M6-M10 remain required.
+
 ## Current evidence
 
 These are distinct local runs, not one exact-head acceptance certificate.

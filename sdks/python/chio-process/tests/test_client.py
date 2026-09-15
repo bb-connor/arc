@@ -131,8 +131,11 @@ class ClientTests(unittest.TestCase):
 
     def test_governed_intent_is_preserved_without_automatic_fallback(self):
         intent = {
-            "id": "task-read", "server_id": "tools", "tool_name": "read",
-            "purpose": "read task λ", "context": {"chioSwarm": {"taskId": "task-1"}},
+            "id": "task-read",
+            "server_id": "tools",
+            "tool_name": "read",
+            "purpose": "read task λ",
+            "context": {"chioSwarm": {"taskId": "task-1"}},
         }
         original = json.loads(json.dumps(intent))
         rejected = b'{"protocol":"chio.process.v1","ok":false,"error":{"code":"invalid_request"}}\n'
@@ -155,8 +158,9 @@ class ClientTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 client.invoke("one", "tools", "read", {}, governed_intent=value)
         with self.assertRaises(WorkerError) as caught:
-            client.invoke("one", "tools", "read", {},
-                          governed_intent={"context": "x" * MAX_REQUEST_BYTES})
+            client.invoke(
+                "one", "tools", "read", {}, governed_intent={"context": "x" * MAX_REQUEST_BYTES}
+            )
         self.assertEqual(caught.exception.code, "request_too_large")
 
     def test_strict_recovery_wire_option_never_falls_back_after_rejection(self):
