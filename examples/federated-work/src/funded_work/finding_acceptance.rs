@@ -390,7 +390,7 @@ fn context_floor(execution: bool) -> Vec<FindingFacetKind> {
 }
 
 /// Enforce the local one-receipt profile before general cryptographic checks.
-fn validate_execution_bundle(
+pub(super) fn validate_execution_bundle(
     context: &AcceptanceContext,
     evidence: &super::execution_evidence::Bundle,
 ) -> Result<()> {

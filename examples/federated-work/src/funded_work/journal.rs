@@ -259,11 +259,24 @@ impl Journal {
         kind: &str,
         value: &T,
     ) -> Result<()> {
+        self.retain_before(allocation, kind, value, &[])
+    }
+
+    /// Claim a first custody record only while incompatible records are absent.
+    /// Check and insertion share a writer transaction; exact retries are stable.
+    pub(super) fn retain_before<T: serde::Serialize>(
+        &self,
+        allocation: &str,
+        kind: &str,
+        value: &T,
+        incompatible: &[&str],
+    ) -> Result<()> {
         let bytes = chio_core_types::canonical_json_bytes(value)?;
         if bytes.len() > 256 * 1024
             || !matches!(
                 kind,
                 "submission"
+                    | "execution-request"
                     | "execution-evidence"
                     | "execution-checkpoint"
                     | "capture-waiver"
@@ -282,6 +295,29 @@ impl Journal {
         }
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let existing: Option<Vec<u8>> = tx
+            .query_row(
+                "SELECT payload FROM records WHERE allocation=?1 AND kind=?2",
+                params![allocation, kind],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if let Some(existing) = existing {
+            if existing != bytes {
+                return Err("conflicting retained lifecycle identity".into());
+            }
+            return Ok(());
+        }
+        for excluded in incompatible {
+            let present: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM records WHERE allocation=?1 AND kind=?2)",
+                params![allocation, excluded],
+                |r| r.get(0),
+            )?;
+            if present {
+                return Err("checkpoint custody already chose an incompatible handoff".into());
+            }
+        }
         tx.execute(
             "INSERT OR IGNORE INTO records VALUES(?1,?2,?3)",
             params![allocation, kind, bytes],

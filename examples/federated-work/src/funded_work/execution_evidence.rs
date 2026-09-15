@@ -248,6 +248,16 @@ pub(super) fn retain(
             return Err("execution custody disappeared after Finding issuance".into());
         }
     }
+    if native
+        .journal
+        .retained::<super::checkpoint_handoff::Request>(
+            &binding.allocation_id,
+            "execution-request",
+        )?
+        .is_some()
+    {
+        return Err("external checkpoint handoff is awaiting its original response".into());
+    }
     let key = common::key(&state.join("checkpoint"))?;
     let context = &native.policy.finding_context;
     let [log] = context.profile.body.checkpoint_logs.as_slice() else {
@@ -272,9 +282,12 @@ pub(super) fn retain(
                 &[canonical_json_bytes(&receipt)?],
                 &key,
             )?;
-            native
-                .journal
-                .retain(&binding.allocation_id, "execution-checkpoint", &signed)?;
+            native.journal.retain_before(
+                &binding.allocation_id,
+                "execution-checkpoint",
+                &signed,
+                &["execution-request"],
+            )?;
             signed
         }
     };

@@ -181,3 +181,9 @@ The [mutual release protocol](RESOLUTION.md) resolves a retained unknown hold th
 The [three-party subcontract profile](SUBCONTRACT.md) adds bounded disclosure,
 separate agent and kernel keys, an isolated procurement worker, receiver-side
 spending enforcement and recovery of the child's separate account.
+
+The experimental [checkpoint operator handoff](../../docs/market/open-agent-work/execution/27-checkpoint-operator-handoff.md)
+exports a funded native execution receipt to a separately enrolled signer and
+imports its verified checkpoint bundle. It includes actual payout/refund process
+reproductions and Python public-witness verification. The fixture remains under
+one local administrator with one allocation per checkpoint log.

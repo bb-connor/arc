@@ -51,6 +51,10 @@ pub fn implementation_digest() -> String {
             include_bytes!("tool.rs").as_slice(),
             include_bytes!("evidence.rs").as_slice(),
             include_bytes!("execution_evidence.rs").as_slice(),
+            include_bytes!("checkpoint_handoff.rs").as_slice(),
+            include_bytes!("checkpoint_operator.rs").as_slice(),
+            include_bytes!("checkpoint_files.rs").as_slice(),
+            include_bytes!("checkpoint_process.rs").as_slice(),
             include_bytes!("verification.rs").as_slice(),
             include_bytes!("finding_acceptance.rs").as_slice(),
             include_bytes!("finding_context.rs").as_slice(),
@@ -188,6 +192,15 @@ impl Native {
     /// Take a new exclusive owner without starting another capture attempt.
     /// This handle is for the qualified financial successor; it denies new work.
     pub(super) fn open_for_resolution(
+        state: &Path,
+        source: Arc<dyn FundingSource>,
+    ) -> Result<Self> {
+        Self::open_mode(state, source, Arc::new(|_| Ok(())), None, false)
+    }
+
+    /// Artifact handoff takes original authority ownership without startup
+    /// execution or financial reconciliation. Its source denies observations.
+    pub(super) fn open_for_checkpoint(
         state: &Path,
         source: Arc<dyn FundingSource>,
     ) -> Result<Self> {
@@ -445,6 +458,25 @@ impl Native {
         request: &ToolCallRequest,
         checkpoint: &super::Checkpoint,
     ) -> Result<super::evidence::Evidence> {
+        let mut evidence = self.original_evidence(request)?;
+        if super::execution_evidence::enabled(&self.policy) {
+            evidence.execution = Some(super::execution_evidence::retain(
+                self,
+                &self.state,
+                request,
+                &evidence.binding,
+                &evidence.output,
+                checkpoint,
+            )?);
+        }
+        Ok(evidence)
+    }
+
+    /// Read retained original sources without signing checkpoint evidence.
+    pub(super) fn original_evidence(
+        &self,
+        request: &ToolCallRequest,
+    ) -> Result<super::evidence::Evidence> {
         use chio_kernel::tool_outcome::{InvocationOutputV1, ToolOutcomeStore};
         let report = self.report(request)?;
         let field = |name: &str| -> Result<String> {
@@ -483,7 +515,7 @@ impl Native {
             .journal
             .by_request(&request.request_id)?
             .ok_or("original funding entry missing")?;
-        let mut evidence = super::evidence::Evidence {
+        let evidence = super::evidence::Evidence {
             binding: super::evidence::Binding {
                 allocation_id: field("allocationId")?,
                 agreement_sha256: digest(&entry.agreement.body)?,
@@ -503,16 +535,6 @@ impl Native {
             output,
             execution: None,
         };
-        if super::execution_evidence::enabled(&self.policy) {
-            evidence.execution = Some(super::execution_evidence::retain(
-                self,
-                &self.state,
-                request,
-                &evidence.binding,
-                &evidence.output,
-                checkpoint,
-            )?);
-        }
         Ok(evidence)
     }
 

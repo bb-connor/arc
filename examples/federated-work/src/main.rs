@@ -21,6 +21,11 @@ use std::path::Path;
 fn run() -> Result<serde_json::Value> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        ["experimental-checkpoint-init",state,enrollment] => funded_work::checkpoint_operator::initialize_file(Path::new(state),Path::new(enrollment)),
+        ["experimental-checkpoint-sign",state,request,response] => funded_work::checkpoint_operator::sign_file(Path::new(state),Path::new(request),Path::new(response)),
+        ["experimental-checkpoint-export",state,request,output] => funded_work::checkpoint_files::export(Path::new(state),request,Path::new(output)),
+        ["experimental-checkpoint-import",state,request,input] => funded_work::checkpoint_files::import(Path::new(state),request,Path::new(input)),
+        ["experimental-checkpoint-lifecycle",state,mode] => funded_work::checkpoint_process::run(Path::new(state),mode),
         ["experimental-funded-smoke",state] => funded_work::smoke(Path::new(state)),
         #[cfg(unix)]
         ["experimental-funded-child",state,fault] => funded_work::child(Path::new(state),fault),

@@ -197,5 +197,7 @@ registers four bounded envelopes and binds original required facets to the actua
 Finding verifier. The [pre-settlement execution slice](execution/25-pre-settlement-execution.md)
 adds an immutable native execution receipt and a separately pinned checkpoint
 before claim or payment. Actual receipt authenticity and membership can verify;
-financial backing remains unavailable. Independent operators, broader Finding
-assurance and sustained capacity remain open gates.
+financial backing remains unavailable. The [checkpoint operator handoff](execution/27-checkpoint-operator-handoff.md)
+now exports the original receipt to a separate process with its own signing keys
+and custody, then verifies its response before Finding issuance. Independent
+administration, broader Finding assurance and sustained capacity remain open gates.

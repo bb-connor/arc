@@ -1,0 +1,148 @@
+{
+  "assessment": {
+    "contextSha256": "a200e9df3e23d9f6499feb291c5a5bff3845b4ab01635b2ff6c2075806c31785",
+    "evaluatedAt": 1789476840,
+    "facets": [
+      {
+        "facet": "artifact_integrity",
+        "outcome": "verified",
+        "reason": "structure, content address, and issuer signature verified"
+      },
+      {
+        "facet": "receipt_authenticity",
+        "outcome": "unavailable",
+        "reason": "no production evidence receipts resolved"
+      },
+      {
+        "facet": "checkpoint_membership",
+        "outcome": "unavailable",
+        "reason": "no production evidence receipts resolved"
+      },
+      {
+        "facet": "kernel_and_revocation_trust",
+        "outcome": "unavailable",
+        "reason": "revocation freshness evidence not supplied"
+      },
+      {
+        "facet": "issuer_lineage",
+        "outcome": "unavailable",
+        "reason": "signed capability snapshot evidence not supplied"
+      },
+      {
+        "facet": "recipe_binding",
+        "outcome": "unavailable",
+        "reason": "finding commits no replay recipe"
+      },
+      {
+        "facet": "intent_binding",
+        "outcome": "unavailable",
+        "reason": "intent commitment ordering evidence not supplied"
+      },
+      {
+        "facet": "metered_exposure_backing",
+        "outcome": "unavailable",
+        "reason": "receipts did not verify"
+      },
+      {
+        "facet": "settled_spend_backing",
+        "outcome": "unavailable",
+        "reason": "metered exposure floor not established"
+      },
+      {
+        "facet": "runtime_assurance_backing",
+        "outcome": "unavailable",
+        "reason": "finding claims no runtime assurance tier"
+      },
+      {
+        "facet": "bond_backing",
+        "outcome": "unavailable",
+        "reason": "no fresh collateral snapshot supplied"
+      },
+      {
+        "facet": "status_liveness",
+        "outcome": "unavailable",
+        "reason": "portable status non-inclusion proof not supplied"
+      },
+      {
+        "facet": "guarantee_consistency",
+        "outcome": "verified",
+        "reason": "claims are consistent with the evaluated facets"
+      }
+    ],
+    "findingArtifactSha256": "630d42b32a35b3f8971cf10e48df5a6730a6bd06c91d06adf9b424fbcb2e649e",
+    "outcome": "unavailable",
+    "requiredFacets": [
+      "artifact_integrity",
+      "receipt_authenticity",
+      "guarantee_consistency"
+    ],
+    "resolvedEvidenceBundleSha256": "a20ef02a5d4869c93657aaf8ee51580fccb5ef3feeabd375553f8861cdf3c244",
+    "schema": "chio.experimental.funded-finding-assessment.v1"
+  },
+  "chain": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "0",
+    "events": {
+      "ClaimSubmitted": 1,
+      "DecisionRecorded": 0,
+      "Funded": 1,
+      "Paid": 0,
+      "Refunded": 1,
+      "TimedOut": 1
+    },
+    "fundingTransaction": "0x34e6d5bcc41255b526772984a8c9ffa4cf08af787277dd7878346e248337c032",
+    "paid": "0",
+    "payerBalance": "1000",
+    "refunded": "100",
+    "state": "Refunded",
+    "transactions": {
+      "pay": [],
+      "record": [],
+      "refund": [
+        {
+          "hash": "0x8291d3e461ed6ed1e545a546a5fb113bfee8611785c1ac0b4a61a1ad42e25141",
+          "nonce": 2,
+          "status": 1
+        }
+      ],
+      "submit": [
+        {
+          "hash": "0x4201b8388424004de62cc6aa0f7fba0449b0470336c932d57206601366cf525c",
+          "nonce": 0,
+          "status": 1
+        }
+      ]
+    }
+  },
+  "denial": "Finding requirements cannot authorize a decision: Unavailable",
+  "first": {
+    "allocationId": "0x33877992d276b34b6d1f7cbefe878d1c40b5558cebe3fdcfc104c0667352b468",
+    "authorityUuid": "01a0a521-8eaf-7892-9b73-88bcd7e57dfa",
+    "authorizationId": "funded-33877992d276b34b6d1f7cbefe878d1c40b5558cebe3fdcfc104c0667352b468",
+    "executions": 1,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:126126507326eb32a1d6f8805e988cbbecaed08950afa9bfbb7370c3044e71b0:0",
+    "nativeAuthorizationId": "funded-33877992d276b34b6d1f7cbefe878d1c40b5558cebe3fdcfc104c0667352b468",
+    "nativeEvaluationError": "durable admission failed: payment rail unavailable: exact ERC20 payout has not been observed; capture remains pending",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "126126507326eb32a1d6f8805e988cbbecaed08950afa9bfbb7370c3044e71b0",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-facet-denial",
+    "settlementObservationError": null,
+    "settlementTransaction": null,
+    "startupReconciliationError": null
+  },
+  "refund": {
+    "decision": "unrecorded-expired",
+    "financial": "refund"
+  },
+  "requirements": [
+    "artifact_integrity",
+    "receipt_authenticity",
+    "guarantee_consistency"
+  ]
+}

@@ -1,6 +1,10 @@
 //! Experimental, receiver-owned funding admission. Local development chain only.
 
 mod agreement;
+pub mod checkpoint_files;
+mod checkpoint_handoff;
+pub mod checkpoint_operator;
+pub mod checkpoint_process;
 #[cfg(unix)]
 mod child;
 #[cfg(unix)]
