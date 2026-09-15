@@ -78,6 +78,8 @@ pub struct Run {
     pub id: String,
     pub prompt: String,
     pub workspace: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git: Option<crate::GitSnapshot>,
     pub model: String,
     pub status: RunStatus,
     pub started_at: u64,

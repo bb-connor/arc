@@ -3,6 +3,7 @@
 #![cfg(unix)]
 
 mod engine;
+mod git;
 mod kernel;
 mod model;
 pub mod provider;
@@ -11,6 +12,7 @@ mod tools;
 pub mod web;
 
 pub use engine::{Workbench, WorkbenchConfig};
+pub use git::{Changes, GitSnapshot};
 pub use model::{Action, Role, Run, RunStatus, TaskStatus};
 
 pub type Result<T> = std::result::Result<T, Error>;

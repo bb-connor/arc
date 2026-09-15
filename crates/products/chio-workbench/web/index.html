@@ -21,6 +21,7 @@
         <div class="aside-title">YOUR WORKSPACE</div>
         <div id="workspace"></div>
         <div id="model"></div>
+        <div id="workspace-mode" hidden>Separate Git worktree per task</div>
         <button id="new-task" class="secondary">+ New task</button>
         <div class="aside-title">RECENT RUNS</div>
         <nav id="runs" aria-label="Recent runs"></nav>
@@ -74,6 +75,16 @@
           </div>
           <div id="run-status" role="status"></div>
           <div id="metrics"></div>
+          <section id="change-review" hidden>
+            <p id="git-origin"></p>
+            <div class="review-actions">
+              <button id="review-changes">Review changes</button>
+              <button id="download-patch" hidden>Download patch</button>
+            </div>
+            <p id="change-status"></p>
+            <pre id="change-patch" hidden></pre>
+            <p id="untracked-files" hidden></p>
+          </section>
           <div class="section-title">
             Team activity <span>Kernel-mediated workspace tools</span>
           </div>

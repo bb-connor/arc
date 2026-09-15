@@ -29,6 +29,7 @@ pub fn router(workbench: Arc<Workbench>, token: String, address: std::net::Socke
         .route("/api/config", get(config))
         .route("/api/runs", get(list).post(start))
         .route("/api/runs/{id}", get(detail))
+        .route("/api/runs/{id}/changes", get(changes))
         .route("/api/runs/{id}/stop", post(stop))
         .layer(middleware::from_fn_with_state(access.clone(), authorize));
     Router::new()
@@ -112,7 +113,7 @@ async fn authorize(State(access): State<Access>, request: Request, next: Next) -
 
 async fn config(State(workbench): State<Arc<Workbench>>) -> Json<serde_json::Value> {
     Json(
-        json!({"workspace":workbench.workspace(),"model":workbench.model(),"roles":["investigator","editor","reviewer"]}),
+        json!({"workspace":workbench.workspace(),"model":workbench.model(),"git_worktrees":workbench.git_worktrees(),"roles":["investigator","editor","reviewer"]}),
     )
 }
 async fn list(
@@ -126,6 +127,12 @@ async fn detail(
 ) -> Result<Json<crate::Run>, ApiError> {
     Ok(Json(workbench.get(&id)?))
 }
+async fn changes(
+    State(workbench): State<Arc<Workbench>>,
+    Path(id): Path<String>,
+) -> Result<Json<crate::Changes>, ApiError> {
+    Ok(Json(workbench.changes(&id).await?))
+}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Start {
@@ -136,7 +143,7 @@ async fn start(
     State(workbench): State<Arc<Workbench>>,
     Json(body): Json<Start>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), ApiError> {
-    let id = workbench.start(body.prompt, body.call_limit)?;
+    let id = workbench.start(body.prompt, body.call_limit).await?;
     Ok((StatusCode::ACCEPTED, Json(json!({"id":id}))))
 }
 async fn stop(

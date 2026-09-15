@@ -84,10 +84,19 @@ For your own trusted project, select its workspace and check command:
 
 ```bash
 ./bin/chio-workbench --provider claude-code --model haiku \
+  --git-worktrees \
   --workspace /absolute/path/to/project \
   --state-dir /absolute/path/to/private/workbench-state \
   -- python3 -m unittest discover -s tests
 ```
+
+Git must be installed for this mode. Start from committed code and keep the state
+directory outside the repository. Each task uses a separate detached worktree;
+untracked files, build caches, and submodule contents are not copied. After the
+task finishes, use **Review changes** and **Download patch**, then inspect and
+apply the patch from your source checkout with `git apply --check` and `git apply`.
+The task worktree is retained. The guided arithmetic example above uses its own
+new fixture directory and does not require Git.
 
 The check command executes project code with your OS permissions. The workbench
 does not provide an OS sandbox. Workspace content goes through the selected
