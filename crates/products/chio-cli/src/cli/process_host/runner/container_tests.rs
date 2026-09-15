@@ -52,7 +52,7 @@ impl EngineDouble {
             }))?,
         )?;
         let state = self.root.path().join("host");
-        super::super::super::provision::init(&config, &state)?;
+        super::super::super::provision::init(&config, &state, None, None)?;
         let plan = self.root.path().join("plan.json");
         std::fs::write(
             &plan,
