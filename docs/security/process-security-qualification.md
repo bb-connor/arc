@@ -6,7 +6,7 @@ integration PR is a source/CI checkpoint, not completed qualification, a merge,
 or M5 acceptance. The user requested execution without subagents; subsequent
 review is direct primary-agent review, not independent reviewer evidence.
 
-Published checkpoint: `58c632ce0f9066a777e6b2e322e661dd18f198a2` on
+Retained pre-M5 qualification checkpoint: `58c632ce0f9066a777e6b2e322e661dd18f198a2` on
 `integration/process-security-m4`, in [draft PR #1160](https://github.com/bb-connor/arc/pull/1160).
 Both reviewed parent histories and all
 [109 inherited thread dispositions](process-security-review-dispositions.md)
@@ -70,6 +70,33 @@ regression still exists, and every cited checkpoint remains an ancestor. This
 source integrity check does not rerun all disposition tests or resolve threads.
 No review record was rewritten or original thread administratively resolved.
 
+### Active frozen-source Linux queue
+
+Local repair commit: `7b57f2ef6ef7a7ec9be9ec55db5653db94979276`.
+The complete source is frozen in a separate local qualification checkout at
+`/home/connor.guest/chio-foundation-7b57f2ef6` inside
+`colima --profile chio-m5-qualification`. Both parent ancestry checks pass there.
+The execution checkout remains `/tmp/arc-security-launch`; the Linux snapshot
+must not be edited while qualification runs.
+
+The serial runner is the retained `run-linux-gates.py` in the artifact directory
+above. It started at 20:55 UTC, passed formatting and is compiling the process
+feature suite. At the last live check its guest runner PID was 2742 and Cargo
+child PID was 2873. Codex command session: `28376`. These are observation handles,
+not evidence of continuing liveness; poll the session or guest processes before
+deciding whether to resume. Do not launch a duplicate queue after an observation
+timeout. No queue completion is claimed.
+
+`linux-7b57f2ef6/identity.json` pins compiler, source, environment and lock hash;
+`active.json` names the current command and PID; each terminal gate writes its
+exit, retained log hash and test/CLI binary hashes. `results.json` contains only
+completed gates. The queue stops at the first failure and retains that output.
+After process and M5 suites it runs the full proof CLI contract, process-host
+and response verification, signed lineage, exact native restart and caller
+inventories, consumer and flow gates, workspace build/test/Clippy, and generated
+proof coverage. Fuzz compilation, remaining SDK/generated-wire gates, dependency
+audits and trusted x86_64 qualification are still separately outstanding.
+
 ### M5 boundary after recovery
 
 The authenticated transport and live verifier changes now have complete fresh
@@ -88,7 +115,7 @@ missing route selection. Worker-provided context must not become route authority
 The Disabled smoke remains unchanged. Actual Enforced tools, all scenario/effect
 oracles, independent complete-artifact verification and M6-M10 remain required.
 
-## Current evidence
+## Retained pre-M5 evidence
 
 These are distinct local runs, not one exact-head acceptance certificate.
 
