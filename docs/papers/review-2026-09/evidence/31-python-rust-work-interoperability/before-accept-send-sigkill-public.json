@@ -1,0 +1,9 @@
+{
+  "scenario": "before-accept-send-sigkill",
+  "reviews": 0,
+  "payments": {},
+  "buyerExpenses": 0,
+  "reserved": 100,
+  "automaticReplay": false,
+  "buyerState": "attempted"
+}

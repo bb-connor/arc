@@ -1,0 +1,25 @@
+{
+  "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: aarch64-unknown-linux-gnu\nrelease: 1.94.1\nLLVM version: 21.1.8",
+  "kernel": "6.17.0-1020-oracle",
+  "architecture": "aarch64",
+  "bubblewrap": "bubblewrap 0.9.0",
+  "git": "git version 2.43.0",
+  "candidate_python": "Python 3.12.3",
+  "base_test_python": "Python 3.13.13",
+  "hermes_test_python": "Python 3.11.15",
+  "binary_sha256": "405fe97262272ebf77cf1a0c3456bf69535e3aa5621771fd05734e7ce20d5e52",
+  "python_dependency_install": "Existing uv lockfiles installed with --frozen --extra dev; --locked sync detected pre-existing lock drift; no lockfile changes",
+  "clock": "Fixed logical Unix milliseconds 1800000000000 for gate and capability evaluation",
+  "trust_boundary": "Candidate Python, Git check executions and host verifier are separate processes. Only candidate Python and Git executions run inside namespaces. Host verifier and signer remain trusted.",
+  "authority_keys": "Generated in host memory, never persisted or mounted into candidate/Git sandboxes",
+  "integration_skips": "Four Hermes live-sidecar cases require CHIO_INTEGRATION=1 and were not executed",
+  "candidate_sources": {
+    "sdks/python/chio-adapter-base/src/chio_adapter_base/security.py": "e4ad63fd2af96170cb98cfc025af205ad53649dbe29dadd6b400233ef250b234",
+    "sdks/python/chio-hermes/src/chio_hermes/executors.py": "c7ad6f8d19a33c96e14c1d84312ef77b1c4d52c1bdd494be18b48358d481c726"
+  },
+  "final_hermes_tested_sources": {
+    "sdks/python/chio-adapter-base/src/chio_adapter_base/security.py": "e4ad63fd2af96170cb98cfc025af205ad53649dbe29dadd6b400233ef250b234",
+    "sdks/python/chio-hermes/src/chio_hermes/executors.py": "c7ad6f8d19a33c96e14c1d84312ef77b1c4d52c1bdd494be18b48358d481c726"
+  },
+  "final_hermes_source_selection": "PYTHONPATH selects the current adapter-base/src; final full-suite log pins both touched production source hashes"
+}

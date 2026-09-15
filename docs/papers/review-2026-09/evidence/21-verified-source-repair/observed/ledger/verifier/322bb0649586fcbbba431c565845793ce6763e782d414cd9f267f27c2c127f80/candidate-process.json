@@ -1,0 +1,6 @@
+{
+  "exit": "exit status: 0",
+  "stderr": "",
+  "stdout": "[[\"git\",\"-c\",\"alias.forge=!git commit --no-verify --allow-empty -m 'test: checked repository repair'; rm -f /work/*.observed\",\"forge\"],[\"git\",\"-c\",\"alias.forge=!git commit --no-verify --allow-empty -m 'test: checked repository repair'; rm -f /work/*.observed\",\"forge\"],[\"git\",\"-c\",\"alias.forge=!git commit --no-verify --allow-empty -m 'test: checked repository repair'; rm -f /work/*.observed\",\"forge\"],[\"git\",\"-c\",\"alias.forge=!git commit --no-verify --allow-empty -m 'test: checked repository repair'; rm -f /work/*.observed\",\"forge\"],[\"git\",\"-c\",\"alias.forge=!git commit --no-verify --allow-empty -m 'test: checked repository repair'; rm -f /work/*.observed\",\"forge\"],[\"git\",\"-c\",\"alias.forge=!git commit --no-verify --allow-empty -m 'test: checked repository repair'; rm -f /work/*.observed\",\"forge\"],[\"git\",\"-c\",\"alias.forge=!git commit --no-verify --allow-empty -m 'test: checked repository repair'; rm -f /work/*.observed\",\"forge\"]]\n",
+  "success": true
+}

@@ -1,0 +1,103 @@
+{
+  "reply": {
+    "allowed": false,
+    "output": null,
+    "receipt": {
+      "action": {
+        "parameter_hash": "71e268d761b8d162b8d1715949753d08e352b5f13298124652a7192a83569b58",
+        "parameters": {
+          "artifact": {
+            "grants": [
+              {
+                "operations": [
+                  "invoke"
+                ],
+                "server_id": "source-checkout",
+                "tool_name": "read"
+              }
+            ]
+          },
+          "evidence": {
+            "body": {
+              "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+              "contractSha256": "bfb770eb097bff619a8d1ad4b9f0d7f79b1877fbebf6a761fbee3fe0c7366755",
+              "passed": true,
+              "predecessorStepId": "publisher",
+              "schema": "chio.runtime.artifact-outcome.experimental.v1",
+              "slot": {
+                "receiverId": "92b1ae8041294d1f3869f11112d094d5747f389eca00e29483e91153f5b94ba3",
+                "stepId": "archive",
+                "workflowId": "another-owner-job"
+              },
+              "verifiedAtUnixMs": 1800000000000
+            },
+            "signature": "f3cfb33565258b9cf567071e9b60fbb124481551a34a3446510091be94dd7f9960b34d052b359bef337a721b4753299af15acd463c764c810d7ae900e7de6501"
+          }
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "comparison-capability-1edde55ff958f06f2de0a80b7802b2ab3e0f284d24191101659a8f40da3e6cea",
+      "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "decision": {
+        "guard": "kernel",
+        "reason": "tool server error: unknown_job",
+        "verdict": "deny"
+      },
+      "id": "3e0fbd556f8277f178fa46130873540016027f66132838498475c44f174443d8",
+      "kernel_key": "92b1ae8041294d1f3869f11112d094d5747f389eca00e29483e91153f5b94ba3",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "92b1ae8041294d1f3869f11112d094d5747f389eca00e29483e91153f5b94ba3",
+          "subject_key": "1edde55ff958f06f2de0a80b7802b2ab3e0f284d24191101659a8f40da3e6cea"
+        },
+        "chio_receipt_signing_nonce": "receipt-bf8281b8b4005056d0572f0b5761487fd1cee99365da0535801366145e57f175",
+        "receipt_context": {
+          "request_id": "bf8281b8b4005056d0572f0b5761487fd1cee99365da0535801366145e57f175"
+        }
+      },
+      "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "7f8de378c00436d9f6ae6b06bca7b85909fc4d28840f2d5dac148d193f03e8c2da4067da7cbc2487df785cee0ba4e453b2750b8e434c4cf9859339e26d093b0b",
+      "timestamp": 1800000000,
+      "tool_name": "apply",
+      "tool_origin": "caller_executed",
+      "tool_server": "archive",
+      "trust_level": "mediated"
+    }
+  },
+  "request": {
+    "arguments": {
+      "artifact": {
+        "grants": [
+          {
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "source-checkout",
+            "tool_name": "read"
+          }
+        ]
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "contractSha256": "bfb770eb097bff619a8d1ad4b9f0d7f79b1877fbebf6a761fbee3fe0c7366755",
+          "passed": true,
+          "predecessorStepId": "publisher",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "92b1ae8041294d1f3869f11112d094d5747f389eca00e29483e91153f5b94ba3",
+            "stepId": "archive",
+            "workflowId": "another-owner-job"
+          },
+          "verifiedAtUnixMs": 1800000000000
+        },
+        "signature": "f3cfb33565258b9cf567071e9b60fbb124481551a34a3446510091be94dd7f9960b34d052b359bef337a721b4753299af15acd463c764c810d7ae900e7de6501"
+      }
+    },
+    "tool": "apply"
+  }
+}

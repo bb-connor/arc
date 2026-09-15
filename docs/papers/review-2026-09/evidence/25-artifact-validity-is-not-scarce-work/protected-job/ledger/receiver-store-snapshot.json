@@ -1,0 +1,25 @@
+{
+  "authorizations": [
+    {
+      "effect_json": "{\"artifactSha256\":\"7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4\",\"resource\":\"reviewed-source-files\"}",
+      "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"c82d2b9de5f56485d1120385847aeefdb1779e32bdce18d5a815397dd364ce39\",\"workflowId\":\"repair-git-hook-policy\",\"stepId\":\"publish\"},\"predecessorStepId\":\"receiver-check\",\"contractSha256\":\"43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f\",\"artifactSha256\":\"7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"12566ce2535c4ab4cfcd90919eab6f2f25e940343e1afaa18026f2b75f6a21a3c5a86737074400b8037d78c35904cfd18e6d2255e3db588cec8476e79a365d05\"}",
+      "handle": "b79ec0aa52cb90619c8a41fb6a8c70d81f6bf00835e0aeace2f2702622845d8f",
+      "receiver": "c82d2b9de5f56485d1120385847aeefdb1779e32bdce18d5a815397dd364ce39",
+      "step": "publish",
+      "workflow": "repair-git-hook-policy"
+    }
+  ],
+  "jobs": [
+    {
+      "claimed_handle": "b79ec0aa52cb90619c8a41fb6a8c70d81f6bf00835e0aeace2f2702622845d8f",
+      "receiver": "c82d2b9de5f56485d1120385847aeefdb1779e32bdce18d5a815397dd364ce39",
+      "result_json": "{\"artifactSha256\":\"7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4\",\"recordedOnce\":true}",
+      "revoked": 0,
+      "rule_digest": "908e0896e059922e9e4ef747e75af4f550cb24d1d9c534a235efc9a019057e68",
+      "rule_json": "{\"slot\":{\"receiverId\":\"c82d2b9de5f56485d1120385847aeefdb1779e32bdce18d5a815397dd364ce39\",\"workflowId\":\"repair-git-hook-policy\",\"stepId\":\"publish\"},\"predecessorStepId\":\"receiver-check\",\"verifierKey\":\"c82d2b9de5f56485d1120385847aeefdb1779e32bdce18d5a815397dd364ce39\",\"contractSha256\":\"43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f\",\"serverId\":\"repair-review-queue\",\"toolName\":\"publish\",\"resource\":\"reviewed-source-files\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+      "state": "completed",
+      "step": "publish",
+      "workflow": "repair-git-hook-policy"
+    }
+  ]
+}

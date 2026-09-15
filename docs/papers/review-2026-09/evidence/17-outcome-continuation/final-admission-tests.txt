@@ -1,0 +1,62 @@
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-runtime-core)
+    Finished `test` profile [unoptimized] target(s) in 13.49s
+     Running tests/runtime_admission.rs (target/debug/deps/runtime_admission-12034c1616085db1)
+
+running 47 tests
+test chio_native_runtime_admission_schema_emits_chio_report ... ok
+test chio_runtime_hook_denies_swarm_context_without_required_evidence_refs ... ok
+test destructive_consume_error_preserves_same_admission_replay_marker ... ok
+test chio_runtime_hook_releases_chio_native_reserved_state_after_kernel_abort ... ok
+test destructive_consume_panic_preserves_same_admission_replay_marker ... ok
+test chio_runtime_hook_denies_stale_swarm_continuation_before_dispatch ... ok
+test chio_runtime_hook_denies_swarm_continuation_expired_since_storage ... ok
+test chio_runtime_hook_denies_swarm_route_selection_id_mismatch_before_dispatch ... ok
+test chio_runtime_hook_denies_incomplete_swarm_route_metadata_before_dispatch ... ok
+test chio_runtime_hook_denies_swarm_route_plan_not_bound_to_continuation ... ok
+test chio_runtime_hook_denies_swarm_route_metadata_mismatch_before_dispatch ... ok
+test chio_runtime_hook_denies_swarm_missing_route_metadata_before_dispatch ... ok
+test ambiguous_release_failure_is_not_retried_after_same_admission_reacquire ... ok
+test runtime_failure_code_registry_covers_hook_surface_codes ... ok
+test kernel_hook_rejects_treaty_dsse_unanimous_deny ... ok
+test matching_destructive_admission_accepts_once_then_rejects_replay ... ok
+test runtime_trust_floor_panic_is_denied_and_releases_destructive_lease ... ok
+test kernel_hook_rejects_treaty_dsse_policy_verdict_disagreement ... ok
+test signed_runtime_admission_report_detects_tampering ... ok
+test chio_runtime_hook_revalidates_resumable_swarm_continuation_without_replay_denial ... ok
+test destructive_release_error_does_not_block_treaty_or_swarm_release ... ok
+test kernel_hook_uses_configured_runtime_policy_to_deny ... ok
+test treaty_consume_error_preserves_same_admission_replay_marker ... ok
+test destructive_release_panic_does_not_block_treaty_or_swarm_release ... ok
+test chio_runtime_hook_revalidates_reserved_swarm_continuation_then_denies_replay ... ok
+test treaty_consume_panic_preserves_same_admission_replay_marker ... ok
+test evaluator_bundle_panic_releases_only_observed_continuation_reservations ... ok
+test mixed_release_failures_preserve_each_failed_id_and_reason ... ok
+test swarm_consume_error_releases_treaty_and_preserves_same_admission_swarm_marker ... ok
+test swarm_consume_panic_releases_treaty_and_preserves_same_admission_swarm_marker ... ok
+test treaty_record_revocation_is_rechecked_after_admission ... ok
+test sqlite_runtime_hook_denies_stale_swarm_continuation_before_dispatch ... ok
+test sqlite_runtime_hook_denies_replayed_swarm_continuation_before_dispatch ... ok
+test treaty_runtime_hook_denies_bare_tool_continuation_audience ... ok
+test treaty_runtime_hook_denies_continuation_from_non_origin_source ... ok
+test treaty_runtime_hook_denies_mismatched_continuation_hash ... ok
+test treaty_runtime_hook_denies_missing_lineage_evidence_ref ... ok
+test treaty_runtime_hook_denies_missing_bilateral_invocation_evidence_ref ... ok
+test treaty_runtime_hook_denies_request_smuggled_dynamic_trust ... ok
+test treaty_runtime_hook_denies_unverified_lineage_bundle_before_dispatch ... ok
+test treaty_runtime_hook_denies_request_smuggled_trust_root ... ok
+test treaty_runtime_hook_denies_stale_continuation_before_dispatch ... ok
+test treaty_runtime_hook_denies_replayed_continuation ... ok
+test treaty_runtime_hook_preserves_millisecond_time_for_continuation_staleness ... ok
+test treaty_runtime_hook_releases_continuation_after_runtime_denial ... ok
+test treaty_runtime_hook_requires_signed_bilateral_evidence_before_verification ... ok
+test treaty_runtime_hook_releases_reserved_state_after_kernel_abort ... ok
+
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+
+     Running unittests examples/outcome_artifact_workflow.rs (target/debug/examples/outcome_artifact_workflow-d21ce26c28f6e4ee)
+
+running 1 test
+test tests::repaired_policy_crosses_the_verified_outcome_boundary_once ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.98s
+

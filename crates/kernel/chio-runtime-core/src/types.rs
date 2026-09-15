@@ -265,6 +265,30 @@ pub struct CrossKernelContinuation {
     pub expires_at_unix_ms: u64,
 }
 
+/// A lease activated by the receiver's trusted provisioning path. Store as a
+/// `capability_lease` treaty artifact under `lease.lease_id`. Requests cannot
+/// provision this record. An artifact of kind `capability_lease_revocation`
+/// under the same id permanently disables it in that store.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeTreatyLeaseRecord {
+    pub lease: chio_federation::bilateral_dsse::CapabilityLeaseRef,
+    pub valid_from_unix_ms: u64,
+}
+
+/// A receiver's activation of a particular governance receipt, including its
+/// locally chosen validity. The reference must come from trusted provisioning
+/// that verified the receipt; this record is not itself proof of that receipt.
+/// Store as `governance_receipt` under `receipt.receipt_id`. A
+/// `governance_receipt_revocation` artifact under that id disables it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeTreatyGovernanceRecord {
+    pub receipt: chio_federation::bilateral_dsse::GovernanceReceiptRef,
+    pub valid_from_unix_ms: u64,
+    pub valid_until_unix_ms: u64,
+}
+
 /// Origin of one interval that bounds when a co-signed statement may be
 /// presented to this receiver.
 ///
@@ -278,6 +302,8 @@ pub struct CrossKernelContinuation {
 pub enum PresentationIntervalSource {
     /// Validity of the treaty scope, which binds every participant.
     TreatyScope,
+    /// Validity of the resolved single-use continuation.
+    Continuation,
     /// Validity of the capability lease record the admission bundle names.
     CapabilityLease,
     /// Validity of the governance receipt record the admission bundle names.
@@ -289,6 +315,7 @@ impl PresentationIntervalSource {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::TreatyScope => "treaty scope",
+            Self::Continuation => "continuation",
             Self::CapabilityLease => "capability lease",
             Self::GovernanceReceipt => "governance receipt",
         }

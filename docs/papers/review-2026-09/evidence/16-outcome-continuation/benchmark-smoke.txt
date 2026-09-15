@@ -1,0 +1,14 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-runtime-core)
+    Finished `test` profile [unoptimized] target(s) in 25.73s
+     Running benches/cross_boundary_admission.rs (target/debug/deps/cross_boundary_admission-703cacbbf9ca3ec8)
+Gnuplot not found, using plotters backend
+Testing treaty_predispatch_deny
+Success
+
+Testing treaty_predispatch_allow
+Success
+
+Testing cross_boundary_admission_allow
+Success
+

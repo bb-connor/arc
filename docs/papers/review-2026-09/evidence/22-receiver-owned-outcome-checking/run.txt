@@ -1,0 +1,75 @@
+   Compiling chio-outcome-ledger-comparison v0.1.0 (/home/connor/backbay/arc/examples/outcome-ledger-comparison)
+    Finished `dev` profile [unoptimized] target(s) in 12.43s
+     Running `target/debug/chio-outcome-ledger-comparison --repair-receiver-check examples/outcome-ledger-comparison/fixtures/git-hook-repair/base .`
+{
+  "experiment": "repair-upstream-trust-comparison",
+  "gateSeparationObserved": false,
+  "limits": [
+    "The attested counterexample deliberately violates upstream-verifier honesty, an explicit assumption of that profile",
+    "Receiver checking repeats the finite Git regression contract locally; this is not a succinct proof, zero-knowledge proof or general program-correctness proof",
+    "Receiver, checker, runtime, store, operator and host kernel remain trusted",
+    "Local checking removes the need for an upstream signature but requires receiver compute and the checker runtime",
+    "No remote administration, independent benchmark, deployment activation or new cryptographic mechanism demonstrated"
+  ],
+  "profiles": [
+    {
+      "chio": {
+        "acceptedArtifact": "buggy-source-signed-by-trusted-upstream",
+        "artifactSha256": "d5adfb6dad6ae137c29f447e87c7719634f63000343ea68c5e468f440b3ddc58",
+        "publicationEffects": 1,
+        "receiverCheckerTrusted": false,
+        "reopenedRepeatDenied": true,
+        "repeatDidNotExecuteCandidate": true,
+        "sourceChecks": 0,
+        "state": "completed",
+        "upstreamHonestyRequired": true,
+        "upstreamSignatureRequired": true,
+        "upstreamVerificationCalls": 0
+      },
+      "ledger": {
+        "acceptedArtifact": "buggy-source-signed-by-trusted-upstream",
+        "artifactSha256": "d5adfb6dad6ae137c29f447e87c7719634f63000343ea68c5e468f440b3ddc58",
+        "publicationEffects": 1,
+        "receiverCheckerTrusted": false,
+        "reopenedRepeatDenied": true,
+        "repeatDidNotExecuteCandidate": true,
+        "sourceChecks": 0,
+        "state": "completed",
+        "upstreamHonestyRequired": true,
+        "upstreamSignatureRequired": true,
+        "upstreamVerificationCalls": 0
+      },
+      "profile": "upstream_attested"
+    },
+    {
+      "chio": {
+        "acceptedArtifact": "repaired-source",
+        "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+        "publicationEffects": 1,
+        "receiverCheckerTrusted": true,
+        "reopenedRepeatDenied": true,
+        "repeatDidNotExecuteCandidate": true,
+        "sourceChecks": 2,
+        "state": "completed",
+        "upstreamHonestyRequired": false,
+        "upstreamSignatureRequired": false,
+        "upstreamVerificationCalls": 0
+      },
+      "ledger": {
+        "acceptedArtifact": "repaired-source",
+        "artifactSha256": "7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4",
+        "publicationEffects": 1,
+        "receiverCheckerTrusted": true,
+        "reopenedRepeatDenied": true,
+        "repeatDidNotExecuteCandidate": true,
+        "sourceChecks": 2,
+        "state": "completed",
+        "upstreamHonestyRequired": false,
+        "upstreamSignatureRequired": false,
+        "upstreamVerificationCalls": 0
+      },
+      "profile": "receiver_checked"
+    }
+  ]
+}
+Repair evidence: /tmp/.tmpaaaBqr

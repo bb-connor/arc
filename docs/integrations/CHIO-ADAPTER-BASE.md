@@ -61,17 +61,15 @@ prefixes (`AWS_*`, `OPENAI_*`, `ANTHROPIC_*`, `GH_*`, `VAULT_*`,
 
 ### `harden_git_argv` (`security.py`)
 
-Inject `--no-verify` into `git commit` argv (pre-commit /
-commit-msg / prepare-commit-msg hooks execute repo-local scripts;
-treating them as inert would let an attacker who controls the
-repo escalate from "model can call git_commit" to arbitrary code
-execution). Specifically: locate the `commit` subcommand, insert
-`--no-verify` immediately after it if not already present, and
-reject any explicit `--verify` (raised as `PermissionError`)
-because that would override the hardening. The helper is scoped
-to `git commit`; non-commit invocations are returned unchanged.
-Other dangerous shapes (e.g. `git push --force`) are out of scope
-for this helper. Source: `security.py`.
+Disable direct commit hooks by inserting `-c core.hooksPath=/dev/null`
+after caller-supplied global options and before `commit`. Retain
+`--no-verify` as defense in depth and reject explicit `--verify`.
+`--no-verify` alone does not suppress prepare-commit-msg, post-commit
+or reference-transaction hooks, which can execute repository-controlled
+scripts. Repeated hardening is idempotent. Non-commit invocations are
+returned unchanged; other Git execution mechanisms remain outside this
+helper's scope. Both Hermes Git entrypoints apply the shared helper.
+Source: `security.py`.
 
 ### `BoundedSubprocess` (`security.py`)
 

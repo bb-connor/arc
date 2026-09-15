@@ -1,0 +1,6 @@
+{
+  "exit": "exit status: 1",
+  "stderr": "Traceback (most recent call last):\n  File \"/tmp/.tmpuPw2Ki/exchange-worker.py\", line 202, in <module>\n    main()\n  File \"/tmp/.tmpuPw2Ki/exchange-worker.py\", line 178, in main\n    decrypt(offer, key)\n  File \"/tmp/.tmpuPw2Ki/exchange-worker.py\", line 37, in decrypt\n    raise ValueError(\"wrong decryption key\")\nValueError: wrong decryption key\n",
+  "stdout": "",
+  "success": false
+}

@@ -1,0 +1,59 @@
+{
+  "id": "990759719a5f19cddb5ae674471a65d35f11459314a42d1b3aa05ad71e14140e",
+  "timestamp": 1800000000,
+  "capability_id": "comparison-capability-e00408c752d9ed610957e11923f1e20eeb372a7c1db9b1f821dfba5583bcba88",
+  "tool_server": "artifact-registry",
+  "tool_name": "publish",
+  "action": {
+    "parameters": {
+      "backend": "Chio",
+      "request": {
+        "arguments": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "resource": "review-queue"
+        },
+        "evidence": {
+          "body": {
+            "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+            "contractSha256": "f2bc1cb96338832ee4cdba2242ad96c25fefea5fe18536eb42ff88df8dfc2cd1",
+            "passed": true,
+            "predecessorStepId": "verify-owner-scope-contract",
+            "schema": "chio.runtime.artifact-outcome.experimental.v1",
+            "slot": {
+              "receiverId": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+              "stepId": "publish-approved-scope",
+              "workflowId": "repair-read-policy"
+            },
+            "verifiedAtUnixMs": 1800000000000
+          },
+          "signature": "33438c7a3e91ba80d7c4ad107072e3f825204db31cab5f494e26baa212349583804ab8a8e2ff4a5f28c16d9af696c63b73ce8ecaf7ce96ee20f2b8bf87e23101"
+        }
+      }
+    },
+    "parameter_hash": "5a562ea62be2ade2c3882b0b152520ac3f7e16cb3b93b842feb608db7bd1ff10"
+  },
+  "decision": {
+    "verdict": "allow"
+  },
+  "receipt_kind": "mediated_decision",
+  "boundary_class": "prevent",
+  "tool_origin": "caller_executed",
+  "redaction_mode": "none",
+  "content_hash": "dcd0afae9408ec11de1d6932e6f55b945bce6b87e5611879ca172e106c2762ad",
+  "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+  "metadata": {
+    "attribution": {
+      "delegation_depth": 0,
+      "grant_index": 0,
+      "issuer_key": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+      "subject_key": "e00408c752d9ed610957e11923f1e20eeb372a7c1db9b1f821dfba5583bcba88"
+    },
+    "chio_receipt_signing_nonce": "receipt-initial-agent",
+    "receipt_context": {
+      "request_id": "initial-agent"
+    }
+  },
+  "trust_level": "mediated",
+  "kernel_key": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+  "signature": "98483e3cbefa1f14c411a5355b30fe10a1b87ec14f1439ac0b43b4489dae4931570eb21b09902e3ca7bb56ec577401dbaccf0bdf32e30ab266642adc48e2e402"
+}

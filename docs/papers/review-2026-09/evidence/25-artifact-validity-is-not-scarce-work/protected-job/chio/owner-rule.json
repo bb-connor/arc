@@ -1,0 +1,15 @@
+{
+  "slot": {
+    "receiverId": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+    "workflowId": "repair-git-hook-policy",
+    "stepId": "publish"
+  },
+  "predecessorStepId": "receiver-check",
+  "verifierKey": "82a8d73e9e083daa4c90e2a5160da0ef832002265013e9723ec851c3d6d5bbd7",
+  "contractSha256": "43ee27f027a2439c19bb98969879d7da13bee254bead3994f5f90c53119f315f",
+  "serverId": "repair-review-queue",
+  "toolName": "publish",
+  "resource": "reviewed-source-files",
+  "validFromUnixMs": 1799999999000,
+  "validUntilUnixMs": 1800000001000
+}

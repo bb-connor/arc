@@ -1,0 +1,59 @@
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-runtime-core)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-agent-web-interop)
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc/crates/trust/chio-federation)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 44.11s
+     Running tests/verifier_hook_conformance.rs (target/debug/deps/verifier_hook_conformance-83564f6c44cbaa4b)
+
+running 7 tests
+test every_divergence_carries_its_reason ... ok
+test the_divergence_set_is_exactly_this ... ok
+test the_corpus_covers_every_verifier_rejection_class ... ok
+test the_agreement_scoped_hook_codes_the_corpus_covers ... ok
+test the_hook_does_not_resolve_the_subject_receipt ... ok
+test the_peer_signature_is_determined_by_custody_of_the_peer_key ... ok
+test the_two_deciders_relate_as_the_corpus_declares ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s
+
+     Running tests/runtime_treaty_binding_substitution.rs (target/debug/deps/runtime_treaty_binding_substitution-31efce280bac3189)
+
+running 35 tests
+test expired_lease_denies_before_dispatch_after_store_reopen ... ok
+test future_governance_denies_before_dispatch_after_store_reopen ... ok
+test activation_start_is_inclusive ... ok
+test lease_cannot_outlast_its_resolved_continuation ... ok
+test empty_governance_window_denies_before_dispatch_after_store_reopen ... ok
+test missing_lease_denies_before_dispatch_after_store_reopen ... ok
+test expired_governance_denies_before_dispatch_after_store_reopen ... ok
+test future_lease_denies_before_dispatch_after_store_reopen ... ok
+test lineage_bundle_digest_is_not_compared_without_a_resolved_bundle ... ok
+test missing_governance_denies_before_dispatch_after_store_reopen ... ok
+test matching_scoped_lease_admits_once ... ok
+test outcome_digest_is_compared_through_the_forced_invocation_record ... ok
+test revoked_governance_denies_before_dispatch_after_store_reopen ... ok
+test reordering_signer_kernel_ids_is_rejected_before_dispatch ... ok
+test revoked_lease_denies_before_dispatch_after_store_reopen ... ok
+test substituting_action_class_id_is_rejected_before_dispatch ... ok
+test scope_cannot_be_omitted_from_a_scoped_lease ... ok
+test substituting_continuation_digest_is_rejected_before_dispatch ... ok
+test substituting_admission_report_digest_is_admitted ... ok
+test substituting_governance_refs_is_rejected_before_dispatch ... ok
+test substituting_ladder_intersection_digest_is_rejected_before_dispatch ... ok
+test substituting_consistency_model_is_rejected_before_dispatch ... ok
+test substituting_admission_report_digest_with_a_non_hex_value_is_rejected ... ok
+test receipt_digests_are_compared_through_the_forced_invocation_record ... ok
+test substituting_lease_refs_is_rejected_before_dispatch ... ok
+test substituting_lineage_bundle_digest_is_rejected_before_dispatch ... ok
+test substituting_outcome_digest_is_rejected_before_dispatch ... ok
+test substituting_treaty_id_is_rejected_before_dispatch ... ok
+test substituting_remote_receipt_digest_is_rejected_before_dispatch ... ok
+test substituting_request_digest_is_rejected_before_dispatch ... ok
+test unsubstituted_binding_is_admitted_and_consumes_its_continuation ... ok
+test substituting_treaty_scope_digest_is_rejected_before_dispatch ... ok
+test substituting_local_receipt_digest_is_rejected_before_dispatch ... ok
+test substituting_signer_kernel_ids_is_rejected_before_dispatch ... ok
+test substituting_the_uncompared_field_alongside_a_compared_one_is_rejected ... ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.38s
+

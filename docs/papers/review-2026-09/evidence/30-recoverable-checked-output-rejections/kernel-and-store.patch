@@ -1,0 +1,719 @@
+diff --git a/crates/kernel/chio-kernel/README.md b/crates/kernel/chio-kernel/README.md
+index 305e6b2d25..393b45c983 100644
+--- a/crates/kernel/chio-kernel/README.md
++++ b/crates/kernel/chio-kernel/README.md
+@@ -66,6 +66,22 @@ Standalone surfaces:
+   read-scope-bounded receipt queries and reporting.
+ - `settlement_observer` - post-signing settlement hook invocation.
+ 
++For work priced on a successful output check, a trusted guard can implement
++`output_rejection_is_zero_charge`. This opts the request into a durable
++checked-output contract and requires a reversible hold for monetary calls.
++The host must bind the agreement and checker through its configured policy.
++Digest, Finding purchase and recovery contracts cannot be combined with this
++profile. The default is false; an ordinary security rejection does not authorize
++release of a payment hold.
++
++The kernel retains the raw tool return before output evaluation. A contracted
++rejection resolves durably before release, emits a signed `DeniedAfterDelivery`
++receipt with zero charge and a redaction content binding, and never releases
++the rejected payload. Recovery preserves a resolved rejection even if the
++checker later allows the result. An unrecorded dispatch remains uncertain,
++retains its holds and is never automatically re-executed. Ordinary output-guard
++errors retain their fail-closed behavior and can leave finalization pending.
++
+ Also re-exports the economic and governance artifact types from
+ `chio_core::{credit, governance, listing, market, open_market, underwriting}`
+ at the crate root, so an embedder does not need a direct `chio-core`
+diff --git a/crates/kernel/chio-kernel/src/admission_operation/projection.rs b/crates/kernel/chio-kernel/src/admission_operation/projection.rs
+index a9eadfde2b..8e0048bafe 100644
+--- a/crates/kernel/chio-kernel/src/admission_operation/projection.rs
++++ b/crates/kernel/chio-kernel/src/admission_operation/projection.rs
+@@ -1308,8 +1308,17 @@ pub enum DeliveryDenialReason {
+     /// The purchased Finding was no longer live at the terminal release
+     /// boundary after the provider returned.
+     FindingStatusChanged,
++    /// A trusted checked-output pricing guard rejected the returned work.
++    OutputGuardRejected,
+ }
+ 
++/// Stable receipt reason for a checked-output pricing rejection.
++pub const OUTPUT_GUARD_REJECTION_REASON: &str =
++    "returned output failed the agreed zero-charge check";
++/// Public redaction preimage for rejected work with no committed output digest.
++pub const OUTPUT_GUARD_REJECTION_REDACTION_DOMAIN: &[u8] =
++    b"chio.output-guard-rejection.redacted.v1\0";
++
+ #[derive(Debug, Clone, Serialize)]
+ #[serde(tag = "terminal", rename_all = "snake_case")]
+ pub enum AdmissionTerminalProjection {
+diff --git a/crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs b/crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs
+index 7f65fe538e..e78e4459b7 100644
+--- a/crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs
++++ b/crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs
+@@ -1190,6 +1190,18 @@ fn validate_denied_receipt_reason_and_delivery_metadata(
+         .as_ref()
+         .and_then(serde_json::Value::as_object)
+         .ok_or_else(mismatch)?;
++    if reason == DeliveryDenialReason::OutputGuardRejected {
++        if guard != "checked_output"
++            || decision_reason != OUTPUT_GUARD_REJECTION_REASON
++            || receipt.content_hash
++                != chio_core::crypto::sha256_hex(OUTPUT_GUARD_REJECTION_REDACTION_DOMAIN)
++            || metadata.contains_key(DELIVERY_CONTRACT_METADATA_KEY)
++            || metadata.contains_key(FINDING_DELIVERY_METADATA_KEY)
++        {
++            return Err(mismatch());
++        }
++        return Ok(());
++    }
+     let delivery: DeliveryContract = metadata
+         .get(DELIVERY_CONTRACT_METADATA_KEY)
+         .cloned()
+@@ -1259,6 +1271,7 @@ fn validate_denied_receipt_reason_and_delivery_metadata(
+                         && finding.status_proof.is_some()
+                 })
+         }
++        DeliveryDenialReason::OutputGuardRejected => false,
+     };
+     if !valid {
+         return Err(mismatch());
+@@ -1438,6 +1451,50 @@ mod tests {
+         Ok(())
+     }
+ 
++    #[test]
++    fn checked_output_projection_reason_requires_its_redaction_and_no_delivery_overlay(
++    ) -> Result<(), AdmissionOperationError> {
++        let key = Keypair::generate();
++        let template = digest_denial_receipt(OUTPUT_GUARD_REJECTION_REASON, "checked_output")?;
++        let mut body = template.body();
++        body.kernel_key = key.public_key();
++        body.content_hash = chio_core::crypto::sha256_hex(OUTPUT_GUARD_REJECTION_REDACTION_DOMAIN);
++        body.metadata = Some(serde_json::json!({}));
++        let sign = |body| {
++            ChioReceipt::sign(body, &key)
++                .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))
++        };
++        let valid = sign(body.clone())?;
++        validate_denied_receipt_reason_and_delivery_metadata(
++            &valid,
++            DeliveryDenialReason::OutputGuardRejected,
++        )?;
++        for mutation in 0..4 {
++            let mut wrong = body.clone();
++            match mutation {
++                0 => wrong.content_hash = OBSERVED_DELIVERY_DIGEST.into(),
++                1 => {
++                    wrong.decision = Some(Decision::Deny {
++                        reason: "ordinary rejection".into(),
++                        guard: "checked_output".into(),
++                    })
++                }
++                2 => wrong.metadata = template.metadata.clone(),
++                _ => wrong.decision = Some(Decision::Allow),
++            }
++            let wrong = sign(wrong)?;
++            assert!(wrong
++                .verify_signature()
++                .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?);
++            assert!(validate_denied_receipt_reason_and_delivery_metadata(
++                &wrong,
++                DeliveryDenialReason::OutputGuardRejected
++            )
++            .is_err());
++        }
++        Ok(())
++    }
++
+     fn record(
+         kind: AdmissionProjectionRecordKind,
+         value: serde_json::Value,
+diff --git a/crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs b/crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs
+index bf44fa852d..51e32f0383 100644
+--- a/crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs
++++ b/crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs
+@@ -624,7 +624,28 @@ impl ChioKernel {
+         // Only a grant that can serve this request may force the structured path. An
+         // unrelated cumulative grant elsewhere in the capability must not withdraw an
+         // otherwise exempt call.
+-        let requires_structured_admission = aggregate_quota.is_some()
++        let mut checked_output_required = false;
++        for matching in matching_grants {
++            checked_output_required |= self.has_checked_output_contract(request, matching.index)?;
++        }
++        if checked_output_required
++            && matching_grants.iter().any(|matching| {
++                matching.grant.constraints.iter().any(|constraint| {
++                    matches!(
++                        constraint,
++                        Constraint::OutputDigestSha256(_)
++                            | Constraint::RequireFindingPurchase(_)
++                            | Constraint::RequireFindingRecovery(_)
++                    )
++                })
++            })
++        {
++            return Err(KernelError::DurableAdmission(
++                "checked-output pricing cannot combine with digest, Finding purchase or recovery contracts".to_owned(),
++            ));
++        }
++        let requires_structured_admission = checked_output_required
++            || aggregate_quota.is_some()
+             || request.supplemental_authorization.is_some()
+             || cumulative_matching_grant_count != 0
+             || recovery_matching_grant_count != 0
+@@ -710,6 +731,13 @@ impl ChioKernel {
+                     "output-digest delivery requires a reversible-hold payment rail".to_owned(),
+                 ));
+             }
++            if checked_output_required
++                && adapter.rail_mode() != Some(crate::payment::PaymentRailMode::ReversibleHold)
++            {
++                return Err(KernelError::DurableAdmission(
++                    "checked-output pricing requires a reversible-hold payment rail".to_owned(),
++                ));
++            }
+         }
+         if self.execution_nonce_config.is_some() {
+             return Err(KernelError::DurableAdmission(
+diff --git a/crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs b/crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs
+index f90f6f5585..8d26e6bc3f 100644
+--- a/crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs
++++ b/crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs
+@@ -62,6 +62,7 @@ struct KernelOutputMaterialization<'a> {
+ }
+ 
+ struct DurableEvaluatedOutput {
++    output_guard_rejected: bool,
+     output: ToolCallOutput,
+     incomplete_reason: Option<String>,
+     post_invocation_metadata: Option<serde_json::Value>,
+@@ -142,6 +143,55 @@ fn receipt_visible_delivery_content(
+     }
+ }
+ 
++fn checked_output_decision() -> Decision {
++    let denial = delivery_contract::output_guard_delivery_denial();
++    Decision::Deny {
++        reason: denial.message.to_owned(),
++        guard: denial.guard.to_owned(),
++    }
++}
++
++fn retained_checked_output_denial(
++    outcome: &ToolOutcomeRecordV1,
++    resolved_output_digest: &str,
++) -> Result<bool, KernelError> {
++    let ResolvedToolOutcomeV1::Resolved {
++        post_guard_decision_digest,
++        ..
++    } = outcome.disposition()
++    else {
++        return Ok(false);
++    };
++    let expected = admission_digest(
++        "post_guard_decision_digest",
++        &KernelOutputGuardDecision {
++            schema: "chio.kernel-output-guard-decision.post-return.v1",
++            resolved_output_digest,
++            decision: &checked_output_decision(),
++        },
++    )?;
++    Ok(post_guard_decision_digest == &expected)
++}
++
++fn visible_terminal_content(
++    actual: &ReceiptContent,
++    evaluation: &delivery_contract::DeliveryEvaluation,
++    expected_digest: Option<&str>,
++) -> ReceiptContent {
++    if evaluation.denial.as_ref().is_some_and(|denial| {
++        denial.reason == crate::admission_operation::DeliveryDenialReason::OutputGuardRejected
++    }) {
++        let canonical_content =
++            crate::admission_operation::OUTPUT_GUARD_REJECTION_REDACTION_DOMAIN.to_vec();
++        return ReceiptContent {
++            content_hash: sha256_hex(&canonical_content),
++            metadata: None,
++            canonical_content,
++        };
++    }
++    receipt_visible_delivery_content(actual, evaluation.digest_mismatched, expected_digest)
++}
++
+ fn record_terminal_finding_denial(
+     metadata: Option<serde_json::Value>,
+     denial: Option<&FindingDenial>,
+@@ -192,7 +242,8 @@ impl ChioKernel {
+             verified_recovery,
+             trusted_now_unix_ms,
+         } = input;
+-        self.validate_guarded_output(request, matched_grant_index, output, false)?;
++        // Retain the authenticated return before validation. Recording it does
++        // not authorize output release or payment capture.
+         let purchase_replay_metadata =
+             self.capture_purchase_replay_metadata(request, matched_grant_index, verified_purchase)?;
+         let recovery_replay_metadata =
+@@ -453,6 +504,13 @@ impl ChioKernel {
+         matched_grant_index: usize,
+         plan: &DurablePostReturnPlan,
+     ) -> Result<DurableEvaluatedOutput, KernelError> {
++        let raw_guard_rejected = self.check_guarded_output(
++            request,
++            matched_grant_index,
++            &invocation_output_to_server_output(raw.output()),
++            false,
++            true,
++        )?;
+         let materialized = self.apply_stream_limit_snapshot(
+             invocation_output_to_server_output(raw.output()),
+             Duration::from_millis(raw.elapsed_millis()),
+@@ -489,7 +547,8 @@ impl ChioKernel {
+                     .to_owned(),
+             ));
+         }
+-        self.validate_guarded_output(request, matched_grant_index, &handling.output, true)?;
++        let released_guard_rejected =
++            self.check_guarded_output(request, matched_grant_index, &handling.output, true, true)?;
+         let (output, transformed_incomplete_reason) =
+             Self::terminal_tool_call_output(handling.output);
+         let incomplete_reason = materialized_incomplete_reason.or(transformed_incomplete_reason);
+@@ -507,6 +566,7 @@ impl ChioKernel {
+             ));
+         }
+         Ok(DurableEvaluatedOutput {
++            output_guard_rejected: raw_guard_rejected || released_guard_rejected,
+             output,
+             incomplete_reason,
+             post_invocation_metadata: handling.extra_metadata,
+@@ -650,6 +710,7 @@ impl ChioKernel {
+             recovery_status,
+         } = self.durable_evaluation_contract(admission, request, &tool_return.raw)?;
+         let DurableEvaluatedOutput {
++            output_guard_rejected,
+             output,
+             incomplete_reason,
+             post_invocation_metadata,
+@@ -688,6 +749,18 @@ impl ChioKernel {
+             &receipt_content.canonical_content,
+             purchase.as_ref(),
+         );
++        if output_guard_rejected && receipt.decision == Some(Decision::Allow) {
++            return Err(KernelError::GuardDenied(
++                "completed output no longer passes the agreed check".to_owned(),
++            ));
++        }
++        if retained_checked_output_denial(&tool_return.outcome, &receipt_content.content_hash)? {
++            delivery_evaluation.denial = Some(delivery_contract::output_guard_delivery_denial());
++        } else if output_guard_rejected {
++            return Err(KernelError::GuardDenied(
++                "replayed output check conflicts with its retained terminal".to_owned(),
++            ));
++        }
+         if let Some(reason) = self.revalidate_replayed_purchase_delivery(
+             receipt.decision.as_ref(),
+             &mut delivery_evaluation,
+@@ -696,9 +769,9 @@ impl ChioKernel {
+         ) {
+             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "finding purchase replay output withheld");
+         }
+-        let receipt_visible_content = receipt_visible_delivery_content(
++        let receipt_visible_content = visible_terminal_content(
+             &receipt_content,
+-            delivery_evaluation.digest_mismatched,
++            &delivery_evaluation,
+             expected_output_digest.as_deref(),
+         );
+         let expected_decision = match &delivery_evaluation.denial {
+@@ -1582,6 +1655,7 @@ impl ChioKernel {
+             recovery_status,
+         } = self.durable_evaluation_contract(admission, request, &tool_return.raw)?;
+         let DurableEvaluatedOutput {
++            output_guard_rejected,
+             output,
+             incomplete_reason,
+             post_invocation_metadata,
+@@ -1647,6 +1721,11 @@ impl ChioKernel {
+         stored_outcome
+             .validate_canonical_blob(&admission.operation, &raw_blob)
+             .map_err(tool_outcome_error)?;
++        if output_guard_rejected
++            || retained_checked_output_denial(&stored_outcome, resolved_output_digest.as_str())?
++        {
++            delivery_evaluation.denial = Some(delivery_contract::output_guard_delivery_denial());
++        }
+         let existing_evaluation = runtime
+             .outcome_store
+             .lookup_post_return_evaluation(admission.operation.binding().operation_id())
+@@ -1732,9 +1811,9 @@ impl ChioKernel {
+         } else {
+             AdmissionOperationState::Completed
+         };
+-        let receipt_visible_content = receipt_visible_delivery_content(
++        let receipt_visible_content = visible_terminal_content(
+             &receipt_content,
+-            delivery_evaluation.digest_mismatched,
++            &delivery_evaluation,
+             expected_output_digest.as_deref(),
+         );
+         let receipt_visible_digest = AdmissionDigest::try_new(
+diff --git a/crates/kernel/chio-kernel/src/kernel/delivery_contract.rs b/crates/kernel/chio-kernel/src/kernel/delivery_contract.rs
+index 8843f527ad..9c458011fb 100644
+--- a/crates/kernel/chio-kernel/src/kernel/delivery_contract.rs
++++ b/crates/kernel/chio-kernel/src/kernel/delivery_contract.rs
+@@ -73,6 +73,14 @@ pub(crate) fn finding_status_delivery_denial() -> DeliveryDenial {
+     }
+ }
+ 
++pub(crate) fn output_guard_delivery_denial() -> DeliveryDenial {
++    DeliveryDenial {
++        reason: crate::admission_operation::DeliveryDenialReason::OutputGuardRejected,
++        message: crate::admission_operation::OUTPUT_GUARD_REJECTION_REASON,
++        guard: "checked_output",
++    }
++}
++
+ /// Make a persisted delivery denial monotonic across replay. Deterministic
+ /// delivery checks are recomputed first; if they now allow while the signed
+ /// terminal receipt denied, the only mutable gate was current finding status.
+diff --git a/crates/kernel/chio-kernel/src/kernel/mod.rs b/crates/kernel/chio-kernel/src/kernel/mod.rs
+index f1ec70a94a..aeb5b41b28 100644
+--- a/crates/kernel/chio-kernel/src/kernel/mod.rs
++++ b/crates/kernel/chio-kernel/src/kernel/mod.rs
+@@ -614,7 +614,8 @@ pub trait Guard: Send + Sync {
+     }
+ 
+     /// Validate the exact output after the tool returns and before it can be
+-    /// released or committed as a durable tool return. Stateful guards use
++    /// released. Raw durable returns are retained before this check so a
++    /// rejected result can be finalized without repeating execution. Stateful guards use
+     /// this seam to bind an admission decision to the value actually read.
+     fn validate_output_before_release(
+         &self,
+@@ -629,6 +630,20 @@ pub trait Guard: Send + Sync {
+     fn requires_exact_released_output(&self, _ctx: &GuardContext) -> bool {
+         false
+     }
++
++    /// Opt this request into a checked-output contract: a returned output
++    /// rejected by this guard earns zero charge. This is trusted pricing
++    /// authority, not an inference from an ordinary security denial. The
++    /// configured policy must bind the agreement and checker. The kernel
++    /// requires durable coverage and a reversible payment hold, retains the
++    /// executed invocation, and withholds the rejected output. Composite
++    /// guards must explicitly implement the contract for their children.
++    /// Digest, Finding purchase and recovery contracts cannot be combined
++    /// with this profile. Errors and panics in guards that do not opt in
++    /// retain their existing fail-closed behavior.
++    fn output_rejection_is_zero_charge(&self, _ctx: &GuardContext) -> bool {
++        false
++    }
+ }
+ 
+ /// Context passed to guards during evaluation.
+diff --git a/crates/kernel/chio-kernel/src/kernel/output_guard.rs b/crates/kernel/chio-kernel/src/kernel/output_guard.rs
+index 4b47207c70..91b2a42541 100644
+--- a/crates/kernel/chio-kernel/src/kernel/output_guard.rs
++++ b/crates/kernel/chio-kernel/src/kernel/output_guard.rs
+@@ -10,6 +10,21 @@ impl ChioKernel {
+         output: &ToolServerOutput,
+         post_invocation_applied: bool,
+     ) -> Result<(), KernelError> {
++        self.check_guarded_output(
++            request,
++            matched_grant_index,
++            output,
++            post_invocation_applied,
++            false,
++        )
++        .map(|_| ())
++    }
++
++    pub(crate) fn has_checked_output_contract(
++        &self,
++        request: &ToolCallRequest,
++        matched_grant_index: usize,
++    ) -> Result<bool, KernelError> {
+         let context = GuardContext {
+             request,
+             scope: &request.capability.scope,
+@@ -18,6 +33,39 @@ impl ChioKernel {
+             session_filesystem_roots: None,
+             matched_grant_index: Some(matched_grant_index),
+         };
++        let mut required = false;
++        for guard in self.guards.iter() {
++            required |= std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++                guard.output_rejection_is_zero_charge(&context)
++            }))
++            .map_err(|_| {
++                KernelError::GuardDenied(
++                    "checked-output contract panicked (fail-closed)".to_owned(),
++                )
++            })?;
++        }
++        Ok(required)
++    }
++
++    /// Return true only for a rejection covered by a trusted zero-charge
++    /// contract. Ordinary errors still fail closed without releasing a hold.
++    pub(crate) fn check_guarded_output(
++        &self,
++        request: &ToolCallRequest,
++        matched_grant_index: usize,
++        output: &ToolServerOutput,
++        post_invocation_applied: bool,
++        allow_contractual_denial: bool,
++    ) -> Result<bool, KernelError> {
++        let context = GuardContext {
++            request,
++            scope: &request.capability.scope,
++            agent_id: &request.agent_id,
++            server_id: &request.server_id,
++            session_filesystem_roots: None,
++            matched_grant_index: Some(matched_grant_index),
++        };
++        let mut rejected = false;
+         for guard in self.guards.iter() {
+             if !post_invocation_applied
+                 && !self.post_invocation_pipeline.is_empty()
+@@ -29,9 +77,20 @@ impl ChioKernel {
+                 // terminal receipt or response is produced.
+                 continue;
+             }
+-            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++            let validation = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                 guard.validate_output_before_release(&context, output)
+-            })) {
++            }));
++            if !matches!(validation, Ok(Ok(()))) && allow_contractual_denial {
++                let zero_charge = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++                    guard.output_rejection_is_zero_charge(&context)
++                }))
++                .unwrap_or(false);
++                if zero_charge {
++                    rejected = true;
++                    continue;
++                }
++            }
++            match validation {
+                 Ok(Ok(())) => {}
+                 Ok(Err(error)) => {
+                     return Err(KernelError::GuardDenied(format!(
+@@ -45,6 +104,6 @@ impl ChioKernel {
+                 }
+             }
+         }
+-        Ok(())
++        Ok(rejected)
+     }
+ }
+diff --git a/crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs b/crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs
+index aac8caa6db..7fc70cc88b 100644
+--- a/crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs
++++ b/crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs
+@@ -14,6 +14,8 @@ use crate::tool_outcome::{
+     ToolOutcomeStoreError,
+ };
+ 
++#[path = "durable_admission/checked_output.rs"]
++mod checked_output;
+ #[path = "durable_admission/monetary.rs"]
+ mod monetary;
+ #[path = "durable_admission/receipt_projection.rs"]
+@@ -128,7 +130,12 @@ fn finding_memory_lineage_requires_a_durable_terminal_projection() {
+         make_scope(vec![make_grant("memory-server", "write")]),
+         300,
+     );
+-    let mut request = make_request("finding-memory-durable", &capability, "write", "memory-server");
++    let mut request = make_request(
++        "finding-memory-durable",
++        &capability,
++        "write",
++        "memory-server",
++    );
+     request.arguments[crate::memory_provenance::FINDING_DELIVERY_RECEIPT_ID_ARGUMENT] =
+         serde_json::json!("delivery-receipt");
+     let matching = resolve_required_matching_grants(
+@@ -140,14 +147,12 @@ fn finding_memory_lineage_requires_a_durable_terminal_projection() {
+     )
+     .expect("matching Finding memory grant");
+ 
+-    let error = match kernel.begin_durable_tool_admission(
+-        &request,
+-        &matching,
+-        current_unix_timestamp_ms(),
+-    ) {
+-        Ok(_) => panic!("Finding memory lineage used an ephemeral terminal"),
+-        Err(error) => error,
+-    };
++    let error =
++        match kernel.begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
++        {
++            Ok(_) => panic!("Finding memory lineage used an ephemeral terminal"),
++            Err(error) => error,
++        };
+     assert!(error
+         .to_string()
+         .contains("no qualified admission operation store"));
+@@ -443,7 +448,11 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
+         not_after_unix_ms: u64,
+         limit: usize,
+     ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
+-        let store_fence = self.fence.lock().expect("test admission fence lock").clone();
++        let store_fence = self
++            .fence
++            .lock()
++            .expect("test admission fence lock")
++            .clone();
+         let state = self.state.lock().expect("test admission state lock");
+         // Mirror the durable store's recovery contract: an operation still under a
+         // live recovery lease held by the serving fence is being actively driven
+@@ -453,9 +462,7 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
+             .operation
+             .iter()
+             .filter(|operation| !operation.state().is_terminal())
+-            .filter(|operation| {
+-                operation.state() != AdmissionOperationState::ApprovalRequired
+-            })
++            .filter(|operation| operation.state() != AdmissionOperationState::ApprovalRequired)
+             .filter(|operation| {
+                 !state.claim.as_ref().is_some_and(|claim| {
+                     claim.operation_id() == operation.binding().operation_id()
+@@ -542,6 +549,13 @@ impl ReceiptStore for TestAdmissionOperationStore {
+         if let AdmissionTerminalProjection::Completed(completed) = projection {
+             state.receipt = Some(completed.receipt.receipt().clone());
+         }
++        if let AdmissionTerminalProjection::DeniedAfterDelivery { evidence, .. } = projection {
++            if let crate::admission_operation::AdmissionReceiptOrIncident::Receipt(receipt) =
++                evidence.as_ref()
++            {
++                state.receipt = Some(receipt.receipt().clone());
++            }
++        }
+         state.operation = Some(updated.clone());
+         state.claim = None;
+         Ok(AdmissionTerminal {
+diff --git a/crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs b/crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs
+index 0e424d7b1c..a8a2a093c6 100644
+--- a/crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs
++++ b/crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs
+@@ -32,6 +32,9 @@ use chio_kernel::{
+ };
+ use chio_store_sqlite::{SqliteAuthorityStore, SqliteToolOutcomeStore};
+ 
++#[path = "durable_admission_sqlite/checked_output.rs"]
++mod checked_output;
++
+ fn secure_directory(path: &std::path::Path) -> std::io::Result<()> {
+     #[cfg(unix)]
+     {
+@@ -1167,9 +1170,10 @@ fn output_digest_delivery_contract_enforces_every_lane() -> Result<(), Box<dyn E
+     // persisted Deny after a restart.
+     {
+         let temp = tempfile::tempdir()?;
++        secure_directory(temp.path())?;
+         let database = temp.path().join("authority.db");
+         let lock_root = temp.path().join("locks");
+-        std::fs::create_dir(&lock_root)?;
++        create_private_directory(&lock_root)?;
+         SqliteAuthorityStore::provision(&database, &lock_root)?;
+         let kernel_keypair = Keypair::generate();
+         let invocations = Arc::new(AtomicU64::new(0));
+@@ -1318,9 +1322,10 @@ fn output_digest_delivery_contract_enforces_every_lane() -> Result<(), Box<dyn E
+     // after a restart without a second capture.
+     {
+         let temp = tempfile::tempdir()?;
++        secure_directory(temp.path())?;
+         let database = temp.path().join("authority.db");
+         let lock_root = temp.path().join("locks");
+-        std::fs::create_dir(&lock_root)?;
++        create_private_directory(&lock_root)?;
+         SqliteAuthorityStore::provision(&database, &lock_root)?;
+         let kernel_keypair = Keypair::generate();
+         let invocations = Arc::new(AtomicU64::new(0));
+@@ -1405,9 +1410,10 @@ fn output_digest_delivery_contract_enforces_every_lane() -> Result<(), Box<dyn E
+     // execution and no money touched.
+     {
+         let temp = tempfile::tempdir()?;
++        secure_directory(temp.path())?;
+         let database = temp.path().join("authority.db");
+         let lock_root = temp.path().join("locks");
+-        std::fs::create_dir(&lock_root)?;
++        create_private_directory(&lock_root)?;
+         SqliteAuthorityStore::provision(&database, &lock_root)?;
+         let invocations = Arc::new(AtomicU64::new(0));
+         let payment_calls = Arc::new(PaymentCalls::default());
+@@ -1468,9 +1474,10 @@ fn malformed_delivery_digests_are_rejected_before_dispatch() -> Result<(), Box<d
+     ];
+     for (digests, expected_fragment) in shapes {
+         let temp = tempfile::tempdir()?;
++        secure_directory(temp.path())?;
+         let database = temp.path().join("authority.db");
+         let lock_root = temp.path().join("locks");
+-        std::fs::create_dir(&lock_root)?;
++        create_private_directory(&lock_root)?;
+         SqliteAuthorityStore::provision(&database, &lock_root)?;
+         let invocations = Arc::new(AtomicU64::new(0));
+         let payment_calls = Arc::new(PaymentCalls::default());
+@@ -1530,9 +1537,10 @@ fn malformed_delivery_digests_are_rejected_before_dispatch() -> Result<(), Box<d
+ fn delivery_marked_grant_cannot_fall_through_to_an_unmarked_sibling() -> Result<(), Box<dyn Error>>
+ {
+     let temp = tempfile::tempdir()?;
++    secure_directory(temp.path())?;
+     let database = temp.path().join("authority.db");
+     let lock_root = temp.path().join("locks");
+-    std::fs::create_dir(&lock_root)?;
++    create_private_directory(&lock_root)?;
+     SqliteAuthorityStore::provision(&database, &lock_root)?;
+     let invocations = Arc::new(AtomicU64::new(0));
+     let payment_calls = Arc::new(PaymentCalls::default());
+@@ -1583,9 +1591,10 @@ fn delivery_marked_grant_cannot_fall_through_to_an_unmarked_sibling() -> Result<
+ #[test]
+ fn output_digest_admission_rejects_malformed_commitments() -> Result<(), Box<dyn Error>> {
+     let temp = tempfile::tempdir()?;
++    secure_directory(temp.path())?;
+     let database = temp.path().join("authority.db");
+     let lock_root = temp.path().join("locks");
+-    std::fs::create_dir(&lock_root)?;
++    create_private_directory(&lock_root)?;
+     SqliteAuthorityStore::provision(&database, &lock_root)?;
+     let invocations = Arc::new(AtomicU64::new(0));
+     let payment_calls = Arc::new(PaymentCalls::default());
+@@ -1688,9 +1697,10 @@ fn stream_delivery_cannot_satisfy_a_committed_output_digest() -> Result<(), Box<
+     // Learn the stream-form content hash from an unconstrained delivery.
+     let stream_hash = {
+         let temp = tempfile::tempdir()?;
++        secure_directory(temp.path())?;
+         let database = temp.path().join("authority.db");
+         let lock_root = temp.path().join("locks");
+-        std::fs::create_dir(&lock_root)?;
++        create_private_directory(&lock_root)?;
+         SqliteAuthorityStore::provision(&database, &lock_root)?;
+         let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+         let invocations = Arc::new(AtomicU64::new(0));
+@@ -1717,9 +1727,10 @@ fn stream_delivery_cannot_satisfy_a_committed_output_digest() -> Result<(), Box<
+     // Commit that exact hash as the output digest: the streamed delivery
+     // must still deny with a zero-charge release, not capture.
+     let temp = tempfile::tempdir()?;
++    secure_directory(temp.path())?;
+     let database = temp.path().join("authority.db");
+     let lock_root = temp.path().join("locks");
+-    std::fs::create_dir(&lock_root)?;
++    create_private_directory(&lock_root)?;
+     SqliteAuthorityStore::provision(&database, &lock_root)?;
+     let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+     let invocations = Arc::new(AtomicU64::new(0));
+diff --git a/crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs b/crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs
+index 57fcc60f45..a1d61b9a99 100644
+--- a/crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs
++++ b/crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs
+@@ -1230,6 +1230,7 @@ fn verify_stored_denied_record_shape(
+                     | "envelope_malformed"
+                     | "media_type_mismatch"
+                     | "finding_status_changed"
++                    | "output_guard_rejected"
+             )
+         )
+         || body

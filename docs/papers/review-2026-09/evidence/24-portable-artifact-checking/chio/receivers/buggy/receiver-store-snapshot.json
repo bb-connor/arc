@@ -1,0 +1,14 @@
+{
+  "runtime_outcome_effect_slots": [
+    {
+      "claim_json": "{\"slot\":{\"receiverId\":\"44cccf5b43980d5dc7e27cc061a8cf13298a3dd18af11af045b86140ab72ec47\",\"workflowId\":\"recover-checked-git-repair\",\"stepId\":\"publish\"},\"ruleSha256\":\"da8910ecd8b6add6e5ecd5395de0fc902bc4bcc9d35e04255b63de4c32c84578\",\"evidenceSha256\":\"0b8663a91b818a64dc27248498fe324d053061da25718aaa2f6edbb2cce35a7e\",\"arguments\":{\"artifactSha256\":\"ea4f44b789891274e9e49f5aa549e2b4b47481634c2d7237f38f29ac77a705fc\",\"resource\":\"refs/heads/verified-repair\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+      "claim_sha256": "2744d2d01b1125da2b9cafd6f0ad69ebe31d69b16fd22ec64b966e947234f4b6",
+      "result_json": "{\"artifactSha256\":\"d5adfb6dad6ae137c29f447e87c7719634f63000343ea68c5e468f440b3ddc58\",\"commit\":\"a602440fb76b56f2bac015e0ef7b0640c4c5d256d6c996e3399c8090005cc1a3\",\"intentSha256\":\"ea4f44b789891274e9e49f5aa549e2b4b47481634c2d7237f38f29ac77a705fc\",\"observedPublished\":true,\"reference\":\"refs/heads/verified-repair\",\"schema\":\"observed-git-publication.experimental.v1\"}",
+      "result_sha256": "9ba11bc27445a40f0bd52337793fa0038fd4e92ccf199e3d3857e6ab4b4b6a60",
+      "revoked": 0,
+      "rule_json": "{\"slot\":{\"receiverId\":\"44cccf5b43980d5dc7e27cc061a8cf13298a3dd18af11af045b86140ab72ec47\",\"workflowId\":\"recover-checked-git-repair\",\"stepId\":\"publish\"},\"predecessorStepId\":\"receiver-source-check\",\"verifierKey\":\"44cccf5b43980d5dc7e27cc061a8cf13298a3dd18af11af045b86140ab72ec47\",\"contractSha256\":\"00fcbd8ae3ea5ede4af97bbf2a3c009a8d46eedbaa9a16ca89e2cce8bb963e30\",\"serverId\":\"checked-git-publication\",\"toolName\":\"publish\",\"resource\":\"refs/heads/verified-repair\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+      "rule_sha256": "da8910ecd8b6add6e5ecd5395de0fc902bc4bcc9d35e04255b63de4c32c84578",
+      "slot_sha256": "b52211e1a61ace8889db4d78b286a27294b63e89677888c51cf7e6496e6a1323"
+    }
+  ]
+}

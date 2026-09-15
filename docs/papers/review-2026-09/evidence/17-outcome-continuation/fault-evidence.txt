@@ -1,0 +1,18 @@
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc/crates/kernel/chio-runtime-core)
+    Finished `test` profile [unoptimized] target(s) in 7.89s
+     Running tests/outcome_continuation.rs (target/debug/deps/outcome_continuation-cdd9baf2386de47a)
+
+running 7 tests
+test outcome_claim_subprocess_worker ... ok
+test activation_is_immutable_and_has_no_new_token_reset_path ... ok
+CHIO_OUTCOME_KILL boundary=crash_after_claim exit=signal: 9 (SIGKILL) physical_effects=0 state=DispatchClaimed replacement_effects=0
+CHIO_OUTCOME_RACE contenders=8 physical_effects=1
+test fresh_evidence_attempt_and_artifact_cannot_recreate_consumed_authority ... ok
+test competing_receiver_processes_spend_exactly_one_effect_slot ... ok
+test revocation_and_expiry_are_rechecked_at_claim_time ... ok
+CHIO_OUTCOME_KILL boundary=crash_after_effect exit=signal: 9 (SIGKILL) physical_effects=1 state=DispatchClaimed replacement_effects=0
+test killed_dispatchers_preserve_uncertainty_before_and_after_the_external_effect ... ok
+test receiver_rule_binds_every_effect_and_outcome_input_without_burning_the_slot ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.46s
+

@@ -1,0 +1,13 @@
+{
+  "enrollments": 26,
+  "externalFundsTransferred": false,
+  "incidents": 3,
+  "independentOperators": false,
+  "meaning": "Peer keys supplied separately by the fixture operator. Native completion attests to the configured local rail. Consent waives the claim without establishing a known execution result.",
+  "privateKeysExported": false,
+  "releases": 7,
+  "roleDatabasesExported": false,
+  "signedIncidentDenials": 30,
+  "signedReleaseDenials": 11,
+  "work": 14
+}

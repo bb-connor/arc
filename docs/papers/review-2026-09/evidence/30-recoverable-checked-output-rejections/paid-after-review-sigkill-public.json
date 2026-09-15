@@ -1,0 +1,11 @@
+{
+  "scenario": "after-review-sigkill",
+  "reviews": 1,
+  "payments": {
+    "held": 1
+  },
+  "buyerExpenses": 0,
+  "retriedWork": false,
+  "firstError": "tool server error: A2A remote request failed: http://127.0.0.1:38571/rpc: Network Error: Unexpected EOF",
+  "recoveryError": "provider did not complete the request: {\"message\":{\"messageId\":\"status-a2a-task-395b655265a5f184ec7e2ada8ce256e5c0964d53a79111bff05095564d98492c-2\",\"parts\":[{\"text\":\"tool server error: review outcome is uncertain; completed paid receipt unavailable\"}],\"role\":\"ROLE_AGENT\"},\"state\":\"TASK_STATE_FAILED\"}"
+}

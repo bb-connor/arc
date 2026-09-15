@@ -1,0 +1,33 @@
+{
+  "endpoints": [
+    {
+      "directory": "/tmp/.tmp8F67sy/attacks/duplicate_delivery/ledger/verifier",
+      "key": "6ec268b8d84678b7313f236a35e616f5624e28adc34561bb2bab47bab3358ee7",
+      "role": "verifier",
+      "socket": "/tmp/.tmp8F67sy/attacks/duplicate_delivery/ledger/sockets/verifier.sock"
+    },
+    {
+      "directory": "/tmp/.tmp8F67sy/attacks/duplicate_delivery/ledger/publisher",
+      "key": "57d6285e5237db5c8162a198e40ca215601d3e1a1d9cac488beb8fe806828773",
+      "role": "publisher",
+      "socket": "/tmp/.tmp8F67sy/attacks/duplicate_delivery/ledger/sockets/publisher.sock"
+    },
+    {
+      "directory": "/tmp/.tmp8F67sy/attacks/duplicate_delivery/ledger/archive",
+      "key": "82b4463e793e949e1ee2a966a96c6aa8851f0fe3b34739fd2fb8feca496f07e8",
+      "role": "archive",
+      "socket": "/tmp/.tmp8F67sy/attacks/duplicate_delivery/ledger/sockets/archive.sock"
+    }
+  ],
+  "artifact": {
+    "grants": [
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "source-checkout",
+        "tool_name": "read"
+      }
+    ]
+  }
+}

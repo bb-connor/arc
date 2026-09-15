@@ -1,0 +1,246 @@
+{
+  "actualGitCommitCases": 14,
+  "bareHashlock": {
+    "buyerHasValidRepair": false,
+    "sellerCredits": 10,
+    "validKeyRevealed": true
+  },
+  "experiment": "checked-repair-for-local-credits",
+  "externalPaymentExecuted": false,
+  "gateSeparationObserved": false,
+  "limits": [
+    "Trusted native checker, local settlement operator and host; all roles run under one administrative account",
+    "Test credits have no monetary value; no blockchain, bank, payment provider or deployed market integration",
+    "The operator sees plaintext and the key before settlement; no trustless fair exchange or zero-knowledge proof",
+    "Buyer delivery reads only the funded offer and committed key view, but this is not a new cross-user filesystem isolation test",
+    "The already-public repository repair is a reproducible fixture, not a secrecy experiment with an unknown valuable good",
+    "Native checking is reused only for identical artifact bytes; the seven-case contract is not general correctness",
+    "Four settlement children are SIGKILLed, while the trusted controller retains its gate permits; no controller-loss, power-loss or dishonest-operator guarantee",
+    "Payment and key release are atomic only because they share one SQLite transaction; moving either to an external system invalidates that argument"
+  ],
+  "nativeCheckerRuns": 2,
+  "pairedScenarios": [
+    {
+      "case": "honest",
+      "chio": {
+        "buyerCredits": 90,
+        "buyerReceivedCheckedArtifact": true,
+        "concurrentOrRecoveryWorkers": 1,
+        "gateStateAfterReopen": "completed",
+        "keyReleased": true,
+        "killedSettlementWorkers": 0,
+        "lockedCredits": 0,
+        "sellerCredits": 10,
+        "settled": true,
+        "terminalEvents": 1
+      },
+      "ledger": {
+        "buyerCredits": 90,
+        "buyerReceivedCheckedArtifact": true,
+        "concurrentOrRecoveryWorkers": 1,
+        "gateStateAfterReopen": "completed",
+        "keyReleased": true,
+        "killedSettlementWorkers": 0,
+        "lockedCredits": 0,
+        "sellerCredits": 10,
+        "settled": true,
+        "terminalEvents": 1
+      }
+    },
+    {
+      "case": "buyer_aborts_after_funding",
+      "chio": {
+        "buyerCredits": 90,
+        "buyerReceivedCheckedArtifact": true,
+        "concurrentOrRecoveryWorkers": 1,
+        "gateStateAfterReopen": "completed",
+        "keyReleased": true,
+        "killedSettlementWorkers": 0,
+        "lockedCredits": 0,
+        "sellerCredits": 10,
+        "settled": true,
+        "terminalEvents": 1
+      },
+      "ledger": {
+        "buyerCredits": 90,
+        "buyerReceivedCheckedArtifact": true,
+        "concurrentOrRecoveryWorkers": 1,
+        "gateStateAfterReopen": "completed",
+        "keyReleased": true,
+        "killedSettlementWorkers": 0,
+        "lockedCredits": 0,
+        "sellerCredits": 10,
+        "settled": true,
+        "terminalEvents": 1
+      }
+    },
+    {
+      "case": "seller_withholds",
+      "chio": {
+        "buyerCredits": 100,
+        "buyerReceivedCheckedArtifact": false,
+        "concurrentOrRecoveryWorkers": 0,
+        "gateStateAfterReopen": "waiting",
+        "keyReleased": false,
+        "killedSettlementWorkers": 0,
+        "lockedCredits": 0,
+        "sellerCredits": 0,
+        "settled": false,
+        "terminalEvents": 1
+      },
+      "ledger": {
+        "buyerCredits": 100,
+        "buyerReceivedCheckedArtifact": false,
+        "concurrentOrRecoveryWorkers": 0,
+        "gateStateAfterReopen": "waiting",
+        "keyReleased": false,
+        "killedSettlementWorkers": 0,
+        "lockedCredits": 0,
+        "sellerCredits": 0,
+        "settled": false,
+        "terminalEvents": 1
+      }
+    },
+    {
+      "case": "before_commit_crash",
+      "chio": {
+        "buyerCredits": 90,
+        "buyerReceivedCheckedArtifact": true,
+        "concurrentOrRecoveryWorkers": 1,
+        "gateStateAfterReopen": "completed",
+        "keyReleased": true,
+        "killedSettlementWorkers": 1,
+        "lockedCredits": 0,
+        "sellerCredits": 10,
+        "settled": true,
+        "terminalEvents": 1
+      },
+      "ledger": {
+        "buyerCredits": 90,
+        "buyerReceivedCheckedArtifact": true,
+        "concurrentOrRecoveryWorkers": 1,
+        "gateStateAfterReopen": "completed",
+        "keyReleased": true,
+        "killedSettlementWorkers": 1,
+        "lockedCredits": 0,
+        "sellerCredits": 10,
+        "settled": true,
+        "terminalEvents": 1
+      }
+    },
+    {
+      "case": "after_commit_crash",
+      "chio": {
+        "buyerCredits": 90,
+        "buyerReceivedCheckedArtifact": true,
+        "concurrentOrRecoveryWorkers": 1,
+        "gateStateAfterReopen": "completed",
+        "keyReleased": true,
+        "killedSettlementWorkers": 1,
+        "lockedCredits": 0,
+        "sellerCredits": 10,
+        "settled": true,
+        "terminalEvents": 1
+      },
+      "ledger": {
+        "buyerCredits": 90,
+        "buyerReceivedCheckedArtifact": true,
+        "concurrentOrRecoveryWorkers": 1,
+        "gateStateAfterReopen": "completed",
+        "keyReleased": true,
+        "killedSettlementWorkers": 1,
+        "lockedCredits": 0,
+        "sellerCredits": 10,
+        "settled": true,
+        "terminalEvents": 1
+      }
+    },
+    {
+      "case": "concurrent_retries",
+      "chio": {
+        "buyerCredits": 90,
+        "buyerReceivedCheckedArtifact": true,
+        "concurrentOrRecoveryWorkers": 8,
+        "gateStateAfterReopen": "completed",
+        "keyReleased": true,
+        "killedSettlementWorkers": 0,
+        "lockedCredits": 0,
+        "sellerCredits": 10,
+        "settled": true,
+        "terminalEvents": 1
+      },
+      "ledger": {
+        "buyerCredits": 90,
+        "buyerReceivedCheckedArtifact": true,
+        "concurrentOrRecoveryWorkers": 8,
+        "gateStateAfterReopen": "completed",
+        "keyReleased": true,
+        "killedSettlementWorkers": 0,
+        "lockedCredits": 0,
+        "sellerCredits": 10,
+        "settled": true,
+        "terminalEvents": 1
+      }
+    },
+    {
+      "case": "wrong_key",
+      "chio": {
+        "buyerCredits": 90,
+        "buyerReceivedCheckedArtifact": true,
+        "concurrentOrRecoveryWorkers": 1,
+        "gateStateAfterReopen": "completed",
+        "keyReleased": true,
+        "killedSettlementWorkers": 0,
+        "lockedCredits": 0,
+        "sellerCredits": 10,
+        "settled": true,
+        "terminalEvents": 1
+      },
+      "ledger": {
+        "buyerCredits": 90,
+        "buyerReceivedCheckedArtifact": true,
+        "concurrentOrRecoveryWorkers": 1,
+        "gateStateAfterReopen": "completed",
+        "keyReleased": true,
+        "killedSettlementWorkers": 0,
+        "lockedCredits": 0,
+        "sellerCredits": 10,
+        "settled": true,
+        "terminalEvents": 1
+      }
+    },
+    {
+      "case": "offer_substitution",
+      "chio": {
+        "buyerCredits": 90,
+        "buyerReceivedCheckedArtifact": true,
+        "concurrentOrRecoveryWorkers": 1,
+        "gateStateAfterReopen": "completed",
+        "keyReleased": true,
+        "killedSettlementWorkers": 0,
+        "lockedCredits": 0,
+        "sellerCredits": 10,
+        "settled": true,
+        "terminalEvents": 1
+      },
+      "ledger": {
+        "buyerCredits": 90,
+        "buyerReceivedCheckedArtifact": true,
+        "concurrentOrRecoveryWorkers": 1,
+        "gateStateAfterReopen": "completed",
+        "keyReleased": true,
+        "killedSettlementWorkers": 0,
+        "lockedCredits": 0,
+        "sellerCredits": 10,
+        "settled": true,
+        "terminalEvents": 1
+      }
+    }
+  ],
+  "plaintextBuyerAbort": {
+    "buyerHasValidRepair": true,
+    "sellerCredits": 0
+  },
+  "trustedCheckerRejectsBuggyOpening": true,
+  "zeroKnowledgeProofImplemented": false
+}

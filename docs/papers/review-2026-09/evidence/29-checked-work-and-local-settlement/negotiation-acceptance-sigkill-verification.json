@@ -1,0 +1,8 @@
+{
+  "acceptedBidSha256": "5409e87c23cc524349ffbd300cca01f0c7514614c68be6dd227d30afcabe075b",
+  "agreementSha256": "2a0129d3ca732a7260e39f82ae7681834787f58b1c13bb043f940355645c7676",
+  "providerAcknowledged": "accepted",
+  "settled": false,
+  "verifiedReceipts": 11,
+  "workExecuted": false
+}

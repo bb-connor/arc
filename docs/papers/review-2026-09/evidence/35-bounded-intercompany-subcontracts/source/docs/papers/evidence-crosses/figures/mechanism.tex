@@ -1,0 +1,31 @@
+\begin{figure}[!tb]
+\centering
+\begin{tikzpicture}[
+  font=\small,
+  env/.style={draw,rounded corners=2pt,align=center,inner sep=3pt,fill=white},
+  rec/.style={draw,rounded corners=2pt,align=left,inner sep=2pt,fill=black!3},
+  ptr/.style={-{Latex[length=1.6mm]},semithick},
+]
+\node[env,align=left,text width=42mm] (stmt) at (0,0)
+  {\textbf{co-signed statement}\\[1pt]
+   \scriptsize subject: one name, one SHA-256\\
+   \scriptsize binding reference: \PSBindingFieldCount{} fields\\
+   \scriptsize signatures: exactly 2, same bytes};
+\node[rec] (rcpt) at (58mm,12mm) {\scriptsize a receipt already in the store};
+\node[rec] (scope) at (58mm,6.5mm) {\scriptsize the activated agreement and its intersection};
+\node[rec] (cont)  at (58mm,1mm)  {\scriptsize an unspent continuation};
+\node[rec] (lease) at (58mm,-4.5mm) {\scriptsize a live lease, a governance record};
+\node[rec] (keys)  at (58mm,-10mm) {\scriptsize two separately pinned peer keys};
+\node[rec] (epoch) at (58mm,-15.5mm) {\scriptsize the revocation clock, fresh};
+\foreach \t in {rcpt,scope,cont,lease,keys,epoch}{
+  \draw[ptr] (stmt.east) .. controls +(11mm,0) and +(-9mm,0) .. (\t.west);
+}
+\node[font=\scriptsize\itshape,anchor=south] at (29mm,15mm)
+  {every arrow terminates inside the receiver};
+\end{tikzpicture}
+\caption{The mechanism. The statement carries no authority of its own: its
+subject, the binding fields the receiver compares, and each of its two keys
+resolve only against records the receiving kernel placed in its own stores
+before the request arrived.}
+\label{fig:mechanism}
+\end{figure}

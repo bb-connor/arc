@@ -1,0 +1,103 @@
+{
+  "reply": {
+    "allowed": false,
+    "output": null,
+    "receipt": {
+      "action": {
+        "parameter_hash": "d0144162b18037eacd86b71b16ee9a6ae27530066b7e6842eadbd12b2badec95",
+        "parameters": {
+          "artifact": {
+            "grants": [
+              {
+                "operations": [
+                  "invoke"
+                ],
+                "server_id": "source-checkout",
+                "tool_name": "delete"
+              }
+            ]
+          },
+          "evidence": {
+            "body": {
+              "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+              "contractSha256": "9e3da4bfd74c434890ae750ca06598715c528c4c05d4be5a8f15c53989112ad9",
+              "passed": true,
+              "predecessorStepId": "publisher",
+              "schema": "chio.runtime.artifact-outcome.experimental.v1",
+              "slot": {
+                "receiverId": "bf59f34fd538371133ad0a586c4461dabf42ff5c2e4140b2b0a1a2c7330fc580",
+                "stepId": "archive",
+                "workflowId": "reviewed-scope-distribution"
+              },
+              "verifiedAtUnixMs": 1800000000000
+            },
+            "signature": "389391738bedc3944fe9b31fa0889369f19a9495ce95e31f7dbe66a14796561e93d1f10631302fbecacf004581fbd598b17f3b4279d5e0b811b62d1922212a02"
+          }
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "comparison-capability-1a32f7d51506b164528be6b945f4435d2d775d34119a9ffee51595953c2c2fd9",
+      "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "decision": {
+        "guard": "kernel",
+        "reason": "tool server error: runtime admission rejected: outcome_effect_binding_mismatch: outcome or effect binding differs from local rule",
+        "verdict": "deny"
+      },
+      "id": "9ba631ae4c6d499074f74994c7f05432aa3500d51c7d6fd05e2cb5147a1ca1b7",
+      "kernel_key": "bf59f34fd538371133ad0a586c4461dabf42ff5c2e4140b2b0a1a2c7330fc580",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "bf59f34fd538371133ad0a586c4461dabf42ff5c2e4140b2b0a1a2c7330fc580",
+          "subject_key": "1a32f7d51506b164528be6b945f4435d2d775d34119a9ffee51595953c2c2fd9"
+        },
+        "chio_receipt_signing_nonce": "receipt-54b17afb5b62e1a267b4d848c1f5cfff4d3a1e2e8265f09aa3b7da66258815eb",
+        "receipt_context": {
+          "request_id": "54b17afb5b62e1a267b4d848c1f5cfff4d3a1e2e8265f09aa3b7da66258815eb"
+        }
+      },
+      "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "0dfec522c4ca4461b159d338b2b0a69e717629a44b3b2f006ffa5bb1410c8cf1db4b0106d7c940c89f6ba2a0e758c44bb57d4114fa18916f9c59cdd171f0cf0e",
+      "timestamp": 1800000000,
+      "tool_name": "apply",
+      "tool_origin": "caller_executed",
+      "tool_server": "archive",
+      "trust_level": "mediated"
+    }
+  },
+  "request": {
+    "arguments": {
+      "artifact": {
+        "grants": [
+          {
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "source-checkout",
+            "tool_name": "delete"
+          }
+        ]
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "contractSha256": "9e3da4bfd74c434890ae750ca06598715c528c4c05d4be5a8f15c53989112ad9",
+          "passed": true,
+          "predecessorStepId": "publisher",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "bf59f34fd538371133ad0a586c4461dabf42ff5c2e4140b2b0a1a2c7330fc580",
+            "stepId": "archive",
+            "workflowId": "reviewed-scope-distribution"
+          },
+          "verifiedAtUnixMs": 1800000000000
+        },
+        "signature": "389391738bedc3944fe9b31fa0889369f19a9495ce95e31f7dbe66a14796561e93d1f10631302fbecacf004581fbd598b17f3b4279d5e0b811b62d1922212a02"
+      }
+    },
+    "tool": "apply"
+  }
+}

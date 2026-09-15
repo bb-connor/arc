@@ -1,0 +1,11 @@
+{
+  "balances": {
+    "buyer": 90,
+    "seller": 10
+  },
+  "locked": 0,
+  "offerSha256": "252ace79e0643eb0359fc53890cb74712ab36f4513abc5c6a90823a8c037d3e9",
+  "releasedKey": "3884054c609e5bae5045e56f3297ac9a9eda83ee49fb927b0a13d3307ca501fa",
+  "settlementEvents": 1,
+  "state": "settled"
+}

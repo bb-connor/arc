@@ -1,0 +1,33 @@
+{
+  "authorizations": [
+    {
+      "effect_json": "{\"artifactSha256\":\"eede042d5a5cfa367d8d90c9960c04c30df417908f3cd8d984b53b519cf0d8f5\",\"resource\":\"refs/heads/verified-repair\"}",
+      "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"5db84ea7852532e9ba4623327dda8e2f56fb4d9dcd2d3eb75018c6a1a0932018\",\"workflowId\":\"recover-checked-git-repair\",\"stepId\":\"publish\"},\"predecessorStepId\":\"receiver-source-check\",\"contractSha256\":\"ad9a50bf9c9712cd1d1ebbfa352bfb48fee196f031eec0cd816279678af46f2c\",\"artifactSha256\":\"eede042d5a5cfa367d8d90c9960c04c30df417908f3cd8d984b53b519cf0d8f5\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"5784b415a6e1964724704f238e3b093b145b38fa36abb6343482ec1a091b94c59fae1430ebbcae3db9c7515cc68311db73c866751bae549666ebcd5942b78403\"}",
+      "handle": "33d7690a585e0f85fca5fedf2836956d16f00dfcbb2f1415715da77f7f3e3526",
+      "receiver": "5db84ea7852532e9ba4623327dda8e2f56fb4d9dcd2d3eb75018c6a1a0932018",
+      "step": "publish",
+      "workflow": "recover-checked-git-repair"
+    },
+    {
+      "effect_json": "{\"artifactSha256\":\"eede042d5a5cfa367d8d90c9960c04c30df417908f3cd8d984b53b519cf0d8f5\",\"resource\":\"refs/heads/verified-repair\"}",
+      "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"5db84ea7852532e9ba4623327dda8e2f56fb4d9dcd2d3eb75018c6a1a0932018\",\"workflowId\":\"recover-checked-git-repair\",\"stepId\":\"publish\"},\"predecessorStepId\":\"receiver-source-check\",\"contractSha256\":\"ad9a50bf9c9712cd1d1ebbfa352bfb48fee196f031eec0cd816279678af46f2c\",\"artifactSha256\":\"eede042d5a5cfa367d8d90c9960c04c30df417908f3cd8d984b53b519cf0d8f5\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"5784b415a6e1964724704f238e3b093b145b38fa36abb6343482ec1a091b94c59fae1430ebbcae3db9c7515cc68311db73c866751bae549666ebcd5942b78403\"}",
+      "handle": "c8ce09ca2d612570c37ece598e367ebb0b6fe333f4fd77a729c18b8f0411fe72",
+      "receiver": "5db84ea7852532e9ba4623327dda8e2f56fb4d9dcd2d3eb75018c6a1a0932018",
+      "step": "publish",
+      "workflow": "recover-checked-git-repair"
+    }
+  ],
+  "jobs": [
+    {
+      "claimed_handle": "c8ce09ca2d612570c37ece598e367ebb0b6fe333f4fd77a729c18b8f0411fe72",
+      "receiver": "5db84ea7852532e9ba4623327dda8e2f56fb4d9dcd2d3eb75018c6a1a0932018",
+      "result_json": "{\"artifactSha256\":\"7677597b18afd499fc759d4e795a4e2e2d02a00c95c4754847f23caa803350b4\",\"commit\":\"e53040cb5ec0d1b83c8795b7615176e5d0de10f755b124138448aedd0bcc42ed\",\"intentSha256\":\"eede042d5a5cfa367d8d90c9960c04c30df417908f3cd8d984b53b519cf0d8f5\",\"observedPublished\":true,\"reference\":\"refs/heads/verified-repair\",\"schema\":\"observed-git-publication.experimental.v1\"}",
+      "revoked": 0,
+      "rule_digest": "493ce539cf724366662f541af6afc4b97b1fb3985dfd61c53e1468812b6521f4",
+      "rule_json": "{\"slot\":{\"receiverId\":\"5db84ea7852532e9ba4623327dda8e2f56fb4d9dcd2d3eb75018c6a1a0932018\",\"workflowId\":\"recover-checked-git-repair\",\"stepId\":\"publish\"},\"predecessorStepId\":\"receiver-source-check\",\"verifierKey\":\"5db84ea7852532e9ba4623327dda8e2f56fb4d9dcd2d3eb75018c6a1a0932018\",\"contractSha256\":\"ad9a50bf9c9712cd1d1ebbfa352bfb48fee196f031eec0cd816279678af46f2c\",\"serverId\":\"checked-git-publication\",\"toolName\":\"publish\",\"resource\":\"refs/heads/verified-repair\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+      "state": "completed",
+      "step": "publish",
+      "workflow": "recover-checked-git-repair"
+    }
+  ]
+}

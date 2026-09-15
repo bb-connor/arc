@@ -1,0 +1,372 @@
+   Compiling chio-outcome-ledger-comparison v0.1.0 (/home/connor/backbay/arc/examples/outcome-ledger-comparison)
+    Finished `dev` profile [unoptimized] target(s) in 12.39s
+     Running `target/debug/chio-outcome-ledger-comparison --graph`
+GRAPH_KILL receiver=verifier boundary=after_complete exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=verifier boundary=after_complete exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=publisher boundary=after_complete exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=publisher boundary=after_complete exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=archive boundary=after_complete exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=archive boundary=after_complete exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=publisher boundary=before_claim exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=publisher boundary=before_claim exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=archive boundary=before_claim exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=archive boundary=before_claim exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=publisher boundary=after_claim exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=publisher boundary=after_claim exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=publisher boundary=after_effect exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=publisher boundary=after_effect exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=archive boundary=after_claim exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=archive boundary=after_claim exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=archive boundary=after_effect exit=signal: 9 (SIGKILL)
+GRAPH_KILL receiver=archive boundary=after_effect exit=signal: 9 (SIGKILL)
+GRAPH_COURIER_KILL boundary=after_publisher exit=signal: 9 (SIGKILL)
+GRAPH_COURIER_KILL boundary=after_publisher exit=signal: 9 (SIGKILL)
+{
+  "experiment": "receiver-owned-outcome-graph",
+  "limits": [
+    "No OS isolation between same-user processes or independent remote administration",
+    "Static native policy artifact; no live model or arbitrary code execution",
+    "Unknown external effects require intervention; completion recovery does not replay them",
+    "No integration-cost or latency advantage measured"
+  ],
+  "pairedAttacks": [
+    {
+      "case": "overbroad_candidate",
+      "chio": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      }
+    },
+    {
+      "case": "skip_publisher",
+      "chio": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      }
+    },
+    {
+      "case": "artifact_substitution",
+      "chio": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      }
+    },
+    {
+      "case": "forged_completion",
+      "chio": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      }
+    },
+    {
+      "case": "foreign_workflow",
+      "chio": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 0,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      }
+    },
+    {
+      "case": "duplicate_delivery",
+      "chio": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 1,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "archiveEffectsAfterAttack": 1,
+        "attackAllowed": false,
+        "publisherEffects": 1,
+        "validFollowupCompleted": true
+      }
+    }
+  ],
+  "pairedScenarios": [
+    {
+      "case": "normal",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      }
+    },
+    {
+      "case": "verifier_response_lost",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      }
+    },
+    {
+      "case": "publisher_response_lost",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      }
+    },
+    {
+      "case": "archive_response_lost",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      }
+    },
+    {
+      "case": "publisher_before_claim",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      }
+    },
+    {
+      "case": "archive_before_claim",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      }
+    },
+    {
+      "case": "publisher_after_claim",
+      "chio": {
+        "archiveEffects": 0,
+        "publisherEffects": 0,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "publisher",
+          "state": "uncertain"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 0,
+        "publisherEffects": 0,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "publisher",
+          "state": "uncertain"
+        }
+      }
+    },
+    {
+      "case": "publisher_after_effect",
+      "chio": {
+        "archiveEffects": 0,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "publisher",
+          "state": "uncertain"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 0,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "publisher",
+          "state": "uncertain"
+        }
+      }
+    },
+    {
+      "case": "archive_after_claim",
+      "chio": {
+        "archiveEffects": 0,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "archive",
+          "state": "uncertain"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 0,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "archive",
+          "state": "uncertain"
+        }
+      }
+    },
+    {
+      "case": "archive_after_effect",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "archive",
+          "state": "uncertain"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "receiver": "archive",
+          "state": "uncertain"
+        }
+      }
+    },
+    {
+      "case": "courier_replaced",
+      "chio": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      },
+      "ledger": {
+        "archiveEffects": 1,
+        "publisherEffects": 1,
+        "replacementPreservedResult": true,
+        "result": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "state": "completed"
+        }
+      }
+    }
+  ],
+  "scope": "Three distinct keys, stores and kernel processes on one host; shared implementation around the two independent gates",
+  "separationObserved": false
+}
+Graph evidence: /tmp/.tmpEVMK7X

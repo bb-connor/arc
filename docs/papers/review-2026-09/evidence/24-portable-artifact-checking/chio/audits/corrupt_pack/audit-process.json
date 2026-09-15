@@ -1,0 +1,1 @@
+{"exit":"exit status: 1","stderr":"Error: \"checker Git setup failed: {\\\"exit\\\":\\\"exit status: 1\\\",\\\"stderr\\\":\\\"bwrap: Only the last --chdir option will take effect\\\\nfatal: pack is corrupted (SHA1 mismatch)\\\\nerror: index-pack died\\\\n\\\",\\\"stdout\\\":\\\"\\\",\\\"success\\\":false}\"\n","stdout":"","success":false}

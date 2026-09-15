@@ -386,8 +386,8 @@ def test_run_subprocess_strips_credential_env_vars(
 async def test_git_commit_executor_passes_no_verify(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # --no-verify guards against repo-local hook scripts escalating
-    # to RCE on the host.
+    # Keep --no-verify alongside the shared core.hooksPath override;
+    # real hook suppression is exercised in test_git_commit_hooks.py.
     import subprocess as _subprocess
 
     from chio_hermes import executors as _exec
@@ -578,14 +578,14 @@ def test_harden_git_run_argv_injects_no_verify_for_commit() -> None:
     from chio_hermes import executors as _exec
 
     out = _exec._harden_git_run_argv(["commit", "-m", "x"])
-    assert out == ["commit", "--no-verify", "-m", "x"]
+    assert out == ["-c", "core.hooksPath=/dev/null", "commit", "--no-verify", "-m", "x"]
 
 
 def test_harden_git_run_argv_skips_when_no_verify_present() -> None:
     from chio_hermes import executors as _exec
 
     out = _exec._harden_git_run_argv(["commit", "--no-verify", "-m", "x"])
-    assert out == ["commit", "--no-verify", "-m", "x"]
+    assert out == ["-c", "core.hooksPath=/dev/null", "commit", "--no-verify", "-m", "x"]
 
 
 def test_harden_git_run_argv_rejects_explicit_verify() -> None:
@@ -612,7 +612,16 @@ def test_harden_git_run_argv_skips_leading_global_flags() -> None:
     from chio_hermes import executors as _exec
 
     out = _exec._harden_git_run_argv(["-c", "user.name=x", "commit", "-m", "y"])
-    assert out == ["-c", "user.name=x", "commit", "--no-verify", "-m", "y"]
+    assert out == [
+        "-c",
+        "user.name=x",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--no-verify",
+        "-m",
+        "y",
+    ]
 
 
 def test_on_session_start_flushes_pending_into_recorded_buffer() -> None:

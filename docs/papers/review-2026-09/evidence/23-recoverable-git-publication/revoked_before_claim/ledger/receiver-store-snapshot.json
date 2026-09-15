@@ -1,0 +1,16 @@
+{
+  "authorizations": [],
+  "jobs": [
+    {
+      "claimed_handle": null,
+      "receiver": "8ddd9a4d49cfb11a3beb5e1acdd89d842cc7db17d795a0fa24df0bdbdf03b3d6",
+      "result_json": null,
+      "revoked": 1,
+      "rule_digest": "bded25311d8ca3c54544b66731dda5919e3649a3c4abbce8476872b49b21fe99",
+      "rule_json": "{\"slot\":{\"receiverId\":\"8ddd9a4d49cfb11a3beb5e1acdd89d842cc7db17d795a0fa24df0bdbdf03b3d6\",\"workflowId\":\"recover-checked-git-repair\",\"stepId\":\"publish\"},\"predecessorStepId\":\"receiver-source-check\",\"verifierKey\":\"8ddd9a4d49cfb11a3beb5e1acdd89d842cc7db17d795a0fa24df0bdbdf03b3d6\",\"contractSha256\":\"ad9a50bf9c9712cd1d1ebbfa352bfb48fee196f031eec0cd816279678af46f2c\",\"serverId\":\"checked-git-publication\",\"toolName\":\"publish\",\"resource\":\"refs/heads/verified-repair\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+      "state": "waiting",
+      "step": "publish",
+      "workflow": "recover-checked-git-repair"
+    }
+  ]
+}

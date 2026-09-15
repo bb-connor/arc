@@ -1,0 +1,2 @@
+    Checking chio-composed-baseline v0.1.0 (/home/connor/backbay/arc/examples/composed-baseline)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.14s

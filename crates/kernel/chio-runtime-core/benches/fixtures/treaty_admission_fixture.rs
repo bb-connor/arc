@@ -117,9 +117,10 @@ impl TreatyPredispatchDenyFixture {
         let mut kernel = ChioKernel::new(config).with_federation_peers(vec![peer]);
         kernel.set_federation_local_kernel_id("kernel.vendor-b");
         let receipt_directory = tempdir()?;
-        kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(
-            receipt_directory.path().join("receipts.sqlite3"),
-        )?))?;
+        let receipt_store =
+            SqliteReceiptStore::open(receipt_directory.path().join("receipts.sqlite3"))?;
+        receipt_store.wait_for_writer_ready(std::time::Duration::from_secs(5))?;
+        kernel.set_receipt_store(Box::new(receipt_store))?;
         kernel.register_tool_server(Box::new(CountingToolServer {
             invocations: Arc::clone(&tool_invocations),
         }));
@@ -464,6 +465,30 @@ impl TreatyArtifacts {
         &self,
         store: &InMemoryRuntimeAdmissionStore,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        // Activate records from this locally constructed fixture, not the
+        // envelope supplied by a caller under test.
+        let (statement, _) = self.dsse.decode_statement()?;
+        if let Some(lease) = statement.predicate.capability_lease_ref {
+            store.insert_treaty_runtime_artifact(
+                "capability_lease",
+                &lease.lease_id.clone(),
+                &chio_runtime_core::RuntimeTreatyLeaseRecord {
+                    lease,
+                    valid_from_unix_ms: self.continuation.issued_at_unix_ms,
+                },
+            )?;
+        }
+        if let Some(receipt) = statement.predicate.governance_receipt_ref {
+            store.insert_treaty_runtime_artifact(
+                "governance_receipt",
+                &receipt.receipt_id.clone(),
+                &chio_runtime_core::RuntimeTreatyGovernanceRecord {
+                    receipt,
+                    valid_from_unix_ms: self.continuation.issued_at_unix_ms,
+                    valid_until_unix_ms: self.continuation.expires_at_unix_ms,
+                },
+            )?;
+        }
         store.insert_treaty_runtime_artifact("treaty_scope", &self.scope.treaty_id, &self.scope)?;
         store.insert_treaty_runtime_artifact(
             "ladder_intersection",

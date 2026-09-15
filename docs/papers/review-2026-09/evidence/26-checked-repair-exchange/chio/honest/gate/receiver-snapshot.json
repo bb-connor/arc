@@ -1,0 +1,14 @@
+{
+  "runtime_outcome_effect_slots": [
+    {
+      "claim_json": "{\"slot\":{\"receiverId\":\"8307462d6695de1d2c0690106575f411e951eec863b90e5a696067a4c95f6dc2\",\"workflowId\":\"chio-honest\",\"stepId\":\"settle\"},\"ruleSha256\":\"eb2f153c2266accb85dc2d0fd8a04c49e2065905d804d798768ba49cc6d258ac\",\"evidenceSha256\":\"5c97def1354478f4c8e7d1d3f7e08928b45a86394f952a2d744cd31847185e95\",\"arguments\":{\"artifactSha256\":\"252ace79e0643eb0359fc53890cb74712ab36f4513abc5c6a90823a8c037d3e9\",\"resource\":\"funded-trade\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+      "claim_sha256": "3dd492f9f49186fc3d6dabe4a4e03ada3b50520682b686a94c8b895fdd471cfe",
+      "result_json": "{\"balances\":{\"buyer\":90,\"seller\":10},\"locked\":0,\"offerSha256\":\"252ace79e0643eb0359fc53890cb74712ab36f4513abc5c6a90823a8c037d3e9\",\"releasedKey\":\"3884054c609e5bae5045e56f3297ac9a9eda83ee49fb927b0a13d3307ca501fa\",\"settlementEvents\":1,\"state\":\"settled\"}",
+      "result_sha256": "04302f7824a4fe199cd25822daa3ef36249634d82945b2d89068f02247d41d0f",
+      "revoked": 0,
+      "rule_json": "{\"slot\":{\"receiverId\":\"8307462d6695de1d2c0690106575f411e951eec863b90e5a696067a4c95f6dc2\",\"workflowId\":\"chio-honest\",\"stepId\":\"settle\"},\"predecessorStepId\":\"check-encrypted-repair\",\"verifierKey\":\"8307462d6695de1d2c0690106575f411e951eec863b90e5a696067a4c95f6dc2\",\"contractSha256\":\"85ccde4096875807635a07d3db23f28213f611983bc79e22475ffa18cfb60729\",\"serverId\":\"local-repair-exchange\",\"toolName\":\"settle\",\"resource\":\"funded-trade\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+      "rule_sha256": "eb2f153c2266accb85dc2d0fd8a04c49e2065905d804d798768ba49cc6d258ac",
+      "slot_sha256": "1234dd01b785428511b88579ba3fe34cd6678cd109247a38628fbd721693c0b3"
+    }
+  ]
+}

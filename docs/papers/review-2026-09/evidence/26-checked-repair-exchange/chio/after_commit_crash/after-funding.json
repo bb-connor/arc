@@ -1,0 +1,11 @@
+{
+  "balances": {
+    "buyer": 90,
+    "seller": 0
+  },
+  "locked": 10,
+  "offerSha256": "ccede19df5481770acad6551f819e178acbabed43cb8076b2bcee3ac955f0d0d",
+  "releasedKey": null,
+  "settlementEvents": 0,
+  "state": "funded"
+}

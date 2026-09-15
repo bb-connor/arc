@@ -1,0 +1,103 @@
+{
+  "reply": {
+    "allowed": false,
+    "output": null,
+    "receipt": {
+      "action": {
+        "parameter_hash": "41d140d315c87526f0ceb30c91075d2ed7f566db74be8a3166bb07704ac3e35e",
+        "parameters": {
+          "artifact": {
+            "grants": [
+              {
+                "operations": [
+                  "invoke"
+                ],
+                "server_id": "source-checkout",
+                "tool_name": "read"
+              }
+            ]
+          },
+          "evidence": {
+            "body": {
+              "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+              "contractSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+              "passed": true,
+              "predecessorStepId": "verifier",
+              "schema": "chio.runtime.artifact-outcome.experimental.v1",
+              "slot": {
+                "receiverId": "28b14bed7aa2a045e87a4a26e40d1c4287b5b0b174b791b226e9b6cfd44bd743",
+                "stepId": "publisher",
+                "workflowId": "reviewed-scope-distribution"
+              },
+              "verifiedAtUnixMs": 1800000000000
+            },
+            "signature": "8ccf7da2ed894aa6775421bbebbeacc8d31b2437ccff415ea46bd11a8574693dcf77156aea46dc7cdd91e5273852a173f42d13c74f36bfdb8eb2b8c0e74ae006"
+          }
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "comparison-capability-b1fdd14c197b39b7e995bb292629a65e59b7fdffbec115a99fe3c9f1ca2d8bd6",
+      "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "decision": {
+        "guard": "kernel",
+        "reason": "tool server error: unknown_job",
+        "verdict": "deny"
+      },
+      "id": "f4b01b954385307e62dda60f63d30f97e57e0c35671b8e52ae7498a6a37bd276",
+      "kernel_key": "a059f4eaf0c65751bbf64a6c292bdd3c9f871cf76ad687b7af48cbc2c72364c4",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "a059f4eaf0c65751bbf64a6c292bdd3c9f871cf76ad687b7af48cbc2c72364c4",
+          "subject_key": "b1fdd14c197b39b7e995bb292629a65e59b7fdffbec115a99fe3c9f1ca2d8bd6"
+        },
+        "chio_receipt_signing_nonce": "receipt-9d5f662ef67cf7831ab0bf40a3b7aad79855f10400dc0e27bf82f0f086403876",
+        "receipt_context": {
+          "request_id": "9d5f662ef67cf7831ab0bf40a3b7aad79855f10400dc0e27bf82f0f086403876"
+        }
+      },
+      "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "4808ccb024c99b211ee2b43de464f5574ce49a78dd31812c171da41b58aa834b3f61a4c709c53c5269b411bffdf0e4a62b0c282f76ad6ed2e232f5ebf74ca508",
+      "timestamp": 1800000000,
+      "tool_name": "apply",
+      "tool_origin": "caller_executed",
+      "tool_server": "archive",
+      "trust_level": "mediated"
+    }
+  },
+  "request": {
+    "arguments": {
+      "artifact": {
+        "grants": [
+          {
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "source-checkout",
+            "tool_name": "read"
+          }
+        ]
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "contractSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "passed": true,
+          "predecessorStepId": "verifier",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "28b14bed7aa2a045e87a4a26e40d1c4287b5b0b174b791b226e9b6cfd44bd743",
+            "stepId": "publisher",
+            "workflowId": "reviewed-scope-distribution"
+          },
+          "verifiedAtUnixMs": 1800000000000
+        },
+        "signature": "8ccf7da2ed894aa6775421bbebbeacc8d31b2437ccff415ea46bd11a8574693dcf77156aea46dc7cdd91e5273852a173f42d13c74f36bfdb8eb2b8c0e74ae006"
+      }
+    },
+    "tool": "apply"
+  }
+}

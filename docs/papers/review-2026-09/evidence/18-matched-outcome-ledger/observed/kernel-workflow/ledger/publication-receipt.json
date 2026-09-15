@@ -1,0 +1,42 @@
+{
+  "id": "c005ba17dc1fc078b4aba2e0d8963ea9f1e9ab51410c9ad082f26dab0abfcdb4",
+  "timestamp": 1800000000,
+  "capability_id": "comparison-capability-40433d693242059a22bafb53fbccc204dde65467a257f9acabadbcc267b343f5",
+  "tool_server": "artifact-registry",
+  "tool_name": "publish",
+  "action": {
+    "parameters": {
+      "arguments": {
+        "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+        "resource": "review-queue"
+      },
+      "backend": "Ledger",
+      "handle": "61028aa398713e965e0b8617ff3111c09c034b79eeb4f8d97f36c816a68f29ef"
+    },
+    "parameter_hash": "5918b33336e0eead76956f42a2c122f9bfd0c138ff67444aff5a2c6fb86b3b82"
+  },
+  "decision": {
+    "verdict": "allow"
+  },
+  "receipt_kind": "mediated_decision",
+  "boundary_class": "prevent",
+  "tool_origin": "caller_executed",
+  "redaction_mode": "none",
+  "content_hash": "dcd0afae9408ec11de1d6932e6f55b945bce6b87e5611879ca172e106c2762ad",
+  "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+  "metadata": {
+    "attribution": {
+      "delegation_depth": 0,
+      "grant_index": 0,
+      "issuer_key": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+      "subject_key": "40433d693242059a22bafb53fbccc204dde65467a257f9acabadbcc267b343f5"
+    },
+    "chio_receipt_signing_nonce": "receipt-initial-agent",
+    "receipt_context": {
+      "request_id": "initial-agent"
+    }
+  },
+  "trust_level": "mediated",
+  "kernel_key": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+  "signature": "a7aa0f39cee8489e0fe37e644c9290d0998f212978cbf3ea44790e00996e3d07ed00e650a547eac5da807910b1415a5b9baf0ab44e913e01463cb3a74031c707"
+}

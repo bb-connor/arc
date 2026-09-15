@@ -1,0 +1,6 @@
+{
+  "exit": "signal: 9 (SIGKILL)",
+  "stderr": "EXCHANGE_KILL after_commit_before_reply\n",
+  "stdout": "",
+  "success": false
+}

@@ -1,0 +1,12 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "Example company payments API", "version": "1.0.0"},
+  "components": {"securitySchemes": {"serviceToken": {"type": "http", "scheme": "bearer"}}},
+  "security": [{"serviceToken": []}],
+  "paths": {
+    "/accounts": {"get": {"responses": {"200": {"description": "Accounts"}}}},
+    "/refunds": {"post": {"security": [], "responses": {"201": {"description": "Refund staged"}}}},
+    "/health": {"get": {"security": [{}, {"serviceToken": []}], "responses": {"200": {"description": "Healthy"}}}},
+    "/sessions": {"delete": {"security": [{"serviceToken": []}], "responses": {"204": {"description": "Session ended"}}}}
+  }
+}

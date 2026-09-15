@@ -1,0 +1,1326 @@
+{
+  "archive_after_claim/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "cba1638faaa6c00a6332638dd1dc6625f64070591121662edb4bab4cb5d7d6c2",
+        "rule_sha256": "4391017b85aa2fc2548ce002599e559c80df3531a79cd5ad870f5284e67ac989",
+        "rule_json": "{\"slot\":{\"receiverId\":\"8a3f8d64e2b276f87d542335b4ed99309dbc0546d80b5d17c8afaca1c15a8be7\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"17b3e7352bddbe37dde4382b3833cd6f10358de324ecd715b58bc887d4275507\",\"contractSha256\":\"f46ca4ed1a35e972b3b8df0fa7bb2661697111ff7c03559fa8c13c61c3f9c1b0\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "5d5a61dc580d6d49017c4200cc1c0346b356dcd31cfdf929e61e2305f3957976",
+        "claim_json": "{\"slot\":{\"receiverId\":\"8a3f8d64e2b276f87d542335b4ed99309dbc0546d80b5d17c8afaca1c15a8be7\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"4391017b85aa2fc2548ce002599e559c80df3531a79cd5ad870f5284e67ac989\",\"evidenceSha256\":\"1971327fd900f6fca4b2e53647ffc5ae4da017160088201bcb9f6dcd4f5451dd\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": null,
+        "result_json": null
+      }
+    ]
+  },
+  "archive_after_claim/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "2f7ac29b7acb4f7894e1dba35eb7fd608c9ef77e08f4a0e15fed567c75794588",
+        "rule_sha256": "8f08dca92af03f1dde51b814e1c9ce84899c6369de9e3b609304a230df8a8b9b",
+        "rule_json": "{\"slot\":{\"receiverId\":\"17b3e7352bddbe37dde4382b3833cd6f10358de324ecd715b58bc887d4275507\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"4f9746f93d8b95452f74d9362ab6f0b790cb9334f2f40df437c70c81e0d25b60\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "5ab3cf6f11b726bcba1a15da529915874a65643f18aa818c70fb718a1b150ae1",
+        "claim_json": "{\"slot\":{\"receiverId\":\"17b3e7352bddbe37dde4382b3833cd6f10358de324ecd715b58bc887d4275507\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"8f08dca92af03f1dde51b814e1c9ce84899c6369de9e3b609304a230df8a8b9b\",\"evidenceSha256\":\"6d06736537a4878b767e1f2afc98182c4205f31203e0c205e838cc4c90a6d3ec\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "33d5da55b468cf11263f33e7bccf888e640cbdfe41062f446915b03d710db390",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"f46ca4ed1a35e972b3b8df0fa7bb2661697111ff7c03559fa8c13c61c3f9c1b0\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"8a3f8d64e2b276f87d542335b4ed99309dbc0546d80b5d17c8afaca1c15a8be7\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"51668886ca82722fcad1f4ec70853ff302c76437f1edd313da9f3d3cbaacd22be636067af1fb767c46a4e8ca2f4caccea54f14877949b0d5cedbfea545a4e60d\"}}"
+      }
+    ]
+  },
+  "archive_after_claim/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "1ade43deee127000b1692c7413ff144ea359de6e0a53a0e7d1ec556bdd1231de",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"1ade43deee127000b1692c7413ff144ea359de6e0a53a0e7d1ec556bdd1231de\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"c77b2a5c9b6788e95b05265573f16a55e9f4af1cd0e9e035c41d585e5c0b29ac\",\"contractSha256\":\"9abab8f84b01f1eec0f3ed7b9caf6b09607c3d89acb8a72c22e87a87ee5f1cee\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "f4955cba44d8600f458511c54a510066954b81fec70acc3c44534879fcf2988f",
+        "revoked": 0,
+        "state": "claimed",
+        "claimed_handle": "69f92c5d1ae7ff62e2d95f2dc9bfe752113d21b8118677c963be3ce7a19945a5",
+        "result_json": null
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "69f92c5d1ae7ff62e2d95f2dc9bfe752113d21b8118677c963be3ce7a19945a5",
+        "receiver": "1ade43deee127000b1692c7413ff144ea359de6e0a53a0e7d1ec556bdd1231de",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"1ade43deee127000b1692c7413ff144ea359de6e0a53a0e7d1ec556bdd1231de\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"9abab8f84b01f1eec0f3ed7b9caf6b09607c3d89acb8a72c22e87a87ee5f1cee\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"31a337dda4233e9f6d04c5192a722d882b6973fffd43dc7c7094ed237efa58be1ace588f770d47c81d798f7a01468019859784ed26af7db1bc84974aa46d8105\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "archive_after_claim/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "c77b2a5c9b6788e95b05265573f16a55e9f4af1cd0e9e035c41d585e5c0b29ac",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"c77b2a5c9b6788e95b05265573f16a55e9f4af1cd0e9e035c41d585e5c0b29ac\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"ad4b04636fb6bf3da5495b6158c9eb8687a87b20bb14b1c4233f357b2b9ea3d6\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "38a804a239251f4f545dbed0bd463543adae88b986122786d9c3638f2d8a0f1d",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "27dd7255daf0476beb3e22d6a97d6f809cf5e233dfa9a93dafcca82ec8023829",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"9abab8f84b01f1eec0f3ed7b9caf6b09607c3d89acb8a72c22e87a87ee5f1cee\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"1ade43deee127000b1692c7413ff144ea359de6e0a53a0e7d1ec556bdd1231de\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"31a337dda4233e9f6d04c5192a722d882b6973fffd43dc7c7094ed237efa58be1ace588f770d47c81d798f7a01468019859784ed26af7db1bc84974aa46d8105\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "27dd7255daf0476beb3e22d6a97d6f809cf5e233dfa9a93dafcca82ec8023829",
+        "receiver": "c77b2a5c9b6788e95b05265573f16a55e9f4af1cd0e9e035c41d585e5c0b29ac",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"c77b2a5c9b6788e95b05265573f16a55e9f4af1cd0e9e035c41d585e5c0b29ac\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"a66a3be7267bddd908745e08bc877385d82e5c3f699693a44ffdc5ad8411601667638aa175cd26662430bd6c484f1b6f6e61ba8ce8a808b97bd7961df0dc210d\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "archive_after_effect/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "d988de14a9808fa919c07e65460dd14612aecb34c3f3c4785d8796d49a087574",
+        "rule_sha256": "06405108a8dd07438bf5bc3f34a54005f531f2d25d8ac0a0caae17ceecc3b5ae",
+        "rule_json": "{\"slot\":{\"receiverId\":\"4f1843398db54a970f20d0673b23b11f922af9fceb3b3882deb346092a31f6e3\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"1e66d0825702343dc844938dd57563642e4422f22a642a4c055474830b924e24\",\"contractSha256\":\"4e40185b06c73926835b714ac76438c6fed1ce4bf18251a0b4f7db1f4d5871bd\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "854d820308ae4c2f7f24b8a4fb2463d1fe0d70720f157d62c2a025d0d0da832b",
+        "claim_json": "{\"slot\":{\"receiverId\":\"4f1843398db54a970f20d0673b23b11f922af9fceb3b3882deb346092a31f6e3\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"06405108a8dd07438bf5bc3f34a54005f531f2d25d8ac0a0caae17ceecc3b5ae\",\"evidenceSha256\":\"ae0e4cf82f9cb6c4f9c11adbab6b6d56a74c8244ad3c56a261d25fc9bb69bd62\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": null,
+        "result_json": null
+      }
+    ]
+  },
+  "archive_after_effect/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "e3008ac4e563ceae0c39f47290b473ddcedcd422849f9f071ed58d1011652392",
+        "rule_sha256": "85d82d46889816827561d1560e3c62515248fe53030a54d1fda982c1cc9149ef",
+        "rule_json": "{\"slot\":{\"receiverId\":\"1e66d0825702343dc844938dd57563642e4422f22a642a4c055474830b924e24\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"97f2e2ecf6c703e3dec01d74f2ea4cc199fe621acdd1e9452243980c96b57913\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "cc23ce099680e0051de3ecf4100e0162a3a1262dc008c1fbcd3a3c5844b87f49",
+        "claim_json": "{\"slot\":{\"receiverId\":\"1e66d0825702343dc844938dd57563642e4422f22a642a4c055474830b924e24\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"85d82d46889816827561d1560e3c62515248fe53030a54d1fda982c1cc9149ef\",\"evidenceSha256\":\"63e5e0ea2eeb01eb3475009942bb77765c5c30da85aabf55cab0b79a34123cd1\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "37dd47e2cdee88b68a17a2a99ef60e11cbd15fe14f2d44d18ab6e6713ecffaf7",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"4e40185b06c73926835b714ac76438c6fed1ce4bf18251a0b4f7db1f4d5871bd\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"4f1843398db54a970f20d0673b23b11f922af9fceb3b3882deb346092a31f6e3\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"28f6abb26b4f10f470ccb23451d40f15d016039ca1320cb36e2c29ac6f9bdc57e3776374e4d35cba94e63a28a3884d3e752d053ba4be0bf26aaaa105cc81fc07\"}}"
+      }
+    ]
+  },
+  "archive_after_effect/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "df68a9c9a2513194a38b900df5356de717bc9c775261b5f3809494eeff1714a7",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"df68a9c9a2513194a38b900df5356de717bc9c775261b5f3809494eeff1714a7\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"586061b230d436eb02a5df335e253056afe6dae7e697d3d1909c4e2e69af3d46\",\"contractSha256\":\"f9f7554085a4fc8dcae8226febad2353e1dc2940fbb5deaba7accad69f420b4c\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "9fa26b7190b8b1323216b148cb06a26383392d841a12d725a8776be7f1e61425",
+        "revoked": 0,
+        "state": "claimed",
+        "claimed_handle": "7fdd4999fc4a8a6f3438dac8899ea8db461300bd2a835a2e51aad16ceeff499c",
+        "result_json": null
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "7fdd4999fc4a8a6f3438dac8899ea8db461300bd2a835a2e51aad16ceeff499c",
+        "receiver": "df68a9c9a2513194a38b900df5356de717bc9c775261b5f3809494eeff1714a7",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"df68a9c9a2513194a38b900df5356de717bc9c775261b5f3809494eeff1714a7\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"f9f7554085a4fc8dcae8226febad2353e1dc2940fbb5deaba7accad69f420b4c\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"9a447d5473f2c32d9fd606beee03de761fb2e41addb2420511f977b5ff94e7318c2aa5a35d140fe778ef57a70f0442a8022a3b23a585ffefd1f198927d365408\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "archive_after_effect/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "586061b230d436eb02a5df335e253056afe6dae7e697d3d1909c4e2e69af3d46",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"586061b230d436eb02a5df335e253056afe6dae7e697d3d1909c4e2e69af3d46\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"e9a2eb1a00f8693ea6cc8c85cf32acc442b4a5afefce627a839fd2622d509637\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "400b7381fc9b46e84daa86e875e799c0c81384aaad12f890733acf9bd7fcadbb",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "ad013f30209f95b7034ff0dcfeb84db7c51e298fc7d3de5e87070e8ca4454f54",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"f9f7554085a4fc8dcae8226febad2353e1dc2940fbb5deaba7accad69f420b4c\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"df68a9c9a2513194a38b900df5356de717bc9c775261b5f3809494eeff1714a7\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"9a447d5473f2c32d9fd606beee03de761fb2e41addb2420511f977b5ff94e7318c2aa5a35d140fe778ef57a70f0442a8022a3b23a585ffefd1f198927d365408\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "ad013f30209f95b7034ff0dcfeb84db7c51e298fc7d3de5e87070e8ca4454f54",
+        "receiver": "586061b230d436eb02a5df335e253056afe6dae7e697d3d1909c4e2e69af3d46",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"586061b230d436eb02a5df335e253056afe6dae7e697d3d1909c4e2e69af3d46\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"393de343fe41b25763cbfa8f04cdd3f41d1409759afded291df21611d7377b25fde862b4abc6d5f830989994631d1b8a41933ad8dab933914a785dd782427c09\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "archive_before_claim/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "dd3a1744b822ce8b01a32e2af57764954fed2f698241588f6ed30cb9d78ee59e",
+        "rule_sha256": "de0164bf16f935f3598053caf3eb041485e037ce8d1815d7eaa7190d94994bbe",
+        "rule_json": "{\"slot\":{\"receiverId\":\"b76e3018b3abb216c76c8555919c238f0dffdf73ce260ad5d5b61deea86d5fbc\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"b053a08c98643b2bff7245912ff93328ae55c33458e483a710cc3ac64497edd6\",\"contractSha256\":\"c28b155d68ba9b5a741c12629f492505af0de544fff515b7d66bb968d0b004e6\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "cb580702c0adddf82b30f52c5483c8a5d8ac94d6318b665a0b989579c3626ada",
+        "claim_json": "{\"slot\":{\"receiverId\":\"b76e3018b3abb216c76c8555919c238f0dffdf73ce260ad5d5b61deea86d5fbc\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"de0164bf16f935f3598053caf3eb041485e037ce8d1815d7eaa7190d94994bbe\",\"evidenceSha256\":\"0dd2c3f32d0ce1ef96cb60ce32a5f02f5b5dc0cc55e418186139c3ed9219ed6a\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "52bf65b317431d1cb13be7ecd3bb3e0d69d4f593188b59122be4d5d136220724",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ]
+  },
+  "archive_before_claim/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "075f60266ade62adc5c4c83cd0dbaa63e8e5b419ca7e7b6bfc3790de2e691c0f",
+        "rule_sha256": "ad2f259efaeb554812832afa96115a5de273eca3db263af2d674a09918c37955",
+        "rule_json": "{\"slot\":{\"receiverId\":\"b053a08c98643b2bff7245912ff93328ae55c33458e483a710cc3ac64497edd6\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"b32862ded93e599226c5bc62e0e1e5bb1afe2b2e676690c4cebd2e76dfd0c338\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "140561b53b3ca93b7be8adefe3a8fb5b475b4788dea011195aa6911ec1a3aee6",
+        "claim_json": "{\"slot\":{\"receiverId\":\"b053a08c98643b2bff7245912ff93328ae55c33458e483a710cc3ac64497edd6\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"ad2f259efaeb554812832afa96115a5de273eca3db263af2d674a09918c37955\",\"evidenceSha256\":\"185e2a0f4031521a9fa5c6df9acf2ccead4f78662a23a211a623a78e3ea8455c\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "35821e31bf40cedffcca6713bbf05b3f50f5e5ce867adcc445883efc16ff1b76",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"c28b155d68ba9b5a741c12629f492505af0de544fff515b7d66bb968d0b004e6\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"b76e3018b3abb216c76c8555919c238f0dffdf73ce260ad5d5b61deea86d5fbc\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"52df70859944a7b2aec93310efae2f244b29029102da0909a2668b444fb55330cea60d130456213d6f29a1498563f5498b06ab4c7adda36d557f49feccf88b0d\"}}"
+      }
+    ]
+  },
+  "archive_before_claim/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "1aefd3cfeafd4782f61ec70bcda4113b84875619f4cab6f719f60c62f4718919",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"1aefd3cfeafd4782f61ec70bcda4113b84875619f4cab6f719f60c62f4718919\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"f66f91e58d9c4074141d42f303c0367cbffe1b22ee2ec4b41225d1dff9660290\",\"contractSha256\":\"f7e55fd6ae5660e71bb4af1e1b46ae43118cc607641320056461ab3f65d756cb\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "b23945a89798ca98518b3b80a0ccd98e854def5d7b71df6ed117ee430ae7462b",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "0cd6454f8991a8667ea77dc93ed274c4fc39a736aff5bf91e29cc920c29a4d7e",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "db115cd17fe1ba7fb241a848168587cbfdfaf53dd6306dad70bfa938fc54d0a6",
+        "receiver": "1aefd3cfeafd4782f61ec70bcda4113b84875619f4cab6f719f60c62f4718919",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"1aefd3cfeafd4782f61ec70bcda4113b84875619f4cab6f719f60c62f4718919\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"f7e55fd6ae5660e71bb4af1e1b46ae43118cc607641320056461ab3f65d756cb\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"589965b27640dff88df6672d7c8f2bbc5fcfe2d1a0c61b0cc4b195cc251db837e76f54ee2ac1be72e768b38adbe776c696aa9456b26319bdc8ec752bea4b6607\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      },
+      {
+        "handle": "0cd6454f8991a8667ea77dc93ed274c4fc39a736aff5bf91e29cc920c29a4d7e",
+        "receiver": "1aefd3cfeafd4782f61ec70bcda4113b84875619f4cab6f719f60c62f4718919",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"1aefd3cfeafd4782f61ec70bcda4113b84875619f4cab6f719f60c62f4718919\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"f7e55fd6ae5660e71bb4af1e1b46ae43118cc607641320056461ab3f65d756cb\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"589965b27640dff88df6672d7c8f2bbc5fcfe2d1a0c61b0cc4b195cc251db837e76f54ee2ac1be72e768b38adbe776c696aa9456b26319bdc8ec752bea4b6607\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "archive_before_claim/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "f66f91e58d9c4074141d42f303c0367cbffe1b22ee2ec4b41225d1dff9660290",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"f66f91e58d9c4074141d42f303c0367cbffe1b22ee2ec4b41225d1dff9660290\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"9a32fae2b3ec08027ccff8971fa32c439a0198b7647a4b0b7bdee0d90d15e2bb\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "eaf69ba7deee905b4017a50d498651cbfb157d35e005b118c0c022975eb8b628",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "c8a7aa1056c6c1cfad57832502c984788df43110dcdeae57bcc192b3fe65c5d3",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"f7e55fd6ae5660e71bb4af1e1b46ae43118cc607641320056461ab3f65d756cb\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"1aefd3cfeafd4782f61ec70bcda4113b84875619f4cab6f719f60c62f4718919\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"589965b27640dff88df6672d7c8f2bbc5fcfe2d1a0c61b0cc4b195cc251db837e76f54ee2ac1be72e768b38adbe776c696aa9456b26319bdc8ec752bea4b6607\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "c8a7aa1056c6c1cfad57832502c984788df43110dcdeae57bcc192b3fe65c5d3",
+        "receiver": "f66f91e58d9c4074141d42f303c0367cbffe1b22ee2ec4b41225d1dff9660290",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"f66f91e58d9c4074141d42f303c0367cbffe1b22ee2ec4b41225d1dff9660290\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"ddd6a7376e9f94fb090220acb89348780372a3e6e7b1236a389949f5c250911a9da7e57a1145d592f0862fc821841c4d3b98c3b0ee631f7cde6f2d90fb59e303\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "archive_response_lost/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "33806fe563b5cdebd6b689ea138990559d902b1119350af8a91e129146194821",
+        "rule_sha256": "629f641d1e9702cef84e521277f83f5fd7065fb689f1a1594aaa280eb2afd34b",
+        "rule_json": "{\"slot\":{\"receiverId\":\"17f026e0f951d8d5ea9233f150051026b763e1d43037dbbf16fe7bce5ff62b41\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"671db1cab47a12622848b5b74893ce4694be4b9ac0a9f8759a2620aac44bbd6a\",\"contractSha256\":\"1fb11ff88ce562f3481cb105cadd80cfa9db76c232a64e399575301ac1498928\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "3fdf6a063fce3ef28cf175539ca153fb655dc7d899558fc1e766752d08f687bd",
+        "claim_json": "{\"slot\":{\"receiverId\":\"17f026e0f951d8d5ea9233f150051026b763e1d43037dbbf16fe7bce5ff62b41\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"629f641d1e9702cef84e521277f83f5fd7065fb689f1a1594aaa280eb2afd34b\",\"evidenceSha256\":\"ba3bce7d67fec4a34a15ee673bdffc8349d18fcfda27cae542b89ed258fd9b90\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "52bf65b317431d1cb13be7ecd3bb3e0d69d4f593188b59122be4d5d136220724",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ]
+  },
+  "archive_response_lost/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "bd7ba4c1de2af50f9cf3661ca9d6239869a15dd8f10494b4a0c18daf54156277",
+        "rule_sha256": "2232dc0b6e336f06bbfe7c1931c927cead08db4dc9152006b486228ab018a4b1",
+        "rule_json": "{\"slot\":{\"receiverId\":\"671db1cab47a12622848b5b74893ce4694be4b9ac0a9f8759a2620aac44bbd6a\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"1d847543607a26653ec2b0083bec1d67b869ed833d328b03617f866921ad72f4\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "6407f74b8d61e69a924181800d801d857ce5b0098f34698980acf6a37c240a11",
+        "claim_json": "{\"slot\":{\"receiverId\":\"671db1cab47a12622848b5b74893ce4694be4b9ac0a9f8759a2620aac44bbd6a\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"2232dc0b6e336f06bbfe7c1931c927cead08db4dc9152006b486228ab018a4b1\",\"evidenceSha256\":\"7eb5c5955a46da128a78a831f818a443a58e6e2bebeaa9e615ae4ac45b68966f\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "4ffca78e5451d0de85353024bf8a2e107d3eedbf63409c6e056dd596c4fa947c",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"1fb11ff88ce562f3481cb105cadd80cfa9db76c232a64e399575301ac1498928\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"17f026e0f951d8d5ea9233f150051026b763e1d43037dbbf16fe7bce5ff62b41\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"a3f302ed65fe2ce913a65cc58fad89810f99cfa17aad2c0f02447eb4f4af25d46d9daccdfe29325db3865a60452c245ff3ec8d76c6c19d0fe8aac03123ba550a\"}}"
+      }
+    ]
+  },
+  "archive_response_lost/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "71a14bb49ef04933094fac167a3ec7586c8c45255994e10447c2cce250fdcca6",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"71a14bb49ef04933094fac167a3ec7586c8c45255994e10447c2cce250fdcca6\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"ad4518193ce4d5de2accfe75bb0dc3c555c90c24dde85f1ef8f27b3b458d05fd\",\"contractSha256\":\"430cac347786af06799221ef53b6d8a5e55c8a42bb28469a0c0f3abf650219e5\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "5a0f2b93d0f2b50a7d488c4d08155e44baed8e8e1b80d7fa5cc389471d2deb18",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "2e5155dbdb08f0833fee90580d95d9517c548ad9efd9f5fd1ca586c0c3222744",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "2e5155dbdb08f0833fee90580d95d9517c548ad9efd9f5fd1ca586c0c3222744",
+        "receiver": "71a14bb49ef04933094fac167a3ec7586c8c45255994e10447c2cce250fdcca6",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"71a14bb49ef04933094fac167a3ec7586c8c45255994e10447c2cce250fdcca6\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"430cac347786af06799221ef53b6d8a5e55c8a42bb28469a0c0f3abf650219e5\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"aeb462855cc2e7f4a741ab4b2fcec5d7f780ee62123865f2849c43ea033c370c6bb5c97632c4e964f2a64c045c117ab6c5d8047eedccb43040953ad1000a9d03\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "archive_response_lost/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "ad4518193ce4d5de2accfe75bb0dc3c555c90c24dde85f1ef8f27b3b458d05fd",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"ad4518193ce4d5de2accfe75bb0dc3c555c90c24dde85f1ef8f27b3b458d05fd\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"e8cf16c7a79e8b980cadfc1285abcb5f0f5c31c912e5da70d13b78153484669f\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "029757db6f16c5a8871f7f97fefddedcfce0864de02f165981357285316203d2",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "5580271f7d4ac8f29cd684cbb3aa9b5b7a67ae0ba471b01da964d6258cee7133",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"430cac347786af06799221ef53b6d8a5e55c8a42bb28469a0c0f3abf650219e5\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"71a14bb49ef04933094fac167a3ec7586c8c45255994e10447c2cce250fdcca6\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"aeb462855cc2e7f4a741ab4b2fcec5d7f780ee62123865f2849c43ea033c370c6bb5c97632c4e964f2a64c045c117ab6c5d8047eedccb43040953ad1000a9d03\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "5580271f7d4ac8f29cd684cbb3aa9b5b7a67ae0ba471b01da964d6258cee7133",
+        "receiver": "ad4518193ce4d5de2accfe75bb0dc3c555c90c24dde85f1ef8f27b3b458d05fd",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"ad4518193ce4d5de2accfe75bb0dc3c555c90c24dde85f1ef8f27b3b458d05fd\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"3c98e8f3e9b446212aca326399bee2ba41e4c795c00494b5f6165e7fe1b3aff85ca3e1a23505ef9bb2161fc145ea2b799e13c1446dd1b36a7d380e0e78fbde06\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "attacks/artifact_substitution/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "958c264cb11d8d450bc74581871f31de0a804dd46926d5fec412e5f887ff72e6",
+        "rule_sha256": "5b8d5a6c448cf121e95826c161e44795a7a59d8cfcc3e15a256c3a6e1657ad94",
+        "rule_json": "{\"slot\":{\"receiverId\":\"f4375a97ba9fcbb896a0986b1ecbb5a2ea1f5e05ffcc46c1364635bb8a3a4d43\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"bebc88cfe301116b92723ae450b3f2035fbbffd5873a2fdc448a298be2c746f7\",\"contractSha256\":\"c9f916b01992d0819f8dedf5ce56110938599c86b5692663f73d5de8686fb0ba\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "8f9127f73965a70530b0fbb99735ee103ae2dcd1608912b879e58ed7cabe7469",
+        "claim_json": "{\"slot\":{\"receiverId\":\"f4375a97ba9fcbb896a0986b1ecbb5a2ea1f5e05ffcc46c1364635bb8a3a4d43\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"5b8d5a6c448cf121e95826c161e44795a7a59d8cfcc3e15a256c3a6e1657ad94\",\"evidenceSha256\":\"73249407f3505a32045bfdab484b91b5b8e3088b99cd033d6dd7b72f001356de\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "52bf65b317431d1cb13be7ecd3bb3e0d69d4f593188b59122be4d5d136220724",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ]
+  },
+  "attacks/artifact_substitution/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "cee6145068f6366c2b1cb9c510e390ef369a360be70dcfc8d52a9bc5381e4005",
+        "rule_sha256": "f30e41a9d9b846161362b279b03b7c47ef216b22fca284d58cda21e44db3fa74",
+        "rule_json": "{\"slot\":{\"receiverId\":\"bebc88cfe301116b92723ae450b3f2035fbbffd5873a2fdc448a298be2c746f7\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"971961c8e32e3736ce339b30fae315ed51fbedacdd55a7ea023a5beb08f55408\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "8441c8c97ffc5955141ff4d31d5665cd7388e862f40102e06fe9885662e3b683",
+        "claim_json": "{\"slot\":{\"receiverId\":\"bebc88cfe301116b92723ae450b3f2035fbbffd5873a2fdc448a298be2c746f7\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"f30e41a9d9b846161362b279b03b7c47ef216b22fca284d58cda21e44db3fa74\",\"evidenceSha256\":\"f4cde9912e02dd6d95693f9dc37386ac4d5bdc637afc0fe0698ef0bbe51b717e\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "c7bdbff202f19156593911fb4b4e6a30d7acda459be8512fda487dafedabeecc",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"c9f916b01992d0819f8dedf5ce56110938599c86b5692663f73d5de8686fb0ba\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"f4375a97ba9fcbb896a0986b1ecbb5a2ea1f5e05ffcc46c1364635bb8a3a4d43\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"af10ffe049abf05e98a999c25277640442ee7d546fa0f5eb8850368b34978c4883e6b22794ea21d7a1988ddccb88cc3d310635752c4d008d4f562b86ad65ea08\"}}"
+      }
+    ]
+  },
+  "attacks/artifact_substitution/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "daf20a2cdb1e4c3ecc0e439e72c6371095925a151a94c914440ce60bc3a230fe",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"daf20a2cdb1e4c3ecc0e439e72c6371095925a151a94c914440ce60bc3a230fe\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"9b6c99de1e0a592e9a7d920d9e310cc266c1315b4781826ff4a5f8749dd5021a\",\"contractSha256\":\"721edadafe8248bbe9d3c6f19a631f82ada03120e414ab2dfc9aca89e2933aec\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "6412e91eb978ef977e74868023d2d05e9c9dc09a541364d9282d45c71cd98869",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "2e325e869b44bd6495ebca2999ec727ce79ee91c2cd384dce729d41c43edbed4",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "2e325e869b44bd6495ebca2999ec727ce79ee91c2cd384dce729d41c43edbed4",
+        "receiver": "daf20a2cdb1e4c3ecc0e439e72c6371095925a151a94c914440ce60bc3a230fe",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"daf20a2cdb1e4c3ecc0e439e72c6371095925a151a94c914440ce60bc3a230fe\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"721edadafe8248bbe9d3c6f19a631f82ada03120e414ab2dfc9aca89e2933aec\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"99c9f9709d0ce27e02707b412343942dde7f2883a19574afdfb4a07aa6a13ae6bc0243ef363b396a51bb767aef06461ec86dc293cb6cb67960b4aa733d341f0a\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "attacks/artifact_substitution/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "9b6c99de1e0a592e9a7d920d9e310cc266c1315b4781826ff4a5f8749dd5021a",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"9b6c99de1e0a592e9a7d920d9e310cc266c1315b4781826ff4a5f8749dd5021a\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"ed1b97538a6f39b6e3a1debb267de5d9ea1d7b955bfabdb0b4009a50bd4f4908\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "e8ff0bda186601104796ecb84f509eef6ed18f9381539cf1f0daca388bb244af",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "6a06d034adafe113a8cbd8f376f2dd358682627159ee8b296328b5dd5efb9399",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"721edadafe8248bbe9d3c6f19a631f82ada03120e414ab2dfc9aca89e2933aec\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"daf20a2cdb1e4c3ecc0e439e72c6371095925a151a94c914440ce60bc3a230fe\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"99c9f9709d0ce27e02707b412343942dde7f2883a19574afdfb4a07aa6a13ae6bc0243ef363b396a51bb767aef06461ec86dc293cb6cb67960b4aa733d341f0a\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "6a06d034adafe113a8cbd8f376f2dd358682627159ee8b296328b5dd5efb9399",
+        "receiver": "9b6c99de1e0a592e9a7d920d9e310cc266c1315b4781826ff4a5f8749dd5021a",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"9b6c99de1e0a592e9a7d920d9e310cc266c1315b4781826ff4a5f8749dd5021a\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"ce556c192f9114e5c608f14b862ede4ba9ee61f0efcf159014a340589be2292b67d82a7f87fc4ad42d8c94ecc561d9db536b10d7039de7a45c9686a8857e4006\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "attacks/duplicate_delivery/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "39245a0c695e6beda852b374b4ccff36ff6ff2a3be7fb6d70abef246f4fb4618",
+        "rule_sha256": "cc96e8fdfebf279b8564489fa3bb0155f7deecbad456ccb86f1674fc71941771",
+        "rule_json": "{\"slot\":{\"receiverId\":\"85da70f44d1af8492b18ec7791b5e6f6cd87fba592e25806ebd9f756815e31f4\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"fe9455c5c2c7b539082a260160b6d51ed9ae9e9eb8a95ad518df1c53c0d06fa0\",\"contractSha256\":\"64c229118418865bde5869b2725b3e59bbab4551594170bbb994b067aa567a4c\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "9d971fa36c506e8692d2f3447b37bd282824ef2cb2f024025472d9c2477c75f7",
+        "claim_json": "{\"slot\":{\"receiverId\":\"85da70f44d1af8492b18ec7791b5e6f6cd87fba592e25806ebd9f756815e31f4\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"cc96e8fdfebf279b8564489fa3bb0155f7deecbad456ccb86f1674fc71941771\",\"evidenceSha256\":\"51dcce3648adc151199c4c1fc8620383d6403a0a8d982dd415a99fea36467b97\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "52bf65b317431d1cb13be7ecd3bb3e0d69d4f593188b59122be4d5d136220724",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ]
+  },
+  "attacks/duplicate_delivery/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "e557ca7760d6e7fb1c7fc07907fc01447740ed83d98bbb65a9f883694c13e528",
+        "rule_sha256": "8e33d826812783d1efc47db72e9af115203a103cb72406333d3596bee5586e8c",
+        "rule_json": "{\"slot\":{\"receiverId\":\"fe9455c5c2c7b539082a260160b6d51ed9ae9e9eb8a95ad518df1c53c0d06fa0\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"6da9fb50f6c9c9fe0261ac9d8161b69e9af48cc4abccc2c00accd1830bfa2ac0\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "f4af64f8c59fab15fbbc5f660e2058f906696a2601672ea71dee4efde842ecc0",
+        "claim_json": "{\"slot\":{\"receiverId\":\"fe9455c5c2c7b539082a260160b6d51ed9ae9e9eb8a95ad518df1c53c0d06fa0\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"8e33d826812783d1efc47db72e9af115203a103cb72406333d3596bee5586e8c\",\"evidenceSha256\":\"dda805b23a48dc44c9b0872acf25ba4083daba0a1e3770dc67df5f0c00b2b383\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "e35d9a3f4fba9c09fc44346e9a6bbefeae534c811a45e381e3723688afe67561",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"64c229118418865bde5869b2725b3e59bbab4551594170bbb994b067aa567a4c\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"85da70f44d1af8492b18ec7791b5e6f6cd87fba592e25806ebd9f756815e31f4\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"0cc0bcd5183aa3767793916c3a775e76ab90ddeb143d73bcdcd1627b486f6238c5092dfcd01d10dc7799e143fdc0b7b572751617be79fbdeb7b10afa14b3d707\"}}"
+      }
+    ]
+  },
+  "attacks/duplicate_delivery/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "83e62487c57802133f4ddfefd7dd8dcdde3240443eaac361036fbbbea12808fe",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"83e62487c57802133f4ddfefd7dd8dcdde3240443eaac361036fbbbea12808fe\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"3775d0a0af9a096d60a1af3672da5efff208a6f48f91d9902c4e4c2fc5b2da1f\",\"contractSha256\":\"f9d2518652bd051d59696393ad6ebee9f84010780b359c13798c337150c37da2\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "e95ec8825f9d62aabd966eb482fa6ef7e1fb00b24b75c2347cc60e4e9c2866a3",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "9080c28444f64b61122e21fbb6fa4da13341716bb8af4f5a70a373cae1bcfe97",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "9080c28444f64b61122e21fbb6fa4da13341716bb8af4f5a70a373cae1bcfe97",
+        "receiver": "83e62487c57802133f4ddfefd7dd8dcdde3240443eaac361036fbbbea12808fe",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"83e62487c57802133f4ddfefd7dd8dcdde3240443eaac361036fbbbea12808fe\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"f9d2518652bd051d59696393ad6ebee9f84010780b359c13798c337150c37da2\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"1ac92384e1c1d5ae48293bbc65b4f3a7b46d784940088cc035463e9b5db765f38b8d39037538ea36a0001d7d9e89826fb8466e58594021aa0fc37c53e39b2d0c\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "attacks/duplicate_delivery/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "3775d0a0af9a096d60a1af3672da5efff208a6f48f91d9902c4e4c2fc5b2da1f",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"3775d0a0af9a096d60a1af3672da5efff208a6f48f91d9902c4e4c2fc5b2da1f\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"185f94f342b9af9625458b6972492062669a667c5f46e82b460c4fbd029ca870\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "7c58fb641cc19991aab2fdfc23d13be6cecbc2a3022726d7dfc33438dea18681",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "812787ac4298fa9d5faa0f39ad9b0ffcbaa85602279d54161a08d1a6ec1502e4",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"f9d2518652bd051d59696393ad6ebee9f84010780b359c13798c337150c37da2\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"83e62487c57802133f4ddfefd7dd8dcdde3240443eaac361036fbbbea12808fe\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"1ac92384e1c1d5ae48293bbc65b4f3a7b46d784940088cc035463e9b5db765f38b8d39037538ea36a0001d7d9e89826fb8466e58594021aa0fc37c53e39b2d0c\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "812787ac4298fa9d5faa0f39ad9b0ffcbaa85602279d54161a08d1a6ec1502e4",
+        "receiver": "3775d0a0af9a096d60a1af3672da5efff208a6f48f91d9902c4e4c2fc5b2da1f",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"3775d0a0af9a096d60a1af3672da5efff208a6f48f91d9902c4e4c2fc5b2da1f\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"381cac877514881d7bf65c5dd693601bcb085b665fc50efdac6ee36c9f7ea4d21038a0dbc5ab7a1466eeaf9243a4ab540abc4bf82bcf4b0fa5517041e3b8650a\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "attacks/foreign_workflow/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "c6bb4b388cb58f8d8bb84ebeaf796977416707b0a1e4a0c15ac5ee660fb1083a",
+        "rule_sha256": "b4ef4a8d1ae256ee594eae17eab587052d4193298342a8e1b5cc06e57cd759c7",
+        "rule_json": "{\"slot\":{\"receiverId\":\"9d9004c894c15d68c63aa4f9623e5398e8f2518efb2950681b0173a7d04006b5\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"7415c75943760132509905dc861b1b7f009ea29a1a45e4836dfe1deae559fd2d\",\"contractSha256\":\"2eb67ce2475d0cb5bedbe7e4cf92417e071fab02db63e60f358051cfe0f95901\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "fa70d57772f3eb7149056179feb61d836661c0e88ce697b09863e1b6f8cfd2ff",
+        "claim_json": "{\"slot\":{\"receiverId\":\"9d9004c894c15d68c63aa4f9623e5398e8f2518efb2950681b0173a7d04006b5\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"b4ef4a8d1ae256ee594eae17eab587052d4193298342a8e1b5cc06e57cd759c7\",\"evidenceSha256\":\"40c6078646a80e7a248caa74a9b61569589054395f4bb69edf4cfe9fd3b2df5a\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "52bf65b317431d1cb13be7ecd3bb3e0d69d4f593188b59122be4d5d136220724",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ]
+  },
+  "attacks/foreign_workflow/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "ac29a201988305358fe87fd95adb1d51b24b12f69d60b72ee4b3b8e448d99e1c",
+        "rule_sha256": "ec15c5f359a56f3680623f91de9aa247b45859a2aabd3ca09876ce7ce8824f9d",
+        "rule_json": "{\"slot\":{\"receiverId\":\"7415c75943760132509905dc861b1b7f009ea29a1a45e4836dfe1deae559fd2d\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"e5075064c40a94665784b5fb76f1e67b2bfa7d3973222d8ae74f164292b0fb7a\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "8a64ac8bad1fecf75e19610131fb6b4b22bd36b3db34a1329c917757ed7526d7",
+        "claim_json": "{\"slot\":{\"receiverId\":\"7415c75943760132509905dc861b1b7f009ea29a1a45e4836dfe1deae559fd2d\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"ec15c5f359a56f3680623f91de9aa247b45859a2aabd3ca09876ce7ce8824f9d\",\"evidenceSha256\":\"55aa7f3646c693e9d861bbea5877094171befe884d783e1bf1164104c25b0afe\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "a8168662ecc2cf86a264e16701de64aea2c2e60fd6ae15e8d7c07bb9c638d005",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"2eb67ce2475d0cb5bedbe7e4cf92417e071fab02db63e60f358051cfe0f95901\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"9d9004c894c15d68c63aa4f9623e5398e8f2518efb2950681b0173a7d04006b5\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"9a9c32cb2ae52f0709d2dc530ba64e6e22b84ae47bc7fa5bdbdf60d9e493cc0f5f0bdabcf28a7b3df4d8979e2d66327691470f7ba57dd1e2b31685382949480b\"}}"
+      }
+    ]
+  },
+  "attacks/foreign_workflow/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "2c16bf5773de1424745786e06b6d83049016c5ba7508502db12663823b8b6da2",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"2c16bf5773de1424745786e06b6d83049016c5ba7508502db12663823b8b6da2\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"65bd4bba0bfc0badc00b4d2a3db62811469faa32746c9667275865a6c7b9f708\",\"contractSha256\":\"33ac7282970f1326ae5683844e4e2a1d2621084a718e0bd71238b7da2fab4f52\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "0db73f6bbbb422a035977f12578cc907c463b60a31668f01f265eb30c3943119",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "4457668d98bdfaea315bddf77e5e2e51e86b5929f40439d6f039985558694854",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "4457668d98bdfaea315bddf77e5e2e51e86b5929f40439d6f039985558694854",
+        "receiver": "2c16bf5773de1424745786e06b6d83049016c5ba7508502db12663823b8b6da2",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"2c16bf5773de1424745786e06b6d83049016c5ba7508502db12663823b8b6da2\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"33ac7282970f1326ae5683844e4e2a1d2621084a718e0bd71238b7da2fab4f52\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"c8fa51f8078f4f9529fdbb47003ec4a184d59d8f72ec5c75211ea71eb53247902435989c3030d2c2878abb75cc71646a4eb44d5b7861429f9168fbabd8efbd06\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "attacks/foreign_workflow/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "65bd4bba0bfc0badc00b4d2a3db62811469faa32746c9667275865a6c7b9f708",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"65bd4bba0bfc0badc00b4d2a3db62811469faa32746c9667275865a6c7b9f708\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"aa97e96bdaec2f3213c80cf8df32e9605a07b4945021600e131522213facb266\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "2178f8eb1a73a25722afdd7e36767c371714bde26487ddb78084257da281ceb6",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "113d290e4b87f453bdc2d073765194ad2a284f86bfe12c75a79cb5dcb3c8fa90",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"33ac7282970f1326ae5683844e4e2a1d2621084a718e0bd71238b7da2fab4f52\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"2c16bf5773de1424745786e06b6d83049016c5ba7508502db12663823b8b6da2\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"c8fa51f8078f4f9529fdbb47003ec4a184d59d8f72ec5c75211ea71eb53247902435989c3030d2c2878abb75cc71646a4eb44d5b7861429f9168fbabd8efbd06\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "113d290e4b87f453bdc2d073765194ad2a284f86bfe12c75a79cb5dcb3c8fa90",
+        "receiver": "65bd4bba0bfc0badc00b4d2a3db62811469faa32746c9667275865a6c7b9f708",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"65bd4bba0bfc0badc00b4d2a3db62811469faa32746c9667275865a6c7b9f708\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"c3af4fabf44115cd0a899b106513322648c396a2ceb3fe2ef84e25851a5142bcf70839db97ebb455b8022c0ae95cde1c1fcb718142ed6c09ebb875c470ec760d\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "attacks/forged_completion/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "3b9ca2e62ef825807e48c054f853065729d8be917ce58fedf25e96dc317c9e2b",
+        "rule_sha256": "e60cb738f3f299f421e7c395cd96697de80b431328db95da45f8f5422f2cb309",
+        "rule_json": "{\"slot\":{\"receiverId\":\"7708546230eda7b492bdcd2190ce1975b5c0f8dc25fb8e577482db3fdde06570\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"f89ff9b1724cb1a3a0040f69ab3aab90f9127692cd9ca836bafe8c9025ca079b\",\"contractSha256\":\"8eef95dd35259d1f2ef14891ac5fd262119e13de71a7185b97590a9ced503455\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "f54d069f5cf4d9cd082780d17d99d1c4a8beda75c9b29dd968ccece16a3e4f64",
+        "claim_json": "{\"slot\":{\"receiverId\":\"7708546230eda7b492bdcd2190ce1975b5c0f8dc25fb8e577482db3fdde06570\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"e60cb738f3f299f421e7c395cd96697de80b431328db95da45f8f5422f2cb309\",\"evidenceSha256\":\"9785c0e303c05afb8166bf3147784471886985089e31b0ddc91c470670a0ccb7\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "52bf65b317431d1cb13be7ecd3bb3e0d69d4f593188b59122be4d5d136220724",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ]
+  },
+  "attacks/forged_completion/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "9e08a0f81c5b55218e41dbfccd724c0cc0ff8cdf01ceaa6340333857017063aa",
+        "rule_sha256": "1d6f9fab668caa2af76c91d8b1da597c0d68f8b07885bfd768a97feafff26c30",
+        "rule_json": "{\"slot\":{\"receiverId\":\"f89ff9b1724cb1a3a0040f69ab3aab90f9127692cd9ca836bafe8c9025ca079b\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"429d873450f06e44a08025fc2049106f146bcd4321d003876ffe891079562f2e\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "cd51c3e7872de0b6fd3d9362ce7934ea5fb07abfca9f9136e494f56c469609c1",
+        "claim_json": "{\"slot\":{\"receiverId\":\"f89ff9b1724cb1a3a0040f69ab3aab90f9127692cd9ca836bafe8c9025ca079b\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"1d6f9fab668caa2af76c91d8b1da597c0d68f8b07885bfd768a97feafff26c30\",\"evidenceSha256\":\"363e33a91fcbe9b177824e9689b7213f21847bf57804ad89626ad147cbe7c884\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "02b8e59e9ce44f9f308d874dc564fbdfa9b68d62897c1d911cad48ad10b9a8b1",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"8eef95dd35259d1f2ef14891ac5fd262119e13de71a7185b97590a9ced503455\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"7708546230eda7b492bdcd2190ce1975b5c0f8dc25fb8e577482db3fdde06570\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"b9d85ab218062656f09491aba037bc3876780a59e859953b53295efd184a003c307a6866686f9e05c45bd9c2b4cf1a5173c084d3bb2db40c0c7bd382f023980d\"}}"
+      }
+    ]
+  },
+  "attacks/forged_completion/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "48061af56f71b78bbecc608af3f0b64b18a519877db52bf061db6aa72e6e05a6",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"48061af56f71b78bbecc608af3f0b64b18a519877db52bf061db6aa72e6e05a6\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"8847d28f353f4ec1554c54c30a041f663f2e3dc5548e5f7844afe06378fd290c\",\"contractSha256\":\"55146a5f7b128eb673ecf1f18f49e981380b8c3c967e2a4444736ac946820db3\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "7a146a49a0d254984928b3c00d40c7f5e92613311936da6fa19fa2591086710d",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "724034f742aa1b73b492a10253c914362f8dd8fc5d9c764aecca4c9b776a2644",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "724034f742aa1b73b492a10253c914362f8dd8fc5d9c764aecca4c9b776a2644",
+        "receiver": "48061af56f71b78bbecc608af3f0b64b18a519877db52bf061db6aa72e6e05a6",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"48061af56f71b78bbecc608af3f0b64b18a519877db52bf061db6aa72e6e05a6\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"55146a5f7b128eb673ecf1f18f49e981380b8c3c967e2a4444736ac946820db3\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"e0a1065eca912ebfedfed302db1902a46087a0b67767ffd2fc6d48c753c918a99e61ea1de32a0ee0ce05be180639bdcaee8ba04e1e6bc95bf4746de203f5330c\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "attacks/forged_completion/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "8847d28f353f4ec1554c54c30a041f663f2e3dc5548e5f7844afe06378fd290c",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"8847d28f353f4ec1554c54c30a041f663f2e3dc5548e5f7844afe06378fd290c\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"66efb98a34fa57ed30bcfde0d359d8c217feb0299b0eea31b67bb88659222404\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "907f7fbf07c35fc9263db78e4701d0afa89a0f31506a5dc1829512ce3bd4e095",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "ac92cc733b71dd3211da42b575b874189b29894e36f26e5dd615dc7525c506fd",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"55146a5f7b128eb673ecf1f18f49e981380b8c3c967e2a4444736ac946820db3\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"48061af56f71b78bbecc608af3f0b64b18a519877db52bf061db6aa72e6e05a6\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"e0a1065eca912ebfedfed302db1902a46087a0b67767ffd2fc6d48c753c918a99e61ea1de32a0ee0ce05be180639bdcaee8ba04e1e6bc95bf4746de203f5330c\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "ac92cc733b71dd3211da42b575b874189b29894e36f26e5dd615dc7525c506fd",
+        "receiver": "8847d28f353f4ec1554c54c30a041f663f2e3dc5548e5f7844afe06378fd290c",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"8847d28f353f4ec1554c54c30a041f663f2e3dc5548e5f7844afe06378fd290c\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"b90fc46df1d06d23280e2d7673991b9ea555078dd6a8e3975f4c01a41af4ac7385704b1e6934b9c95b8f6898361bd17f301a1cbd752d1cdb0d73f282ce41fd0b\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "attacks/overbroad_candidate/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "8bd6c83f3c0f70e14b787b45e19f75870f7b3a3a078fe24295bec236aff67d92",
+        "rule_sha256": "ae1637cad522beeb2505aff37b5da2ac103004418100e1bb71dc989a82980799",
+        "rule_json": "{\"slot\":{\"receiverId\":\"c8c5118ab69465790161a77a88f98ca7a7d2c140a163b4681d089cbff92b00ba\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"26b839c2c943e8b17c95c86f7c12bb8c19cb5b40a35ea08a640507076e22af6d\",\"contractSha256\":\"237db6e8801f465350df8942f6a2f3ad3042363873bdc2cc1bf488a6731d197f\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "7cbd7c2f7b55e4cb4ba445b8e73f923894a5b2975cbcba977ed170c53901cd2b",
+        "claim_json": "{\"slot\":{\"receiverId\":\"c8c5118ab69465790161a77a88f98ca7a7d2c140a163b4681d089cbff92b00ba\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"ae1637cad522beeb2505aff37b5da2ac103004418100e1bb71dc989a82980799\",\"evidenceSha256\":\"0ac17d5e836f03bceed96fc642e6a6479aee8ee192644584d74e6056af453d3b\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "52bf65b317431d1cb13be7ecd3bb3e0d69d4f593188b59122be4d5d136220724",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ]
+  },
+  "attacks/overbroad_candidate/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "48df8a18f75ee13bfc401c76248a014d200c988e576d6f2c2bc908bd7873f9f2",
+        "rule_sha256": "6807db6e7e85610135a0a3adeecd7c470a1587f6fcf3676d09970f36bf1daee8",
+        "rule_json": "{\"slot\":{\"receiverId\":\"26b839c2c943e8b17c95c86f7c12bb8c19cb5b40a35ea08a640507076e22af6d\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"d7e240252977fd51c6113abb8ea6d56becb5847e150e6a79f68bf38dbeba07d3\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "241e6276240218788c17f495699295dacd50c5ec69ff8766a64c4885a02381f8",
+        "claim_json": "{\"slot\":{\"receiverId\":\"26b839c2c943e8b17c95c86f7c12bb8c19cb5b40a35ea08a640507076e22af6d\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"6807db6e7e85610135a0a3adeecd7c470a1587f6fcf3676d09970f36bf1daee8\",\"evidenceSha256\":\"1bb669b2e09a05d856afddaf3f0f5ff13b538985171f0befc15f6d1be206b70b\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "a12c1885705dc461fea5e4d0f7194a6f4a33ab375479f35be312334eb393a79f",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"237db6e8801f465350df8942f6a2f3ad3042363873bdc2cc1bf488a6731d197f\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"c8c5118ab69465790161a77a88f98ca7a7d2c140a163b4681d089cbff92b00ba\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"36bd3a6941433f110a458a21c53f858f16ba76083f0a01de45f6c2d2e8cfccba27e8bad2abc00427fd44b3fcd2c4ed09c01496453b7a26dad222429f1f11220b\"}}"
+      }
+    ]
+  },
+  "attacks/overbroad_candidate/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "493589ec26aaf80ee9c50f3c01f35e5914a80f43648f3563e4473cc31a7efede",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"493589ec26aaf80ee9c50f3c01f35e5914a80f43648f3563e4473cc31a7efede\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"5e5c9ce60a78ca4d8ab69e291a995ba5f557a6753b6d7e66f1d04d4c41793e36\",\"contractSha256\":\"69fb63c87bced491ca3138c0c13cab949b1044296686e24367494adaeabf2b94\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "db16efb1a054cda5a1c5fe0cf3d0ca155752f3a80099c5f9b3a37f16edb68eb6",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "7efb6d8acf26e71dcaea5446f9578ade1c9a9551e2651248f6c60e19dec811a7",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "7efb6d8acf26e71dcaea5446f9578ade1c9a9551e2651248f6c60e19dec811a7",
+        "receiver": "493589ec26aaf80ee9c50f3c01f35e5914a80f43648f3563e4473cc31a7efede",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"493589ec26aaf80ee9c50f3c01f35e5914a80f43648f3563e4473cc31a7efede\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"69fb63c87bced491ca3138c0c13cab949b1044296686e24367494adaeabf2b94\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"71bc48bb9f3126f89023994d63f4a9c51346b8e4362a6f9986e221623cc73784333ce89277961d5e2bdd73e93c648b4337e2517b882b48f90ad0689a48db2902\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "attacks/overbroad_candidate/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "5e5c9ce60a78ca4d8ab69e291a995ba5f557a6753b6d7e66f1d04d4c41793e36",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"5e5c9ce60a78ca4d8ab69e291a995ba5f557a6753b6d7e66f1d04d4c41793e36\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"436c9b08481de43052a263e67bcb3b4df979808682ac235439b2a056c3612e4c\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "550887cb54d45d5db238fb3e51aa83218586628427870f0225809d62f652ee8d",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "34c1d56b0504275703e70e3951b8d10d8f43d947a3f147fbd038cf24845f7859",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"69fb63c87bced491ca3138c0c13cab949b1044296686e24367494adaeabf2b94\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"493589ec26aaf80ee9c50f3c01f35e5914a80f43648f3563e4473cc31a7efede\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"71bc48bb9f3126f89023994d63f4a9c51346b8e4362a6f9986e221623cc73784333ce89277961d5e2bdd73e93c648b4337e2517b882b48f90ad0689a48db2902\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "34c1d56b0504275703e70e3951b8d10d8f43d947a3f147fbd038cf24845f7859",
+        "receiver": "5e5c9ce60a78ca4d8ab69e291a995ba5f557a6753b6d7e66f1d04d4c41793e36",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"5e5c9ce60a78ca4d8ab69e291a995ba5f557a6753b6d7e66f1d04d4c41793e36\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"b60bd2436e9c19f5a8753f0ccf6d1614a326d1431b774e779ef08e2f7add2f372dbef31f6c549fce97e619b2bfa014121a5571f03fcf3222cbafc4b6c5d04508\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "attacks/skip_publisher/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "cab4e929cecafd8303a767d233d525776ab98227e1533fbaf727dc22a4495764",
+        "rule_sha256": "fd1e3512d3d89d4e820a528c10215d42ab1e2b071c9df711f336d09f653b53d9",
+        "rule_json": "{\"slot\":{\"receiverId\":\"5eb266c824b77de60b3abf3a007d071fe07182013c33d4cfb4bf68faf6f756bb\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"6c2452e8151fa80d9eded3692e960422d64b5952f376fc27fb5d25475ba2b196\",\"contractSha256\":\"63c72c2f5681fc557f8e18f4676e5939ea200975fab0414bf76e74ed9bc64610\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "6db74d9cd455201a5b1bcaedc2178a3487a313c46a4a9c899e96b7b9223f5f5f",
+        "claim_json": "{\"slot\":{\"receiverId\":\"5eb266c824b77de60b3abf3a007d071fe07182013c33d4cfb4bf68faf6f756bb\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"fd1e3512d3d89d4e820a528c10215d42ab1e2b071c9df711f336d09f653b53d9\",\"evidenceSha256\":\"bd4277b6d414fc6aa54fd6b5bd0f0387160bd571c6de7f4ad6593420b9a99106\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "52bf65b317431d1cb13be7ecd3bb3e0d69d4f593188b59122be4d5d136220724",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ]
+  },
+  "attacks/skip_publisher/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "07cebf7327591274cf885d97e30b6bc763594326833d73d9c9815745a66dc2e6",
+        "rule_sha256": "f9d44768a50671ea00d961f2ce57d07efae9cddf6f0e8ef7bae7a5029cc8de45",
+        "rule_json": "{\"slot\":{\"receiverId\":\"6c2452e8151fa80d9eded3692e960422d64b5952f376fc27fb5d25475ba2b196\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"0cd42b693bb739fb8d9ea3a25739429b6c922d4e787c1962c4cee4dc65708c51\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "3db98e76d08479a9a6710536f1b30b638ad4bd4b471e7f58ba1d17e230c3d810",
+        "claim_json": "{\"slot\":{\"receiverId\":\"6c2452e8151fa80d9eded3692e960422d64b5952f376fc27fb5d25475ba2b196\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"f9d44768a50671ea00d961f2ce57d07efae9cddf6f0e8ef7bae7a5029cc8de45\",\"evidenceSha256\":\"20cebed63f9baa6276d43bad30bbfb18551887e9e163e3b57335f55a3d0b4ef9\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "8f99e69b4232a98ec6df7ec9c96e3a6af305843da254048a426eee86d8033f95",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"63c72c2f5681fc557f8e18f4676e5939ea200975fab0414bf76e74ed9bc64610\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"5eb266c824b77de60b3abf3a007d071fe07182013c33d4cfb4bf68faf6f756bb\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"9693f8e51309fff7832ca78c8b72e4f4a0aa30bc47e9139456b1150bf651dab3ac808eecf4a8c27c9ad58397542f78517564d9dbcf2832d1a344383764ed9000\"}}"
+      }
+    ]
+  },
+  "attacks/skip_publisher/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "915ce58e050c323876dc1a4fae0aab8fa0c758504d6292ca61a2c2e1a48989b9",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"915ce58e050c323876dc1a4fae0aab8fa0c758504d6292ca61a2c2e1a48989b9\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"7ef28456a1d1f92f76874405804b5b9925b65137c6428a1e41431c1ef57a31c9\",\"contractSha256\":\"98f30b55254ca4e8c800aad1bc43537c80d57c7cda6c7a328f19aec225d694b2\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "95fd2890283c128b9b2b5775864b84ec18b666118b7ee943dc0c6b72f94c5707",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "d0dc4d10aa45a3b098b58533eb183e5c95d5a71f169252ff79fe1587551ea220",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "d0dc4d10aa45a3b098b58533eb183e5c95d5a71f169252ff79fe1587551ea220",
+        "receiver": "915ce58e050c323876dc1a4fae0aab8fa0c758504d6292ca61a2c2e1a48989b9",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"915ce58e050c323876dc1a4fae0aab8fa0c758504d6292ca61a2c2e1a48989b9\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"98f30b55254ca4e8c800aad1bc43537c80d57c7cda6c7a328f19aec225d694b2\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"a7f4f203de17c54d34f70f6d01a8b9a5e7b823efcf80ba8637da317bbf6fa263b8c317847808525a6bac86707cf07329efc3855816f3894b277037089be3fd03\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "attacks/skip_publisher/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "7ef28456a1d1f92f76874405804b5b9925b65137c6428a1e41431c1ef57a31c9",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"7ef28456a1d1f92f76874405804b5b9925b65137c6428a1e41431c1ef57a31c9\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"37de4dea59f4eeeff56ff6be08e4aa37fc082a2aa311b43aa8bc7d7587b146a3\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "792bfc67550dc4cee4e02fe752a93a7f813a45c2e645dc2ce749a149028975a6",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "4c24fda84f3f9ade1bc33361b849c63b16b85a7682955767c9ab1a74271b54b8",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"98f30b55254ca4e8c800aad1bc43537c80d57c7cda6c7a328f19aec225d694b2\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"915ce58e050c323876dc1a4fae0aab8fa0c758504d6292ca61a2c2e1a48989b9\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"a7f4f203de17c54d34f70f6d01a8b9a5e7b823efcf80ba8637da317bbf6fa263b8c317847808525a6bac86707cf07329efc3855816f3894b277037089be3fd03\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "4c24fda84f3f9ade1bc33361b849c63b16b85a7682955767c9ab1a74271b54b8",
+        "receiver": "7ef28456a1d1f92f76874405804b5b9925b65137c6428a1e41431c1ef57a31c9",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"7ef28456a1d1f92f76874405804b5b9925b65137c6428a1e41431c1ef57a31c9\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"c0a1b12a2b9f2badaa0ce57154581e34ed2ddad81899ccc6ee83bef71b38329c78a8478c9d67ebadbfea8cc8983b160643a70925681fbe028b918fab10dd3c06\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "courier_replaced/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "be33417c088aa8187300fedfe789f39e30e54f0a2eed649d03447d510ac6e37b",
+        "rule_sha256": "8a633e3a00b7225c5e81653fc8f81aefef8d43e623bbb3eeddf384fe53d673d6",
+        "rule_json": "{\"slot\":{\"receiverId\":\"e4e387253fd313134e5742b68a951659770ee32c4133acac6bc7bb9f56177b83\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"65e9dc1b41942ce36238a1ffc31629f1d84e082295a76af053cc7590b608ca83\",\"contractSha256\":\"7f9af36493dfa508af97c63a5fa46fba9ef7f2cc238b15aa08f7f17217b3a428\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "ef0f6d65b56cd20d6a0e24ddf1c84175fc63c46548a4f9dd7bbb8d3939023238",
+        "claim_json": "{\"slot\":{\"receiverId\":\"e4e387253fd313134e5742b68a951659770ee32c4133acac6bc7bb9f56177b83\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"8a633e3a00b7225c5e81653fc8f81aefef8d43e623bbb3eeddf384fe53d673d6\",\"evidenceSha256\":\"0c21f6b58ad97249ae05d328a6cbf0c7ab4defd4f7c940630f04899ce1d08c7d\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "52bf65b317431d1cb13be7ecd3bb3e0d69d4f593188b59122be4d5d136220724",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ]
+  },
+  "courier_replaced/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "4e36fee55ccb8193a89505384216f40e661ce0f0f4fdca58900122abbcf9b740",
+        "rule_sha256": "8901ce2b9fa5c1e29a3783764a46bc96d7207746a6cdfbbda6d1e9ce0b92eee5",
+        "rule_json": "{\"slot\":{\"receiverId\":\"65e9dc1b41942ce36238a1ffc31629f1d84e082295a76af053cc7590b608ca83\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"96800fe9e3786640d6fa04c4ad246593a021107d64876068716499188b70c017\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "f5df2b7edb49df9b2fc59c52d927b308f2843165c0221f65102d9b465e5e4f3f",
+        "claim_json": "{\"slot\":{\"receiverId\":\"65e9dc1b41942ce36238a1ffc31629f1d84e082295a76af053cc7590b608ca83\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"8901ce2b9fa5c1e29a3783764a46bc96d7207746a6cdfbbda6d1e9ce0b92eee5\",\"evidenceSha256\":\"7f33172143745ec5100532c33b64b22ecdee97337438c0e0969262b0086f6082\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "ec8e51382e1eba35682e786ac86fc0ba62a4e6abeab8deafb29bc7fe780b355e",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"7f9af36493dfa508af97c63a5fa46fba9ef7f2cc238b15aa08f7f17217b3a428\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"e4e387253fd313134e5742b68a951659770ee32c4133acac6bc7bb9f56177b83\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"7514bfe2a892085d8dcdfb3d2a5c2533fce1348100debe06c36f575001c99ac77c1f053ffd6844906afdc0a28d6eccf2e25fd9fb02b13a0ccd10396810248c0d\"}}"
+      }
+    ]
+  },
+  "courier_replaced/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "ef687a51141d27a95d4ec04eb98cb33322613533671d11dc2929fbcb921d396b",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"ef687a51141d27a95d4ec04eb98cb33322613533671d11dc2929fbcb921d396b\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"7db9ab9148cb06f424e74ea43e23a0b726731cb094396527a674d5dde27780d2\",\"contractSha256\":\"053e19546a2ff6d8016abcfe6f42f18acc154d9b8e17923a2a3c9c44a628445a\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "c91156a39f8a6ca3a787f1f738b41a59aa23799653e470699d1a4e863f7fee5c",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "5b2cc4810b86c08fd0927add876a3353d6726e53c563e51a50c487d2db277b89",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "5b2cc4810b86c08fd0927add876a3353d6726e53c563e51a50c487d2db277b89",
+        "receiver": "ef687a51141d27a95d4ec04eb98cb33322613533671d11dc2929fbcb921d396b",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"ef687a51141d27a95d4ec04eb98cb33322613533671d11dc2929fbcb921d396b\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"053e19546a2ff6d8016abcfe6f42f18acc154d9b8e17923a2a3c9c44a628445a\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"ef07fd075fa89b2eb1ac46908b8d612dea5b20af91070ad7a094467e0ca2b7e8d9aad50e74d04ff9732872802f0607848f61165af6ecd6a15e3f3c2909610300\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "courier_replaced/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "7db9ab9148cb06f424e74ea43e23a0b726731cb094396527a674d5dde27780d2",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"7db9ab9148cb06f424e74ea43e23a0b726731cb094396527a674d5dde27780d2\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"96ca38dda7db82fed43dd66ad02e51c24bfbb1b374cc1ee33893c8934f9ef34a\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "65d54cd4d926661fed968abd620e2ba152ea226f836bcf9e00dd2b27ad600944",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "3e2558b7b4828d77167799e9feb6b515431acfa0582e3049921057d08b35bb91",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"053e19546a2ff6d8016abcfe6f42f18acc154d9b8e17923a2a3c9c44a628445a\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"ef687a51141d27a95d4ec04eb98cb33322613533671d11dc2929fbcb921d396b\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"ef07fd075fa89b2eb1ac46908b8d612dea5b20af91070ad7a094467e0ca2b7e8d9aad50e74d04ff9732872802f0607848f61165af6ecd6a15e3f3c2909610300\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "3e2558b7b4828d77167799e9feb6b515431acfa0582e3049921057d08b35bb91",
+        "receiver": "7db9ab9148cb06f424e74ea43e23a0b726731cb094396527a674d5dde27780d2",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"7db9ab9148cb06f424e74ea43e23a0b726731cb094396527a674d5dde27780d2\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"e52b03111c540f6641e1fc46a177c71b196beaa9d8ef83aa5efdb128ec17fea3fd6625cb6a54dba5ce133f894f8d06c80a3389191be0dc9c5d4e28d7bbbff307\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "normal/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "a48c80f244bb475ca139c89f0e31979aa7c872ae7b82b90a693b07be9c7601ec",
+        "rule_sha256": "e47df33878dcdd656b25bacd9235c612133184cd2c909bba8d13cc63a0ec14f1",
+        "rule_json": "{\"slot\":{\"receiverId\":\"83cef7be50e4fc44662b33935411cf5d847eea5ca7a1017727698bb18b7bc433\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"d5f0d71d1ba9cbca8ccbedfe3f0014650a8eab3de8e95b5068ebf11e7371a92d\",\"contractSha256\":\"447719a3922e5ac97212dca90f26da35e050503e7f62292922f75fde78530763\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "4dc184591fd7f1adb4a8a103f7f5cbc8d22d8f92efeaeffdac5e8a9f50bfad78",
+        "claim_json": "{\"slot\":{\"receiverId\":\"83cef7be50e4fc44662b33935411cf5d847eea5ca7a1017727698bb18b7bc433\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"e47df33878dcdd656b25bacd9235c612133184cd2c909bba8d13cc63a0ec14f1\",\"evidenceSha256\":\"e2f801895df5d6efa0c6847a7b016a570bb5f74424b80d0dc4ad050be8a00a8f\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "52bf65b317431d1cb13be7ecd3bb3e0d69d4f593188b59122be4d5d136220724",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ]
+  },
+  "normal/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "ac2242fe5682a3459b2684522221394c96efa2f1970580187703e8d03ae141aa",
+        "rule_sha256": "c067330ad5cc3e65bfcf74437c34656ad1a443429840d197cd53d05960918f2c",
+        "rule_json": "{\"slot\":{\"receiverId\":\"d5f0d71d1ba9cbca8ccbedfe3f0014650a8eab3de8e95b5068ebf11e7371a92d\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"f3994d537ee051fd444f036efbf5fe2ceb42da228d12cccc66778431e5070ab6\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "37ca13693caa6eab9ef8d36afbe8b0ebef3e7621d5abec4f80cdfb693c1d0d10",
+        "claim_json": "{\"slot\":{\"receiverId\":\"d5f0d71d1ba9cbca8ccbedfe3f0014650a8eab3de8e95b5068ebf11e7371a92d\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"c067330ad5cc3e65bfcf74437c34656ad1a443429840d197cd53d05960918f2c\",\"evidenceSha256\":\"74172694c5e0eb0c3c2232236542ebdb0081383c566a3ecea5cbe9a274c1c101\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "d1e830783f39974798ab6b8c24d3eba43e7bc7be9659f3775a2c4c9a670dfcd4",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"447719a3922e5ac97212dca90f26da35e050503e7f62292922f75fde78530763\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"83cef7be50e4fc44662b33935411cf5d847eea5ca7a1017727698bb18b7bc433\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"a7b501e77a18957d09c990ef4f67d3215b13d3d5a2db9b5bb6f598b8a26a4684fabe9d84fdb5e43ff1e9ed850ec32ee4abb8413ffc6527fc65effc099f62db09\"}}"
+      }
+    ]
+  },
+  "normal/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "12083f77834a88d1422f19d81cd4b9d532c56e5be64c87aea04be6bbea4ffe4f",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"12083f77834a88d1422f19d81cd4b9d532c56e5be64c87aea04be6bbea4ffe4f\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"d84f3c934270404ce5043c3b3246da7365bd0054343d9a8c8bffa5ee8f4cb552\",\"contractSha256\":\"6ee8039bbad460517ab0b4ecbc602f3e4c865e19fcc5d85214a9fad2b5371c21\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "f46211bb9b72f552247b808cf7a8e2fae9a3c43d2b070281b8b403a7347c8a18",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "0af4de62e098e3ceea94f22259018c7c9e3649fce4a10a659967ef09572977ec",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "0af4de62e098e3ceea94f22259018c7c9e3649fce4a10a659967ef09572977ec",
+        "receiver": "12083f77834a88d1422f19d81cd4b9d532c56e5be64c87aea04be6bbea4ffe4f",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"12083f77834a88d1422f19d81cd4b9d532c56e5be64c87aea04be6bbea4ffe4f\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"6ee8039bbad460517ab0b4ecbc602f3e4c865e19fcc5d85214a9fad2b5371c21\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"a755915d9661122b872b02e610c56e11c663674bfd06e954f4ea65cbe8abe5a09094fddc6dd68ec9b2870ac1a0f89164e60d12a3541dff0046ba218fc99ca904\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "normal/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "d84f3c934270404ce5043c3b3246da7365bd0054343d9a8c8bffa5ee8f4cb552",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"d84f3c934270404ce5043c3b3246da7365bd0054343d9a8c8bffa5ee8f4cb552\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"3e6dee4bd2a3e3e5883e82e84cdb85a678e65770a26f49cb81d8100d761a910d\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "60b57b5bd927dc3ce8b60624df7a2d4da43ae1734cb88ccb9b2061e965465996",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "128440e48f64e655e8d1a510d99efe84491d65e26965001f3280652b697a3dc9",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"6ee8039bbad460517ab0b4ecbc602f3e4c865e19fcc5d85214a9fad2b5371c21\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"12083f77834a88d1422f19d81cd4b9d532c56e5be64c87aea04be6bbea4ffe4f\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"a755915d9661122b872b02e610c56e11c663674bfd06e954f4ea65cbe8abe5a09094fddc6dd68ec9b2870ac1a0f89164e60d12a3541dff0046ba218fc99ca904\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "128440e48f64e655e8d1a510d99efe84491d65e26965001f3280652b697a3dc9",
+        "receiver": "d84f3c934270404ce5043c3b3246da7365bd0054343d9a8c8bffa5ee8f4cb552",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"d84f3c934270404ce5043c3b3246da7365bd0054343d9a8c8bffa5ee8f4cb552\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"0f07a8968fd97a1303af7cbecbf3a8ece87db309c46dbaf7932623139ff8c942122189af8e0a0a5ae228aa3cf337f2ccc9178646d6e9ebb54d770b377a9a5706\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "publisher_after_claim/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "e831633248b9f3cd43c6a08e7a0db8c6ae7682ba0dc92f383e7395130a23eb3f",
+        "rule_sha256": "1b95d571492e9ab1ad7179a8288cd6dce54996fe441df259ac8e19f30a486ae7",
+        "rule_json": "{\"slot\":{\"receiverId\":\"a94ab05731008ead94ad0f268a9140f6dbb6d3839c6b60b661ed5351755b38cb\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"bc33ebe847f6b7b54c0070138da52186c265d6e1ed75605c472b07a5fd882c49\",\"contractSha256\":\"6940f9cd6d624d3aedd4a33b9b56491bb42a2b27b9fdf92406024ac498c769a2\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": null,
+        "claim_json": null,
+        "result_sha256": null,
+        "result_json": null
+      }
+    ]
+  },
+  "publisher_after_claim/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "c4a16fc0c82b6bf9c8e3d551628d5427daca24da7e69f7d31ef589b0123a5fa3",
+        "rule_sha256": "ffcfcb1a67264de914388870da367e2073c0bb91fd81120222fd89c0467c3709",
+        "rule_json": "{\"slot\":{\"receiverId\":\"bc33ebe847f6b7b54c0070138da52186c265d6e1ed75605c472b07a5fd882c49\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"76ed0685a99ed4a58a83df9a76dd07ef1eed78b9c5bb055139c17c754c8ae723\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "10fc9a8dc37fb0918802ba8b86cd64854b908884c6186068afe99ad628052fa6",
+        "claim_json": "{\"slot\":{\"receiverId\":\"bc33ebe847f6b7b54c0070138da52186c265d6e1ed75605c472b07a5fd882c49\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"ffcfcb1a67264de914388870da367e2073c0bb91fd81120222fd89c0467c3709\",\"evidenceSha256\":\"7d0473b45ce12fc7beddd1314f464ce1ec6f509056ec1fbabf143f64070d11ce\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": null,
+        "result_json": null
+      }
+    ]
+  },
+  "publisher_after_claim/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "f29e4599e77274057fdff32403aa7a509bad73b6f6ea3ce9e18860270ab4d690",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"f29e4599e77274057fdff32403aa7a509bad73b6f6ea3ce9e18860270ab4d690\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"bda7199227fd1bcc903a2cd62e4f7f75ad6922718e3517af27f7de096203b757\",\"contractSha256\":\"157476248c79bf2738f5604a8c1a75b1601e75631ceddfe41e613547234e8933\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "deead453777487c2836e5cd0de7be95bb68fc76efcdf0079462f07cf01f365c5",
+        "revoked": 0,
+        "state": "waiting",
+        "claimed_handle": null,
+        "result_json": null
+      }
+    ],
+    "authorizations": []
+  },
+  "publisher_after_claim/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "bda7199227fd1bcc903a2cd62e4f7f75ad6922718e3517af27f7de096203b757",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"bda7199227fd1bcc903a2cd62e4f7f75ad6922718e3517af27f7de096203b757\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"1547d9bf45e97c32cd7e2e968f12738756c6c548bef19e2db25c9d59383c06c5\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "d3e74c6015d6b660ba338a1914dfc0486bc491cbc8ff8aac0b1db5667fe17ac2",
+        "revoked": 0,
+        "state": "claimed",
+        "claimed_handle": "95b68d1fa833ee9b85569d646dc83b2aa0515f0f8379cbce5b6f4b19a735cf95",
+        "result_json": null
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "95b68d1fa833ee9b85569d646dc83b2aa0515f0f8379cbce5b6f4b19a735cf95",
+        "receiver": "bda7199227fd1bcc903a2cd62e4f7f75ad6922718e3517af27f7de096203b757",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"bda7199227fd1bcc903a2cd62e4f7f75ad6922718e3517af27f7de096203b757\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"5459bd48e4cd76efdec53b7e610831f7a4702a3f4d58c3e0783252e780d97b176b8a55b536e1f5ec9ab3daf2afc80508222e87f10594977ca6dcbbe13b41c700\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "publisher_after_effect/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "b49498621145a1f08f672c748da857532d47c4eeccc4f56ba6d7bd9eea53fd54",
+        "rule_sha256": "bca2684bc7c6176a18e4dc4022086aa6fe5f06daa6d44988b71bafbf91f16c83",
+        "rule_json": "{\"slot\":{\"receiverId\":\"37d9598f65429949fba185000f072a27b4d1ff74ca56da15a9e48209afa86609\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"57b10f61989dcf3c5c3167ffe07684167c2a2083db4397407d3150fe413da610\",\"contractSha256\":\"5e882d2ebd1d0a9e7c2bfc909a676740fad9f253a4fba5b48c76939bc71abb6c\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": null,
+        "claim_json": null,
+        "result_sha256": null,
+        "result_json": null
+      }
+    ]
+  },
+  "publisher_after_effect/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "a55e64a21e0610f04c683c4d7bf809785bdc863d4f02912135aff5c1184edd4d",
+        "rule_sha256": "04f1fe605593094b72be601f26bc6684f2a7bd07126099a55d13a00c02bcc58d",
+        "rule_json": "{\"slot\":{\"receiverId\":\"57b10f61989dcf3c5c3167ffe07684167c2a2083db4397407d3150fe413da610\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"70f8e6bee87e64e8ab76be59cdbf12711c1bcd32510feed8c4ae3b7606e16723\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "1c1371b91623c37f8cbc0f4ffcda4fab6b9de825acce5c96928eed826df303d7",
+        "claim_json": "{\"slot\":{\"receiverId\":\"57b10f61989dcf3c5c3167ffe07684167c2a2083db4397407d3150fe413da610\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"04f1fe605593094b72be601f26bc6684f2a7bd07126099a55d13a00c02bcc58d\",\"evidenceSha256\":\"67e99fde7a028ea6cd55d90c0aecc48f7f630110a24d3f6d64c9962dd440cfcf\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": null,
+        "result_json": null
+      }
+    ]
+  },
+  "publisher_after_effect/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "8bc073f3e2449bfa0a49dce024045691e8c68376a9678301a4a159123e212abe",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"8bc073f3e2449bfa0a49dce024045691e8c68376a9678301a4a159123e212abe\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"5be70bd40d4f7ec9848bd3cfc438141f19d5f2a621aac508f36caf58c5ca51b6\",\"contractSha256\":\"6a8125462b84ef3f60c7cd13deceec08b3358b3420f8c51f211f1075e086dfcc\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "87f14ad4fda58a6aa4ee277105aa6f45baf898ab74e59b4c46c51589216784b1",
+        "revoked": 0,
+        "state": "waiting",
+        "claimed_handle": null,
+        "result_json": null
+      }
+    ],
+    "authorizations": []
+  },
+  "publisher_after_effect/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "5be70bd40d4f7ec9848bd3cfc438141f19d5f2a621aac508f36caf58c5ca51b6",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"5be70bd40d4f7ec9848bd3cfc438141f19d5f2a621aac508f36caf58c5ca51b6\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"0a8912085af07f4e9f5a03e72764d287bacc015a953be134d7c249d559f5ea9a\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "04b7fcae6274d7836830f20af7639c5f5bf32c5cfd0a92ec6beaba5d8f277e17",
+        "revoked": 0,
+        "state": "claimed",
+        "claimed_handle": "82b225668de8c4635cfd75aad5114c25b1c5a3c176c00ada2236da69760b7761",
+        "result_json": null
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "82b225668de8c4635cfd75aad5114c25b1c5a3c176c00ada2236da69760b7761",
+        "receiver": "5be70bd40d4f7ec9848bd3cfc438141f19d5f2a621aac508f36caf58c5ca51b6",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"5be70bd40d4f7ec9848bd3cfc438141f19d5f2a621aac508f36caf58c5ca51b6\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"83e92834c6a3b007bfd40bb769bcd82bfaa4596f73bad1809ac1b69cb74a0b09fa6d0386ad01935eb4a67f95f5f27ed9ab336f92118a9a5744decbcb6662ea09\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "publisher_before_claim/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "9f104c49f68a80ef016c673ee3b8c9e3cc131fc27991b0b1485716feaa5cf561",
+        "rule_sha256": "7450dd13ab5ad5bb114e45b9e42f35b664e580af3e5791fc5878978aac706c74",
+        "rule_json": "{\"slot\":{\"receiverId\":\"5f09c3ff41834c99ef0b14b0e5e98460a786bc24a8fa238ac0d23bb4fb84b560\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"a021c5e5c7a5533a672e4343198399ed34f5534f9b5d11df6f583ed974026524\",\"contractSha256\":\"0ff61cbfe4ad3795136b2c34418fb3ec4038479f75dddf3bfc7e8f97cd20bbb6\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "b368510812540cc3e35cdfe115fdfdc8e57e2673a1b6739045c910e6176322d3",
+        "claim_json": "{\"slot\":{\"receiverId\":\"5f09c3ff41834c99ef0b14b0e5e98460a786bc24a8fa238ac0d23bb4fb84b560\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"7450dd13ab5ad5bb114e45b9e42f35b664e580af3e5791fc5878978aac706c74\",\"evidenceSha256\":\"4c0792be5a85cc69a13d744a6ac0a1d9765917118bb86b15b6e2670cdfb6b080\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "52bf65b317431d1cb13be7ecd3bb3e0d69d4f593188b59122be4d5d136220724",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ]
+  },
+  "publisher_before_claim/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "c920571cd03d8fbef9a10c11e2fc585e17d4541cc15d0e7c18881fb387ff85be",
+        "rule_sha256": "a05b0278037dc02c039d6ead6162b2d11689bf8444250f8059cc8430eb903528",
+        "rule_json": "{\"slot\":{\"receiverId\":\"a021c5e5c7a5533a672e4343198399ed34f5534f9b5d11df6f583ed974026524\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"4268387f18056e214eaba0ed703faad1220ad12674004bf79a595a61bf9016da\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "3113c518d5367bb82056353448e8562b03d3d4afc9b56edd8bc2b3100e62d421",
+        "claim_json": "{\"slot\":{\"receiverId\":\"a021c5e5c7a5533a672e4343198399ed34f5534f9b5d11df6f583ed974026524\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"a05b0278037dc02c039d6ead6162b2d11689bf8444250f8059cc8430eb903528\",\"evidenceSha256\":\"081e21021976865551d30d976062e4d34657aecd09c2b78fe068a1143e8badd6\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "9632f11175b7b271b8e2aadfb56a9ce323cf84d472df8ce63245aaf166b17b5e",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"0ff61cbfe4ad3795136b2c34418fb3ec4038479f75dddf3bfc7e8f97cd20bbb6\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"5f09c3ff41834c99ef0b14b0e5e98460a786bc24a8fa238ac0d23bb4fb84b560\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"82d8209e85c725877fecb0e05f021576874f36d9a1eb5667a28b1abfbb93327dd757667cde34b22ec03d965eeaf84b93f2d305b03c423fa6327ebaff39a7e40c\"}}"
+      }
+    ]
+  },
+  "publisher_before_claim/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "1296f3e06e36955606418b9910937689df5efb8bbb94c9fe3ec0922862890dea",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"1296f3e06e36955606418b9910937689df5efb8bbb94c9fe3ec0922862890dea\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"e97ef0205ffbabd8b435541cf7a8fe431b23e6a0114cd332199f9bd41c1bef71\",\"contractSha256\":\"eab8e60719eb7ec70e0288a8eddfcc55c08429188fa2e51e4fbd497e0446c897\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "38aa9d2c5118617e6ccaf9c91e0654bd349baed9c19f1dd337c33f1d0967beea",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "6807169ab61726bd7c6a02afb4d07c825c5ee647b97c121608a6653ffad9f94c",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "6807169ab61726bd7c6a02afb4d07c825c5ee647b97c121608a6653ffad9f94c",
+        "receiver": "1296f3e06e36955606418b9910937689df5efb8bbb94c9fe3ec0922862890dea",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"1296f3e06e36955606418b9910937689df5efb8bbb94c9fe3ec0922862890dea\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"eab8e60719eb7ec70e0288a8eddfcc55c08429188fa2e51e4fbd497e0446c897\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"b48f27a63f39968ce2056f210e807ab00c757337f8274a2d4c0269e8ca03f52f4a87178a630b15bef34b0b39decbac1e92cd611754dbce2b0aec95c3f712ca06\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "publisher_before_claim/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "e97ef0205ffbabd8b435541cf7a8fe431b23e6a0114cd332199f9bd41c1bef71",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"e97ef0205ffbabd8b435541cf7a8fe431b23e6a0114cd332199f9bd41c1bef71\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"10d722a3379365933db1d9f19bb2b84470b7b6f6aee2d112d034f94c4726b8a4\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "55b140f4edf238c7109b232e81eda61a3c5920ff5ed91f7bec378e7f0b5d51e2",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "c24a11ce66a3e5961ab5e8579d1e79d560fe0e99e6c23b4b365c3b04ed16d895",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"eab8e60719eb7ec70e0288a8eddfcc55c08429188fa2e51e4fbd497e0446c897\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"1296f3e06e36955606418b9910937689df5efb8bbb94c9fe3ec0922862890dea\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"b48f27a63f39968ce2056f210e807ab00c757337f8274a2d4c0269e8ca03f52f4a87178a630b15bef34b0b39decbac1e92cd611754dbce2b0aec95c3f712ca06\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "3a27c7d70bfca58fd09e509bd16921088a27aa537abb7714d0c71962bb9ee81a",
+        "receiver": "e97ef0205ffbabd8b435541cf7a8fe431b23e6a0114cd332199f9bd41c1bef71",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"e97ef0205ffbabd8b435541cf7a8fe431b23e6a0114cd332199f9bd41c1bef71\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"9ffc3322530d238be95c4da8f30240342c2c4ff3d1c4ff641406cfe8d814713e8543db20019afa74e3be7df39456a25bedd744139fc1e25a65f0c54f3b9b8a0d\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      },
+      {
+        "handle": "c24a11ce66a3e5961ab5e8579d1e79d560fe0e99e6c23b4b365c3b04ed16d895",
+        "receiver": "e97ef0205ffbabd8b435541cf7a8fe431b23e6a0114cd332199f9bd41c1bef71",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"e97ef0205ffbabd8b435541cf7a8fe431b23e6a0114cd332199f9bd41c1bef71\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"9ffc3322530d238be95c4da8f30240342c2c4ff3d1c4ff641406cfe8d814713e8543db20019afa74e3be7df39456a25bedd744139fc1e25a65f0c54f3b9b8a0d\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "publisher_response_lost/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "73a0dd87bf036c3560d60eda88228c9fc2008f4de184c22ceda589fe7fb87100",
+        "rule_sha256": "b40f058b6a27d200b39b80eef558b0fb3c908707a30b0c61141ca6bfbff55716",
+        "rule_json": "{\"slot\":{\"receiverId\":\"1204214ab13684b096b1ce1e3b34f34c1a3f9486b4780cc803936b274f618670\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"c4c2a29938039aafedb08ae182fedcf41bf30fae3ca5028664acdcbc42dde902\",\"contractSha256\":\"d5a6fe411b8b8a1b56e60bed24d19f7e246a46cccb9d222c879ef5556c380213\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "631997d4c535de26b62581a3c4e67b0775d6a2a8173daf96db8191286ae5d36c",
+        "claim_json": "{\"slot\":{\"receiverId\":\"1204214ab13684b096b1ce1e3b34f34c1a3f9486b4780cc803936b274f618670\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"b40f058b6a27d200b39b80eef558b0fb3c908707a30b0c61141ca6bfbff55716\",\"evidenceSha256\":\"22af5a01732f914cc44cf5bd200fb32f20c750abebf299fd4a393fe8a49a238c\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "52bf65b317431d1cb13be7ecd3bb3e0d69d4f593188b59122be4d5d136220724",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ]
+  },
+  "publisher_response_lost/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "b05af940884d5c98b9ccfb2e30251da9b871ca269e06028822fdf2190cf7ec29",
+        "rule_sha256": "e9de3d86445d3206e04cfd597491887dd139d515bea29560ff0a4577acead727",
+        "rule_json": "{\"slot\":{\"receiverId\":\"c4c2a29938039aafedb08ae182fedcf41bf30fae3ca5028664acdcbc42dde902\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"d93ba6e9a41d3772b3895b29cab7f5a5cbed31df5d7dce861ae69431368637bc\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "e4f09fdf01e067f8f2be9ccd087e430fd8e2f1a6d38bdce89b47e9cfa1489a8c",
+        "claim_json": "{\"slot\":{\"receiverId\":\"c4c2a29938039aafedb08ae182fedcf41bf30fae3ca5028664acdcbc42dde902\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"e9de3d86445d3206e04cfd597491887dd139d515bea29560ff0a4577acead727\",\"evidenceSha256\":\"ed429732a55a41a8dcf9ce337187cff53f080ace2fcd3b24ddac63a1853d2795\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "e283f6420ef421e2a2b213722152afad30430a35c41bfc05d6cae6c35bf251e1",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"d5a6fe411b8b8a1b56e60bed24d19f7e246a46cccb9d222c879ef5556c380213\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"1204214ab13684b096b1ce1e3b34f34c1a3f9486b4780cc803936b274f618670\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"890c1f29f025978aa368711b51ee4fbe9fa9cd6c8639229b640abf5830481d076047cbb77618737c25c3332bc5fda16be837d6b834ab0077bbe33b32501eac00\"}}"
+      }
+    ]
+  },
+  "publisher_response_lost/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "446596464c632685114c937396947a036a200a21baa75c7ce381c4ae77c132ea",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"446596464c632685114c937396947a036a200a21baa75c7ce381c4ae77c132ea\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"4fbfc55fbe6ec8f2cd246e75f61b9a237a5ab11291ca829745ea929b03e83a46\",\"contractSha256\":\"43aac70000cbc9855a5a72b381aabb53bb95350e69eeff855f9a638d2a764d9c\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "8f2938c2eb0a58fd9916edd2050a00de43d98b95c4e6ac2c0ce4c6fbb482133d",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "b0667c3f9d66deaa8552057210bc0546b943bb81c7a315bc8beb9aab1b9a89d8",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "b0667c3f9d66deaa8552057210bc0546b943bb81c7a315bc8beb9aab1b9a89d8",
+        "receiver": "446596464c632685114c937396947a036a200a21baa75c7ce381c4ae77c132ea",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"446596464c632685114c937396947a036a200a21baa75c7ce381c4ae77c132ea\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"43aac70000cbc9855a5a72b381aabb53bb95350e69eeff855f9a638d2a764d9c\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"65ac2b09582f41ea34d7b78e673a7b7d0bd7c608b6015dea0e3a15e4301b6b7221e6f115bdff00e798db06de9e43cf8c0313849f1c34651bd58c61a88e649d0f\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "publisher_response_lost/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "4fbfc55fbe6ec8f2cd246e75f61b9a237a5ab11291ca829745ea929b03e83a46",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"4fbfc55fbe6ec8f2cd246e75f61b9a237a5ab11291ca829745ea929b03e83a46\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"2665b3677b688113199624e9ade086f3df3b3505435ef1f6d6a28e398dad2678\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "d7c3dbd1afd74a195b03e1b5f33d499c413189cf980364dbb86eeb8cb66a25ce",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "5600f54b88f8479000a0c22206a1e4ef29cf5a6f3a5834b207721d2a3519e626",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"43aac70000cbc9855a5a72b381aabb53bb95350e69eeff855f9a638d2a764d9c\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"446596464c632685114c937396947a036a200a21baa75c7ce381c4ae77c132ea\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"65ac2b09582f41ea34d7b78e673a7b7d0bd7c608b6015dea0e3a15e4301b6b7221e6f115bdff00e798db06de9e43cf8c0313849f1c34651bd58c61a88e649d0f\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "5600f54b88f8479000a0c22206a1e4ef29cf5a6f3a5834b207721d2a3519e626",
+        "receiver": "4fbfc55fbe6ec8f2cd246e75f61b9a237a5ab11291ca829745ea929b03e83a46",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"4fbfc55fbe6ec8f2cd246e75f61b9a237a5ab11291ca829745ea929b03e83a46\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"052186b0984c9eb48a22c2ea7d8d6386ebb8b0727a3540768c0ab8f78fca14122a075b24b13615e0b01331ace2d27a285ee74840bd1d9ebb94d7cfc87ba3bf01\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  },
+  "verifier_response_lost/chio/archive/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "04b89ede57e551ae3aad3088e94d675e859611fcca2cb6f3da8b66f66304c32c",
+        "rule_sha256": "f74c8060d2d77f71e8f7519e43265f7995fc6c673cb3c7214502e43ac630d76d",
+        "rule_json": "{\"slot\":{\"receiverId\":\"fbd775fc2ee298d4d7a50c421a53d2d950f1f13a482099ec445d4f5cf6c5688f\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"5f2db7d29f0bdc4dd981779943b255a6dc639bf1d87da8a78d0ef63505f9c78c\",\"contractSha256\":\"16e7a80611422b7fbbab4bdff68e39f3a091df336e173a77051ea57098e3ef66\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "88ce538fbb5e7f3ffbee73ccb8fb640d96f9fd6b7746b30862151f2327de6042",
+        "claim_json": "{\"slot\":{\"receiverId\":\"fbd775fc2ee298d4d7a50c421a53d2d950f1f13a482099ec445d4f5cf6c5688f\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"ruleSha256\":\"f74c8060d2d77f71e8f7519e43265f7995fc6c673cb3c7214502e43ac630d76d\",\"evidenceSha256\":\"b060e18cab20fa350f32cef4a30577d39b5e128c3e56d02a1efd9e07cf340717\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "52bf65b317431d1cb13be7ecd3bb3e0d69d4f593188b59122be4d5d136220724",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ]
+  },
+  "verifier_response_lost/chio/publisher/receiver.sqlite": {
+    "runtime_outcome_effect_slots": [
+      {
+        "slot_sha256": "9bb41f9c6009e1ab9d51a70904ad59b0568a164446a5da359926e48559432569",
+        "rule_sha256": "b0f91d0859e13059fec4aa13cab7729af3eb45d415229fccd32745a237322e61",
+        "rule_json": "{\"slot\":{\"receiverId\":\"5f2db7d29f0bdc4dd981779943b255a6dc639bf1d87da8a78d0ef63505f9c78c\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"5fa87b8c046bb627bef55fcd5be81cedd66b86687fea53fad2a7ead8a36f1ef4\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "revoked": 0,
+        "claim_sha256": "757789c203e3785dea71c77d31c6d6e1e30c12c610881ae5da1e20e6c1894227",
+        "claim_json": "{\"slot\":{\"receiverId\":\"5f2db7d29f0bdc4dd981779943b255a6dc639bf1d87da8a78d0ef63505f9c78c\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"ruleSha256\":\"b0f91d0859e13059fec4aa13cab7729af3eb45d415229fccd32745a237322e61\",\"evidenceSha256\":\"1d7a1ebd8ab24a565b465b1ac22081adae5447c54719f53aa25540d608188b21\",\"arguments\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"},\"requestId\":\"comparison-attempt\",\"claimedAtUnixMs\":1800000000000}",
+        "result_sha256": "063beeeb8c4efebd551aee1509d7aaa0daff3f91e1b4ab6e3ebcf1876f0f75b4",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"16e7a80611422b7fbbab4bdff68e39f3a091df336e173a77051ea57098e3ef66\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"fbd775fc2ee298d4d7a50c421a53d2d950f1f13a482099ec445d4f5cf6c5688f\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"d7a6d9a242e414ca2bdc387ce99f2eab95f2ae6df28bc433bb6bff755aa6ab58e603ba82140c5e7c481fabe2f654da4ee286a181f4c3a55da357a6517d3d3f0d\"}}"
+      }
+    ]
+  },
+  "verifier_response_lost/ledger/archive/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "b2a5dcfdc32ae10de15986f137e16963a48fb153abeb22a0c0e3664cd05a26fc",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "rule_json": "{\"slot\":{\"receiverId\":\"b2a5dcfdc32ae10de15986f137e16963a48fb153abeb22a0c0e3664cd05a26fc\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"verifierKey\":\"84a88296d4fa084c4324419fe3400ed07cd8e193de23679277d0b4c0c747ec8b\",\"contractSha256\":\"7ee5cf1b629b846204faea53a4e7a307545bdb3e6712761706d9db4a171959ad\",\"serverId\":\"archive\",\"toolName\":\"apply\",\"resource\":\"archive/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "4707d4463530224e7807677917265bf17714077991a7a6b1a9165d8ac344f604",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "da5348a8847fe8a2e3814e22709f4c3be3aeb3ed0188c8fef5b47a3d766892e1",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"completed\":true}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "da5348a8847fe8a2e3814e22709f4c3be3aeb3ed0188c8fef5b47a3d766892e1",
+        "receiver": "b2a5dcfdc32ae10de15986f137e16963a48fb153abeb22a0c0e3664cd05a26fc",
+        "workflow": "reviewed-scope-distribution",
+        "step": "archive",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"b2a5dcfdc32ae10de15986f137e16963a48fb153abeb22a0c0e3664cd05a26fc\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"archive\"},\"predecessorStepId\":\"publisher\",\"contractSha256\":\"7ee5cf1b629b846204faea53a4e7a307545bdb3e6712761706d9db4a171959ad\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"f86ae6d8578306df71bc73830bf10c3517e66f91bc727b63f5a30eb12a7db485ae0fb421cf10ca741ce158598683f4e52437ec655b19e92453adf83aef3f670f\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"archive/approved-scopes\"}"
+      }
+    ]
+  },
+  "verifier_response_lost/ledger/publisher/receiver.sqlite": {
+    "jobs": [
+      {
+        "receiver": "84a88296d4fa084c4324419fe3400ed07cd8e193de23679277d0b4c0c747ec8b",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "rule_json": "{\"slot\":{\"receiverId\":\"84a88296d4fa084c4324419fe3400ed07cd8e193de23679277d0b4c0c747ec8b\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"verifierKey\":\"5f9a56984d5001bfb7ddcdb6a2cd960d8a6e5882071172578a7c69e46d648e5b\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"serverId\":\"publisher\",\"toolName\":\"apply\",\"resource\":\"publisher/approved-scopes\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+        "rule_digest": "8cf5429e8448b3c1de15a1243360aef671cdffea55c51577e3cc28a7c068761a",
+        "revoked": 0,
+        "state": "completed",
+        "claimed_handle": "765cf253e7031531b7c934af81333f7b36f9055ce5ad73e7e45358192662473a",
+        "result_json": "{\"artifact\":{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]},\"evidence\":{\"body\":{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"contractSha256\":\"7ee5cf1b629b846204faea53a4e7a307545bdb3e6712761706d9db4a171959ad\",\"passed\":true,\"predecessorStepId\":\"publisher\",\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"b2a5dcfdc32ae10de15986f137e16963a48fb153abeb22a0c0e3664cd05a26fc\",\"stepId\":\"archive\",\"workflowId\":\"reviewed-scope-distribution\"},\"verifiedAtUnixMs\":1800000000000},\"signature\":\"f86ae6d8578306df71bc73830bf10c3517e66f91bc727b63f5a30eb12a7db485ae0fb421cf10ca741ce158598683f4e52437ec655b19e92453adf83aef3f670f\"}}"
+      }
+    ],
+    "authorizations": [
+      {
+        "handle": "765cf253e7031531b7c934af81333f7b36f9055ce5ad73e7e45358192662473a",
+        "receiver": "84a88296d4fa084c4324419fe3400ed07cd8e193de23679277d0b4c0c747ec8b",
+        "workflow": "reviewed-scope-distribution",
+        "step": "publisher",
+        "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"84a88296d4fa084c4324419fe3400ed07cd8e193de23679277d0b4c0c747ec8b\",\"workflowId\":\"reviewed-scope-distribution\",\"stepId\":\"publisher\"},\"predecessorStepId\":\"verifier\",\"contractSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"96038b21c65206a5b6384a2f730cf37850a19525445d920fe87ef2b75178c4149637d8224abac2078cb1d97be029f0ef467099303b14d865dc7836e1cdb3d20c\"}",
+        "effect_json": "{\"artifactSha256\":\"b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746\",\"resource\":\"publisher/approved-scopes\"}"
+      }
+    ]
+  }
+}

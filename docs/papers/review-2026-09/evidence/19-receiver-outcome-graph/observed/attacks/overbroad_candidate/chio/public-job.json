@@ -1,0 +1,30 @@
+{
+  "endpoints": [
+    {
+      "directory": "/tmp/.tmpEVMK7X/attacks/overbroad_candidate/chio/verifier",
+      "key": "d7e240252977fd51c6113abb8ea6d56becb5847e150e6a79f68bf38dbeba07d3",
+      "role": "verifier"
+    },
+    {
+      "directory": "/tmp/.tmpEVMK7X/attacks/overbroad_candidate/chio/publisher",
+      "key": "26b839c2c943e8b17c95c86f7c12bb8c19cb5b40a35ea08a640507076e22af6d",
+      "role": "publisher"
+    },
+    {
+      "directory": "/tmp/.tmpEVMK7X/attacks/overbroad_candidate/chio/archive",
+      "key": "c8c5118ab69465790161a77a88f98ca7a7d2c140a163b4681d089cbff92b00ba",
+      "role": "archive"
+    }
+  ],
+  "artifact": {
+    "grants": [
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "source-checkout",
+        "tool_name": "read"
+      }
+    ]
+  }
+}

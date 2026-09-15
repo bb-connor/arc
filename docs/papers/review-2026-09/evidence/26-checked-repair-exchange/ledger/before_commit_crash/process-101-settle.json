@@ -1,0 +1,6 @@
+{
+  "exit": "signal: 9 (SIGKILL)",
+  "stderr": "EXCHANGE_KILL after_credit_before_commit\n",
+  "stdout": "",
+  "success": false
+}

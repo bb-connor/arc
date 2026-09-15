@@ -22,11 +22,9 @@
 //! unconsumed; admissions assert the counter reads exactly one, which is what
 //! makes zero on a denial a measurement rather than an absence.
 //!
-//! Two leaves are bounded rather than compared for equality: the lease expiry
-//! against the presentation window the receiver resolved for the lease issuer,
-//! and the lease issuer against the agreement's participant set. Both carry a
-//! second declared value on the other side of the bound, so the corpus records
-//! the domain rather than pretending it is an equality.
+//! The lease expiry is bounded by the receiver-resolved presentation window.
+//! Its second declared value lies inside the bound. The issuer must equal the
+//! receiver-owned lease record; even the other treaty participant is denied.
 //!
 //! A leaf the receiver compares against nothing is not therefore a leaf whose
 //! value is free. Each such leaf declares the shape the wire form still
@@ -51,6 +49,9 @@
 //! into disagreeing with the other.
 
 mod support;
+
+#[path = "support/treaty_presentation.rs"]
+mod treaty_presentation;
 
 #[path = "support/dispatch_counter.rs"]
 mod dispatch_counter;
@@ -411,14 +412,11 @@ const FIELD_RULES: &[FieldRule] = &[
     ),
     with_probe(
         "predicate/capability_lease_ref/issuer",
-        Comparison::ReceiverDomain(
-            "the two participant kernel ids of the resolved agreement, as a membership test \
-             rather than an equality: either participant is admitted",
-        ),
+        Comparison::ReceiverState("the issuer of the lease the receiver resolved"),
         Outcome::Denied(UNVERIFIED_EVIDENCE),
         (
             MutationSpec::Literal("\"kernel.vendor-b\""),
-            Outcome::Admitted,
+            Outcome::Denied(UNVERIFIED_EVIDENCE),
         ),
     ),
     with_probe(
@@ -550,29 +548,20 @@ const FIELD_RULES: &[FieldRule] = &[
     ),
     rule(
         "predicate/governance_receipt_ref/kernel_id",
-        Comparison::Uncompared {
-            shape: ANY_VALUE_OF_ITS_JSON_TYPE,
-            reason: "the governance receipt the receiver acts on is the one its own admission \
-                     bundle names; the issuing kernel recorded here is audit content",
-        },
-        Outcome::Admitted,
+        Comparison::ReceiverState("the issuer of the governance receipt the receiver activated"),
+        Outcome::Denied(UNVERIFIED_EVIDENCE),
     ),
     rule(
         "predicate/governance_receipt_ref/digest/alg",
-        Comparison::Uncompared {
-            shape: ANY_VALUE_OF_ITS_JSON_TYPE,
-            reason: "audit content, as for the governance kernel id",
-        },
-        Outcome::Admitted,
+        Comparison::ReceiverState(
+            "the hash algorithm of the governance receipt the receiver activated",
+        ),
+        Outcome::Denied(UNVERIFIED_EVIDENCE),
     ),
     rule(
         "predicate/governance_receipt_ref/digest/value",
-        Comparison::Uncompared {
-            shape: ANY_VALUE_OF_ITS_JSON_TYPE,
-            reason: "the receiver resolves the governance receipt by id from its own store and \
-                     never compares this digest against the record it resolved",
-        },
-        Outcome::Admitted,
+        Comparison::ReceiverState("the digest of the governance receipt the receiver activated"),
+        Outcome::Denied(UNVERIFIED_EVIDENCE),
     ),
     rule(
         "predicate/consistency_anchor",
@@ -871,10 +860,8 @@ const ADDITION_CASES: &[AdditionCase] = &[
             "predicate/capability_lease_ref/scope_digest/alg",
             "predicate/capability_lease_ref/scope_digest/value",
         ],
-        expected: Outcome::Admitted,
-        note: "the field's own contract says a registry record's scope digest must match it, \
-               but the pre-dispatch hook resolves no lease registry record, so nothing reads \
-               the value",
+        expected: Outcome::Denied(UNVERIFIED_EVIDENCE),
+        note: "the receiver-owned lease has no scope digest, so adding one must deny",
     },
     AdditionCase {
         id: "an origin policy rationale code",
@@ -924,10 +911,8 @@ const ADDITION_CASES: &[AdditionCase] = &[
             "predicate/policy_evaluation_summary/server_a_verdict/rationale_code",
             "predicate/policy_evaluation_summary/server_b_verdict/rationale_code",
         ],
-        expected: Outcome::Admitted,
-        note: "the addition residual, alongside the substitution residual: leaves the receiver \
-               never validates can be added to a doubly signed statement as well as rewritten \
-               inside it",
+        expected: Outcome::Denied(UNVERIFIED_EVIDENCE),
+        note: "adding a lease scope absent from the receiver record must deny",
     },
 ];
 
@@ -1124,8 +1109,8 @@ fn every_pair_inside_the_binding_reference_is_rejected() -> TestResult {
             );
             assert!(
                 run.baseline_after.allowed,
-                "substituting {left} and {right} together must not consume the continuation: {:?}",
-                run.baseline_after.failure_code
+                "substituting {left} and {right} together must not consume the continuation: {:?} {:?}",
+                run.baseline_after.failure_code, run.baseline_after.reason
             );
             pairs += 1;
         }
@@ -1711,6 +1696,21 @@ fn admit_with_insertions(
     )?;
     let baseline_after = summarize(&hook, &baseline_request)?;
 
+    // These fixtures only reject before dispatch. Check both evaluations here
+    // so pair, residual, and optional-field cases cannot omit their counters.
+    for (label, decision) in [
+        ("substitution", &substituted),
+        ("follow-up", &baseline_after),
+    ] {
+        assert_eq!(
+            decision.dispatches,
+            u64::from(decision.allowed),
+            "{label} dispatch count disagrees with its verdict: {:?} {:?}",
+            decision.failure_code,
+            decision.reason
+        );
+    }
+
     Ok(SubstitutionRun {
         substituted,
         baseline_after,
@@ -2163,6 +2163,13 @@ fn insert_treaty_artifacts(
     store: &SqliteRuntimeOrchestrationStore,
     fixture: &TreatyFixture,
 ) -> TestResult {
+    let (lease, governance) = treaty_presentation::records(&fixture.envelope)?;
+    store.insert_treaty_runtime_artifact("capability_lease", &lease.lease.lease_id, &lease)?;
+    store.insert_treaty_runtime_artifact(
+        "governance_receipt",
+        &governance.receipt.receipt_id,
+        &governance,
+    )?;
     store.insert_treaty_runtime_artifact(
         "treaty_scope",
         &fixture.treaty_scope.treaty_id,

@@ -1,0 +1,8 @@
+MATCHED_KILL backend=chio boundary=before_claim exit=signal: 9 (SIGKILL)
+MATCHED_KILL backend=ledger boundary=before_claim exit=signal: 9 (SIGKILL)
+MATCHED_KILL backend=chio boundary=after_claim exit=signal: 9 (SIGKILL)
+MATCHED_KILL backend=ledger boundary=after_claim exit=signal: 9 (SIGKILL)
+MATCHED_KILL backend=chio boundary=after_effect exit=signal: 9 (SIGKILL)
+MATCHED_KILL backend=ledger boundary=after_effect exit=signal: 9 (SIGKILL)
+MATCHED_KILL backend=chio boundary=after_complete exit=signal: 9 (SIGKILL)
+MATCHED_KILL backend=ledger boundary=after_complete exit=signal: 9 (SIGKILL)

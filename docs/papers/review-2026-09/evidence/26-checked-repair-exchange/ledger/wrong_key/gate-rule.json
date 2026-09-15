@@ -1,0 +1,15 @@
+{
+  "slot": {
+    "receiverId": "862de80d819e6a6f6fb2fd6e3a7cc3a88c1cd7f3d52d4336129d4b4f7b131e17",
+    "workflowId": "ledger-wrong_key",
+    "stepId": "settle"
+  },
+  "predecessorStepId": "check-encrypted-repair",
+  "verifierKey": "862de80d819e6a6f6fb2fd6e3a7cc3a88c1cd7f3d52d4336129d4b4f7b131e17",
+  "contractSha256": "85ccde4096875807635a07d3db23f28213f611983bc79e22475ffa18cfb60729",
+  "serverId": "local-repair-exchange",
+  "toolName": "settle",
+  "resource": "funded-trade",
+  "validFromUnixMs": 1799999999000,
+  "validUntilUnixMs": 1800000001000
+}

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Apply the shared hook-disabling policy to both `git_commit` and `git_run`
+  before subprocess dispatch. Commits previously executed hooks that Git's
+  `--no-verify` flag does not suppress.
+
 ## [0.1.1]
 
 ### Changed

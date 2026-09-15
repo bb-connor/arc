@@ -1,0 +1,103 @@
+{
+  "reply": {
+    "allowed": false,
+    "output": null,
+    "receipt": {
+      "action": {
+        "parameter_hash": "9277c3169036e433ba79e5e8140a5810e9f4fbedba2e71672f9e5b16b88ae4a6",
+        "parameters": {
+          "artifact": {
+            "grants": [
+              {
+                "operations": [
+                  "invoke"
+                ],
+                "server_id": "source-checkout",
+                "tool_name": "read"
+              }
+            ]
+          },
+          "evidence": {
+            "body": {
+              "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+              "contractSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+              "passed": true,
+              "predecessorStepId": "verifier",
+              "schema": "chio.runtime.artifact-outcome.experimental.v1",
+              "slot": {
+                "receiverId": "9842b3b2ab5632ce3935fb4b2525799d959c3834dfeba5214e87221155892e95",
+                "stepId": "publisher",
+                "workflowId": "reviewed-scope-distribution"
+              },
+              "verifiedAtUnixMs": 1800000000000
+            },
+            "signature": "36714b437657c043b5a9f16632b52a924fc2d3c17f5e9ace6fa6e2b861e198cad364db0c01e477ad90ce5d2159b038deffd98cadb022d0fe22b973a0aff8ce0b"
+          }
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "comparison-capability-2ddee2abd1e2726c668d4abc6622c2e70fb63f2de7dc07ccab82e174b2fc9282",
+      "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "decision": {
+        "guard": "kernel",
+        "reason": "tool server error: runtime admission rejected: outcome_effect_unknown: receiver has not activated this logical slot",
+        "verdict": "deny"
+      },
+      "id": "5d65502aeea0a52d76b93eaf1eb98cff69306fa84506e75e6917f899b0265526",
+      "kernel_key": "5adc2a11db73e61f5243e6556754f8c6c341e14636e14aa52d45c5c608d1f6cf",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "5adc2a11db73e61f5243e6556754f8c6c341e14636e14aa52d45c5c608d1f6cf",
+          "subject_key": "2ddee2abd1e2726c668d4abc6622c2e70fb63f2de7dc07ccab82e174b2fc9282"
+        },
+        "chio_receipt_signing_nonce": "receipt-6c9ccc6300cc6363370afa94e35b0751bfebb857875b2be6b79186fabc546224",
+        "receipt_context": {
+          "request_id": "6c9ccc6300cc6363370afa94e35b0751bfebb857875b2be6b79186fabc546224"
+        }
+      },
+      "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "81d3b3462a14afe304ca55ca309ffb42af73dcfafe5627d6c2e2f0e970da13b149f7b7fa7b016acbf2609c052e741a1659811bf5bb2f5d66e81d2515c413660e",
+      "timestamp": 1800000000,
+      "tool_name": "apply",
+      "tool_origin": "caller_executed",
+      "tool_server": "archive",
+      "trust_level": "mediated"
+    }
+  },
+  "request": {
+    "arguments": {
+      "artifact": {
+        "grants": [
+          {
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "source-checkout",
+            "tool_name": "read"
+          }
+        ]
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "contractSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "passed": true,
+          "predecessorStepId": "verifier",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "9842b3b2ab5632ce3935fb4b2525799d959c3834dfeba5214e87221155892e95",
+            "stepId": "publisher",
+            "workflowId": "reviewed-scope-distribution"
+          },
+          "verifiedAtUnixMs": 1800000000000
+        },
+        "signature": "36714b437657c043b5a9f16632b52a924fc2d3c17f5e9ace6fa6e2b861e198cad364db0c01e477ad90ce5d2159b038deffd98cadb022d0fe22b973a0aff8ce0b"
+      }
+    },
+    "tool": "apply"
+  }
+}

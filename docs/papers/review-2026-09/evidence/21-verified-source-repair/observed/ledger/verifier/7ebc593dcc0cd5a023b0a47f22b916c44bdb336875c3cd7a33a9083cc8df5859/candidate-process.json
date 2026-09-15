@@ -1,0 +1,6 @@
+{
+  "exit": "exit status: 0",
+  "stderr": "",
+  "stdout": "[[\"git\", \"status\"], [\"git\", \"status\"], [\"git\", \"status\"], [\"git\", \"status\"], [\"git\", \"status\"], [\"git\", \"status\"], [\"git\", \"status\"]]\n",
+  "success": true
+}

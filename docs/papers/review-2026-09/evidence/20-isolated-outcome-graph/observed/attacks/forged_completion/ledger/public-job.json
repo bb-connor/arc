@@ -1,0 +1,33 @@
+{
+  "endpoints": [
+    {
+      "directory": "/tmp/.tmp8F67sy/attacks/forged_completion/ledger/verifier",
+      "key": "c4df72a85cb5f806611926e0d7dc750114023192a0fb3687cac88f22460410d9",
+      "role": "verifier",
+      "socket": "/tmp/.tmp8F67sy/attacks/forged_completion/ledger/sockets/verifier.sock"
+    },
+    {
+      "directory": "/tmp/.tmp8F67sy/attacks/forged_completion/ledger/publisher",
+      "key": "949e70e9ba2a5cc9feb7c6619c2e1a600a13b6be7c8e0d8a0703e9fdcfa3918d",
+      "role": "publisher",
+      "socket": "/tmp/.tmp8F67sy/attacks/forged_completion/ledger/sockets/publisher.sock"
+    },
+    {
+      "directory": "/tmp/.tmp8F67sy/attacks/forged_completion/ledger/archive",
+      "key": "5fca5a3de45d965974fa9451be67a8a8a2191aa88722322bf3cc39164fae5ff1",
+      "role": "archive",
+      "socket": "/tmp/.tmp8F67sy/attacks/forged_completion/ledger/sockets/archive.sock"
+    }
+  ],
+  "artifact": {
+    "grants": [
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "source-checkout",
+        "tool_name": "read"
+      }
+    ]
+  }
+}

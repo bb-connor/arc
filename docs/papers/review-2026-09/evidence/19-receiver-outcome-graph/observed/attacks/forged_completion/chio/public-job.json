@@ -1,0 +1,30 @@
+{
+  "endpoints": [
+    {
+      "directory": "/tmp/.tmpEVMK7X/attacks/forged_completion/chio/verifier",
+      "key": "429d873450f06e44a08025fc2049106f146bcd4321d003876ffe891079562f2e",
+      "role": "verifier"
+    },
+    {
+      "directory": "/tmp/.tmpEVMK7X/attacks/forged_completion/chio/publisher",
+      "key": "f89ff9b1724cb1a3a0040f69ab3aab90f9127692cd9ca836bafe8c9025ca079b",
+      "role": "publisher"
+    },
+    {
+      "directory": "/tmp/.tmpEVMK7X/attacks/forged_completion/chio/archive",
+      "key": "7708546230eda7b492bdcd2190ce1975b5c0f8dc25fb8e577482db3fdde06570",
+      "role": "archive"
+    }
+  ],
+  "artifact": {
+    "grants": [
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "source-checkout",
+        "tool_name": "read"
+      }
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+   Building chio-adapter-base @ file:///home/connor/backbay/arc/sdks/python/chio-adapter-base
+Downloading mypy (13.4MiB)
+      Built chio-adapter-base @ file:///home/connor/backbay/arc/sdks/python/chio-adapter-base
+ Downloaded mypy
+Prepared 7 packages in 1.50s
+Uninstalled 2 packages in 25ms
+Installed 18 packages in 29ms
+ + ast-serialize==0.3.0
+ ~ chio-adapter-base==0.2.0 (from file:///home/connor/backbay/arc/sdks/python/chio-adapter-base)
+ ~ chio-sdk-python==0.1.0 (from file:///home/connor/backbay/arc/sdks/python/chio-sdk-python)
+ + coverage==7.14.0
+ + hypothesis==6.152.6
+ + iniconfig==2.3.0
+ + librt==0.11.0
+ + mypy==2.1.0
+ + mypy-extensions==1.1.0
+ + packaging==26.2
+ + pathspec==1.1.1
+ + pluggy==1.6.0
+ + pygments==2.20.0
+ + pytest==8.4.2
+ + pytest-asyncio==0.26.0
+ + pytest-cov==5.0.0
+ + ruff==0.15.12
+ + sortedcontainers==2.4.0

@@ -1,0 +1,6 @@
+{
+  "exit": "exit status: 0",
+  "stderr": "",
+  "stdout": "[[\"git\", \"-c\", \"core.hooksPath=/dev/null\", \"commit\", \"--no-verify\", \"--allow-empty\", \"-m\", \"test: checked repository repair\"], [\"git\", \"-c\", \"core.hooksPath=/dev/null\", \"commit\", \"--allow-empty\", \"-m\", \"test: checked repository repair\", \"--no-verify\"], [\"git\", \"-c\", \"core.hooksPath=/work/hooks\", \"-c\", \"core.hooksPath=/dev/null\", \"commit\", \"--no-verify\", \"--allow-empty\", \"-m\", \"test: checked repository repair\"], [\"git\", \"-c\", \"core.hooksPath=/dev/null\", \"-c\", \"core.hooksPath=/work/hooks\", \"-c\", \"core.hooksPath=/dev/null\", \"commit\", \"--no-verify\", \"--allow-empty\", \"-m\", \"test: checked repository repair\"], [\"git\", \"--config-env=core.hooksPath=HOOK_TEST_PATH\", \"-c\", \"core.hooksPath=/dev/null\", \"commit\", \"--no-verify\", \"--allow-empty\", \"-m\", \"test: checked repository repair\"], [\"git\", \"-C\", \"/work\", \"--git-dir\", \"/work/.git\", \"--work-tree\", \"/work\", \"-c\", \"core.hooksPath=/dev/null\", \"commit\", \"--no-verify\", \"-m\", \"test: checked repository repair\"], [\"git\", \"-C\", \"/work\", \"--git-dir\", \"/work/.git\", \"--work-tree\", \"/work\", \"-c\", \"core.hooksPath=/dev/null\", \"commit\", \"--no-verify\", \"-m\", \"test: checked repository repair\"]]\n",
+  "success": true
+}

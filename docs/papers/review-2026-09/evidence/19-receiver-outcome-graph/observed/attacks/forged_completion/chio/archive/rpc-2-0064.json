@@ -1,0 +1,103 @@
+{
+  "reply": {
+    "allowed": false,
+    "output": null,
+    "receipt": {
+      "action": {
+        "parameter_hash": "1e9432681b8670a586b403260b962016e8bf69c0edf5c32821410638cc5d25a2",
+        "parameters": {
+          "artifact": {
+            "grants": [
+              {
+                "operations": [
+                  "invoke"
+                ],
+                "server_id": "source-checkout",
+                "tool_name": "read"
+              }
+            ]
+          },
+          "evidence": {
+            "body": {
+              "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+              "contractSha256": "8eef95dd35259d1f2ef14891ac5fd262119e13de71a7185b97590a9ced503455",
+              "passed": true,
+              "predecessorStepId": "publisher",
+              "schema": "chio.runtime.artifact-outcome.experimental.v1",
+              "slot": {
+                "receiverId": "7708546230eda7b492bdcd2190ce1975b5c0f8dc25fb8e577482db3fdde06570",
+                "stepId": "archive",
+                "workflowId": "reviewed-scope-distribution"
+              },
+              "verifiedAtUnixMs": 1800000000000
+            },
+            "signature": "0f5d5070a3b0b2e82c471491e6910cb75b21a2451ba685af55b80b144271aa280d3a7d1ce9a133226dd4a67c15d60ced2cc36ffe84359a33f43cd485bd4eec04"
+          }
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "comparison-capability-b8c19779188b3c06bee95e2323aca63ac24066e9e696ded212de16e1d1ce221d",
+      "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "decision": {
+        "guard": "kernel",
+        "reason": "tool server error: runtime admission rejected: outcome_signature_invalid: outcome was not signed by the locally selected verifier",
+        "verdict": "deny"
+      },
+      "id": "ff0ea0592acbbf0dc32cf0bf0f93a624a3a10804634d877e9eefba1da6b22305",
+      "kernel_key": "7708546230eda7b492bdcd2190ce1975b5c0f8dc25fb8e577482db3fdde06570",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "7708546230eda7b492bdcd2190ce1975b5c0f8dc25fb8e577482db3fdde06570",
+          "subject_key": "b8c19779188b3c06bee95e2323aca63ac24066e9e696ded212de16e1d1ce221d"
+        },
+        "chio_receipt_signing_nonce": "receipt-15e023af51a7a45a1e7d72883938d5d28a4dbe9ffc791e3577fadac9e288d50f",
+        "receipt_context": {
+          "request_id": "15e023af51a7a45a1e7d72883938d5d28a4dbe9ffc791e3577fadac9e288d50f"
+        }
+      },
+      "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "62cf7d8dc482d56ae41facba289b922309f7d85d8445e1c55202878ba8b6b6aa7296fff0839788db662cb05ffa776cde88e774fbb4829efd83eb9a120b2c1d04",
+      "timestamp": 1800000000,
+      "tool_name": "apply",
+      "tool_origin": "caller_executed",
+      "tool_server": "archive",
+      "trust_level": "mediated"
+    }
+  },
+  "request": {
+    "arguments": {
+      "artifact": {
+        "grants": [
+          {
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "source-checkout",
+            "tool_name": "read"
+          }
+        ]
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "contractSha256": "8eef95dd35259d1f2ef14891ac5fd262119e13de71a7185b97590a9ced503455",
+          "passed": true,
+          "predecessorStepId": "publisher",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "7708546230eda7b492bdcd2190ce1975b5c0f8dc25fb8e577482db3fdde06570",
+            "stepId": "archive",
+            "workflowId": "reviewed-scope-distribution"
+          },
+          "verifiedAtUnixMs": 1800000000000
+        },
+        "signature": "0f5d5070a3b0b2e82c471491e6910cb75b21a2451ba685af55b80b144271aa280d3a7d1ce9a133226dd4a67c15d60ced2cc36ffe84359a33f43cd485bd4eec04"
+      }
+    },
+    "tool": "apply"
+  }
+}

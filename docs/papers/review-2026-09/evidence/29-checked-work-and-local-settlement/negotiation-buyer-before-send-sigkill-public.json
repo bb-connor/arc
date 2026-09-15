@@ -1,0 +1,153 @@
+{
+  "buyer": {
+    "available": 900,
+    "creditProfile": "buyer-local-credit-promise-v1",
+    "externalFundsTransferred": false,
+    "jobs": [
+      {
+        "acceptance": {
+          "accepted": {
+            "body": {
+              "acceptedAt": 1789334865,
+              "agentId": "92745c4f79586ac77afe2f99dfc89709b20adb5de0b72313f31fc2bcfe9f3dd8",
+              "askDigest": "ad7760d371b633e70a4acb62cb0b3a14e86b9bfa372ce9b7ab0b5c960388d016",
+              "bidDigest": "43b4bd39ea530921da1ab53a22ce891049ca731b163abb37ef5ced03df341bc5",
+              "bidReceiptId": "hold-8aeeb430aaccab74447fca3b7ef756e8574b3505a977dc8a959ba0c3c5ac313d",
+              "listingId": "security-review-v1",
+              "quotedPrice": {
+                "currency": "TST",
+                "units": 100
+              },
+              "schema": "chio.marketplace.accepted-bid.v1",
+              "tokenExpiresAt": 1789335463,
+              "tokenId": "work-ed925b510d825d4be473dbf7f7b9d1042b485c4a0167897e0b5ab0aab96b8805",
+              "tokenSubject": "92745c4f79586ac77afe2f99dfc89709b20adb5de0b72313f31fc2bcfe9f3dd8"
+            },
+            "signature": "e67541cd8ee0ff76bf83fa6649291c497892d21203050909a601b48e77e41d8cac36b6ab6784f8673c1082dc160366f202f290c76aa7861dad0e189116c2f40d",
+            "signerKey": "92745c4f79586ac77afe2f99dfc89709b20adb5de0b72313f31fc2bcfe9f3dd8"
+          },
+          "ask": {
+            "body": {
+              "agentId": "92745c4f79586ac77afe2f99dfc89709b20adb5de0b72313f31fc2bcfe9f3dd8",
+              "bidDigest": "43b4bd39ea530921da1ab53a22ce891049ca731b163abb37ef5ced03df341bc5",
+              "expiresAt": 1789335463,
+              "issuedAt": 1789334865,
+              "listingId": "security-review-v1",
+              "quotedPrice": {
+                "currency": "TST",
+                "units": 100
+              },
+              "schema": "chio.marketplace.ask-response.v1",
+              "tokenOffer": {
+                "expires_at": 1789335463,
+                "id": "work-ed925b510d825d4be473dbf7f7b9d1042b485c4a0167897e0b5ab0aab96b8805",
+                "issued_at": 1789334865,
+                "issuer": "2737fa34ffc432a81f5eb0b220db6efe6170250d8f15462a9846bc4696ba69a3",
+                "schema": "chio.capability.v1",
+                "scope": {
+                  "grants": [
+                    {
+                      "dpop_required": true,
+                      "max_cost_per_invocation": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "max_invocations": 1,
+                      "max_total_cost": {
+                        "currency": "TST",
+                        "units": 100
+                      },
+                      "operations": [
+                        "invoke"
+                      ],
+                      "server_id": "security-review-provider",
+                      "tool_name": "review"
+                    }
+                  ]
+                },
+                "signature": "3aac3427965584f2fbb5d54d57907f7b9b74ec7cc80f43bd8ceb15a1f97f36dd610eabc5ce3a1cf4ecb00e711b8456a5a281c11371d699b98969d241f8317c08",
+                "subject": "92745c4f79586ac77afe2f99dfc89709b20adb5de0b72313f31fc2bcfe9f3dd8"
+              }
+            },
+            "signature": "56c0940e64b40b84f47fa1696e7c175ad89a183ec58f288551259e2318ef98509b309fbddb2e4934b589d9fc123a5b62108559dd1a1de511dbe7c2257027c50b",
+            "signerKey": "2737fa34ffc432a81f5eb0b220db6efe6170250d8f15462a9846bc4696ba69a3"
+          },
+          "quote": {
+            "agreement": {
+              "buyer": "92745c4f79586ac77afe2f99dfc89709b20adb5de0b72313f31fc2bcfe9f3dd8",
+              "checker": "openapi-explicit-auth-v1",
+              "creditProfile": "buyer-local-credit-promise-v1",
+              "deadline": 1789335463,
+              "inputSha256": "1338df0c2be084a97319b13d42e58c184f9dbbe76c85c2b9ff3d051705addc74",
+              "jobId": "security-review-001",
+              "priceCeiling": 200,
+              "profile": "chio.example.security-review-agreement.v1",
+              "provider": "2737fa34ffc432a81f5eb0b220db6efe6170250d8f15462a9846bc4696ba69a3",
+              "subcontracting": false
+            },
+            "bid": {
+              "body": {
+                "agentId": "92745c4f79586ac77afe2f99dfc89709b20adb5de0b72313f31fc2bcfe9f3dd8",
+                "issuedAt": 1789334865,
+                "listingId": "security-review-v1",
+                "maxPricePerCall": {
+                  "currency": "TST",
+                  "units": 200
+                },
+                "requestedScope": {
+                  "capabilityScopePrefix": "tools:security-review:8aeeb430aaccab74447fca3b7ef756e8574b3505a977dc8a959ba0c3c5ac313d",
+                  "maxInvocations": 1,
+                  "serverId": "security-review-provider",
+                  "toolName": "review"
+                },
+                "schema": "chio.marketplace.bid-request.v1",
+                "windowSeconds": 598
+              },
+              "signature": "77c55cd334ad268798552aa70b29b72f8b900142d44a3a1b37a928f197f2d93594798bf061034c1340bb686510b6bd9c97682ed1fd0927b64f2a2e5f75856d06",
+              "signerKey": "92745c4f79586ac77afe2f99dfc89709b20adb5de0b72313f31fc2bcfe9f3dd8"
+            }
+          },
+          "reservation": {
+            "body": {
+              "agentId": "92745c4f79586ac77afe2f99dfc89709b20adb5de0b72313f31fc2bcfe9f3dd8",
+              "askDigest": "ad7760d371b633e70a4acb62cb0b3a14e86b9bfa372ce9b7ab0b5c960388d016",
+              "listingId": "security-review-v1",
+              "receiptId": "hold-8aeeb430aaccab74447fca3b7ef756e8574b3505a977dc8a959ba0c3c5ac313d",
+              "reservedAmount": {
+                "currency": "TST",
+                "units": 100
+              },
+              "schema": "chio.marketplace.reservation-receipt.v1"
+            },
+            "signature": "15d33018d8103f59e1474e87ab0c67024848f072b1dde6d22473e957148a32ccbca63d9370f734ea77019e1d6127ec22b3d7ec5ba8b864b48514887c505c1d03",
+            "signerKey": "92745c4f79586ac77afe2f99dfc89709b20adb5de0b72313f31fc2bcfe9f3dd8"
+          }
+        },
+        "acknowledgement": null,
+        "job": "security-review-001",
+        "state": "attempted"
+      }
+    ],
+    "reservationCount": 1,
+    "reserved": 100,
+    "settled": false,
+    "spent": 0,
+    "workExecuted": false
+  },
+  "provider": {
+    "acceptanceEvents": 0,
+    "jobs": [
+      [
+        "security-review-001",
+        "quoted"
+      ]
+    ],
+    "admissionStates": {
+      "completed": 2
+    }
+  },
+  "buyerCrashExit": 137,
+  "retryError": "acceptance remains uncertain; reservation retained for reconciliation",
+  "workExecuted": false,
+  "settled": false
+}

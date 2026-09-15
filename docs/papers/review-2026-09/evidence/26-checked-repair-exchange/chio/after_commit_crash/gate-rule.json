@@ -1,0 +1,15 @@
+{
+  "slot": {
+    "receiverId": "653ffa7361faf09ea9b7ebfff3f385e4abb0c745321a18405bd401e02f66b52a",
+    "workflowId": "chio-after_commit_crash",
+    "stepId": "settle"
+  },
+  "predecessorStepId": "check-encrypted-repair",
+  "verifierKey": "653ffa7361faf09ea9b7ebfff3f385e4abb0c745321a18405bd401e02f66b52a",
+  "contractSha256": "85ccde4096875807635a07d3db23f28213f611983bc79e22475ffa18cfb60729",
+  "serverId": "local-repair-exchange",
+  "toolName": "settle",
+  "resource": "funded-trade",
+  "validFromUnixMs": 1799999999000,
+  "validUntilUnixMs": 1800000001000
+}

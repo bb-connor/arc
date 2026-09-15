@@ -1,0 +1,37 @@
+{
+  "id": "6ee88a95ec3f6cea8dfdeae9c74d7428f3c8131960dcc1caa294edb49afb74ef",
+  "timestamp": 1789310339,
+  "capability_id": "cap-01a09b35-09b2-77a2-ac08-3779f26d10d9",
+  "tool_server": "contract-verifier",
+  "tool_name": "verify_scope",
+  "action": {
+    "parameters": {
+      "artifact": "{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"source-checkout\",\"tool_name\":\"read\"}]}"
+    },
+    "parameter_hash": "808a4552a0f3d3ef55e23a2d8b4ebce2dcec7717f22da4e2d2afac08e959a997"
+  },
+  "decision": {
+    "verdict": "allow"
+  },
+  "receipt_kind": "mediated_decision",
+  "boundary_class": "prevent",
+  "tool_origin": "caller_executed",
+  "redaction_mode": "none",
+  "content_hash": "3ec6f4ecbf4097a997012adcd987165ba81a3402157b040631807f1bada5baaa",
+  "policy_hash": "f009896c60a294dccb450806f9709f586d5120bcbefdb8f22f469808a903e60b",
+  "metadata": {
+    "attribution": {
+      "delegation_depth": 0,
+      "grant_index": 0,
+      "issuer_key": "ee36e7ad911353300215912f3c644c0b8524edb2b475aba8b18813bd18de716c",
+      "subject_key": "d13ac616521997446f118c499be93ea0f918f2502e376fa6826ee09b206a7c0b"
+    },
+    "chio_receipt_signing_nonce": "rcpt-01a09b35-09c1-7791-9d2b-8a20c84e4da1",
+    "receipt_context": {
+      "request_id": "worker-2-repaired-policy"
+    }
+  },
+  "trust_level": "mediated",
+  "kernel_key": "ee36e7ad911353300215912f3c644c0b8524edb2b475aba8b18813bd18de716c",
+  "signature": "ce05b126f57345ee3bc31b8f1d34844d10bf82dc2feb49d46093471a2cc3ab34c0ce0786b538359fc97a88013c807844c2617fc855118e0efb2baac2aacf8f0a"
+}

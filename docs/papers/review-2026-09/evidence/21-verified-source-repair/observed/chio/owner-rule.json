@@ -1,0 +1,15 @@
+{
+  "slot": {
+    "receiverId": "4bf367c890272395e6bb876b2c0348615e75cfacace999dfdd19f9207c77f302",
+    "workflowId": "disable-git-commit-hooks",
+    "stepId": "publish-reviewed-repair"
+  },
+  "predecessorStepId": "check-git-effects",
+  "verifierKey": "c5d17fd012bb3bba620381e1285cd2c682f92bcad5d079c301104bb5dba69cf9",
+  "contractSha256": "f18ef93dcd79f072c44eb6fdc16ac4aa6f01239eada4af6c811cacc87f7f0759",
+  "serverId": "repair-review-queue",
+  "toolName": "publish",
+  "resource": "reviewed-source-files",
+  "validFromUnixMs": 1799999999000,
+  "validUntilUnixMs": 1800000001000
+}

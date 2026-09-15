@@ -24,8 +24,7 @@
 //!     and no offline verifier holds.
 //!
 //! The asymmetries are the point. The offline verifier resolves the subject
-//! receipt, the lease and the governance record; the hook resolves none of the
-//! three. The hook enforces the single-use continuation, the agreement scope,
+//! receipt; both resolve lease and governance records. The hook enforces the single-use continuation, the agreement scope,
 //! the ladder intersection and the request's own smuggling refusals; the
 //! offline verifier sees none of the four. The two also read the participants'
 //! public keys out of two different receiver-owned stores: the verifier from
@@ -433,20 +432,25 @@ fn corpus() -> Vec<Case> {
             .verifier_state(|state| {
                 state.lease_registry = InMemoryLeaseRegistry::new();
             })
-            .verifier_only(
+            .hook_state(|state| {
+                state.missing_lease = true;
+                Ok(())
+            })
+            .agree_reject(
                 "capability.lease_expired_or_unknown",
-                "the hook compares the binding's lease references against the lease identifier \
-                 its own admission bundle names; it does not resolve the lease record itself, so \
-                 expiry and issuer are not checked here.",
+                "chio_treaty_unverified_required_evidence",
             ),
         Case::new("governance record absent from the receiver's store")
             .verifier_state(|state| {
                 state.governance_store = InMemoryGovernanceReceiptStore::new();
             })
-            .verifier_only(
+            .hook_state(|state| {
+                state.missing_governance = true;
+                Ok(())
+            })
+            .agree_reject(
                 "governance.receipt_required_missing",
-                "the hook compares governance references against its own admission bundle and \
-                 does not resolve the governance record or re-derive its digest.",
+                "chio_treaty_unverified_required_evidence",
             ),
         Case::new("tool name absent from the verifier's action-class table")
             .verifier_state(|state| {
@@ -808,8 +812,6 @@ fn the_divergence_set_is_exactly_this() {
         vec![
             "subject digest does not match the receipt body",
             "subject receipt absent from the receiver's receipt store",
-            "capability lease absent from the receiver's registry",
-            "governance record absent from the receiver's store",
             "tool name absent from the verifier's action-class table",
             "peer passport revoked at the pinned epoch",
             "pinned peer has no ladder manifest reference",
@@ -1259,6 +1261,8 @@ struct HookState {
     store: InMemoryRuntimeAdmissionStore,
     agreement: Agreement,
     continuation_expires_at_unix_ms: u64,
+    missing_lease: bool,
+    missing_governance: bool,
     smuggle_trust_root: bool,
     unbind_lineage_from_continuation: bool,
     unbind_invocation_from_dispatch: bool,
@@ -1271,6 +1275,8 @@ impl HookState {
             store: InMemoryRuntimeAdmissionStore::new(),
             agreement: Agreement::Baseline,
             continuation_expires_at_unix_ms: fixture.continuation.expires_at_unix_ms,
+            missing_lease: false,
+            missing_governance: false,
             smuggle_trust_root: false,
             unbind_lineage_from_continuation: false,
             unbind_invocation_from_dispatch: false,
@@ -1336,6 +1342,38 @@ impl HookState {
         }
         let lineage_bundle_sha256 = sha256_hex(&canonical_json_bytes(&lineage_bundle)?);
 
+        // Activate records from this locally constructed fixture, not the
+        // envelope supplied by a caller under test.
+        let (statement, _) = fixture.envelope.decode_statement()?;
+        if let Some(lease) = statement
+            .predicate
+            .capability_lease_ref
+            .filter(|_| !self.missing_lease)
+        {
+            self.store.insert_treaty_runtime_artifact(
+                "capability_lease",
+                &lease.lease_id.clone(),
+                &chio_runtime_core::RuntimeTreatyLeaseRecord {
+                    lease,
+                    valid_from_unix_ms: ISSUED_AT_MS,
+                },
+            )?;
+        }
+        if let Some(receipt) = statement
+            .predicate
+            .governance_receipt_ref
+            .filter(|_| !self.missing_governance)
+        {
+            self.store.insert_treaty_runtime_artifact(
+                "governance_receipt",
+                &receipt.receipt_id.clone(),
+                &chio_runtime_core::RuntimeTreatyGovernanceRecord {
+                    receipt,
+                    valid_from_unix_ms: ISSUED_AT_MS,
+                    valid_until_unix_ms: EXPIRES_AT_MS,
+                },
+            )?;
+        }
         self.store.insert_bundle(fixture.bundle.clone())?;
         self.store.insert_treaty_runtime_artifact(
             "treaty_scope",

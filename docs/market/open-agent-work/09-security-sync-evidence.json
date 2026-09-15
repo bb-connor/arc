@@ -1,0 +1,1280 @@
+{
+  "schema": "chio.open-agent-work.security-sync-review.v1",
+  "initial_capture_utc": "2026-09-14T06:17:32.018677+00:00",
+  "snapshot_written_utc": "2026-09-14T06:27:32.923119+00:00",
+  "host_architecture": "aarch64",
+  "scope": "Read-only source/PR/ancestry review; documentation updates only; no runtime tests, merges, migrations or release qualification.",
+  "refs": {
+    "paper": "2b3b5af8cbfbc6f16ce6005de3f97cd149803b81",
+    "security": "8738bdfd7be8c43a0543ca0ce468541529c47add",
+    "process": "75d664822abf5f6e8da6e6f858cab5a6d81dc3bd",
+    "main": "f5566d9a765c21cb36652a99c79de64968a656bf",
+    "legacy": "cbbba8cf2178cbbdd7b6b38a121e59365eb452ac"
+  },
+  "paper_pr_remote_commits_behind_local": 2,
+  "initial_paper_porcelain_entries": 123,
+  "workspace_member_counts": {
+    "paper": 163,
+    "security": 175,
+    "process": 175
+  },
+  "prs": [
+    {
+      "additions": 623755,
+      "baseRefName": "main",
+      "baseRefOid": "f5566d9a765c21cb36652a99c79de64968a656bf",
+      "changedFiles": 2324,
+      "deletions": 37349,
+      "headRefName": "security/launch-integration",
+      "headRefOid": "8738bdfd7be8c43a0543ca0ce468541529c47add",
+      "isDraft": true,
+      "mergeStateStatus": "BLOCKED",
+      "mergeable": "MERGEABLE",
+      "number": 1117,
+      "title": "feat(security): integrate durable custody and negotiated consumer boundaries",
+      "url": "https://github.com/bb-connor/arc/pull/1117",
+      "check_counts": {
+        "COMPLETED/FAILURE": 2,
+        "QUEUED/": 45,
+        "IN_PROGRESS/": 18,
+        "COMPLETED/SKIPPED": 5,
+        "COMPLETED/SUCCESS": 26
+      },
+      "failed_check_names": [
+        "dispatch isolated enterprise Linux capture",
+        "cargo-vet (locked supply-chain audit)"
+      ],
+      "review_count": 12,
+      "latest_review": {
+        "id": "PRR_kwDOR0fQBc8AAAABNUI_uA",
+        "author": {
+          "login": "bb-connor"
+        },
+        "authorAssociation": "OWNER",
+        "body": "<!-- chio-review-swarm: pr=1117 head=2c5188e8ada2b8afe136cf5d1fba95ee0a2cbeca mode=triage pass=5 -->\n\nFourth in-depth crate-folder pass at this head. Only NEW findings from v4 slices A-H; prior waves (pass 2/3/4 and later watch findings) are not restated. Slices B, C, and H reported no new findings. Head still matches the slices (`2c5188e8ada2b8afe136cf5d1fba95ee0a2cbeca`).\n\n### P1\n\n**[P1] Open the SIEM alert outbox with SQLITE_OPEN_NOFOLLOW before WAL**\n\n`crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs:696`\n\nNew production constructor `SqliteSiemOutbox::open` calls `Connection::open(path)` (rusqlite URI mode, no `SQLITE_OPEN_NOFOLLOW`), then `PRAGMA journal_mode = WAL` and `CREATE TABLE IF NOT EXISTS chio_security_alert_outbox` before any identity bind. It never calls `is_in_memory_sqlite_path`, so `file:pool?vfs=memdb`, `file:x?mode=memory`, and NUL-terminated URIs open a volatile store while `ensure_alerts_ready` / `ensure_scheduler_health_ready` still succeed. Leftover `-wal`/`-shm`/`-journal` sidecars are not inspected. This type is the live `EscalateAlertStore` and `SchedulerHealthPort`: `ActiveResponseEffectPort::production` (`effect_port_parts/part_01.inc:129-160`) requires it as one of the six closed effect backends, and `EscalateAlertBackend::execute_apply` (`part_01.inc:416-418`) treats any persisted matching outbox row as effect success. A last-component symlink or leftover WAL therefore receives the security paging schema, and a planted delivered row with a matching command hash makes escalation complete without writing the intended file or running `deliver_due`. `map_err(|_| PortError::unavailable())` also drops the open error.\n\n**[P1] Bind provision to the live create_new descriptor before the path-open WAL pragma**\n\n`crates/platform/chio-store-sqlite/src/caller_execution_ledger.rs:77`\n\nSqliteCallerExecutionLedger::provision is new at this head. It exclusive-creates the main file with O_NOFOLLOW and mode 0600 (line 73) and keeps that File alive through the rest of provision, then connect() opens the same pathname again (line 77) and immediately commits PRAGMA journal_mode=WAL (line 79) before file_identity (line 81) or SCHEMA (line 85). file_identity only compares main_database_file_identity(connection) to symlink_metadata(path); it never fstats the create_new descriptor. connect() uses SQLITE_OPEN_NOFOLLOW without SQLITE_OPEN_URI and never inspects leftover -wal/-shm/-journal. A same-UID rename of the new name onto another regular file (or a leftover WAL beside a brand-new main file) therefore receives a committed journal-mode change and, if the substitute is empty enough for CREATE TABLE to succeed, the executor catalog. On failure the comment at line 75 retains that file. open() later requires journal_mode=wal (line 384), so every reopen also attaches those sidecars. This is not missing NOFOLLOW on the main path and not the admission/blob/enterprise constructors already posted; the unused live create fd is the new fact.\n\n### P2\n\n**[P2] Wake the FIPS lane on security crate and control-plane changes**\n\n`.github/workflows/chio-tee-fips.yml:5`\n\nThis PR expands `chio-tee-fips.yml` path filters and adds nonce, threshold, session-report, and cli inventories that run `cargo test --locked` against `chio-kernel`, `chio-store-sqlite`, and `chio-cli`. `Cargo.toml` also adds the `crates/security/*` workspace members. Those FIPS-tested crates now depend on the new tree: `chio-kernel` and `chio-store-sqlite` take `chio-security-types`, and `chio-cli` takes `chio-cage`, `chio-security-types`, and `chio-control-plane`. The pull_request/push path sets still omit `crates/security/**` and `crates/platform/chio-control-plane/**` (`chio-tee-fips.yml:5-20` and `:26-40`). A PR that only edits those paths never starts the FIPS workflow, even though the FIPS cargo commands would compile the changed crates. `scripts/check-security-ci-contract.py` still never opens this workflow, so the omitted paths cannot fail Security contract.\n\n**[P2] Validate ThresholdApprovalRequest on deserialize**\n\n`crates/core/chio-core-types/src/capability/threshold_approval.rs:17`\n\nNew `ThresholdApprovalRequest` derives `Deserialize` (`threshold_approval.rs:17-23`) while the empty, trim, control, and 256-byte checks live only in `new()` (`:26-49`). Fields are private so Rust construction is gated, but serde still builds empty, control-bearing, or multi-megabyte `request_id` / `server_id` / `tool_name` values. The type is the collector route: `ThresholdApprovalCollectorProposal.request_route` is `Option<ThresholdApprovalRequest>` (`crates/kernel/chio-kernel/src/threshold_approval.rs:118`) and `chio-store-sqlite` `decode_collector` does `serde_json::from_slice` (`crates/platform/chio-store-sqlite/src/approval_store/threshold_collector.rs:33-37`). `validate_restored` re-runs `requirement.validate()` and proposal signature checks but never `ThresholdApprovalRequest::new` (`collector_validation.rs:83-91`). `validate_current_context` only compares the deserialized route to the live resolver (`:60-64`), so a tampered snapshot fails closed after allocating the oversized strings. Sibling `GovernedResponsePlanIntentBody` in the same PR calls `validate()` from `Deserialize` (`governance.rs:846`). No test deserializes an invalid request JSON.\n\n**[P2] Cap threshold-approval identifier and directory_version lengths**\n\n`crates/core/chio-core-types/src/capability/threshold_approval.rs:109`\n\n`ThresholdApprovalRequirement::new` rejects empty, padded, or control-bearing approver identifiers (`threshold_approval.rs:109-117`) and empty/padded `directory_version` (`:97-99`) but never applies `MAX_THRESHOLD_APPROVAL_IDENTIFIER_BYTES` (256), which this PR added in the same file for request routes (`:14,41`). Identifiers are public fields on `ThresholdApproverIdentity` (`:70-73`) and are sorted, then canonical-JSON hashed into `eligible_set_digest` under `chio.approver-set.v1` (`:142-147`). A policy directory can force a multi-megabyte identifier or directory_version through `new()`/`validate()` and every later digest and collector persist. Collector restore does call `requirement.validate()` (`collector_validation.rs:91`), so this is a constructor ceiling gap, not a deserialize skip.\n\n**[P2] Surface OutcomeUnknown after a committed claim, not Expired**\n\n`crates/platform/chio-store-sqlite/src/caller_execution_ledger.rs:281`\n\nexecute_once inserts and commits the claim (lines 253-266), confirms readback (lines 269-275), drops the connection lock, then calls authorization.verify_for_claim(..., started) at line 281. verify_for_claim performs require_live_at on a later wall-clock sample. If expires_at_unix_ms falls between the committed claimed_at and started, the function returns CallerExecutionLedgerError::Authentication(Expired) while caller_executor_claims already has the row and caller_executor_reports does not. The next execute_once takes the existing-claim branch (line 216) and returns OutcomeUnknown without invoking effect, so this is not a double-execution. It is the wrong first error: callers that treat Expired as retryable (mint a replacement authorization for the same operation_id) then hit 'redelivery changed the original authorization' (line 218) and still cannot recover. Clock regression after claim already returns Storage (line 279). A committed claim with no report should be OutcomeUnknown on this path too.\n\n**[P2] Lock the composed M2 inventories that hosted CI runs**\n\n`scripts/check-flow-security.sh:624`\n\nThis head adds `scripts/check-native-restart-safety.sh` as the documented M2 exact gate (34 process/race tests plus five live-ownership tests) and uses `cargo test --locked` on both inventories (`check-native-restart-safety.sh:44` and `:52`). `scripts/tests/check-flow-security.test.sh:341-352` now requires those `--locked` tokens on the standalone script. No workflow invokes that script. Hosted Security contract runs the composed copy instead: `enterprise-hardening.yml:430` calls `./scripts/check-flow-security.sh`, whose matching commands omit `--locked` (`check-flow-security.sh:507` and `:624`). `scripts/check-security-ci-contract.py` never names the restart script and only asserts that enterprise-hardening still calls `check-flow-security.sh`. The ratchet therefore enforces lockfile discipline only on a local wrapper, while the required composed gate can resolve a different graph than `cargo vet --locked` / `cargo deny`.\n\n**[P2] Publish schemas for PROTOCOL-named admission persist artifacts**\n\n`spec/PROTOCOL.md:859`\n\nNew section 'Original Authority Selection For Retained Admission' and 'Native Dispatch Preparation History' name five live persist discriminators: `chio.retained-tool-admission-request.v4` (`spec/PROTOCOL.md:859`), `chio.admission-authority-profile.v1` (`:860`), `chio.tool-admission-request.v4` (`:872`), `chio.native-dispatch-preparation-ledger.v1` (`:894`), and `chio.native-flow-dispatch-policy.v1` (`:896`). Each is a deny_unknown_fields canonical record in production code (`crates/kernel/chio-kernel/src/admission_operation/retained_request.rs:19`, `authority_profile.rs:9` and `:151-154`, `crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger.rs:20`, `dispatch_ledger/policy.rs:6`). None of those IDs appear under `spec/schemas/**` or in `spec/schemas/registry.json`. Live policy decode additionally requires `chio.native-flow-dispatch-policy.v2` when a declassification grant is present (`dispatch_ledger/policy.rs:66-71`); `policy_deadline` accepts v1 or v2 (`crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/lifecycle.rs:223-226`). PROTOCOL never names v2. Rust then rejects inverted policy clocks (`prepared_at < observed_at` or `valid_until <= prepared_at` at `policy.rs:158-159`). `tests/bindings/**` and `tests/conformance/**` have no persist-object vectors. A second implementation can follow PROTOCOL and still cannot recover original authority selection or native preparation history, and a schema-only peer never accepts a valid declassified v2 policy.\n\n**[P2] Publish the caller persist-frame schema**\n\n`spec/PROTOCOL.md:884`\n\nPROTOCOL says final dispatch revalidation and caller context handling check the bound authority profile (`spec/PROTOCOL.md:884`) but never names the persist wrapper recovery actually stores. `AdmissionCallerDispatchContextV1` is deny_unknown_fields canonical JSON with `schema: chio.admission-caller-dispatch-context.v1` plus operation binding, request digest, nonce/budget ids, and a private `kernel_context_json` payload (`crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs:9-34`). `from_canonical_bytes` rejects any other schema string (`:105`). The inner payload uses `chio.kernel-caller-return-context.v4` (`return_context/caller.rs:12`). Custody digests use `chio.caller-claim-intent.v1` and `chio.caller-claim-history.v1` (`caller/custody.rs:126` and `:144`). None of those IDs appear in `spec/schemas/**`, `registry.json`, PROTOCOL.md, binding vectors, or any SDK. A peer that implements only the signed `chio.caller-dispatch-authorization.v1` / `chio.caller-delivery-report.v1` codecs still cannot recover or verify reserved caller context after restart. `formal/MAPPING.md` and `formal/proof-manifest.toml` have no caller persist-frame row; they treat profile checks as stuttering (`MAPPING.md:300-301`).\n\n**[P2] Require equal correlated-finding sequence lengths**\n\n`spec/schemas/chio-wire/v1/security/correlated-finding-v1.schema.json:28`\n\n`CorrelatedFinding::new` rejects empty sequences and requires `ordered_event_ids`, `ordered_evidence_digests`, and `ordered_source_receipt_ids` to have the same length (`crates/security/chio-security-types/src/event.rs:202-208`, `MismatchedEvidence`). This closed schema (and the receipt body at `correlated-finding-receipt-body-v1.schema.json:30-48`) only gives each array its own `minItems: 1` / `maxItems: 64`. A three-event finding with one evidence digest is schema-valid and Rust-invalid. Registry row `chio.correlated-finding.v1` (`spec/schemas/registry.json:2307`) therefore accepts artifacts the signer refuses. The committed positive vector `tests/bindings/vectors/security/active-defense/positive/correlated-finding-v1.json` is a matching-length happy path; mutations do not include an unequal-cardinality invalid case. This is a sequence-integrity hole, not a time-window constraint.\n",
+        "submittedAt": "2026-09-12T23:15:50Z",
+        "includesCreatedEdit": false,
+        "reactionGroups": [],
+        "state": "COMMENTED",
+        "commit": {
+          "oid": "2c5188e8ada2b8afe136cf5d1fba95ee0a2cbeca"
+        }
+      }
+    },
+    {
+      "additions": 34823,
+      "baseRefName": "security/launch-integration",
+      "baseRefOid": "8b9f9243905dfa61acac82d83438684940777fe3",
+      "changedFiles": 272,
+      "deletions": 1081,
+      "headRefName": "integration/process-security-recovery",
+      "headRefOid": "75d664822abf5f6e8da6e6f858cab5a6d81dc3bd",
+      "isDraft": true,
+      "mergeStateStatus": "DIRTY",
+      "mergeable": "CONFLICTING",
+      "number": 1131,
+      "title": "feat(process): integrate durable hosting with security launch contracts",
+      "url": "https://github.com/bb-connor/arc/pull/1131",
+      "check_counts": {
+        "COMPLETED/FAILURE": 1,
+        "COMPLETED/CANCELLED": 2,
+        "COMPLETED/SKIPPED": 7,
+        "COMPLETED/SUCCESS": 76
+      },
+      "failed_check_names": [
+        "cargo-vet (locked supply-chain audit)"
+      ],
+      "review_count": 1,
+      "latest_review": {
+        "id": "PRR_kwDOR0fQBc8AAAABNOausg",
+        "author": {
+          "login": "bb-connor"
+        },
+        "authorAssociation": "OWNER",
+        "body": "<!-- chio-review-swarm: pr=1131 head=75d664822abf5f6e8da6e6f858cab5a6d81dc3bd mode=triage -->\n### Swarm review (static) of 75d664822abf\n\n**Verdict:** No findings\n\nIntegrates the process stack onto #1117, requiring a signed native MCP launch policy and pinned signer, refusing flow-required manifests, and recording host state under chio.process.abi.v2 with a pre-decode ABI gate. Sampled TCB slices (signed lineage verification, hosted ancestor lookup, SQLite fused recovery, process-host launch rematch, ABI refuse-before-decode) stay fail-closed; demo policies remain Disabled with no OS containment or worker sandbox, as the body states. This candidate is a union of open process PRs #1098-#1130 plus unique launch-policy, ABI, and lineage glue, so this 272-file delta is not a substitute for those slice reviews. Dedicated follow-up should stay on kernel-core lineage plus PROTOCOL 5.x, sqlite fused claim/authorize, and CLI process-host launch/ABI/relocation; SDKs, examples, and qualification harnesses can stay with the slice PRs. Body validation counts and the claim that 75d664822a only changes a negative CLI ABI fixture are unverified from a static read; hosted qualification is disclosed as pending.\n\n**Checked**\n- fail-closed paths (lineage, evaluate evidence, process redispatch, ABI gate, launch rematch)\n- unwrap/expect/allow/unsafe additions\n- wire and spec drift (PROTOCOL lineage MUST; process ABI is host-level)\n- trust-boundary paths (kernel-core, receipt_store, conformance, workflows, Cargo.toml, spec)\n- tests (signed_lineage, process grandchild restore, recovery.py ABI/launch_policy)\n- PR body claims\n- stack hygiene (#1117 base, includes #1130 and process stack #1098-#1130)\n- directory risk map and CODEOWNERS sampling\n\n**Not checked**\n- builds and tests were not run (static review)\n- line-by-line review of examples/, sdks/typescript/, sdks/python/, and fuzz corpus binaries\n- remaining process-stack files beyond the sampled TCB, host, and sqlite slices\n- cited local cargo, clippy, and qualification runs\n- hosted qualification (disclosed pending)\n\nReviewed commit 75d664822abf5f6e8da6e6f858cab5a6d81dc3bd, mode triage, agent swarm-4",
+        "submittedAt": "2026-09-11T19:05:34Z",
+        "includesCreatedEdit": false,
+        "reactionGroups": [],
+        "state": "COMMENTED",
+        "commit": {
+          "oid": "75d664822abf5f6e8da6e6f858cab5a6d81dc3bd"
+        }
+      }
+    },
+    {
+      "additions": 1035094,
+      "baseRefName": "main",
+      "baseRefOid": "eba8cdf3fb2e16501947c58415a4739a23cc12b3",
+      "changedFiles": 2321,
+      "deletions": 189352,
+      "headRefName": "codex/chio-security-execution",
+      "headRefOid": "cbbba8cf2178cbbdd7b6b38a121e59365eb452ac",
+      "isDraft": false,
+      "mergeStateStatus": "DIRTY",
+      "mergeable": "CONFLICTING",
+      "number": 1029,
+      "title": "BREAKING: feat(security): integrate agent economy and enterprise evidence authority",
+      "url": "https://github.com/bb-connor/arc/pull/1029",
+      "check_counts": {
+        "COMPLETED/FAILURE": 25,
+        "COMPLETED/CANCELLED": 32,
+        "COMPLETED/SKIPPED": 15,
+        "COMPLETED/SUCCESS": 86
+      },
+      "failed_check_names": [
+        "Build, lint, test",
+        "cargo-audit and osv-scanner",
+        "live-treaty-buyer-closure",
+        "treaty-bound-provenance",
+        "dispatch isolated enterprise Linux capture",
+        "SDK parity contract lane",
+        "Windows authority guard and init",
+        "runtime (policy)",
+        "runtime (proof-parity)",
+        "runtime (spine)",
+        "kani-public-pr (all lane=pr harnesses)",
+        "Live C++ conformance",
+        "changed-target-sampling",
+        "fuzz-corpus-smoke-pr (locked replay)",
+        "apalache-full-contract / apalache-contracts",
+        "rust-verification-metadata (schema only, no proofs)",
+        "apalache-full-contract / apalache-negative",
+        "apalache-full-contract / apalache-subset",
+        "apalache-full-contract / apalache-subset",
+        "threat-model-coverage-contract / coverage-gate",
+        "enterprise-security-contract / attest exact pull request merge binding",
+        "MSRV build and test",
+        "cargo-deny (supply-chain bans/advisories/licenses)",
+        "Security contract",
+        "Security contract"
+      ],
+      "review_count": 115,
+      "latest_review": {
+        "id": "PRR_kwDOR0fQBc8AAAABINOm4w",
+        "author": {
+          "login": "bb-connor"
+        },
+        "authorAssociation": "OWNER",
+        "body": "",
+        "submittedAt": "2026-08-03T15:19:03Z",
+        "includesCreatedEdit": false,
+        "reactionGroups": [],
+        "state": "COMMENTED",
+        "url": "https://github.com/bb-connor/arc/pull/1029#pullrequestreview-4845709027",
+        "commit": {
+          "oid": "57b7483d13d0b8ffb7bf83a23a10e38e5200beb4"
+        }
+      }
+    },
+    {
+      "additions": 53834,
+      "baseRefName": "main",
+      "baseRefOid": "f5566d9a765c21cb36652a99c79de64968a656bf",
+      "changedFiles": 274,
+      "deletions": 1832,
+      "headRefName": "paper/roadmap-phase-0-1",
+      "headRefOid": "e1d20158229619b401a10b193726a178c3b01827",
+      "isDraft": true,
+      "mergeStateStatus": "BLOCKED",
+      "mergeable": "MERGEABLE",
+      "number": 1159,
+      "title": "feat(paper): whitepaper roadmap phases 0 to 3",
+      "url": "https://github.com/bb-connor/arc/pull/1159",
+      "check_counts": {
+        "COMPLETED/FAILURE": 9,
+        "COMPLETED/SKIPPED": 8,
+        "COMPLETED/SUCCESS": 69
+      },
+      "failed_check_names": [
+        "Build, lint, test",
+        "cargo-audit and osv-scanner",
+        "Cognition market PostgreSQL isolation",
+        "artifact-check",
+        "codegen-no-diff (rust+python+ts+go)",
+        "runtime (policy)",
+        "runtime (proof-parity)",
+        "runtime (spine)",
+        "cargo-deny (supply-chain bans/advisories/licenses)"
+      ],
+      "review_count": 13,
+      "latest_review": {
+        "id": "PRR_kwDOR0fQBc8AAAABNUXsuw",
+        "author": {
+          "login": "bb-connor"
+        },
+        "authorAssociation": "OWNER",
+        "body": "<!-- chio-review-swarm: pr=1159 head=e1d20158229619b401a10b193726a178c3b01827 mode=triage -->\n### Swarm review (static) of e1d201582296\n\n**Verdict:** 1 P2 (1 inline, 0 below)\n\nTriage of phases 0-3 plus this head's three commits: a second-review archive, a work-item list, and feat(kernel) e1d201582 that deep-scans agreement-context trust names, adds a PresentationWindow type, drives substitution corpora through a dispatch-counting kernel, concurrent-izes sustained load, and rebuilds the composed baseline from cited external formats. The nested scan is fail-closed at both bounds and covered by runtime_agreement_context_scan.rs. The new window is not the paper's window: resolved_presentation_intervals returns only the treaty-scope interval, so a signer-authored lease expiry that sits past the ladder or continuation but inside the treaty is admitted. Prior threads (missing run-composed-baseline binary, artifact watch paths, toolchain --check, co-sign reply redaction, two-host claim) were not re-filed.\n\n**Checked**\n- fail-closed paths (admission-hook scan and presentation window)\n- unwrap/expect/allow additions\n- wire and spec drift\n- trust-boundary paths (runtime-core admission hook, types, treaty.rs, federation verifier, workflows)\n- tests (agreement-context scan, substitution corpora, dispatch counter)\n- PR body claims\n- stack hygiene\n- triage sampling of dirmap trust-boundary and largest non-generated files\n\n**Not checked**\n- builds and tests were not run (static review)\n- line-by-line review of all 274 files\n- Lean elaboration and lake build\n- paper PDF and generated bench JSON contents\n- federated_call_pair.rs and the 5900-line example beyond prior-head threads\n\nReviewed commit e1d20158229619b401a10b193726a178c3b01827, mode triage, agent swarm-watch",
+        "submittedAt": "2026-09-13T00:24:04Z",
+        "includesCreatedEdit": false,
+        "reactionGroups": [],
+        "state": "COMMENTED",
+        "commit": {
+          "oid": "e1d20158229619b401a10b193726a178c3b01827"
+        }
+      }
+    }
+  ],
+  "comparisons": {
+    "main--security": {
+      "merge_base": "f5566d9a765c21cb36652a99c79de64968a656bf",
+      "left_right_commits": "0\t129",
+      "merge_exit": 0,
+      "tree": "712c966cbbc458eb0b4dd29a4c0090f0f4760659",
+      "conflicts": []
+    },
+    "paper--security": {
+      "merge_base": "f5566d9a765c21cb36652a99c79de64968a656bf",
+      "left_right_commits": "30\t129",
+      "merge_exit": 1,
+      "tree": "13963935a9aee5d2436e85239e3764a9188cb699",
+      "conflicts": [
+        "docs/formal/COVERAGE.md"
+      ]
+    },
+    "security--process": {
+      "merge_base": "8b9f9243905dfa61acac82d83438684940777fe3",
+      "left_right_commits": "27\t55",
+      "merge_exit": 1,
+      "tree": "f7c578486c4caf288e27cffa3b795d3046edb0f5",
+      "conflicts": [
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests.rs",
+        "crates/kernel/chio-kernel/src/kernel/validation.rs",
+        "crates/kernel/chio-kernel/src/receipt_store.rs",
+        "crates/kernel/chio-kernel/src/runtime.rs",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs",
+        "crates/platform/chio-store-sqlite/src/budget_store/composite/transitions/capture.rs",
+        "crates/platform/chio-store-sqlite/src/lib.rs",
+        "crates/platform/chio-store-sqlite/src/serving_owner.rs",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs",
+        "docs/formal/COVERAGE.md",
+        "scripts/check-rust-file-hygiene.py"
+      ]
+    },
+    "main--legacy": {
+      "merge_base": "eba8cdf3fb2e16501947c58415a4739a23cc12b3",
+      "left_right_commits": "906\t230",
+      "merge_exit": 1,
+      "tree": "4b74a8ac67f657e00dd599b9ee8e054c3cd0b1ce",
+      "conflicts": [
+        ".github/actionlint.yaml",
+        "Cargo.lock",
+        "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs",
+        "crates/guards/chio-wasm-guards/Cargo.toml",
+        "crates/kernel/chio-kernel-core/src/normalized.rs",
+        "crates/kernel/chio-kernel/src/governed_active_response.rs",
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs",
+        "crates/kernel/chio-kernel/src/kernel/agent_economy_admission_coordinator/finding_pool_recovery.rs",
+        "crates/kernel/chio-kernel/src/kernel/agent_economy_admission_coordinator/terminal.rs",
+        "crates/kernel/chio-kernel/src/kernel/agent_economy_admission_coordinator/terminal_tests.rs",
+        "crates/kernel/chio-kernel/src/kernel/construction.rs",
+        "crates/kernel/chio-kernel/src/kernel/dispatch.rs",
+        "crates/kernel/chio-kernel/src/kernel/error.rs",
+        "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs",
+        "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_helpers.rs",
+        "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs",
+        "crates/kernel/chio-kernel/src/kernel/kernel_struct.rs",
+        "crates/kernel/chio-kernel/src/kernel/mod.rs",
+        "crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/budget_governed_assurance.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/monetary.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_regressions.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/settlement_routing.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/support.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/support_monetary_durability.rs",
+        "crates/kernel/chio-kernel/src/lib.rs",
+        "crates/kernel/chio-kernel/src/payment.rs",
+        "crates/kernel/chio-kernel/src/receipt_store.rs",
+        "crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs",
+        "crates/platform/chio-control-plane/Cargo.toml",
+        "crates/platform/chio-control-plane/src/lib.rs",
+        "crates/platform/chio-control-plane/src/trust_control.rs",
+        "crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs",
+        "crates/platform/chio-control-plane/src/trust_control/cluster/snapshots.rs",
+        "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs",
+        "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs",
+        "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs",
+        "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+        "crates/platform/chio-control-plane/src/trust_control/service_types.rs",
+        "crates/platform/chio-store-sqlite/Cargo.toml",
+        "crates/platform/chio-store-sqlite/src/budget_store/store.rs",
+        "crates/platform/chio-store-sqlite/src/capability_lineage.rs",
+        "crates/platform/chio-store-sqlite/src/dead_letters.rs",
+        "crates/platform/chio-store-sqlite/src/iou_store.rs",
+        "crates/platform/chio-store-sqlite/src/lib.rs",
+        "crates/platform/chio-store-sqlite/src/receipt_store.rs",
+        "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap.rs",
+        "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/open.rs",
+        "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+        "crates/platform/chio-store-sqlite/src/receipt_store/support.rs",
+        "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs",
+        "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs",
+        "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs",
+        "crates/platform/chio-store-sqlite/src/receipt_store/tests/support.rs",
+        "crates/platform/chio-store-sqlite/src/receipt_store/tests/verified_head.rs",
+        "crates/platform/chio-store-sqlite/src/revocation_store.rs",
+        "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs",
+        "crates/platform/chio-store-sqlite/src/settle_attempts.rs",
+        "crates/products/chio-cli/Cargo.toml",
+        "crates/products/chio-cli/src/cli/dispatch/mod.rs",
+        "crates/products/chio-cli/src/cli/dispatch/proof/unit_tests.rs",
+        "crates/products/chio-cli/src/cli/runtime.rs",
+        "crates/products/chio-cli/tests/capability_lineage.rs",
+        "crates/products/chio-cli/tests/init.rs",
+        "crates/products/chio-cli/tests/proof_cli_contract/collect.rs",
+        "crates/products/chio-cli/tests/proof_cli_contract/support.rs",
+        "crates/products/chio-cli/tests/trust_cluster.rs",
+        "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests.rs",
+        "crates/tooling/chio-conformance/src/econsim.rs",
+        "deploy/docker/Dockerfile",
+        "deploy/docker/chio-workspace/Cargo.lock",
+        "docs/README.md",
+        "docs/adr/README.md",
+        "examples/internet-of-agents-incident-network/scenario/lib.sh",
+        "examples/internet-of-agents-incident-network/smoke.sh",
+        "scripts/check-chio-schema-registry.sh",
+        "sdks/go/chio-go-http/types.go",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/__init__.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/__init__.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/active_response_governed_intent_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/governed_transaction_intent_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/heartbeat_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/list_capabilities_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/agent/tool_call_request_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/anchor/__init__.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/anchor/batch_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/__init__.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/aggregate_budget_root_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/aggregate_invocation_budget_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/capabilities_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/cumulative_approval_root_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/governed_approval_token_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/grant_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/revocation_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/supplemental_authorization_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/threshold_approval_proposal_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/token_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/capability/verified_approval_set_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/__init__.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/capability_denied_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/capability_expired_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/capability_revoked_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/internal_error_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/policy_denied_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/error/tool_server_error_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/federation/__init__.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/federation/bilateral_signature_slice_envelope_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/federation/bilateral_signature_slice_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/jsonrpc/__init__.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/jsonrpc/notification_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/jsonrpc/request_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/jsonrpc/response_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/__init__.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/capability_list_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/capability_revoked_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/combined_capture_metadata_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/execution_nonce_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/heartbeat_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/tool_call_chunk_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/kernel/tool_call_response_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/__init__.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/attestation_bundle_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/context_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/stamp_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/provenance/verdict_link_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/__init__.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/admission_metadata_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/inclusion_proof_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/lineage_statement_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/receipt/record_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/__init__.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/cancelled_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/err_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/incomplete_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/ok_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/result/stream_complete_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/__init__.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/attestation_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/budget_snapshot_anchor_provenance_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/heartbeat_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/lease_schema.py",
+        "sdks/python/chio-sdk-python/src/chio_sdk/_generated/trust_control/terminate_schema.py",
+        "sdks/typescript/packages/conformance/src/_generated/index.ts",
+        "spec/schemas/COVERAGE.md",
+        "spec/schemas/MANIFEST.sha256",
+        "spec/schemas/registry.json",
+        "supply-chain/audits.toml",
+        "supply-chain/config.toml",
+        "supply-chain/imports.lock"
+      ]
+    }
+  },
+  "overlap_probe": {
+    "method": "Per-file three-way merge of current tracked bytes, common base, and security HEAD; no checkout or index changes. Not a full merge/build.",
+    "results": [
+      {
+        "path": "crates/kernel/chio-kernel/README.md",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "aeebaffce8499330fdebec4bc887d07f6c639ee3cf5e6aeea22a49d43da5d607"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/admission_operation/projection.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "9e738609c575fce459c9679853590f4e28817d65ea00603dd503baa0fb5c1e12"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "84473ab1c4091ee11bde1a1c7dbff1aa0fdd906eeeacd3de6df00155476dfc30"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs",
+        "status": "conflict",
+        "conflict_regions": 1,
+        "current_sha256": "7b5fc4172186b7314fa5f7aa441c38e565c2c0282e7127a56c34145f2d9bdf0f"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/mod.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "50c2ef556cff906e30ab0bb22326fc1c5fe747ed7e05d81cc25b0424231f3ce1"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/output_guard.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "25596819c12c5d0a67a98428d2b9c46140e1f399d621db1d65871029ba3a2583"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs",
+        "status": "conflict",
+        "conflict_regions": 2,
+        "current_sha256": "4b3662a2b405f9cd7f3f4cde793e8ff597a49b49bf68b6176da65be7074852d3"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs",
+        "status": "conflict",
+        "conflict_regions": 1,
+        "current_sha256": "7e0113cbd110b98aecabf0a0a2bacc15f1d3472f07c96b9043dd4849858f4d40"
+      },
+      {
+        "path": "crates/kernel/chio-runtime-core/README.md",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "492163838c17b7d28e9f1c12c4eb4c48ec6735c87b2d84913d5f4b803f319bc4"
+      },
+      {
+        "path": "crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_fixture.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "5a28c14c29c14b6f06dcc207f36e8b3b238225b50de3cb74676affb55dcaa9ba"
+      },
+      {
+        "path": "crates/kernel/chio-runtime-core/src/admission_hook/treaty_evidence.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "25621717efe7df2d21bcf50999552db0787c1c470e3d29abc95264640427be7f"
+      },
+      {
+        "path": "crates/kernel/chio-runtime-core/src/lib.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "2c608bb6a157d324b26eb35ffaa1c6e954a5c4e89202ac63de26cc8adda7f829"
+      },
+      {
+        "path": "crates/kernel/chio-runtime-core/src/schema.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "5f7aee7e0d54843e16812e74ee69777c1d7dd4d1e5f14ce85b57c2b2f16249ef"
+      },
+      {
+        "path": "crates/kernel/chio-runtime-core/src/store/sqlite.rs",
+        "status": "conflict",
+        "conflict_regions": 1,
+        "current_sha256": "5daa2c10b6778b6593ba9b4deb90dae17ec1c87b4bb7db2db1f06b7079fb51bf"
+      },
+      {
+        "path": "crates/kernel/chio-runtime-core/src/store/traits.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "a5f936cfe3f76d729752de320f3e6fa929f813b67592eb4173779e27bc029ee9"
+      },
+      {
+        "path": "crates/kernel/chio-runtime-core/tests/runtime_admission.rs",
+        "status": "conflict",
+        "conflict_regions": 1,
+        "current_sha256": "3cec0c28665157369f39821c02eecb13c43c41b907c666eb756f28f16f84f727"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+        "status": "conflict",
+        "conflict_regions": 1,
+        "current_sha256": "6772a78fc6b0f982cc6c51efb0c57c5803e422ecbd80ffed063c05bb42a9c3d4"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store.sql",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "c58a2d776ec57c3dc09d73d5e6d5c15580cefb6cbba1083bd4bf2ebe8fada199"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/participant.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "0f472212c4658f80a724b0bb139673ffcea243b548dc03bb7891c436fddceddc"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "c1f23f1830b9ed1983cf628b83e6ed0402e5eaee188dd0e8d05514cbce01d49c"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs",
+        "status": "conflict",
+        "conflict_regions": 2,
+        "current_sha256": "e59ffc7a7181d6ff669c0d1470761e498de1edfd8504f806af8826190a19a951"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "03bec2df023f4fe8f15bd1f4b36e742fb56e40b4b48a74c4d5646841202d8f23"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "1729455902e6f704848ab193d19f383d8ee4d74bf02bc7335dc9b03039260f83"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "d3dac6395b27d786d7b6b4a7bc78f4f1e6b79f7d29f05e51cea13dd331c74c18"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/budget_store.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "1086e1ea4ca7beee0aa6f2c12fb36bdb1f231f701f460e46a1c190d854d7a731"
+      },
+      {
+        "path": "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs",
+        "status": "conflict",
+        "conflict_regions": 4,
+        "current_sha256": "c9b877d9ce760bc6845f27354cd75e23cc9932e3d6ca2d6cda7426b4a52286fe"
+      },
+      {
+        "path": "crates/protocol/chio-a2a-edge/src/edge.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "dfe1a2bc52c0e73b790b53584dddbb65d2185d6e149fbd643d90b79ae49fecb9"
+      },
+      {
+        "path": "crates/protocol/chio-a2a-edge/src/lib.rs",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "8d17565fbc164462e891f3f08c2a524b258150199ab960f7fdca5e9165ed52cd"
+      },
+      {
+        "path": "crates/protocol/chio-a2a-edge/src/tests/all.rs",
+        "status": "conflict",
+        "conflict_regions": 2,
+        "current_sha256": "ae3b1cd2a23975302bef40c69ddbebd622196d9b16c82e4c12e60396f169e2d4"
+      },
+      {
+        "path": "docs/README.md",
+        "status": "clean",
+        "conflict_regions": 0,
+        "current_sha256": "6fd2b95591fc853949bcd5b8912695c8734eb06d0a32330c556f3bd7ab3f5cc9"
+      }
+    ],
+    "untracked_security_path_collisions": []
+  },
+  "committed_overlap_paths": [
+    "Cargo.lock",
+    "crates/kernel/chio-runtime-core/src/admission_hook/swarm_ref.rs",
+    "docs/formal/COVERAGE.md",
+    "formal/proof-manifest.toml",
+    "fuzz/Cargo.lock"
+  ],
+  "security_review_threads": {
+    "total": 12,
+    "unresolved": 12,
+    "has_next_page": false,
+    "threads": [
+      {
+        "path": "crates/kernel/chio-kernel/src/admission_operation.rs",
+        "line": null,
+        "is_resolved": false,
+        "is_outdated": true,
+        "last_comment_url": "https://github.com/bb-connor/arc/pull/1117#discussion_r3994851885"
+      },
+      {
+        "path": "crates/core/chio-core-types/src/receipt/kinds.rs",
+        "line": 110,
+        "is_resolved": false,
+        "is_outdated": false,
+        "last_comment_url": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483666"
+      },
+      {
+        "path": "crates/guards/chio-data-guards/src/structured_classification.rs",
+        "line": 228,
+        "is_resolved": false,
+        "is_outdated": false,
+        "last_comment_url": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483673"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/mod.rs",
+        "line": 339,
+        "is_resolved": false,
+        "is_outdated": false,
+        "last_comment_url": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483676"
+      },
+      {
+        "path": ".github/workflows/chio-tee-fips.yml",
+        "line": 66,
+        "is_resolved": false,
+        "is_outdated": false,
+        "last_comment_url": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483684"
+      },
+      {
+        "path": ".github/workflows/chio-tee-fips.yml",
+        "line": 675,
+        "is_resolved": false,
+        "is_outdated": false,
+        "last_comment_url": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483688"
+      },
+      {
+        "path": ".github/workflows/ci.yml",
+        "line": 512,
+        "is_resolved": false,
+        "is_outdated": false,
+        "last_comment_url": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483693"
+      },
+      {
+        "path": ".github/workflows/enterprise-hardening.yml",
+        "line": 819,
+        "is_resolved": false,
+        "is_outdated": false,
+        "last_comment_url": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483699"
+      },
+      {
+        "path": "crates/guards/chio-data-guards/src/structured_classification.rs",
+        "line": 84,
+        "is_resolved": false,
+        "is_outdated": false,
+        "last_comment_url": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483704"
+      },
+      {
+        "path": "crates/guards/chio-data-guards/src/structured_classification.rs",
+        "line": 225,
+        "is_resolved": false,
+        "is_outdated": false,
+        "last_comment_url": "https://github.com/bb-connor/arc/pull/1117#discussion_r3996483710"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/caller_delivery.rs",
+        "line": 16,
+        "is_resolved": false,
+        "is_outdated": false,
+        "last_comment_url": "https://github.com/bb-connor/arc/pull/1117#discussion_r3997874701"
+      },
+      {
+        "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/custody.rs",
+        "line": 163,
+        "is_resolved": false,
+        "is_outdated": false,
+        "last_comment_url": "https://github.com/bb-connor/arc/pull/1117#discussion_r3997874703"
+      }
+    ]
+  },
+  "security_exact_head_runs": {
+    "count": 46,
+    "status_counts": {
+      "pending/": 2,
+      "queued/": 15,
+      "in_progress/": 11,
+      "completed/success": 15,
+      "completed/failure": 3
+    },
+    "failed": [
+      {
+        "conclusion": "failure",
+        "databaseId": 34811945865,
+        "event": "pull_request",
+        "headSha": "8738bdfd7be8c43a0543ca0ce468541529c47add",
+        "status": "completed",
+        "updatedAt": "2026-09-14T06:11:07Z",
+        "url": "https://github.com/bb-connor/arc/actions/runs/34811945865",
+        "workflowName": "cargo-vet",
+        "run_attempt": 1
+      },
+      {
+        "conclusion": "failure",
+        "databaseId": 34811945802,
+        "event": "pull_request",
+        "headSha": "8738bdfd7be8c43a0543ca0ce468541529c47add",
+        "status": "completed",
+        "updatedAt": "2026-09-14T06:18:59Z",
+        "url": "https://github.com/bb-connor/arc/actions/runs/34811945802",
+        "workflowName": "CVE Monitor",
+        "run_attempt": 1
+      },
+      {
+        "conclusion": "failure",
+        "databaseId": 34811943914,
+        "event": "pull_request_target",
+        "headSha": "8738bdfd7be8c43a0543ca0ce468541529c47add",
+        "status": "completed",
+        "updatedAt": "2026-09-14T06:04:49Z",
+        "url": "https://github.com/bb-connor/arc/actions/runs/34811943914",
+        "workflowName": "Enterprise evidence controller",
+        "run_attempt": 1
+      }
+    ]
+  },
+  "source_snapshots": [
+    {
+      "worktree": "paper",
+      "path": "Cargo.toml",
+      "sha256": "f1af9cc30375572b2b393e0d4fde6ffd536638f95d3d2e1d48dd75d75e1e1424",
+      "bytes": 22303,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "paper",
+      "path": "examples/federated-work/src/provider.rs",
+      "sha256": "f0a0090fcde7896028b28e1ef7ba945b9ec7838379e7e89f7696f033ccb8b18b",
+      "bytes": 25074,
+      "matches_recorded_head": false,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "paper",
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs",
+      "sha256": "7b5fc4172186b7314fa5f7aa441c38e565c2c0282e7127a56c34145f2d9bdf0f",
+      "bytes": 108521,
+      "matches_recorded_head": false,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "paper",
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+      "sha256": "6772a78fc6b0f982cc6c51efb0c57c5803e422ecbd80ffed063c05bb42a9c3d4",
+      "bytes": 49063,
+      "matches_recorded_head": false,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "paper",
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store.sql",
+      "sha256": "c58a2d776ec57c3dc09d73d5e6d5c15580cefb6cbba1083bd4bf2ebe8fada199",
+      "bytes": 70069,
+      "matches_recorded_head": false,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "paper",
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs",
+      "sha256": "e59ffc7a7181d6ff669c0d1470761e498de1edfd8504f806af8826190a19a951",
+      "bytes": 28702,
+      "matches_recorded_head": false,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "paper",
+      "path": "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs",
+      "sha256": "c9b877d9ce760bc6845f27354cd75e23cc9932e3d6ca2d6cda7426b4a52286fe",
+      "bytes": 113183,
+      "matches_recorded_head": false,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "paper",
+      "path": "crates/kernel/chio-runtime-core/src/store/sqlite.rs",
+      "sha256": "5daa2c10b6778b6593ba9b4deb90dae17ec1c87b4bb7db2db1f06b7079fb51bf",
+      "bytes": 2883,
+      "matches_recorded_head": false,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "paper",
+      "path": "docs/papers/review-2026-09/evidence/35-bounded-intercompany-subcontracts/manifest.json",
+      "sha256": "87de3a065fe13af801997b60d8983672d41175112b26c4b873cfe5af59554b8b",
+      "bytes": 241800,
+      "matches_recorded_head": false,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "Cargo.toml",
+      "sha256": "c06ca090d707412639de4f6166f8d3b1dcdf3df02b927eed86613b140e0ace87",
+      "bytes": 24068,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "AGENTS.md",
+      "sha256": "98979837f4c51e084a88b2afa7b3b679740d132ec878bdea06016832421a1d15",
+      "bytes": 6061,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "docs/security/launch-status.md",
+      "sha256": "a65ab51561b5e92f408c0af56fe07cf084e4ab9535f0feb17ee2b4674048dd0d",
+      "bytes": 83435,
+      "matches_recorded_head": false,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "docs/security/launch-plan.md",
+      "sha256": "909de92fc8dd34d2962942be1ea8dafdfd9240b6e488d60fbd89af9e400cf71e",
+      "bytes": 599993,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "docs/security/launch-execution-plan.md",
+      "sha256": "1458bfa3d9d46fe54844be8eaeda2c5b8484af5824384019e42e24f6866e6d9a",
+      "bytes": 41206,
+      "matches_recorded_head": false,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "docs/security/authenticated-caller-delivery.md",
+      "sha256": "6a2abfa41a7ca00671d3da5b426d8ab0fff9ab61a5730b39cc37ab3903c49e0a",
+      "bytes": 10286,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "docs/security/consumer-support.md",
+      "sha256": "ce76331dfae44229ce8752dff4a7dc12bdcd8aae1e14aeecd351b0ae726d32db",
+      "bytes": 38774,
+      "matches_recorded_head": false,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "docs/security/m4-consumer-migration.md",
+      "sha256": "8d9e3026c90a85806569808937dacf860e4825c7b88640e631d0102aca29db21",
+      "bytes": 12178,
+      "matches_recorded_head": false,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "docs/security/m4-local-acceptance.md",
+      "sha256": "d3aa0f712436610a99ea49a49406ef78efc623b3a6207dec1d4b8319cf1d9a05",
+      "bytes": 45366,
+      "matches_recorded_head": false,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs",
+      "sha256": "b9bc5978f50b428e7d320d971fe9f3d18f59ac77d41678f7c60272cf56cba6d3",
+      "bytes": 20183,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/platform/chio-store-sqlite/src/caller_execution_ledger.rs",
+      "sha256": "e9bcfb389ee072a22567e4135b3b50d57915815dde5f1380772dc9f064bfc2f7",
+      "bytes": 21372,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/platform/chio-store-sqlite/tests/caller_execution_ledger.rs",
+      "sha256": "f818e6a4c3581baba44f841dc330dc77b1a2e178a5dd6f5f2f4a35d62d428403",
+      "bytes": 20659,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/kernel/chio-kernel/src/admission_operation.rs",
+      "sha256": "b91563b4752a91d68ed6a2cd7fb75940971c6bc80047bfaccb079e69d314d9c8",
+      "bytes": 55565,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery/caller.rs",
+      "sha256": "eba75b59d84a3cd189c06cd5171ba57908ab4874dbc01ee22df0aaf956d06851",
+      "bytes": 2621,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/report.rs",
+      "sha256": "646fec3237f5aa3387d9508297e7af8b4b2432c0041a135a8c2eb9b3f436b128",
+      "bytes": 7019,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+      "sha256": "e45c0f8192c50a3efaca4bfd03f395a8b12e379acbc4cbf1f51e4033fca9852a",
+      "bytes": 60163,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs",
+      "sha256": "798ede3608aab494b4a1142dcb0b8b34d5beafb935404961ec2e066e5b32ba2e",
+      "bytes": 40528,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/protocol/chio-a2a-edge/src/edge.rs",
+      "sha256": "fec7298a135d617f43bfbc9df28c29210a45bdac9b279bd8e90b929c52fa4642",
+      "bytes": 40200,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/kernel/chio-kernel/src/provider_verdict.rs",
+      "sha256": "d384b905234fe1355bd7c9f688b8aa94c2f169a119062aacd03c45edb2b36759",
+      "bytes": 28802,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/core/chio-core-types/src/capability/aggregate_invocation.rs",
+      "sha256": "d545c5f03a670e16eea90d5e8977980b741b186f13a47ceed9c025316ec9a477",
+      "bytes": 19484,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/platform/chio-manifest/src/lib.rs",
+      "sha256": "3419d4bd6ad21622e1ecb0be9b8d3c27b7b3f67a3cfc5d048a15bafc7fd371dc",
+      "bytes": 1390,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/platform/chio-manifest/src/lib_parts/part_01.inc",
+      "sha256": "c8067ecb1e831ab4ea7b7da7a47248a23a7396b28473c9be35689ad2d93a8e6f",
+      "bytes": 43275,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/guards/chio-data-guards/src/structured_classification.rs",
+      "sha256": "301967610f13f10d5a801b6f6d858233f65fcbe68c80eacb3d867ce558ef3519",
+      "bytes": 17910,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/security/chio-flow/src/lib.rs",
+      "sha256": "000bf7a8cfcb85dddee2b6abe058556e082d3c64f8191ab758b30dc2f1017a8e",
+      "bytes": 1124,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/security/chio-flow/src/engine.rs",
+      "sha256": "8b04a11bc644e2b5fd522d8ad0c24ff422494a4ebde75d94f9385d80c36953b7",
+      "bytes": 56049,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/security/chio-flow/src/declassification.rs",
+      "sha256": "0e121749b4bc7f6811cea537840bfdbe1cd7fac5183384cffa2ff3f89503b5bc",
+      "bytes": 32130,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/security/chio-cage/src/lib.rs",
+      "sha256": "8b5372939ec280f37876d4dbf3a4f694b2baa1c9846b238d255d89315c2a379d",
+      "bytes": 2924,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/security/chio-keyring/src/lib.rs",
+      "sha256": "816dadcd984c207f72eed9f21b797c115e3e3ca5ee4450cb62c8da2a98497b4a",
+      "bytes": 35414,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/security/chio-secret-broker/README.md",
+      "sha256": "f43a352408ea829f84f822947e9c902f944768770039b5b1cfc5ccaa294118d5",
+      "bytes": 11414,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/security/chio-secret-broker/src/service_parts/part_02_sections/execution_setup.inc",
+      "sha256": "c6a95e31ae2ec0b1bf83352c9344dd0691f2291027f16f2f1358933dae7d592d",
+      "bytes": 38792,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "crates/security/chio-active-response-authority/src/lib.rs",
+      "sha256": "b3a8a77e51b2203a3c87c657007283d5f07059ac0b6a894088746a5422f4a000",
+      "bytes": 1374,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "examples/reference-swarm/README.md",
+      "sha256": "885f14e29dadc0d33c755d2be9b97ab4681d4933f659f840c4e0d2291a3fe14d",
+      "bytes": 3902,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "scripts/check-authenticated-caller-delivery.sh",
+      "sha256": "4e6b36b880258406d133a45833d0038926330f7976edfb1e6018e6c2bf86a7b5",
+      "bytes": 6944,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "security",
+      "path": "scripts/check-consumer-boundaries.sh",
+      "sha256": "f553ec42550ea4ff311c4f74e820d0f85463d53bc0d938ed03b1baf2ad6ecbbe",
+      "bytes": 5914,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "process",
+      "path": "Cargo.toml",
+      "sha256": "c25645f1a2f3d7491b0f48cf0eb7ecd2684b762160e2d31c4211bc0877530619",
+      "bytes": 24125,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "process",
+      "path": "crates/kernel/chio-process/README.md",
+      "sha256": "f601f69fc08ad4200c86650f7fc0ae1b17a2ddac26040854a4cc84e76dcb4456",
+      "bytes": 8588,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "process",
+      "path": "crates/kernel/chio-process/src/lib.rs",
+      "sha256": "3e3f20f01aee63ceaf73ce41569a5fd1131db67e8211a392f5a1c323ff41dc7d",
+      "bytes": 16422,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    },
+    {
+      "worktree": "process",
+      "path": "crates/products/chio-cli/PROCESS_HOST.md",
+      "sha256": "8b4cfa6815c7e7a066ea60cadc16b9efd3ddd8ae8c9a097c82d3d7c606505622",
+      "bytes": 15958,
+      "matches_recorded_head": true,
+      "review_scope": "selected source or document inspection, not exhaustive audit"
+    }
+  ],
+  "worktrees_after_review_reads": {
+    "paper": {
+      "path": "/home/connor/backbay/arc",
+      "head": "2b3b5af8cbfbc6f16ce6005de3f97cd149803b81",
+      "porcelain": [
+        " M crates/economy/chio-open-market/README.md",
+        " M crates/economy/chio-open-market/src/bidding.rs",
+        " M crates/economy/chio-open-market/src/bidding/tests.rs",
+        " M crates/kernel/chio-kernel/README.md",
+        " M crates/kernel/chio-kernel/src/admission_operation/projection.rs",
+        " M crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs",
+        " M crates/kernel/chio-kernel/src/admission_operation_tests/terminal_projection.rs",
+        " M crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs",
+        " M crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs",
+        " M crates/kernel/chio-kernel/src/kernel/delivery_contract.rs",
+        " M crates/kernel/chio-kernel/src/kernel/mod.rs",
+        " M crates/kernel/chio-kernel/src/kernel/output_guard.rs",
+        " M crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs",
+        " M crates/kernel/chio-kernel/src/payment.rs",
+        " M crates/kernel/chio-kernel/src/payment/journal.rs",
+        " M crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs",
+        " M crates/kernel/chio-runtime-core/README.md",
+        " M crates/kernel/chio-runtime-core/benches/fixtures/admission_scaling_fixture.rs",
+        " M crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_allow_fixture.rs",
+        " M crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_fixture.rs",
+        " M crates/kernel/chio-runtime-core/src/admission_hook/dsse.rs",
+        " M crates/kernel/chio-runtime-core/src/admission_hook/treaty_evidence.rs",
+        " M crates/kernel/chio-runtime-core/src/lib.rs",
+        " M crates/kernel/chio-runtime-core/src/schema.rs",
+        " M crates/kernel/chio-runtime-core/src/store/sqlite.rs",
+        " M crates/kernel/chio-runtime-core/src/store/sqlite/schema_migrations.rs",
+        " M crates/kernel/chio-runtime-core/src/store/traits.rs",
+        " M crates/kernel/chio-runtime-core/src/types.rs",
+        " M crates/kernel/chio-runtime-core/tests/runtime_admission.rs",
+        " M crates/kernel/chio-runtime-core/tests/runtime_treaty_binding_substitution.rs",
+        " M crates/kernel/chio-runtime-core/tests/runtime_treaty_predicate_substitution.rs",
+        " M crates/kernel/chio-runtime-core/tests/support/dispatch_counter.rs",
+        " M crates/kernel/chio-runtime-harness/src/treaty.rs",
+        " M crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+        " M crates/platform/chio-store-sqlite/src/admission_operation_store.sql",
+        " M crates/platform/chio-store-sqlite/src/admission_operation_store/participant.rs",
+        " M crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs",
+        " M crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs",
+        " M crates/platform/chio-store-sqlite/src/admission_operation_store_tests.rs",
+        " M crates/platform/chio-store-sqlite/src/admission_operation_store_tests/recovery.rs",
+        " M crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema.rs",
+        " M crates/platform/chio-store-sqlite/src/budget_store.rs",
+        " M crates/platform/chio-store-sqlite/src/budget_store/payment_journal.rs",
+        " M crates/platform/chio-store-sqlite/src/finding_operator_payment.rs",
+        " M crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs",
+        " M crates/protocol/chio-a2a-edge/README.md",
+        " M crates/protocol/chio-a2a-edge/src/edge.rs",
+        " M crates/protocol/chio-a2a-edge/src/lib.rs",
+        " M crates/protocol/chio-a2a-edge/src/tests/all.rs",
+        " M crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs",
+        " M crates/trust/chio-federation/tests/verifier_hook_conformance.rs",
+        " M docs/README.md",
+        " M docs/integrations/CHIO-ADAPTER-BASE.md",
+        " M docs/market/README.md",
+        " M docs/papers/evidence-crosses/bib.bib",
+        " M docs/papers/evidence-crosses/derived-macros.tex",
+        " M docs/papers/evidence-crosses/paper.pdf",
+        " M docs/papers/evidence-crosses/paper.tex",
+        " M docs/papers/evidence-crosses/proof-model.md",
+        " M docs/papers/evidence-crosses/sections/01-rule.tex",
+        " M docs/papers/evidence-crosses/sections/03-receipt.tex",
+        " M docs/papers/evidence-crosses/sections/04-admission.tex",
+        " M docs/papers/evidence-crosses/sections/05-cross-organization.tex",
+        " M docs/papers/evidence-crosses/sections/06-security.tex",
+        " M docs/papers/evidence-crosses/sections/07-formal.tex",
+        " M docs/papers/evidence-crosses/sections/08-evaluation.tex",
+        " M docs/papers/evidence-crosses/sections/09-limitations.tex",
+        " M docs/papers/evidence-crosses/tools/derive-macros.py",
+        " M docs/papers/review-2026-09/README.md",
+        " M examples/composed-baseline/src/lib.rs",
+        " M formal/lean4/Chio/Chio/Treaty/AdmissionBinding.lean",
+        " M sdks/python/chio-adapter-base/CHANGELOG.md",
+        " M sdks/python/chio-adapter-base/src/chio_adapter_base/security.py",
+        " M sdks/python/chio-adapter-base/tests/test_security.py",
+        " M sdks/python/chio-hermes/CHANGELOG.md",
+        " M sdks/python/chio-hermes/README.md",
+        " M sdks/python/chio-hermes/src/chio_hermes/executors.py",
+        " M sdks/python/chio-hermes/tests/test_security_fixes.py",
+        "?? crates/kernel/chio-kernel/src/kernel/tests/durable_admission/checked_output.rs",
+        "?? crates/kernel/chio-kernel/src/payment/unknown_release.rs",
+        "?? crates/kernel/chio-kernel/tests/durable_admission_sqlite/",
+        "?? crates/kernel/chio-runtime-core/examples/outcome_artifact_workflow.rs",
+        "?? crates/kernel/chio-runtime-core/examples/outcome_artifact_workflow/",
+        "?? crates/kernel/chio-runtime-core/src/outcome_continuation.rs",
+        "?? crates/kernel/chio-runtime-core/src/store/sqlite/outcome_continuation.rs",
+        "?? crates/kernel/chio-runtime-core/tests/outcome_continuation.rs",
+        "?? crates/kernel/chio-runtime-core/tests/support/treaty_presentation.rs",
+        "?? crates/platform/chio-store-sqlite/src/admission_operation_store/unknown_release.rs",
+        "?? crates/protocol/chio-a2a-edge/src/tests/v1.rs",
+        "?? crates/protocol/chio-a2a-edge/src/v1.rs",
+        "?? crates/tooling/chio-conformance/tests/a2a_client_edge_interop.rs",
+        "?? docs/market/open-agent-work/",
+        "?? docs/papers/review-2026-09/15-breakthrough-judgment.md",
+        "?? docs/papers/review-2026-09/16-outcome-continuation-research.md",
+        "?? docs/papers/review-2026-09/17-outcome-continuation-experiment.md",
+        "?? docs/papers/review-2026-09/18-matched-outcome-ledger.md",
+        "?? docs/papers/review-2026-09/19-receiver-outcome-graph.md",
+        "?? docs/papers/review-2026-09/20-isolated-outcome-graph.md",
+        "?? docs/papers/review-2026-09/21-verified-source-repair.md",
+        "?? docs/papers/review-2026-09/22-receiver-owned-outcome-checking.md",
+        "?? docs/papers/review-2026-09/23-recoverable-git-publication.md",
+        "?? docs/papers/review-2026-09/24-portable-artifact-checking.md",
+        "?? docs/papers/review-2026-09/25-artifact-validity-is-not-scarce-work.md",
+        "?? docs/papers/review-2026-09/26-checked-repair-exchange.md",
+        "?? docs/papers/review-2026-09/27-interorganization-work-protocol.md",
+        "?? docs/papers/review-2026-09/28-recoverable-market-agreements.md",
+        "?? docs/papers/review-2026-09/29-checked-work-and-local-settlement.md",
+        "?? docs/papers/review-2026-09/30-recoverable-checked-output-rejections.md",
+        "?? docs/papers/review-2026-09/31-python-rust-work-interoperability.md",
+        "?? docs/papers/review-2026-09/32-public-enrollment-and-https.md",
+        "?? docs/papers/review-2026-09/33-verifiable-uncertain-work.md",
+        "?? docs/papers/review-2026-09/34-mutually-agreed-unknown-release.md",
+        "?? docs/papers/review-2026-09/35-bounded-intercompany-subcontracts.md",
+        "?? docs/papers/review-2026-09/evidence/",
+        "?? docs/papers/verifiable-work/",
+        "?? docs/superpowers/plans/2026-09-14-open-agent-work.md",
+        "?? examples/composed-baseline/src/outcome_ledger.rs",
+        "?? examples/composed-baseline/tests/receiver_owned_issuer.rs",
+        "?? examples/federated-work/",
+        "?? examples/outcome-ledger-comparison/",
+        "?? examples/repair-machine-proof/",
+        "?? sdks/python/chio-adapter-base/tests/test_git_hooks.py",
+        "?? sdks/python/chio-hermes/tests/test_git_commit_hooks.py"
+      ]
+    },
+    "security": {
+      "path": "/tmp/arc-security-launch",
+      "head": "8738bdfd7be8c43a0543ca0ce468541529c47add",
+      "porcelain": [
+        " M docs/security/consumer-support.md",
+        " M docs/security/launch-execution-plan.md",
+        " M docs/security/launch-status.md",
+        " M docs/security/m4-consumer-migration.md",
+        " M docs/security/m4-consumer-qualification.md",
+        "?? docs/security/m4-local-acceptance.md"
+      ]
+    },
+    "process": {
+      "path": "/home/connor/backbay/arc-process-security",
+      "head": "75d664822abf5f6e8da6e6f858cab5a6d81dc3bd",
+      "porcelain": []
+    }
+  },
+  "historical_schema_collision": {
+    "security_commit": "bd94b09a7b76b2066e135f0e58f7f7c00ce0f523",
+    "path": "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+    "sha256": "1782b78a2b65a4830ef09f21f9164bfaee91d673e52d509e70f008bb301d8f24",
+    "security_version_10_purpose": "retain original cumulative admission requests",
+    "paper_dirty_version_10_purpose": "retain unknown payment release records",
+    "integration_requirement": "Authenticate the predecessor catalog, not only its numeric version."
+  }
+}

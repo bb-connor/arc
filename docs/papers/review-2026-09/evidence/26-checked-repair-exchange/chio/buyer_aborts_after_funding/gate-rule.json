@@ -1,0 +1,15 @@
+{
+  "slot": {
+    "receiverId": "90e1c65dfeecb329b4e64736964ce47ff9ef06052aa5071d72a5c54612464872",
+    "workflowId": "chio-buyer_aborts_after_funding",
+    "stepId": "settle"
+  },
+  "predecessorStepId": "check-encrypted-repair",
+  "verifierKey": "90e1c65dfeecb329b4e64736964ce47ff9ef06052aa5071d72a5c54612464872",
+  "contractSha256": "85ccde4096875807635a07d3db23f28213f611983bc79e22475ffa18cfb60729",
+  "serverId": "local-repair-exchange",
+  "toolName": "settle",
+  "resource": "funded-trade",
+  "validFromUnixMs": 1799999999000,
+  "validUntilUnixMs": 1800000001000
+}

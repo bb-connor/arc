@@ -1,0 +1,66 @@
+{
+  "reply": {
+    "allowed": true,
+    "output": {
+      "result": {
+        "artifact": {
+          "grants": [
+            {
+              "operations": [
+                "invoke"
+              ],
+              "server_id": "source-checkout",
+              "tool_name": "read"
+            }
+          ]
+        },
+        "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+        "completed": true
+      },
+      "state": "completed"
+    },
+    "receipt": {
+      "action": {
+        "parameter_hash": "116ae56190083485aca140d4f1a176131acab83c88c9b957fa47e71dac224fa6",
+        "parameters": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746"
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "comparison-capability-8efa74d6f37c05cbd44664ed2fb72e7e5bca82503696a69a7b85ddabca53513f",
+      "content_hash": "975163aac97a5b0c95b1b04e93d19a4345697f20dec68a77c0c676d1ae69b239",
+      "decision": {
+        "verdict": "allow"
+      },
+      "id": "8a28777a70532249dccd88c5720e8b83c39a519bc2ed1da1ea0b9824a07bac1f",
+      "kernel_key": "83cef7be50e4fc44662b33935411cf5d847eea5ca7a1017727698bb18b7bc433",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "83cef7be50e4fc44662b33935411cf5d847eea5ca7a1017727698bb18b7bc433",
+          "subject_key": "8efa74d6f37c05cbd44664ed2fb72e7e5bca82503696a69a7b85ddabca53513f"
+        },
+        "chio_receipt_signing_nonce": "receipt-0dafac0ffb0081a3f72588606461ce5e0cb0cd11648e061731e3b4c36c643da7",
+        "receipt_context": {
+          "request_id": "0dafac0ffb0081a3f72588606461ce5e0cb0cd11648e061731e3b4c36c643da7"
+        }
+      },
+      "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "28421e0565db15888997cc018e5b70ac03aa01c663cd3adfb14511049e1b99e1186e020fbc90bd4a1cdd63adf07e1b2bd21699deaa2b8dd1049fde724cc77b02",
+      "timestamp": 1800000000,
+      "tool_name": "status",
+      "tool_origin": "caller_executed",
+      "tool_server": "archive",
+      "trust_level": "mediated"
+    }
+  },
+  "request": {
+    "arguments": {
+      "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746"
+    },
+    "tool": "status"
+  }
+}

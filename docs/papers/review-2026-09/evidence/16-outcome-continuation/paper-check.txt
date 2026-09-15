@@ -1,0 +1,7 @@
+check-log: clean
+check-bibtex: clean
+pages: 12 (maximum 12)
+check-pages: clean
+body words: 4726 (maximum 5000)
+check-words: clean
+check-macros: clean

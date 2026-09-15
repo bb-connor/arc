@@ -1,0 +1,20 @@
+{
+  "artifact": "repaired Chio capability scope",
+  "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+  "contractSha256": "f2bc1cb96338832ee4cdba2242ad96c25fefea5fe18536eb42ff88df8dfc2cd1",
+  "experiment": "receiver-owned-outcome-continuation",
+  "failedCandidatePublished": false,
+  "limits": [
+    "Local in-process kernels, not independently operated remote hosts",
+    "Verifier remains trusted for the native scope contract",
+    "No matched baseline or integration-cost result yet",
+    "Receipt logs are persistent; this demo does not qualify full kernel crash recovery"
+  ],
+  "physicalPublicationRecords": 1,
+  "publisherKey": "4e68614e741dc29e76316d2d1dc53e7ede811766dd6a118e8ba30d60c59495e7",
+  "receiverReopened": true,
+  "replacementAgentPublishedAgain": false,
+  "substitutedArtifactPublished": false,
+  "verifiedArtifactPublished": true,
+  "verifierKey": "ee36e7ad911353300215912f3c644c0b8524edb2b475aba8b18813bd18de716c"
+}

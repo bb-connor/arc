@@ -1,0 +1,23 @@
+{
+  "denied_paths": [
+    "/tmp/.tmp8F67sy/normal/ledger/verifier/key.seed",
+    "/tmp/.tmp8F67sy/normal/ledger/verifier/owner.json",
+    "/tmp/.tmp8F67sy/normal/ledger/publisher/key.seed",
+    "/tmp/.tmp8F67sy/normal/ledger/publisher/owner.json",
+    "/tmp/.tmp8F67sy/normal/ledger/publisher/receiver.sqlite",
+    "/tmp/.tmp8F67sy/normal/ledger/archive/key.seed",
+    "/tmp/.tmp8F67sy/normal/ledger/archive/owner.json",
+    "/tmp/.tmp8F67sy/normal/ledger/archive/receiver.sqlite",
+    "/tmp/.tmp8F67sy/normal/ledger/host-only-canary"
+  ],
+  "host_namespaces": {
+    "ipc": "ipc:[4026531839]",
+    "mnt": "mnt:[4026531832]",
+    "net": "net:[4026531833]",
+    "pid": "pid:[4026531836]",
+    "user": "user:[4026531837]",
+    "uts": "uts:[4026531838]"
+  },
+  "host_tcp_port": 42711,
+  "receiver": false
+}

@@ -1,0 +1,25 @@
+{
+  "authorizations": [
+    {
+      "effect_json": "{\"artifactSha256\":\"345716eeb0bf5e0959a2f5e942c0183c9ae5db8204a1717404d2f9a1a3ac885b\",\"resource\":\"funded-trade\"}",
+      "evidence_json": "{\"body\":{\"schema\":\"chio.runtime.artifact-outcome.experimental.v1\",\"slot\":{\"receiverId\":\"bbc50dc823fe8d338d18e1e2ff9a90b62b46888a1cddb2f4909c15af4c1778ce\",\"workflowId\":\"ledger-concurrent_retries\",\"stepId\":\"settle\"},\"predecessorStepId\":\"check-encrypted-repair\",\"contractSha256\":\"85ccde4096875807635a07d3db23f28213f611983bc79e22475ffa18cfb60729\",\"artifactSha256\":\"345716eeb0bf5e0959a2f5e942c0183c9ae5db8204a1717404d2f9a1a3ac885b\",\"passed\":true,\"verifiedAtUnixMs\":1800000000000},\"signature\":\"389e67b9fa4cf936b7a309402d00671bce8ebed5441b4d35bc29f40919198ca4c045fac20cbd312cf49c93f37225541420395dd23bae4498eb549eb70304fe07\"}",
+      "handle": "d8f345a2ad83d6285b7c5beeae25a1fe8d52ba251d2dc5cd4e6a94574e7fa5b6",
+      "receiver": "bbc50dc823fe8d338d18e1e2ff9a90b62b46888a1cddb2f4909c15af4c1778ce",
+      "step": "settle",
+      "workflow": "ledger-concurrent_retries"
+    }
+  ],
+  "jobs": [
+    {
+      "claimed_handle": "d8f345a2ad83d6285b7c5beeae25a1fe8d52ba251d2dc5cd4e6a94574e7fa5b6",
+      "receiver": "bbc50dc823fe8d338d18e1e2ff9a90b62b46888a1cddb2f4909c15af4c1778ce",
+      "result_json": "{\"balances\":{\"buyer\":90,\"seller\":10},\"locked\":0,\"offerSha256\":\"345716eeb0bf5e0959a2f5e942c0183c9ae5db8204a1717404d2f9a1a3ac885b\",\"releasedKey\":\"396cc80e86753664b6fd9d3af9edf321f3418023d7a194fa28e6267a7495d01c\",\"settlementEvents\":1,\"state\":\"settled\"}",
+      "revoked": 0,
+      "rule_digest": "283646289083ffd2f9cb9dd3baa252c7434df14cd3bd148d4b633bc12c890f7a",
+      "rule_json": "{\"slot\":{\"receiverId\":\"bbc50dc823fe8d338d18e1e2ff9a90b62b46888a1cddb2f4909c15af4c1778ce\",\"workflowId\":\"ledger-concurrent_retries\",\"stepId\":\"settle\"},\"predecessorStepId\":\"check-encrypted-repair\",\"verifierKey\":\"bbc50dc823fe8d338d18e1e2ff9a90b62b46888a1cddb2f4909c15af4c1778ce\",\"contractSha256\":\"85ccde4096875807635a07d3db23f28213f611983bc79e22475ffa18cfb60729\",\"serverId\":\"local-repair-exchange\",\"toolName\":\"settle\",\"resource\":\"funded-trade\",\"validFromUnixMs\":1799999999000,\"validUntilUnixMs\":1800000001000}",
+      "state": "completed",
+      "step": "settle",
+      "workflow": "ledger-concurrent_retries"
+    }
+  ]
+}

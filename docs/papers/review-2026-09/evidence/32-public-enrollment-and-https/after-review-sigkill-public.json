@@ -1,0 +1,11 @@
+{
+  "scenario": "after-review-sigkill",
+  "reviews": 1,
+  "payments": {
+    "held": 1
+  },
+  "buyerExpenses": 0,
+  "retriedWork": false,
+  "firstError": "buyer: RemoteDisconnected",
+  "recoveryError": "buyer: provider has no completed result for this request"
+}

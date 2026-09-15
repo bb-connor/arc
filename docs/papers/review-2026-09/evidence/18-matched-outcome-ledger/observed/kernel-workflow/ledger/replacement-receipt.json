@@ -1,0 +1,44 @@
+{
+  "id": "a79a3081f8e16e2887fc5e46e8cfc49790cfdf7778ef39ad2bcf2081b2a4efb6",
+  "timestamp": 1800000000,
+  "capability_id": "comparison-capability-9e1c25beb6d76262994a5bfd2cb0471524422c7ba02f16ce5c7a0d835e39ec6a",
+  "tool_server": "artifact-registry",
+  "tool_name": "publish",
+  "action": {
+    "parameters": {
+      "arguments": {
+        "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+        "resource": "review-queue"
+      },
+      "backend": "Ledger",
+      "handle": "61028aa398713e965e0b8617ff3111c09c034b79eeb4f8d97f36c816a68f29ef"
+    },
+    "parameter_hash": "5918b33336e0eead76956f42a2c122f9bfd0c138ff67444aff5a2c6fb86b3b82"
+  },
+  "decision": {
+    "verdict": "deny",
+    "reason": "tool server error: job_revoked_or_spent",
+    "guard": "kernel"
+  },
+  "receipt_kind": "mediated_decision",
+  "boundary_class": "prevent",
+  "tool_origin": "caller_executed",
+  "redaction_mode": "none",
+  "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+  "policy_hash": "373d76625b15155ce65b5c15617d15e0121672dfc4f592f59878a41bd51a966b",
+  "metadata": {
+    "attribution": {
+      "delegation_depth": 0,
+      "grant_index": 0,
+      "issuer_key": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+      "subject_key": "9e1c25beb6d76262994a5bfd2cb0471524422c7ba02f16ce5c7a0d835e39ec6a"
+    },
+    "chio_receipt_signing_nonce": "receipt-replacement-agent-fresh-capability",
+    "receipt_context": {
+      "request_id": "replacement-agent-fresh-capability"
+    }
+  },
+  "trust_level": "mediated",
+  "kernel_key": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+  "signature": "2044921f4beb65be51f7ffda28cb53f08fb4b39444b36474a641c652cee1ff7204a2076a89cd6d107b932475ea8ee3010e1b566a807273b07034b9cd26a03803"
+}

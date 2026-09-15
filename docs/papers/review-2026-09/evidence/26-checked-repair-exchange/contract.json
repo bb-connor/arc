@@ -1,0 +1,98 @@
+{
+  "baseSha256": {
+    "sdks/python/chio-adapter-base/src/chio_adapter_base/security.py": "8b5ee6ac0f62c065c22719bba446ececff1584689cf7a4bb7160d4cabcf769b0",
+    "sdks/python/chio-hermes/src/chio_hermes/executors.py": "103407888daf53bc19e7ec074f996da9e7162e5fe9763b91b46cbc21a81adcba"
+  },
+  "checkerSha256": "c285d26015273d07606e00eb465cf35b06186b2d540f2dbb5ec29595e52386e4",
+  "driverSha256": "827c120271a23444183bae4417f6d6d507eaa73563eac19476d595885c97fc15",
+  "exchangeSha256": "edd540873f23524f21a4bac70a6acccdba21a870f4d239db87ab3492826b1a22",
+  "hooks": [
+    "pre-commit",
+    "prepare-commit-msg",
+    "commit-msg",
+    "post-commit",
+    "reference-transaction"
+  ],
+  "isolationSha256": "8fbc0fa5119c1db06c5e29c0f63e5684e340dde8d6d5f0c10a879088d3389e03",
+  "paths": [
+    "sdks/python/chio-adapter-base/src/chio_adapter_base/security.py",
+    "sdks/python/chio-hermes/src/chio_hermes/executors.py"
+  ],
+  "requests": [
+    {
+      "argv": [
+        "git",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair"
+      ],
+      "entrypoint": "helper",
+      "message": "test: checked repository repair"
+    },
+    {
+      "argv": [
+        "git",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair",
+        "--no-verify"
+      ],
+      "entrypoint": "helper",
+      "message": "test: checked repository repair"
+    },
+    {
+      "argv": [
+        "git",
+        "-c",
+        "core.hooksPath=/work/hooks",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair"
+      ],
+      "entrypoint": "helper",
+      "message": "test: checked repository repair"
+    },
+    {
+      "argv": [
+        "git",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.hooksPath=/work/hooks",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair"
+      ],
+      "entrypoint": "helper",
+      "message": "test: checked repository repair"
+    },
+    {
+      "argv": [
+        "git",
+        "--config-env=core.hooksPath=HOOK_TEST_PATH",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "test: checked repository repair"
+      ],
+      "entrypoint": "helper",
+      "message": "test: checked repository repair"
+    },
+    {
+      "entrypoint": "commit",
+      "message": "test: checked repository repair"
+    },
+    {
+      "command": "commit -m 'test: checked repository repair'",
+      "entrypoint": "git_run",
+      "message": "test: checked repository repair"
+    }
+  ],
+  "schema": "repair-exchange-check.experimental.v1",
+  "settlementAssumption": "Trusted local checker and SQLite operator; 100 test credits, no external payment rail",
+  "settlementWorkerSha256": "e6d79be1c58a962438941349cf50fd40b117d6c9245fc18e8dc71a316d9029e7"
+}

@@ -1,0 +1,8 @@
+{
+  "observedSourceSha256": {
+    "sdks/python/chio-adapter-base/src/chio_adapter_base/security.py": "e4ad63fd2af96170cb98cfc025af205ad53649dbe29dadd6b400233ef250b234",
+    "sdks/python/chio-hermes/src/chio_hermes/executors.py": "c7ad6f8d19a33c96e14c1d84312ef77b1c4d52c1bdd494be18b48358d481c726"
+  },
+  "publicationReflog": "0000000000000000000000000000000000000000000000000000000000000000 8ea5a0adb5d7e7bceedae168b9de835ee1bdc6e9be72a3fbad83e380672a5e26 Chio repair checker <test@example.invalid> 1789324813 +0000\tchecked-repair-publication\n",
+  "referenceInventory": "refs/heads/verified-repair 8ea5a0adb5d7e7bceedae168b9de835ee1bdc6e9be72a3fbad83e380672a5e26 \n"
+}

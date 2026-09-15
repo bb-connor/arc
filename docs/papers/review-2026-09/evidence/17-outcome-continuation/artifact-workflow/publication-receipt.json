@@ -1,0 +1,56 @@
+{
+  "id": "91719c39674dc34aea009c50477e09ff3733bfd3604024f60aa83971258ba992",
+  "timestamp": 1789310339,
+  "capability_id": "cap-01a09b35-0b4b-7ab3-87e6-4d8cf4cb96a3",
+  "tool_server": "artifact-registry",
+  "tool_name": "publish",
+  "action": {
+    "parameters": {
+      "arguments": {
+        "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+        "resource": "review-queue"
+      },
+      "evidence": {
+        "body": {
+          "artifactSha256": "b8ca50233cd9d3ba3ba092ea3a8a08310a20632726386e9d69a7c7719e2d9746",
+          "contractSha256": "f2bc1cb96338832ee4cdba2242ad96c25fefea5fe18536eb42ff88df8dfc2cd1",
+          "passed": true,
+          "predecessorStepId": "verify-owner-scope-contract",
+          "schema": "chio.runtime.artifact-outcome.experimental.v1",
+          "slot": {
+            "receiverId": "4e68614e741dc29e76316d2d1dc53e7ede811766dd6a118e8ba30d60c59495e7",
+            "stepId": "publish-approved-scope",
+            "workflowId": "repair-read-policy"
+          },
+          "verifiedAtUnixMs": 1789310339521
+        },
+        "signature": "01391044354f2fcd5faccd2d7a48460fc2093398e186c5c9645e4c82a05299f04dd096021babd9cc37201eed25079500dc72d98163f372777adab45b8a782705"
+      }
+    },
+    "parameter_hash": "3cf264c3dc3e587a9c9ce45edfa0d3e22afeeb9fb45088483f49c7305accbb6e"
+  },
+  "decision": {
+    "verdict": "allow"
+  },
+  "receipt_kind": "mediated_decision",
+  "boundary_class": "prevent",
+  "tool_origin": "caller_executed",
+  "redaction_mode": "none",
+  "content_hash": "d71c819daf913ec9c77277e05d90dd6c00b34e8e355a462c83cca1c6d99837ad",
+  "policy_hash": "f009896c60a294dccb450806f9709f586d5120bcbefdb8f22f469808a903e60b",
+  "metadata": {
+    "attribution": {
+      "delegation_depth": 0,
+      "grant_index": 0,
+      "issuer_key": "4e68614e741dc29e76316d2d1dc53e7ede811766dd6a118e8ba30d60c59495e7",
+      "subject_key": "8f152b64dce31ef880cb7839f5d3205f739db2927b2f3d0b0a7efec2a3a31058"
+    },
+    "chio_receipt_signing_nonce": "rcpt-01a09b35-0b6c-77d2-ad5b-1732f4776fd9",
+    "receipt_context": {
+      "request_id": "delivery-3-verified-artifact"
+    }
+  },
+  "trust_level": "mediated",
+  "kernel_key": "4e68614e741dc29e76316d2d1dc53e7ede811766dd6a118e8ba30d60c59495e7",
+  "signature": "060c6600ec2f8c785cf2d45a3d73d535d0115a084fb491a8af9a2eccc2fe8bcdaf511e82b40b21b51f56e928754bb05603e80eedececc0fa838fc9c599c0b200"
+}

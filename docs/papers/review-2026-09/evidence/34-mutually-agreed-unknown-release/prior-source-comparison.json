@@ -1,0 +1,33 @@
+{
+  "changedExistingSources": [
+    "crates/kernel/chio-kernel/src/payment.rs",
+    "crates/kernel/chio-kernel/src/payment/journal.rs",
+    "crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store.sql",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/participant.rs",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/schema.rs",
+    "crates/platform/chio-store-sqlite/src/budget_store.rs",
+    "crates/platform/chio-store-sqlite/src/budget_store/payment_journal.rs",
+    "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs",
+    "docs/papers/evidence-crosses/paper.pdf",
+    "docs/papers/evidence-crosses/sections/01-rule.tex",
+    "docs/papers/review-2026-09/README.md",
+    "examples/federated-work/HTTPS.md",
+    "examples/federated-work/README.md",
+    "examples/federated-work/python_buyer/README.md",
+    "examples/federated-work/python_buyer/client.py",
+    "examples/federated-work/src/common.rs",
+    "examples/federated-work/src/https.rs",
+    "examples/federated-work/src/incident.rs",
+    "examples/federated-work/src/main.rs",
+    "examples/federated-work/src/payment.rs",
+    "examples/federated-work/src/provider.rs",
+    "examples/federated-work/src/tests.rs"
+  ],
+  "manifest": "docs/papers/review-2026-09/evidence/33-verifiable-uncertain-work/manifest.json",
+  "manifestSha256": "3b6fab48a95b7b3710b82ff1e7c0daab628a2863dd78c7bc4e502e38e49a12de",
+  "previousArtifactsVerified": 169,
+  "previousSourceFiles": 1495
+}
