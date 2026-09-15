@@ -81,12 +81,18 @@ impl StructuredClassificationFinding {
         field_path: impl Into<String>,
     ) -> Result<Self, StructuredClassificationError> {
         let field_path = field_path.into();
-        if field_path.is_empty()
+        if !field_path.starts_with('/')
             || field_path.len() > MAX_FIELD_PATH_BYTES
             || field_path.trim() != field_path
             || field_path.chars().any(char::is_control)
         {
             return Err(StructuredClassificationError::InvalidLocation);
+        }
+        let mut characters = field_path.chars();
+        while let Some(character) = characters.next() {
+            if character == '~' && !matches!(characters.next(), Some('0' | '1')) {
+                return Err(StructuredClassificationError::InvalidLocation);
+            }
         }
         Self::new(
             classifier_id,
@@ -223,6 +229,17 @@ impl RegexClassificationRule {
             return Err(StructuredClassificationError::InvalidConfidence);
         }
         if expression.is_empty() || expression.len() > MAX_PATTERN_BYTES {
+            return Err(StructuredClassificationError::InvalidPattern);
+        }
+        // Analyze consumed bytes, including contextual assertions such as word
+        // boundaries that cannot be detected by matching only the empty input.
+        // Match the byte regex engine's support for explicitly non-UTF-8 rules.
+        let syntax = regex_syntax::ParserBuilder::new()
+            .utf8(false)
+            .build()
+            .parse(expression)
+            .map_err(|_| StructuredClassificationError::InvalidPattern)?;
+        if syntax.properties().minimum_len() == Some(0) {
             return Err(StructuredClassificationError::InvalidPattern);
         }
         let expression = RegexBuilder::new(expression)
@@ -428,6 +445,10 @@ mod tests {
             RegexClassificationRule::new("pii", &oversized_compiled_rule, 8_000),
             Err(StructuredClassificationError::InvalidPattern)
         ));
+        assert!(matches!(
+            RegexClassificationRule::new("pii", "(?:a{1000}){1000}", 8_000),
+            Err(StructuredClassificationError::InvalidPattern)
+        ));
     }
 
     #[test]
@@ -455,6 +476,101 @@ mod tests {
             ),
             Err(StructuredClassificationError::InvalidLocation)
         );
+    }
+
+    #[test]
+    fn nullable_regex_rules_reject_at_load_including_contextual_boundaries() {
+        for pattern in [
+            "a?",
+            "a*",
+            "^",
+            "$",
+            "(?:a|)",
+            r"\b",
+            r"\B",
+            r"(?-u:\b)",
+            r"(?-u:\B)",
+            r"(?:\b|abc)",
+            r"(?:a{0,2})",
+        ] {
+            assert!(
+                matches!(
+                    RegexClassificationRule::new("pii", pattern, 8_000),
+                    Err(StructuredClassificationError::InvalidPattern)
+                ),
+                "accepted nullable pattern {pattern}"
+            );
+        }
+    }
+
+    #[test]
+    fn consuming_regex_rules_retain_byte_matching_and_bounds() {
+        for (pattern, payload, end) in [
+            (r"\ba+\b", b"aaa".as_slice(), 3),
+            (r"(?-u:\b)a", b"a".as_slice(), 1),
+            (r"^(?:a|bc)$", b"bc".as_slice(), 2),
+            (r"(?-u:\xFF)", &[255][..], 1),
+        ] {
+            let rule = RegexClassificationRule::new("pii", pattern, 8_000)
+                .unwrap_or_else(|error| panic!("{pattern}: {error}"));
+            let classifier = RegexStructuredClassifier::new("classifier.local", "1", vec![rule])
+                .unwrap_or_else(|error| panic!("classifier: {error}"));
+            let result = classifier
+                .classify(payload)
+                .unwrap_or_else(|error| panic!("classify: {error}"));
+            assert_eq!(result.findings().len(), 1);
+            assert_eq!(
+                result.findings()[0].location(),
+                &FindingLocation::ByteRange { start: 0, end }
+            );
+        }
+    }
+
+    #[test]
+    fn field_path_constructor_rejects_non_pointer_syntax() {
+        for path in [
+            "patient.diagnosis",
+            "patient/diagnosis",
+            "/bad~",
+            "/bad~2",
+            "/bad~x/key",
+        ] {
+            assert_eq!(
+                StructuredClassificationFinding::at_field_path(
+                    "classifier.local",
+                    "1",
+                    "phi",
+                    9_000,
+                    path
+                ),
+                Err(StructuredClassificationError::InvalidLocation),
+                "accepted {path}"
+            );
+        }
+    }
+
+    #[test]
+    fn field_paths_preserve_escaped_and_empty_key_segments_and_check_existence_later() {
+        let payload = br#"{"":{"":"value"},"a/b":{"~key":true}}"#;
+        for path in ["/", "//", "/a~1b/~0key", "/missing"] {
+            let finding = StructuredClassificationFinding::at_field_path(
+                "classifier.local",
+                "1",
+                "phi",
+                9_000,
+                path,
+            )
+            .unwrap_or_else(|error| panic!("{path}: {error}"));
+            let identity = ClassifierIdentity::new("classifier.local", "1")
+                .unwrap_or_else(|error| panic!("identity: {error}"));
+            let result =
+                StructuredClassificationResult::from_payload(identity, payload, vec![finding]);
+            if path == "/missing" {
+                assert_eq!(result, Err(StructuredClassificationError::InvalidLocation));
+            } else {
+                assert!(result.is_ok(), "{path}: {result:?}");
+            }
+        }
     }
 
     struct FieldClassifier;
@@ -533,6 +649,27 @@ mod tests {
         assert_eq!(
             classifier.classify(&vec![b'a'; 257]),
             Err(StructuredClassificationError::TooManyFindings)
+        );
+    }
+
+    #[test]
+    fn unexpected_empty_runtime_match_cannot_become_authenticated_no_findings() {
+        // Bypass the constructor only in this test to preserve the independent
+        // runtime check against a future regression in load-time validation.
+        let classifier = RegexStructuredClassifier::new(
+            "classifier.local",
+            "1",
+            vec![RegexClassificationRule {
+                category: "secret".to_owned(),
+                expression: regex::bytes::Regex::new(r"\b")
+                    .unwrap_or_else(|error| panic!("test regex: {error}")),
+                confidence_basis_points: 10_000,
+            }],
+        )
+        .unwrap_or_else(|error| panic!("classifier: {error}"));
+        assert_eq!(
+            classifier.classify(b"secret"),
+            Err(StructuredClassificationError::InvalidLocation)
         );
     }
 }
