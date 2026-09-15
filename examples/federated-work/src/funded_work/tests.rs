@@ -46,3 +46,5 @@ fn allocation_rejects_lossy_or_ambiguous_money() {
 mod authority_enrollment;
 mod checkpoint_handoff;
 mod verifier_handoff;
+
+mod work_consent;

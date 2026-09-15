@@ -1,0 +1,22 @@
+   Compiling chio-federated-work v0.1.0 (/home/connor/backbay/arc-funded-integration/examples/federated-work)
+    Finished `test` profile [unoptimized] target(s) in 22.00s
+     Running unittests src/main.rs (target/debug/deps/chio_federated_work-ec8305597a8f01bf)
+
+running 1 test
+test funded_work::tests::work_consent::lost_consent_components_cannot_silently_mint_replacements ... FAILED
+
+failures:
+
+---- funded_work::tests::work_consent::lost_consent_components_cannot_silently_mint_replacements stdout ----
+
+thread 'funded_work::tests::work_consent::lost_consent_components_cannot_silently_mint_replacements' (3238262) panicked at src/funded_work/tests/work_consent.rs:69:5:
+lost enrollment marker must remain absent
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    funded_work::tests::work_consent::lost_consent_components_cannot_silently_mint_replacements
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 85 filtered out; finished in 2.90s
+
+error: test failed, to rerun pass `--bin chio-federated-work`

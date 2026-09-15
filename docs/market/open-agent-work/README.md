@@ -206,3 +206,10 @@ now provisions provider authority from public role pins and an externally signed
 context, then runs claim observation, Finding verification and signed decisions in
 a separate verifier process. Payout/refund preserve the original native identities.
 Bilateral signature exchange and enforced role isolation are the next delivery gate.
+
+The [isolated bilateral consent slice](execution/31-isolated-bilateral-consent.md)
+now exchanges provider proposals and buyer acceptances without coordinator access
+to role keys or native requests. Five Linux namespace domains complete the original
+payout/refund with active peer-state, read-only-input and host-network probes.
+Authenticated peer transport and separately administered observers are the next
+external delivery gate; same-host administration remains the current boundary.

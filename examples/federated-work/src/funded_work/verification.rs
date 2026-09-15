@@ -37,7 +37,7 @@ pub trait Checker {
 
 pub struct PythonChecker(pub PathBuf);
 
-const SOURCES: &[(&str, &[u8])] = &[
+pub(super) const SOURCES: &[(&str, &[u8])] = &[
     (
         "../funded-work/native_checker.py",
         include_bytes!("../../../funded-work/native_checker.py"),

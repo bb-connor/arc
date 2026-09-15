@@ -191,3 +191,103 @@ pub fn enroll_files(
         &super::evidence::read(domain)?,
     )?)?)
 }
+
+/// Governance publishes only its signed profile; status remains a separate act.
+pub fn draft(state: &Path, pins: &Pins, expires: u64) -> Result<finding::AcceptanceContext> {
+    pins.validate()?;
+    let path = state.join("context-draft.json");
+    let context: finding::AcceptanceContext = if path.try_exists()? {
+        super::evidence::read(&path)?
+    } else {
+        let key = common::key(state)?;
+        if key.public_key() != pins.governance {
+            return Err("governance seed changed selected authority".into());
+        }
+        let context = finding::draft_execution_context(
+            &pins.verifier,
+            &pins.provider,
+            pins.checkpoint.clone(),
+            &key,
+            pins.status.clone(),
+            common::now()?,
+            expires,
+        )?;
+        checkpoint_files::write(&path, &context)?;
+        fs::File::open(state)?.sync_all()?;
+        context
+    };
+    if context.profile.body.expires_at != expires
+        || context.governance_authority.key != pins.governance
+        || context.admitted_kernel_key != pins.provider
+        || context.profile.body.verifier_report_signer.key != pins.verifier
+        || context.governance_standing.status_authority.key != pins.status
+        || context.profile.body.checkpoint_logs.len() != 1
+        || context.profile.body.checkpoint_logs[0].signer.key != pins.checkpoint
+        || !context.governance_standing.signed_statuses.is_empty()
+    {
+        return Err("draft cannot replace original selected context".into());
+    }
+    chio_finding::verify_signed_profile(&context.profile, &pins.governance)?;
+    Ok(context)
+}
+
+pub fn attest(
+    state: &Path,
+    pins: &Pins,
+    draft: &finding::AcceptanceContext,
+) -> Result<finding::AcceptanceContext> {
+    pins.validate()?;
+    if !draft.governance_standing.signed_statuses.is_empty() {
+        return Err("context draft already contains standing".into());
+    }
+    let path = state.join("context-attested.json");
+    if path.try_exists()? {
+        let retained: finding::AcceptanceContext = super::evidence::read(&path)?;
+        let at = retained
+            .governance_standing
+            .signed_statuses
+            .first()
+            .ok_or("standing missing")?
+            .body
+            .observed_at;
+        validate(pins, &retained, at)?;
+        let mut original = retained.clone();
+        original.governance_standing.signed_statuses.clear();
+        if canonical_json_bytes(&original)? != canonical_json_bytes(draft)? {
+            return Err("status cannot replace original context".into());
+        }
+        return Ok(retained);
+    }
+    let mut context = draft.clone();
+    let now = common::now()?;
+    finding::attest_context(&mut context, &common::key(state)?, now)?;
+    validate(pins, &context, now)?;
+    checkpoint_files::write(&path, &context)?;
+    fs::File::open(state)?.sync_all()?;
+    Ok(context)
+}
+
+pub fn draft_file(
+    state: &Path,
+    pins: &Path,
+    expires: u64,
+    output: &Path,
+) -> Result<serde_json::Value> {
+    let context = draft(state, &super::evidence::read(pins)?, expires)?;
+    checkpoint_files::write(output, &context)?;
+    Ok(serde_json::json!({"draftSha256":common::digest(&context)?}))
+}
+pub fn attest_file(
+    state: &Path,
+    pins: &Path,
+    draft: &Path,
+    output: &Path,
+) -> Result<serde_json::Value> {
+    let context = attest(
+        state,
+        &super::evidence::read(pins)?,
+        &super::evidence::read(draft)?,
+    )?;
+    checkpoint_files::write(output, &context)?;
+    Ok(serde_json::json!({"contextSha256":common::digest(&context)?}))
+}

@@ -75,6 +75,29 @@ impl Agreement {
         })
     }
 
+    pub(super) fn validate_public(&self, policy: &Policy) -> Result<Terms> {
+        let body = self;
+        super::wire::agreement_body(self)?;
+        if body.schema != AGREEMENT_SCHEMA
+            || body.policy_sha256 != digest(policy)?
+            || body.finding_context_sha256 != digest(&policy.finding_context)?
+            || body.required_finding_facets != policy.required_finding_facets
+            || body.authority_uuid != policy.authority_uuid
+            || body.domain != policy.domain
+            || body.buyer_key != policy.buyer_key
+            || body.provider_key != policy.provider_key
+            || body.buyer_key == body.provider_key
+        {
+            return Err("agreement changes pinned native funding authority or request".into());
+        }
+        let terms = body.terms()?;
+        terms.abi(&policy.domain.escrow)?;
+        if terms.amount != "100" {
+            return Err("native W0 profile requires exactly 100 mock units".into());
+        }
+        Ok(terms)
+    }
+
     pub fn sign(self, buyer: &Keypair, provider: &Keypair) -> Result<SignedAgreement> {
         let bytes = canonical_json_bytes(&self)?;
         Ok(SignedAgreement {
@@ -102,20 +125,9 @@ impl SignedAgreement {
     /// Authenticate bilateral public commitments. Native request preimages and
     /// financial waiver authority remain additional checks in `validate`.
     pub(super) fn validate_public(&self, policy: &Policy) -> Result<Terms> {
-        let body = &self.body;
         super::wire::agreement(self)?;
-        if body.schema != AGREEMENT_SCHEMA
-            || body.policy_sha256 != digest(policy)?
-            || body.finding_context_sha256 != digest(&policy.finding_context)?
-            || body.required_finding_facets != policy.required_finding_facets
-            || body.authority_uuid != policy.authority_uuid
-            || body.domain != policy.domain
-            || body.buyer_key != policy.buyer_key
-            || body.provider_key != policy.provider_key
-            || body.buyer_key == body.provider_key
-        {
-            return Err("agreement changes pinned native funding authority or request".into());
-        }
+        let terms = self.body.validate_public(policy)?;
+        let body = &self.body;
         let bytes = canonical_json_bytes(body)?;
         if !policy
             .buyer_key
@@ -125,11 +137,6 @@ impl SignedAgreement {
                 .verify_strict(&bytes, &self.provider_signature)
         {
             return Err("funding agreement signature invalid".into());
-        }
-        let terms = body.terms()?;
-        terms.abi(&policy.domain.escrow)?;
-        if terms.amount != "100" {
-            return Err("native W0 profile requires exactly 100 mock units".into());
         }
         Ok(terms)
     }

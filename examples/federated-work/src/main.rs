@@ -21,6 +21,22 @@ use std::path::Path;
 fn run() -> Result<serde_json::Value> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        ["experimental-context-draft",state,pins,expires,output] => funded_work::authority_enrollment::draft_file(Path::new(state),Path::new(pins),expires.parse()?,Path::new(output)),
+        ["experimental-context-attest",state,pins,draft,output] => funded_work::authority_enrollment::attest_file(Path::new(state),Path::new(pins),Path::new(draft),Path::new(output)),
+        #[cfg(unix)]
+        ["experimental-work-propose",state,intent,input,output] => funded_work::provider_files::propose(Path::new(state),Path::new(intent),Path::new(input),Path::new(output)),
+        #[cfg(unix)]
+        ["experimental-work-accept",state,intent,proposal,output] => funded_work::provider_files::accept(Path::new(state),Path::new(intent),Path::new(proposal),Path::new(output)),
+        #[cfg(unix)]
+        ["experimental-provider-execute",state,socket,acceptance] => funded_work::provider_files::execute(Path::new(state),Path::new(socket),Path::new(acceptance)),
+        #[cfg(unix)]
+        ["experimental-provider-output",state,id,output] => funded_work::provider_files::output(Path::new(state),id,Path::new(output)),
+        #[cfg(unix)]
+        ["experimental-provider-submit",state,id,socket,candidate] => funded_work::provider_files::submit(Path::new(state),id,Path::new(socket),Path::new(candidate)),
+        #[cfg(unix)]
+        ["experimental-provider-settle",state,id,socket] => funded_work::provider_files::settle(Path::new(state),id,Path::new(socket)),
+        #[cfg(target_os = "linux")]
+        ["experimental-isolated-lifecycle",state,mode] => funded_work::isolated_process::run(Path::new(state),mode),
         ["experimental-authority-context",governance,status,pins,expires,output] => funded_work::authority_enrollment::context_file(Path::new(governance),Path::new(status),Path::new(pins),expires.parse()?,Path::new(output)),
         ["experimental-provider-enroll",state,pins,context,domain] => funded_work::authority_enrollment::enroll_files(Path::new(state),Path::new(pins),Path::new(context),Path::new(domain)),
         ["experimental-verifier-init",state,enrollment] => funded_work::verifier_operator::initialize_file(Path::new(state),Path::new(enrollment)),

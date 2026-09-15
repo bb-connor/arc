@@ -171,3 +171,27 @@ fn every_pair_of_authority_roles_must_be_distinct() -> Result<()> {
     }
     Ok(())
 }
+
+#[test]
+fn governance_draft_can_be_attested_without_either_role_reading_peer_seed() -> Result<()> {
+    let (provider, roles, pins) = setup()?;
+    let draft = enrollment::draft(
+        &roles.path().join("governance"),
+        &pins,
+        common::now()? + 3600,
+    )?;
+    assert!(draft.governance_standing.signed_statuses.is_empty());
+    let context = enrollment::attest(&roles.path().join("status"), &pins, &draft)?;
+    let (domain, _, _, _) = super::observer::fixture()?;
+    enrollment::enroll(provider.path(), &pins, &context, &domain)?;
+    let again = enrollment::draft(
+        &roles.path().join("governance"),
+        &pins,
+        context.profile.body.expires_at,
+    )?;
+    assert_eq!(canonical_json_bytes(&draft)?, canonical_json_bytes(&again)?);
+    let mut changed = pins.clone();
+    changed.governance = Keypair::generate().public_key();
+    assert!(enrollment::attest(&roles.path().join("status"), &changed, &draft).is_err());
+    Ok(())
+}

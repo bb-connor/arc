@@ -65,3 +65,12 @@ mod tests;
 pub mod finding_acceptance;
 
 pub mod wire;
+
+pub mod work_consent;
+
+#[cfg(target_os = "linux")]
+pub mod isolated_process;
+#[cfg(target_os = "linux")]
+mod isolated_roles;
+#[cfg(unix)]
+pub mod provider_files;

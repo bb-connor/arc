@@ -79,11 +79,83 @@ fn authority(key: PublicKey, role: &str, now: u64, expires_at: u64) -> FindingAu
     }
 }
 
+struct DraftSigners<'a> {
+    governance: &'a Keypair,
+    status: PublicKey,
+}
+
 fn build_context(
+    verifier: &PublicKey,
+    kernel: &PublicKey,
+    checkpoint: PublicKey,
+    signers: ContextSigners<'_>,
+    now: u64,
+    expires: u64,
+    execution: bool,
+) -> Result<AcceptanceContext> {
+    let mut context = build_draft(
+        verifier,
+        kernel,
+        checkpoint,
+        DraftSigners {
+            governance: signers.governance,
+            status: signers.status.public_key(),
+        },
+        now,
+        expires,
+        execution,
+    )?;
+    attest_context(&mut context, signers.status, now)?;
+    Ok(context)
+}
+
+pub fn draft_execution_context(
+    verifier: &PublicKey,
+    kernel: &PublicKey,
+    checkpoint: PublicKey,
+    governance: &Keypair,
+    status: PublicKey,
+    now: u64,
+    expires: u64,
+) -> Result<AcceptanceContext> {
+    build_draft(
+        verifier,
+        kernel,
+        checkpoint,
+        DraftSigners { governance, status },
+        now,
+        expires,
+        true,
+    )
+}
+
+pub fn attest_context(context: &mut AcceptanceContext, status: &Keypair, now: u64) -> Result<()> {
+    if !context.governance_standing.signed_statuses.is_empty()
+        || status.public_key() != context.governance_standing.status_authority.key
+    {
+        return Err("standing must use the originally selected status key exactly once".into());
+    }
+    let governance = &context.governance_authority;
+    context.governance_standing.signed_statuses = vec![SignedExportEnvelope::sign(
+        FindingAuthorityStatus {
+            schema: FINDING_AUTHORITY_STATUS_SCHEMA_V1.into(),
+            status_ref: governance.revocation_status_ref.clone(),
+            authority_id: governance.authority_id.clone(),
+            key: governance.key.clone(),
+            key_epoch: governance.key_epoch,
+            revoked_from: None,
+            observed_at: now,
+        },
+        status,
+    )?];
+    Ok(())
+}
+
+fn build_draft(
     verifier_key: &PublicKey,
     kernel_key: &PublicKey,
     checkpoint_key: PublicKey,
-    signers: ContextSigners<'_>,
+    signers: DraftSigners<'_>,
     now: u64,
     expires_at: u64,
     execution: bool,
@@ -91,7 +163,7 @@ fn build_context(
     if now >= expires_at || expires_at - now > 86400 {
         return Err("Finding fixture trust requires a bounded one-day window".into());
     }
-    let ContextSigners { governance, status } = signers;
+    let DraftSigners { governance, status } = signers;
     let new_authority = |role| authority(Keypair::generate().public_key(), role, now, expires_at);
     let governance_authority = authority(governance.public_key(), "governance", now, expires_at);
     let checkpoint = authority(checkpoint_key, "checkpoint", now, expires_at);
@@ -158,18 +230,6 @@ fn build_context(
     };
     body.profile_id = compute_profile_id(&body)?;
     let profile = SignedExportEnvelope::sign(body, governance)?;
-    let standing = SignedExportEnvelope::sign(
-        FindingAuthorityStatus {
-            schema: FINDING_AUTHORITY_STATUS_SCHEMA_V1.into(),
-            status_ref: governance_authority.revocation_status_ref.clone(),
-            authority_id: governance_authority.authority_id.clone(),
-            key: governance.public_key(),
-            key_epoch: 1,
-            revoked_from: None,
-            observed_at: now,
-        },
-        status,
-    )?;
     Ok(AcceptanceContext {
         schema: if execution {
             EXECUTION_CONTEXT_SCHEMA
@@ -180,8 +240,8 @@ fn build_context(
         governance_authority,
         profile,
         governance_standing: FindingCheckpointSignerStatusTrust {
-            signed_statuses: vec![standing],
-            status_authority: authority(status.public_key(), "authority-status", now, expires_at),
+            signed_statuses: Vec::new(),
+            status_authority: authority(status, "authority-status", now, expires_at),
             max_age_secs: expires_at - now,
         },
         admitted_kernel_key: kernel_key.clone(),

@@ -66,11 +66,14 @@ pub(super) fn requirements(facets: &[FindingFacetKind]) -> Result<()> {
 }
 
 pub(super) fn agreement(signed: &SignedAgreement) -> Result<()> {
-    let b = &signed.body;
-    key(&b.buyer_key)?;
-    key(&b.provider_key)?;
     signature(&signed.buyer_signature)?;
     signature(&signed.provider_signature)?;
+    agreement_body(&signed.body)
+}
+
+pub(super) fn agreement_body(b: &super::agreement::Agreement) -> Result<()> {
+    key(&b.buyer_key)?;
+    key(&b.provider_key)?;
     if b.schema != super::agreement::AGREEMENT_SCHEMA {
         return Err("unsupported registered work agreement".into());
     }
