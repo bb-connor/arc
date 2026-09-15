@@ -17,14 +17,14 @@ pub(super) type AdvanceClock = Arc<dyn Fn(&str) -> Result<()> + Send + Sync>;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Dependency {
-    schema: String,
-    parent_agreement: String,
-    child_agreement: String,
-    parent_request: String,
-    child_request: String,
-    parent_authority: String,
-    child_authority: String,
-    input_sha256: String,
+    pub(super) schema: String,
+    pub(super) parent_agreement: String,
+    pub(super) child_agreement: String,
+    pub(super) parent_request: String,
+    pub(super) child_request: String,
+    pub(super) parent_authority: String,
+    pub(super) child_authority: String,
+    pub(super) input_sha256: String,
 }
 
 pub(super) fn retain(
@@ -88,6 +88,7 @@ pub(super) fn verify_dependency(
     child_request: &ToolCallRequest,
     parent_key: &PublicKey,
 ) -> Result<()> {
+    super::wire::dependency(signed)?;
     let b = &signed.body;
     if b.schema != "chio.experimental.native-funded-dependency.v1"
         || !parent_key.verify_strict(
@@ -124,10 +125,13 @@ pub(super) fn executor(
 ) -> Result<super::tool::Subcontract> {
     let dependency: Signed<Dependency> =
         evidence::decode(&std::fs::read(state.join("dependency.json"))?)?;
-    let parent: SignedAgreement = common::read(state.join("parent/original-agreement.json"))?;
-    let parent_request = common::read(state.join("parent/original-request.json"))?;
-    let child: SignedAgreement = common::read(state.join("child/original-agreement.json"))?;
-    let request: ToolCallRequest = common::read(state.join("child/original-request.json"))?;
+    let parent: SignedAgreement =
+        super::evidence::read(state.join("parent/original-agreement.json"))?;
+    let parent_request = super::evidence::read(state.join("parent/original-request.json"))?;
+    let child: SignedAgreement =
+        super::evidence::read(state.join("child/original-agreement.json"))?;
+    let request: ToolCallRequest =
+        super::evidence::read(state.join("child/original-request.json"))?;
     verify_dependency(
         &dependency,
         &parent,
@@ -177,7 +181,7 @@ pub(super) fn collect(
     checkpoint: super::Checkpoint,
 ) -> Result<Value> {
     let native = Native::open(state, source.clone())?;
-    let request: ToolCallRequest = common::read(state.join("original-request.json"))?;
+    let request: ToolCallRequest = super::evidence::read(state.join("original-request.json"))?;
     let entry = native
         .journal
         .by_request(&request.request_id)?
@@ -192,7 +196,7 @@ pub(super) fn collect(
     )?;
     drop(native);
     let native = Native::open(state, source)?;
-    let agreement = common::read(state.join("original-agreement.json"))?;
+    let agreement = super::evidence::read(state.join("original-agreement.json"))?;
     let report = native.execute(&agreement, &request)?;
     if report["paymentState"] != "paid" || report["executions"] != 1 {
         return Err("child payout did not reconcile the original single execution".into());

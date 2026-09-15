@@ -4,7 +4,8 @@ use chio_core_types::{canonical_json_bytes, Keypair, PublicKey, Signature};
 use chio_kernel::ToolCallRequest;
 use serde::{Deserialize, Serialize};
 
-pub const AGREEMENT_SCHEMA: &str = "chio.experimental.native-funded-w0-agreement.v1";
+pub const AGREEMENT_SCHEMA: &str =
+    chio_core_types::CHIO_EXPERIMENTAL_NATIVE_FUNDED_AGREEMENT_V2_SCHEMA;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -14,6 +15,8 @@ pub struct Policy {
     pub buyer_key: PublicKey,
     pub provider_key: PublicKey,
     pub verifier_key: PublicKey,
+    pub finding_context: super::finding_acceptance::AcceptanceContext,
+    pub required_finding_facets: Vec<chio_finding::FindingFacetKind>,
     pub domain: Domain,
 }
 
@@ -40,6 +43,8 @@ pub struct Agreement {
     pub provider_key: PublicKey,
     pub request_id: String,
     pub request_sha256: String,
+    pub finding_context_sha256: String,
+    pub required_finding_facets: Vec<chio_finding::FindingFacetKind>,
     pub domain: Domain,
     pub work: WorkTerms,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -83,8 +88,11 @@ impl Agreement {
 impl SignedAgreement {
     pub fn validate(&self, policy: &Policy, request: &ToolCallRequest) -> Result<Terms> {
         let body = &self.body;
+        super::wire::agreement(self)?;
         if body.schema != AGREEMENT_SCHEMA
             || body.policy_sha256 != digest(policy)?
+            || body.finding_context_sha256 != digest(&policy.finding_context)?
+            || body.required_finding_facets != policy.required_finding_facets
             || body.authority_uuid != policy.authority_uuid
             || body.domain != policy.domain
             || body.buyer_key != policy.buyer_key

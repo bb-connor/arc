@@ -27,7 +27,7 @@ pub fn worker(state: &Path, socket: &Path, fault: &str) -> Result<Value> {
     }
     let source = Arc::new(SocketSource(socket.to_owned()));
     let native = Native::open_for_resolution(state, source.clone())?;
-    let request = common::read(state.join("original-request.json"))?;
+    let request = super::evidence::read(state.join("original-request.json"))?;
     let point = fault.to_owned();
     let checkpoint: super::Checkpoint = Arc::new(move |current| {
         if current == point {
@@ -39,7 +39,7 @@ pub fn worker(state: &Path, socket: &Path, fault: &str) -> Result<Value> {
     let resolution = capture_resolution::resolve(state, &native, &request, &checkpoint)?;
     drop(native);
     let native = Native::open(state, source)?;
-    let agreement = common::read(state.join("original-agreement.json"))?;
+    let agreement = super::evidence::read(state.join("original-agreement.json"))?;
     let report = native.execute(&agreement, &request)?;
     Ok(
         json!({"resolution":resolution,"after":report,"financial":capture_resolution::financial(state,&native,&request)?}),

@@ -1,0 +1,372 @@
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling chio-spec-validate v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-spec-validate)
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-revocation-oracle)
+   Compiling chio-listing v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-listing)
+   Compiling chio-finding v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-finding)
+   Compiling chio-fiscal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone)
+   Compiling chio-fincred v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fincred)
+   Compiling chio-open-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-appraisal)
+   Compiling chio-did v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-did)
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-verify)
+   Compiling chio-underwriting v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-underwriting)
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation)
+   Compiling chio-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-lineage)
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-custody-hw)
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-weights)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling chio-credit v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-credit)
+   Compiling chio-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-market)
+   Compiling chio-web3 v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3)
+   Compiling chio-autonomy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core)
+   Compiling chio-manifest v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-manifest)
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-settle)
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-link)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+    Finished `test` profile [unoptimized] target(s) in 2m 06s
+     Running unittests src/lib.rs (target/debug/deps/chio_finding-880746b283786c92)
+
+running 9 tests
+test reveal::tests::payload_commitment_binds_media_type_and_canonical_base64 ... ok
+test status_admission::tests::a_floor_the_caller_does_not_pin_is_refused_before_the_proof_is_read ... ok
+test status_admission::tests::a_fresh_non_inclusion_proof_at_the_floor_is_live ... ok
+test status_admission::tests::a_source_failure_is_reported_as_the_source_not_a_refusal ... ok
+test status_admission::tests::a_sticky_row_outranks_any_proof ... ok
+test status_admission::tests::an_inclusion_proof_without_its_sticky_row_is_an_integrity_refusal ... ok
+test status_admission::tests::freshness_is_judged_against_the_epoch_not_the_proof_alone ... ok
+test status_admission::tests::missing_durable_state_refuses_rather_than_admitting ... ok
+test status_admission::tests::standing_taken_before_the_epoch_cannot_speak_for_it ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/challenge_families.rs (target/debug/deps/challenge_families-6fba259a36bbd812)
+
+running 33 tests
+test audit_artifacts_sign_and_conform_to_their_schemas ... ok
+test audit_epoch_integer_bounds_match_the_registered_schema ... ok
+test audit_report_accounts_for_every_selection ... ok
+test audit_seed_commitment_reproduces_in_both_directions ... ok
+test authority_status_round_trips_registered_schema_and_external_pin ... ok
+test bond_snapshot_arithmetic_is_checked ... ok
+test bond_snapshot_signs_and_conforms_to_its_schema ... ok
+test challenge_authorization_union_rejects_cross_branch_members ... ok
+test challenge_content_address_is_stable_and_detects_tampering ... ok
+test challenge_evidence_union_rejects_cross_class_members ... ok
+test challenge_nonzero_integers_enforce_the_i_json_maximum ... ok
+test challenge_requires_standing_matching_its_evidence_class ... ok
+test challenge_schema_closes_both_unions ... ok
+test challenge_signing_binds_the_challenger_or_the_pinned_audit_authority ... ok
+test compatibility_matrix_admits_exactly_the_closed_pairings ... ok
+test enforcement_conforms_to_its_schema ... ok
+test enforcement_destinations_sum_exactly_to_the_total ... ok
+test enforcement_requires_every_pre_dispatch_intent ... ok
+test enforcement_signs_and_verifies_under_the_finalization_authority ... ok
+test every_challenge_family_round_trips_its_registered_schema ... ok
+test market_penalty_schema_mirrors_the_frozen_camel_case_shape ... ok
+test outcome_binds_the_challenge_envelope_not_its_body ... ok
+test outcome_conforms_to_its_schema ... ok
+test outcome_id_derivation_is_stable_and_domain_separated ... ok
+test outcome_penalty_calculation_is_checked_against_its_own_formula ... ok
+test outcome_rejects_policy_transform_denials_and_facet_substitution ... ok
+test outcome_reserves_the_penalty_calculation_for_upheld_verdicts ... ok
+test outcome_retry_deadline_is_future_and_indeterminate_only ... ok
+test outcome_signs_and_verifies_under_its_pinned_evaluator ... ok
+test penalty_calculation_bounds_match_the_registered_schema ... ok
+test replay_evidence_binds_one_run_and_the_committed_recipe ... ok
+test replay_observation_digest_is_the_receipt_binding ... ok
+test replay_predicate_maps_onto_every_verdict ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.98s
+
+     Running tests/finding.rs (target/debug/deps/finding-568957c3422be71f)
+
+running 43 tests
+test attested_guarantee_requires_receipts_even_with_asserted_evidence_class ... ok
+test blank_evidence_receipt_id_is_rejected ... ok
+test blank_intent_commitment_reference_is_rejected ... ok
+test deterministic_replay_requires_recipe ... ok
+test duplicate_evidence_receipt_ids_are_rejected ... ok
+test empty_finding_id_is_rejected ... ok
+test evidence_cost_above_i_json_maximum_is_rejected ... ok
+test expires_at_above_i_json_maximum_is_rejected ... ok
+test expiry_must_follow_issuance ... ok
+test explicit_none_runtime_tier_is_rejected ... ok
+test golden_verified_fix_fixture_validates ... ok
+test i_json_maximum_values_are_accepted ... ok
+test invalid_currency_is_rejected ... ok
+test issued_at_above_i_json_maximum_is_rejected ... ok
+test malformed_payload_digest_is_rejected ... ok
+test non_asserted_evidence_requires_receipts ... ok
+test non_canonical_signature_encodings_are_rejected ... ok
+test non_ed25519_issuer_is_rejected ... ok
+test non_none_runtime_tier_requires_receipts ... ok
+test oversized_finding_fields_are_rejected ... ok
+test regenerate_golden_fixture ... ignored, regenerates the deterministic golden fixture; run manually
+test schema_accepts_fully_asserted_finding_without_receipts ... ok
+test schema_rejects_attested_guarantee_without_receipts ... ok
+test schema_rejects_deterministic_replay_without_recipe ... ok
+test schema_rejects_duplicate_evidence_receipts ... ok
+test schema_rejects_explicit_null_for_optional_field ... ok
+test schema_rejects_integer_above_i_json_maximum ... ok
+test schema_rejects_invalid_currency ... ok
+test schema_rejects_observed_evidence_without_receipts ... ok
+test schema_rejects_oversized_finding_fields ... ok
+test schema_rejects_prefixed_issuer ... ok
+test schema_rejects_runtime_assurance_none ... ok
+test schema_rejects_runtime_assurance_without_receipts ... ok
+test signed_finding_roundtrip_verifies ... ok
+test signing_backend_preserves_the_finding_wire_contract ... ok
+test signing_rejects_stale_finding_id ... ok
+test signing_requires_the_issuer_key ... ok
+test stale_finding_id_is_rejected ... ok
+test tampered_signed_finding_fails_verification ... ok
+test unknown_json_fields_are_rejected ... ok
+test valid_finding_passes_validation ... ok
+test weak_identity_issuer_cannot_forge_a_finding ... ok
+test wrong_schema_is_rejected ... ok
+
+test result: ok. 42 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/market_families.rs (target/debug/deps/market_families-b732a37c60f3bd38)
+
+running 22 tests
+test admission_pools_must_be_distinct_and_scope_must_bind_the_finding ... ok
+test admission_rejects_malformed_backing_fields ... ok
+test admission_requires_publication_and_first_epoch_terminals ... ok
+test admission_venue_id_mismatch_rejects ... ok
+test backing_exposure_cannot_exceed_locked_amount ... ok
+test envelope_signed_by_another_key_is_rejected_for_every_family ... ok
+test every_family_validates_and_verifies_under_its_pinned_authority ... ok
+test market_families_reject_oversized_collections ... ok
+test market_families_reject_oversized_string_fields ... ok
+test pre_run_template_digest_is_stable_and_validated ... ok
+test profile_body_authority_must_match_the_governance_pin ... ok
+test profile_rejects_checkpoint_log_aliases ... ok
+test profile_rejects_overlapping_receipt_role_keys ... ok
+test profile_requires_all_three_receipt_roles_exactly_once ... ok
+test recipe_payload_application_vocabulary_is_phase_specific ... ok
+test recipe_phase_order_is_normative ... ok
+test recipe_unknown_fields_and_wrong_schema_reject ... ok
+test report_bond_backing_verdict_requires_the_named_allocation ... ok
+test report_facets_are_exactly_the_closed_vocabulary_in_order ... ok
+test tampered_bodies_fail_their_content_addressed_ids ... ok
+test terms_reject_a_payout_policy_the_settlement_math_does_not_implement ... ok
+test terms_reject_currency_mismatch_and_overflow ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/market_schemas.rs (target/debug/deps/market_schemas-053f95791ecffc2c)
+
+running 42 tests
+test admission_envelope_conforms_to_schema ... ok
+test admission_schema_rejects_malformed_capability_scope ... ok
+test admission_schema_rejects_unknown_top_level_member ... ok
+test admission_schema_rejects_wrong_schema_const ... ok
+test authorization_envelope_conforms_to_schema ... ok
+test authorization_schema_rejects_unknown_top_level_member ... ok
+test authorization_schema_rejects_uppercase_finding_id ... ok
+test authorization_schema_rejects_wrong_schema_const ... ok
+test backing_envelope_conforms_to_schema ... ok
+test backing_schema_rejects_unknown_top_level_member ... ok
+test backing_schema_rejects_wrong_schema_const ... ok
+test backing_schema_rejects_zero_claim_horizon ... ok
+test golden_bond_backing_fixture_validates ... ok
+test golden_market_terms_fixture_validates ... ok
+test golden_replay_recipe_fixture_validates ... ok
+test golden_seller_authorization_fixture_validates ... ok
+test golden_venue_admission_fixture_validates ... ok
+test golden_verifier_profile_fixture_validates ... ok
+test golden_verifier_report_fixture_validates ... ok
+test market_family_schemas_reject_oversized_collections ... ok
+test market_family_schemas_reject_oversized_string_fields ... ok
+test profile_envelope_conforms_to_schema ... ok
+test profile_schema_rejects_missing_receipt_role ... ok
+test profile_schema_rejects_unknown_top_level_member ... ok
+test profile_schema_rejects_wrong_schema_const ... ok
+test qualified_delivery_verifier_report_conforms_to_schema ... ok
+test recipe_conforms_to_schema ... ok
+test recipe_schema_rejects_swapped_phase_order ... ok
+test recipe_schema_rejects_unknown_payload_application ... ok
+test recipe_schema_rejects_unknown_top_level_member ... ok
+test recipe_schema_rejects_wrong_schema_const ... ok
+test regenerate_market_golden_fixtures ... ignored, regenerates the deterministic golden fixtures; run manually
+test report_envelope_conforms_to_schema ... ok
+test report_schema_rejects_unknown_facet_outcome ... ok
+test report_schema_rejects_unknown_top_level_member ... ok
+test report_schema_rejects_wrong_schema_const ... ok
+test signed_verifier_report_rejects_explicit_null_optionals ... ok
+test terms_envelope_conforms_to_schema ... ok
+test terms_schema_rejects_unknown_payout_policy ... ok
+test terms_schema_rejects_unknown_top_level_member ... ok
+test terms_schema_rejects_wrong_schema_const ... ok
+test terms_schema_rejects_zero_base_finding_stake ... ok
+
+test result: ok. 41 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.85s
+
+     Running tests/purchase_families.rs (target/debug/deps/purchase_families-5fb05cd46fa7f998)
+
+running 22 tests
+test failed_delivery_conforms_to_its_schema ... ok
+test failed_delivery_content_address_is_stable_and_detects_tampering ... ok
+test failed_delivery_rejects_realized_spend_and_payout_eligibility ... ok
+test failed_delivery_signs_and_verifies_under_its_pinned_authority ... ok
+test payout_destination_canonicalization_prevents_case_slot_aliases ... ok
+test purchase_context_conforms_to_its_schema ... ok
+test purchase_context_encoded_bound_covers_the_full_raw_bound ... ok
+test purchase_context_rejects_a_foreign_schema ... ok
+test purchase_context_rejects_a_non_canonical_carried_member ... ok
+test purchase_context_rejects_an_oversized_decoded_carrier ... ok
+test purchase_context_rejects_an_oversized_encoding_before_decoding ... ok
+test purchase_context_rejects_an_unknown_member ... ok
+test purchase_context_rejects_non_canonical_carrier_bytes ... ok
+test purchase_context_roundtrips_through_base64 ... ok
+test purchase_context_roundtrips_through_canonical_bytes ... ok
+test purchase_key_derivation_is_stable_and_pair_specific ... ok
+test purchase_record_conforms_to_its_schema ... ok
+test purchase_record_rejects_a_seller_controlled_harm_destination ... ok
+test purchase_record_rejects_currency_mismatch_and_overcapture ... ok
+test purchase_record_rejects_unbounded_identifiers ... ok
+test purchase_record_signs_and_verifies_under_its_pinned_authority ... ok
+test purchase_record_validates_and_detects_tampering ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests/recovery_context.rs (target/debug/deps/recovery_context-6561f6665c0bf63a)
+
+running 3 tests
+test canonical_recovery_context_round_trips ... ok
+test recovery_context_rejects_noncanonical_or_substituted_shape ... ok
+test recovery_identity_is_deterministic_and_cross_bound ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/status_artifacts.rs (target/debug/deps/status_artifacts-5947d9eec78a9e41)
+
+running 13 tests
+test deterministic_hash_and_artifact_goldens_are_stable ... ok
+test epoch_version_domain_and_ordinary_root_substitution_reject ... ok
+test every_portable_cross_binding_and_freshness_mutation_rejects ... ok
+test exact_canonical_proof_bytes_round_trip ... ok
+test exact_epoch_bytes_and_signature_cannot_be_substituted ... ok
+test operator_authorization_requires_a_nonempty_live_window ... ok
+test operator_role_key_epoch_validity_and_revocation_are_pinned ... ok
+test schemas_accept_both_branches_and_reject_cross_branch_fields ... ok
+test signed_epoch_and_both_portable_branches_verify ... ok
+test stale_future_and_revoked_at_verification_time_reject ... ok
+test status_epoch_numeric_identifiers_are_nonzero_i_json_integers ... ok
+test status_epoch_schema_accepts_zero_valid_from_like_the_runtime ... ok
+test status_identifiers_reject_non_ascii_input ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+     Running unittests src/lib.rs (target/debug/deps/chio_finding_verifier-38b6b7e1ae6d3891)
+
+running 2 tests
+test checkpoints::tests::checkpoint_status_authority_must_differ_from_signer ... ok
+test checkpoints::tests::strict_checkpoint_signature_rejects_a_weak_ed25519_key ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/verifier.rs (target/debug/deps/verifier-9beda580ea81442d)
+
+running 81 tests
+test authority_regressions::backing_accepted_at_or_after_evaluation_is_not_verified ... ok
+test authority_regressions::backing_cannot_be_accepted_before_its_signed_issue_time ... ok
+test authority_regressions::backing_signed_by_an_unpinned_authority_is_not_bond_evidence ... ok
+test authority_regressions::bond_backing_must_bind_the_evaluated_verifier_profile ... ok
+test authority_regressions::bond_backing_requires_live_unrevoked_collateral_authority_standing ... ok
+test authority_regressions::fee_schedule_and_collateral_authorities_must_be_distinct ... ok
+test authority_regressions::guarantee_consistency_denies_an_unbacked_metered_claim ... ok
+test authority_regressions::receipt_and_checkpoint_signers_must_cover_the_evidence_timestamp ... ok
+test authority_regressions::receipts_signed_by_an_unpinned_kernel_are_not_authentic ... ok
+test authority_regressions::recipe_must_bind_the_finding_it_is_committed_by ... ok
+test authority_regressions::recipe_preimage_must_fit_its_committed_size_bound ... ok
+test authority_regressions::report_signer_policy_must_cover_the_evaluation_time ... ok
+test authority_regressions::report_signing_copies_the_trust_commitments_used_for_evaluation ... ok
+test authority_regressions::report_signing_key_must_be_distinct_from_governance_and_evidence ... ok
+test authority_regressions::report_signing_rejects_profile_substitution_even_with_the_same_signer ... ok
+test authority_regressions::report_signing_requires_the_profile_authorized_key ... ok
+test authority_regressions::revoked_profile_governance_authority_cannot_backdate_a_profile ... ok
+test authority_regressions::runtime_assurance_requires_live_unrevoked_authority_standing ... ok
+test authority_regressions::runtime_attestation_and_appraisal_authorities_must_be_distinct ... ok
+test authority_regressions::unpinned_profile_or_empty_kernel_keys_reject_outright ... ok
+test authority_regressions::unsupported_profile_requirements_reject_outright ... ok
+test authority_regressions::verifier_report_and_authority_status_signers_must_be_distinct ... ok
+test authority_regressions::verifier_report_and_collateral_authorities_must_be_distinct ... ok
+test authority_regressions::verifier_report_and_status_operator_authorities_must_be_distinct ... ok
+test bond_regressions::backing_must_name_the_exact_signed_fee_schedule ... ok
+test bond_regressions::bond_ref_must_resolve_through_the_signed_store_snapshot ... ok
+test bond_regressions::listing_requirement_must_include_the_base_finding_stake ... ok
+test bond_regressions::locked_allocation_must_include_the_base_finding_stake ... ok
+test bond_regressions::signed_requirement_class_and_currency_must_match_the_allocation ... ok
+test bond_regressions::smaller_signed_requirement_cannot_back_larger_sale_exposure ... ok
+test bond_regressions::unsupported_collateral_policy_cannot_qualify_bond_backing ... ok
+test checkpoint_equivocation_fails_before_membership ... ok
+test checkpoint_status_regressions::expired_checkpoint_signer_cannot_backdate_new_evidence ... ok
+test checkpoint_status_regressions::expired_checkpoint_status_authority_denies_receipts_and_checkpoints ... ok
+test checkpoint_status_regressions::production_checkpoint_must_predate_the_finding ... ok
+test checkpoint_status_regressions::resolved_nonce_envelopes_change_the_bundle_commitment ... ok
+test checkpoint_status_regressions::revoked_checkpoint_signer_cannot_backdate_new_evidence ... ok
+test checkpoint_status_regressions::status_non_inclusion_proof_must_not_predate_the_finding ... ok
+test checkpoint_transparency_records_must_match_the_signed_set ... ok
+test delivery_alone_does_not_verify_production_evidence_facets ... ok
+test failed_optional_facet_denies_the_draft ... ok
+test full_evidence_bundle_verifies_the_required_facets ... ok
+test missing_bond_snapshot_is_unavailable_and_denies ... ok
+test observed_and_metered_findings_name_their_direct_facet_floors ... ok
+test portable_status_proof_must_bind_the_findings_declared_feed ... ok
+test portable_status_proof_rejects_a_clock_different_from_report_evaluation ... ok
+test portable_status_proof_rejects_revoked_operator_standing ... ok
+test portable_status_proof_verifies_and_is_pinned_into_signed_report ... ok
+test post_purchase_delivery_cannot_predate_the_finding ... ok
+test post_purchase_delivery_is_finding_bound_and_checkpointed_in_the_report ... ok
+test post_purchase_delivery_rejects_a_checkpoint_after_report_evaluation ... ok
+test post_purchase_delivery_rejects_a_receipt_after_report_evaluation ... ok
+test post_purchase_delivery_rejects_an_overlay_for_another_finding ... ok
+test post_purchase_delivery_requires_a_finding_specific_overlay ... ok
+test post_purchase_delivery_requires_the_signed_execution_nonce ... ok
+test production_checkpoints_cannot_postdate_the_finding ... ok
+test production_receipt_semantics_reject_a_nonce_binding_mismatch ... ok
+test production_receipt_semantics_require_the_signed_execution_nonce ... ok
+test production_receipts_cannot_postdate_report_evaluation ... ok
+test production_receipts_cannot_postdate_the_finding ... ok
+test production_receipts_cannot_postdate_their_checkpoint ... ok
+test production_receipts_must_satisfy_the_profile_receipt_semantics ... ok
+test raw_ingress_rejects_noncanonical_and_oversized_findings ... ok
+test receipt_security_regressions::delivery_nonce_envelope_changes_the_bundle_commitment ... ok
+test receipt_security_regressions::delivery_receipt_rejects_nonce_expired_at_receipt_issuance ... ok
+test receipt_security_regressions::delivery_receipt_rejects_signer_expired_at_evaluation ... ok
+test receipt_security_regressions::missing_delivery_receipt_signer_status_is_rejected ... ok
+test receipt_security_regressions::production_receipt_rejects_nonce_expired_at_receipt_issuance ... ok
+test receipt_security_regressions::production_receipt_rejects_self_signed_status ... ok
+test receipt_security_regressions::production_receipt_rejects_signer_expired_at_evaluation ... ok
+test receipt_security_regressions::revoked_production_receipt_signer_is_rejected ... ok
+test recipe_digest_mismatch_fails_and_denies_the_deterministic_claim ... ok
+test reordered_receipts_fail_the_exact_binding ... ok
+test report_evaluation_must_be_inside_the_finding_validity_window ... ok
+test resolved_bundle_commitment_includes_assurance_artifacts_pins_and_policy ... ok
+test resolved_bundle_commitment_includes_status_authorization_and_freshness ... ok
+test runtime_assurance_rejects_empty_policy_and_unrelated_signed_evidence ... ok
+test runtime_assurance_rejects_invalid_or_stale_signed_artifacts ... ok
+test signed_runtime_assurance_can_verify_each_claimed_tier ... ok
+test unsigned_collateral_store_state_is_not_verified ... ok
+test wrapper_tampering_fails_membership_on_every_closed_gap ... ok
+
+test result: ok. 81 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.07s
+
+   Doc-tests chio_finding
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_finding_verifier
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

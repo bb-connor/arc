@@ -46,6 +46,8 @@ pub fn implementation_digest() -> String {
             include_bytes!("tool.rs").as_slice(),
             include_bytes!("evidence.rs").as_slice(),
             include_bytes!("verification.rs").as_slice(),
+            include_bytes!("finding_acceptance.rs").as_slice(),
+            include_bytes!("wire.rs").as_slice(),
             include_bytes!("settlement.rs").as_slice(),
             include_bytes!("settlement_observer.rs").as_slice(),
             include_bytes!("lifecycle.rs").as_slice(),
@@ -66,7 +68,26 @@ pub fn implementation_digest() -> String {
 }
 
 impl Native {
+    #[cfg(test)]
     pub fn provision(state: &Path, buyer: PublicKey, domain: Domain) -> Result<()> {
+        Self::provision_with_requirements(
+            state,
+            buyer,
+            domain,
+            vec![
+                chio_finding::FindingFacetKind::ArtifactIntegrity,
+                chio_finding::FindingFacetKind::GuaranteeConsistency,
+            ],
+        )
+    }
+
+    pub(super) fn provision_with_requirements(
+        state: &Path,
+        buyer: PublicKey,
+        domain: Domain,
+        required_finding_facets: Vec<chio_finding::FindingFacetKind>,
+    ) -> Result<()> {
+        super::wire::requirements(&required_finding_facets)?;
         domain.validate()?;
         match fs::symlink_metadata(state) {
             Ok(metadata)
@@ -89,12 +110,22 @@ impl Native {
         let database = state.join("authority.sqlite");
         SqliteAuthorityStore::provision(&database, &locks)?;
         let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
+        let now = common::now()?;
+        let finding_context = super::finding_acceptance::fixture_context(
+            &verifier,
+            &provider,
+            now,
+            now.checked_add(86400)
+                .ok_or("Finding context expiry overflow")?,
+        )?;
         let policy = Policy {
             authority_uuid: authority.mutation_fence().store_uuid,
             implementation_sha256: implementation_digest(),
             buyer_key: buyer,
             provider_key: provider,
             verifier_key: verifier,
+            finding_context,
+            required_finding_facets,
             domain,
         };
         fs::write(
@@ -142,7 +173,7 @@ impl Native {
         subcontract: Option<super::tool::Subcontract>,
         recover: bool,
     ) -> Result<Self> {
-        let policy: Policy = common::read(state.join("funding-policy.json"))?;
+        let policy: Policy = super::evidence::read(state.join("funding-policy.json"))?;
         let key = common::key(state)?;
         let authority = SqliteAuthorityStore::open_serving(
             state.join("authority.sqlite"),
@@ -316,6 +347,12 @@ impl Native {
             return Err("native startup reconciliation must close before new funded work".into());
         }
         let time = common::now()?;
+        super::finding_acceptance::validate_context(
+            &self.policy.finding_context,
+            &self.policy.verifier_key,
+            &self.policy.provider_key,
+            time,
+        )?;
         if time >= request.capability.expires_at
             || request.capability.issued_at > time
             || request.capability.issuer != self.policy.provider_key

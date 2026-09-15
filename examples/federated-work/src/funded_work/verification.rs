@@ -27,6 +27,7 @@ pub struct DecisionBody {
     pub claim_transaction_hash: String,
     pub claim_block_hash: String,
     pub accepted: bool,
+    pub finding_assessment: super::finding_acceptance::Assessment,
 }
 pub type Decision = Signed<DecisionBody>;
 
@@ -171,16 +172,37 @@ pub fn decide(
     }
     let raw = canonical_json_bytes(submission)?;
     let matches_native = evidence::verify(&raw, original, policy, custody)?;
+    let finding_assessment = super::finding_acceptance::evaluate(
+        &canonical_json_bytes(&submission.body.finding)?,
+        &policy.finding_context,
+        &entry.agreement.body.finding_context_sha256,
+        &entry.agreement.body.required_finding_facets,
+        crate::common::now()?,
+    )?;
+    use super::finding_acceptance::Outcome;
+    if matches!(
+        finding_assessment.outcome,
+        Outcome::Unavailable | Outcome::Unsupported
+    ) {
+        return Err(format!(
+            "Finding requirements cannot authorize a decision: {:?}",
+            finding_assessment.outcome
+        )
+        .into());
+    }
     let checked = checker.check(&original.input)?;
     let retrieved = custody.blob(&submission.body.output_sha256)?;
     let decision = evidence::sign(
         DecisionBody {
-            schema: "chio.experimental.native-funded-decision.v1".into(),
+            schema: "chio.experimental.native-funded-decision.v2".into(),
             binding: original.binding.clone(),
             commitment: format!("0x{}", digest(submission)?),
             finding_id: submission.body.finding.finding_id.clone(),
             checker_sha256: checker_digest(),
-            accepted: matches_native && retrieved == canonical_json_bytes(&checked)?,
+            accepted: finding_assessment.outcome == Outcome::Accepted
+                && matches_native
+                && retrieved == canonical_json_bytes(&checked)?,
+            finding_assessment,
             claim_transaction_hash: claim.transaction_hash.clone(),
             claim_block_hash: claim.block_hash.clone(),
         },
@@ -196,7 +218,22 @@ pub fn verify_decision(
     policy: &Policy,
 ) -> Result<()> {
     let body = &decision.body;
-    if body.schema != "chio.experimental.native-funded-decision.v1"
+    super::wire::decision(decision)?;
+    super::finding_acceptance::validate_assessment(
+        &body.finding_assessment,
+        &submission.body.finding,
+        &policy.finding_context,
+        &policy.required_finding_facets,
+    )?;
+    use super::finding_acceptance::Outcome;
+    if matches!(
+        body.finding_assessment.outcome,
+        Outcome::Unavailable | Outcome::Unsupported
+    ) || (body.accepted && body.finding_assessment.outcome != Outcome::Accepted)
+    {
+        return Err("decision contradicts required Finding assessment".into());
+    }
+    if body.schema != "chio.experimental.native-funded-decision.v2"
         || body.binding != submission.body.binding
         || body.commitment != format!("0x{}", digest(submission)?)
         || body.finding_id != submission.body.finding.finding_id

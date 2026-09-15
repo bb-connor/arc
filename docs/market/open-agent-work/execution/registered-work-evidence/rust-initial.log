@@ -1,0 +1,103 @@
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling chio-listing v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-finding)
+   Compiling chio-fiscal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone)
+   Compiling chio-did v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-did)
+   Compiling chio-open-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-appraisal)
+   Compiling chio-fincred v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fincred)
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation)
+   Compiling chio-underwriting v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-underwriting)
+   Compiling chio-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-lineage)
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-verify)
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-weights)
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-custody-hw)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling chio-credit v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-credit)
+   Compiling chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-swarm-authority)
+   Compiling chio-disclosure-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-disclosure-lineage)
+   Compiling chio-web3 v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-market)
+   Compiling chio-autonomy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core)
+   Compiling chio-manifest v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-manifest)
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-link)
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-settle)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-workflow v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-workflow)
+   Compiling chio-selective-disclosure v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-selective-disclosure)
+   Compiling chio-attest-buyer-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-buyer-core)
+   Compiling chio-federation-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation-authority)
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-cross-protocol v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-cross-protocol)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-edge-metrics v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-edge-metrics)
+   Compiling chio-mcp-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-edge)
+   Compiling chio-a2a-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-a2a-edge)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-a2a-adapter v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-a2a-adapter)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+   Compiling chio-federated-work v0.1.0 (/home/connor/backbay/arc-funded-integration/examples/federated-work)
+    Finished `test` profile [unoptimized] target(s) in 2m 39s
+     Running unittests src/main.rs (target/debug/deps/chio_federated_work-ec8305597a8f01bf)
+
+running 51 tests
+test funded_work::finding_acceptance::tests::asserted_w0_has_exact_derived_facets_and_no_backing_upgrade ... ok
+test funded_work::finding_acceptance::tests::changed_claim_and_optional_failed_facet_deny ... ok
+test funded_work::finding_acceptance::tests::changed_trust_profile_and_standing_fail_closed ... ok
+test funded_work::finding_acceptance::tests::context_admission_checks_independent_role_pins_and_time ... ok
+test funded_work::finding_acceptance::tests::missing_required_and_unsupported_facets_deny ... ok
+test funded_work::finding_acceptance::tests::raw_ingress_and_relabelled_assessment_deny ... ok
+test funded_work::finding_acceptance::tests::retained_assessment_uses_historical_authority_window ... ok
+test funded_work::finding_acceptance::tests::trust_time_and_authentication_cannot_be_refreshed_by_evaluator ... ok
+test funded_work::tests::allocation_matches_the_independent_contract_vector ... ok
+test funded_work::tests::allocation_rejects_lossy_or_ambiguous_money ... ok
+test funded_work::tests::evidence::authenticated_wrong_result_is_rejected_without_replacing_execution ... ok
+test funded_work::tests::evidence::custody_capacity_preserves_exact_retrieval_and_retries ... ok
+test funded_work::tests::evidence::custody_loss_and_noncanonical_or_forged_finding_cannot_decide ... ok
+test funded_work::tests::evidence::finding_requires_the_original_retained_native_outcome ... ok
+test funded_work::tests::evidence::private_chain_pays_the_original_native_operation ... ignored, requires the local Node chain and CHIO_FUNDED_PYTHON; exercised by lifecycle qualification
+test funded_work::tests::native::admission_without_a_payment_participant_remains_inspectable ... ok
+test funded_work::tests::native::changed_request_and_unavailable_observer_cannot_reserve ... ok
+test funded_work::tests::native::concurrent_retries_cannot_duplicate_native_dispatch_or_hold ... ok
+test funded_work::tests::native::fresh_native_authority_cannot_inherit_funded_agreement ... ok
+test funded_work::tests::native::invalid_observations_deny_before_any_native_operation_hold_or_dispatch ... ok
+test funded_work::tests::native::observation_lost_during_authorization_keeps_original_native_identity ... ok
+test funded_work::tests::native::original_capability_expiry_and_scope_deny_before_reservation ... ok
+test funded_work::tests::native::resigning_another_request_cannot_reuse_the_original_deposit ... ok
+test funded_work::tests::native::restart_and_replay_preserve_one_operation_and_original_hold ... ok
+test funded_work::tests::native::retention_capacity_denies_before_an_additional_native_reservation ... ok
+test funded_work::tests::native::signed_agreement_rejects_identity_and_signature_substitution ... ok
+test funded_work::tests::native::verified_funding_creates_one_native_operation_and_hold ... ok
+test funded_work::tests::observer::receiver_verifies_exact_funded_state_and_confirmed_ancestry ... ok
+test funded_work::tests::observer::stale_chain_time_cannot_be_refreshed_by_a_new_receiver_timestamp ... ok
+test funded_work::tests::resolution::refund_substitution_cannot_authorize_a_native_waiver ... ignored, requires the owned Node chain; selected explicitly by successor qualification
+test funded_work::tests::settlement::payout_rejects_altered_observations_and_adapter_identities ... ignored, requires the owned Node chain and CHIO_FUNDED_PYTHON; exercised by lifecycle qualification
+test funded_work::tests::successors::altered_original_waiver_authority_denies_before_reservation ... ok
+test funded_work::tests::successors::legacy_funding_cannot_acquire_a_waiver_after_execution ... ok
+test funded_work::tests::successors::substituted_dependency_denies_before_opening_the_child_kernel ... ok
+test funded_work::tests::wire::canonical_signed_artifact_decoding_rejects_raw_ambiguity ... ok
+test funded_work::tests::wire::original_agreement_commits_finding_context_and_required_facets ... ok
+test funded_work::tests::wire::registered_artifact_vectors_cover_current_signed_shapes ... ok
+test funded_work::tests::wire::signed_decision_cannot_override_missing_or_changed_finding_authority ... ok
+test funded_work::tests::wire::signed_requirement_or_context_substitution_cannot_admit_work ... ok
+test funded_work::tests::wire::unavailable_or_unsupported_finding_facets_cannot_mint_financial_decisions ... ok
+test https::tests::advertised_origin_cannot_change_scheme_or_route ... ok
+test https::tests::public_enrollment_rejects_keys_and_malformed_certificates ... ok
+test subcontract::tests::disclosure_reconstructs_authentication_without_nested_private_data ... ok
+test subcontract::tests::even_valid_promisor_signatures_cannot_widen_the_exact_procurement ... ok
+test subcontract::tests::four_keys_and_exact_disclosure_are_required ... ok
+test subcontract::tests::parent_signature_cannot_replace_specialist_evidence ... ok
+test tests::authentication_review_observes_inheritance_and_explicit_anonymous_alternatives ... ok
+test tests::authentication_review_rejects_ambiguous_or_unsupported_security_semantics ... ok
+test tests::buyer_rejects_widened_offers_even_when_provider_resigns_them ... ok
+test tests::release_vectors_require_exact_joint_authority_and_completed_receipt ... ok
+test work_buyer::tests::conflicting_verified_terminals_cannot_change_the_first_accounting_choice ... ok
+
+test result: ok. 48 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 101.19s

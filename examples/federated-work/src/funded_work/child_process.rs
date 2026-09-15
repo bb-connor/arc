@@ -20,7 +20,7 @@ pub fn parent_worker(state: &Path) -> Result<Value> {
     let parent_source = Arc::new(SocketSource(state.join("parent.sock")));
     let child_source = Arc::new(SocketSource(state.join("child.sock")));
     let agreement: super::agreement::SignedAgreement =
-        common::read(state.join("child/original-agreement.json"))?;
+        super::evidence::read(state.join("child/original-agreement.json"))?;
     let allocation = super::allocation::allocation_id(
         &agreement.body.domain.chain_id,
         &agreement.body.domain.escrow,
@@ -49,8 +49,8 @@ pub fn parent_worker(state: &Path) -> Result<Value> {
         Some(subcontract),
     )?;
     native.execute(
-        &common::read(state.join("parent/original-agreement.json"))?,
-        &common::read(state.join("parent/original-request.json"))?,
+        &super::evidence::read(state.join("parent/original-agreement.json"))?,
+        &super::evidence::read(state.join("parent/original-request.json"))?,
     )
 }
 

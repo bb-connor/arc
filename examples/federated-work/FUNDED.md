@@ -81,10 +81,11 @@ cargo test -p chio-kernel --test durable_admission_sqlite
 
 ## Admission contract
 
-`chio.experimental.native-funded-w0-agreement.v1` is an example-local signed
+`chio.experimental.native-funded-w0-agreement.v2` is a registered experimental
 agreement. Buyer and provider signatures cover the receiver policy digest,
 native authority UUID, complete original request digest, original request ID,
-chain/deployment/code pins, actors, amount and deadlines. Amounts use canonical
+chain/deployment/code pins, actors, amount and deadlines, plus the exact original
+Finding verifier context and required facets. Amounts use canonical
 positive decimal strings bounded by `2^53 - 1`. The profile fixes the price at
 100 mock base units; native `XTS` units map one-to-one to that pinned token.
 
@@ -267,3 +268,35 @@ integration, broader disclosure and manifest attacks, independent operators and
 sustained capacity. Experimental agreement/submission/decision schemas remain
 example-local. See the [execution report](../../docs/market/open-agent-work/execution/21-native-resolution-earned-child.md)
 for selected qualification and security-sync provenance.
+
+## Registered wire and Finding requirements
+
+The [registered profile](../../spec/schemas/chio-work/README.md) defines exact closed
+agreement v2, submission v1, dependency v1 and decision v2 shapes. The agreement
+commits a pre-provisioned governance-signed Finding context and ordered facet
+requirements. The current profile requires artifact integrity and guarantee
+consistency; additional requirements cannot be weakened by a later verifier.
+
+The actual Finding evidence verifier derives all thirteen facets. This profile
+supplies no external receipt, checkpoint, bond, status or runtime evidence.
+Unavailable or unsupported required facets do not produce a financial decision;
+existing timeout/refund handles the allocation. Positive work acceptance still
+requires custody retrieval and the independent pinned Python W0 checker. Decision
+verification re-derives the exact assessment at its original evaluation time, so
+retained accepted claims survive later context expiry without creating fresh
+admission authority.
+
+The raw wire check is intentionally a parser, not a signature or authority check:
+
+```sh
+target/debug/chio-federated-work experimental-funded-wire-check examples/federated-work/fixtures/registered-work/decision.json
+python examples/federated-work/funded_wire.py --vectors examples/federated-work/fixtures/registered-work/manifest.json
+CARGO_TARGET_DIR=target cargo test --locked --manifest-path examples/federated-work/Cargo.toml shared_malformed_vectors
+CHIO_WORK_PYTHON="$(command -v python)" python3 scripts/tests/check-registered-work-schemas.py
+```
+
+Use the existing Python environment installed with the hashed buyer requirements.
+The [execution report](../../docs/market/open-agent-work/execution/23-registered-work-finding-acceptance.md)
+records the schema, trust, funding and qualification boundaries. These artifacts
+create no market purchase, reimbursement, verified-fix, collateral or challenge
+rights. Full Finding backing and independent operators remain separate work.

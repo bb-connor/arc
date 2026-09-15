@@ -174,8 +174,8 @@ pub fn worker(state: &Path, socket: &Path, fault: &str) -> Result<Value> {
             }
         }),
     )?;
-    let agreement: SignedAgreement = common::read(state.join("original-agreement.json"))?;
-    let request = common::read(state.join("original-request.json"))?;
+    let agreement: SignedAgreement = super::evidence::read(state.join("original-agreement.json"))?;
+    let request = super::evidence::read(state.join("original-request.json"))?;
     native.execute(&agreement, &request)
 }
 
@@ -223,7 +223,7 @@ pub fn run_fault(state: &Path, fault: &str) -> Result<Value> {
         request,
         funding,
     } = setup(state)?;
-    common::read::<Value>(state.join("funding-policy.json"))?;
+    super::evidence::read::<Value>(state.join("funding-policy.json"))?;
     std::fs::write(
         state.join("original-agreement.json"),
         chio_core_types::canonical_json_bytes(&agreement)?,

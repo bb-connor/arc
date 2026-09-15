@@ -191,5 +191,8 @@ The [native resolution and earned-child slice](execution/21-native-resolution-ea
 adds jointly authorized capture waivers with immutable consumed work history,
 and an actual native parent death after its separately funded child earns an
 unpaid claim. The child can collect using retained authority after parent refund.
-This advances the local composition witness. Registered work artifacts, complete
-Finding facets, independent operators and sustained capacity remain open gates.
+This advances the local composition witness. The subsequent
+[registered work and Finding acceptance slice](execution/23-registered-work-finding-acceptance.md)
+registers four bounded envelopes and binds original required facets to the actual
+Finding verifier. Full Finding evidence backing, independent operators and
+sustained capacity remain open gates.

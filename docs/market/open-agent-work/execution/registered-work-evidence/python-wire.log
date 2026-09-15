@@ -1,0 +1,11 @@
+test_ed25519_key_validation (test_funded_wire.WireTests.test_ed25519_key_validation) ... ok
+test_offline_interpreter_rejects_unknown_instructions_and_refs (test_funded_wire.WireTests.test_offline_interpreter_rejects_unknown_instructions_and_refs) ... ok
+test_raw_malformed_variants (test_funded_wire.WireTests.test_raw_malformed_variants) ... ok
+test_shape_and_semantic_rejections (test_funded_wire.WireTests.test_shape_and_semantic_rejections) ... ok
+test_shared_vectors_when_published (test_funded_wire.WireTests.test_shared_vectors_when_published) ... ok
+test_valid_dependency_never_claims_authority (test_funded_wire.WireTests.test_valid_dependency_never_claims_authority) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.056s
+
+OK

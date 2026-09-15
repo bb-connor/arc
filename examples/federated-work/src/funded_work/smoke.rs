@@ -36,9 +36,30 @@ pub(super) fn setup_on_chain(
     buyer: &Keypair,
     request_id: &str,
 ) -> Result<Scenario> {
+    setup_with_requirements(
+        state,
+        chain,
+        setup,
+        buyer,
+        request_id,
+        vec![
+            chio_finding::FindingFacetKind::ArtifactIntegrity,
+            chio_finding::FindingFacetKind::GuaranteeConsistency,
+        ],
+    )
+}
+
+pub(super) fn setup_with_requirements(
+    state: &Path,
+    chain: Arc<LocalChain>,
+    setup: &serde_json::Value,
+    buyer: &Keypair,
+    request_id: &str,
+    requirements: Vec<chio_finding::FindingFacetKind>,
+) -> Result<Scenario> {
     let domain: Domain = serde_json::from_value(setup["domain"].clone())?;
     let work: WorkTerms = serde_json::from_value(setup["work"].clone())?;
-    Native::provision(state, buyer.public_key(), domain.clone())?;
+    Native::provision_with_requirements(state, buyer.public_key(), domain.clone(), requirements)?;
     let native = Native::open(state, chain.clone())?;
     let mut request = native.request(
         request_id,
@@ -50,6 +71,8 @@ pub(super) fn setup_on_chain(
         super::waiver_terms::authorize(&native.policy, &work, &mut request, &receiver, buyer)?;
     let agreement = Agreement {
         schema: AGREEMENT_SCHEMA.into(),
+        finding_context_sha256: digest(&native.policy.finding_context)?,
+        required_finding_facets: native.policy.required_finding_facets.clone(),
         policy_sha256: digest(&native.policy)?,
         authority_uuid: native.policy.authority_uuid.clone(),
         buyer_key: buyer.public_key(),

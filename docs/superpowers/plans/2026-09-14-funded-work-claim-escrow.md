@@ -166,3 +166,10 @@ authority. The parent remains outcome-unknown and is never replayed.
 General artifact/facet integration and the remaining disclosure, substitution,
 capacity and independent-operator gates stay open. The full Task 4 checklist
 remains open where its scope exceeds this one-host private-chain witness.
+
+The [registered-work extension](../../market/open-agent-work/execution/23-registered-work-finding-acceptance.md)
+now registers the bounded agreement v2, submission v1, dependency v1 and decision
+v2 profile and maps its original requirements through the existing Finding verifier.
+Unavailable or unsupported required facets cannot mint a financial decision.
+This completes that bounded artifact/facet mapping, while the full Task 4 checklist
+retains the wider Finding backing, commerce-role and public-finality gates.

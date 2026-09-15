@@ -45,6 +45,11 @@ fn run() -> Result<serde_json::Value> {
         ["experimental-funded-smoke",state,fault] => funded_work::smoke_fault(Path::new(state),fault),
         #[cfg(unix)]
         ["experimental-funded-worker",state,socket,fault] => funded_work::worker(Path::new(state),Path::new(socket),fault),
+        ["experimental-funded-wire-check",file] => {
+            let mut bytes = Vec::new();
+            std::fs::File::open(file)?.take(funded_work::wire::MAX_ARTIFACT_BYTES as u64 + 1).read_to_end(&mut bytes)?;
+            funded_work::wire::parse(&bytes)
+        },
         ["check-openapi",file] => {
             let mut input = String::new();
             std::fs::File::open(file)?.take(64 * 1024 + 1).read_to_string(&mut input)?;

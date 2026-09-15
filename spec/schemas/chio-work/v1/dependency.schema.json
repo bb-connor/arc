@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Chio experimental native funded dependency v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "signature"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "parentAgreement",
+        "childAgreement",
+        "parentRequest",
+        "childRequest",
+        "inputSha256",
+        "parentAuthority",
+        "childAuthority"
+      ],
+      "properties": {
+        "schema": {
+          "const": "chio.experimental.native-funded-dependency.v1"
+        },
+        "parentAgreement": {
+          "$ref": "#/$defs/sha256"
+        },
+        "childAgreement": {
+          "$ref": "#/$defs/sha256"
+        },
+        "parentRequest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "childRequest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "inputSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "parentAuthority": {
+          "$ref": "#/$defs/identifier"
+        },
+        "childAuthority": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
+    "signature": {
+      "$ref": "#/$defs/signature"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "signature": {
+      "type": "string",
+      "minLength": 128,
+      "maxLength": 128,
+      "pattern": "^[0-9a-f]{128}$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\s\\u0000-\\u001f\\u007f-\\u009f]+$"
+    }
+  },
+  "$id": "https://chio.world/schemas/chio-work/v1/dependency.schema.json"
+}

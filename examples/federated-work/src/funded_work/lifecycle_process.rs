@@ -46,7 +46,8 @@ pub fn worker(state: &Path, socket: &Path, mode: &str, fault: &str) -> Result<Va
     validate(mode, fault)?;
     let source = Arc::new(SocketSource(socket.to_owned()));
     let native = Native::open(state, source.clone())?;
-    let request: chio_kernel::ToolCallRequest = common::read(state.join("original-request.json"))?;
+    let request: chio_kernel::ToolCallRequest =
+        super::evidence::read(state.join("original-request.json"))?;
     let fault = fault.to_owned();
     let checkpoint: super::Checkpoint = Arc::new(move |point| {
         if point == fault {
@@ -113,7 +114,7 @@ pub fn run(state: &Path, mode: &str, fault: &str) -> Result<Value> {
     if expire_decision {
         chain.request(json!({"method":"advance","allocation":allocation,"phase":"refund"}))?;
     }
-    let agreement: SignedAgreement = common::read(state.join("original-agreement.json"))?;
+    let agreement: SignedAgreement = super::evidence::read(state.join("original-agreement.json"))?;
     let resumed = Command::new(std::env::current_exe()?)
         .arg("experimental-funded-lifecycle-worker")
         .arg(state)

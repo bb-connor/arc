@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Chio experimental native funded submission v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "signature"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "binding",
+        "inputSha256",
+        "outputSha256",
+        "finding"
+      ],
+      "properties": {
+        "schema": {
+          "const": "chio.experimental.native-funded-submission.v1"
+        },
+        "binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "allocationId",
+            "agreementSha256",
+            "authorityUuid",
+            "operationId",
+            "holdId",
+            "authorizationId",
+            "requestSha256",
+            "outcomeId",
+            "rawOutcomeSha256",
+            "expiresAt"
+          ],
+          "properties": {
+            "allocationId": {
+              "$ref": "#/$defs/hash32"
+            },
+            "agreementSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "authorityUuid": {
+              "$ref": "#/$defs/identifier"
+            },
+            "operationId": {
+              "$ref": "#/$defs/identifier"
+            },
+            "holdId": {
+              "$ref": "#/$defs/identifier"
+            },
+            "authorizationId": {
+              "$ref": "#/$defs/identifier"
+            },
+            "requestSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "outcomeId": {
+              "$ref": "#/$defs/identifier"
+            },
+            "rawOutcomeSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "expiresAt": {
+              "$ref": "#/$defs/safeInteger"
+            }
+          }
+        },
+        "inputSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "outputSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "finding": {
+          "$ref": "../../chio-finding/v1/finding.schema.json"
+        }
+      }
+    },
+    "signature": {
+      "$ref": "#/$defs/signature"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "signature": {
+      "type": "string",
+      "minLength": 128,
+      "maxLength": 128,
+      "pattern": "^[0-9a-f]{128}$"
+    },
+    "hash32": {
+      "type": "string",
+      "minLength": 66,
+      "maxLength": 66,
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\s\\u0000-\\u001f\\u007f-\\u009f]+$"
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "$id": "https://chio.world/schemas/chio-work/v1/submission.schema.json"
+}

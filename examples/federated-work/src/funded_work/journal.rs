@@ -135,8 +135,8 @@ impl Journal {
         row.map(|stored| {
             Ok(Entry {
                 allocation: stored.allocation,
-                agreement: serde_json::from_str(&stored.agreement)?,
-                request: serde_json::from_str(&stored.request)?,
+                agreement: super::evidence::decode(stored.agreement.as_bytes())?,
+                request: super::evidence::decode(stored.request.as_bytes())?,
                 operation: stored.operation,
                 hold: stored.hold,
             })

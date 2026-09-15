@@ -1,0 +1,6 @@
+test_earned_child_collects_after_native_parent_loss (__main__.FundedChild.test_earned_child_collects_after_native_parent_loss) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 170.333s
+
+OK

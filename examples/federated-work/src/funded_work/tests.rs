@@ -6,6 +6,7 @@ mod observer;
 mod resolution;
 mod settlement;
 mod successors;
+mod wire;
 
 #[test]
 fn allocation_matches_the_independent_contract_vector() -> Result<()> {

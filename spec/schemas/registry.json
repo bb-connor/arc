@@ -2719,6 +2719,30 @@
       "artifactKind": "verified_approval_set",
       "introducedBy": "enterprise-security-execution-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/capability/verified-approval-set.schema.json"
+    },
+    {
+      "schema": "chio.experimental.native-funded-w0-agreement.v2",
+      "artifactKind": "native_funded_agreement",
+      "introducedBy": "registered-native-funded-work-v1",
+      "schemaFile": "spec/schemas/chio-work/v2/agreement.schema.json"
+    },
+    {
+      "schema": "chio.experimental.native-funded-submission.v1",
+      "artifactKind": "native_funded_submission",
+      "introducedBy": "registered-native-funded-work-v1",
+      "schemaFile": "spec/schemas/chio-work/v1/submission.schema.json"
+    },
+    {
+      "schema": "chio.experimental.native-funded-dependency.v1",
+      "artifactKind": "native_funded_dependency",
+      "introducedBy": "registered-native-funded-work-v1",
+      "schemaFile": "spec/schemas/chio-work/v1/dependency.schema.json"
+    },
+    {
+      "schema": "chio.experimental.native-funded-decision.v2",
+      "artifactKind": "native_funded_decision",
+      "introducedBy": "registered-native-funded-work-v1",
+      "schemaFile": "spec/schemas/chio-work/v2/decision.schema.json"
     }
   ]
 }

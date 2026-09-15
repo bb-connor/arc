@@ -200,7 +200,8 @@ pub(super) fn progress(
         json!({"findingId":submission.body.finding.finding_id,"commitment":decision.body.commitment,
         "decision":"verified","accepted":paid,"decisionSha256":common::digest(&decision.body)?,
         "financial":if paid {"payout"} else {"refund"},"transactionHash":observed.transaction_hash,
-        "observationSha256":observed.observation_sha256,"findingAssurance":"asserted-native-artifact-with-experimental-w0-checks"}),
+        "observationSha256":observed.observation_sha256,"findingAssessment":decision.body.finding_assessment,
+        "findingAssurance":"asserted-finding-with-explicit-facets-and-independent-w0-checks"}),
     )
 }
 

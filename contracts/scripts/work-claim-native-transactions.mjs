@@ -4,11 +4,13 @@ import { createPublicKey, verify } from 'node:crypto';
 import { ethers } from 'ethers';
 import { escrowInterface, intentFor, validatePrepared, reconcile } from './work-claim-recovery.mjs';
 
-// The native decision grammar contains ASCII strings, safe integers and booleans.
-function canonical(value) {
+// This bounded native decision grammar adds ordered facet arrays to ASCII
+// strings, safe integers, booleans and closed objects. Null is not omission.
+export function canonical(value) {
   if (typeof value === 'string') { assert.match(value, /^[\x20-\x7e]*$/); return JSON.stringify(value); }
   if (typeof value === 'boolean') return JSON.stringify(value);
   if (typeof value === 'number') { assert.ok(Number.isSafeInteger(value)); return JSON.stringify(value); }
+  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
   assert.ok(value && typeof value === 'object' && !Array.isArray(value));
   return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical(value[key])).join(',') + '}';
 }
@@ -56,7 +58,7 @@ export function transactions({ rpc, provider, escrow, domain, payer, beneficiary
       if (action === 'record') {
         assert.ok(verifierKey && decision);
         const body = decision.body;
-        assert.equal(body.schema, 'chio.experimental.native-funded-decision.v1');
+        assert.equal(body.schema, 'chio.experimental.native-funded-decision.v2');
         assert.equal(body.binding.allocationId, allocationId);
         assert.equal('0x' + body.binding.agreementSha256, terms.agreementDigest);
         assert.equal(body.commitment, commitment);

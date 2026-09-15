@@ -30,10 +30,24 @@ pub(super) struct Fixture {
 }
 
 pub(super) fn fixture() -> Result<Fixture> {
+    fixture_with_requirements(vec![
+        chio_finding::FindingFacetKind::ArtifactIntegrity,
+        chio_finding::FindingFacetKind::GuaranteeConsistency,
+    ])
+}
+
+pub(super) fn fixture_with_requirements(
+    requirements: Vec<chio_finding::FindingFacetKind>,
+) -> Result<Fixture> {
     let (domain, terms, observation, _) = super::observer::fixture()?;
     let directory = tempfile::tempdir()?;
     let buyer = Keypair::generate();
-    Native::provision(directory.path(), buyer.public_key(), domain.clone())?;
+    Native::provision_with_requirements(
+        directory.path(),
+        buyer.public_key(),
+        domain.clone(),
+        requirements,
+    )?;
     let source = Arc::new(Source(Mutex::new(observation), AtomicBool::new(true)));
     let native = Native::open(directory.path(), source.clone())?;
     let request = native.request(
@@ -44,6 +58,8 @@ pub(super) fn fixture() -> Result<Fixture> {
     let agreement = Agreement {
         capture_waiver_terms: None,
         schema: AGREEMENT_SCHEMA.into(),
+        finding_context_sha256: crate::common::digest(&native.policy.finding_context)?,
+        required_finding_facets: native.policy.required_finding_facets.clone(),
         policy_sha256: crate::common::digest(&native.policy)?,
         authority_uuid: native.policy.authority_uuid.clone(),
         buyer_key: buyer.public_key(),

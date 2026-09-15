@@ -62,6 +62,17 @@ pub fn decode<T: DeserializeOwned + Serialize>(raw: &[u8]) -> Result<T> {
     Ok(value)
 }
 
+pub(super) fn read<T: DeserializeOwned + Serialize>(
+    path: impl AsRef<std::path::Path>,
+) -> Result<T> {
+    use std::io::Read;
+    let mut raw = Vec::new();
+    std::fs::File::open(path)?
+        .take(super::wire::MAX_ARTIFACT_BYTES as u64 + 1)
+        .read_to_end(&mut raw)?;
+    decode(&raw)
+}
+
 pub fn sign<T: Serialize>(body: T, key: &Keypair) -> Result<Signed<T>> {
     let signature = key.sign(&canonical_json_bytes(&body)?);
     Ok(Signed { body, signature })
@@ -126,6 +137,7 @@ pub fn submit(
 /// remain errors; callers must never turn them into financial decisions.
 pub fn verify(raw: &[u8], original: &Evidence, policy: &Policy, custody: &Journal) -> Result<bool> {
     let submission: Submission = decode(raw)?;
+    super::wire::submission(&submission)?;
     let body = &submission.body;
     if body.schema != "chio.experimental.native-funded-submission.v1"
         || body.binding != original.binding

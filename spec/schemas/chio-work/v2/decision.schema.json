@@ -1,0 +1,400 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Chio experimental native funded decision v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "signature"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "binding",
+        "commitment",
+        "findingId",
+        "checkerSha256",
+        "claimTransactionHash",
+        "claimBlockHash",
+        "accepted",
+        "findingAssessment"
+      ],
+      "properties": {
+        "schema": {
+          "const": "chio.experimental.native-funded-decision.v2"
+        },
+        "binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "allocationId",
+            "agreementSha256",
+            "authorityUuid",
+            "operationId",
+            "holdId",
+            "authorizationId",
+            "requestSha256",
+            "outcomeId",
+            "rawOutcomeSha256",
+            "expiresAt"
+          ],
+          "properties": {
+            "allocationId": {
+              "$ref": "#/$defs/hash32"
+            },
+            "agreementSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "authorityUuid": {
+              "$ref": "#/$defs/identifier"
+            },
+            "operationId": {
+              "$ref": "#/$defs/identifier"
+            },
+            "holdId": {
+              "$ref": "#/$defs/identifier"
+            },
+            "authorizationId": {
+              "$ref": "#/$defs/identifier"
+            },
+            "requestSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "outcomeId": {
+              "$ref": "#/$defs/identifier"
+            },
+            "rawOutcomeSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "expiresAt": {
+              "$ref": "#/$defs/safeInteger"
+            }
+          }
+        },
+        "commitment": {
+          "$ref": "#/$defs/hash32"
+        },
+        "findingId": {
+          "$ref": "#/$defs/sha256"
+        },
+        "checkerSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "claimTransactionHash": {
+          "$ref": "#/$defs/hash32"
+        },
+        "claimBlockHash": {
+          "$ref": "#/$defs/hash32"
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "findingAssessment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "contextSha256",
+            "findingArtifactSha256",
+            "resolvedEvidenceBundleSha256",
+            "evaluatedAt",
+            "requiredFacets",
+            "facets",
+            "outcome"
+          ],
+          "properties": {
+            "schema": {
+              "const": "chio.experimental.funded-finding-assessment.v1"
+            },
+            "contextSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "findingArtifactSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "resolvedEvidenceBundleSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "evaluatedAt": {
+              "$ref": "#/$defs/safeInteger"
+            },
+            "requiredFacets": {
+              "$ref": "#/$defs/facetKinds"
+            },
+            "facets": {
+              "type": "array",
+              "minItems": 13,
+              "maxItems": 13,
+              "prefixItems": [
+                {
+                  "allOf": [
+                    {
+                      "$ref": "../../chio-finding/v1/verifier-report.schema.json#/$defs/facetResult"
+                    },
+                    {
+                      "properties": {
+                        "facet": {
+                          "const": "artifact_integrity"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "../../chio-finding/v1/verifier-report.schema.json#/$defs/facetResult"
+                    },
+                    {
+                      "properties": {
+                        "facet": {
+                          "const": "receipt_authenticity"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "../../chio-finding/v1/verifier-report.schema.json#/$defs/facetResult"
+                    },
+                    {
+                      "properties": {
+                        "facet": {
+                          "const": "checkpoint_membership"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "../../chio-finding/v1/verifier-report.schema.json#/$defs/facetResult"
+                    },
+                    {
+                      "properties": {
+                        "facet": {
+                          "const": "kernel_and_revocation_trust"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "../../chio-finding/v1/verifier-report.schema.json#/$defs/facetResult"
+                    },
+                    {
+                      "properties": {
+                        "facet": {
+                          "const": "issuer_lineage"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "../../chio-finding/v1/verifier-report.schema.json#/$defs/facetResult"
+                    },
+                    {
+                      "properties": {
+                        "facet": {
+                          "const": "recipe_binding"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "../../chio-finding/v1/verifier-report.schema.json#/$defs/facetResult"
+                    },
+                    {
+                      "properties": {
+                        "facet": {
+                          "const": "intent_binding"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "../../chio-finding/v1/verifier-report.schema.json#/$defs/facetResult"
+                    },
+                    {
+                      "properties": {
+                        "facet": {
+                          "const": "metered_exposure_backing"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "../../chio-finding/v1/verifier-report.schema.json#/$defs/facetResult"
+                    },
+                    {
+                      "properties": {
+                        "facet": {
+                          "const": "settled_spend_backing"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "../../chio-finding/v1/verifier-report.schema.json#/$defs/facetResult"
+                    },
+                    {
+                      "properties": {
+                        "facet": {
+                          "const": "runtime_assurance_backing"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "../../chio-finding/v1/verifier-report.schema.json#/$defs/facetResult"
+                    },
+                    {
+                      "properties": {
+                        "facet": {
+                          "const": "bond_backing"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "../../chio-finding/v1/verifier-report.schema.json#/$defs/facetResult"
+                    },
+                    {
+                      "properties": {
+                        "facet": {
+                          "const": "status_liveness"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "../../chio-finding/v1/verifier-report.schema.json#/$defs/facetResult"
+                    },
+                    {
+                      "properties": {
+                        "facet": {
+                          "const": "guarantee_consistency"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ],
+              "items": false
+            },
+            "outcome": {
+              "enum": [
+                "accepted",
+                "rejected",
+                "unavailable",
+                "unsupported"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "signature": {
+      "$ref": "#/$defs/signature"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "signature": {
+      "type": "string",
+      "minLength": 128,
+      "maxLength": 128,
+      "pattern": "^[0-9a-f]{128}$"
+    },
+    "hash32": {
+      "type": "string",
+      "minLength": 66,
+      "maxLength": 66,
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\s\\u0000-\\u001f\\u007f-\\u009f]+$"
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "facetKinds": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 13,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "artifact_integrity",
+          "receipt_authenticity",
+          "checkpoint_membership",
+          "kernel_and_revocation_trust",
+          "issuer_lineage",
+          "recipe_binding",
+          "intent_binding",
+          "metered_exposure_backing",
+          "settled_spend_backing",
+          "runtime_assurance_backing",
+          "bond_backing",
+          "status_liveness",
+          "guarantee_consistency"
+        ]
+      },
+      "allOf": [
+        {
+          "contains": {
+            "const": "artifact_integrity"
+          }
+        },
+        {
+          "contains": {
+            "const": "guarantee_consistency"
+          }
+        }
+      ]
+    }
+  },
+  "$id": "https://chio.world/schemas/chio-work/v2/decision.schema.json"
+}

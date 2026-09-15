@@ -333,3 +333,10 @@ actual native parent death. P45 registered artifact/facet integration, P48 signi
 and rotation profiles, P49 disclosure, P53 sustained retention, and P22/P31
 independent implementations/operators remain separate gates. The new native
 financial authority does not qualify those broader packages by itself.
+
+The [registered-work acceptance extension](execution/23-registered-work-finding-acceptance.md)
+advances the bounded P45 mapping: registered agreement/submission/dependency/decision
+bytes, original context and facet requirements, exact verifier-derived assessment,
+shared Rust/Python malformed vectors and no payment when required evidence is
+unavailable or unsupported. Full Finding backing, verified-fix/standing/challenge
+roles and the general market/public-finality boundary remain unqualified.

@@ -1473,6 +1473,7 @@ dependencies = [
  "chio-core-types",
  "chio-egress-contract",
  "chio-finding",
+ "chio-finding-verifier",
  "chio-kernel",
  "chio-manifest",
  "chio-open-market",

@@ -1,0 +1,79 @@
+{
+  "chain": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "0",
+    "events": {
+      "ClaimSubmitted": 0,
+      "DecisionRecorded": 0,
+      "Funded": 1,
+      "Paid": 0,
+      "Refunded": 1,
+      "TimedOut": 1
+    },
+    "fundingTransaction": "0x994408ec48f9a9b10604948625e2a185d7f2a2b8e75accd99df5a26fbd826766",
+    "paid": "0",
+    "payerBalance": "1000",
+    "refunded": "100",
+    "state": "Refunded",
+    "transactions": {
+      "pay": [],
+      "record": [],
+      "refund": [
+        {
+          "hash": "0x1bbe25c19ce4f8842a07fef1607df5c2e28d43dd894b194edb5da1814ad25625",
+          "nonce": 2,
+          "status": 1
+        }
+      ],
+      "submit": []
+    }
+  },
+  "first": {
+    "allocationId": "0x782172b795b9a495b02b4c3aedcc7830b636c324b2bb59e2a7bfca4bf22d7149",
+    "authorityUuid": "01a0a2da-cf91-7903-8190-b821ae75013a",
+    "authorizationId": "funded-782172b795b9a495b02b4c3aedcc7830b636c324b2bb59e2a7bfca4bf22d7149",
+    "executions": 1,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:d5ef2e53f9a6af9e67cb066a29a905deab79751a8417114dd88e86f8c8e11e41:0",
+    "nativeAuthorizationId": "funded-782172b795b9a495b02b4c3aedcc7830b636c324b2bb59e2a7bfca4bf22d7149",
+    "nativeEvaluationError": "durable admission failed: payment rail unavailable: exact ERC20 payout has not been observed; capture remains pending",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "d5ef2e53f9a6af9e67cb066a29a905deab79751a8417114dd88e86f8c8e11e41",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": null,
+    "startupReconciliationError": null
+  },
+  "replay": {
+    "allocationId": "0x782172b795b9a495b02b4c3aedcc7830b636c324b2bb59e2a7bfca4bf22d7149",
+    "authorityUuid": "01a0a2da-cf91-7903-8190-b821ae75013a",
+    "authorizationId": "funded-782172b795b9a495b02b4c3aedcc7830b636c324b2bb59e2a7bfca4bf22d7149",
+    "executions": 1,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:d5ef2e53f9a6af9e67cb066a29a905deab79751a8417114dd88e86f8c8e11e41:0",
+    "nativeAuthorizationId": "funded-782172b795b9a495b02b4c3aedcc7830b636c324b2bb59e2a7bfca4bf22d7149",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "d5ef2e53f9a6af9e67cb066a29a905deab79751a8417114dd88e86f8c8e11e41",
+    "paymentState": "refunded",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": "0x1bbe25c19ce4f8842a07fef1607df5c2e28d43dd894b194edb5da1814ad25625",
+    "startupReconciliationError": "durable admission failed: payment rail unavailable: exact ERC20 payout has not been observed; capture remains pending"
+  },
+  "verification": {
+    "decision": "absent",
+    "financial": "refund"
+  },
+  "retainedTransactions": {
+    "refund": "0x1bbe25c19ce4f8842a07fef1607df5c2e28d43dd894b194edb5da1814ad25625"
+  }
+}
