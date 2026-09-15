@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -42,7 +43,34 @@ def command(args, cwd, env):
     return result.stdout
 
 
+def packages(pins):
+    listed = {Path(name) for name in pins if Path(name).parent == Path("packages")}
+    actual = {path.relative_to(HERE) for path in (HERE / "packages").iterdir()}
+    require(actual <= listed, "unlisted package artifact")
+    selected = []
+    for pattern in ("chio_process-*.whl", "chio-protocol-process-*.tgz"):
+        matches = sorted(path for path in listed if path.match(pattern))
+        require(len(matches) == 1, f"exactly one expected {pattern} artifact is required")
+        selected.append(HERE / matches[0])
+    require(
+        all(
+            path == Path("packages/.gitignore")
+            or path.match("chio_process-*.tar.gz")
+            or HERE / path in selected
+            for path in listed
+        ),
+        "unexpected package artifact",
+    )
+    return selected
+
+
+def normalized_platform(system, machine):
+    system, machine = system.lower(), machine.lower()
+    return system, {"amd64": "x86_64", "arm64": "aarch64"}.get(machine, machine)
+
+
 def prepare(state, pins, recovery, env):
+    wheel, package = packages(pins)
     state.mkdir(mode=0o700)
     app = state / "app"
     app.mkdir(mode=0o700)
@@ -50,7 +78,6 @@ def prepare(state, pins, recovery, env):
         shutil.copyfile(HERE / name, app / name)
     venv.EnvBuilder(with_pip=True).create(state / "venv")
     python = state / "venv/bin/python"
-    wheel = next((HERE / "packages").glob("*.whl"))
     command(
         [
             python,
@@ -67,7 +94,6 @@ def prepare(state, pins, recovery, env):
         env,
     )
     write(app / "package.json", {"name": "chio-process-starter", "private": True})
-    package = next((HERE / "packages").glob("*.tgz"))
     command(
         [
             "npm",
@@ -171,7 +197,13 @@ def main():
     os.umask(0o077)
     state = args.state.resolve()
     manifest = json.loads((HERE / "manifest.json").read_text())
+    require(
+        normalized_platform(manifest["system"], manifest["machine"])
+        == normalized_platform(platform.system(), platform.machine()),
+        "this starter was built for another operating system or architecture",
+    )
     pins = manifest["files"]
+    packages(pins)
     for name, expected in pins.items():
         path = HERE / name
         require(path.resolve().is_relative_to(HERE), "artifact path escapes starter")

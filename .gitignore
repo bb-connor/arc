@@ -145,3 +145,5 @@ _apalache-out/
 
 # Raw cargo-mutants output (dated JSON summaries stay tracked)
 audits/evidence/**/mutants.out/*.txt
+# Local environment documented by the repository review example.
+/examples/repository-review/.venv/

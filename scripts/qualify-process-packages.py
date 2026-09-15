@@ -10,6 +10,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import venv
@@ -30,7 +31,7 @@ def command(args, cwd, env, *, success=True):
         timeout=300,
     )
     assert (result.returncode == 0) == success, (args, result.stdout, result.stderr)
-    return result.stdout
+    return result.stdout if success else result
 
 
 def digest(path):
@@ -160,7 +161,8 @@ def qualify(kit, work, env):
     saved = source.read_bytes()
     try:
         source.write_bytes(saved + b"\n# changed application\n")
-        command(invoke, work, env, success=False)
+        refused = command(invoke, work, env, success=False)
+        assert "artifact changed: producer.py" in refused.stderr, refused.stderr
     finally:
         source.write_bytes(saved)
     exported = kit / "evidence"
@@ -237,6 +239,18 @@ def main():
     wheel = next(packages.glob("*.whl"))
     with zipfile.ZipFile(wheel) as archive:
         assert "chio_process/py.typed" in archive.namelist()
+        metadata = archive.read(
+            next(name for name in archive.namelist() if name.endswith(".dist-info/METADATA"))
+        ).decode()
+    with tarfile.open(next(packages.glob("*.tgz"))) as archive:
+        readme = archive.extractfile("package/README.md").read().decode()
+    for document in (metadata, readme):
+        for target in (
+            "crates/products/chio-cli/PROCESS_RUNNER.md#adaptive-child-work",
+            "crates/kernel/chio-process/WORKER_PROTOCOL.md",
+        ):
+            assert "https://github.com/bb-connor/arc/blob/main/" + target in document
+        assert "](../" not in document
     # These local hashes detect accidental artifact drift. They are not a
     # signature or release provenance for the supplied host executable.
     write(

@@ -17,13 +17,6 @@ def command(args, cwd, *, success=True):
     env = {
         key: value for key, value in os.environ.items() if not key.startswith("PYTHON")
     }
-    # Offline installation must not depend on a working package registry.
-    env.update(
-        {
-            "PIP_INDEX_URL": "http://127.0.0.1:1",
-            "PIP_EXTRA_INDEX_URL": "http://127.0.0.1:1",
-        }
-    )
     result = subprocess.run(
         list(map(str, args)),
         cwd=cwd,
@@ -34,6 +27,16 @@ def command(args, cwd, *, success=True):
     )
     assert (result.returncode == 0) == success, (args, result.stdout, result.stderr)
     return result
+
+
+def verify_offline_install(log):
+    # pip's own debug log records this only when it disables index discovery.
+    # Environment index overrides are ignored by pip --isolated.
+    text = log.read_text()
+    assert "Ignoring indexes:" in text, "pip did not disable index discovery"
+    assert "Fetching project page and analyzing links:" not in text, (
+        "pip accessed a package index"
+    )
 
 
 def fixture(temporary):
@@ -165,6 +168,7 @@ def exercise(kit, temporary):
         temporary,
     )
     (repo / "api/main.py").write_text("uncommitted = 'not captured'\n")
+    verify_offline_install(state / "pip-install.log")
     original = interrupted_run(kit, state, app, temporary)
     command([*app, "run", "--state", state], temporary)
     evidence = json.loads((state / "run/evidence.json").read_text())

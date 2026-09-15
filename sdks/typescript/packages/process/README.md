@@ -31,13 +31,13 @@ Preserve `receipt_json` unchanged for a Chio verifier. The client returns
 receipts without verifying their signatures. Revision strings remain strings;
 application integers outside JavaScript's safe range must use strings too.
 
-The Linux host's optional [adaptive process profile](../../../../crates/products/chio-cli/PROCESS_RUNNER.md#adaptive-child-work)
+The Linux host's optional [adaptive process profile](https://github.com/bb-connor/arc/blob/main/crates/products/chio-cli/PROCESS_RUNNER.md#adaptive-child-work)
 uses the same `invoke` method for `chio-process/spawn_<template>` and
 `wait_children`. A waiting parent checkpoints and exits 75 to release its
 worker slot, then resumes under its original process identity and attempt
 budget. Executable selection and signing stay with the host.
 
-See the [worker contract](../../../../crates/kernel/chio-process/WORKER_PROTOCOL.md)
+See the [worker contract](https://github.com/bb-connor/arc/blob/main/crates/kernel/chio-process/WORKER_PROTOCOL.md)
 for authentication, cancellation, frame limits and OS isolation requirements.
 Run client tests with `npm test` in this directory.
 

@@ -154,6 +154,8 @@ def prepare(args, pins):
             "--require-hashes",
             "--only-binary=:all:",
             "--disable-pip-version-check",
+            "--log",
+            state / "pip-install.log",
             "--find-links",
             HERE / "packages",
             "-r",
@@ -175,6 +177,7 @@ def prepare(args, pins):
     command(
         [
             python,
+            "-I",
             HERE / "application/adaptive_review.py",
             "prepare",
             "--repo",
@@ -290,6 +293,7 @@ def main():
             command(
                 [
                     state / "venv/bin/python",
+                    "-I",
                     HERE / "application/adaptive_review.py",
                     "run",
                     "--run-dir",

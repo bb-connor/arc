@@ -120,7 +120,7 @@ def host(config, directory):
 
 
 def plan(config, directory):
-    executable = [sys.executable, str(HERE / "adaptive_review.py"), "worker"]
+    executable = [sys.executable, "-I", str(HERE / "adaptive_review.py"), "worker"]
 
     def settings(role, slot=None):
         return {**config, "directory": str(directory), "role": role, "slot": slot}
