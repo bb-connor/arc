@@ -288,6 +288,39 @@ prepared plan, request binding and terminal receipt. Historical evidence cannot
 authorize another effect. Execution nonces and the full M5 scenario matrix remain
 unverified; the report includes `m5_acceptance_complete: false`.
 
+### Observe a denied or uncertain call
+
+Stop the host and retain the caller's request, invocation context and response
+envelope. The local qualifier writes these as `WORKER/request.json`,
+`WORKER/context.json` and `WORKER/response.json`. Export one observation on Linux:
+
+```sh
+chio process attest-call --state "$PWD/run-state" \
+  --request writer/request.json --context writer/context.json \
+  --response writer/response.json --out "$PWD/writer-call.json"
+chio process verify-call --artifact "$PWD/writer-call.json" \
+  --request writer/request.json --context writer/context.json \
+  --trusted-kernel-pubkey "$TRUSTED_KERNEL_PUBLIC_KEY_FILE" \
+  --runtime-id "$INITIALIZED_RUNTIME_ID"
+```
+
+Keep the expected request, process/capability context, kernel key and runtime ID
+independently of the submitted artifact. Verification works offline on supported
+Unix hosts. It checks the signed provisioning record, worker response and the
+operation's observed state. For a dispatched call it also checks the original
+signed admission projection and continuation claim commitment. Completed calls
+must name their actual terminal receipt; uncertain calls retain their incident
+record and `outcome_unknown_after_dispatch` state. Compensated calls cannot claim
+a dispatch commitment or a retained continuation.
+
+Export uses the existing fenced, anchored store read APIs and keeps the private
+admission request in the host. It signs only the public binding and custody
+observation. It does not dispatch, retry, refund or release a continuation. The
+observation may describe an ordinary denial without an admission record, but it
+does not prove an external effect was absent. Task authority, aggregate usage,
+confinement, physical effects and graph completion require their own evidence.
+This command does not replace `verify-run` or close M5 acceptance.
+
 ### Verify a launch when the observing host died
 
 A recovered unknown-outcome response can refer to the replacement connection.

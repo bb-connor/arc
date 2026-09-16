@@ -1,6 +1,7 @@
 //! Observe real allowed and compensated calls without changing their outcome.
 #![cfg(target_os = "linux")]
 
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -27,6 +28,7 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let directory = tempfile::tempdir()?;
     let root = directory.path().canonicalize()?;
+    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700))?;
     let output = Command::new("python3")
         .args(["-c", "import sys,json; from pathlib import Path; import swarm_shared_family; print(json.dumps(swarm_shared_family.exercise(sys.argv[1],Path(sys.argv[2]))))"])
         .arg(env!("CARGO_BIN_EXE_chio")).arg(&root)
