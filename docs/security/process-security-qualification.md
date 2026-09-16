@@ -19,6 +19,27 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 #### Current local evidence (2026-09-15, continued September 16 UTC)
 
+The receipt-history campaign at `15cd4178efe80cda959e16e7c70ceacde412b265`
+adds a separate million-entry inventory for full checkpoint integrity, filtered
+pagination, consistent SQLite backup, reopen readiness, half-history archival,
+authenticated retained receipts/commitments and post-restore sequence continuity.
+It uses real appends and the unchanged checkpoint batch size of 100. The normal
+1,000-entry calibration is not the million-entry acceptance case. Both scale
+script regressions pass and reject empty, ignored, failed and substituted test
+output. Rust compilation, calibration, strict Clippy and the million-entry
+recovery campaign are pending; this commit does not establish M8 acceptance.
+
+At 10:28-10:36 UTC the host reported load averages around 379-397 on ten CPU
+cores and about 16 GiB of occupied swap. The frozen foundation workspace run
+reported four failed cases during that interval; their causes remain unclassified
+until the test target emits its captured failures. Its raw output remains in
+`linux-810664017-retry2/workspace-tests.log`. The original append-scale campaign
+also remains in progress. Pending graph/recovery work is held until the host
+settles, with automatic resume and load samples retained in
+`host-contention-queued-controllers.json` and `host-contention-recovery.json`.
+No test deadline or acceptance bound was changed, and host contention is not
+treated as proof that a failed assertion is harmless.
+
 The fresh seven-scenario matrix completes on Linux/x86_64 at 09:28 UTC on
 September 16. Runtime `2d4b28da06ae06b0040acc67fadb141a2b6c9c89`, built with
 the unchanged `docker-release` profile, runs the qualifier at
