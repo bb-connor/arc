@@ -26,6 +26,8 @@ mod retained_commitments;
 mod retention;
 #[path = "tests/scale_proof.rs"]
 mod scale_proof;
+#[path = "tests/scale_recovery.rs"]
+mod scale_recovery;
 #[path = "tests/schema_archive.rs"]
 mod schema_archive;
 #[path = "tests/settlement.rs"]
