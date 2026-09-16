@@ -397,6 +397,12 @@ audit-as-crates-io = true
 [policy.chio-workflow-preflight]
 audit-as-crates-io = true
 
+[policy.enumflags2_derive]
+audit-as-crates-io = false
+
+[policy.sigstore-verify]
+audit-as-crates-io = false
+
 [[exemptions.addr2line]]
 version = "0.26.1"
 criteria = "safe-to-deploy"

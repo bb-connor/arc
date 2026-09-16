@@ -7,6 +7,7 @@ members = ["crates/products/chio-cli"]
 
 [patch.crates-io]
 sigstore-verify = { path = "third_party/sigstore-verify-chio" }
+enumflags2_derive = { path = "third_party/enumflags2-derive-chio" }
 
 [workspace.package]
 version = "0.1.0"

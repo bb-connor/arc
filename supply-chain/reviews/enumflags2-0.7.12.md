@@ -2,7 +2,8 @@
 
 Recorded September 16, 2026 UTC by the single executing Codex agent. This is a
 source review and local reproduction, not an independent human certification.
-No cargo-vet certification was added for either crate.
+The original registry derive package remains uncertified. The selected repair
+and library-only certification are recorded below.
 
 ## Finding
 
@@ -151,11 +152,79 @@ invariant as iteration. Formatting delegates to iteration. Checked numeric and
 serde inputs use `from_bits`, which rejects unknown bits; truncating inputs mask
 them. These paths do not repair a bad `DEFAULT` generated earlier.
 
-This is a tested repair proposal. It is not installed in Chio's dependency graph
-and does not certify either unpatched crate. Dependency ownership, the actual
-selected package revision and affected native qualification remain open.
+At the original review checkpoint this was a tested proposal outside Chio's
+dependency graph. The selected local fork below supersedes that selection
+status; affected native qualification remains a separate requirement.
 
-Keep certification pending. A passing upstream regression suite on a supported
-diagnostic toolchain and downstream native qualification remain required before
-certifying a selected patched revision. No upstream issue, advisory identifier,
-fixed release, or external disclosure is asserted here.
+No upstream issue, advisory identifier, fixed release, or external disclosure
+is asserted here.
+
+## Selected local repair, September 16 continuation
+
+The main, generated Docker and fuzz workspaces now select
+`third_party/enumflags2-derive-chio` through an explicit crates.io patch. Their
+lockfile package changes are limited to replacing the registry derive source
+with the local fork; the library remains exactly 0.7.12. The fork retains the
+original licenses and manifest and documents its complete production delta in
+`CHIO-PATCH.md`. Chio owns and reviews the fork as local source, so cargo-vet
+does not apply registry certificates to its modified bytes. Its registry
+dependencies still require ordinary deployment audits.
+
+The fork adds five positive width tests and three compile-fail cases: the
+original invalid numeric default, a numeric constant that happens to name a
+valid bit, and a constant of another enum type. All eight pass on Rust 1.94.1.
+Reverting only the repaired expression in an isolated copy makes all three
+compile-fail cases fail because the invalid declarations compile. The local
+source remains repaired; mutation results are retained separately.
+
+The eight regressions also pass with proc-macro2 1.0.106, quote 1.0.45 and syn
+2.0.117, matching the application lockfile. Locked metadata confirms selection
+of the same local derive source in the main, fuzz and staged Docker workspaces;
+the Docker manifest regeneration check passes. Workspace formatting, accumulated
+whitespace validation and the confinement provenance check pass. These are
+source and dependency checks, not a new native runtime acceptance result.
+
+After the library audit, explicit fork ownership and the separately reviewed
+trusted-feed refresh, `cargo vet check --locked --no-minimize-exemptions` reports
+22 unvetted dependencies. It still fails; the remaining confinement and other
+dependency audits are open.
+
+The full upstream inventory also ran on nightly-2026-04-21 and the release-date
+nightly-2025-06-10. Both retain diagnostic snapshot failures. On the April
+nightly, eleven of fourteen UI snapshots match; the three mismatches concern
+qualified trait names and constant-evaluation diagnostic wording. All fourteen
+invalid declarations are rejected, and all 89 non-UI tests pass with the same
+two existing documentation ignores. No upstream snapshot was overwritten and
+neither overall exit 101 is described as a passing full suite.
+
+### Library source audit
+
+The `enumflags2` 0.7.12 library audit covers all five Rust source files and its
+published manifest, using the checksum-verified archive above. It has no build
+script, process execution, filesystem/network operations or cryptographic
+implementation. Review followed every bitset constructor, conversion, operator,
+constant API, iterator, formatting path and optional serde implementation.
+
+- Checked numeric and serde conversion reject unknown bits. Truncating and
+  complement operations mask with `ALL_BITS`; union, intersection and xor
+  preserve an existing valid-bit set.
+- `make_bitflags!` requires each selected item to have the enum type. The
+  repaired derive now applies that same condition to custom defaults.
+- Iteration and `exactly_one` use `transmute_copy` only on one valid bit. Their
+  safety depends on the documented unsafe `RawBitFlags` implementation and
+  valid constructors; the default-generation defect was in the derive package.
+- Arbitrary unchecked masks and handwritten incorrect `RawBitFlags`
+  implementations require unsafe caller code. Public bitset fields are private.
+- Constant tokens carry the enum and representation type; checked constant
+  construction and complement use their valid mask. Formatting consumes the
+  checked iterator; fallible conversion delegates to the checked constructor.
+
+The library-only `safe-to-deploy` record applies with independently admitted
+dependencies, including this selected repaired derive. It does not approve the
+unmodified derive package, certify the entire confinement chain, or replace
+downstream cage qualification on the resulting binary.
+
+Retained continuation evidence lives under
+`output/process-security-20260915/selected-enumflags-derive-validation/`,
+`confinement-audit-471e91ef0/`, and the two `upstream-*-nightly-repair/`
+directories within the original dependency review evidence directory.

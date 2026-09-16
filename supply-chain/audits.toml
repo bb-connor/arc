@@ -583,6 +583,12 @@ criteria = "safe-to-deploy"
 version = "2.2.0"
 notes = "Top-centrality certification seed. Reviewed for dependency role, declared build behavior, and no new trust-boundary expansion."
 
+[[audits.enumflags2]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.7.12"
+notes = "Reviewed checksum-verified manifest and all five Rust modules: constructors, constant tokens, bitwise operations, serde, formatting and unsafe single-bit conversions. No build script or system IO. Valid-bit invariant requires the selected Chio-owned typed-default derive repair; unmodified enumflags2_derive 0.7.12 is not certified. Source reasoning, upstream inventory and positive/negative mutation results: supply-chain/reviews/enumflags2-0.7.12.md. This is not independent human review or downstream confinement qualification."
+
 [[audits.etcetera]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
