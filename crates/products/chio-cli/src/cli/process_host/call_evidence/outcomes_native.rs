@@ -200,18 +200,61 @@ mod tests {
     use super::*;
 
     #[test]
-    fn retained_crash_outcomes_bind_actual_launches_without_inventing_exits(
+    fn historical_signed_outcomes_do_not_prove_complete_launch_policy(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let key = PublicKey::from_hex(
             include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-budget-kernel.pub")
                 .trim(),
         )?;
+        // Preserve the original signed evidence. Its valid signature cannot
+        // supply the complete-policy commitment that this runtime never made.
         let signed = crate::receipt_verify::verify_original_receipt(
             include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-budget.json"),
             &key,
         )?;
         let selected: Value = serde_json::from_str(include_str!(
             "../../../../tests/fixtures/process-worker-outcomes/v2-budget-pins.json"
+        ))?;
+        let pins: BTreeMap<String, PublicKey> = selected["launch_policy_signers"]
+            .as_object()
+            .ok_or("pins")?
+            .iter()
+            .map(|(server, value)| {
+                Ok((
+                    server.clone(),
+                    PublicKey::from_hex(value.as_str().ok_or("key")?)?,
+                ))
+            })
+            .collect::<Result<_, Box<dyn std::error::Error>>>()?;
+        let runtime = selected["runtime_id"].as_str().ok_or("runtime")?;
+        let run: Outcomes = serde_json::from_value(signed.action.parameters.clone())?;
+        let error = super::super::verify_outcomes(&signed, &run, &key, runtime, &pins)
+            .err()
+            .ok_or("accepted historical evidence without policy commitment")?;
+        assert!(
+            error
+                .to_string()
+                .contains("complete admitted signed policy"),
+            "unexpected rejection: {error}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn retained_crash_outcomes_bind_actual_launches_without_inventing_exits(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let key = PublicKey::from_hex(
+            include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-policy-bound-budget-kernel.pub")
+                .trim(),
+        )?;
+        let signed = crate::receipt_verify::verify_original_receipt(
+            include_str!(
+                "../../../../tests/fixtures/process-worker-outcomes/v2-policy-bound-budget.json"
+            ),
+            &key,
+        )?;
+        let selected: Value = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/process-worker-outcomes/v2-policy-bound-budget-pins.json"
         ))?;
         let pins: BTreeMap<String, PublicKey> = selected["launch_policy_signers"]
             .as_object()

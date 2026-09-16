@@ -390,7 +390,19 @@ chio receipt verify-native-start \
 
 This offline command verifies the signed Enforced policy, manifest, receipt
 semantics, helper and target digests, execution identity and selected launch.
-Its report includes the signed process ID and trace identity. Matching that ID
+It also requires the launch receipt's signed `admitted_policy_digest` to equal
+the SHA-256 of the complete canonical signed policy. This covers command
+arguments, working directory, limits and every other policy field. Another
+policy signed by the same operator cannot be substituted for the admitted one.
+The report includes `admitted_policy_binding` only after that comparison passes.
+
+Receipts produced before this commitment was introduced remain valid historical
+signatures, but fail native policy verification. Produce a fresh launch and
+retain its original receipts to obtain complete policy evidence. The verifier
+does not infer the missing commitment from an old manifest or executable digest.
+Enforcement and terminal receipts must carry the same policy commitment.
+
+The report also includes the signed process ID and trace identity. Matching that ID
 to a live target and observing its death remain separate external observations.
 This check supplies no terminal receipt, completed tool result, or receipt-log
 inclusion proof. An unknown effect remains unknown. The completed fan-out

@@ -161,6 +161,41 @@ fn native_run_evidence_requires_external_policy_pin_and_same_observed_launch() -
         policy.receipt.tenant_id.clone(),
     )?
     .with_admitted_policy_digest(chio_core::sha256_hex(evidence.signed_policy.as_bytes()))?;
+    // The complete-policy commitment supplements the observed executable and
+    // execution-identity checks. A matching policy tag alone is insufficient.
+    for field in ["helper", "target", "identity"] {
+        let mut observed = verify_signed_cage_receipt(&evidence.enforcement)?;
+        let full = observed
+            .enforcement_record
+            .fully_enforced
+            .as_mut()
+            .ok_or("full enforcement")?;
+        match field {
+            "helper" => full.prepared.helper_binding_digest = "a".repeat(64),
+            "target" => {
+                full.prepared.target_binding_digest = "b".repeat(64);
+                full.exec_transition.target_binding_digest = "b".repeat(64);
+            }
+            _ => {
+                full.prepared.applied_execution_identity =
+                    ExecutionIdentity::new(20001, 20001, vec![])?;
+            }
+        }
+        observed.bindings = Some(CageReceiptBindings::from_prepared(&full.prepared));
+        let receipt = sign_cage_receipt(observed, &context, &Ed25519Backend::new(signer.clone()))?;
+        let error = verify_policy_bound_enforcement(
+            &evidence.signed_policy,
+            &receipt,
+            "cage-policy-test",
+            &signer.public_key(),
+        )
+        .err()
+        .ok_or("accepted mismatched observed launch")?;
+        assert!(
+            error.to_string().contains("observed launch differs"),
+            "{field}: {error}"
+        );
+    }
     changed.terminal = sign_cage_receipt(terminal, &context, &Ed25519Backend::new(signer.clone()))?;
     assert!(verify(&changed).is_err());
     Ok(())

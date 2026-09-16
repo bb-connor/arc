@@ -18,5 +18,15 @@
     "private_keys_exported": false,
     "retrospective_observation": true,
     "m5_acceptance_complete": false
+  },
+  "v2-policy-bound-budget": {
+    "runtime_source": "f3a9a558eab15751c092f73c17e90a3ce93eb179",
+    "observer_source": "f3a9a558eab15751c092f73c17e90a3ce93eb179",
+    "runtime_id": "2aeedf94-f478-4c92-99fa-8a202c878aac",
+    "source_directory": "linux-x86-policy-binding-matrix-f3a9a558e",
+    "sha256": "8e3f2679fe1b6206ef553dea654df2e668af2dd5670b12f891f6c78abf81927a",
+    "private_keys_exported": false,
+    "retrospective_observation": false,
+    "m5_acceptance_complete": false
   }
 }
