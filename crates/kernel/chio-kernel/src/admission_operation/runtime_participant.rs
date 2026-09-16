@@ -108,6 +108,48 @@ pub struct RuntimeParticipantClaimHistoryV1 {
     pub disposition: RuntimeParticipantDisposition,
 }
 
+/// The exact retained preimage of a claim digest already named in a receipt.
+/// This proves historical binding, never current custody or execution authority.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeParticipantClaimEvidenceV1 {
+    pub history: RuntimeParticipantClaimHistoryV1,
+    pub claim: serde_json::Value,
+    pub operation: super::PersistedAdmissionOperationV1,
+}
+
+impl RuntimeParticipantClaimEvidenceV1 {
+    pub fn verify(&self) -> Result<(), AdmissionOperationStoreError> {
+        use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
+        let invalid = || {
+            AdmissionOperationStoreError::Invariant(
+                "runtime claim commitment differs from its history".into(),
+            )
+        };
+        self.history.intent.validate()?;
+        let operation = super::AdmissionOperationV1::from_persisted(self.operation.clone())
+            .map_err(|_| invalid())?;
+        let intent = serde_json::to_value(&self.history.intent).map_err(|_| invalid())?;
+        let bytes = canonical_json_bytes(&(
+            "chio.runtime-participant-claim-commit.v1",
+            (&self.claim, &self.operation),
+        ))
+        .map_err(|_| invalid())?;
+        if sha256_hex(&bytes) != self.history.reference.claim_digest().as_str()
+            || self.claim["schema"] != "chio.runtime-participant-claim.v1"
+            || self.claim["operationId"] != self.history.reference.operation_id().as_str()
+            || self.claim["intent"] != intent
+            || operation.binding().operation_id() != self.history.reference.operation_id()
+            || operation.binding().request_binding_hash()
+                != self.history.intent.request_binding_hash()
+            || self.history.reference.episode_id() != self.history.intent.episode_id()
+        {
+            return Err(invalid());
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeParticipantResourceV1 {

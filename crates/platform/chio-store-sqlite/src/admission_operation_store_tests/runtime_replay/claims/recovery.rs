@@ -55,6 +55,14 @@ fn reopened_history_recovers_exact_claim_and_retains_dispatch_disposition() -> T
             ),
             Err(AdmissionOperationStoreError::Fenced)
         ));
+        assert!(matches!(
+            store.load_runtime_participant_evidence(
+                operation.binding().operation_id(),
+                &fence,
+                now_ms()
+            ),
+            Err(AdmissionOperationStoreError::Fenced)
+        ));
         let fence = authority.mutation_fence();
         let (loaded, history) = store
             .load_runtime_participant_history(operation.binding().operation_id(), &fence, now_ms())?
@@ -63,6 +71,31 @@ fn reopened_history_recovers_exact_claim_and_retains_dispatch_disposition() -> T
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].reference, reference);
         assert_eq!(history[0].intent, candidate);
+        let count = global_count(&store);
+        let (exported, evidence) = store
+            .load_runtime_participant_evidence(
+                operation.binding().operation_id(),
+                &fence,
+                now_ms(),
+            )?
+            .ok_or("missing restored claim evidence")?;
+        assert_eq!(exported, operation);
+        assert_eq!(evidence.len(), 1);
+        assert_eq!(evidence[0].history, history[0]);
+        evidence[0].verify()?;
+        for field in ["expectationId", "requestBindingHash", "planDigest"] {
+            let mut changed = evidence[0].clone();
+            changed.claim["intent"][field] = serde_json::json!("a".repeat(64));
+            assert!(changed.verify().is_err(), "accepted substituted {field}");
+        }
+        let mut changed = evidence[0].clone();
+        changed.operation.version += 1;
+        assert!(changed.verify().is_err());
+        assert_eq!(
+            global_count(&store),
+            count,
+            "export mutated the custody ledger"
+        );
         assert_eq!(
             history[0].disposition,
             if dispatched {
@@ -99,6 +132,15 @@ fn reopened_history_recovers_exact_claim_and_retains_dispatch_disposition() -> T
                 history[0].disposition,
                 RuntimeParticipantDisposition::ReleasedBeforeDispatch
             );
+            let (_, evidence) = store
+                .load_runtime_participant_evidence(
+                    operation.binding().operation_id(),
+                    &fence,
+                    now_ms(),
+                )?
+                .ok_or("missing released evidence")?;
+            evidence[0].verify()?;
+            assert_eq!(evidence[0].history, history[0]);
             assert!(store
                 .claim_runtime_participants(&operation, &lease, &candidate, now_ms())
                 .is_err());

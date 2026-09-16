@@ -223,6 +223,9 @@ anchored receipt store lacks the referenced launch or terminal record.
 The budget pool in this artifact remains the original allocation authority.
 `aggregate` separately records captured and reserved invocation counts from the
 host's authoritative store. Verification checks this signed observation against
-the issued family limit. Complete custody history, execution nonces, and the full
-M5 scenario matrix are still excluded;
-the verifier reports these limits and `m5_acceptance_complete: false`.
+the issued family limit. Each completed call also carries fenced readback of its
+operation-owned continuation claims. The verifier recomputes the original claim
+commitment named in the signed tool receipt and matches the retained token,
+prepared plan, request binding and terminal receipt. Historical evidence cannot
+authorize another effect. Execution nonces and the full M5 scenario matrix remain
+unverified; the report includes `m5_acceptance_complete: false`.

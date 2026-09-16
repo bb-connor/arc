@@ -72,6 +72,7 @@ pub(super) fn verify(
             .iter()
             .find(|route| route.route_plan_id == token.route_plan_receipt_id)
             .ok_or_else(|| error("missing task route"))?;
+        super::super::custody::verify(&call.custody, &receipt, token, &evidence.runtime_id)?;
         require(
             receipt
                 .metadata

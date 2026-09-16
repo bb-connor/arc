@@ -4,9 +4,9 @@
 
 use super::*;
 use chio_kernel::admission_operation::runtime_participant::{
-    RuntimeParticipantClaimHistoryV1, RuntimeParticipantClaimIntentV1,
-    RuntimeParticipantClaimReferenceV1, RuntimeParticipantDisposition, RuntimeParticipantPhase,
-    MAX_RUNTIME_PARTICIPANT_EPISODES,
+    RuntimeParticipantClaimEvidenceV1, RuntimeParticipantClaimHistoryV1,
+    RuntimeParticipantClaimIntentV1, RuntimeParticipantClaimReferenceV1,
+    RuntimeParticipantDisposition, RuntimeParticipantPhase, MAX_RUNTIME_PARTICIPANT_EPISODES,
 };
 use participant::{ParticipantCommit, ParticipantMutation};
 
@@ -47,6 +47,32 @@ pub(crate) fn verify_runtime_budget_selection_tx(
 }
 
 impl SqliteAdmissionOperationStore {
+    /// Export the original claim commitments through the same fenced, anchored
+    /// read boundary as recovery. No claim is acquired or released by this call.
+    pub fn load_runtime_participant_evidence(
+        &self,
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<(AdmissionOperationV1, Vec<RuntimeParticipantClaimEvidenceV1>)>,
+        AdmissionOperationStoreError,
+    > {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        let Some(stored) = load_by_operation_id_tx(&transaction, operation_id)? else {
+            return Ok(None);
+        };
+        stored.verify_decision_time(trusted_now_unix_ms)?;
+        let evidence = records::load(&transaction, &stored.operation)?
+            .iter()
+            .map(|claim| claim.evidence(stored.operation.dispatch_commit().is_some()))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Some((stored.operation, evidence)))
+    }
+
     /// Fenced, anchored readback for a lost claim or release acknowledgement.
     /// This does not rerun preparation, reacquire resources or require artifacts
     /// to remain unexpired. Returned history cannot authorize fresh execution.

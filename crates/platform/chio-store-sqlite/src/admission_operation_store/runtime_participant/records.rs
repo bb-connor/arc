@@ -61,6 +61,29 @@ impl Claim {
             self.digest()?,
         ))
     }
+    pub(super) fn evidence(
+        &self,
+        dispatched: bool,
+    ) -> Result<RuntimeParticipantClaimEvidenceV1, AdmissionOperationStoreError> {
+        let evidence = RuntimeParticipantClaimEvidenceV1 {
+            history: RuntimeParticipantClaimHistoryV1 {
+                reference: self.reference()?,
+                intent: self.intent().clone(),
+                disposition: if self.released() {
+                    RuntimeParticipantDisposition::ReleasedBeforeDispatch
+                } else if dispatched {
+                    RuntimeParticipantDisposition::RetainedAfterDispatchCommit
+                } else {
+                    RuntimeParticipantDisposition::ReservedBeforeDispatch
+                },
+            },
+            claim: serde_json::to_value(&self.ownership)
+                .map_err(|error| invariant(error.to_string()))?,
+            operation: self.operation.to_persisted(),
+        };
+        evidence.verify()?;
+        Ok(evidence)
+    }
     pub(super) fn insert(
         &self,
         connection: &Connection,

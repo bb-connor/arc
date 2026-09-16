@@ -17,40 +17,64 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 ### Latest local continuation
 
-#### Subsequent local evidence and repairs
+#### Current local evidence (2026-09-15, terminal updates through 00:47 UTC September 16)
 
-`bcf81182a` repairs the minimal profile's missing read-only Rust startup
-queries, `sched_getaffinity` and x86 `readlink`, after an actual reader launch
-recorded `SIGSYS`. The preceding `4ddf40ada` run did persist both enforcement
-and terminal receipts, establishing that `54cc0c052` repaired the preparation
-binding failure. The real-kernel success probe now exercises both queries;
-the full cage gate is running at `bcf81182a`, with its original denial controls
-and mutation inventories unchanged. Cross-built CLI and static tools at that
-source passed and have hashes in `x86-executables-bcf81182a/manifest.json`.
+The first actual Enforced repository-reader fan-out passes at `bcf81182a`.
+A fresh run at `9dd317b6f` also passes all nine stages: initialization, two
+supervised Docker workers, collection, completed-run export/verification,
+byte-identical worker-response recovery, and refusal of missing/wrong native
+policy keys, output substitution and runtime substitution. The exported v2
+artifact verifies one actual cage launch and its signed terminal receipt.
+Evidence is retained in `linux-x86-reference-9dd317b6f/`, including the completed
+artifact and verifier report. These local x86 VM results are not designated
+release-capture evidence or complete M5 scenario acceptance.
 
-The entire `db7f7049b` Linux M5 queue passed: completed-run evidence, 10 host
-cases, five response-verification cases and strict all-target CLI Clippy.
-`5c8cb8e7f` carries the persisted cage launch receipt's ID and canonical digest
-into the actual tool receipt. Four host-route tests pass, including authenticated
-context substitution and restart with a different launch while recovering the
-original receipt without another effect. CLI and adapter all-target checks pass.
+`bcf81182a` repairs the minimal profile's missing read-only Rust startup queries,
+`sched_getaffinity` and x86 `readlink`, exposed by an actual `SIGSYS`. Its complete
+owning cage gate passes all 69 cases and all ten mutation controls with unchanged
+assertions and deadlines (`linux-x86-bcf81182a/`). The failed `6374eb394` mutation
+run and diagnostic retries remain retained separately. The matching mutant
+helper has SHA256 `094a473d9d153e1a1ff30f6b686afd1209f8f0394662af2cd5c912ee7c1afe05`.
+
+`5c8cb8e7f` binds each tool receipt to the persisted cage launch ID and canonical
+digest. `9dd317b6f` exports the existing launch policy and original enforcement
+and terminal receipts. Verification requires an externally pinned policy key,
+the admitted host record, manifest, route, executable identity and actual call
+lifetime. All four host-route cases pass, including malicious context and
+recovery under a different later launch without repeating an effect. The Linux
+native-evidence unit, host-route and completed-run artifact gates pass at this
+source; host/response and strict Clippy remain running. Strict macOS Clippy passes.
+CLI and static helper/tool cross-builds pass with hashes retained in
+`x86-executables-9dd317b6f/manifest.json`.
+
+The subsequent continuation-custody export passes strict macOS CLI/store Clippy
+and the existing store recovery regression. The export reads the same fenced,
+anchored operation-owned ledger; it does not acquire or release claims. The
+artifact carries the original claim preimages so verification can recompute the
+commitment already named in the tool receipt. Stale-owner readback and modified
+claim/operation preimages are rejected. Linux integration validation is pending.
+`7ceab1818` repairs an existing store-test `expect_err` lint while preserving its
+stale-time refusal assertion.
 
 The `97705575b` foundation flow gate failed on an outdated exact inventory after
 all 31 selected return-context tests passed. It omitted
 `caller_custody_rejects_each_selected_family_without_its_physical_ledger`.
-`810664017` adds that existing test to the mandatory inventory and updates its
-contract count; the 69-inventory shell contract passes. The complete foundation
-queue has restarted at this frozen source. The failed run and its binary/log
-hashes remain in `linux-97705575b/`; no full flow or workspace pass is claimed.
+`810664017` adds that existing case and corrects the contract count; all 69
+inventory contracts pass. The frozen foundation queue has passed consumer
+boundaries and is running flow-security before workspace build/test/Clippy.
+No complete flow or workspace pass is claimed.
 
-The original x86 mutation gate remains failed at `6374eb394`. A diagnostic retry
-of its two timeout cases passed with unchanged deadlines and the matching mutant
-helper. The first diagnostic attempt refused an executable created under an
-incorrect umask before launch; its logs remain separate. The complete owning
-gate at the repaired source must pass before treating that lane as qualified.
+The implementation checkout is `/tmp/arc-m5-evidence`, branch
+`integration/process-security-m5-evidence`, at `7ceab1818` plus the custody export.
+The same single agent owns it and the frozen qualification queues. The execution
+checkout remains `/tmp/arc-security-launch` at `a4c3a77ee`. Both parent histories
+and all 109 inherited dispositions remain preserved; no protected publication
+or administrative thread resolution has occurred.
 
-The native receipt-chain export is under implementation and validation. The
-entries below retain the source-bounded evidence from earlier checkpoints.
+#### Earlier source-bounded checkpoints
+
+The entries below are historical records. Their pending statements describe
+those specific checkpoints; the current status above supersedes them.
 
 Current implementation checkpoint: `4ddf40ada850d77d205d694908d3e2516ff1d375`,
 with the execution checkout qualifying `a4c3a77eee190c9feac589d035f25c9474346e9f`.

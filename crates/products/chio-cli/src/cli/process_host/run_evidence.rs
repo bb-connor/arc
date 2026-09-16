@@ -19,6 +19,8 @@ use crate::CliError;
 mod exporting;
 #[cfg(target_os = "linux")]
 pub(super) use exporting::export;
+#[path = "run_evidence/custody.rs"]
+mod custody;
 #[path = "run_evidence/native.rs"]
 mod native;
 #[path = "run_evidence/verify.rs"]
@@ -48,6 +50,7 @@ struct CompletedCall {
     request: Value,
     context: Value,
     response: Value,
+    custody: custody::Observation,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -125,6 +128,7 @@ pub(super) fn verify_file(
         "terminal_result",
         "runner_completion",
         "aggregate_usage",
+        "continuation_custody",
     ];
     if !evidence.confinement.is_empty() {
         checks.push("confinement_receipt_chain");
@@ -136,7 +140,7 @@ pub(super) fn verify_file(
             "verified_workers": evidence.results.keys().collect::<Vec<_>>(),
             "captured_invocations": evidence.aggregate.captured_invocations,
             "verified_native_launches": evidence.confinement.len(), "checks": checks,
-            "unchecked": ["continuation_custody_export", "scenario_matrix", "execution_nonces"],
+            "unchecked": ["scenario_matrix", "execution_nonces"],
             "m5_acceptance_complete": false,
         })
     );

@@ -64,6 +64,7 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
             response["verdict"] == "allow",
             "every joined task must have an allowed result",
         )?;
+        let custody = super::custody::export(&host, &receipt, now)?;
         parents.push(SwarmJoinParentReceipt {
             task_id: process.into(),
             receipt_id: receipt.id,
@@ -76,6 +77,7 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
                         request,
                         context,
                         response,
+                        custody,
                     },
                 )
                 .is_none(),

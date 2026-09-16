@@ -86,6 +86,31 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
     assert_eq!(signer.public_key(), original.kernel_key);
     let cases = [
         (
+            "/results/alice/custody/terminal_receipt_id",
+            json!("another-receipt"),
+            "custody operation differs",
+        ),
+        (
+            "/results/alice/custody/history",
+            json!([]),
+            "custody history is absent",
+        ),
+        (
+            "/results/alice/custody/history/0/history/disposition",
+            json!("released_before_dispatch"),
+            "custody is not retained",
+        ),
+        (
+            "/results/alice/custody/history/0/claim/intent/expectationId",
+            json!("substituted-authority-generation"),
+            "claim commitment differs",
+        ),
+        (
+            "/results/alice/custody/history/0/operation/version",
+            json!(999),
+            "claim commitment differs",
+        ),
+        (
             "/host_record/config/limits/max_calls",
             json!(9999),
             "host record differs",
