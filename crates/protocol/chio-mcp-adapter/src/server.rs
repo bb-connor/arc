@@ -11,6 +11,21 @@ use crate::errors::map_tool_invocation_error;
 use crate::prompts::AdaptedMcpPromptProvider;
 use crate::resources::AdaptedMcpResourceProvider;
 
+/// MCP transports perform synchronous I/O. Hand the executor's other tasks to
+/// another worker while retaining this borrowed invocation on its current stack.
+/// No detached dispatch or second cancellation owner is created. Non-Tokio and
+/// current-thread callers retain their existing synchronous behavior.
+fn blocking_transport<T>(call: impl FnOnce() -> T) -> T {
+    if matches!(
+        tokio::runtime::Handle::try_current().map(|handle| handle.runtime_flavor()),
+        Ok(tokio::runtime::RuntimeFlavor::MultiThread)
+    ) {
+        tokio::task::block_in_place(call)
+    } else {
+        call()
+    }
+}
+
 /// A Chio tool-server connection backed by a wrapped MCP server.
 #[derive(Clone)]
 pub struct AdaptedMcpServer {
@@ -189,15 +204,19 @@ impl ToolServerConnection for AdaptedMcpServer {
             return Err(KernelError::ToolNotRegistered(tool_name.to_string()));
         }
 
-        self.adapter
-            .invoke_with_nested_flow(tool_name, arguments, nested_flow_bridge)
-            .map_err(map_tool_invocation_error)
+        blocking_transport(|| {
+            self.adapter
+                .invoke_with_nested_flow(tool_name, arguments, nested_flow_bridge)
+                .map_err(map_tool_invocation_error)
+        })
     }
 
     async fn prepare_delivery(&self, _context: &ToolDispatchContext) -> Result<(), KernelError> {
-        self.adapter
-            .prepare_delivery()
-            .map_err(map_tool_invocation_error)
+        blocking_transport(|| {
+            self.adapter
+                .prepare_delivery()
+                .map_err(map_tool_invocation_error)
+        })
     }
 
     async fn invoke_in_context(
@@ -215,9 +234,11 @@ impl ToolServerConnection for AdaptedMcpServer {
         {
             return Err(KernelError::ToolNotRegistered(tool_name.to_string()));
         }
-        self.adapter
-            .invoke_in_context(context, tool_name, arguments, nested_flow_bridge)
-            .map_err(map_tool_invocation_error)
+        blocking_transport(|| {
+            self.adapter
+                .invoke_in_context(context, tool_name, arguments, nested_flow_bridge)
+                .map_err(map_tool_invocation_error)
+        })
     }
 
     async fn invoke_with_cost_in_context(

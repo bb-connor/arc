@@ -1296,6 +1296,83 @@ fn serialized_transport_serializes_notification_drain_with_active_request() {
         .unwrap_or_else(|_| panic!("drain thread panicked"));
 }
 
+fn blocked_server_keeps_executor_available(with_context: bool) {
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+    let transport = Arc::new(BlockingDrainProbeTransport::new(entered_tx));
+    let make_server = || {
+        AdaptedMcpServer::new(McpAdapter::new(
+            default_config(),
+            Box::new(MockTransport::simple(
+                vec![text_tool_info("t")],
+                MockCallBehavior::Success(success_result("fast")),
+            )),
+        ))
+        .unwrap_or_else(|error| panic!("server: {error}"))
+    };
+    let mut slow = make_server();
+    slow.adapter.transport = transport.clone();
+    let fast = make_server();
+    let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+    let (progress_tx, progress_rx) = std::sync::mpsc::channel();
+    // An independent observer always releases the synchronous transport, even
+    // when the executor is blocked. The regression cannot hang its own timeout.
+    let observer = std::thread::spawn(move || {
+        let entered = entered_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .is_ok();
+        let _ = started_tx.send(());
+        let progress = progress_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .is_ok();
+        transport.release_call();
+        entered && progress
+    });
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .unwrap_or_else(|error| panic!("runtime: {error}"));
+    runtime.block_on(async {
+        let slow = tokio::spawn(async move {
+            if with_context {
+                slow.invoke_in_context(&dispatch_context(), "t", serde_json::json!({}), None)
+                    .await
+            } else {
+                slow.invoke("t", serde_json::json!({}), None).await
+            }
+        });
+        started_rx
+            .await
+            .unwrap_or_else(|error| panic!("start: {error}"));
+        let fast = tokio::spawn(async move {
+            let response = fast.invoke("t", serde_json::json!({}), None).await;
+            let _ = progress_tx.send(());
+            response
+        });
+        for task in [slow, fast] {
+            task.await
+                .unwrap_or_else(|error| panic!("join: {error}"))
+                .unwrap_or_else(|error| panic!("invoke: {error}"));
+        }
+    });
+    assert!(
+        observer
+            .join()
+            .unwrap_or_else(|_| panic!("observer panicked")),
+        "an independent server could not complete while the first transport was blocked"
+    );
+}
+
+#[test]
+fn blocking_mcp_call_preserves_other_server_progress() {
+    blocked_server_keeps_executor_available(false);
+}
+
+#[test]
+fn blocking_context_mcp_call_preserves_other_server_progress() {
+    blocked_server_keeps_executor_available(true);
+}
+
 // ---- Chunked output tests ----
 
 #[test]

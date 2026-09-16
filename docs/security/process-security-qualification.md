@@ -41,11 +41,26 @@ new integration attempt failed because its recovery fixture reused an existing
 credential output filename; the corrected run is retained separately in
 `swarm-shared-family-plan/`. Both live swarm tests and strict CLI all-target
 Clippy also pass on Linux/aarch64 at `f612cb257874bb9df83015f6f987a82faff983ff`,
-retained in `linux-m5-f612cb257/`. Its optimized x86 CLI build is active;
-actual Enforced contention qualification remains pending. The new qualifier is
-designed to observe quota denials
-while two admitted tools are still executing, then recover their uncertain
-outcomes without repeating either effect. Its existence is not a passing run.
+retained in `linux-m5-f612cb257/`. Its unmodified optimized x86 CLI build passes,
+with SHA-256 `efc9c7dd94afb310ce62a9021aba6e3c3740268e37182505e2d424cc111fb01a`.
+The first actual Enforced contention run fails before proving overlap: the two
+writes occur about 67 seconds apart, transport waits reach their unchanged
+60-second limit, and worker attempts time out. The ledger retains exactly two
+captured invocations, two unknown-after-dispatch operations and two compensated
+before-dispatch operations. This is not a contention or recovery acceptance pass.
+`linux-x86-release-budget-f612cb257/` retains the failure, 26 diagnostic files,
+effect hashes and read-only store observations. Cage compilation was paused
+during this runtime scenario and resumed afterward; no cage test was paused.
+
+The MCP adapter's async interface performs synchronous transport waits on the
+executor thread. Two new single-worker regressions reproduce starvation of an
+independent server through both plain and context-bound calls. Marking those
+waits as blocking on Tokio multithread runtimes makes both regressions pass;
+all 116 adapter unit tests and strict adapter all-target Clippy pass on macOS.
+The original call stack and borrowed nested-flow bridge remain owned, and no
+transport deadline changes. `mcp-blocking-dispatch/` retains the failing and
+passing tests. A fresh confined run must establish whether this repair resolves
+the observed scenario failure before contention can be qualified.
 
 The retained host-crash result exposes an artifact distinction: the signed
 unknown-outcome receipt observes the replacement connection opened during
@@ -75,8 +90,10 @@ completed artifacts still pass. These 13 offline results, command logs and
 verifier SHA-256 `a6b34b0388457718f023f0b1076d4ff5c4729194660feb15a8796c57f3bd5d04`
 are retained in `native-start-verifier/offline/`. The original runtime source
 remains `e42e0ed41`, and this is retrospective verification, not a new live run.
-The affected Linux verification queue is pending behind the active optimized
-build; the full scenario artifact remains open.
+The affected Linux verification queue also passes: both native-evidence tests,
+the live completed-artifact test with semantic substitutions, and strict CLI
+all-target Clippy. Exact commands and unchanged-source checks are retained in
+`linux-m5-d9a070c57/`. The full scenario artifact remains open.
 
 The unmodified `docker-release` CLI build passes at Rust source
 `e42e0ed41656e345438664a3d382727f454296f9`, with executable SHA-256
