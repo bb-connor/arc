@@ -139,6 +139,11 @@ fn verify_policy_bound_enforcement(
     let enforcement = verify_signed_cage_receipt_with_trusted_key(receipt, &key)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     require(
+        enforcement.admitted_policy_digest.as_deref()
+            == Some(chio_core::sha256_hex(signed_policy.as_bytes()).as_str()),
+        "receipt does not bind the complete admitted signed policy",
+    )?;
+    require(
         receipt.tool_server == server_id
             && receipt.tool_name == "cage-launch"
             && receipt.capability_id == policy.receipt.capability_id
@@ -192,6 +197,7 @@ pub(crate) fn verify_native_launch_evidence(
             && enforcement.attempt_id == terminal.attempt_id
             && enforcement.started_at_unix_ms == terminal.started_at_unix_ms
             && enforcement.bindings == terminal.bindings
+            && enforcement.admitted_policy_digest == terminal.admitted_policy_digest
             && enforcement.enforcement_record.fully_enforced
                 == terminal.enforcement_record.fully_enforced
             && enforcement.recorded_at_unix_ms <= terminal.recorded_at_unix_ms,

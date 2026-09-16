@@ -54,7 +54,7 @@ pub(crate) fn verify_native_start_file(
             "target_sha256": full.prepared.target_binding_digest,
             "trace_session_digest": full.prepared.trace_session_digest,
             "released_at_unix_ms": body.recorded_at_unix_ms,
-            "checks": ["policy_signer_pin", "enforced_policy", "signed_manifest",
+            "checks": ["policy_signer_pin", "enforced_policy", "admitted_policy_binding", "signed_manifest",
                 "receipt_signature", "receipt_semantics", "receipt_context",
                 "execution_identity", "helper_binding", "target_binding", "selected_receipt"],
             "unchecked": ["live_pid_linkage", "target_death", "call_completion",

@@ -94,6 +94,10 @@ pub struct CageReceiptBody {
     pub stage: CageReceiptStage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bindings: Option<CageReceiptBindings>,
+    /// SHA-256 of the complete canonical signed policy admitted by the launcher.
+    /// Older and non-policy launchers omit this commitment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admitted_policy_digest: Option<String>,
     pub enforcement_record: CageEnforcementRecord,
     pub started_at_unix_ms: u64,
     pub recorded_at_unix_ms: u64,
@@ -122,6 +126,7 @@ impl CageReceiptBody {
             attempt_id: attempt_id.into(),
             stage,
             bindings,
+            admitted_policy_digest: None,
             enforcement_record,
             started_at_unix_ms,
             recorded_at_unix_ms,
@@ -135,6 +140,9 @@ impl CageReceiptBody {
             return Err(CageReceiptError::InvalidSchema);
         }
         validate_identifier(&self.attempt_id)?;
+        if let Some(digest) = &self.admitted_policy_digest {
+            validate_digest(digest)?;
+        }
         self.enforcement_record.validate()?;
         if self.stage != stage_for_state(self.enforcement_record.state) {
             return Err(CageReceiptError::InvalidStage);
@@ -190,6 +198,7 @@ pub struct CageReceiptSigningContext {
     tool_name: String,
     policy_hash: String,
     tenant_id: Option<String>,
+    admitted_policy_digest: Option<String>,
 }
 
 impl CageReceiptSigningContext {
@@ -206,9 +215,22 @@ impl CageReceiptSigningContext {
             tool_name: tool_name.into(),
             policy_hash: policy_hash.into(),
             tenant_id,
+            admitted_policy_digest: None,
         };
         context.validate()?;
         Ok(context)
+    }
+
+    /// Bind the launcher's authenticated, canonical signed policy to every
+    /// receipt it produces, including after descriptor bindings are prepared.
+    pub fn with_admitted_policy_digest(
+        mut self,
+        digest: impl Into<String>,
+    ) -> Result<Self, CageReceiptError> {
+        let digest = digest.into();
+        validate_digest(&digest)?;
+        self.admitted_policy_digest = Some(digest);
+        Ok(self)
     }
 
     /// Follow the trusted launch preparation's descriptor binding transition.
@@ -274,12 +296,20 @@ impl PreparedCageReceipt {
 }
 
 pub fn prepare_cage_receipt(
-    cage_receipt: CageReceiptBody,
+    mut cage_receipt: CageReceiptBody,
     context: &CageReceiptSigningContext,
     kernel_key: PublicKey,
 ) -> Result<PreparedCageReceipt, CageReceiptError> {
     cage_receipt.validate()?;
     context.validate()?;
+    if cage_receipt.admitted_policy_digest.is_some()
+        && cage_receipt.admitted_policy_digest != context.admitted_policy_digest
+    {
+        return Err(CageReceiptError::BindingMismatch);
+    }
+    cage_receipt
+        .admitted_policy_digest
+        .clone_from(&context.admitted_policy_digest);
     if cage_receipt
         .bindings
         .as_ref()

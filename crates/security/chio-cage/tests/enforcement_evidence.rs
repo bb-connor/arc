@@ -328,6 +328,8 @@ fn cage_receipt_rejects_missing_or_forged_enforcement_bindings() {
     bound.plan_digest = digest('b');
     bound.fd_table_digest = digest('c');
     let context = signing_context()
+        .with_admitted_policy_digest(digest('e'))
+        .test_expect("complete admitted policy")
         .with_launch_bindings(&original, &bound)
         .test_expect("stdio preparation updates plan bindings");
     assert!(context.with_launch_bindings(&original, &bound).is_err());
@@ -365,7 +367,21 @@ fn cage_receipt_rejects_missing_or_forged_enforcement_bindings() {
     assert!(sign_cage_receipt(body.clone(), &signing_context(), &backend).is_err());
     let signed = sign_cage_receipt(body, &context, &backend).test_unwrap();
     assert_eq!(signed.policy_hash, digest('a'));
-    verify_signed_cage_receipt(&signed).test_unwrap();
+    let verified = verify_signed_cage_receipt(&signed).test_unwrap();
+    assert_eq!(
+        verified.admitted_policy_digest.as_deref(),
+        Some(digest('e').as_str())
+    );
+    let mut tampered = signed.clone();
+    tampered.metadata.as_mut().test_unwrap()["cage_receipt"]["admitted_policy_digest"] =
+        serde_json::json!(digest('f'));
+    assert!(verify_signed_cage_receipt(&tampered).is_err());
+    let wrong_context = context
+        .clone()
+        .with_admitted_policy_digest(digest('f'))
+        .test_unwrap();
+    assert!(sign_cage_receipt(verified, &wrong_context, &backend).is_err());
+    assert!(context.with_admitted_policy_digest("invalid").is_err());
 
     let bootstrap = CageEnforcementRecord::bootstrap_failed(
         CageEnforcementFailure::new(

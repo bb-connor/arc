@@ -59,13 +59,18 @@ fn fixture() -> Result<(NativeLaunchEvidence, McpCageLaunchPolicy, Keypair)> {
         },
         true,
     )?;
+    let signed_policy = String::from_utf8(canonical_json_bytes(&signed_policy(
+        policy.clone(),
+        &signer,
+    ))?)?;
     let context = CageReceiptSigningContext::new(
         policy.receipt.capability_id.clone(),
         "cage-policy-test",
         "cage-launch",
         "3".repeat(64),
         policy.receipt.tenant_id.clone(),
-    )?;
+    )?
+    .with_admitted_policy_digest(chio_core::sha256_hex(signed_policy.as_bytes()))?;
     let backend = Ed25519Backend::new(signer.clone());
     let enforcement = sign_cage_receipt(
         CageReceiptBody::new(
@@ -97,10 +102,6 @@ fn fixture() -> Result<(NativeLaunchEvidence, McpCageLaunchPolicy, Keypair)> {
         &context,
         &backend,
     )?;
-    let signed_policy = String::from_utf8(canonical_json_bytes(&signed_policy(
-        policy.clone(),
-        &signer,
-    ))?)?;
     Ok((
         NativeLaunchEvidence {
             signed_policy,
@@ -158,7 +159,8 @@ fn native_run_evidence_requires_external_policy_pin_and_same_observed_launch() -
         "cage-launch",
         "3".repeat(64),
         policy.receipt.tenant_id.clone(),
-    )?;
+    )?
+    .with_admitted_policy_digest(chio_core::sha256_hex(evidence.signed_policy.as_bytes()))?;
     changed.terminal = sign_cage_receipt(terminal, &context, &Ed25519Backend::new(signer.clone()))?;
     assert!(verify(&changed).is_err());
     Ok(())
@@ -206,6 +208,144 @@ fn native_start_verification_binds_original_receipt_without_claiming_exit() -> R
 }
 
 #[test]
+fn native_policy_substitutions_by_the_same_operator_fail_all_verifiers() -> Result {
+    let (evidence, policy, signer) = fixture()?;
+    let directory = tempfile::tempdir()?;
+    let policy_path = directory.path().join("policy.json");
+    let receipt_path = directory.path().join("receipt.json");
+    let original_receipt = canonical_json_bytes(&evidence.enforcement)?;
+    std::fs::write(&receipt_path, &original_receipt)?;
+    for field in [
+        "argv",
+        "cwd",
+        "limits",
+        "timeout",
+        "ceilings",
+        "receipt",
+        "migration",
+    ] {
+        let mut alternate = policy.clone();
+        match field {
+            "argv" => alternate
+                .runtime
+                .target_argv
+                .push("--different-behavior".into()),
+            "cwd" => alternate.runtime.working_directory = "/different-directory".into(),
+            "limits" => {
+                alternate.limits.nofile_soft = 32;
+                alternate.limits.nofile_hard = 32;
+            }
+            "timeout" => alternate.limits.launch_timeout_ms += 1,
+            "ceilings" => {
+                alternate
+                    .operator_ceilings
+                    .forbidden_paths
+                    .insert("/another-path".into());
+            }
+            "receipt" => alternate.receipt.database_path = "/another-receipt-store".into(),
+            _ => {
+                alternate.enterprise_migration.state_database_path =
+                    "/another-migration-store".into()
+            }
+        }
+        let mut changed = evidence.clone();
+        changed.signed_policy =
+            String::from_utf8(canonical_json_bytes(&signed_policy(alternate, &signer))?)?;
+        // A valid signature by the same trusted operator must not authorize
+        // associating a different configuration with this unchanged launch.
+        decode_cage_policy(
+            &policy_path,
+            changed.signed_policy.as_bytes(),
+            &signer.public_key(),
+        )?;
+        std::fs::write(&policy_path, &changed.signed_policy)?;
+        let error = verify_native_start_file(
+            &policy_path,
+            &receipt_path,
+            "cage-policy-test",
+            &signer.public_key().to_hex(),
+            &evidence.enforcement.id,
+            &policy.runtime.target_binding_digest,
+        )
+        .err()
+        .ok_or("accepted alternate policy")?;
+        assert!(
+            error
+                .to_string()
+                .contains("complete admitted signed policy"),
+            "{field}: {error}"
+        );
+        assert!(
+            verify_native_launch_evidence(&changed, "cage-policy-test", &signer.public_key())
+                .is_err(),
+            "{field}"
+        );
+        let observed = NativeLaunchObservation {
+            signed_policy: changed.signed_policy,
+            enforcement: changed.enforcement,
+            terminal: None,
+        };
+        assert!(
+            verify_native_launch_observation(&observed, "cage-policy-test", &signer.public_key())
+                .is_err(),
+            "{field}"
+        );
+        assert_eq!(std::fs::read(&receipt_path)?, original_receipt);
+    }
+    // A fresh policy signer also cannot relabel the original signed launch.
+    let replacement = Keypair::from_seed(&[93; 32]);
+    let mut changed = evidence.clone();
+    changed.signed_policy =
+        String::from_utf8(canonical_json_bytes(&signed_policy(policy, &replacement))?)?;
+    assert!(
+        verify_native_launch_evidence(&changed, "cage-policy-test", &replacement.public_key())
+            .is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn native_policy_verification_rejects_legacy_and_mismatched_terminal_commitments() -> Result {
+    let (mut evidence, policy, signer) = fixture()?;
+    let legacy_context = CageReceiptSigningContext::new(
+        policy.receipt.capability_id,
+        "cage-policy-test",
+        "cage-launch",
+        "3".repeat(64),
+        policy.receipt.tenant_id,
+    )?;
+    let backend = Ed25519Backend::new(signer.clone());
+    let mut terminal = verify_signed_cage_receipt(&evidence.terminal)?;
+    terminal.admitted_policy_digest = None;
+    evidence.terminal = sign_cage_receipt(terminal.clone(), &legacy_context, &backend)?;
+    assert!(
+        verify_native_launch_evidence(&evidence, "cage-policy-test", &signer.public_key()).is_err()
+    );
+    let alternate = legacy_context
+        .clone()
+        .with_admitted_policy_digest("a".repeat(64))?;
+    evidence.terminal = sign_cage_receipt(terminal, &alternate, &backend)?;
+    assert!(
+        verify_native_launch_evidence(&evidence, "cage-policy-test", &signer.public_key()).is_err()
+    );
+    let mut legacy = verify_signed_cage_receipt(&evidence.enforcement)?;
+    legacy.admitted_policy_digest = None;
+    evidence.enforcement = sign_cage_receipt(legacy, &legacy_context, &backend)?;
+    let error = verify_policy_bound_enforcement(
+        &evidence.signed_policy,
+        &evidence.enforcement,
+        "cage-policy-test",
+        &signer.public_key(),
+    )
+    .err()
+    .ok_or("legacy receipt proved complete policy")?;
+    assert!(error
+        .to_string()
+        .contains("complete admitted signed policy"));
+    Ok(())
+}
+
+#[test]
 fn native_observation_keeps_missing_exit_distinct_and_rejects_substituted_terminal() -> Result {
     let (evidence, policy, signer) = fixture()?;
     let mut observed = NativeLaunchObservation {
@@ -236,7 +376,8 @@ fn native_observation_keeps_missing_exit_distinct_and_rejects_substituted_termin
         "cage-launch",
         "3".repeat(64),
         policy.receipt.tenant_id,
-    )?;
+    )?
+    .with_admitted_policy_digest(chio_core::sha256_hex(observed.signed_policy.as_bytes()))?;
     observed.terminal = Some(sign_cage_receipt(
         terminal,
         &context,

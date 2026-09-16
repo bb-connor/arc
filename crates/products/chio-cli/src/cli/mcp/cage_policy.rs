@@ -769,6 +769,7 @@ fn load_native_mcp_launch_from_bytes(
     } else {
         compose_cage_required_launch(
             policy,
+            &chio_core::sha256_hex(bytes),
             command,
             args,
             &launch_contract,
@@ -968,6 +969,7 @@ fn compose_legacy_authorized_launch(
 
 fn compose_cage_required_launch(
     policy: McpCageLaunchPolicy,
+    admitted_policy_digest: &str,
     command: &str,
     args: &[&str],
     launch_contract: &chio_security_types::CageLaunchContractDigests,
@@ -1132,6 +1134,7 @@ fn compose_cage_required_launch(
         &server_id,
         compiled.profile_digest(),
         compiled.plan_digest(),
+        admitted_policy_digest,
     )?;
     chio_mcp_adapter::transport::CageRequiredLaunch::new(
         manifest_registry,
@@ -1170,6 +1173,7 @@ fn cage_receipt_persistence(
     server_id: &str,
     profile_digest: &str,
     plan_digest: &str,
+    admitted_policy_digest: &str,
 ) -> Result<chio_mcp_adapter::transport::CageReceiptPersistence, CliError> {
     if !policy.database_path.is_absolute()
         || !policy.signer_seed_path.is_absolute()
@@ -1209,6 +1213,7 @@ fn cage_receipt_persistence(
         profile_digest.to_string(),
         policy.tenant_id.clone(),
     )
+    .and_then(|context| context.with_admitted_policy_digest(admitted_policy_digest))
     .map_err(|error| {
         CliError::cli_other_error(format!("cage receipt signing context denied: {error}"))
     })?;
@@ -1812,6 +1817,7 @@ mod tests {
                 chio_manifest::NativeSyscallProfile::NativeStandardV1,
                 chio_manifest::NativeSyscallProfile::NativeMinimalV1,
             ),
+            &"a".repeat(64),
             "/operator/mcp-server",
             &[],
             &test_launch_contract(),
@@ -1834,6 +1840,7 @@ mod tests {
 
         let error = compose_cage_required_launch(
             policy,
+            &"a".repeat(64),
             "/operator/mcp-server",
             &[],
             &test_launch_contract(),
@@ -1852,6 +1859,7 @@ mod tests {
                 chio_manifest::NativeSyscallProfile::BrokeredNativeV1,
                 chio_manifest::NativeSyscallProfile::BrokeredNativeV1,
             ),
+            &"a".repeat(64),
             "/operator/mcp-server",
             &[],
             &test_launch_contract(),
