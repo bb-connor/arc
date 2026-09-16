@@ -590,10 +590,16 @@ fn launch_bound(
             "status_eof_missing",
         ));
     }
+    let exec_time_precedes_prepared =
+        exec_transition.observed_at_unix_ms < prepared.prepared_at_unix_ms;
     let evidence = FullyEnforcedEvidence::new(prepared, exec_transition, true).map_err(|_| {
         CageLaunchError::bootstrap_failed(
             CageEnforcementFailureCode::PreparedRecordInvalid,
-            "fully_enforced_evidence",
+            if exec_time_precedes_prepared {
+                "exec_time_precedes_prepared"
+            } else {
+                "fully_enforced_evidence"
+            },
         )
     })?;
     let (stdin, stdout, stderr) = compiled.take_parent_stdio().ok_or_else(|| {

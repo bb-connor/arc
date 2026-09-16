@@ -3,11 +3,11 @@ use chio_cage::{
     verify_signed_cage_receipt, verify_signed_cage_receipt_with_trusted_key,
     CageEnforcementFailure, CageEnforcementFailureCode, CageEnforcementRecord,
     CageEnforcementState, CageReceiptBindings, CageReceiptBody, CageReceiptPersistenceError,
-    CageReceiptSigningContext, EnforcementPrepared, ExecTransitionObserved, ExecutionIdentity,
-    FullyEnforcedEvidence, ObservedRulesetStatus, ProcessExitEvidence, SandboxArchitecture,
-    SeccompEnforcementStatus, CAGE_ENFORCEMENT_RECORD_SCHEMA, ENFORCEMENT_PREPARED_SCHEMA,
-    EXEC_TRANSITION_OBSERVED_SCHEMA, NONO_PATCH_VERSION, PINNED_NONO_VERSION,
-    PINNED_SECCOMPILER_VERSION,
+    CageReceiptSigningContext, EnforcementEvidenceError, EnforcementPrepared,
+    ExecTransitionObserved, ExecutionIdentity, FullyEnforcedEvidence, ObservedRulesetStatus,
+    ProcessExitEvidence, SandboxArchitecture, SeccompEnforcementStatus,
+    CAGE_ENFORCEMENT_RECORD_SCHEMA, ENFORCEMENT_PREPARED_SCHEMA, EXEC_TRANSITION_OBSERVED_SCHEMA,
+    NONO_PATCH_VERSION, PINNED_NONO_VERSION, PINNED_SECCOMPILER_VERSION,
 };
 use chio_core::crypto::{Ed25519Backend, Keypair};
 use chio_test_support::prelude::*;
@@ -98,6 +98,27 @@ fn fully_enforced_requires_prepared_exec_identity_and_status_eof() {
     let mut wrong_target = exec_transition();
     wrong_target.target_binding_digest = digest('9');
     assert!(FullyEnforcedEvidence::new(prepared(), wrong_target, true).is_err());
+
+    // Millisecond timestamps may tie, but a backwards wall clock must deny
+    // launch rather than mint apparently ordered enforcement evidence.
+    let mut same_millisecond = exec_transition();
+    same_millisecond.observed_at_unix_ms = prepared().prepared_at_unix_ms;
+    FullyEnforcedEvidence::new(prepared(), same_millisecond, true)
+        .test_expect("equal observation timestamps remain valid");
+    let mut earlier_exec = exec_transition();
+    earlier_exec.observed_at_unix_ms = prepared().prepared_at_unix_ms - 1;
+    assert_eq!(
+        FullyEnforcedEvidence::new(prepared(), earlier_exec.clone(), true),
+        Err(EnforcementEvidenceError::BindingMismatch)
+    );
+    assert!(
+        CageEnforcementRecord::fully_enforced(FullyEnforcedEvidence {
+            prepared: prepared(),
+            exec_transition: earlier_exec,
+            status_eof_observed: true,
+        })
+        .is_err()
+    );
 
     let forged = FullyEnforcedEvidence {
         prepared: prepared(),
