@@ -84,7 +84,11 @@ def main():
                 "cwd": "/work",
                 "container": {"image": args.worker_image},
                 "max_attempts": 2,
-                "timeout_seconds": 60,
+                # Six serial host requests plus inspect/checkpoint. The x86
+                # emulated qualifier exceeded the single-call 60-second worker
+                # lifetime while both original allowed calls still completed.
+                # Each SDK request retains its existing 60-second deadline.
+                "timeout_seconds": 180,
             }
         )
     plan = harness.output / "run-plan.json"
