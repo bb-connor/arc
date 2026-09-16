@@ -19,6 +19,60 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 #### Current local evidence (2026-09-15, continued September 16 UTC)
 
+The unchanged optimized CLI at
+`cb5a34e722b52c794f2aaf84fbcb02a40bac3f03` now passes all seven local x86_64
+scenarios: reference fan-out, authority, revocation, filesystem, network, host
+crash, and actual shared-budget contention. The CLI SHA-256 is
+`f8500b76f7a9f513f2818206b5f8746df2dedab80845f7f76380c229a433fe7a`;
+`x86-executables-docker-release-cb5a34e72/manifest.json` records the separately
+retained static tool identities. This closes the earlier observed executor
+starvation failure for the tested runtime. It is not designated-runner or
+complete M5 acceptance.
+
+`linux-x86-release-budget-cb5a34e72-retry1/` retains four workers across two
+graphs contending for one family budget of two. Carol and Dave append while
+both admitted calls remain outstanding; Alice and Bob checkpoint signed quota
+denials. After host death, all four pinned targets terminate within five
+seconds. The admitted workers recover their original requests as uncertain;
+the denied workers retain their original responses. A second reopen produces
+no extra effects. Aggregate usage is max two, reserved zero, captured two.
+The run retains 82 public diagnostic files and all four original native launch
+receipts. `budget-original-launch-verification-cb5a34e72-retry1/` records four
+successful offline semantic verifications using the independently built macOS
+verifier at `5d71ef11e26aaaca21363d4bcb85cdb182dc44ec`.
+
+The preceding `linux-x86-release-budget-cb5a34e72/` run passed those runtime
+checks but failed its final no-WAL assertion. The Python observer kept a
+read-only SQLite connection open: its connection context manager handled the
+transaction without closing the connection. `budget-sqlite-reader-reproduction.json`
+records the retained WAL with that reader and its removal after explicit close.
+Qualifier `8e7b53347e4e8050d8f96de1babc2740e8efe76b` closes all three observer
+connections with `contextlib.closing`. The retry passes the unchanged assertion;
+no WAL, retained state, timeout or admission condition was removed.
+
+The other current runtime results are retained in
+`linux-x86-release-reference-cb5a34e72/`,
+`linux-x86-release-authority-cb5a34e72-retry1/`, and the corresponding
+`linux-x86-release-{revocation,filesystem,network,host-crash}-cb5a34e72/`
+directories. The reference passes all nine checks. The first authority attempt
+stopped before execution because its old Docker image ID was unavailable.
+The retained replacement image has exactly matching filesystem layers, runtime
+configuration, architecture and OS for all five continued scenario images;
+`worker-image-runtime-equivalence-cb5a34e72.json` records that comparison.
+The fresh plans pin its actual immutable digest
+`sha256:261460d71f4e8546b563fdb73968382366def31f4884937464dc3c827154cbaa`.
+The unavailable old image identity is not claimed as present or reused. Cage
+compilation was paused only during timed qualification and resumed afterward.
+
+At `5d71ef11e26aaaca21363d4bcb85cdb182dc44ec`, the allowed/compensated call
+integration test and strict CLI all-target Clippy pass again on Linux/aarch64.
+Both the x86 observer build and separate macOS offline-verifier build pass.
+The implementation distinguishes an uncertain original operation from the
+signed kernel refusal returned during recovery. Such a refusal has no original
+completed-call custody reference. Its custody claim is explicitly a signed
+readback of the fenced store. Real uncertain-call export and the complete
+scenario artifact still require their own evidence.
+
 The frozen foundation at `810664017dffa38235e3914a0a4477c8345cf359` passes
 consumer boundaries, the complete flow-security gate and workspace build.
 `linux-810664017/` retains the exact commands and terminal results. Its workspace

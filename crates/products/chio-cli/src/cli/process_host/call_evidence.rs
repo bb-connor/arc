@@ -31,6 +31,10 @@ pub(super) use exporting::export;
 const SCHEMA: &str = "chio.process.call-observation.v1";
 const LIMIT: u64 = 32 * 1024 * 1024;
 
+#[cfg(test)]
+#[path = "call_evidence/tests.rs"]
+mod tests;
+
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Evidence {
