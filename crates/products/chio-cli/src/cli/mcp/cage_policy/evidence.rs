@@ -23,6 +23,67 @@ pub(crate) struct NativeLaunchEvidence {
     pub terminal: ChioReceipt,
 }
 
+/// An original launch with its exit receipt only when one was retained.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct NativeLaunchObservation {
+    pub signed_policy: String,
+    pub enforcement: ChioReceipt,
+    pub terminal: Option<ChioReceipt>,
+}
+
+pub(crate) struct NativeObservedWindow {
+    pub started_at_unix_ms: u64,
+    pub exited_at_unix_ms: Option<u64>,
+    pub tools: BTreeSet<String>,
+    pub manifest: chio_manifest::ToolManifest,
+    pub target_argv: Vec<String>,
+}
+
+pub(crate) fn verify_native_launch_observation(
+    evidence: &NativeLaunchObservation,
+    server_id: &str,
+    trusted_policy_signer: &chio_core::PublicKey,
+) -> Result<NativeObservedWindow, CliError> {
+    if let Some(terminal) = &evidence.terminal {
+        let window = verify_native_launch_evidence(
+            &NativeLaunchEvidence {
+                signed_policy: evidence.signed_policy.clone(),
+                enforcement: evidence.enforcement.clone(),
+                terminal: terminal.clone(),
+            },
+            server_id,
+            trusted_policy_signer,
+        )?;
+        return Ok(NativeObservedWindow {
+            started_at_unix_ms: window.started_at_unix_ms,
+            exited_at_unix_ms: Some(window.exited_at_unix_ms),
+            tools: window.tools,
+            manifest: window.manifest,
+            target_argv: window.target_argv,
+        });
+    }
+    let (policy, enforcement) = verify_policy_bound_enforcement(
+        &evidence.signed_policy,
+        &evidence.enforcement,
+        server_id,
+        trusted_policy_signer,
+    )?;
+    Ok(NativeObservedWindow {
+        started_at_unix_ms: enforcement.recorded_at_unix_ms,
+        exited_at_unix_ms: None,
+        tools: policy
+            .signed_manifest
+            .manifest
+            .tools
+            .iter()
+            .map(|tool| tool.name.clone())
+            .collect(),
+        manifest: policy.signed_manifest.manifest,
+        target_argv: policy.runtime.target_argv,
+    })
+}
+
 pub(crate) struct NativeLaunchWindow {
     pub started_at_unix_ms: u64,
     pub exited_at_unix_ms: u64,
@@ -167,6 +228,31 @@ pub(crate) fn export_native_launch_evidence(
     trusted_policy_signer: &chio_core::PublicKey,
     receipt_ids: &BTreeSet<String>,
 ) -> Result<BTreeMap<String, NativeLaunchEvidence>, CliError> {
+    export_native_launch_observations(policy_path, server_id, trusted_policy_signer, receipt_ids)?
+        .into_iter()
+        .map(|(id, observed)| {
+            let terminal = observed.terminal.ok_or_else(|| {
+                CliError::cli_other_error("native launch has no retained terminal receipt")
+            })?;
+            Ok((
+                id,
+                NativeLaunchEvidence {
+                    signed_policy: observed.signed_policy,
+                    enforcement: observed.enforcement,
+                    terminal,
+                },
+            ))
+        })
+        .collect()
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn export_native_launch_observations(
+    policy_path: &Path,
+    server_id: &str,
+    trusted_policy_signer: &chio_core::PublicKey,
+    receipt_ids: &BTreeSet<String>,
+) -> Result<BTreeMap<String, NativeLaunchObservation>, CliError> {
     use chio_kernel::receipt_query::ReceiptQuery;
     use chio_kernel::ReceiptStore;
 
@@ -252,15 +338,12 @@ pub(crate) fn export_native_launch_evidence(
     launches
         .into_iter()
         .map(|(attempt, (id, enforcement))| {
-            let terminal = terminals.remove(&attempt).ok_or_else(|| {
-                CliError::cli_other_error("native launch has no retained terminal receipt")
-            })?;
-            let evidence = NativeLaunchEvidence {
+            let evidence = NativeLaunchObservation {
                 signed_policy: signed_policy.clone(),
                 enforcement,
-                terminal,
+                terminal: terminals.remove(&attempt),
             };
-            verify_native_launch_evidence(&evidence, server_id, trusted_policy_signer)?;
+            verify_native_launch_observation(&evidence, server_id, trusted_policy_signer)?;
             Ok((id, evidence))
         })
         .collect()

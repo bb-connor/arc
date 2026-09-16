@@ -56,6 +56,9 @@ pub(crate) enum ProcessCommands {
         trusted_kernel_pubkey: PathBuf,
         #[arg(long)]
         runtime_id: String,
+        /// External operator pin for each native server, repeated as SERVER=PUBLIC_KEY.
+        #[arg(long)]
+        trusted_launch_policy_signer: Vec<String>,
     },
     /// Observe one retained call and its continuation custody while stopped (Linux).
     AttestCall {
@@ -222,7 +225,13 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
                 artifact,
                 trusted_kernel_pubkey,
                 runtime_id,
-            } => call_evidence::verify_outcomes(&artifact, &trusted_kernel_pubkey, &runtime_id),
+                trusted_launch_policy_signer,
+            } => call_evidence::verify_outcomes(
+                &artifact,
+                &trusted_kernel_pubkey,
+                &runtime_id,
+                &trusted_launch_policy_signer,
+            ),
             ProcessCommands::AttestCall {
                 state,
                 request,

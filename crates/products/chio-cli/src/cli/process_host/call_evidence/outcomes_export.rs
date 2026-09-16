@@ -80,6 +80,7 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
         })
         .map_err(error)?
         .ok_or_else(|| error("missing retained family usage"))?;
+    let native = native::export(&host.record.config, &calls)?;
     let run = Outcomes {
         schema: OUTCOMES_SCHEMA.into(),
         runtime_id: host.runtime.runtime_id().into(),
@@ -89,6 +90,7 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
         authorities,
         runner,
         calls,
+        confinement: native.confinement,
         aggregate: Usage {
             owner_id: usage.quota.key.owner_id,
             max_invocations: usage.quota.max_invocations,
@@ -109,6 +111,7 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
         &run,
         &host.kernel.public_key(),
         host.runtime.runtime_id(),
+        &native.pins,
     )?;
     let bytes = canonical_json_bytes(&signed).map_err(error)?;
     require(bytes.len() as u64 <= LIMIT, "worker outcomes exceed 32 MiB")?;

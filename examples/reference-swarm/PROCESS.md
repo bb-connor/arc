@@ -333,10 +333,13 @@ retained outcomes together:
 chio process attest-outcomes --state "$PWD/run-state" \
   --plan "$PWD/run-state/reference-run-plan.json" --out "$PWD/outcomes.json"
 chio process verify-outcomes --artifact "$PWD/outcomes.json" \
-  --trusted-kernel-pubkey "$PWD/operator-kernel.pub" --runtime-id "$RUNTIME_ID"
+  --trusted-kernel-pubkey "$PWD/operator-kernel.pub" --runtime-id "$RUNTIME_ID" \
+  --trusted-launch-policy-signer "repo-reader=$READER_POLICY_PUBLIC_KEY"
 ```
 
-Keep the kernel key and runtime ID independently. Export reads each original
+Supply one independently retained policy signer pin per referenced native server.
+For a mailbox-only host, omit that option. Keep the kernel key and runtime ID
+independently. Export reads each original
 worker checkpoint under one stopped-host lease, verifies its retained call, and
 reads captured usage from the existing family budget store. It also reads the
 actual worker completion journal and the originally issued graph authorities.
@@ -352,10 +355,21 @@ records that the worker finished processing its response; the response can
 still describe a denied or interrupted tool call. The original live graph
 authority is retained without minting a successful join or graph completion.
 
-The report verifies issued task authority, worker completion, call outcomes,
-continuation custody and authoritative family usage. Confinement, physical
-effects, execution nonces and the complete scenario matrix require additional
-evidence. `m5_acceptance_complete` remains false.
+Version 2 also includes each response's original signed launch reference, its
+signed Enforced policy and any matching retained exit receipt. Verification
+binds the original host configuration, signed manifest, exact policy bytes,
+route and executable identity to the independently pinned policy signer. Each
+`native_launches` entry says whether a terminal receipt was verified. A missing
+exit remains unknown. Interrupted responses may be signed after observing the
+process exit; they do not assert that the call completed inside its lifetime.
+
+A recovery refusal's connection can be a replacement connection. Its launch
+evidence does not identify the earlier external effect or establish that the
+original target died. Those observations, physical effects, execution nonces
+and the complete scenario matrix still require additional evidence.
+`m5_acceptance_complete` remains false. Version 1 artifacts remain verifiable
+with their original limits and no native policy signer options. The separate
+completed-run verifier continues to require actual terminal launch receipts.
 
 ### Verify a launch when the observing host died
 

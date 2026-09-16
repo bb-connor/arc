@@ -187,7 +187,13 @@ fn native_start_verification_binds_original_receipt_without_claiming_exit() -> R
     )
     .is_err());
     assert!(verify("cage-policy-test", &pin, &"a".repeat(64), target).is_err());
-    assert!(verify("cage-policy-test", &pin, &evidence.enforcement.id, &"b".repeat(64)).is_err());
+    assert!(verify(
+        "cage-policy-test",
+        &pin,
+        &evidence.enforcement.id,
+        &"b".repeat(64)
+    )
+    .is_err());
 
     // A valid signed exit is not the selected original enforcement receipt.
     std::fs::write(&receipt_path, canonical_json_bytes(&evidence.terminal)?)?;
@@ -196,5 +202,48 @@ fn native_start_verification_binds_original_receipt_without_claiming_exit() -> R
     changed["invented_field"] = json!(true);
     std::fs::write(&receipt_path, serde_json::to_vec(&changed)?)?;
     assert!(verify("cage-policy-test", &pin, &evidence.enforcement.id, target).is_err());
+    Ok(())
+}
+
+#[test]
+fn native_observation_keeps_missing_exit_distinct_and_rejects_substituted_terminal() -> Result {
+    let (evidence, policy, signer) = fixture()?;
+    let mut observed = NativeLaunchObservation {
+        signed_policy: evidence.signed_policy,
+        enforcement: evidence.enforcement,
+        terminal: None,
+    };
+    let verify = |value: &NativeLaunchObservation| {
+        verify_native_launch_observation(value, "cage-policy-test", &signer.public_key())
+    };
+    let start = verify(&observed)?;
+    assert_eq!(start.started_at_unix_ms, 1300);
+    assert_eq!(start.exited_at_unix_ms, None);
+    assert!(verify_native_launch_observation(
+        &observed,
+        "cage-policy-test",
+        &Keypair::from_seed(&[92; 32]).public_key()
+    )
+    .is_err());
+    observed.terminal = Some(evidence.terminal.clone());
+    assert_eq!(verify(&observed)?.exited_at_unix_ms, Some(2000));
+
+    let mut terminal = verify_signed_cage_receipt(&evidence.terminal)?;
+    terminal.attempt_id = "unrelated-attempt".into();
+    let context = CageReceiptSigningContext::new(
+        policy.receipt.capability_id,
+        "cage-policy-test",
+        "cage-launch",
+        "3".repeat(64),
+        policy.receipt.tenant_id,
+    )?;
+    observed.terminal = Some(sign_cage_receipt(
+        terminal,
+        &context,
+        &Ed25519Backend::new(signer.clone()),
+    )?);
+    assert!(verify(&observed).is_err());
+    observed.terminal = Some(observed.enforcement.clone());
+    assert!(verify(&observed).is_err());
     Ok(())
 }

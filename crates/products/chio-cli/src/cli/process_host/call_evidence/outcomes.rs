@@ -18,7 +18,11 @@ mod exporting;
 #[cfg(target_os = "linux")]
 pub(crate) use self::exporting::export;
 
-const OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v1";
+#[path = "outcomes_native.rs"]
+mod native;
+
+const OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v2";
+const LEGACY_OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v1";
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -32,6 +36,8 @@ struct Outcomes {
     runner: Value,
     aggregate: Usage,
     calls: BTreeMap<String, ChioReceipt>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    confinement: BTreeMap<String, crate::mcp_cli::NativeLaunchObservation>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -48,14 +54,15 @@ fn verify_outcomes(
     run: &Outcomes,
     key: &PublicKey,
     runtime: &str,
-) -> Result<(), CliError> {
+    pins: &BTreeMap<String, PublicKey>,
+) -> Result<BTreeMap<String, Value>, CliError> {
     receipt(signed, key)?;
     observation(signed, "attest_worker_outcomes")?;
     receipt(&run.bootstrap, key)?;
     observation(&run.bootstrap, "provision_swarm")?;
     require(
         !runtime.is_empty()
-            && run.schema == OUTCOMES_SCHEMA
+            && (run.schema == OUTCOMES_SCHEMA || run.schema == LEGACY_OUTCOMES_SCHEMA)
             && run.runtime_id == runtime
             && run.bootstrap.action.parameters["runtime_id"] == runtime
             && signed.action.parameters == serde_json::to_value(run).map_err(error)?
@@ -258,7 +265,16 @@ fn verify_outcomes(
             && run.aggregate.captured_invocations == committed
             && committed <= family.max_invocations,
         "authoritative family usage differs from retained dispatches",
-    )
+    )?;
+    if run.schema == LEGACY_OUTCOMES_SCHEMA {
+        require(
+            run.confinement.is_empty() && pins.is_empty(),
+            "v1 outcomes do not verify native launches",
+        )?;
+        Ok(BTreeMap::new())
+    } else {
+        native::verify(run, pins)
+    }
 }
 
 fn task_authority(
@@ -341,22 +357,50 @@ fn task_authority(
     )
 }
 
-pub(crate) fn verify_file(path: &Path, key: &Path, runtime: &str) -> Result<(), CliError> {
+pub(crate) fn verify_file(
+    path: &Path,
+    key: &Path,
+    runtime: &str,
+    policy_pins: &[String],
+) -> Result<(), CliError> {
     let key = crate::load_trusted_kernel_pubkey(key).map_err(error)?;
     let signed = crate::receipt_verify::verify_original_receipt(&text(path)?, &key)?;
     let run: Outcomes = serde_json::from_value(signed.action.parameters.clone()).map_err(error)?;
-    verify_outcomes(&signed, &run, &key, runtime)?;
+    let pins = native::pins(policy_pins)?;
+    let launches = verify_outcomes(&signed, &run, &key, runtime, &pins)?;
+    let mut unchecked = vec![
+        "physical_effects",
+        "execution_nonces",
+        "scenario_matrix",
+        "original_interrupted_launch",
+        "target_death_without_terminal",
+    ];
+    let mut checks = vec![
+        "signer_pin",
+        "runtime_pin",
+        "issued_task_authority",
+        "worker_completion",
+        "call_outcomes",
+        "continuation_custody",
+        "aggregate_usage",
+    ];
+    if run.schema == LEGACY_OUTCOMES_SCHEMA {
+        unchecked.push("confinement");
+    } else {
+        checks.push("call_referenced_native_launches");
+    }
     println!(
         "{}",
         json!({
-        "schema": "chio.process.worker-outcomes-verification.v1", "runtime_id": runtime,
+        "schema": "chio.process.worker-outcomes-verification.v2", "runtime_id": runtime,
+        "artifact_schema": run.schema, "native_launches": launches,
         "graphs": run.authorities.len(), "workers": run.calls.len(),
         "captured_invocations": run.aggregate.captured_invocations,
         "observed_operations": run.calls.iter().map(|(process, call)|
             (process, call.action.parameters["operation"]["state"].clone())
         ).collect::<BTreeMap<_, _>>(),
-            "checks": ["signer_pin", "runtime_pin", "issued_task_authority", "worker_completion", "call_outcomes", "continuation_custody", "aggregate_usage"],
-            "unchecked": ["confinement", "physical_effects", "execution_nonces", "scenario_matrix"],
+            "checks": checks,
+            "unchecked": unchecked,
             "m5_acceptance_complete": false,
         })
     );

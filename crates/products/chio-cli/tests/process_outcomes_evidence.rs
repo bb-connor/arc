@@ -65,6 +65,8 @@ fn supervised_outcomes_bind_multiple_graphs_and_authoritative_family_usage() -> 
     assert_eq!(report["workers"], 4);
     assert_eq!(report["captured_invocations"], 2);
     assert_eq!(report["m5_acceptance_complete"], false);
+    assert_eq!(report["artifact_schema"], "chio.process.worker-outcomes.v2");
+    assert_eq!(report["native_launches"], json!({}));
     assert!(!verify(&artifact, "another-runtime")?.status.success());
     let original: ChioReceipt = serde_json::from_slice(&std::fs::read(&artifact)?)?;
     let signer = chio_control_plane::load_existing_authority_keypair(
@@ -111,6 +113,7 @@ fn supervised_outcomes_bind_multiple_graphs_and_authoritative_family_usage() -> 
         ("/authorities/1", params["authorities"][0].clone()),
         ("/calls/alice", params["calls"]["bob"].clone()),
         ("/observed_at_unix_ms", json!(1)),
+        ("/schema", json!("chio.process.worker-outcomes.v9")),
     ];
     for (index, (pointer, replacement)) in cases.into_iter().enumerate() {
         let mut body = original.body();
