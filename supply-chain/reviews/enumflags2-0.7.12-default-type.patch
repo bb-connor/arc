@@ -1,0 +1,11 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -337,7 +337,7 @@
+                 const EMPTY: <Self as ::enumflags2::_internal::RawBitFlags>::Numeric = 0;
+ 
+                 const DEFAULT: <Self as ::enumflags2::_internal::RawBitFlags>::Numeric =
+-                    0 #(| (Self::#default as #repr))*;
++                    0 #(| { let flag: Self = Self::#default; flag as #repr })*;
+ 
+                 const ALL_BITS: <Self as ::enumflags2::_internal::RawBitFlags>::Numeric =
+                     0 #(| (Self::#variant_names as #repr))*;

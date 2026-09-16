@@ -86,9 +86,37 @@ native-target tree completed.
 
 ## Disposition
 
-Keep certification pending. A narrow repair should type-check each requested
-default value as the enum before converting it to the numeric representation,
-as the crate's existing `make_bitflags!` macro already does. Verify a repair
-against the reproducer, valid custom defaults, and the complete upstream tests,
-then review the remaining unsafe surface before certifying. No upstream issue,
-advisory identifier, fixed release, or external disclosure is asserted here.
+### Prepared repair
+
+[The local repair patch](enumflags2-0.7.12-default-type.patch) requires every
+custom-default item to type-check as the enum before conversion to its unsigned
+representation. This preserves valid enum variants and typed associated aliases,
+and rejects numeric associated constants. It follows the type check already
+used by the crate's `make_bitflags!` macro.
+
+The patch was applied to a separate copy of the exact reviewed derive source.
+With Rust 1.94.1, the original invalid-default example now fails compilation
+with `expected Flag, found u8`. A positive executable passes for `u8`, `u16`,
+`u32`, `u64` and `u128`, covering combined defaults, typed enum aliases, empty
+defaults, iteration, `exactly_one` and checked numeric conversion. The original
+unpatched reproduction remains unchanged and retained separately.
+`repair-results.json`, `repair-valid-defaults.log` and
+`repair-invalid-default.log` in the evidence directory retain the commands and
+terminal results. The invalid case is expected to exit 101; no invalid enum
+value is evaluated at runtime.
+
+The continued source review covers the library constructors, constant APIs,
+operators, serde conversion, fallible conversions, formatting and iteration,
+plus the derive generator. `exactly_one` also relies on the same valid-bit
+invariant as iteration. Formatting delegates to iteration. Checked numeric and
+serde inputs use `from_bits`, which rejects unknown bits; truncating inputs mask
+them. These paths do not repair a bad `DEFAULT` generated earlier.
+
+This is a tested repair proposal. It is not installed in Chio's dependency graph
+and does not certify either unpatched crate. Dependency ownership, the actual
+selected package revision and affected native qualification remain open.
+
+Keep certification pending. The complete upstream regression suite and
+downstream native qualification remain required before certifying a selected
+patched revision. No upstream issue, advisory identifier, fixed release, or
+external disclosure is asserted here.
