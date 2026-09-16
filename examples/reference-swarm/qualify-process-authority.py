@@ -102,6 +102,12 @@ def main():
     assert snapshots["alice"]["attempts"] == 2 and snapshots["bob"]["attempts"] == 1, (
         snapshots
     )
+    first_attempt = (harness.state / "run-logs/alice-1.stderr").read_text()
+    assert first_attempt.endswith(
+        "checkpoint: retained\ncrash-after-checkpoint: sigkill\n"
+    ), (
+        "Alice must restart from the deliberate checkpoint crash, not an unrelated failure"
+    )
     responses, denials = {}, {}
     for call in calls:
         name = call["process"]

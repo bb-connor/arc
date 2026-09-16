@@ -65,6 +65,7 @@ def main():
     )
     print("checkpoint: retained", file=sys.stderr, flush=True)
     if call.get("crash_after_checkpoint") and bootstrap["attempt"] == 1:
+        print("crash-after-checkpoint: sigkill", file=sys.stderr, flush=True)
         os.kill(os.getpid(), signal.SIGKILL)
     if response["verdict"] != expected:
         raise RuntimeError(f"expected {expected}, received {response['verdict']}")

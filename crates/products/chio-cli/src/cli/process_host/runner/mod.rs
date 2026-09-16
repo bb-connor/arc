@@ -98,7 +98,7 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
         .build()?;
     runtime.block_on(async {
         let logs = chio_control_plane::prepare_private_directory(&host.lease.directory.path().join("run-logs"))?;
-        let service = WorkerService::new(host.runtime.clone());
+        let service = super::serving::worker_service(host.runtime.clone());
         for worker in &journal.workers { service.revoke_credentials(&worker.process).map_err(error)?; }
         container::reconcile(&journal).await?;
         if !journal.containers()?.is_empty() {

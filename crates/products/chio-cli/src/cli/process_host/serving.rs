@@ -19,6 +19,12 @@ type ConnectedServers = (
     BTreeMap<String, chio_process::ProcessLaunchReceipt>,
 );
 
+pub(super) fn worker_service(runtime: chio_process::ProcessRuntime) -> WorkerService {
+    WorkerService::new(runtime).with_error_observer(|error| {
+        tracing::warn!(error = %error, "process worker request failed");
+    })
+}
+
 pub(super) fn connect(
     config: &Config,
     kernel: &ChioKernel,
@@ -147,7 +153,7 @@ pub(super) fn serve(state: &Path, socket: &Path) -> Result<(), CliError> {
     runtime.block_on(async {
         let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
         let mut interrupt = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
-        let listener = WorkerServer::bind(socket, WorkerService::new(host.runtime.clone()))?;
+        let listener = WorkerServer::bind(socket, worker_service(host.runtime.clone()))?;
         host.lease.directory.validate_path_identity()?;
         println!("{}", serde_json::json!({"ready": true, "protocol": chio_process::worker::PROTOCOL,
             "socket_path": std::fs::canonicalize(socket)?, "kernel_key": host.kernel.public_key().to_hex()}));

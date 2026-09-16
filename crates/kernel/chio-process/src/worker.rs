@@ -44,6 +44,7 @@ impl std::fmt::Debug for WorkerCredential {
 #[derive(Clone)]
 pub struct WorkerService {
     runtime: ProcessRuntime,
+    error_observer: Option<fn(&ProcessError)>,
 }
 
 // Deliberately no Debug derive on requests containing bearer credentials.
@@ -85,7 +86,18 @@ enum Operation {
 
 impl WorkerService {
     pub fn new(runtime: ProcessRuntime) -> Self {
-        Self { runtime }
+        Self {
+            runtime,
+            error_observer: None,
+        }
+    }
+
+    /// Observe failures in the trusted host without changing the bounded,
+    /// redacted worker error frame. The observer must not panic or block.
+    #[must_use]
+    pub fn with_error_observer(mut self, observer: fn(&ProcessError)) -> Self {
+        self.error_observer = Some(observer);
+        self
     }
 
     /// Issue a 256-bit OS-random bearer credential for an existing process.
@@ -242,7 +254,12 @@ impl WorkerService {
     pub async fn handle_frame(&self, frame: &[u8]) -> Vec<u8> {
         let result = match self.execute(frame).await {
             Ok(value) => json!({"protocol": PROTOCOL, "ok": true, "result": value}),
-            Err(error) => failure(error_code(&error)),
+            Err(error) => {
+                if let Some(observer) = self.error_observer {
+                    observer(&error);
+                }
+                failure(error_code(&error))
+            }
         };
         // A bounded writer avoids an unbounded second copy of large outputs.
         let mut bytes = BoundedBytes(Vec::new());

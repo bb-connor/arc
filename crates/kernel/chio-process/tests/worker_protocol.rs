@@ -590,12 +590,25 @@ async fn framing_is_bounded_and_socket_paths_are_not_clobbered() -> Result {
     let mut bad_protocol: Value =
         serde_json::from_slice(&frame(credential.expose_secret(), invoke("version")))?;
     bad_protocol["protocol"] = json!("future");
+    static OBSERVED_ERRORS: AtomicUsize = AtomicUsize::new(0);
+    let observed = service.clone().with_error_observer(|error| {
+        assert!(matches!(
+            error,
+            ProcessError::Invalid("unsupported protocol")
+        ));
+        OBSERVED_ERRORS.fetch_add(1, Ordering::SeqCst);
+    });
     let response: Value = serde_json::from_slice(
-        &service
+        &observed
             .handle_frame(bad_protocol.to_string().as_bytes())
             .await,
     )?;
-    assert_eq!(response["error"]["code"], "invalid_request");
+    assert_eq!(OBSERVED_ERRORS.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        response,
+        json!({"protocol": PROTOCOL, "ok": false,
+        "error": {"code": "invalid_request"}})
+    );
     assert_eq!(runtime.process("root")?.tree_calls, 0);
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     stop.send(()).map_err(|_| "shutdown channel closed")?;
