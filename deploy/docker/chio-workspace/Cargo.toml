@@ -11,6 +11,7 @@ enumflags2_derive = { path = "third_party/enumflags2-derive-chio" }
 crmf = { path = "third_party/crmf-chio" }
 cmpv2 = { path = "third_party/cmpv2-chio" }
 seccompiler = { path = "third_party/seccompiler-chio" }
+sigstore-merkle = { path = "third_party/sigstore-merkle-chio" }
 
 [workspace.package]
 version = "0.1.0"

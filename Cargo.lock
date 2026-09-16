@@ -13078,8 +13078,6 @@ dependencies = [
 [[package]]
 name = "sigstore-merkle"
 version = "0.6.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c0d53558825c77716855c13794306fff766854c1bf92948e77d7890da3f2455"
 dependencies = [
  "base64 0.22.1",
  "hex",

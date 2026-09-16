@@ -47,11 +47,16 @@ the original workspace invocation.
 
 The fixture now uses the existing `private_tempdir()` helper. Runtime ancestry
 validation, all malformed relocation inputs, mutation assertions and deadlines
-remain unchanged. Requalification must include the original failing `002`
-umask and the owning target before claiming resolution.
+remain unchanged. The rebuilt test passes under the original failing `002`
+umask at frozen source `6554383cc2acb4fe79f9085b8f5f7bc7443a9b69`.
+Its executable SHA-256 is
+`c3ab362444ec4b6b970c06a160188a4ee1fcb8b2f910ad3ec1568f2b96eebd55`.
+The complete owning target and workspace gates are still required.
 
 Evidence: `foundation-relocation-diagnostic-94e0da1fb/`, including the exact
 executable digest, first isolated failure and three-case umask matrix.
+The passing rebuilt case and its source, lock and binary identities are in
+`linux-foundation-6554383cc/relocation-umask-002.json` and its adjacent log.
 
 ## Remaining acceptance
 
