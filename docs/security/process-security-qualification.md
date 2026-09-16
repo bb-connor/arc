@@ -19,40 +19,88 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 #### Current local evidence (2026-09-15, continued September 16 UTC)
 
+The frozen foundation at `810664017dffa38235e3914a0a4477c8345cf359` passes
+consumer boundaries, the complete flow-security gate and workspace build.
+`linux-810664017/` retains the exact commands and terminal results. Its serial
+workspace test, workspace Clippy and proof-coverage queue is still active;
+no full-workspace acceptance is claimed.
+
 `eea8733b1` passes the full actual Enforced reference workflow with exported
 continuation custody, then passes the filesystem qualifier. The same raw OS
 probe first reads and modifies private fixture files unconfined. Under Enforced
 launch, both forbidden read and write return `EACCES`, the allowed read succeeds,
-the protected file is unchanged, and no secret reaches a worker. Its completed
-artifact verifies all three tool calls, aggregate capture, continuation claims
-and actual cage history. All ten runner stages terminate as expected in
-`linux-x86-reference-eea8733b1/`, including retained filesystem and completed-run
-artifacts. Binary identities are in `x86-executables-eea8733b1/manifest.json`.
+the protected file is unchanged, and no secret reaches a worker. All ten stages
+pass in `linux-x86-reference-eea8733b1/`. The filesystem completed artifact has
+SHA-256 `df3f72d7d530875d9c07f05460304607e5c004852b1a228d51b65b8891697eeb`.
+Both completed artifacts also pass offline verification on macOS with public
+keys, runtime IDs and native policy pins copied separately from operator state;
+see `offline-verification-eea8733b1/`. This is independent artifact verification,
+not an independent source review or designated release capture.
 
 The Linux custody queue at `8f1da077c` passes both store regressions,
 `process_run_evidence` with 13 re-signed semantic substitutions, and strict
 all-target CLI/store Clippy (`linux-m5-8f1da077c/`). The prior `9dd317b6f` host and
 response suite passes all 15 cases, then Linux Clippy fails a Linux-only tuple
-complexity lint. `8f1da077c` replaces it with a named structure; the failed log
-remains retained. No lint suppression was added.
+complexity lint. The named return structure repairs it without suppression.
+The failed log remains retained.
 
 `c11aaf538` adds stopped-host `process revoke-capability` through the existing
-persistent kernel revocation store. The macOS mailbox regression proves busy-host
+persistent kernel revocation store. Its mailbox regression and strict CLI
+Clippy pass on macOS and Linux (`linux-m5-c11aaf538/`). This proves busy-host
 refusal, durable revocation across reopen, retained worker authentication and
-no new protected mailbox effect. Strict all-target CLI Clippy and source hygiene
-pass. The first test attempt's external SQLite readback fails on hardened WAL
-sidecars; the corrected read requires a closed, checkpointed immutable snapshot.
-Both logs remain as `process-capability-revocation*.log`. Linux qualification and
-an x86 build are queued at this source.
+no new protected mailbox effect. The Enforced worker scenario remains pending.
 
-The adversarial scripts additionally implement network and scope/peer/replay
-probes, deliberate worker death after checkpoint, and issued-capability
-revocation. They are not yet runtime-qualified. Network acceptance requires a
-working unconfined positive control, an empty external listener, a verified
-caller denial and the matching signed `SIGSYS` exit record. The full scenario
-artifact, contended budget denial and uncertain-effect host death remain open.
-The local current code is `c11aaf538` in `/tmp/arc-m5-evidence`; the foundation
-continues its frozen `810664017` flow/workspace queue.
+The actual network scenario passes at `c11aaf538`, retained in
+`linux-x86-adversarial-c11aaf538/network-qualification.json`: the unconfined probe
+connects and transmits a marker; the confined call returns a verified denial
+without output, the external listener receives no connection, and the matching
+native terminal receipt reports `SIGSYS` (31). The allowed canary still works.
+These are verified raw signed receipts, not receipt-log inclusion proofs.
+
+The initial authority scenario at `c11aaf538` fails its 60-second worker
+lifetime after the multi-request prelude; the allowed operations nevertheless
+complete in the durable ledger. `248ba9c0f` adds request progress markers and
+`1938ec33e` gives this six-request fixture a 180-second total lifetime while
+retaining each SDK request's 60-second deadline. That fresh run also fails:
+Alice's first scope probe receives a generic runtime error and Bob restarts
+after reaching continuation reuse. Both eventually complete, but their attempt
+counts fail the qualifier. These runs are not authority qualification passes.
+`e42e0ed41` installs trusted host-side error observation while preserving redacted
+worker error frames, and requires an explicit deliberate-crash marker after
+Alice's retained checkpoint. All 12 worker-protocol cases, strict all-target
+CLI/process Clippy, format and source hygiene pass on macOS at that source
+(`macos-m5-e42e0ed41/`). Its x86 CLI and static tools cross-build successfully.
+
+The host-crash qualifier at `97bdb43c2` observes one actual Enforced append,
+kills the host before any outcome is returned, and recovers the original request
+as `outcome_unknown_after_dispatch`. Reopening again does not repeat the effect;
+aggregate capture remains two, and the writer's continuation claim is retained.
+The report is in `linux-x86-adversarial-97bdb43c2/`. This run also exposes a
+separate lifecycle defect: the original confined target survives the host as a
+PID-1 orphan. Its process identity and explicit cleanup after qualification are
+retained in `orphaned-target-observation.json` in the same folder.
+
+`4e7c0055d` arms a kernel parent-death `SIGKILL` after the helper's final
+credential change and verifies that the authenticated parent still exists.
+The strengthened host-crash qualifier pins both actual targets with pidfds and
+requires them to terminate after host death. Cross-build passes; the new runtime
+host-crash/revocation queue is running. The complete cage gate must also be
+rerun for this helper. The older complete 69-case/ten-mutant cage pass remains
+bounded to `bcf81182a`.
+
+The source review found a reproducible custom-default invariant failure in
+`enumflags2`/`enumflags2_derive` 0.7.12. Exact hashes, safe reproduction and the
+current native Landlock reachability analysis are recorded in
+[the audit finding](../../supply-chain/reviews/enumflags2-0.7.12.md).
+No certification has been added for either crate.
+
+The current implementation is `e42e0ed41` in `/tmp/arc-m5-evidence`. The full
+scenario artifact, genuine over-budget contention case, repaired authority
+scenario and the remaining foundation gates are open. Existing fixed fan-out
+preallocates one unit per task and rejects a graph larger than its family quota;
+two successful simultaneous calls do not prove a contended over-capacity denial.
+All 109 inherited dispositions remain unchanged. No protected publication,
+designated release capture or administrative thread resolution has occurred.
 
 ##### Preceding checkpoints
 
