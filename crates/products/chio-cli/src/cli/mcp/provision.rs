@@ -11,7 +11,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 
 use super::cage_policy::{
-    ProvisionedCagePolicyFactory, ProvisionedCagePolicyInput, ProvisionedCeilings,
+    ProvisionedBrokerBinding, ProvisionedCagePolicyFactory, ProvisionedCagePolicyInput,
+    ProvisionedCeilings,
 };
 
 #[path = "provision/discovery.rs"]
@@ -99,6 +100,7 @@ pub(super) struct ProvisionProfile {
     pub(super) stage: chio_security_types::EnterpriseMigrationStage,
     pub(super) cage_init: CageInitSource,
     pub(super) ceilings: ProvisionedCeilings,
+    pub(super) broker: Option<ProvisionedBrokerBinding>,
 }
 
 impl ProvisionProfile {
@@ -116,6 +118,7 @@ impl ProvisionProfile {
             stage: chio_security_types::EnterpriseMigrationStage::Disabled,
             cage_init: CageInitSource::ChioExecutable,
             ceilings: ProvisionedCeilings::default(),
+            broker: None,
         }
     }
 
@@ -188,6 +191,8 @@ struct ProvisionReport {
     write_paths: Option<BTreeSet<PathBuf>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     runtime_files: Option<BTreeSet<PathBuf>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    broker: Option<ProvisionedBrokerBinding>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     migration_transition_digests: Option<Vec<String>>,
     artifacts: ProvisionArtifactPaths,
@@ -1117,7 +1122,11 @@ fn build_signed_manifest(
         write_paths: declared_grants(&inputs.profile.ceilings.write_paths),
         network_destinations: None,
         environment_variables: None,
-        native_syscall_profile: chio_manifest::NativeSyscallProfile::NativeMinimalV1,
+        native_syscall_profile: if inputs.profile.broker.is_some() {
+            chio_manifest::NativeSyscallProfile::BrokeredNativeV1
+        } else {
+            chio_manifest::NativeSyscallProfile::NativeMinimalV1
+        },
     });
     chio_manifest::sign_manifest(&manifest, signer).map_err(|error| {
         CliError::cli_other_error(format!("failed to sign strict manifest: {error}"))
@@ -1150,6 +1159,7 @@ fn build_policy_factory(
         policy_signer_public_key: signers.policy.public_key(),
         stage: inputs.profile.stage,
         ceilings: inputs.profile.ceilings.clone(),
+        broker: inputs.profile.broker.clone(),
         receipt_capability_id: inputs.profile.receipt_capability_id.to_string(),
         receipt_tenant_id: inputs.profile.receipt_tenant_id.map(str::to_string),
         cage_init_path: inputs.cage_init_path.clone(),
@@ -1219,6 +1229,7 @@ fn build_report(
         read_paths: optional_paths(&profile.ceilings.read_paths),
         write_paths: optional_paths(&profile.ceilings.write_paths),
         runtime_files: optional_paths(&profile.ceilings.runtime_files),
+        broker: profile.broker.clone(),
         migration_transition_digests: enforcing.then(|| {
             transition_digests
                 .iter()

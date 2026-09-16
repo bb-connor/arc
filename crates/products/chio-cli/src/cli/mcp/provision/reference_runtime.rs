@@ -13,7 +13,7 @@ use std::path::PathBuf;
 
 use super::{
     provision, require_exact_canonical_path, resolve_inputs, CageInitSource, ProvisionProfile,
-    ProvisionedCeilings, ToolSurfaceSource,
+    ProvisionedBrokerBinding, ProvisionedCeilings, ToolSurfaceSource,
 };
 use crate::CliError;
 
@@ -57,6 +57,11 @@ pub(crate) struct ProvisionReferenceRuntimeArgs {
     /// launch; it must be on a different filesystem from the receipt database.
     #[arg(long, value_name = "PATH")]
     pub receipt_rollback_anchor_root: Option<PathBuf>,
+
+    /// Reviewed JSON socket path, authentication digest and broker peer identity.
+    /// Requires Enforced stage, a tools fixture and a static target without file grants.
+    #[arg(long, value_name = "PATH", conflicts_with_all = ["discover_tools", "read_paths", "write_paths", "runtime_files"])]
+    pub broker_binding: Option<PathBuf>,
 
     /// Reviewed `tools/list` fixture of the target.
     #[arg(
@@ -123,6 +128,41 @@ pub(crate) struct ProvisionReferenceRuntimeArgs {
 pub(crate) fn cmd_provision_reference_runtime(
     args: &ProvisionReferenceRuntimeArgs,
 ) -> Result<(), CliError> {
+    let broker = args
+        .broker_binding
+        .as_ref()
+        .map(|path| {
+            if args.stage != ProvisionStage::Enforced {
+                return Err(CliError::cli_other_error(
+                    "brokered provisioning requires Enforced stage".to_string(),
+                ));
+            }
+            let bytes = super::read_bounded_regular_file(path, 16 * 1024, false, "broker binding")?;
+            let binding: ProvisionedBrokerBinding =
+                serde_json::from_slice(&bytes).map_err(|error| {
+                    CliError::cli_other_error(format!("invalid broker binding: {error}"))
+                })?;
+            binding.validate()?;
+            require_exact_canonical_path(&binding.socket_path, "broker socket")?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::FileTypeExt;
+                if !std::fs::symlink_metadata(&binding.socket_path)?
+                    .file_type()
+                    .is_socket()
+                {
+                    return Err(CliError::cli_other_error(
+                        "broker binding path is not a Unix socket".to_string(),
+                    ));
+                }
+                Ok(binding)
+            }
+            #[cfg(not(unix))]
+            Err(CliError::cli_other_error(
+                "broker provisioning requires Unix sockets".to_string(),
+            ))
+        })
+        .transpose()?;
     for path in [&args.cage_init, &args.target]
         .into_iter()
         .chain(args.runtime_files.iter())
@@ -175,6 +215,7 @@ pub(crate) fn cmd_provision_reference_runtime(
         stage,
         cage_init: CageInitSource::Helper(args.cage_init.clone()),
         ceilings,
+        broker,
     };
     let inputs = resolve_inputs(
         profile,

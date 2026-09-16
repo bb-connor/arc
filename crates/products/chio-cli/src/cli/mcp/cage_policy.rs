@@ -185,6 +185,46 @@ struct CageBrokerBinding {
     expected_peer_identity: chio_cage::BrokerPeerIdentity,
 }
 
+/// Reviewed connection identity for a brokered reference launch. The live
+/// descriptor and its peer credentials are still authenticated at launch.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ProvisionedBrokerBinding {
+    pub(super) socket_path: PathBuf,
+    pub(super) authentication_digest: String,
+    pub(super) expected_peer_identity: chio_cage::BrokerPeerIdentity,
+}
+
+impl ProvisionedBrokerBinding {
+    pub(super) fn validate(&self) -> Result<(), CliError> {
+        if !self.socket_path.is_absolute()
+            || self.socket_path.as_os_str().as_encoded_bytes().len() > 100
+            || self.socket_path.components().any(|component| {
+                matches!(
+                    component,
+                    std::path::Component::ParentDir | std::path::Component::CurDir
+                )
+            })
+            || !is_sha256_hex(&self.authentication_digest)
+            || self.expected_peer_identity.pid == 0
+        {
+            return Err(CliError::cli_other_error(
+                "broker binding requires an absolute socket path, SHA-256 authentication digest and nonzero peer PID".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn policy_binding(&self) -> CageBrokerBinding {
+        CageBrokerBinding {
+            inherited_fd: None,
+            socket_path: Some(self.socket_path.clone()),
+            authentication_digest: self.authentication_digest.clone(),
+            expected_peer_identity: self.expected_peer_identity,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct CageReceiptRuntimePolicy {
@@ -218,6 +258,7 @@ pub(super) struct ProvisionedCagePolicyInput {
     pub(super) policy_signer_public_key: chio_core::PublicKey,
     pub(super) stage: chio_security_types::EnterpriseMigrationStage,
     pub(super) ceilings: ProvisionedCeilings,
+    pub(super) broker: Option<ProvisionedBrokerBinding>,
     pub(super) receipt_capability_id: String,
     pub(super) receipt_tenant_id: Option<String>,
     pub(super) cage_init_path: PathBuf,
@@ -279,13 +320,27 @@ impl ProvisionedCagePolicyFactory {
                     "demo native MCP manifest requires explicit platform permissions".to_string(),
                 )
             })?;
-        if permissions.native_syscall_profile
-            != chio_manifest::NativeSyscallProfile::NativeMinimalV1
+        let expected_profile = if let Some(broker) = &input.broker {
+            broker.validate()?;
+            if input.stage != chio_security_types::EnterpriseMigrationStage::Enforced
+                || !input.ceilings.read_paths.is_empty()
+                || !input.ceilings.write_paths.is_empty()
+                || !input.ceilings.runtime_files.is_empty()
+            {
+                return Err(CliError::cli_other_error(
+                    "brokered provisioning requires Enforced stage without file or runtime-file grants".to_string(),
+                ));
+            }
+            chio_manifest::NativeSyscallProfile::BrokeredNativeV1
+        } else {
+            chio_manifest::NativeSyscallProfile::NativeMinimalV1
+        };
+        if permissions.native_syscall_profile != expected_profile
             || permissions.network_destinations.is_some()
             || permissions.environment_variables.is_some()
         {
             return Err(CliError::cli_other_error(
-                "provisioned native MCP manifest must use the closed native_minimal_v1 profile without network or environment grants"
+                "provisioned native MCP manifest must match its closed launch profile without network or environment grants"
                     .to_string(),
             ));
         }
@@ -396,9 +451,13 @@ impl ProvisionedCagePolicyFactory {
                 write_paths: self.input.ceilings.write_paths.clone(),
                 network_destinations: BTreeSet::new(),
                 environment_variables: BTreeSet::new(),
-                native_syscall_profiles: [chio_manifest::NativeSyscallProfile::NativeMinimalV1]
-                    .into_iter()
-                    .collect(),
+                native_syscall_profiles: [if self.input.broker.is_some() {
+                    chio_manifest::NativeSyscallProfile::BrokeredNativeV1
+                } else {
+                    chio_manifest::NativeSyscallProfile::NativeMinimalV1
+                }]
+                .into_iter()
+                .collect(),
                 forbidden_paths: BTreeSet::new(),
             },
             runtime: CageRuntimePolicy {
@@ -434,7 +493,11 @@ impl ProvisionedCagePolicyFactory {
                 ],
                 minimum_head,
             },
-            broker: None,
+            broker: self
+                .input
+                .broker
+                .as_ref()
+                .map(ProvisionedBrokerBinding::policy_binding),
         })
     }
 }
@@ -1796,6 +1859,33 @@ mod tests {
         )
         .test_unwrap_err();
         assert!(error.to_string().contains("authenticated broker FD"));
+    }
+
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    #[test]
+    fn provisioned_broker_socket_authenticates_live_peer() {
+        let directory = tempfile::tempdir().test_expect("broker directory");
+        let socket_path = directory.path().join("broker.sock");
+        let listener =
+            std::os::unix::net::UnixListener::bind(&socket_path).test_expect("broker listener");
+        let peer = chio_cage::BrokerPeerIdentity::current_process().test_expect("broker peer");
+        let binding = ProvisionedBrokerBinding {
+            socket_path,
+            authentication_digest: "ab".repeat(32),
+            expected_peer_identity: peer,
+        };
+        binding.validate().test_expect("reviewed binding");
+        let retained = retain_policy_broker(binding.policy_binding()).test_expect("live broker");
+        assert_eq!(
+            retained.authentication_digest(),
+            binding.authentication_digest
+        );
+        drop(retained);
+        let mut wrong = binding.clone();
+        wrong.expected_peer_identity.pid += 1;
+        assert!(retain_policy_broker(wrong.policy_binding()).is_err());
+        drop(listener);
+        assert!(retain_policy_broker(binding.policy_binding()).is_err());
     }
 
     #[test]

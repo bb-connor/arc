@@ -189,6 +189,160 @@ fn read_json(path: &Path) -> Value {
     serde_json::from_slice(&std::fs::read(path).expect("read artifact")).expect("artifact JSON")
 }
 
+fn broker_command(fixture: &Fixture, output: &Path, binding: &Path) -> Command {
+    let mut command = Command::new(chio());
+    command
+        .args(["security", "provision-reference-runtime", "--output-dir"])
+        .arg(output)
+        .arg("--cage-init")
+        .arg(&fixture.helper)
+        .arg("--tools-fixture")
+        .arg(&fixture.tools)
+        .arg("--target")
+        .arg(&fixture.target)
+        .arg("--broker-binding")
+        .arg(binding)
+        .args([
+            "--execution-uid",
+            "10001",
+            "--execution-gid",
+            "10001",
+            "--server-id",
+            "brokered-reference-tool",
+        ]);
+    command
+}
+
+fn broker_fixture(fixture: &Fixture) -> (std::os::unix::net::UnixListener, PathBuf, Value) {
+    let socket = fixture.root.path().join("broker.sock");
+    let listener = std::os::unix::net::UnixListener::bind(&socket).expect("broker socket");
+    let binding = json!({
+        "socket_path": socket,
+        "authentication_digest": "ab".repeat(32),
+        "expected_peer_identity": { "pid": std::process::id(), "uid": 10002, "gid": 10002 }
+    });
+    let path = fixture.root.path().join("broker-binding.json");
+    std::fs::write(&path, serde_json::to_vec(&binding).expect("binding JSON"))
+        .expect("write binding");
+    (listener, path, binding)
+}
+
+#[test]
+fn brokered_provisioning_signs_the_exact_connection_and_rejects_rebinding() {
+    let fixture = Fixture::new();
+    let (_listener, binding_path, binding) = broker_fixture(&fixture);
+    let output = fixture.output("brokered");
+    let first = broker_command(&fixture, &output, &binding_path)
+        .output()
+        .expect("provision");
+    assert!(first.status.success(), "{}", stderr(&first));
+    let report = report(&first);
+    assert_eq!(report["broker"], binding);
+    assert_eq!(report["securityMode"], "enforced_cage");
+    let policy_path = output.join("cage-launch-policy.json");
+    let original = std::fs::read(&policy_path).expect("signed policy");
+    let policy = read_json(&policy_path);
+    assert_eq!(policy["body"]["broker"], binding);
+    assert_eq!(
+        policy["body"]["operator_ceilings"]["native_syscall_profiles"],
+        json!(["brokered_native_v1"])
+    );
+    let manifest = read_json(&output.join("signed-manifest.json"));
+    assert_eq!(
+        manifest["manifest"]["required_permissions"]["native_syscall_profile"],
+        "brokered_native_v1"
+    );
+    let same = broker_command(&fixture, &output, &binding_path)
+        .output()
+        .expect("reopen");
+    assert!(same.status.success(), "{}", stderr(&same));
+    for (field, value) in [
+        ("authentication_digest", json!("cd".repeat(32))),
+        (
+            "expected_peer_identity",
+            json!({"pid": std::process::id() + 1, "uid": 10002, "gid": 10002}),
+        ),
+    ] {
+        let mut changed = binding.clone();
+        changed[field] = value;
+        std::fs::write(
+            &binding_path,
+            serde_json::to_vec(&changed).expect("changed binding"),
+        )
+        .expect("write changed binding");
+        let denied = broker_command(&fixture, &output, &binding_path)
+            .output()
+            .expect("rebind");
+        assert!(!denied.status.success(), "accepted changed {field}");
+        assert_eq!(
+            std::fs::read(&policy_path).expect("retained policy"),
+            original
+        );
+    }
+}
+
+#[test]
+fn brokered_provisioning_rejects_legacy_stage_discovery_and_file_grants() {
+    let fixture = Fixture::new();
+    let (_listener, binding, _) = broker_fixture(&fixture);
+    for (index, extra) in [
+        vec!["--stage", "shadow"],
+        vec!["--discover-tools"],
+        vec![
+            "--read-path",
+            fixture.repository.to_str().expect("repository"),
+        ],
+        vec![
+            "--write-path",
+            fixture.repository.to_str().expect("repository"),
+        ],
+        vec!["--runtime-file", fixture.target.to_str().expect("target")],
+    ]
+    .iter()
+    .enumerate()
+    {
+        let output = fixture.output(&format!("denied-{index}"));
+        let denied = broker_command(&fixture, &output, &binding)
+            .args(extra)
+            .output()
+            .expect("deny");
+        assert!(!denied.status.success(), "accepted {extra:?}");
+        assert!(!output.exists());
+    }
+}
+
+#[test]
+fn brokered_provisioning_rejects_malformed_or_non_socket_bindings() {
+    let fixture = Fixture::new();
+    let (_listener, path, binding) = broker_fixture(&fixture);
+    let mut cases = Vec::new();
+    for (field, value) in [
+        ("socket_path", json!(fixture.target)),
+        ("socket_path", json!("relative.sock")),
+        ("authentication_digest", json!("not-a-digest")),
+        (
+            "expected_peer_identity",
+            json!({"pid": 0, "uid": 10002, "gid": 10002}),
+        ),
+        ("inherited_fd", json!(3)),
+        ("extra", json!(true)),
+    ] {
+        let mut changed = binding.clone();
+        changed[field] = value;
+        cases.push(serde_json::to_vec(&changed).expect("invalid binding"));
+    }
+    cases.push(vec![b' '; 16 * 1024 + 1]);
+    for (index, bytes) in cases.iter().enumerate() {
+        std::fs::write(&path, bytes).expect("write invalid binding");
+        let output = fixture.output(&format!("invalid-{index}"));
+        let denied = broker_command(&fixture, &output, &path)
+            .output()
+            .expect("deny");
+        assert!(!denied.status.success(), "accepted invalid case {index}");
+        assert!(!output.exists());
+    }
+}
+
 #[test]
 fn an_explicit_artifact_ceiling_is_signed_and_cannot_change_on_reopen() {
     let fixture = Fixture::new();
