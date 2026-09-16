@@ -42,10 +42,11 @@ imported feeds and the workspace policy.
 
 ## Updating upstream feeds
 
-Locally maintained forks `enumflags2_derive`, `crmf` and `sigstore-verify` have explicit
+Locally maintained forks `enumflags2_derive`, `crmf`, `cmpv2`, `seccompiler` and
+`sigstore-verify` have explicit
 `audit-as-crates-io = false` ownership entries. Their modified sources are
 reviewed and tested in `third_party/enumflags2-derive-chio`,
-`third_party/crmf-chio` and
+`third_party/crmf-chio`, `third_party/cmpv2-chio`, `third_party/seccompiler-chio` and
 `third_party/sigstore-verify-chio`, with provenance beside each fork. Applying a
 registry certificate to those different bytes would misstate its scope. Their
 registry dependencies remain subject to the normal deployment-audit policy.

@@ -18,6 +18,7 @@ make_fixture() {
     "$root/crates/security/chio-cage/scripts" \
     "$root/crates/security/chio-cage/tests"
   cp "$REPO_ROOT/NOTICE" "$root/"
+  cp "$REPO_ROOT/Cargo.toml" "$root/"
   cp "$REPO_ROOT/third_party/provenance/linux-enforcement-stack.toml" \
     "$root/third_party/provenance/"
   cp \
@@ -28,6 +29,7 @@ make_fixture() {
     "$root/third_party/nono-chio/"
   cp "$REPO_ROOT/third_party/nono-chio/src/lib.rs" \
     "$root/third_party/nono-chio/src/"
+  cp -R "$REPO_ROOT/third_party/seccompiler-chio" "$root/third_party/"
   cp "$REPO_ROOT/crates/security/chio-cage/Cargo.toml" \
     "$root/crates/security/chio-cage/"
   cp "$REPO_ROOT/crates/security/chio-cage/src/lib.rs" \
@@ -79,6 +81,18 @@ cp -R "$valid" "$tampered_wrapper"
 printf '\n// provenance tamper\n' >>"$tampered_wrapper/third_party/nono-chio/src/lib.rs"
 test "$(run_checker "$tampered_wrapper" "$work/tampered.out" "$work/tampered.err")" = 1
 grep -F 'nono-chio wrapper source digest does not match provenance' "$work/tampered.err" >/dev/null
+
+tampered_seccompiler="$work/tampered-seccompiler"
+cp -R "$valid" "$tampered_seccompiler"
+printf '\n// provenance tamper\n' >>"$tampered_seccompiler/third_party/seccompiler-chio/src/lib.rs"
+test "$(run_checker "$tampered_seccompiler" "$work/tampered-seccompiler.out" "$work/tampered-seccompiler.err")" = 1
+grep -F 'seccompiler fork source digest does not match provenance' "$work/tampered-seccompiler.err" >/dev/null
+
+registry_seccompiler="$work/registry-seccompiler"
+cp -R "$valid" "$registry_seccompiler"
+python3 -c 'from pathlib import Path; p=Path("'$registry_seccompiler'/Cargo.toml"); s=p.read_text(); p.write_text(s.replace("seccompiler = { path = \"third_party/seccompiler-chio\" }", "seccompiler = \"=0.5.0\"", 1))'
+test "$(run_checker "$registry_seccompiler" "$work/registry-seccompiler.out" "$work/registry-seccompiler.err")" = 1
+grep -F 'workspace must select the reviewed local seccompiler fork' "$work/registry-seccompiler.err" >/dev/null
 
 missing_notice="$work/missing-notice"
 cp -R "$valid" "$missing_notice"

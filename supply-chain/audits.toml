@@ -793,6 +793,12 @@ criteria = "safe-to-deploy"
 version = "0.3.91"
 notes = "Exemption chase-down certification. Reviewed current workspace dependency role and removed the matching audit-this-later exemption row."
 
+[[audits.landlock]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.4.4"
+notes = "Reviewed checksum-verified manifest and complete production source: access masks, compatibility state, ruleset lifecycle, filesystem and TCP rules, scope restrictions, syscalls, prctl, fstat, packed ABI layouts and descriptor ownership. All 52 unit and 12 documentation tests pass on Linux x86_64 with the selected derive repair; the first-party cage gate passes 69 tests, 26 kernel outcomes and 10 mutations. Best-effort defaults and path helper omissions require caller validation; Chio requires full enforcement. Details: supply-chain/reviews/landlock-0.4.4.md."
+
 [[audits.leb128]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
@@ -1566,6 +1572,12 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "0.16.0"
 notes = "cargo-vet drift closure. Reviewed for current workspace use and required cargo-vet criterion; deeper supplier evidence remains tracked separately."
+
+[[audits.x509-tsp]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "Reviewed checksum-verified manifest and all production source. Pure DER data model with no unsafe code, build script, IO, process execution or cryptographic implementation. Request and OpenSSL response fixtures decode on the selected repaired cmpv2 graph; the sole upstream test mismatch is x509-cert display formatting after successful field checks. RFC semantic and cryptographic verification remain caller responsibilities. Details: supply-chain/reviews/x509-tsp-0.1.0.md."
 
 [[audits.zed_extension_api]]
 who = "Chio supply-chain reviewer"

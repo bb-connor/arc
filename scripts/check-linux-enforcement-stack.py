@@ -55,6 +55,10 @@ PATCH_CHANGES = {
     "grant directory listing without granting descendant file reads",
     "handle every filesystem and network right known to the detected ABI",
 }
+SECCOMPILER_PATCH_CHANGES = {
+    "reject unrepresentable sock_fprog lengths before changing process state",
+    "cover calling-thread and all-thread installation APIs",
+}
 
 
 def load_toml(path: Path) -> dict:
@@ -171,6 +175,28 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def seccompiler_source_sha256(root: Path) -> str:
+    package = root / "third_party/seccompiler-chio"
+    paths = [
+        package / "Cargo.toml",
+        package / "Cargo.toml.orig",
+        package / "CHIO-PATCH.md",
+        package / "LICENSE-APACHE",
+        package / "LICENSE-BSD-3-Clause",
+        *package.glob("src/**/*.rs"),
+        *package.glob("tests/**/*.rs"),
+    ]
+    digest = hashlib.sha256()
+    for path in sorted(paths):
+        relative = path.relative_to(package).as_posix().encode()
+        contents = path.read_bytes()
+        digest.update(len(relative).to_bytes(8, "big"))
+        digest.update(relative)
+        digest.update(len(contents).to_bytes(8, "big"))
+        digest.update(contents)
+    return digest.hexdigest()
+
+
 def validate_record(data: dict) -> list[str]:
     errors = []
     if data.get("schema") != "chio.linux-enforcement-stack.v1":
@@ -222,13 +248,34 @@ def validate_record(data: dict) -> list[str]:
             errors.append("production seccomp must default to kill_process")
         if seccompiler.get("independent_from_nono_notify") is not True:
             errors.append("seccomp allowlisting must be independent from nono notification")
+        if seccompiler.get("patch_required") is not True:
+            errors.append("the reviewed seccompiler release requires a documented patch")
+        patch = seccompiler.get("patch")
+        if not isinstance(patch, dict):
+            errors.append("the required seccompiler fork patch record is missing")
+        else:
+            if (
+                patch.get("directory") != "third_party/seccompiler-chio"
+                or patch.get("kind") != "fork"
+                or patch.get("package_name") != "seccompiler"
+                or patch.get("version") != "0.5.0"
+                or patch.get("status") != "required"
+            ):
+                errors.append("the seccompiler fork patch identity is invalid")
+            if set(patch.get("changes", [])) != SECCOMPILER_PATCH_CHANGES:
+                errors.append("the seccompiler fork patch inventory is incomplete")
+            digest = patch.get("source_sha256")
+            if not isinstance(digest, str) or len(digest) != 64:
+                errors.append("the seccompiler fork source digest is invalid")
     return errors
 
 
 def validate_manifests(root: Path, errors: list[str]) -> None:
     try:
+        workspace = load_toml(root / "Cargo.toml")
         cage = load_toml(root / "crates/security/chio-cage/Cargo.toml")
         wrapper = load_toml(root / "third_party/nono-chio/Cargo.toml")
+        seccompiler_fork = load_toml(root / "third_party/seccompiler-chio/Cargo.toml")
     except (OSError, ValueError, tomllib.TOMLDecodeError) as error:
         errors.append(str(error))
         return
@@ -243,6 +290,12 @@ def validate_manifests(root: Path, errors: list[str]) -> None:
         errors.append("chio-cage must depend on the reviewed local nono-chio wrapper")
     if linux.get("seccompiler") != "=0.5.0":
         errors.append("chio-cage seccompiler dependency must be pinned to =0.5.0")
+    seccompiler_patch = workspace.get("patch", {}).get("crates-io", {}).get("seccompiler")
+    if (
+        not isinstance(seccompiler_patch, dict)
+        or seccompiler_patch.get("path") != "third_party/seccompiler-chio"
+    ):
+        errors.append("workspace must select the reviewed local seccompiler fork")
     if cage.get("features", {}).get("enforcement-mutants") != []:
         errors.append("the test-only enforcement-mutants feature is missing")
 
@@ -255,6 +308,13 @@ def validate_manifests(root: Path, errors: list[str]) -> None:
         errors.append("nono-chio must pin nono =0.53.0 with default features disabled")
     if dependencies.get("landlock") != "=0.4.4":
         errors.append("nono-chio must pin landlock =0.4.4")
+    seccompiler_package = seccompiler_fork.get("package", {})
+    if (
+        seccompiler_package.get("name") != "seccompiler"
+        or seccompiler_package.get("version") != "0.5.0"
+        or seccompiler_package.get("publish") is not False
+    ):
+        errors.append("seccompiler fork package identity is invalid")
 
 
 def validate_sources(root: Path, data: dict, errors: list[str]) -> None:
@@ -303,6 +363,66 @@ def validate_sources(root: Path, data: dict, errors: list[str]) -> None:
             errors.append(f"repository NOTICE is missing nono attribution: {required}")
     if "caller-owned" not in wrapper_readme or "FullyEnforced" not in wrapper_readme:
         errors.append("nono-chio README does not state the reviewed enforcement contract")
+
+    seccompiler_root = root / "third_party/seccompiler-chio"
+    seccompiler_source = read_text(
+        seccompiler_root / "src/lib.rs",
+        errors,
+        "seccompiler fork library",
+    )
+    seccompiler_tests = read_text(
+        seccompiler_root / "tests/integration_tests.rs",
+        errors,
+        "seccompiler fork integration tests",
+    )
+    seccompiler_patch = read_text(
+        seccompiler_root / "CHIO-PATCH.md",
+        errors,
+        "seccompiler patch inventory",
+    )
+    read_text(
+        seccompiler_root / "LICENSE-APACHE",
+        errors,
+        "seccompiler Apache license",
+    )
+    read_text(
+        seccompiler_root / "LICENSE-BSD-3-Clause",
+        errors,
+        "seccompiler BSD license",
+    )
+    expected_digest = data.get("seccompiler", {}).get("patch", {}).get("source_sha256")
+    try:
+        actual_digest = seccompiler_source_sha256(root)
+    except OSError as error:
+        errors.append(f"cannot hash seccompiler fork source: {error}")
+    else:
+        if expected_digest != actual_digest:
+            errors.append("seccompiler fork source digest does not match provenance")
+    for required in [
+        ".try_into()",
+        "BackendError::FilterTooLarge(bpf_filter.len())",
+        "len: filter_len",
+    ]:
+        if required not in seccompiler_source:
+            errors.append(f"seccompiler fork is missing required repair token: {required}")
+    if "len: bpf_filter.len() as u16" in seccompiler_source:
+        errors.append("seccompiler fork retains the truncating filter length conversion")
+    for required in [
+        "apply_filter_all_threads",
+        "usize::from(u16::MAX) + 2",
+        "Error::Backend(BackendError::FilterTooLarge(actual))",
+        "libc::PR_GET_SECCOMP",
+    ]:
+        if required not in seccompiler_tests:
+            errors.append(f"seccompiler tests are missing required coverage: {required}")
+    for required in [
+        SECCOMPILER_PIN["commit"],
+        SECCOMPILER_PIN["checksum"],
+        "try_into()",
+        "65,537",
+    ]:
+        if required not in seccompiler_patch:
+            errors.append(f"seccompiler patch inventory is missing attribution: {required}")
 
     linux_source = read_linux_launcher(root, errors)
     for required in [
@@ -424,13 +544,20 @@ def validate_lock(root: Path, errors: list[str]) -> None:
     except (OSError, ValueError, tomllib.TOMLDecodeError) as error:
         errors.append(str(error))
         return
-    for pin in [NONO_PIN, LANDLOCK_PIN, SECCOMPILER_PIN]:
+    for pin in [NONO_PIN, LANDLOCK_PIN]:
         package = find_locked_package(lock, pin["name"], pin["version"])
         if package is None or package.get("source") != pin["source"] or package.get("checksum") != pin["checksum"]:
             errors.append(f"Cargo.lock does not contain the reviewed {pin['name']} pin")
     wrapper = find_locked_package(lock, "nono-chio", "0.53.0-chio.2")
     if wrapper is None or wrapper.get("source") is not None:
         errors.append("Cargo.lock does not contain the local nono-chio wrapper")
+    seccompiler = find_locked_package(lock, "seccompiler", "0.5.0")
+    if (
+        seccompiler is None
+        or seccompiler.get("source") is not None
+        or seccompiler.get("checksum") is not None
+    ):
+        errors.append("Cargo.lock does not contain the local seccompiler fork")
 
 
 def validate(root: Path, data: dict, require_lock: bool) -> list[str]:

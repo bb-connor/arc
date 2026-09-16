@@ -397,10 +397,16 @@ audit-as-crates-io = true
 [policy.chio-workflow-preflight]
 audit-as-crates-io = true
 
+[policy.cmpv2]
+audit-as-crates-io = false
+
 [policy.crmf]
 audit-as-crates-io = false
 
 [policy.enumflags2_derive]
+audit-as-crates-io = false
+
+[policy.seccompiler]
 audit-as-crates-io = false
 
 [policy.sigstore-verify]

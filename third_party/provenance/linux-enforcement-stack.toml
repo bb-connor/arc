@@ -50,3 +50,13 @@ checksum = "a4ae55de56877481d112a559bbc12667635fdaf5e005712fd4e2b2fa50ffc884"
 license = "Apache-2.0 OR BSD-3-Clause"
 production_default_action = "kill_process"
 independent_from_nono_notify = true
+patch_required = true
+
+[seccompiler.patch]
+directory = "third_party/seccompiler-chio"
+kind = "fork"
+package_name = "seccompiler"
+version = "0.5.0"
+status = "required"
+source_sha256 = "69147fcf0ec055702f6b3fb49825ab51fa0f2007cf3a19d6e86b4bd5d5f6486a"
+changes = ["reject unrepresentable sock_fprog lengths before changing process state", "cover calling-thread and all-thread installation APIs"]
