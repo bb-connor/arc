@@ -70,6 +70,21 @@ worker error frames, and requires an explicit deliberate-crash marker after
 Alice's retained checkpoint. All 12 worker-protocol cases, strict all-target
 CLI/process Clippy, format and source hygiene pass on macOS at that source
 (`macos-m5-e42e0ed41/`). Its x86 CLI and static tools cross-build successfully.
+The diagnostic authority run at that source fails before the deliberate crash:
+the trusted host records `receipt persistence failed: sqlite receipt commit
+write timed out after 5000ms`. Bob's first worker reaches the allowed call before
+its lifetime expires; subsequent worker authentication/transport errors follow
+restart, and the runner exhausts its attempt budget. The terminal exit is one.
+Host and worker logs are retained in
+`linux-x86-adversarial-e42e0ed41/runtime-diagnostics/`. This establishes the
+receipt writer deadline failure, not its performance cause. A build using the
+existing `docker-release` profile is running at the same Rust source, with no
+request, receipt or scenario deadline changes.
+
+`445c3d313` streams qualification command output to retained files and records
+partial diagnostics when a command times out. Actual subprocess checks cover
+success, nonzero exit and timeout; the production command deadline remains
+600 seconds (`qualification-streaming-regression-retry1.log`).
 
 The host-crash qualifier at `97bdb43c2` observes one actual Enforced append,
 kills the host before any outcome is returned, and recovers the original request
@@ -83,10 +98,21 @@ retained in `orphaned-target-observation.json` in the same folder.
 `4e7c0055d` arms a kernel parent-death `SIGKILL` after the helper's final
 credential change and verifies that the authenticated parent still exists.
 The strengthened host-crash qualifier pins both actual targets with pidfds and
-requires them to terminate after host death. Cross-build passes; the new runtime
-host-crash/revocation queue is running. The complete cage gate must also be
-rerun for this helper. The older complete 69-case/ten-mutant cage pass remains
-bounded to `bcf81182a`.
+requires them to terminate after host death. Cross-build passes. Both targets
+terminate within the existing five-second assertion in the fresh runtime run,
+and the effect remains exactly one append. The full scenario nevertheless fails:
+the writer completes on attempt three instead of the required attempt two after
+a generic runtime error on the first recovery attempt. Revocation does not run
+behind that failed gate. `linux-x86-adversarial-4e7c0055d/` retains this failure;
+its `host-death.json` remains in the VM scenario directory. No complete
+host-crash pass is claimed for this source.
+
+`221c3c19d` adds a bounded launch-thread lifetime regression to the existing
+real-kernel lifecycle case. A target handle moved to another thread must still
+observe `SIGKILL` after the original launching thread exits. Formatting and the
+69-case source inventory pass. The full real-Linux cage gate is running at that
+source (`linux-x86-221c3c19d/`); the older complete 69-case/ten-mutant cage pass
+remains bounded to `bcf81182a` until a new terminal result exists.
 
 The source review found a reproducible custom-default invariant failure in
 `enumflags2`/`enumflags2_derive` 0.7.12. Exact hashes, safe reproduction and the
@@ -94,7 +120,15 @@ current native Landlock reachability analysis are recorded in
 [the audit finding](../../supply-chain/reviews/enumflags2-0.7.12.md).
 No certification has been added for either crate.
 
-The current implementation is `e42e0ed41` in `/tmp/arc-m5-evidence`. The full
+Two idle build caches were relocated to the VM's existing writable host mount
+after checking Cargo ownership and verifying complete file hashes, modes and
+symlinks before and after copying. Their original guest paths remain symlinks
+to the verified copies. `native-m5-cache-relocation.json` and
+`cross-x86-debug-cache-relocation.json` retain the inventories. Active targets,
+VMs, source and qualification artifacts were preserved; these cache directories
+are regenerable build storage, not qualification results.
+
+The current implementation is `445c3d313` in `/tmp/arc-m5-evidence`. The full
 scenario artifact, genuine over-budget contention case, repaired authority
 scenario and the remaining foundation gates are open. Existing fixed fan-out
 preallocates one unit per task and rejects a graph larger than its family quota;
