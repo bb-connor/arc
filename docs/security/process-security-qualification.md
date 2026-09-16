@@ -39,10 +39,28 @@ family invocations survive host death and restart without extra effects. The
 single-graph compatibility case and strict CLI all-target Clippy pass. The first
 new integration attempt failed because its recovery fixture reused an existing
 credential output filename; the corrected run is retained separately in
-`swarm-shared-family-plan/`. Linux and actual Enforced contention qualification
-remain pending. The new Enforced qualifier is designed to observe quota denials
+`swarm-shared-family-plan/`. Both live swarm tests and strict CLI all-target
+Clippy also pass on Linux/aarch64 at `f612cb257874bb9df83015f6f987a82faff983ff`,
+retained in `linux-m5-f612cb257/`. Its optimized x86 CLI build is active;
+actual Enforced contention qualification remains pending. The new qualifier is
+designed to observe quota denials
 while two admitted tools are still executing, then recover their uncertain
 outcomes without repeating either effect. Its existence is not a passing run.
+
+The retained host-crash result exposes an artifact distinction: the signed
+unknown-outcome receipt observes the replacement connection opened during
+recovery. Its `native_launch` reference is not the original target's launch.
+At qualifier source `0927874c0c142d40caa26eeceb2d3294d26c3a60`, crash and contention
+fixtures retain the original enforcement receipts by matching their signed
+process IDs to the actual targets pinned before host death. They independently
+verify receipt signatures after the crash. A retrospective readback of the
+existing passing host-crash run verifies both original launch signatures and
+confirms that the writer's original and recovery launch identities differ.
+`original-launch-readback-e42e0ed41/` retains that result. It is not a new live
+capture. PID linkage and death remain external observations, and no missing
+terminal receipt is fabricated. The complete scenario verifier must preserve
+these distinct claims instead of treating recovery launch evidence as proof of
+the earlier effect's execution.
 
 The unmodified `docker-release` CLI build passes at Rust source
 `e42e0ed41656e345438664a3d382727f454296f9`, with executable SHA-256
