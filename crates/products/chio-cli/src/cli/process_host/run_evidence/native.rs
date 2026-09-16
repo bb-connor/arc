@@ -108,16 +108,16 @@ pub(super) fn verify(
 }
 
 #[cfg(target_os = "linux")]
+pub(super) struct ExportedLaunches {
+    pub(super) confinement: BTreeMap<String, crate::mcp_cli::NativeLaunchEvidence>,
+    pub(super) pins: BTreeMap<String, PublicKey>,
+}
+
+#[cfg(target_os = "linux")]
 pub(super) fn export(
     config: &super::super::state::Config,
     results: &BTreeMap<String, CompletedCall>,
-) -> Result<
-    (
-        BTreeMap<String, crate::mcp_cli::NativeLaunchEvidence>,
-        BTreeMap<String, PublicKey>,
-    ),
-    CliError,
-> {
+) -> Result<ExportedLaunches, CliError> {
     let mut references = BTreeMap::<String, BTreeSet<String>>::new();
     for call in results.values() {
         let receipt: ChioReceipt = serde_json::from_str(
@@ -166,5 +166,5 @@ pub(super) fn export(
         }
         pins.insert(server_id, key);
     }
-    Ok((launches, pins))
+    Ok(ExportedLaunches { confinement: launches, pins })
 }
