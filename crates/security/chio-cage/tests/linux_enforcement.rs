@@ -876,6 +876,36 @@ fn pidfd_forwards_an_allowed_termination_signal() {
     assert!(elapsed >= Duration::from_secs(1));
     assert!(elapsed < Duration::from_secs(10));
     assert!(!Path::new(&format!("/proc/{process_id}")).exists());
+
+    // Linux binds the parent-death signal to the thread that created the
+    // target. Moving its handle to a surviving thread must not detach that
+    // lifetime requirement. No explicit signal or handle drop ends this target.
+    let mut child = std::thread::spawn(|| {
+        launch(
+            compiled(&required_path("CHIO_CAGE_TEST_WAIT")),
+            CageLaunchOptions::default(),
+        )
+        .test_unwrap()
+    })
+    .join()
+    .test_unwrap();
+    let process_id = child.process_id();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let record = loop {
+        if let Some(record) = child.try_wait().test_unwrap() {
+            break record;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "target survived its launch thread"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    assert_eq!(
+        record.exit.as_ref().and_then(|exit| exit.signal),
+        Some(libc::SIGKILL)
+    );
+    assert!(!Path::new(&format!("/proc/{process_id}")).exists());
 }
 
 #[test]
