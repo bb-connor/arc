@@ -19,6 +19,48 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 #### Current local evidence (2026-09-15, continued September 16 UTC)
 
+At `48c7b83148262ed83a415fc54dbed01ac21da54d`, the new Linux supervised-outcomes
+integration test passes: four actual supervised workers across two issued graphs
+retain two completed calls and two compensated calls, with exactly two mailbox
+writes and captured family invocations. Offline outcome verification rejects 13
+re-signed substitutions across usage, graph inventory, worker identity, runner
+input and observation time, plus a wrong runtime pin. `process attest-outcomes`
+reads the existing stopped-host journal, fenced call state and budget authority
+under one host lease. `process verify-outcomes` checks their combined public
+artifact. It retains the original live graph authorities without inventing
+successful joins or graph completion. Confinement and external-effect evidence
+remain separate. `linux-outcomes-48c7b8314/` retains this passing test and the
+continuing regression queue. The first Linux build failed at an ambiguous module
+import, retained in `linux-outcomes-95b11b74a/`; the import was qualified explicitly.
+
+The network scenario exposed a second genuine uncertain-call representation.
+Its original signed receipt is `Incomplete`, has no admission projection, and
+contains the original retained continuation reference. The later host-crash
+recovery refusal instead has a signed unknown-state projection and no original
+call reference. `411b553908e6c2b640a7aeedee7a4856fbfe72da` verifies both while
+requiring an exact matching commitment whenever the original receipt supplies
+one. The first network export refusal remains in
+`call-observation-network-cb5a34e72-5d71ef11e/`. Actual network and revocation
+readback now pass; separate macOS verification passes their four calls and
+rejects 16 wrong-key, wrong-runtime, wrong-context and unsigned-edit cases.
+`call-observation-{network,revocation}-offline-411b55390/` retains those results.
+The verifier SHA-256 is
+`16fcc074c0e694083f1a20a052bfb5f8062ce7a9aadae3ef8d32889e7a247d57`.
+Both real public uncertain-call fixtures and strict CLI all-target Clippy pass
+on macOS at `48c7b8314`. Linux at `411b55390` also passes the earlier uncertain
+regression, live allowed/compensated call integration and strict CLI Clippy.
+
+The current optimized reference, authority and filesystem completion artifacts
+pass independent macOS verification at `5d71ef11e`; commands and externally
+retained operator pins are in `offline-verification-docker-release-cb5a34e72/`.
+The filesystem copy driver initially selected the wrong retained artifact path;
+its failed copy is preserved and `filesystem-retry1/` contains the original
+public artifact copied from the guest's evidence directory. Both original
+launches from the current host-crash run also pass offline semantic verification
+at `411b55390`, retained in `original-launches-host-crash-cb5a34e72/`. These are
+readbacks of the recorded runtime, not new runtime execution or a designated
+platform qualification.
+
 The unchanged optimized CLI at
 `cb5a34e722b52c794f2aaf84fbcb02a40bac3f03` now passes all seven local x86_64
 scenarios: reference fan-out, authority, revocation, filesystem, network, host
