@@ -493,6 +493,12 @@ criteria = "safe-to-deploy"
 version = "0.4.44"
 notes = "Top-centrality certification seed. Reviewed for dependency role, declared build behavior, and no new trust-boundary expansion."
 
+[[audits.cms]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.2.3"
+notes = "Reviewed checksum-verified manifests, all production modules including the optional builder, and upstream tests. DER data model forbids unsafe code and has no build script or IO. All 26 upstream tests and strict all-feature Clippy pass with unchanged production/test bytes. Audit discretion: optional builder has collection panics, an explicit content-type check limitation and incomplete key cleanup on errors; Chio does not enable it. Parsing does not authenticate CMS content or enforce full RFC semantics. Details: supply-chain/reviews/cms-0.2.3.md."
+
 [[audits.coset]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
