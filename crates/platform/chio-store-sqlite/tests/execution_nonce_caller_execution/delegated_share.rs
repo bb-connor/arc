@@ -257,7 +257,8 @@ fn caller_share_snapshot_is_complete_scoped_and_fenced() -> TestResult {
         .is_err());
     let stale = store
         .load_caller_budget_shares(&parent, 1, &fence, now.saturating_sub(1_000))
-        .expect_err("an earlier physical timestamp must remain refused");
+        .err()
+        .ok_or("an earlier physical timestamp must remain refused")?;
     assert!(stale
         .to_string()
         .contains("trusted operation time regressed"));
