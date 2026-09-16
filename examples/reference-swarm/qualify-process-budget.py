@@ -10,6 +10,7 @@ import signal
 import sqlite3
 import subprocess
 import time
+from contextlib import closing
 from pathlib import Path
 
 from process_qualification import Harness, write
@@ -75,7 +76,9 @@ def main():
                 assert host.poll() is None, "host exited before contention was observed"
                 written = [name for name, path in effects.items() if path.read_bytes()]
                 assert len(written) <= 2, "family quota allowed more than two effects"
-                with sqlite3.connect(f"file:{harness.state / 'process.db'}?mode=ro", uri=True) as db:
+                with closing(sqlite3.connect(
+                    f"file:{harness.state / 'process.db'}?mode=ro", uri=True
+                )) as db:
                     checkpoints = {
                         name: json.loads(raw) for name, raw in db.execute(
                             "SELECT id, checkpoint FROM processes WHERE id != 'root'"
@@ -96,7 +99,12 @@ def main():
             # Both admitted tools are still inside append_and_wait, which never
             # returns. The other two workers already retained quota denials.
             # This proves overlap rather than only sequential quota exhaustion.
-            with sqlite3.connect(f"file:{harness.state / 'authority.db'}?mode=ro", uri=True) as db:
+            # SQLite's connection context commits or rolls back but does not
+            # close the reader. A live observer would prevent WAL removal when
+            # the host's last writer exits during the recovery check below.
+            with closing(sqlite3.connect(
+                f"file:{harness.state / 'authority.db'}?mode=ro", uri=True
+            )) as db:
                 live_quota = db.execute(
                     "SELECT max_invocations, reserved_invocations, captured_invocations "
                     "FROM budget_invocation_quotas WHERE profile='chio.aggregate-family-invocation.v1'"
@@ -172,7 +180,7 @@ def main():
         assert path.read_bytes() == (b"" if name in before_crash else b"probe-effect\n")
     database = harness.state / "authority.db"
     assert not Path(str(database) + "-wal").exists()
-    with sqlite3.connect(f"file:{database}?mode=ro&immutable=1", uri=True) as db:
+    with closing(sqlite3.connect(f"file:{database}?mode=ro&immutable=1", uri=True)) as db:
         quotas = db.execute(
             "SELECT max_invocations, reserved_invocations, captured_invocations "
             "FROM budget_invocation_quotas WHERE profile='chio.aggregate-family-invocation.v1'"
