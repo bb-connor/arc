@@ -705,6 +705,7 @@ run_exact_target --label "durable release output binding" --allow-filtered --exp
 
 run_exact_target --label "frozen dispatch participant context" --allow-filtered --expected \
   kernel::admission_coordinator::return_context::caller::tests::caller_observation_metadata_cannot_be_injected_before_dispatch \
+  kernel::admission_coordinator::return_context::caller::tests::custody::caller_custody_rejects_each_selected_family_without_its_physical_ledger \
   kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_custody_requires_explicit_absence_and_rejects_unowned_claims \
   kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_v3_remains_readable_but_cannot_acquire_custody_on_reissue \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_keeps_frozen_facts_without_credentials_or_return_observations \

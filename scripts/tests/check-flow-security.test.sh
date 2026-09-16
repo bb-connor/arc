@@ -87,7 +87,7 @@ def parse(source: str) -> dict[str, tuple[bool, list[str], list[str]]]:
 expected_counts = {
     "live admission ownership": 5,
     "frozen federation context": 13,
-    "frozen dispatch participant context": 30,
+    "frozen dispatch participant context": 31,
     "durable caller participant persistence": 3,
     "native compiled catalog identity": 2,
     "native post-join policy": 133,
