@@ -19,13 +19,41 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 #### Current local evidence (2026-09-15, continued September 16 UTC)
 
+The fresh seven-scenario matrix completes on Linux/x86_64 at 09:28 UTC on
+September 16. Runtime `2d4b28da06ae06b0040acc67fadb141a2b6c9c89`, built with
+the unchanged `docker-release` profile, runs the qualifier at
+`167a17110931d0cf83e6dfe48928057e99fc1827` with the retained static tools at
+`e42e0ed41656e345438664a3d382727f454296f9`. Reference execution, authority,
+revocation, filesystem, network, host-crash and shared-budget scenarios all
+pass. The 1,789,290-byte bundle covers 17 worker outcomes and has SHA-256
+`e4aa37f0d2b86d5da96bb5112e2cd32dc8555e36f853f1f0a31b86fa7e6c2658`.
+Both its Linux verifier and the separately built macOS observer at `1ae9f9dda`
+accept it and reject all 15 evidence substitutions. Exact commands, source and
+binary identities, separately retained pins and results are in
+`linux-x86-complete-matrix-167a17110/` and
+`matrix-independent-macos-167a17110/`.
+
+The first launcher attempt stopped before any scenario or process pause because
+its preflight recognized `cargo build` but not a `cargo test` still compiling
+dependencies. `linux-x86-complete-matrix-167a17110-preflight1/` retains that
+failure. The retry verifies that a compiler is present and no test executable
+is running, then pauses only that compilation group for the timed scenarios.
+The group resumed after the matrix. No runtime deadline, enforcement condition
+or scenario assertion changed. This is fresh local evidence; combined-foundation,
+full cage and designated-runner qualification remain open. The verifier still
+does not establish execution nonces or receipt-log inclusion, and its
+`m5_acceptance_complete` remains false.
+
 At `10c3995ee4aab5c0dbbed707af2b4d9be43d3176`, reference-runtime provisioning
 can sign an operator-reviewed broker socket, authentication digest and peer
 identity into an Enforced `brokered_native_v1` launch. Ten reference-provision
 tests, ten existing demo-provision tests and strict CLI all-target Clippy pass
 on macOS in `macos-broker-provision-10c3995ee/`. The new cases check exact reopen,
 identity/digest substitution, malformed/non-socket input and refusal of Shadow,
-discovery and file grants. Live Linux peer authentication is queued separately.
+discovery and file grants. The exact live-peer test also passes on Linux/x86_64:
+the pinned peer is accepted, a different PID and a closed endpoint refuse.
+`linux-x86-broker-peer-test-10c3995ee/` retains the one-test inventory, terminal
+result and executable hash; the cross-compiled test build also passes.
 This is launch-material composition, not M6 acceptance: the production broker
 authority adapter, supplemental verifier installation, original composite hold
 and keyring/broker/cage receipt join remain unqualified. Existing native outcome
@@ -77,9 +105,9 @@ substitutions, missing and extra pins, and preservation of unknown exits.
 Strict CLI all-target Clippy also passes. The new
 `qualify-process-matrix.py run` entry point composes all seven unchanged local
 scenarios and exports the portable bundle; `verify` and `test-evidence` allow
-independent checks. Its fresh end-to-end execution is pending the optimized
-CLI build. Combined-foundation, full cage inventory and designated-platform
-qualification remain open, so M5 is not marked accepted.
+independent checks. Its fresh end-to-end execution now passes as recorded above.
+Combined-foundation, full cage inventory and designated-platform qualification
+remain open, so M5 is not marked accepted.
 
 At `1ae9f9ddac749d71f27c9c7f62c49c519a53c7b3`, worker-outcomes version 2
 joins each MCP response to its original signed native launch reference. It

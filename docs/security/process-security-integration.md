@@ -380,20 +380,29 @@ runtime authority stores, independent evidence verification and the authorized
 M5 qualification operation. This task retains every requirement of M5 in
 `launch-execution-plan.md`; it is not replaced by the process demos.
 
-- [ ] Bind actual persistent process capabilities and authenticated workers into
+- [x] Bind actual persistent process capabilities and authenticated workers into
   the signed task graph. Install verifier-owned live swarm/runtime authority and
   require swarm admission on the selected edges.
-- [ ] Use the real durable aggregate budget and single-use continuation custody.
+- [x] Use the real durable aggregate budget and single-use continuation custody.
   The process journal's logical-call ceiling remains a separate upper bound.
-- [ ] Launch real Enforced tools with signed manifests and trusted evidence;
+- [x] Launch real Enforced tools with signed manifests and trusted evidence;
   preserve the existing Disabled integration smoke under its honest name.
-- [ ] Execute success, scope widening, forbidden filesystem/network, cross-agent
+- [x] Execute success, scope widening, forbidden filesystem/network, cross-agent
   leakage, shared-budget contention, continuation replay, crash/restart and
   revocation with both caller-output and external-effect assertions.
 - [ ] Independently verify one exact-run artifact joining capabilities, workers,
   graph, receipts, accounting, confinement and terminal outcomes. Only that
   complete result closes M5. Any unavailable required authorization or platform
   remains explicit and does not relax the milestone.
+
+The checked items have fresh local runtime evidence from September 16 at
+`2d4b28da06ae06b0040acc67fadb141a2b6c9c89`, with qualifier `167a17110`.
+All seven scenarios pass, and a separate macOS observer verifies the joined
+artifact and rejects 15 substitutions. The final checkbox remains open because
+combined-foundation, full cage and designated-runner qualification are still
+required. See the [current evidence](process-security-qualification.md#current-local-evidence-2026-09-15-continued-september-16-utc)
+for exact identities, retained failures and claim limits. The subtask breakdown
+below preserves the original implementation requirements.
 
 ### M5.1: Carry governed task context through authenticated workers
 
