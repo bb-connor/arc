@@ -114,7 +114,29 @@ the exact published library, a manifest-only workspace/patch override, and
 first invocation failed because Cargo does not allow selecting dependency
 features from outside its workspace; that command failure is retained separately.
 The published archive does not contain the complete upstream repository test
-suite, so this result does not cover that missing inventory.
+suite, so that result alone does not cover the repository inventory.
+
+### Upstream repository comparison
+
+The exact release commit `332c37f47577e5f6b7104419da7e761963032086` was then
+fetched from the declared upstream repository. Every published Rust source file
+matches that commit byte-for-byte. The repository suite ran first unchanged,
+then with only the reviewed derive repair, using the same generated lockfile
+(`ec913e3f7519c2f5b0c6a6295241cf90ceeea0de37789fb018d362a34628a233`).
+Both runs used Rust 1.94.1 with `--workspace --all-features --no-fail-fast`.
+
+Both runs pass 89 non-UI tests, retain two existing ignored documentation
+examples, and fail the UI target on the same five diagnostic snapshots out of
+14 cases. The complete UI diagnostic output is byte-identical between baseline
+and repair. The mismatches involve diagnostic spans/help text in
+`multiple_bits`, `multiple_bits_deferred`, `shift_out_of_range`,
+`zero_disciminant` and `zero_discriminant_deferred`; they are not new acceptance
+of invalid flags. The upstream release's CI runs these snapshots on nightly
+and skips the UI target on stable/MSRV. This comparison deliberately ran the
+whole inventory and did not change snapshots or set `TRYBUILD=overwrite`.
+`upstream-baseline.log`, `upstream-patched.log`, `upstream-applied-repair.patch`
+and `upstream-repair-comparison.json` retain the commands, changes and results.
+Neither overall exit 101 is represented as a passing full suite.
 
 The continued source review covers the library constructors, constant APIs,
 operators, serde conversion, fallible conversions, formatting and iteration,
@@ -127,7 +149,7 @@ This is a tested repair proposal. It is not installed in Chio's dependency graph
 and does not certify either unpatched crate. Dependency ownership, the actual
 selected package revision and affected native qualification remain open.
 
-Keep certification pending. The complete upstream regression suite and
-downstream native qualification remain required before certifying a selected
-patched revision. No upstream issue, advisory identifier, fixed release, or
-external disclosure is asserted here.
+Keep certification pending. A passing upstream regression suite on a supported
+diagnostic toolchain and downstream native qualification remain required before
+certifying a selected patched revision. No upstream issue, advisory identifier,
+fixed release, or external disclosure is asserted here.
