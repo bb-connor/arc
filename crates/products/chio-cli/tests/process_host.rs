@@ -239,3 +239,35 @@ fn process_swarm_binds_issued_workers_and_recovers_sealed_authority(
     assert_eq!(evidence["effects"], 2);
     Ok(())
 }
+
+#[test]
+fn independent_swarm_graphs_share_the_original_family_quota(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/swarm_shared_family.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let evidence: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    let bootstrap: ChioReceipt = serde_json::from_value(evidence["bootstrap"].clone())?;
+    assert!(bootstrap.verify_signature()?);
+    assert_eq!(bootstrap.kernel_key.to_hex(), evidence["kernel_key"]);
+    for raw in evidence["receipts"].as_array().ok_or("missing receipts")? {
+        let receipt: ChioReceipt = serde_json::from_str(raw.as_str().ok_or("invalid receipt")?)?;
+        assert!(receipt.verify_signature()?);
+        assert_eq!(receipt.kernel_key.to_hex(), evidence["kernel_key"]);
+    }
+    assert_eq!(evidence["effects"], 2);
+    assert_eq!(evidence["graphs"], 2);
+    Ok(())
+}

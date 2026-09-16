@@ -6,7 +6,7 @@ use chio_swarm_authority::*;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn build(
-    plan: &Plan,
+    plan: &Graph,
     runtime: &ProcessRuntime,
     record: &Record,
     routes: &BTreeMap<String, Route>,

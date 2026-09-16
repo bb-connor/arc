@@ -70,6 +70,64 @@ results or future join/terminal receipts. The private state contains:
 - `swarm-runtime.db`: verifier-owned evidence and sealed legacy replay markers.
 - `authority.db`: the existing budget, revocation, outcome and continuation owner.
 
+### Independent graphs sharing one family
+
+Use `chio.process.swarm-plan.v2` when independent graphs must compete for the
+same family invocation quota. It accepts `profile_id` and `graphs`; each graph
+has the same `graph_id` and `calls` fields as the v1 plan above. For example,
+this writes two mailbox graphs for four configured direct children:
+
+```sh
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+groups = [("first", ["alice", "bob"]), ("second", ["carol", "dave"])]
+plan = {
+    "schema": "chio.process.swarm-plan.v2",
+    "profile_id": "shared-mailbox-family",
+    "graphs": [
+        {
+            "graph_id": graph,
+            "calls": [
+                {
+                    "process": name,
+                    "operation_key": "publish",
+                    "server_id": "chio-ipc",
+                    "tool_name": "send_jobs",
+                    "arguments": {"message_key": name, "payload": {"from": name}},
+                }
+                for name in children
+            ],
+        }
+        for graph, children in groups
+    ],
+}
+Path("shared-tasks.json").write_text(json.dumps(plan, indent=2) + "\n")
+PY
+chio process init --config host.json --state "$PWD/shared-state" \
+  --aggregate-invocations 2 --swarm-plan shared-tasks.json
+```
+
+The host configuration must declare these four children with `send_jobs` access,
+2500 basis points each, the `jobs` mailbox, and capacity for five processes.
+Each graph retains its allocation checks and must fit within the signed family
+maximum. Graphs do not reserve separate copies of that quota: all four calls
+compete for the same two invocations in `authority.db`. Once two calls consume
+it, the remaining calls receive signed budget-exhaustion denials before dispatch.
+Which workers succeed depends on admission order.
+
+There must be 2-8 graphs, 2-32 calls per graph, and at most 32 total calls.
+Graph identifiers and child process names must be unique across the plan.
+Initialization writes `swarm-bundles.json` containing the individual authorities,
+one combined `swarm-calls.json`, and one sealed, activated runtime source. The
+root and all children retain their original shared family binding.
+
+Collect and verify each response with `receipt verify-process-response`.
+The current `attest-run` completed-fanout format supports one graph whose tasks
+all returned allowed results. It refuses this shared-family profile; a
+multi-graph terminal artifact remains part of the unfinished M5 work.
+
 ## Run supervised workers on Linux
 
 Install the local Python process SDK in the worker interpreter, or point

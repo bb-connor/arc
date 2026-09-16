@@ -5,6 +5,10 @@
 mod graph;
 #[path = "swarm/requests.rs"]
 mod requests;
+#[path = "swarm/plan.rs"]
+mod plan;
+
+use plan::{Graph, Plan};
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -30,24 +34,6 @@ use crate::CliError;
 const PROFILE: &str = "swarm-profile.json";
 const SOURCE: &str = "swarm-runtime.db";
 const SCHEMA: &str = "chio.process.swarm-profile.v1";
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct Plan {
-    schema: String,
-    graph_id: String,
-    calls: Vec<Call>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Call {
-    process: String,
-    operation_key: String,
-    server_id: String,
-    tool_name: String,
-    arguments: Value,
-}
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -99,28 +85,7 @@ fn now_ms() -> Result<u64, CliError> {
 }
 
 pub(super) fn load_plan(path: &Path) -> Result<Plan, CliError> {
-    let plan: Plan = read_json(path)?;
-    if plan.schema != "chio.process.swarm-plan.v1" || plan.calls.len() < 2 || plan.calls.len() > 32
-    {
-        return Err(error(
-            "expected a chio.process.swarm-plan.v1 with 2-32 calls",
-        ));
-    }
-    identifier(&plan.graph_id)?;
-    let mut processes = std::collections::BTreeSet::new();
-    for call in &plan.calls {
-        identifier(&call.process)?;
-        identifier(&call.operation_key)?;
-        if !call.arguments.is_object() {
-            return Err(error("planned arguments must be an object"));
-        }
-        if call.process == "root" || !processes.insert(&call.process) {
-            return Err(error(
-                "a bounded fan-out plan needs one call per distinct child",
-            ));
-        }
-    }
-    Ok(plan)
+    plan::load(path)
 }
 
 fn routes(record: &Record) -> Result<BTreeMap<String, Route>, CliError> {
@@ -191,22 +156,26 @@ pub(super) fn provision(
     }
     let routes = routes(record)?;
     let bootstrap = requests::bootstrap(runtime, record, issuer, now)?;
-    let bundle = graph::build(
-        &plan,
-        runtime,
-        record,
-        &routes,
-        issuer,
-        &bootstrap.id,
-        now,
-        expires,
-        budget.max_invocations,
-    )?;
-    chio_swarm_authority::verify_swarm_authority_for_admission(&bundle, &[issuer.public_key()])
-        .map_err(error)?;
+    let mut bundles = Vec::new();
+    for graph in &plan.graphs {
+        let bundle = graph::build(
+            graph,
+            runtime,
+            record,
+            &routes,
+            issuer,
+            &bootstrap.id,
+            now,
+            expires,
+            budget.max_invocations,
+        )?;
+        chio_swarm_authority::verify_swarm_authority_for_admission(&bundle, &[issuer.public_key()])
+            .map_err(error)?;
+        bundles.push(bundle);
+    }
     let admission = RuntimeAdmissionProfile {
         schema: CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA.into(),
-        profile_id: format!("process-{}", plan.graph_id),
+        profile_id: format!("process-{}", plan.profile_id),
         local_kernel_id: format!("kernel:{}", issuer.public_key().to_hex()),
         verifier_id: format!("did:chio:{}", issuer.public_key().to_hex()),
         issued_at_unix_ms: now,
@@ -214,14 +183,18 @@ pub(super) fn provision(
     };
     let source =
         SqliteRuntimeOrchestrationStore::open(directory.path().join(SOURCE)).map_err(error)?;
-    let calls = requests::prepare(&plan, &bundle, runtime, record, &admission, &source)?;
-    source
-        .insert_swarm_authority_bundle(bundle.clone())
-        .map_err(error)?;
+    let mut calls = Vec::new();
+    for (graph, bundle) in plan.graphs.iter().zip(&bundles) {
+        calls.extend(requests::prepare(graph, bundle, runtime, record, &admission, &source)?);
+        source.insert_swarm_authority_bundle(bundle.clone()).map_err(error)?;
+    }
+    let calls = serde_json::json!({
+        "schema": "chio.process.swarm-calls.v1", "runtime_id": runtime.runtime_id(), "calls": calls,
+    });
     let (store, fence) = authority
         .local_runtime_participant()
         .ok_or_else(|| error("swarm source requires a local qualified authority"))?;
-    let source_id = AdmissionIdentifier::try_new("source_id", format!("process-{}", plan.graph_id))
+    let source_id = AdmissionIdentifier::try_new("source_id", format!("process-{}", plan.profile_id))
         .map_err(error)?;
     let runtime_id = AdmissionIdentifier::try_new("runtime_id", runtime.runtime_id().to_owned())
         .map_err(error)?;
@@ -251,14 +224,22 @@ pub(super) fn provision(
         routes,
     };
     let (signature, _) = issuer.sign_canonical(&body).map_err(error)?;
+    let (bundle_name, bundle_bytes) = if let [bundle] = bundles.as_slice() {
+        ("swarm-bundle.json", canonical_json_bytes(bundle).map_err(error)?)
+    } else {
+        ("swarm-bundles.json", canonical_json_bytes(&serde_json::json!({
+            "schema": "chio.process.swarm-authorities.v1", "runtime_id": runtime.runtime_id(),
+            "graphs": bundles,
+        })).map_err(error)?)
+    };
     for (name, bytes) in [
         (
             "swarm-bootstrap.json",
             canonical_json_bytes(&bootstrap).map_err(error)?,
         ),
         (
-            "swarm-bundle.json",
-            canonical_json_bytes(&bundle).map_err(error)?,
+            bundle_name,
+            bundle_bytes,
         ),
         (
             "swarm-calls.json",
@@ -354,4 +335,79 @@ pub(super) fn host_routes(
         .into_iter()
         .map(|(id, route)| Ok((id, route.process_route()?)))
         .collect()
+}
+
+#[cfg(test)]
+mod plan_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn graph(id: &str, processes: &[&str]) -> Value {
+        json!({
+            "graph_id": id,
+            "calls": processes.iter().map(|process| json!({
+                "process": process, "operation_key": "publish",
+                "server_id": "chio-ipc", "tool_name": "send_jobs",
+                "arguments": {"message_key": process, "payload": {"from": process}},
+            })).collect::<Vec<_>>(),
+        })
+    }
+
+    fn read_plan(value: Value) -> Result<Plan, CliError> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("plan.json");
+        std::fs::write(&path, serde_json::to_vec(&value).map_err(error)?)?;
+        load_plan(&path)
+    }
+
+    #[test]
+    fn independent_graphs_can_share_one_process_family() {
+        let result = read_plan(json!({
+            "schema": "chio.process.swarm-plan.v2", "profile_id": "shared-family",
+            "graphs": [graph("first", &["alice", "bob"]), graph("second", &["carol", "dave"])],
+        }));
+        match result {
+            Ok(plan) => {
+                assert_eq!(plan.profile_id, "shared-family");
+                assert_eq!(plan.graphs.len(), 2);
+                assert_eq!(plan.graphs[0].graph_id, "first");
+                assert_eq!(plan.graphs[1].calls[0].process, "carol");
+            }
+            Err(error) => panic!("valid independent graphs were rejected: {error}"),
+        }
+    }
+
+    #[test]
+    fn shared_family_plan_rejects_ambiguous_or_unbounded_graphs() {
+        for graphs in [
+            vec![],
+            vec![graph("first", &["alice", "bob"])],
+            vec![graph("same", &["alice", "bob"]), graph("same", &["carol", "dave"])],
+            vec![graph("first", &["alice", "bob"]), graph("second", &["alice", "dave"])],
+            vec![graph("first", &["alice", "bob"]), graph("second", &["root", "dave"])],
+            vec![graph("first", &["alice", "bob"]), graph("second", &["carol"])],
+        ] {
+            assert!(read_plan(json!({
+                "schema": "chio.process.swarm-plan.v2", "profile_id": "shared-family", "graphs": graphs,
+            })).is_err());
+        }
+        let mut legacy = graph("legacy", &["alice", "bob"]);
+        legacy["schema"] = json!("chio.process.swarm-plan.v1");
+        assert!(read_plan(legacy.clone()).is_ok());
+        legacy["graphs"] = json!([]);
+        assert!(read_plan(legacy).is_err());
+        let graphs = (0..9).map(|index| graph(
+            &format!("graph-{index}"),
+            &[&format!("worker-{index}-a"), &format!("worker-{index}-b")],
+        )).collect::<Vec<_>>();
+        assert!(read_plan(json!({
+            "schema": "chio.process.swarm-plan.v2", "profile_id": "too-many-graphs", "graphs": graphs,
+        })).is_err());
+        let children = (0..31).map(|index| format!("worker-{index}")).collect::<Vec<_>>();
+        let children = children.iter().map(String::as_str).collect::<Vec<_>>();
+        assert!(read_plan(json!({
+            "schema": "chio.process.swarm-plan.v2", "profile_id": "too-many-children",
+            "graphs": [graph("first", &children), graph("second", &["alice", "bob"])],
+        })).is_err());
+    }
 }

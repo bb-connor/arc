@@ -12,6 +12,10 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
     let host = Host::open(state, false)?;
     let directory = host.lease.directory.path();
     let runner = super::super::runner::completed_snapshot(&host, plan)?;
+    require(
+        !directory.join("swarm-bundles.json").try_exists()?,
+        "completed-fanout export requires a single graph",
+    )?;
     let bootstrap: ChioReceipt = read_json(&directory.join("swarm-bootstrap.json"))?;
     verified_receipt(&bootstrap, &host.kernel.public_key())?;
     let mut authority: SwarmAuthorityBundle = read_json(&directory.join("swarm-bundle.json"))?;

@@ -56,13 +56,13 @@ pub(super) fn bootstrap(
 }
 
 pub(super) fn prepare(
-    plan: &Plan,
+    plan: &Graph,
     swarm: &SwarmAuthorityBundle,
     runtime: &ProcessRuntime,
     record: &Record,
     profile: &RuntimeAdmissionProfile,
     source: &SqliteRuntimeOrchestrationStore,
-) -> Result<Value, CliError> {
+) -> Result<Vec<Value>, CliError> {
     let mut calls = Vec::new();
     for (index, call) in plan.calls.iter().enumerate() {
         let request = runtime
@@ -122,7 +122,5 @@ pub(super) fn prepare(
         source.insert_bundle(admission).map_err(error)?;
         calls.push(json!({"process": call.process, "operation_key": call.operation_key, "server_id": call.server_id, "tool_name": call.tool_name, "arguments": call.arguments, "governed_intent": intent, "request_id": request.request_id, "capability_sha256": hash(&request.capability)?}));
     }
-    Ok(
-        json!({"schema": "chio.process.swarm-calls.v1", "runtime_id": runtime.runtime_id(), "calls": calls}),
-    )
+    Ok(calls)
 }

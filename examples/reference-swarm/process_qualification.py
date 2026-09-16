@@ -109,7 +109,7 @@ class Harness:
             }
         )
 
-    def initialize(self, calls):
+    def initialize(self, calls, *, plan=None, aggregate_invocations=None):
         policy = self.output / "policy.yaml"
         policy.write_text("""kernel:
   max_capability_ttl: 3600
@@ -148,7 +148,7 @@ capabilities:
         write(self.output / "host.json", config)
         write(
             self.output / "tasks.json",
-            {
+            plan if plan is not None else {
                 "schema": "chio.process.swarm-plan.v1",
                 "graph_id": "confinement-probes",
                 "calls": calls,
@@ -165,7 +165,7 @@ capabilities:
                 "--state",
                 self.state,
                 "--aggregate-invocations",
-                len(calls),
+                len(calls) if aggregate_invocations is None else aggregate_invocations,
                 "--swarm-plan",
                 self.output / "tasks.json",
             ],

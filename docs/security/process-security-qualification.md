@@ -21,9 +21,28 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 The frozen foundation at `810664017dffa38235e3914a0a4477c8345cf359` passes
 consumer boundaries, the complete flow-security gate and workspace build.
-`linux-810664017/` retains the exact commands and terminal results. Its serial
-workspace test, workspace Clippy and proof-coverage queue is still active;
-no full-workspace acceptance is claimed.
+`linux-810664017/` retains the exact commands and terminal results. Its workspace
+test run fails at the native standards fixture because the external Cargo target
+cannot discover the checkout. The tracked draft and alignment matrix are present.
+With the existing explicit `CHIO_CHECKOUT_ROOT` set to that same frozen checkout,
+both native-suite tests pass. `linux-810664017-retry1/` retains that result and the
+resumed workspace test, workspace Clippy and proof-coverage queue. No source,
+assertion or fixture was changed to fix this runner configuration; the original
+failed workspace run remains retained. No full-workspace acceptance is claimed.
+
+The shared-family plan extension accepts multiple independently valid graphs
+under the original issued family and single durable quota owner. Focused parser
+tests and both live mailbox swarm tests pass on macOS: four distinct requests
+across two graphs yield exactly two allowed responses, two signed budget denials,
+and two actual writes. Independently verified responses and the two captured
+family invocations survive host death and restart without extra effects. The
+single-graph compatibility case and strict CLI all-target Clippy pass. The first
+new integration attempt failed because its recovery fixture reused an existing
+credential output filename; the corrected run is retained separately in
+`swarm-shared-family-plan/`. Linux and actual Enforced contention qualification
+remain pending. The new Enforced qualifier is designed to observe quota denials
+while two admitted tools are still executing, then recover their uncertain
+outcomes without repeating either effect. Its existence is not a passing run.
 
 The unmodified `docker-release` CLI build passes at Rust source
 `e42e0ed41656e345438664a3d382727f454296f9`, with executable SHA-256
@@ -70,7 +89,8 @@ results are in `offline-verification-docker-release-e42e0ed41/`.
 The eight evidence tests, strict all-target cage Clippy, formatting and unchanged
 69-case source inventory pass on macOS. The evidence regression checks that equal
 millisecond timestamps remain valid and backwards timestamps cannot mint an
-enforced record. Linux cross-checking is in progress. The six runtime results
+enforced record. Linux x86_64 all-target cross-checking with real-kernel and
+mutant features passes in `cross-x86-cage-e0187de56/`. The six runtime results
 above still name their actual preceding source and executable.
 
 `eea8733b1` passes the full actual Enforced reference workflow with exported
