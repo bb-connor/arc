@@ -32,10 +32,12 @@ fn syscall_number(architecture: SandboxArchitecture, name: &str) -> Option<u32> 
             "exit" => 60,
             "getdents64" => 217,
             "getcwd" => 79,
+            "readlink" => 89,
             "sigaltstack" => 131,
             "arch_prctl" => 158,
             "gettid" => 186,
             "futex" => 202,
+            "sched_getaffinity" => 204,
             "set_tid_address" => 218,
             "restart_syscall" => 219,
             "clock_gettime" => 228,
@@ -89,6 +91,7 @@ fn syscall_number(architecture: SandboxArchitecture, name: &str) -> Option<u32> 
             "nanosleep" => 101,
             "setitimer" => 103,
             "clock_gettime" => 113,
+            "sched_getaffinity" => 123,
             "sched_yield" => 124,
             "restart_syscall" => 128,
             "tgkill" => 131,
@@ -1390,11 +1393,18 @@ mod tests {
                 "openat",
                 "openat2",
                 "rt_sigreturn",
+                "sched_getaffinity",
+                "readlinkat",
             ] {
                 assert!(syscall_number(architecture, syscall).is_some());
             }
         }
         assert!(syscall_number(SandboxArchitecture::Aarch64, "arch_prctl").is_none());
         assert!(syscall_number(SandboxArchitecture::Aarch64, "poll").is_none());
+        assert_eq!(
+            syscall_number(SandboxArchitecture::X86_64, "readlink"),
+            Some(89)
+        );
+        assert!(syscall_number(SandboxArchitecture::Aarch64, "readlink").is_none());
     }
 }

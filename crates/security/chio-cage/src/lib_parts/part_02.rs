@@ -103,6 +103,7 @@ fn build_seccomp_plan(
         "rt_sigaction",
         "rt_sigprocmask",
         "rt_sigreturn",
+        "sched_getaffinity",
         "sched_yield",
         "set_robust_list",
         "set_tid_address",
@@ -132,7 +133,9 @@ fn build_seccomp_plan(
     if architecture == SandboxArchitecture::X86_64 {
         // glibc's ELF loader probes /etc/ld.so.preload with access(2). The
         // subsequent open remains independently confined by Landlock.
-        allowed.extend(["access", "arch_prctl", "poll"]);
+        // Rust/glibc path canonicalization uses readlink rather than readlinkat
+        // on x86_64. Both inspect link metadata; file opens remain confined.
+        allowed.extend(["access", "arch_prctl", "poll", "readlink"]);
     }
     match profile {
         NativeSyscallProfile::NativeMinimalV1 => {}

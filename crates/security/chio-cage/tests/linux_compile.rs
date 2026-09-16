@@ -12,7 +12,7 @@ use chio_cage::{
     admit as admit_authorized, compile, retain_broker_ipc, retain_runtime_resources,
     AdmittedManifest, BrokerPeerIdentity, CageError, ExecutionIdentity, FdPurpose,
     FilesystemGrantAccess, NetworkMode, OperatorCeilings, ResourceKind, RuntimeResourcePaths,
-    SeccompDefaultAction,
+    SandboxArchitecture, SeccompDefaultAction,
 };
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_manifest::{
@@ -318,6 +318,16 @@ fn compile_is_deterministic_and_starts_from_deny_all() {
         first.plan().seccomp.default_action,
         SeccompDefaultAction::KillProcess
     );
+    let allowed = &first.plan().seccomp.allowed_syscalls;
+    assert!(allowed.iter().any(|name| name == "sched_getaffinity"));
+    assert!(allowed.iter().any(|name| name == "readlinkat"));
+    assert_eq!(
+        allowed.iter().any(|name| name == "readlink"),
+        first.plan().seccomp.architecture == SandboxArchitecture::X86_64
+    );
+    for denied in ["socket", "connect", "clone", "execve", "getdents64"] {
+        assert!(!allowed.iter().any(|name| name == denied));
+    }
     assert_eq!(first.plan().resource_limits.nofile_hard, 192);
     assert_eq!(first.plan().target_fd_slot, 255);
     assert!(!first.plan().environment.contains_key("HOME"));

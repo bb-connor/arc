@@ -3,8 +3,11 @@
 Three MCP servers over standard input and output, built to run inside the
 Chio cage as the wrapped servers of the reference runtime. Each one is
 single-threaded, reads one JSON-RPC object per line, never touches the
-environment or the network, and bounds every message, so the
-`native_minimal_v1` syscall profile is enough for all three.
+environment or the network, and bounds every message. The
+`native_minimal_v1` syscall profile supports startup and the reference swarm's
+file reads. The reader's `list_directory` additionally needs `getdents64`,
+which is available in `native_standard_v1`; the reference provisioner currently
+selects the minimal profile and does not support directory enumeration.
 
 | Binary | Arguments | Tools | Grants the launch policy needs |
 |--------|-----------|-------|--------------------------------|

@@ -35,6 +35,8 @@ static long invoke5(long number, long first, long second, long third, long fourt
 #define SYS_EXECVEAT 322
 #define SYS_RT_SIGACTION 13
 #define SYS_PPOLL 271
+#define SYS_SCHED_GETAFFINITY 204
+#define SYS_READLINK 89
 __asm__(
     ".global _start\n"
     ".type _start,@function\n"
@@ -83,6 +85,8 @@ static long invoke5(long number, long first, long second, long third, long fourt
 #define SYS_EXECVEAT 281
 #define SYS_RT_SIGACTION 134
 #define SYS_PPOLL 73
+#define SYS_SCHED_GETAFFINITY 123
+#define SYS_READLINKAT 78
 __asm__(
     ".global _start\n"
     ".type _start,%function\n"
@@ -131,6 +135,22 @@ static int starts_with(const char *value, const char *prefix) {
 
 __attribute__((noreturn, used)) void probe_start(long *initial_stack) {
 #if PROBE_MODE == 1
+    // Exercise the read-only queries used by Rust/glibc before an MCP request.
+    unsigned long cpu_mask[128];
+    long affinity = invoke(SYS_SCHED_GETAFFINITY, 0, sizeof(cpu_mask), (long)cpu_mask, 0);
+    if (affinity <= 0) {
+        terminate(81);
+    }
+    static const char directory[] = "/";
+    char link_target[8];
+#if defined(__x86_64__)
+    long link = invoke(SYS_READLINK, (long)directory, (long)link_target, sizeof(link_target), 0);
+#else
+    long link = invoke(SYS_READLINKAT, AT_FDCWD, (long)directory, (long)link_target, sizeof(link_target));
+#endif
+    if (link != -22) { // EINVAL: an existing directory is not a symbolic link.
+        terminate(82);
+    }
     terminate(0);
 #elif PROBE_MODE == 2
     invoke(SYS_SOCKET, AF_INET, SOCK_STREAM, 0, 0);
