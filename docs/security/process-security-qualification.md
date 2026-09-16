@@ -25,6 +25,54 @@ consumer boundaries, the complete flow-security gate and workspace build.
 workspace test, workspace Clippy and proof-coverage queue is still active;
 no full-workspace acceptance is claimed.
 
+The unmodified `docker-release` CLI build passes at Rust source
+`e42e0ed41656e345438664a3d382727f454296f9`, with executable SHA-256
+`cb7f42f5fdf54d8dea33d129228455e1efca67bd14ebf0689192d280d365ab82`.
+Its manifest is `x86-executables-docker-release-e42e0ed41/manifest.json`.
+Using qualifier source `445c3d313`, unchanged deadlines and the same optimized
+CLI, the following actual Linux x86_64 scenarios now have terminal passes:
+
+| Scenario | Observed result | Retained directory |
+| --- | --- | --- |
+| Reference fan-out | Nine stages including completed-run verification, byte-identical recovery and refusal of missing/wrong native pins and output/runtime substitutions | `linux-x86-release-reference-445c3d313-retry1/` |
+| Authority and worker restart | Scope widening, peer authority, changed intent and continuation reuse denied; allowed reads and logical replay succeed; Alice restarts only after the deliberate checkpoint crash; aggregate capture remains two | `linux-x86-release-authority-445c3d313/` |
+| Revocation | Issued unspent capability remains revoked after reopen; signed denial returns no secret; the allowed canary works and protected files remain unchanged | `linux-x86-release-revocation-445c3d313/` |
+| Filesystem | Raw unconfined controls succeed; confined forbidden read/write return `EACCES`; allowed read succeeds, protected file is unchanged and secret is withheld | `linux-x86-release-filesystem-445c3d313/` |
+| Network | Unconfined connection reaches the external listener; confined connection is absent, with signed caller denial and matching native `SIGSYS` terminal receipt; canary succeeds | `linux-x86-release-network-445c3d313/` |
+| Host death and uncertain recovery | One append, both pinned targets terminate within five seconds, original request remains `outcome_unknown_after_dispatch`, writer completes on attempt two, repeated reopen does not repeat the effect, capture remains two and continuation custody remains retained | `linux-x86-release-host-crash-445c3d313-retry1/` |
+
+The earlier optimized host-crash run fails when reopening its host at
+`PreparedRecordInvalid at fully_enforced_evidence`. Its one append and both
+target deaths were observed, but recovery did not complete. Source analysis
+narrows this stage to a likely reversed observation timestamp: the prepared
+record has already passed all identity/digest checks against the same retained
+objects used to construct the exec observation. The actual failed timestamps
+were not retained. The VM reports an unstable tracing clock at boot, while a
+later 6,000-sample cross-process clock measurement records no backward step.
+These observations do not prove the clock's cause or resolve the earlier
+intermittent refusal. The failed run remains in
+`linux-x86-release-host-crash-445c3d313/`; the fresh passing run does not erase it.
+
+The first reference rerun fails because its previously recorded worker image ID
+is no longer available after subsequent builds moved the shared local tag. A
+dedicated tag now retains the exact worker image before the fresh run's immutable
+plan is initialized. The original failed state and logs remain retained. No
+existing runner plan was rewritten to replace its image identity.
+
+The reference, filesystem and authority completed artifacts also pass offline
+verification using a separately built macOS verifier at `dcb7fab72`. Operator
+public keys, runtime IDs and native signer pins were copied separately from
+submitted artifacts. No live database is used. Commands, verifier hash and
+results are in `offline-verification-docker-release-e42e0ed41/`.
+
+`e0187de56` distinguishes reversed launch timestamps as
+`exec_time_precedes_prepared` while preserving the existing fail-closed check.
+The eight evidence tests, strict all-target cage Clippy, formatting and unchanged
+69-case source inventory pass on macOS. The evidence regression checks that equal
+millisecond timestamps remain valid and backwards timestamps cannot mint an
+enforced record. Linux cross-checking is in progress. The six runtime results
+above still name their actual preceding source and executable.
+
 `eea8733b1` passes the full actual Enforced reference workflow with exported
 continuation custody, then passes the filesystem qualifier. The same raw OS
 probe first reads and modifies private fixture files unconfined. Under Enforced
@@ -48,7 +96,8 @@ The failed log remains retained.
 persistent kernel revocation store. Its mailbox regression and strict CLI
 Clippy pass on macOS and Linux (`linux-m5-c11aaf538/`). This proves busy-host
 refusal, durable revocation across reopen, retained worker authentication and
-no new protected mailbox effect. The Enforced worker scenario remains pending.
+no new protected mailbox effect. The later optimized Enforced scenario passes
+as recorded above.
 
 The actual network scenario passes at `c11aaf538`, retained in
 `linux-x86-adversarial-c11aaf538/network-qualification.json`: the unconfined probe
@@ -77,9 +126,9 @@ its lifetime expires; subsequent worker authentication/transport errors follow
 restart, and the runner exhausts its attempt budget. The terminal exit is one.
 Host and worker logs are retained in
 `linux-x86-adversarial-e42e0ed41/runtime-diagnostics/`. This establishes the
-receipt writer deadline failure, not its performance cause. A build using the
-existing `docker-release` profile is running at the same Rust source, with no
-request, receipt or scenario deadline changes.
+receipt writer deadline failure, not its performance cause. The existing
+`docker-release` profile subsequently builds and passes the authority scenario
+at the same Rust source, with no request, receipt or scenario deadline changes.
 
 `445c3d313` streams qualification command output to retained files and records
 partial diagnostics when a command times out. Actual subprocess checks cover
@@ -120,7 +169,11 @@ optimized helper and unchanged test deadlines, both the same network case and
 the full existing lifecycle case, including the new launch-thread regression,
 pass. `cage-diagnostic-221c3c19d/` retains both failures and isolated passes with
 binary identities. Startup cost under emulation is a hypothesis; the complete
-69-case/ten-mutant pass remains bounded to `bcf81182a`.
+69-case/ten-mutant pass remains bounded to `bcf81182a`. A full rerun with optimized
+debug code, explicit debug assertions and overflow checks is active at the same
+`221c3c19d` source (`linux-x86-221c3c19d-optimized-debug/`). Its compilation was
+paused and resumed around the runtime scenarios to isolate the emulated CPU;
+all tests, mutation controls and deadlines remain unchanged.
 
 The source review found a reproducible custom-default invariant failure in
 `enumflags2`/`enumflags2_derive` 0.7.12. Exact hashes, safe reproduction and the
@@ -141,11 +194,11 @@ to the verified copies. `native-m5-cache-relocation.json` and
 VMs, source and qualification artifacts were preserved; these cache directories
 are regenerable build storage, not qualification results.
 
-The current runtime implementation is `e42e0ed41`, the lifecycle test source is
-`221c3c19d`, and the streaming qualifier source is `445c3d313`, retained in
+The current runtime diagnostic source is `e0187de56`, the lifecycle test source
+is `221c3c19d`, and the streaming qualifier source is `445c3d313`, retained in
 `/tmp/arc-m5-evidence`. The full
-scenario artifact, genuine over-budget contention case, repaired authority
-scenario and the remaining foundation gates are open. Existing fixed fan-out
+scenario artifact, genuine over-budget contention case, intermittent launch
+evidence refusal and the remaining foundation gates are open. Existing fixed fan-out
 preallocates one unit per task and rejects a graph larger than its family quota;
 two successful simultaneous calls do not prove a contended over-capacity denial.
 All 109 inherited dispositions remain unchanged. No protected publication,
