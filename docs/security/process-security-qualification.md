@@ -110,15 +110,28 @@ host-crash pass is claimed for this source.
 `221c3c19d` adds a bounded launch-thread lifetime regression to the existing
 real-kernel lifecycle case. A target handle moved to another thread must still
 observe `SIGKILL` after the original launching thread exits. Formatting and the
-69-case source inventory pass. The full real-Linux cage gate is running at that
-source (`linux-x86-221c3c19d/`); the older complete 69-case/ten-mutant cage pass
-remains bounded to `bcf81182a` until a new terminal result exists.
+69-case source inventory pass. The full real-Linux cage gate at that source
+passes the library, receipt and compilation cases, then fails several real
+launch cases. It was interrupted after those failures to retain fixtures and
+diagnose the first failure; this is an incomplete failed inventory, not a pass
+(`linux-x86-221c3c19d/`). An isolated rerun fails at the initial trace-handshake
+deadline (`trace_timeout`), before the new parent-death setup. With the existing
+optimized helper and unchanged test deadlines, both the same network case and
+the full existing lifecycle case, including the new launch-thread regression,
+pass. `cage-diagnostic-221c3c19d/` retains both failures and isolated passes with
+binary identities. Startup cost under emulation is a hypothesis; the complete
+69-case/ten-mutant pass remains bounded to `bcf81182a`.
 
 The source review found a reproducible custom-default invariant failure in
 `enumflags2`/`enumflags2_derive` 0.7.12. Exact hashes, safe reproduction and the
 current native Landlock reachability analysis are recorded in
 [the audit finding](../../supply-chain/reviews/enumflags2-0.7.12.md).
 No certification has been added for either crate.
+The separately applied typed-default repair rejects the original invalid
+declaration, passes valid defaults across all five unsigned widths, and passes
+the published library's two unit tests and 29 documentation tests (two existing
+documentation examples remain ignored). The patch is retained for review and
+is not installed in the workspace dependency graph.
 
 Two idle build caches were relocated to the VM's existing writable host mount
 after checking Cargo ownership and verifying complete file hashes, modes and
@@ -128,7 +141,9 @@ to the verified copies. `native-m5-cache-relocation.json` and
 VMs, source and qualification artifacts were preserved; these cache directories
 are regenerable build storage, not qualification results.
 
-The current implementation is `445c3d313` in `/tmp/arc-m5-evidence`. The full
+The current runtime implementation is `e42e0ed41`, the lifecycle test source is
+`221c3c19d`, and the streaming qualifier source is `445c3d313`, retained in
+`/tmp/arc-m5-evidence`. The full
 scenario artifact, genuine over-budget contention case, repaired authority
 scenario and the remaining foundation gates are open. Existing fixed fan-out
 preallocates one unit per task and rejects a graph larger than its family quota;

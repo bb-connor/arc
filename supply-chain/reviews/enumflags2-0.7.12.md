@@ -105,6 +105,17 @@ unpatched reproduction remains unchanged and retained separately.
 terminal results. The invalid case is expected to exit 101; no invalid enum
 value is evaluated at runtime.
 
+The published library source also passes its complete available test inventory
+with this patched derive crate: two unit tests and 29 documentation tests, with
+two pre-existing ignored documentation examples. This used an isolated copy of
+the exact published library, a manifest-only workspace/patch override, and
+`cargo +1.94.1 test --locked --offline --all-features`.
+`repair-published-tests-retry1.log` and its JSON record retain the result. The
+first invocation failed because Cargo does not allow selecting dependency
+features from outside its workspace; that command failure is retained separately.
+The published archive does not contain the complete upstream repository test
+suite, so this result does not cover that missing inventory.
+
 The continued source review covers the library constructors, constant APIs,
 operators, serde conversion, fallible conversions, formatting and iteration,
 plus the derive generator. `exactly_one` also relies on the same valid-bit
