@@ -1235,7 +1235,7 @@ mod tests {
     fn unchecked_relocation_validates_seed_before_any_import_mutation(
     ) -> Result<(), Box<dyn std::error::Error>> {
         use std::os::unix::fs::{symlink, PermissionsExt};
-        let temp = tempfile::tempdir()?;
+        let temp = private_tempdir()?;
         let original = temp.path().join("original");
         fs::create_dir(&original)?;
         fs::set_permissions(&original, fs::Permissions::from_mode(0o700))?;
