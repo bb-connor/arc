@@ -40,3 +40,32 @@ impl ProcessRoute {
         Ok(route)
     }
 }
+
+/// A trusted host's reference to its actual persisted tool-launch receipt.
+/// This observation grants no authority. Offline verification must load the
+/// referenced envelope and verify its digest, signer and confinement claims.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ProcessLaunchReceipt {
+    receipt_id: String,
+    receipt_sha256: String,
+}
+
+impl ProcessLaunchReceipt {
+    pub fn new(receipt_id: String, receipt_sha256: String) -> Result<Self, ProcessError> {
+        for digest in [&receipt_id, &receipt_sha256] {
+            if digest.len() != 64
+                || !digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            {
+                return Err(ProcessError::Configuration(
+                    "invalid host launch receipt reference",
+                ));
+            }
+        }
+        Ok(Self {
+            receipt_id,
+            receipt_sha256,
+        })
+    }
+}

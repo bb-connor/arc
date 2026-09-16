@@ -130,7 +130,7 @@ pub(super) fn init(
     let defaults = policy.default_capabilities.clone();
     let lease = Lease::acquire(state, true)?;
     let (kernel, issuer, authority) = kernel(lease.directory.path(), policy, true)?;
-    let (servers, manifests) =
+    let (servers, manifests, _) =
         super::serving::connect(&config, &kernel, lease.directory.path(), plan.is_some())?;
     let root_key = Keypair::generate();
     let root = match aggregate_invocations {

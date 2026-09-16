@@ -50,6 +50,7 @@ pub struct McpAdapter {
     pub(crate) config: McpAdapterConfig,
     pub(crate) transport: Arc<dyn McpTransport>,
     native_enforcement_evidence: Option<chio_cage::FullyEnforcedEvidence>,
+    native_enforcement_receipt: Option<chio_core::receipt::body::ChioReceipt>,
 }
 
 /// Transport wrapper that serializes upstream MCP calls through one shared gate.
@@ -194,6 +195,7 @@ impl McpAdapter {
             config,
             transport: Arc::from(transport),
             native_enforcement_evidence: None,
+            native_enforcement_receipt: None,
         }
     }
 
@@ -251,8 +253,16 @@ impl McpAdapter {
         } else {
             None
         };
+        let enforcement_receipt = transport.enforcement_receipt().cloned();
+        if cage_required && enforcement_receipt.is_none() {
+            let error = AdapterError::ConnectionFailed(
+                "cage-required transport returned no persisted enforcement receipt".into(),
+            );
+            return Err(merge_shutdown_error(error, transport.shutdown()));
+        }
         let mut adapter = Self::new(config, Box::new(transport));
         adapter.native_enforcement_evidence = enforcement_evidence;
+        adapter.native_enforcement_receipt = enforcement_receipt;
         Ok(adapter)
     }
 
@@ -275,6 +285,11 @@ impl McpAdapter {
     #[must_use]
     pub fn native_enforcement_evidence(&self) -> Option<&chio_cage::FullyEnforcedEvidence> {
         self.native_enforcement_evidence.as_ref()
+    }
+
+    #[must_use]
+    pub fn native_enforcement_receipt(&self) -> Option<&chio_core::receipt::body::ChioReceipt> {
+        self.native_enforcement_receipt.as_ref()
     }
 
     /// Query the MCP server for its tool list and generate a Chio manifest.

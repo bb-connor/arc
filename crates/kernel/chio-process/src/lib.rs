@@ -30,7 +30,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 
 pub use registry::{ChildSubmission, ChildWork, ProcessRegistry, WorkerWait};
-pub use routes::ProcessRoute;
+pub use routes::{ProcessLaunchReceipt, ProcessRoute};
 pub use state_reader::ProcessStateReader;
 use store::Store;
 pub use types::{
@@ -62,6 +62,7 @@ pub struct ProcessRuntime {
     store: Arc<Mutex<Store>>,
     namespace: String,
     routes: Arc<BTreeMap<String, ProcessRoute>>,
+    launch_receipts: Arc<BTreeMap<String, ProcessLaunchReceipt>>,
 }
 
 impl ProcessRuntime {
@@ -76,6 +77,7 @@ impl ProcessRuntime {
             store: registry.store,
             namespace,
             routes: Arc::new(BTreeMap::new()),
+            launch_receipts: Arc::new(BTreeMap::new()),
         })
     }
 
@@ -106,6 +108,25 @@ impl ProcessRuntime {
             store: self.store.clone(),
             namespace: self.namespace.clone(),
         }
+    }
+
+    /// Attach the launch receipts verified by the trusted host for its actual
+    /// connections. Workers cannot select these observations. A restarted tool
+    /// has a new launch receipt, while recovery returns the original call's
+    /// receipt unchanged. Launch observations do not alter logical call identity.
+    pub fn with_launch_receipts(
+        mut self,
+        receipts: impl IntoIterator<Item = (String, ProcessLaunchReceipt)>,
+    ) -> Result<Self, ProcessError> {
+        let mut selected = BTreeMap::new();
+        for (server_id, receipt) in receipts {
+            validate_id(&server_id)?;
+            if selected.insert(server_id, receipt).is_some() {
+                return Err(ProcessError::Configuration("duplicate host launch receipt"));
+            }
+        }
+        self.launch_receipts = Arc::new(selected);
+        Ok(self)
     }
 
     /// Persistent namespace used to bind logical operation and receipt identities.
@@ -348,6 +369,9 @@ impl ProcessRuntime {
             }
             if let Some(route) = route {
                 attribution["route"] = serde_json::to_value(route)?;
+            }
+            if let Some(receipt) = self.launch_receipts.get(&request.server_id) {
+                attribution["native_launch"] = serde_json::to_value(receipt)?;
             }
             // Keep the kernel evaluation frame out of every enclosing worker
             // future. Durable nonce verification adds a deep synchronous path;

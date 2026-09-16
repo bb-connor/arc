@@ -486,13 +486,15 @@ impl Host {
         } else {
             None
         };
+        let mut launch_receipts = std::collections::BTreeMap::new();
         if connect {
-            let (servers, manifests) = super::serving::connect(
+            let (servers, manifests, observed_launches) = super::serving::connect(
                 &record.config,
                 &kernel,
                 lease.directory.path(),
                 swarm_required,
             )?;
+            launch_receipts = observed_launches;
             if chio_core_types::crypto::canonical_json_bytes(&manifests).map_err(error)?
                 != chio_core_types::crypto::canonical_json_bytes(&record.manifests)
                     .map_err(error)?
@@ -518,6 +520,8 @@ impl Host {
             ProcessRuntime::open(lease.directory.path().join("process.db"), kernel.clone())
                 .map_err(error)?
                 .with_routes(routes)
+                .map_err(error)?
+                .with_launch_receipts(launch_receipts)
                 .map_err(error)?;
         lease.directory.validate_path_identity()?;
         Ok(Self {

@@ -133,6 +133,11 @@ impl AdaptedMcpServer {
         self.adapter.native_enforcement_evidence()
     }
 
+    #[must_use]
+    pub fn native_enforcement_receipt(&self) -> Option<&chio_core::receipt::body::ChioReceipt> {
+        self.adapter.native_enforcement_receipt()
+    }
+
     /// Shut down the upstream transport and persist terminal security evidence.
     pub fn shutdown(&self) -> Result<(), AdapterError> {
         self.adapter.shutdown()

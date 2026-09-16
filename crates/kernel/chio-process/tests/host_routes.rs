@@ -11,7 +11,7 @@ use chio_kernel::{
     RuntimeAdmissionHook, ToolServerConnection, Verdict,
 };
 use chio_process::worker::{WorkerService, PROTOCOL};
-use chio_process::{ProcessError, ProcessRoute, ProcessRuntime};
+use chio_process::{ProcessError, ProcessLaunchReceipt, ProcessRoute, ProcessRuntime};
 use serde_json::{json, Value};
 use support::Result;
 
@@ -68,6 +68,14 @@ fn routes() -> Result<[(String, ProcessRoute); 1]> {
     )])
 }
 
+// These references test host attribution and recovery, not cage authenticity.
+fn launch(id: char) -> Result<[(String, ProcessLaunchReceipt); 1]> {
+    Ok([(
+        "tools".into(),
+        ProcessLaunchReceipt::new(id.to_string().repeat(64), "d".repeat(64))?,
+    )])
+}
+
 fn kernel(
     path: &std::path::Path,
     effects: Arc<AtomicUsize>,
@@ -85,7 +93,8 @@ async fn authenticated_worker_context_cannot_replace_host_route_or_process_attri
     let effects = Arc::new(AtomicUsize::new(0));
     let kernel = kernel(dir.path(), effects.clone())?;
     let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?
-        .with_routes(routes()?)?;
+        .with_routes(routes()?)?
+        .with_launch_receipts(launch('a')?)?;
     let capability = support::root(&runtime, &kernel, 4)?;
     let service = WorkerService::new(runtime.clone());
     let token = service.issue_credential("root", capability.expires_at)?;
@@ -100,6 +109,8 @@ async fn authenticated_worker_context_cannot_replace_host_route_or_process_attri
                 }}
         }
     });
+    frame["operation"]["governed_intent"]["context"]["native_launch"] =
+        json!({"receipt_id": "forged", "receipt_sha256": "forged"});
     let response: Value =
         serde_json::from_slice(&service.handle_frame(&serde_json::to_vec(&frame)?).await)?;
     assert_eq!(response["result"]["verdict"], "allow", "{response}");
@@ -113,6 +124,10 @@ async fn authenticated_worker_context_cannot_replace_host_route_or_process_attri
     assert_eq!(metadata["route"], expected_route());
     assert_eq!(metadata["chio_process"]["process_id"], "root");
     assert_eq!(metadata["chio_process"]["runtime_id"], runtime.runtime_id());
+    assert_eq!(
+        metadata["native_launch"],
+        serde_json::to_value(&launch('a')?[0].1)?
+    );
     assert_eq!(effects.load(Ordering::SeqCst), 1);
 
     // Route selection is absent from the worker protocol, even with valid auth.
@@ -132,7 +147,9 @@ async fn reopen_requires_original_route_and_preserves_completed_receipt_without_
     let effects = Arc::new(AtomicUsize::new(0));
     let kernel = kernel(dir.path(), effects.clone())?;
     let journal = dir.path().join("process.db");
-    let runtime = ProcessRuntime::open(&journal, kernel.clone())?.with_routes(routes()?)?;
+    let runtime = ProcessRuntime::open(&journal, kernel.clone())?
+        .with_routes(routes()?)?
+        .with_launch_receipts(launch('a')?)?;
     support::root(&runtime, &kernel, 4)?;
     let request =
         runtime.tool_request("root", "effect", "tools", "append", json!({"text": "one"}))?;
@@ -164,7 +181,9 @@ async fn reopen_requires_original_route_and_preserves_completed_receipt_without_
         assert_eq!(reopened.process("root")?.tree_calls, 1);
         assert_eq!(effects.load(Ordering::SeqCst), 1);
     }
-    let reopened = ProcessRuntime::open(&journal, kernel)?.with_routes(routes()?)?;
+    let reopened = ProcessRuntime::open(&journal, kernel)?
+        .with_routes(routes()?)?
+        .with_launch_receipts(launch('b')?)?;
     let replay = reopened
         .invoke_known_only("root", "effect", &request)
         .await?;
@@ -173,6 +192,21 @@ async fn reopen_requires_original_route_and_preserves_completed_receipt_without_
         canonical_json_bytes(&replay.receipt)?
     );
     assert_eq!(effects.load(Ordering::SeqCst), 1);
+    let request =
+        reopened.tool_request("root", "second", "tools", "append", json!({"text": "two"}))?;
+    let second = reopened
+        .invoke_known_only("root", "second", &request)
+        .await?;
+    assert_eq!(second.verdict, Verdict::Allow);
+    assert_eq!(
+        second.receipt.metadata.as_ref().ok_or("missing metadata")?["native_launch"],
+        serde_json::to_value(&launch('b')?[0].1)?
+    );
+    assert_eq!(
+        replay.receipt.metadata.as_ref().ok_or("missing metadata")?["native_launch"],
+        serde_json::to_value(&launch('a')?[0].1)?
+    );
+    assert_eq!(effects.load(Ordering::SeqCst), 2);
     Ok(())
 }
 
@@ -214,6 +248,15 @@ fn ambiguous_or_malformed_host_routes_refuse_configuration() -> Result {
     let kernel = kernel(dir.path(), Arc::new(AtomicUsize::new(0)))?;
     let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel)?;
     let route = routes()?[0].clone();
+    for invalid in ["", "Z", " "] {
+        assert!(ProcessLaunchReceipt::new(invalid.repeat(64), "d".repeat(64)).is_err());
+    }
+    assert!(ProcessLaunchReceipt::new("f".into(), "d".repeat(64)).is_err());
+    let receipt = launch('a')?[0].clone();
+    assert!(runtime
+        .clone()
+        .with_launch_receipts([receipt.clone(), receipt])
+        .is_err());
     assert!(runtime.with_routes([route.clone(), route]).is_err());
     Ok(())
 }

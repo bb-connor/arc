@@ -83,6 +83,7 @@ struct ActiveCageReceiptPersistence {
     persistence: CageReceiptPersistence,
     bindings: chio_cage::CageReceiptBindings,
     started_at_unix_ms: u64,
+    enforcement_receipt: Option<chio_core::receipt::body::ChioReceipt>,
 }
 
 impl ActiveCageReceiptPersistence {
@@ -96,6 +97,7 @@ impl ActiveCageReceiptPersistence {
     fn persist(&self, record: chio_cage::CageEnforcementRecord) -> Result<(), AdapterError> {
         self.persistence
             .persist(Some(self.bindings.clone()), record, self.started_at_unix_ms)
+            .map(|_| ())
     }
 
     fn persist_failure(
@@ -225,7 +227,7 @@ impl CageReceiptPersistence {
         bindings: Option<chio_cage::CageReceiptBindings>,
         record: chio_cage::CageEnforcementRecord,
         started_at_unix_ms: u64,
-    ) -> Result<(), AdapterError> {
+    ) -> Result<chio_core::receipt::body::ChioReceipt, AdapterError> {
         let recorded_at_unix_ms = now_unix_ms()?;
         let body = chio_cage::CageReceiptBody::new(
             self.attempt_id.clone(),
@@ -283,7 +285,7 @@ impl CageReceiptPersistence {
                 "persisted cage release receipt differs from the signed envelope".to_string(),
             ));
         }
-        Ok(())
+        Ok(loaded)
     }
 }
 
@@ -820,6 +822,7 @@ impl StdioMcpTransport {
             persistence: receipt_persistence,
             bindings: chio_cage::CageReceiptBindings::from_compiled(&compiled),
             started_at_unix_ms,
+            enforcement_receipt: None,
         };
         let expected = match validate_cage_required_inputs(
             command,
@@ -957,8 +960,13 @@ impl StdioMcpTransport {
                     ));
                 }
             };
-        if let Err(error) = cage_receipts.persist(fully_enforced) {
-            return Err(fail_caged_child(error, child, &cage_receipts, None));
+        match cage_receipts.persistence.persist(
+            Some(cage_receipts.bindings.clone()),
+            fully_enforced,
+            cage_receipts.started_at_unix_ms,
+        ) {
+            Ok(receipt) => cage_receipts.enforcement_receipt = Some(receipt),
+            Err(error) => return Err(fail_caged_child(error, child, &cage_receipts, None)),
         }
         let (stdin, stdout, stderr) = stdio.into_parts();
         let transport = Self::from_launched_process(
@@ -1200,6 +1208,11 @@ impl StdioMcpTransport {
     #[must_use]
     pub fn enforcement_evidence(&self) -> Option<&chio_cage::FullyEnforcedEvidence> {
         self.enforcement_evidence.as_ref()
+    }
+
+    /// The signed enforcement receipt read back from the authoritative sink.
+    pub fn enforcement_receipt(&self) -> Option<&chio_core::receipt::body::ChioReceipt> {
+        self.cage_receipts.as_ref()?.enforcement_receipt.as_ref()
     }
 
     /// Send the MCP `initialize` handshake followed by the

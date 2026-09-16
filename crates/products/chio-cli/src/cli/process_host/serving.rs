@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::Path;
 
@@ -12,7 +13,11 @@ use chio_process::worker::{WorkerServer, WorkerService};
 use super::state::{error, Config, Host};
 use crate::CliError;
 
-type ConnectedServers = (Vec<Box<dyn ToolServerConnection>>, Vec<ToolManifest>);
+type ConnectedServers = (
+    Vec<Box<dyn ToolServerConnection>>,
+    Vec<ToolManifest>,
+    BTreeMap<String, chio_process::ProcessLaunchReceipt>,
+);
 
 pub(super) fn connect(
     config: &Config,
@@ -22,6 +27,7 @@ pub(super) fn connect(
 ) -> Result<ConnectedServers, CliError> {
     let mut servers: Vec<Box<dyn ToolServerConnection>> = Vec::new();
     let mut manifests = Vec::new();
+    let mut launch_receipts = BTreeMap::new();
     for server in &config.servers {
         let arguments: Vec<_> = server.command[1..].iter().map(String::as_str).collect();
         let launch = crate::mcp_cli::load_native_mcp_launch(
@@ -84,6 +90,21 @@ pub(super) fn connect(
                 "governed process tool has no verified enforcement evidence",
             ));
         }
+        if let Some(receipt) = adapter.native_enforcement_receipt() {
+            let bytes = chio_core::canonical_json_bytes(receipt).map_err(error)?;
+            launch_receipts.insert(
+                server.id.clone(),
+                chio_process::ProcessLaunchReceipt::new(
+                    receipt.id.clone(),
+                    chio_core::sha256_hex(&bytes),
+                )
+                .map_err(error)?,
+            );
+        } else if require_enforced {
+            return Err(error(
+                "governed process tool has no persisted enforcement receipt",
+            ));
+        }
         let mut manifest = adapter.manifest_clone();
         manifest.tools.sort_by(|a, b| a.name.cmp(&b.name));
         manifests.push(manifest);
@@ -114,7 +135,7 @@ pub(super) fn connect(
         chio_manifest::validate_manifest(&manifest).map_err(error)?;
         manifests.push(manifest);
     }
-    Ok((servers, manifests))
+    Ok((servers, manifests, launch_receipts))
 }
 
 pub(super) fn serve(state: &Path, socket: &Path) -> Result<(), CliError> {
