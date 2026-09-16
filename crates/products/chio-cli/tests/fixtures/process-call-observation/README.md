@@ -11,3 +11,10 @@ key or private retained admission request is included. The artifact is a later
 signed readback of the fenced store. Its custody claim does not pretend an
 original completed-call commitment exists. This fixture supports offline
 signature and semantic regressions; it does not certify all M5 requirements.
+
+`interrupted.json` records the distinct network case: the confined tool exited
+before responding. Its original signed receipt is incomplete and retains an
+exact continuation commitment. The later store observation retains the unknown
+operation and incident. `interrupted-kernel.pub` and
+`interrupted-provenance.json` identify the public verification inputs. Neither
+fixture claims an unknown external outcome became a completed tool result.

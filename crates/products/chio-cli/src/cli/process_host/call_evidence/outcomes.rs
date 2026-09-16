@@ -16,7 +16,7 @@ use super::*;
 #[path = "outcomes_export.rs"]
 mod exporting;
 #[cfg(target_os = "linux")]
-pub(crate) use exporting::export;
+pub(crate) use self::exporting::export;
 
 const OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v1";
 

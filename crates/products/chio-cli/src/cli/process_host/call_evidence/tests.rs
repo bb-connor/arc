@@ -11,6 +11,56 @@ const KEY: &str = include_str!(concat!(
 const RUNTIME: &str = "714d3643-e7f7-42f9-95b5-6a3a0d734ce8";
 
 #[test]
+fn real_interrupted_call_keeps_its_original_signed_custody_reference() -> Result<(), CliError> {
+    let text = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/process-call-observation/interrupted.json"
+    ));
+    let key = PublicKey::from_hex(
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/process-call-observation/interrupted-kernel.pub"
+        ))
+        .trim(),
+    )
+    .map_err(error)?;
+    let signed = crate::receipt_verify::verify_original_receipt(text, &key)?;
+    let evidence: Evidence =
+        serde_json::from_value(signed.action.parameters.clone()).map_err(error)?;
+    verify(
+        &signed,
+        &evidence,
+        &key,
+        "a86fa37d-97ec-4e6b-afbd-b178dd9a10a8",
+    )?;
+    let call = crate::process_response_verify::verify_values(
+        &evidence.request,
+        &evidence.context,
+        &evidence.response,
+        &key,
+    )?;
+    assert!(matches!(call.decision, Some(Decision::Incomplete { .. })));
+    let operation = evidence
+        .operation
+        .as_ref()
+        .ok_or_else(|| error("missing fixture operation"))?;
+    assert_eq!(
+        operation.state,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch
+    );
+    let metadata = call
+        .metadata
+        .as_ref()
+        .ok_or_else(|| error("missing metadata"))?;
+    assert!(metadata["admission_operation"].is_null());
+    assert_eq!(
+        metadata["chio_runtime"]["operation_owned_replay"]["reference"],
+        serde_json::to_value(&operation.history[0].history.reference).map_err(error)?
+    );
+    Ok(())
+}
+
+#[test]
 fn real_unknown_call_preserves_uncertainty_and_retained_custody() -> Result<(), CliError> {
     let key = PublicKey::from_hex(KEY.trim()).map_err(error)?;
     let signed = crate::receipt_verify::verify_original_receipt(ARTIFACT, &key)?;
