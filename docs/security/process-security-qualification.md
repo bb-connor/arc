@@ -62,6 +62,35 @@ transport deadline changes. `mcp-blocking-dispatch/` retains the failing and
 passing tests. A fresh confined run must establish whether this repair resolves
 the observed scenario failure before contention can be qualified.
 
+At `cb5a34e722b52c794f2aaf84fbcb02a40bac3f03`, all 116 adapter tests, both live
+shared-family host tests and strict adapter/CLI all-target Clippy also pass on
+Linux/aarch64, retained in `linux-m5-cb5a34e72/`. An attempted faster diagnostic
+link with final CLI LTO disabled fails because the cached release dependencies
+cannot be linked in that configuration. `cross-x86-diagnostic-cb5a34e72/` retains
+that build failure; no diagnostic executable or runtime pass is claimed. The
+unmodified `docker-release` build is recorded separately.
+
+The new `process attest-call` and offline `process verify-call` commands retain
+one call's observed outcome and operation-owned continuation custody without
+requiring a successful graph completion. Export checks the original private
+request through the fenced, anchored store API; those private request bytes are
+not exported. The artifact carries the public binding, original signed response
+and existing claim commitment preimages. Completed calls require their actual
+terminal receipt; uncertain calls retain an incident rather than inventing a
+tool result. Compensated calls cannot claim committed dispatch or live custody.
+
+The Linux integration gate at `bf263bf6a5811553fbc330a0ffa1cdd1a9d87909` exports
+and verifies two real allowed calls and two compensated calls from the shared
+family fixture. It rejects 38 re-signed semantic substitutions, 12 wrong runtime,
+key or caller-context selections, and four unsigned changes. Strict CLI
+all-target Clippy passes. `linux-call-bf263bf6a/` retains both gates. Earlier
+compile errors and a fixture directory-permission failure remain in
+`linux-call-f2e72bc05/` and `linux-call-08c4300ed/`; the fixture now explicitly uses
+0700 without relaxing the host's credential boundary. The macOS offline verifier
+build passes at `08c4300ed`, with identical command implementation and SHA-256
+`2761a616b55d4438c280e41e508167527e39c001da3026355eae40c5d32a70ff`.
+Real uncertain-call readback and the composed scenario artifact remain open.
+
 The retained host-crash result exposes an artifact distinction: the signed
 unknown-outcome receipt observes the replacement connection opened during
 recovery. Its `native_launch` reference is not the original target's launch.
