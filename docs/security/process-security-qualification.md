@@ -62,6 +62,22 @@ terminal receipt is fabricated. The complete scenario verifier must preserve
 these distinct claims instead of treating recovery launch evidence as proof of
 the earlier effect's execution.
 
+`d9a070c57f65a98fec77a46203570bcd50ed3629` adds offline
+`receipt verify-native-start` for that original launch. It reuses the same
+policy, manifest, typed cage receipt, executable and execution-identity checks
+as the completed-run verifier. The caller must supply the policy signer,
+selected receipt ID and expected target digest. It makes no claim about target
+death or terminal outcome. The two owning verifier tests, strict all-target CLI
+Clippy and CLI build pass on macOS. Against retained actual x86 evidence, both
+original host-crash launches pass; eight wrong-server, wrong-receipt,
+wrong-target and wrong-signer cases fail as required; all three existing
+completed artifacts still pass. These 13 offline results, command logs and
+verifier SHA-256 `a6b34b0388457718f023f0b1076d4ff5c4729194660feb15a8796c57f3bd5d04`
+are retained in `native-start-verifier/offline/`. The original runtime source
+remains `e42e0ed41`, and this is retrospective verification, not a new live run.
+The affected Linux verification queue is pending behind the active optimized
+build; the full scenario artifact remains open.
+
 The unmodified `docker-release` CLI build passes at Rust source
 `e42e0ed41656e345438664a3d382727f454296f9`, with executable SHA-256
 `cb7f42f5fdf54d8dea33d129228455e1efca67bd14ebf0689192d280d365ab82`.
