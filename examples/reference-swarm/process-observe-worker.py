@@ -23,53 +23,47 @@ def main():
     if expected not in ["allow", "deny"]:
         raise ValueError("unsupported expected verdict")
     client = ProcessClient(connection["socket_path"], connection["credential"])
+
+    def invoke(request):
+        # Retain progress without logging arguments, credentials or output.
+        label = request["operation_key"]
+        print(f"invoke {label}: started", file=sys.stderr, flush=True)
+        result = client.invoke(
+            label,
+            request["server_id"],
+            request["tool_name"],
+            request["arguments"],
+            governed_intent=request["governed_intent"],
+        )
+        print(f"invoke {label}: {result['verdict']}", file=sys.stderr, flush=True)
+        return result
+
     observations = []
     for probe in call.get("probes", []):
-        response = client.invoke(
-            probe["operation_key"],
-            probe["server_id"],
-            probe["tool_name"],
-            probe["arguments"],
-            governed_intent=probe["governed_intent"],
-        )
+        response = invoke(probe)
         if response["verdict"] != "deny" or response.get("output") is not None:
             raise RuntimeError("unauthorized probe released a result")
         observations.append({"request": probe, "response": response})
-    response = client.invoke(
-        call["operation_key"],
-        call["server_id"],
-        call["tool_name"],
-        call["arguments"],
-        governed_intent=call["governed_intent"],
-    )
+    response = invoke(call)
+    print("inspect: started", file=sys.stderr, flush=True)
     current = client.inspect()["checkpoint"]
     previous = current["value"]
     if previous and previous["response"]["receipt_json"] != response["receipt_json"]:
         raise RuntimeError("recovery replaced the original tool receipt")
     if call.get("check_replay"):
-        replay = client.invoke(
-            call["operation_key"],
-            call["server_id"],
-            call["tool_name"],
-            call["arguments"],
-            governed_intent=call["governed_intent"],
-        )
+        replay = invoke(call)
         if replay != response:
             raise RuntimeError("logical replay replaced the original response")
         attempt = dict(call, operation_key="reused-continuation")
-        refused = client.invoke(
-            attempt["operation_key"],
-            attempt["server_id"],
-            attempt["tool_name"],
-            attempt["arguments"],
-            governed_intent=attempt["governed_intent"],
-        )
+        refused = invoke(attempt)
         if refused["verdict"] != "deny" or refused.get("output") is not None:
             raise RuntimeError("continuation authorized an additional result")
         observations.append({"request": attempt, "response": refused})
+    print("checkpoint: started", file=sys.stderr, flush=True)
     client.checkpoint(
         current["revision"], {"response": response, "probes": observations}
     )
+    print("checkpoint: retained", file=sys.stderr, flush=True)
     if call.get("crash_after_checkpoint") and bootstrap["attempt"] == 1:
         os.kill(os.getpid(), signal.SIGKILL)
     if response["verdict"] != expected:
