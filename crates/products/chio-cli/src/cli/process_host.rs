@@ -39,6 +39,24 @@ mod swarm;
 
 #[derive(Subcommand)]
 pub(crate) enum ProcessCommands {
+    /// Observe finished workers, issued graphs, call outcomes and durable family usage (Linux).
+    AttestOutcomes {
+        #[arg(long)]
+        state: PathBuf,
+        #[arg(long)]
+        plan: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Verify worker outcomes and their issued authority without opening host state.
+    VerifyOutcomes {
+        #[arg(long)]
+        artifact: PathBuf,
+        #[arg(long)]
+        trusted_kernel_pubkey: PathBuf,
+        #[arg(long)]
+        runtime_id: String,
+    },
     /// Observe one retained call and its continuation custody while stopped (Linux).
     AttestCall {
         #[arg(long)]
@@ -189,6 +207,22 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
     #[cfg(unix)]
     {
         match command {
+            ProcessCommands::AttestOutcomes { state, plan, out } => {
+                #[cfg(target_os = "linux")]
+                {
+                    call_evidence::export_outcomes(&state, &plan, &out)
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    let _ = (state, plan, out);
+                    Err(state::error("worker outcome attestation requires Linux"))
+                }
+            }
+            ProcessCommands::VerifyOutcomes {
+                artifact,
+                trusted_kernel_pubkey,
+                runtime_id,
+            } => call_evidence::verify_outcomes(&artifact, &trusted_kernel_pubkey, &runtime_id),
             ProcessCommands::AttestCall {
                 state,
                 request,

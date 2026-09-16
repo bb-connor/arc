@@ -324,6 +324,39 @@ does not prove an external effect was absent. Task authority, aggregate usage,
 confinement, physical effects and graph completion require their own evidence.
 This command does not replace `verify-run` or close M5 acceptance.
 
+### Observe all worker outcomes and family accounting
+
+After every declared worker has finished and the host has stopped, export its
+retained outcomes together:
+
+```sh
+chio process attest-outcomes --state "$PWD/run-state" \
+  --plan "$PWD/run-state/reference-run-plan.json" --out "$PWD/outcomes.json"
+chio process verify-outcomes --artifact "$PWD/outcomes.json" \
+  --trusted-kernel-pubkey "$PWD/operator-kernel.pub" --runtime-id "$RUNTIME_ID"
+```
+
+Keep the kernel key and runtime ID independently. Export reads each original
+worker checkpoint under one stopped-host lease, verifies its retained call, and
+reads captured usage from the existing family budget store. It also reads the
+actual worker completion journal and the originally issued graph authorities.
+Multiple graphs may share the same family. Every observed worker must occur in
+exactly one graph; each retained continuation must bind that worker's issued
+single-use token. The captured count must equal the observed committed calls,
+including calls whose external outcome remains unknown. No reserved invocation
+may remain in a finished observation.
+
+Verification reports each `observed_operations` state. A null state means an
+ordinary signed denial without a retained admission operation. Worker completion
+records that the worker finished processing its response; the response can
+still describe a denied or interrupted tool call. The original live graph
+authority is retained without minting a successful join or graph completion.
+
+The report verifies issued task authority, worker completion, call outcomes,
+continuation custody and authoritative family usage. Confinement, physical
+effects, execution nonces and the complete scenario matrix require additional
+evidence. `m5_acceptance_complete` remains false.
+
 ### Verify a launch when the observing host died
 
 A recovered unknown-outcome response can refer to the replacement connection.

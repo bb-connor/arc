@@ -35,6 +35,12 @@ const LIMIT: u64 = 32 * 1024 * 1024;
 #[path = "call_evidence/tests.rs"]
 mod tests;
 
+#[path = "call_evidence/outcomes.rs"]
+mod outcomes;
+#[cfg(target_os = "linux")]
+pub(super) use outcomes::export as export_outcomes;
+pub(super) use outcomes::verify_file as verify_outcomes;
+
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Evidence {

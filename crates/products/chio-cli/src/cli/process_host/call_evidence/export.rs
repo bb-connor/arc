@@ -17,6 +17,43 @@ pub(crate) fn export(
     let context: Value = crate::process_response_verify::read_document(context)?;
     let response: Value = crate::process_response_verify::read_document(response)?;
     let host = Host::open(state, false)?;
+    let now = u64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(error)?
+            .as_millis(),
+    )
+    .map_err(error)?;
+    let signed = observe(&host, request, context, response, now)?;
+    let bytes = canonical_json_bytes(&signed).map_err(error)?;
+    require(bytes.len() as u64 <= LIMIT, "call evidence exceeds 32 MiB")?;
+    let parent = output
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let directory = chio_control_plane::prepare_private_directory(parent)?;
+    write_secret(
+        &directory,
+        output
+            .file_name()
+            .ok_or_else(|| error("artifact needs a file name"))?,
+        &bytes,
+    )?;
+    println!(
+        "{}",
+        json!({"artifact": output, "receipt_id": signed.id, "request_id": signed.action.parameters["response"]["request_id"], "m5_acceptance_complete": false})
+    );
+    Ok(())
+}
+
+/// Read the same anchored state under the caller's existing stopped-host lease.
+pub(super) fn observe(
+    host: &Host,
+    request: Value,
+    context: Value,
+    response: Value,
+    now: u64,
+) -> Result<ChioReceipt, CliError> {
     let key = host.kernel.public_key();
     let call = crate::process_response_verify::verify_values(&request, &context, &response, &key)?;
     require(
@@ -34,13 +71,6 @@ pub(crate) fn export(
             == serde_json::to_value(&cap).map_err(error)?,
         "issued capability differs from provisioning",
     )?;
-    let now = u64::try_from(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(error)?
-            .as_millis(),
-    )
-    .map_err(error)?;
     let request_id = AdmissionIdentifier::try_new(
         "request_id",
         response["request_id"]
@@ -125,23 +155,5 @@ pub(crate) fn export(
     body.content_hash = hash(&parameters)?;
     let signed = ChioReceipt::sign(body, &host.authority.kernel_keypair()).map_err(error)?;
     verify(&signed, &evidence, &key, host.runtime.runtime_id())?;
-    let bytes = canonical_json_bytes(&signed).map_err(error)?;
-    require(bytes.len() as u64 <= LIMIT, "call evidence exceeds 32 MiB")?;
-    let parent = output
-        .parent()
-        .filter(|p| !p.as_os_str().is_empty())
-        .unwrap_or(Path::new("."));
-    let directory = chio_control_plane::prepare_private_directory(parent)?;
-    write_secret(
-        &directory,
-        output
-            .file_name()
-            .ok_or_else(|| error("artifact needs a file name"))?,
-        &bytes,
-    )?;
-    println!(
-        "{}",
-        json!({"artifact": output, "receipt_id": signed.id, "request_id": evidence.response["request_id"], "m5_acceptance_complete": false})
-    );
-    Ok(())
+    Ok(signed)
 }
