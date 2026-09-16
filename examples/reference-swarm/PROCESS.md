@@ -497,3 +497,54 @@ a signed tool exit. `local_matrix_verified: true` reports that local composition
 `m5_acceptance_complete` stays false pending combined-foundation and designated
 platform qualification. Failed commands keep their logs and do not emit a
 passing matrix.
+
+## Provision brokered launch material
+
+`chio security provision-reference-runtime --broker-binding PATH` can prepare
+the signed launch material for a static brokered MCP tool. This is an M6
+composition primitive. The provider-backed reference topology and its combined
+keyring, broker and quota acceptance remain unqualified.
+
+The operator-reviewed binding file has exactly this shape (replace every
+example value with the reviewed broker's identity):
+
+```json
+{
+  "socket_path": "/run/chio/broker/broker.sock",
+  "authentication_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "expected_peer_identity": { "pid": 1234, "uid": 10002, "gid": 10002 }
+}
+```
+
+The authentication digest is the operator's retained authentication commitment;
+an arbitrary digest is not proof of broker identity. The socket must already
+exist at its canonical absolute path. Provisioning records the reviewed values;
+Linux authenticates the actual connected peer's PID, UID and GID when preparing
+each launch. A missing socket, changed peer or failed connection denies launch.
+
+With a reviewed static MCP executable and its reviewed `tools/list` fixture:
+
+```sh
+chio security provision-reference-runtime \
+  --output-dir "$FRESH_LAUNCH_DIRECTORY" \
+  --cage-init "$CAGE_INIT" --target "$BROKERED_MCP_TOOL" \
+  --tools-fixture "$REVIEWED_TOOLS" --broker-binding "$REVIEWED_BROKER_BINDING" \
+  --receipt-rollback-anchor-root "$PRIVATE_EXTERNAL_ANCHOR" \
+  --execution-uid "$TOOL_UID" --execution-gid "$TOOL_GID" \
+  --server-id brokered-reference-tool
+```
+
+The manifest and operator ceiling use `brokered_native_v1`. The signed policy,
+migration posture and report retain the exact broker binding. Reopening the
+same output validates that binding; changing it refuses to overwrite the
+original artifacts. Broker restarts that change the PID require newly reviewed
+launch material. This profile refuses Shadow mode, discovery launches, raw file
+grants and runtime-file grants. It grants no direct network or environment
+access. Raw provider credentials belong only in the existing broker custody
+boundary, never in this file or the tool's command arguments.
+
+Provisioning does not register a broker attempt, install the kernel's
+supplemental quota verifier, capture a composite hold, or qualify the provider
+request. The current completed-run and worker-outcomes verifiers continue to
+accept only their qualified local launch profile. M6 must compose and verify
+those additional boundaries before claiming a brokered reference run.

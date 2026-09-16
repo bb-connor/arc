@@ -19,6 +19,26 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 #### Current local evidence (2026-09-15, continued September 16 UTC)
 
+At `10c3995ee4aab5c0dbbed707af2b4d9be43d3176`, reference-runtime provisioning
+can sign an operator-reviewed broker socket, authentication digest and peer
+identity into an Enforced `brokered_native_v1` launch. Ten reference-provision
+tests, ten existing demo-provision tests and strict CLI all-target Clippy pass
+on macOS in `macos-broker-provision-10c3995ee/`. The new cases check exact reopen,
+identity/digest substitution, malformed/non-socket input and refusal of Shadow,
+discovery and file grants. Live Linux peer authentication is queued separately.
+This is launch-material composition, not M6 acceptance: the production broker
+authority adapter, supplemental verifier installation, original composite hold
+and keyring/broker/cage receipt join remain unqualified. Existing native outcome
+verification still refuses brokered artifacts.
+
+The receipt-scale gate previously selected an ignored test without `--ignored`,
+so exit zero did not establish a scale run. It now executes the exact ignored
+library test under the release profile and checks the listed and passing test
+inventory. Its histories remain 1,000, 100,000 and 1,000,000 receipts, with the
+unchanged ratio bound. The gate regression rejects empty, ignored, failed and
+substituted test output; the existing inventory verifier self-test also passes.
+The actual million-receipt campaign and retention issue #1045 remain open.
+
 All seven retained runtime states now export and verify native-bound outcomes
 at `1ae9f9dda`. Independent macOS verification accepts all seven and rejects
 42 missing/extra/wrong policy-pin, wrong kernel-key/runtime-pin and unsigned-edit
