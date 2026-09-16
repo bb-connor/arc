@@ -199,7 +199,8 @@ chio process attest-run --state "$PWD/run-state" \
   --plan "$PWD/run-state/reference-run-plan.json" --out "$PWD/completed-run.json"
 chio process verify-run --artifact "$PWD/completed-run.json" \
   --trusted-kernel-pubkey "$PWD/run-state/authority.db.kernel.pub" \
-  --runtime-id "$INITIALIZED_RUNTIME_ID"
+  --runtime-id "$INITIALIZED_RUNTIME_ID" \
+  --trusted-launch-policy-signer "reference-reader=$READER_LAUNCH_POLICY_SIGNER"
 ```
 
 Export requires Linux, the retained completed worker journal, all successful
@@ -209,9 +210,19 @@ observation. It neither dispatches another tool call nor creates new admission
 authority. The verifier binds actual capability bodies, graph/witness references,
 worker request/result receipts, join parents and terminal result digests.
 
+For native tools, use each server ID and policy signer from the operator-owned
+host configuration. Repeat `--trusted-launch-policy-signer SERVER=PUBLIC_KEY`
+for multiple native servers; omit it for hosts with only built-in mailboxes.
+The supervised script supplies these pins from that configuration automatically.
+The v2 artifact includes the original signed launch policy and the existing
+enforcement and terminal receipts. The verifier checks the tool receipt's launch
+reference, policy signer, manifest, executable bindings, execution identity,
+matching launch attempt and observed lifetime. Export fails if its independently
+anchored receipt store lacks the referenced launch or terminal record.
+
 The budget pool in this artifact remains the original allocation authority.
 `aggregate` separately records captured and reserved invocation counts from the
 host's authoritative store. Verification checks this signed observation against
-the issued family limit. Complete custody history, native confinement receipt
-linkage, execution nonces, and the full M5 scenario matrix are still excluded;
+the issued family limit. Complete custody history, execution nonces, and the full
+M5 scenario matrix are still excluded;
 the verifier reports these limits and `m5_acceptance_complete: false`.

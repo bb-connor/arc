@@ -166,14 +166,17 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
     };
     terminal.signature = sign_swarm_terminal_graph_receipt(&terminal, &key).map_err(error)?;
     authority.terminal_receipts.push(terminal);
+    let (confinement, native_pins) = super::native::export(&host.record.config, &results)?;
     let evidence = Evidence {
         schema: SCHEMA.into(),
         runtime_id: host.runtime.runtime_id().into(),
         bootstrap,
+        host_record: host.record,
         authority,
         results,
         runner,
         aggregate,
+        confinement,
     };
     let value = serde_json::to_value(&evidence).map_err(error)?;
     let mut body = evidence.bootstrap.body();
@@ -188,6 +191,7 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
         &evidence,
         &host.kernel.public_key(),
         host.runtime.runtime_id(),
+        &native_pins,
     )?;
     let bytes = canonical_json_bytes(&signed).map_err(error)?;
     require(

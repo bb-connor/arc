@@ -17,6 +17,41 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 ### Latest local continuation
 
+#### Subsequent local evidence and repairs
+
+`bcf81182a` repairs the minimal profile's missing read-only Rust startup
+queries, `sched_getaffinity` and x86 `readlink`, after an actual reader launch
+recorded `SIGSYS`. The preceding `4ddf40ada` run did persist both enforcement
+and terminal receipts, establishing that `54cc0c052` repaired the preparation
+binding failure. The real-kernel success probe now exercises both queries;
+the full cage gate is running at `bcf81182a`, with its original denial controls
+and mutation inventories unchanged. Cross-built CLI and static tools at that
+source passed and have hashes in `x86-executables-bcf81182a/manifest.json`.
+
+The entire `db7f7049b` Linux M5 queue passed: completed-run evidence, 10 host
+cases, five response-verification cases and strict all-target CLI Clippy.
+`5c8cb8e7f` carries the persisted cage launch receipt's ID and canonical digest
+into the actual tool receipt. Four host-route tests pass, including authenticated
+context substitution and restart with a different launch while recovering the
+original receipt without another effect. CLI and adapter all-target checks pass.
+
+The `97705575b` foundation flow gate failed on an outdated exact inventory after
+all 31 selected return-context tests passed. It omitted
+`caller_custody_rejects_each_selected_family_without_its_physical_ledger`.
+`810664017` adds that existing test to the mandatory inventory and updates its
+contract count; the 69-inventory shell contract passes. The complete foundation
+queue has restarted at this frozen source. The failed run and its binary/log
+hashes remain in `linux-97705575b/`; no full flow or workspace pass is claimed.
+
+The original x86 mutation gate remains failed at `6374eb394`. A diagnostic retry
+of its two timeout cases passed with unchanged deadlines and the matching mutant
+helper. The first diagnostic attempt refused an executable created under an
+incorrect umask before launch; its logs remain separate. The complete owning
+gate at the repaired source must pass before treating that lane as qualified.
+
+The native receipt-chain export is under implementation and validation. The
+entries below retain the source-bounded evidence from earlier checkpoints.
+
 Current implementation checkpoint: `4ddf40ada850d77d205d694908d3e2516ff1d375`,
 with the execution checkout qualifying `a4c3a77eee190c9feac589d035f25c9474346e9f`.
 The implementation checkout is `/tmp/arc-m5-evidence`, maintained by the same

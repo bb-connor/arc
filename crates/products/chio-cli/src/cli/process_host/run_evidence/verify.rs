@@ -18,6 +18,7 @@ pub(super) fn verify(
     evidence: &Evidence,
     key: &PublicKey,
     runtime_id: &str,
+    native_pins: &BTreeMap<String, PublicKey>,
 ) -> Result<(), CliError> {
     verified_receipt(signed, key)?;
     observation(signed, "attest_completed_fanout")?;
@@ -30,6 +31,13 @@ pub(super) fn verify(
         "signed run payload differs",
     )?;
     verified_receipt(&evidence.bootstrap, key)?;
+    require(
+        evidence.bootstrap.action.parameters["record_sha256"] == hash(&evidence.host_record)?
+            && evidence.host_record.runtime_policy_hash == evidence.bootstrap.policy_hash,
+        "host record differs from original provisioning",
+    )?;
+    super::super::state::require_abi(&evidence.host_record.abi, "completed run")?;
+    super::native::verify(evidence, native_pins)?;
     observation(&evidence.bootstrap, "provision_swarm")?;
     require(
         evidence.bootstrap.action.parameters["runtime_id"] == runtime_id,

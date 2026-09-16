@@ -86,6 +86,11 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
     assert_eq!(signer.public_key(), original.kernel_key);
     let cases = [
         (
+            "/host_record/config/limits/max_calls",
+            json!(9999),
+            "host record differs",
+        ),
+        (
             "/aggregate/captured_invocations",
             json!(0),
             "aggregate usage",

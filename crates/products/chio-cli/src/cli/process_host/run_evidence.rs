@@ -19,10 +19,12 @@ use crate::CliError;
 mod exporting;
 #[cfg(target_os = "linux")]
 pub(super) use exporting::export;
+#[path = "run_evidence/native.rs"]
+mod native;
 #[path = "run_evidence/verify.rs"]
 mod verification;
 
-const SCHEMA: &str = "chio.process.completed-fanout.v1";
+const SCHEMA: &str = "chio.process.completed-fanout.v2";
 const MAX_ARTIFACT_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Serialize, Deserialize)]
@@ -31,11 +33,13 @@ struct Evidence {
     schema: String,
     runtime_id: String,
     bootstrap: ChioReceipt,
+    host_record: super::state::Record,
     /// Original signed allocation authority, distinct from captured quota below.
     authority: SwarmAuthorityBundle,
     results: BTreeMap<String, CompletedCall>,
     runner: Value,
     aggregate: AggregateUsage,
+    confinement: BTreeMap<String, crate::mcp_cli::NativeLaunchEvidence>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -82,7 +86,12 @@ fn verified_receipt(receipt: &ChioReceipt, key: &PublicKey) -> Result<ChioReceip
     )
 }
 
-pub(super) fn verify_file(path: &Path, key_path: &Path, runtime_id: &str) -> Result<(), CliError> {
+pub(super) fn verify_file(
+    path: &Path,
+    key_path: &Path,
+    runtime_id: &str,
+    native_pins: &[String],
+) -> Result<(), CliError> {
     let key = crate::load_trusted_kernel_pubkey(key_path).map_err(error)?;
     let file = std::fs::File::open(path)?;
     require(
@@ -99,15 +108,35 @@ pub(super) fn verify_file(path: &Path, key_path: &Path, runtime_id: &str) -> Res
     let signed = crate::receipt_verify::verify_original_receipt(&text, &key)?;
     let evidence: Evidence =
         serde_json::from_value(signed.action.parameters.clone()).map_err(error)?;
-    verification::verify(&signed, &evidence, &key, runtime_id)?;
+    verification::verify(
+        &signed,
+        &evidence,
+        &key,
+        runtime_id,
+        &native::pins(native_pins)?,
+    )?;
+    let mut checks = vec![
+        "signer_pin",
+        "runtime_pin",
+        "issued_capabilities",
+        "worker_responses",
+        "task_authority",
+        "actual_join_parents",
+        "terminal_result",
+        "runner_completion",
+        "aggregate_usage",
+    ];
+    if !evidence.confinement.is_empty() {
+        checks.push("confinement_receipt_chain");
+    }
     println!(
         "{}",
         json!({
             "schema": "chio.process.run-verification.v1", "runtime_id": evidence.runtime_id,
             "verified_workers": evidence.results.keys().collect::<Vec<_>>(),
             "captured_invocations": evidence.aggregate.captured_invocations,
-            "checks": ["signer_pin", "runtime_pin", "issued_capabilities", "worker_responses", "task_authority", "actual_join_parents", "terminal_result", "runner_completion", "aggregate_usage"],
-            "unchecked": ["confinement_receipt_chain", "continuation_custody_export", "scenario_matrix", "execution_nonces"],
+            "verified_native_launches": evidence.confinement.len(), "checks": checks,
+            "unchecked": ["continuation_custody_export", "scenario_matrix", "execution_nonces"],
             "m5_acceptance_complete": false,
         })
     );

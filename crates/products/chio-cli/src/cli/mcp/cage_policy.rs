@@ -10,6 +10,12 @@ use serde::{Deserialize, Serialize};
 pub(crate) const MCP_CAGE_LAUNCH_POLICY_SCHEMA: &str = "chio.mcp.cage-launch-policy.v2";
 const MAX_CAGE_POLICY_BYTES: usize = 4 * 1024 * 1024;
 
+#[path = "cage_policy/evidence.rs"]
+mod evidence;
+pub(crate) use evidence::{verify_native_launch_evidence, NativeLaunchEvidence};
+#[cfg(target_os = "linux")]
+pub(crate) use evidence::export_native_launch_evidence;
+
 #[cfg(all(test, target_os = "linux"))]
 #[path = "cage_receipt_tests.rs"]
 mod receipt_tests;
@@ -1278,7 +1284,7 @@ mod tests {
         (signed, keypair)
     }
 
-    fn policy(
+    pub(super) fn policy(
         manifest_profile: chio_manifest::NativeSyscallProfile,
         ceiling_profile: chio_manifest::NativeSyscallProfile,
     ) -> McpCageLaunchPolicy {
@@ -1350,7 +1356,7 @@ mod tests {
         }
     }
 
-    fn signed_policy(
+    pub(super) fn signed_policy(
         policy: McpCageLaunchPolicy,
         signer: &chio_core::Keypair,
     ) -> SignedMcpCageLaunchPolicy {

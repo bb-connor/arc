@@ -149,6 +149,13 @@ def main():
         "--out",
         artifact,
     )
+    native_pins = []
+    host = json.loads((state / "host.json").read_text())
+    for server in host["config"]["servers"]:
+        native_pins.extend([
+            "--trusted-launch-policy-signer",
+            f"{server['id']}={server['launch_policy_signer']}",
+        ])
     run_verification = run(
         chio,
         "process",
@@ -159,6 +166,7 @@ def main():
         key,
         "--runtime-id",
         calls["runtime_id"],
+        *native_pins,
     )
     write(output / "completed-run-verification.json", run_verification)
     result = {
