@@ -166,5 +166,8 @@ pub(super) fn export(
         }
         pins.insert(server_id, key);
     }
-    Ok(ExportedLaunches { confinement: launches, pins })
+    Ok(ExportedLaunches {
+        confinement: launches,
+        pins,
+    })
 }

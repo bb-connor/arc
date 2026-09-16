@@ -3,10 +3,10 @@
 
 #[path = "swarm/graph.rs"]
 mod graph;
-#[path = "swarm/requests.rs"]
-mod requests;
 #[path = "swarm/plan.rs"]
 mod plan;
+#[path = "swarm/requests.rs"]
+mod requests;
 
 use plan::{Graph, Plan};
 
@@ -185,8 +185,12 @@ pub(super) fn provision(
         SqliteRuntimeOrchestrationStore::open(directory.path().join(SOURCE)).map_err(error)?;
     let mut calls = Vec::new();
     for (graph, bundle) in plan.graphs.iter().zip(&bundles) {
-        calls.extend(requests::prepare(graph, bundle, runtime, record, &admission, &source)?);
-        source.insert_swarm_authority_bundle(bundle.clone()).map_err(error)?;
+        calls.extend(requests::prepare(
+            graph, bundle, runtime, record, &admission, &source,
+        )?);
+        source
+            .insert_swarm_authority_bundle(bundle.clone())
+            .map_err(error)?;
     }
     let calls = serde_json::json!({
         "schema": "chio.process.swarm-calls.v1", "runtime_id": runtime.runtime_id(), "calls": calls,
@@ -194,8 +198,9 @@ pub(super) fn provision(
     let (store, fence) = authority
         .local_runtime_participant()
         .ok_or_else(|| error("swarm source requires a local qualified authority"))?;
-    let source_id = AdmissionIdentifier::try_new("source_id", format!("process-{}", plan.profile_id))
-        .map_err(error)?;
+    let source_id =
+        AdmissionIdentifier::try_new("source_id", format!("process-{}", plan.profile_id))
+            .map_err(error)?;
     let runtime_id = AdmissionIdentifier::try_new("runtime_id", runtime.runtime_id().to_owned())
         .map_err(error)?;
     let expected = store
@@ -224,23 +229,24 @@ pub(super) fn provision(
         routes,
     };
     let (signature, _) = issuer.sign_canonical(&body).map_err(error)?;
-    let (bundle_name, bundle_bytes) = if let [bundle] = bundles.as_slice() {
-        ("swarm-bundle.json", canonical_json_bytes(bundle).map_err(error)?)
-    } else {
-        ("swarm-bundles.json", canonical_json_bytes(&serde_json::json!({
+    let (bundle_name, bundle_bytes) =
+        if let [bundle] = bundles.as_slice() {
+            (
+                "swarm-bundle.json",
+                canonical_json_bytes(bundle).map_err(error)?,
+            )
+        } else {
+            ("swarm-bundles.json", canonical_json_bytes(&serde_json::json!({
             "schema": "chio.process.swarm-authorities.v1", "runtime_id": runtime.runtime_id(),
             "graphs": bundles,
         })).map_err(error)?)
-    };
+        };
     for (name, bytes) in [
         (
             "swarm-bootstrap.json",
             canonical_json_bytes(&bootstrap).map_err(error)?,
         ),
-        (
-            bundle_name,
-            bundle_bytes,
-        ),
+        (bundle_name, bundle_bytes),
         (
             "swarm-calls.json",
             canonical_json_bytes(&calls).map_err(error)?,
@@ -382,10 +388,22 @@ mod plan_tests {
         for graphs in [
             vec![],
             vec![graph("first", &["alice", "bob"])],
-            vec![graph("same", &["alice", "bob"]), graph("same", &["carol", "dave"])],
-            vec![graph("first", &["alice", "bob"]), graph("second", &["alice", "dave"])],
-            vec![graph("first", &["alice", "bob"]), graph("second", &["root", "dave"])],
-            vec![graph("first", &["alice", "bob"]), graph("second", &["carol"])],
+            vec![
+                graph("same", &["alice", "bob"]),
+                graph("same", &["carol", "dave"]),
+            ],
+            vec![
+                graph("first", &["alice", "bob"]),
+                graph("second", &["alice", "dave"]),
+            ],
+            vec![
+                graph("first", &["alice", "bob"]),
+                graph("second", &["root", "dave"]),
+            ],
+            vec![
+                graph("first", &["alice", "bob"]),
+                graph("second", &["carol"]),
+            ],
         ] {
             assert!(read_plan(json!({
                 "schema": "chio.process.swarm-plan.v2", "profile_id": "shared-family", "graphs": graphs,
@@ -396,18 +414,25 @@ mod plan_tests {
         assert!(read_plan(legacy.clone()).is_ok());
         legacy["graphs"] = json!([]);
         assert!(read_plan(legacy).is_err());
-        let graphs = (0..9).map(|index| graph(
-            &format!("graph-{index}"),
-            &[&format!("worker-{index}-a"), &format!("worker-{index}-b")],
-        )).collect::<Vec<_>>();
+        let graphs = (0..9)
+            .map(|index| {
+                graph(
+                    &format!("graph-{index}"),
+                    &[&format!("worker-{index}-a"), &format!("worker-{index}-b")],
+                )
+            })
+            .collect::<Vec<_>>();
         assert!(read_plan(json!({
             "schema": "chio.process.swarm-plan.v2", "profile_id": "too-many-graphs", "graphs": graphs,
         })).is_err());
-        let children = (0..31).map(|index| format!("worker-{index}")).collect::<Vec<_>>();
+        let children = (0..31)
+            .map(|index| format!("worker-{index}"))
+            .collect::<Vec<_>>();
         let children = children.iter().map(String::as_str).collect::<Vec<_>>();
         assert!(read_plan(json!({
             "schema": "chio.process.swarm-plan.v2", "profile_id": "too-many-children",
             "graphs": [graph("first", &children), graph("second", &["alice", "bob"])],
-        })).is_err());
+        }))
+        .is_err());
     }
 }

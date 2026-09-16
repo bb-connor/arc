@@ -94,6 +94,12 @@ representation. This preserves valid enum variants and typed associated aliases,
 and rejects numeric associated constants. It follows the type check already
 used by the crate's `make_bitflags!` macro.
 
+The retained patch uses zero context so blank context markers do not become
+trailing whitespace when the patch file is added to a candidate. From the
+checksum-verified `enumflags2_derive` source directory, apply it with
+`git apply --unidiff-zero --whitespace=error-all /path/to/enumflags2-0.7.12-default-type.patch`.
+Its output is byte-identical to the previously reviewed repaired source.
+
 The patch was applied to a separate copy of the exact reviewed derive source.
 With Rust 1.94.1, the original invalid-default example now fails compilation
 with `expected Flag, found u8`. A positive executable passes for `u8`, `u16`,

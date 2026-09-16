@@ -50,7 +50,9 @@ pub(super) fn load(path: &Path) -> Result<Plan, CliError> {
         },
         Document::SharedFamily { profile_id, graphs } => {
             if !(2..=8).contains(&graphs.len()) {
-                return Err(error("a shared-family plan requires 2-8 independent graphs"));
+                return Err(error(
+                    "a shared-family plan requires 2-8 independent graphs",
+                ));
             }
             Plan { profile_id, graphs }
         }
@@ -73,7 +75,9 @@ pub(super) fn load(path: &Path) -> Result<Plan, CliError> {
                 return Err(error("planned arguments must be an object"));
             }
             if call.process == "root" || !processes.insert(&call.process) {
-                return Err(error("a bounded fan-out plan needs one call per distinct child"));
+                return Err(error(
+                    "a bounded fan-out plan needs one call per distinct child",
+                ));
             }
             if processes.len() > 32 {
                 return Err(error("a shared-family plan exceeds 32 total planned calls"));
