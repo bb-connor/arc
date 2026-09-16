@@ -194,3 +194,105 @@ pub(super) fn export(
     }
     Ok(Exported { confinement, pins })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retained_crash_outcomes_bind_actual_launches_without_inventing_exits(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let key = PublicKey::from_hex(
+            include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-budget-kernel.pub")
+                .trim(),
+        )?;
+        let signed = crate::receipt_verify::verify_original_receipt(
+            include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-budget.json"),
+            &key,
+        )?;
+        let selected: Value = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/process-worker-outcomes/v2-budget-pins.json"
+        ))?;
+        let pins: BTreeMap<String, PublicKey> = selected["launch_policy_signers"]
+            .as_object()
+            .ok_or("pins")?
+            .iter()
+            .map(|(server, value)| {
+                Ok((
+                    server.clone(),
+                    PublicKey::from_hex(value.as_str().ok_or("key")?)?,
+                ))
+            })
+            .collect::<Result<_, Box<dyn std::error::Error>>>()?;
+        let runtime = selected["runtime_id"].as_str().ok_or("runtime")?;
+        let run: Outcomes = serde_json::from_value(signed.action.parameters.clone())?;
+        let report = super::super::verify_outcomes(&signed, &run, &key, runtime, &pins)?;
+        assert_eq!(report.len(), 4);
+        assert_eq!(report["alice"]["terminal_verified"], false);
+        assert_eq!(report["bob"]["terminal_verified"], false);
+        assert_eq!(report["carol"]["terminal_verified"], true);
+        assert_eq!(report["dave"]["terminal_verified"], true);
+        assert!(verify(&run, &BTreeMap::new()).is_err());
+        let mut extra_pin = pins.clone();
+        extra_pin.insert("unused-server".into(), key.clone());
+        assert!(verify(&run, &extra_pin).is_err());
+        let mut wrong_pin = pins.clone();
+        wrong_pin.insert("alice-probe".into(), key);
+        assert!(verify(&run, &wrong_pin).is_err());
+
+        // Test the native composition boundary after the original signatures
+        // above passed. Substituted receipts retain their valid native signatures.
+        let alice = report["alice"]["receipt_id"].as_str().ok_or("alice")?;
+        let carol = report["carol"]["receipt_id"].as_str().ok_or("carol")?;
+        let params = &signed.action.parameters;
+        let cases = [
+            ("/confinement".to_owned(), json!({})),
+            (
+                format!("/confinement/{alice}/enforcement"),
+                params["confinement"][carol]["enforcement"].clone(),
+            ),
+            (
+                format!("/confinement/{alice}/terminal"),
+                params["confinement"][carol]["terminal"].clone(),
+            ),
+            (
+                format!("/confinement/{carol}/terminal"),
+                params["confinement"][carol]["enforcement"].clone(),
+            ),
+            (
+                format!("/confinement/{alice}/signed_policy"),
+                json!(format!("{}\n", run.confinement[alice].signed_policy)),
+            ),
+            (
+                "/host_record/config/servers/0/command".into(),
+                json!(["/bin/another-tool"]),
+            ),
+            ("/host_record/manifests/0/tools".into(), json!([])),
+            ("/observed_at_unix_ms".into(), json!(1)),
+        ];
+        for (pointer, value) in cases {
+            let mut changed = params.clone();
+            *changed.pointer_mut(&pointer).ok_or("mutation target")? = value;
+            let changed: Outcomes = serde_json::from_value(changed)?;
+            assert!(verify(&changed, &pins).is_err(), "accepted {pointer}");
+        }
+        let mut changed: Outcomes = serde_json::from_value(params.clone())?;
+        changed
+            .confinement
+            .insert("unreferenced".into(), run.confinement[alice].clone());
+        assert!(verify(&changed, &pins).is_err());
+
+        // Withholding an exit can only reduce the reported claim to a start.
+        let mut changed: Outcomes = serde_json::from_value(params.clone())?;
+        changed
+            .confinement
+            .get_mut(carol)
+            .ok_or("carol launch")?
+            .terminal = None;
+        assert_eq!(
+            verify(&changed, &pins)?["carol"]["terminal_verified"],
+            false
+        );
+        Ok(())
+    }
+}
