@@ -1135,6 +1135,18 @@ criteria = "safe-to-deploy"
 version = "0.10.9"
 notes = "Top-centrality certification seed. Reviewed for dependency role, declared build behavior, and no new trust-boundary expansion."
 
+[[audits.sigstore-bundle]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.6.6"
+notes = "Reviewed checksum-verified manifests and all production source, tests and fixture inventory. No unsafe code, build script or IO in this package. All 24 upstream tests, two audit boundary tests and strict all-feature Clippy pass; one upstream doc example is ignored. Validation does not authenticate certificates, signatures, timestamps or checkpoints and does not join duplicate root/size fields. Chio separately performs those checks in its owned verifier; six focused log-verifier tests pass. Builder fallback behavior also requires full verification. Details: supply-chain/reviews/sigstore-bundle-0.6.6.md."
+
+[[audits.sigstore-types]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.6.6"
+notes = "Reviewed checksum-verified manifests and all nine source modules. No unsafe code, build script, IO or cryptographic primitive implementation. All 27 unit tests, three doc tests, five additional encoding-boundary tests and strict Clippy pass. Exact signed checkpoint text and DSSE byte lengths are preserved. Audit limits: decoded wrappers are untrusted, log indices require checked unsigned conversion, checkpoint JSON drops signed text, and semantic/input-size validation remains with callers. Details: supply-chain/reviews/sigstore-types-0.6.6.md."
+
 [[audits.smallvec]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"

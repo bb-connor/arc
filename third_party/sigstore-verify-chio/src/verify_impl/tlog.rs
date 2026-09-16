@@ -368,6 +368,43 @@ mod tests {
     }
 
     #[test]
+    fn checkpoint_rejects_substituted_root_and_tree_size(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE)?;
+        let proof = bundle.verification_material.tlog_entries[0]
+            .inclusion_proof
+            .as_ref()
+            .ok_or("fixture lacks an inclusion proof")?;
+        let trusted_root = TrustedRoot::production()?;
+        verify_checkpoint(&proof.checkpoint.envelope, proof, &trusted_root)?;
+
+        let mut changed_root = proof.clone();
+        let mut hash = *changed_root.root_hash.as_bytes();
+        hash[0] ^= 1;
+        changed_root.root_hash = sigstore_types::Sha256Hash::from_bytes(hash);
+        let root_error = verify_checkpoint(
+            &changed_root.checkpoint.envelope,
+            &changed_root,
+            &trusted_root,
+        )
+        .err()
+        .ok_or("substituted proof root was accepted")?;
+        assert!(root_error.to_string().contains("root hash mismatch"));
+
+        let mut changed_size = proof.clone();
+        changed_size.tree_size += 1;
+        let size_error = verify_checkpoint(
+            &changed_size.checkpoint.envelope,
+            &changed_size,
+            &trusted_root,
+        )
+        .err()
+        .ok_or("substituted proof size was accepted")?;
+        assert!(size_error.to_string().contains("tree size mismatch"));
+        Ok(())
+    }
+
+    #[test]
     fn checkpoint_rejects_a_rekor_key_outside_its_current_authority_window() {
         let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
         let proof = bundle.verification_material.tlog_entries[0]
@@ -400,7 +437,10 @@ mod tests {
             .envelope
             .split_once("\n\n")
             .expect("checkpoint body and signatures");
-        let valid_line = signature_block.lines().next().expect("checkpoint signature");
+        let valid_line = signature_block
+            .lines()
+            .next()
+            .expect("checkpoint signature");
         let (line_prefix, encoded_signature) = valid_line
             .rsplit_once(' ')
             .expect("checkpoint signature encoding");
