@@ -7,6 +7,7 @@ They are never converted into tool receipts or platform authorization.
 
 import hashlib
 import json
+import copy
 import subprocess
 import tempfile
 from pathlib import Path
@@ -206,7 +207,9 @@ def verify_observations(name, case, verified, identity):
                 "reference result differs from captured input",
             )
             require(
-                response(call)["request_id"] == item["request_id"],
+                response(call)["request_id"] == item["request_id"]
+                and call["action"]["parameters"]["context"]["capability_id"]
+                == item["capability_id"],
                 "reference request differs",
             )
             reported = next(
@@ -249,7 +252,9 @@ def verify_observations(name, case, verified, identity):
         require(
             set(calls) == {"alice", "bob"}
             and all(state == "completed" for state in states.values())
-            and verified["captured_invocations"] == 2,
+            and verified["captured_invocations"]
+            == observed["captured_invocations"]
+            == 2,
             "authority outcome inventory differs",
         )
         require(
@@ -311,7 +316,10 @@ def verify_observations(name, case, verified, identity):
         launch = run["confinement"][observed["native_launch_receipt_id"]]
         require(
             call["id"] == observed["caller_receipt_id"]
-            and call["decision"]["verdict"] == "incomplete",
+            and call["decision"]["verdict"] == "incomplete"
+            and response(calls["network"])["verdict"]
+            == observed["caller_verdict"]
+            == "deny",
             "network interruption receipt differs",
         )
         require(
@@ -403,7 +411,9 @@ def verify_observations(name, case, verified, identity):
         )
     elif name == "budget":
         require(
-            set(calls) == {"alice", "bob", "carol", "dave"} and verified["graphs"] == 2,
+            set(calls) == {"alice", "bob", "carol", "dave"}
+            and verified["graphs"] == observed["independent_graphs"] == 2
+            and observed["competing_workers"] == 4,
             "budget task graph inventory differs",
         )
         denied = {
@@ -642,4 +652,129 @@ def verify_bundle(chio, artifact, trusted_pins):
             "execution_nonces",
             "receipt_log_inclusion",
         ],
+    }
+
+
+def verify_negative_cases(chio, artifact, trusted_pins):
+    """Repin mutations to test intrinsic signatures and cross-links as well as transport integrity."""
+    verify_bundle(chio, artifact, trusted_pins)
+    original, original_pins = read(artifact), read(trusted_pins)
+    mutations = [
+        (
+            "reference-capability",
+            ["scenarios", "reference", "inputs", "files", 0, "capability_id"],
+            "another-capability",
+        ),
+        (
+            "authority-accounting",
+            ["scenarios", "authority", "observation", "captured_invocations"],
+            99,
+        ),
+        (
+            "filesystem-effect",
+            [
+                "scenarios",
+                "filesystem",
+                "observation",
+                "observations",
+                "forbidden-read",
+                "os_errno",
+            ],
+            0,
+        ),
+        (
+            "network-receipt",
+            ["scenarios", "network", "observation", "caller_receipt_id"],
+            "another-receipt",
+        ),
+        (
+            "revoked-capability",
+            [
+                "scenarios",
+                "revocation",
+                "observation",
+                "issued_capability_revoked",
+                "capability_id",
+            ],
+            "another-capability",
+        ),
+        (
+            "host-crash-operation",
+            ["scenarios", "host-crash", "observation", "operation_id"],
+            "another-operation",
+        ),
+        (
+            "budget-graph-count",
+            ["scenarios", "budget", "observation", "independent_graphs"],
+            1,
+        ),
+        (
+            "budget-effect-count",
+            ["scenarios", "budget", "observation", "protected_effect_count"],
+            3,
+        ),
+        (
+            "signed-outcome-edit",
+            [
+                "scenarios",
+                "reference",
+                "outcomes",
+                "action",
+                "parameters",
+                "aggregate",
+                "captured_invocations",
+            ],
+            99,
+        ),
+        (
+            "completed-run-substitution",
+            ["scenarios", "authority", "completed_run"],
+            original["scenarios"]["reference"]["completed_run"],
+        ),
+    ]
+    results = []
+    with tempfile.TemporaryDirectory(prefix="chio-matrix-mutations-") as temporary:
+        root = Path(temporary)
+
+        def reject(name, changed, selected, repin=True):
+            candidate, pin_file = root / (name + ".json"), root / (name + "-pins.json")
+            write(candidate, changed)
+            if repin:
+                selected["bundle_sha256"] = digest(candidate)
+            write(pin_file, selected)
+            try:
+                verify_bundle(chio, candidate, pin_file)
+            except ValueError as error:
+                results.append({"case": name, "rejected": True, "reason": str(error)})
+            else:
+                raise ValueError(f"matrix verifier accepted {name}")
+
+        for name, path, replacement in mutations:
+            changed = copy.deepcopy(original)
+            value = changed
+            for part in path[:-1]:
+                value = value[part]
+            value[path[-1]] = replacement
+            reject(name, changed, copy.deepcopy(original_pins))
+        changed = copy.deepcopy(original)
+        changed["scenarios"]["budget"]["observation"]["overlap_observed"] = False
+        reject("capture-digest", changed, copy.deepcopy(original_pins), repin=False)
+        reject("contention-observation", changed, copy.deepcopy(original_pins))
+        changed = copy.deepcopy(original)
+        del changed["scenarios"]["network"]
+        reject("missing-scenario", changed, copy.deepcopy(original_pins))
+        changed = copy.deepcopy(original)
+        first, second = sorted(changed["scenarios"]["budget"]["original_launches"])[:2]
+        changed["scenarios"]["budget"]["original_launches"][first]["enforcement"] = (
+            changed["scenarios"]["budget"]["original_launches"][second]["enforcement"]
+        )
+        reject("original-launch-substitution", changed, copy.deepcopy(original_pins))
+        selected = copy.deepcopy(original_pins)
+        selected["scenarios"]["reference"]["runtime_id"] = "another-runtime"
+        reject("runtime-pin", copy.deepcopy(original), selected)
+    return {
+        "schema": SCHEMA + ".negative-verification",
+        "checks": results,
+        "all_rejected": True,
+        "m5_acceptance_complete": False,
     }

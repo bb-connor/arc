@@ -483,6 +483,12 @@ python3 examples/reference-swarm/qualify-process-matrix.py verify \
   --artifact /received/matrix.json --trusted-pins /trusted/operator-pins.json
 ```
 
+Replace `verify` with `test-evidence` to repeat the 15 capture, signature and
+semantic substitution checks. The run command executes those checks before
+reporting success and retains `negative-verification.json`. Most mutation cases
+deliberately update the test capture digest, so they exercise the underlying
+signatures and cross-links as well as rejection of transport tampering.
+
 Verification rechecks the original signatures and joins the observations to
 the same worker identities, responses, launches and durable accounting. An
 operator's file, socket, contention or PID observation remains an external

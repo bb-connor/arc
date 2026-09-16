@@ -17,6 +17,7 @@ from process_matrix_evidence import (
     digest,
     require,
     verify_bundle,
+    verify_negative_cases,
     write,
 )
 
@@ -29,6 +30,12 @@ def main():
     )
     for name in ("chio", "artifact", "trusted-pins"):
         verify.add_argument("--" + name, type=Path, required=True)
+    negative = subparsers.add_parser(
+        "test-evidence",
+        help="Check rejection of capture, signature and semantic substitutions",
+    )
+    for name in ("chio", "artifact", "trusted-pins"):
+        negative.add_argument("--" + name, type=Path, required=True)
     run = subparsers.add_parser(
         "run",
         help="Execute the real local scenario matrix (supported Linux x86_64 only)",
@@ -51,8 +58,9 @@ def main():
     args = parser.parse_args()
     os.umask(0o077)
     chio = args.chio.resolve(strict=True)
-    if args.command == "verify":
-        print(json.dumps(verify_bundle(chio, args.artifact, args.trusted_pins)))
+    if args.command in ("verify", "test-evidence"):
+        verify = verify_bundle if args.command == "verify" else verify_negative_cases
+        print(json.dumps(verify(chio, args.artifact, args.trusted_pins)))
         return
     require(
         platform.system() == "Linux" and platform.machine() == "x86_64",
@@ -250,6 +258,8 @@ def main():
     )
     report = verify_bundle(chio, artifact, trusted_pins)
     write(root / "verification.json", report)
+    negative = verify_negative_cases(chio, artifact, trusted_pins)
+    write(root / "negative-verification.json", negative)
     print(
         json.dumps(
             {
@@ -257,6 +267,7 @@ def main():
                 "operator_pins": str(trusted_pins),
                 "bundle_sha256": digest(artifact),
                 "local_matrix_verified": True,
+                "rejected_substitutions": len(negative["checks"]),
                 "m5_acceptance_complete": False,
             }
         )

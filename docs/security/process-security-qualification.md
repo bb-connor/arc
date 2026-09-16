@@ -19,6 +19,37 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 #### Current local evidence (2026-09-15, continued September 16 UTC)
 
+All seven retained runtime states now export and verify native-bound outcomes
+at `1ae9f9dda`. Independent macOS verification accepts all seven and rejects
+42 missing/extra/wrong policy-pin, wrong kernel-key/runtime-pin and unsigned-edit
+cases. `outcomes-*-cb5a34e72-1ae9f9dda/` and
+`outcomes-*-native-offline-1ae9f9dda/` retain these results. Linux at the same
+source passes all six gates: native evidence unit tests, supervised outcomes,
+completed runs, retained calls, uncertain-call fixtures and strict CLI all-target
+Clippy. The x86 link retry passes after the competing native build finishes;
+the original OOM failure remains retained.
+
+`matrix-retained-cb5a34e72-1ae9f9dda/` contains one independently verified bundle
+of those seven original runs: 17 worker outcomes, three successful completion
+artifacts, eight authority denials and six original pre-crash launches, joined
+to checked input hashes, accounting and pinned external observations. This is
+a retrospective collection of the retained runtime, not a fresh matrix run.
+`matrix-strengthened-tests-2d4b28da0/` records the portable Python verifier's
+exact file hashes, a passing whole-bundle check and 15 rejected capture,
+signature and semantic substitutions. External file/socket/PID observations
+remain the capturing operator's assertions; their separately retained digest
+is not a kernel receipt or designated-runner authorization.
+
+The real version 1 network and version 2 budget artifacts are now regression
+fixtures. At `2d4b28da0`, both pass on macOS, including native policy/receipt
+substitutions, missing and extra pins, and preservation of unknown exits.
+Strict CLI all-target Clippy also passes. The new
+`qualify-process-matrix.py run` entry point composes all seven unchanged local
+scenarios and exports the portable bundle; `verify` and `test-evidence` allow
+independent checks. Its fresh end-to-end execution is pending the optimized
+CLI build. Combined-foundation, full cage inventory and designated-platform
+qualification remain open, so M5 is not marked accepted.
+
 At `1ae9f9ddac749d71f27c9c7f62c49c519a53c7b3`, worker-outcomes version 2
 joins each MCP response to its original signed native launch reference. It
 requires independent policy signer pins and verifies policy, manifest, host
