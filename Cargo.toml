@@ -223,11 +223,14 @@ exclude = [
     "third_party/sigstore-verify-chio",
     # Locally maintained enumflags derive repair; upstream library stays pinned.
     "third_party/enumflags2-derive-chio",
+    # Upstream CRMF tag-dispatch fix backported to the compatible release.
+    "third_party/crmf-chio",
 ]
 
 [patch.crates-io]
 sigstore-verify = { path = "third_party/sigstore-verify-chio" }
 enumflags2_derive = { path = "third_party/enumflags2-derive-chio" }
+crmf = { path = "third_party/crmf-chio" }
 
 [workspace.package]
 version = "0.1.0"

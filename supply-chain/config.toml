@@ -397,6 +397,9 @@ audit-as-crates-io = true
 [policy.chio-workflow-preflight]
 audit-as-crates-io = true
 
+[policy.crmf]
+audit-as-crates-io = false
+
 [policy.enumflags2_derive]
 audit-as-crates-io = false
 
