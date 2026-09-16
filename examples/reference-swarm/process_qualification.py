@@ -28,31 +28,42 @@ class Harness:
         self.state = self.output / "state"
 
     def run(self, label, command, success=True):
-        result = subprocess.run(
-            list(map(str, command)),
-            text=True,
-            capture_output=True,
-            timeout=600,
-            check=False,
-        )
-        (self.output / f"{label}.stdout").write_text(result.stdout)
-        (self.output / f"{label}.stderr").write_text(result.stderr)
-        self.commands.append(
-            {
-                "stage": label,
-                "command": list(map(str, command)),
-                "exit": result.returncode,
-                "expected_success": success,
-            }
-        )
-        (self.output / "commands.json").write_text(
-            json.dumps(self.commands, indent=2) + "\n"
-        )
+        command = list(map(str, command))
+        stdout_path = self.output / f"{label}.stdout"
+        stderr_path = self.output / f"{label}.stderr"
+        observation = {
+            "stage": label,
+            "command": command,
+            "exit": None,
+            "expected_success": success,
+        }
+        # Stream host diagnostics to retained files while a scenario is running.
+        # In particular, a command timeout must not discard its partial evidence.
+        try:
+            with stdout_path.open("w") as stdout, stderr_path.open("w") as stderr:
+                result = subprocess.run(
+                    command,
+                    text=True,
+                    stdout=stdout,
+                    stderr=stderr,
+                    timeout=600,
+                    check=False,
+                )
+            observation["exit"] = result.returncode
+        except subprocess.TimeoutExpired:
+            observation["timed_out"] = True
+            observation["timeout_seconds"] = 600
+            raise
+        finally:
+            self.commands.append(observation)
+            (self.output / "commands.json").write_text(
+                json.dumps(self.commands, indent=2) + "\n"
+            )
         if (result.returncode == 0) != success:
             raise RuntimeError(
                 f"{label} failed; inspect {self.output / (label + '.stderr')}"
             )
-        return json.loads(result.stdout) if success else result.stderr
+        return json.loads(stdout_path.read_text()) if success else stderr_path.read_text()
 
     def server(self, name, read_directory, write_paths=()):
         launch = self.output / (name + "-launch")
