@@ -237,17 +237,19 @@ fn verify_operation(
             true
         }
         AdmissionOperationState::OutcomeUnknownAfterDispatch => {
+            let recovery_refusal = projection.as_ref().is_some_and(|value| {
+                value.tool_outcome_id.is_none() && value.tool_outcome_version.is_none()
+            }) && matches!(&call.decision, Some(Decision::Deny { guard, .. }) if guard == "kernel")
+                && owned.is_null();
+            let original_interruption = projection.is_none()
+                && matches!(call.decision, Some(Decision::Incomplete { .. }))
+                && !owned.is_null();
             require(
-                projection.is_some()
+                (recovery_refusal || original_interruption)
                     && matches!(
                         operation.terminal_replay,
                         Some(AdmissionTerminalReplay::Incident { .. })
-                    )
-                    && matches!(&call.decision, Some(Decision::Deny { guard, .. }) if guard == "kernel")
-                    && projection.as_ref().is_some_and(|value| {
-                        value.tool_outcome_id.is_none() && value.tool_outcome_version.is_none()
-                    })
-                    && owned.is_null(),
+                    ),
                 "unknown operation must retain uncertainty without a terminal result",
             )?;
             true
@@ -302,7 +304,8 @@ fn verify_operation(
     // Recovery signs the historical dispatch projection and a refusal to retry.
     // There was no completed tool receipt carrying a runtime claim reference.
     // Custody in this case is explicitly the exporter's signed store readback.
-    let unknown = operation.state == AdmissionOperationState::OutcomeUnknownAfterDispatch;
+    let unknown_readback = operation.state == AdmissionOperationState::OutcomeUnknownAfterDispatch
+        && reference.is_none();
     for evidence in &operation.history {
         evidence.verify().map_err(error)?;
         let claim = &evidence.history;
@@ -315,7 +318,7 @@ fn verify_operation(
             "substituted or duplicate continuation episode",
         )?;
         let receipt_reference = Some(&claim.reference) == reference.as_ref();
-        let retained_unknown = unknown
+        let retained_unknown = unknown_readback
             && claim.disposition == RuntimeParticipantDisposition::RetainedAfterDispatchCommit;
         if receipt_reference || retained_unknown {
             require(
@@ -342,7 +345,7 @@ fn verify_operation(
     }
     require(
         if committed {
-            (reference.is_some() || unknown) && retained == 1
+            (reference.is_some() || unknown_readback) && retained == 1
         } else {
             reference.is_none() && retained == 0
         },
@@ -368,15 +371,25 @@ pub(super) fn verify_file(
         "call differs from independently retained request or context",
     )?;
     verify(&signed, &evidence, &key, runtime)?;
+    let call: ChioReceipt = serde_json::from_str(
+        evidence.response["receipt_json"]
+            .as_str()
+            .ok_or_else(|| error("missing call receipt"))?,
+    )
+    .map_err(error)?;
+    let original_custody = call
+        .metadata
+        .as_ref()
+        .is_some_and(|metadata| !metadata["chio_runtime"]["operation_owned_replay"].is_null());
     println!(
         "{}",
         json!({"schema": "chio.process.call-verification.v1", "runtime_id": runtime,
         "process_id": evidence.context["process_id"], "request_id": evidence.response["request_id"],
         "observed_operation_state": evidence.operation.as_ref().map(|operation| operation.state),
-        "custody_binding": match evidence.operation.as_ref().map(|operation| operation.state) {
-            Some(AdmissionOperationState::Completed) => "original_call_commitment_and_signed_store_readback",
-            Some(_) => "signed_store_readback",
-            None => "no_custody_claim",
+        "custody_binding": match (evidence.operation.is_some(), original_custody) {
+            (true, true) => "original_call_commitment_and_signed_store_readback",
+            (true, false) => "signed_store_readback",
+            (false, _) => "no_custody_claim",
         },
         "checks": ["signer_pin", "runtime_pin", "original_request", "issued_capability", "worker_response", "retained_operation", "continuation_custody"],
         "unchecked": ["task_authority", "aggregate_usage", "confinement", "physical_effects", "execution_nonces", "graph_completion", "scenario_matrix"],

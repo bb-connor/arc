@@ -126,5 +126,66 @@ fn real_unknown_call_preserves_uncertainty_and_retained_custody() -> Result<(), 
         )
         .is_err());
     }
+
+    // A transport interruption can return its original signed custody
+    // commitment before the host stores the terminal incident. Unlike the
+    // later recovery refusal, that receipt must select the exact retained
+    // episode; an arbitrary retained episode cannot substitute for it.
+    let mut interrupted = call.clone();
+    interrupted.decision = Some(Decision::Incomplete {
+        reason: "upstream process exited before responding".into(),
+    });
+    let metadata = interrupted
+        .metadata
+        .as_mut()
+        .ok_or_else(|| error("metadata"))?;
+    metadata
+        .as_object_mut()
+        .ok_or_else(|| error("metadata object"))?
+        .remove("admission_operation");
+    let intent = &operation.history[0].history.intent;
+    metadata["chio_runtime"] = json!({"operation_owned_replay": {
+        "reference": operation.history[0].history.reference,
+        "plan_sha256": intent.plan_digest().as_str(),
+        "resources_sha256": hash(&intent.resources())?,
+    }});
+    verify_operation(
+        Some(operation),
+        &interrupted,
+        &cap,
+        RUNTIME,
+        evidence.observed_at_unix_ms,
+    )?;
+    for (field, replacement) in [
+        ("reference", Value::Null),
+        ("plan_sha256", json!("a".repeat(64))),
+        ("resources_sha256", json!("a".repeat(64))),
+    ] {
+        let mut changed = interrupted.clone();
+        changed.metadata.as_mut().ok_or_else(|| error("metadata"))?["chio_runtime"]
+            ["operation_owned_replay"][field] = replacement;
+        assert!(verify_operation(
+            Some(operation),
+            &changed,
+            &cap,
+            RUNTIME,
+            evidence.observed_at_unix_ms
+        )
+        .is_err());
+    }
+    let mut substituted = interrupted.clone();
+    substituted
+        .metadata
+        .as_mut()
+        .ok_or_else(|| error("metadata"))?["chio_runtime"]["operation_owned_replay"]["reference"]
+        ["claimDigest"] = json!("a".repeat(64));
+    assert!(verify_operation(
+        Some(operation),
+        &substituted,
+        &cap,
+        RUNTIME,
+        evidence.observed_at_unix_ms
+    )
+    .is_err());
     Ok(())
 }

@@ -70,8 +70,17 @@ Both the x86 observer build and separate macOS offline-verifier build pass.
 The implementation distinguishes an uncertain original operation from the
 signed kernel refusal returned during recovery. Such a refusal has no original
 completed-call custody reference. Its custody claim is explicitly a signed
-readback of the fenced store. Real uncertain-call export and the complete
-scenario artifact still require their own evidence.
+readback of the fenced store. The passing budget and host-crash states now
+export six verified call observations: three uncertain original calls, two
+compensated calls and one completed canary. Independent macOS verification
+passes all six and rejects 24 wrong-key, wrong-runtime, wrong-context and
+unsigned-edit cases. Results are retained in
+`call-observation-{budget,host-crash}-cb5a34e72-5d71ef11e/` and
+`call-observation-{budget,host-crash}-offline-5d71ef11e/`. No private retained
+request or private key is exported. A public uncertain-call fixture at
+`b98659aea` passes its original signatures and 19 semantic rejection cases;
+strict CLI all-target Clippy also passes on macOS, retained in
+`macos-call-unknown-b98659aea/`. The complete scenario artifact remains open.
 
 The frozen foundation at `810664017dffa38235e3914a0a4477c8345cf359` passes
 consumer boundaries, the complete flow-security gate and workspace build.

@@ -309,12 +309,12 @@ independently of the submitted artifact. Verification works offline on supported
 Unix hosts. It checks the signed provisioning record, worker response and the
 operation's observed state. Completed calls must name their actual terminal
 receipt and its original continuation claim commitment. Uncertain calls retain
-their incident record and signed `outcome_unknown_after_dispatch` projection.
-Their caller response denies another dispatch; it is not a completed tool
-result. Their continuation custody is the exporter's signed store readback,
-identified separately in `custody_binding`, because no completed tool receipt
-exists to anchor that claim. Compensated calls cannot claim a dispatch commitment
-or a retained continuation.
+their incident record. An original incomplete receipt must bind the exact
+retained continuation commitment. A later recovery refusal instead binds the
+signed `outcome_unknown_after_dispatch` projection; its continuation custody
+comes from the exporter's signed store readback. `custody_binding` identifies
+these different sources. Neither response claims a completed tool result.
+Compensated calls cannot claim a dispatch commitment or a retained continuation.
 
 Export uses the existing fenced, anchored store read APIs and keeps the private
 admission request in the host. It signs only the public binding and custody
