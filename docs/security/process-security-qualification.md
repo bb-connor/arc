@@ -19,6 +19,43 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 #### Current local evidence (2026-09-15, continued September 16 UTC)
 
+At `1ae9f9ddac749d71f27c9c7f62c49c519a53c7b3`, worker-outcomes version 2
+joins each MCP response to its original signed native launch reference. It
+requires independent policy signer pins and verifies policy, manifest, host
+configuration, route bytes and executable identity. A retained exit must match
+the original launch; a missing exit stays explicitly unknown. Recovery
+connections do not establish the earlier effect's launch or target death.
+The completed-run verifier still requires an actual terminal receipt.
+macOS build, three native evidence tests, two uncertain-call fixtures and
+strict CLI all-target Clippy pass in `macos-outcomes-1ae9f9dda/`. All seven
+version 1 artifacts also pass compatibility verification, including 21 rejected
+wrong-key, wrong-runtime and unsigned-edit cases, retained in
+`outcomes-v1-*-offline-1ae9f9dda/`. Linux qualification is still running. The
+first x86 observer link failed with signal 9; guest OOM records identify `ld`
+at 07:49:12 UTC. Its failure remains in `cross-x86-call-1ae9f9dda/`.
+
+All seven current confined scenario states export version 1 worker-outcomes
+artifacts at observer `48c7b8314`, retained in
+`outcomes-*-cb5a34e72-48c7b8314/`. Independent macOS verification at `95b11b74a`
+passes all seven and rejects all 21 wrong-key, wrong-runtime and unsigned-edit
+cases. These records are retrospective observations of runtime `cb5a34e72`;
+they do not represent a fresh runtime or full M5 acceptance. The complete
+Linux regression queue at `48c7b8314` passes the supervised-outcomes,
+completed-run and call-evidence integrations, both real uncertain-call fixtures
+and strict CLI all-target Clippy.
+
+The frozen foundation `810664017` retry stopped after 5,374 passes, one failure
+and 18 ignores in 299 completed test targets. The failing security-vector test
+could not import Python `referencing`. `foundation-python-810664017/` records a
+dedicated environment matching the owning CI's exact PyYAML 6.0.2, jsonschema
+4.26.0 and referencing 0.37.0 pins. With that environment, all four tests in
+`security_generated_vectors` and strict workspace Clippy pass. The next
+proof-coverage check reports stale generated input digests. Regeneration at the
+current source preserves all 59 rows and 170 artifacts and updates only input
+hashes. The original failure remains in `linux-810664017-retry2/`; that frozen
+queue now runs the full workspace with `--no-fail-fast`. A complete workspace
+pass is still pending.
+
 At `48c7b83148262ed83a415fc54dbed01ac21da54d`, the new Linux supervised-outcomes
 integration test passes: four actual supervised workers across two issued graphs
 retain two completed calls and two compensated calls, with exactly two mailbox
