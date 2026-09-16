@@ -41,7 +41,8 @@ pub(crate) fn export(
             .as_millis(),
     )
     .map_err(error)?;
-    let request_id = AdmissionIdentifier::new(
+    let request_id = AdmissionIdentifier::try_new(
+        "request_id",
         response["request_id"]
             .as_str()
             .ok_or_else(|| error("missing request ID"))?,
@@ -65,7 +66,7 @@ pub(crate) fn export(
             .map_err(error)?;
         require(
             original.request_id == request_id.as_str()
-                && original.capability == cap
+                && hash(&original.capability)? == hash(&cap)?
                 && original.server_id == request["server_id"]
                 && original.tool_name == request["tool_name"]
                 && original.arguments == request["arguments"],

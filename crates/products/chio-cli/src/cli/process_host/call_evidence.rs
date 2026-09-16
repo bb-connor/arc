@@ -235,7 +235,10 @@ fn verify_operation(
         AdmissionOperationState::OutcomeUnknownAfterDispatch => {
             require(
                 projection.is_some()
-                    && operation.terminal_replay.is_none()
+                    && matches!(
+                        operation.terminal_replay,
+                        Some(AdmissionTerminalReplay::Incident { .. })
+                    )
                     && matches!(&call.decision, Some(Decision::Incomplete { reason }) if reason == "outcome_unknown_after_dispatch"),
                 "unknown operation must retain uncertainty without a terminal result",
             )?;
@@ -243,7 +246,15 @@ fn verify_operation(
         }
         AdmissionOperationState::CompensatedBeforeDispatch => {
             require(
-                matches!(call.decision, Some(Decision::Deny { .. })) && owned.is_null(),
+                matches!(call.decision, Some(Decision::Deny { .. }))
+                    && owned.is_null()
+                    && matches!(
+                        operation.terminal_replay,
+                        Some(
+                            AdmissionTerminalReplay::Receipt { .. }
+                                | AdmissionTerminalReplay::Incident { .. }
+                        )
+                    ),
                 "compensated operation must be denied without retained dispatch custody",
             )?;
             false
