@@ -17,6 +17,40 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 ### Latest local continuation
 
+Current implementation checkpoint: `4ddf40ada850d77d205d694908d3e2516ff1d375`,
+with the execution checkout qualifying `a4c3a77eee190c9feac589d035f25c9474346e9f`.
+The implementation checkout is `/tmp/arc-m5-evidence`, maintained by the same
+single agent while frozen qualification checkouts run. No subagents or protected
+publication actions have been used.
+
+| New gate / behavior | Frozen source | Terminal evidence |
+| --- | --- | --- |
+| Signed receipt-anchor provisioning and runtime units on macOS | `6b2552d0e` | 7 provisioning and 4 unit cases pass; strict Clippy, format and hygiene pass. `macos-provision-6b2552d0e/` |
+| Independent receipt-anchor ownership on Linux | `6374eb394` | Exact anchor case, 7 provisioning and 4 unit cases, strict all-target CLI Clippy pass. `linux-m5-6374eb394-retry1/`. Initial filter selected zero tests and the runner rejected that attempt. |
+| Actual completed fan-out export and semantic verification | `db7f7049b` | `process_run_evidence` passes with real supervised effects, seven re-signed semantic substitutions, runtime substitution and unsigned tampering. `linux-m5-db7f7049b/run-evidence.log`; host/response and Clippy gates continue. |
+| x86 cage gate with matching helper features | `6374eb394` | 69 cases pass; mutation lane has 8 passes and two timeouts where exact prepared-record refusal was required. Gate remains failed. `linux-x86-6374eb394/` |
+| Enforced initialization with anchored receipts | `6374eb394` | Refuses receipt persistence because the adapter retained pre-stdio plan bindings. `linux-x86-reference-6374eb394/`; no useful workflow accepted. |
+| Prepared launch receipt binding repair | `54cc0c052` | All 8 receipt-evidence cases pass, including immutable identity substitutions; source inventory remains 69. `cage-prepared-receipts.log`. Actual Enforced rerun pending. |
+| x86 CLI plus static helper/tool cross-build | `a4c3a77ee` | Both gates pass. `cross-x86-m5-a4c3a77ee/` and `x86-executables-a4c3a77ee/manifest.json`. |
+
+`db7f7049b` adds `process attest-run` and `process verify-run`. The signed
+observation joins actual worker request/response receipts, issued capabilities,
+strict complete task authority, original allocation authority and a separately
+read aggregate quota snapshot. It does not claim exported continuation custody,
+confinement receipt linkage, execution nonce verification or complete M5 scenario
+coverage. `4ddf40ada` makes the supervised script export and independently verify
+that observation. `a4c3a77ee` corrects collection of native MCP content from the
+verified value envelope.
+
+`54cc0c052` consumes receipt bindings from the owned sealed launch preparation.
+The signing context follows the stdio-dependent profile digest only while the
+admitted manifest, helper, target and executable identity remain unchanged.
+The mismatch check itself remains mandatory. The next actual Enforced run uses
+scripts `4ddf40ada`, binary `a4c3a77ee`, and a private anchor on `/dev/shm`; this
+local anchor profile covers process restart and database rollback, not VM reboot
+or power loss. It is not designated release-capture evidence.
+
+
 Latest source repairs include `97705575b` (explicit signed artifact ceilings) and
 `6b2552d0e` (independent receipt rollback anchor in the signed runtime policy).
 The real Enforced reader initialization exposed both requirements before any
