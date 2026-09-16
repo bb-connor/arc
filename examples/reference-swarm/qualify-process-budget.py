@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 from process_qualification import Harness, write
+from process_native_observation import retain_original_launches, verify_original_launch_signatures
 
 
 def main():
@@ -115,6 +116,7 @@ def main():
                     if executable == harness.probe:
                         target_pidfds[int(child)] = os.pidfd_open(int(child))
             assert len(target_pidfds) == 4, target_pidfds
+            original_launches = retain_original_launches(harness, target_pidfds)
             host.kill()
             assert host.wait(timeout=15) == -signal.SIGKILL
             poller = select.poll()
@@ -141,6 +143,7 @@ def main():
         "effect_sha256": {name: hashlib.sha256(path.read_bytes()).hexdigest()
                           for name, path in effects.items()},
     })
+    verify_original_launch_signatures(harness, original_launches)
     report = harness.run("recover-workers", command)
     assert report["complete"], report
     attempts = {worker["process"]: worker["attempts"] for worker in report["workers"]}
@@ -182,8 +185,10 @@ def main():
         "uncertain_effect_workers": sorted(set(effects) - set(before_crash)),
         "protected_effect_count": 2, "confined_targets_terminated_on_host_death": 4,
         "aggregate_projection": quotas, "worker_image": args.worker_image, "runner": report,
+        "original_native_launches": original_launches,
         "m5_acceptance_complete": False,
         "limits": ["overlap and store projections are external observations",
+                   "original launch signatures are checked; PID linkage and death are external observations",
                    "admitted effects have unknown terminal outcomes",
                    "not a complete scenario artifact"],
     }

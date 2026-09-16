@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 from process_qualification import Harness, write
+from process_native_observation import retain_original_launches, verify_original_launch_signatures
 
 
 def main():
@@ -122,6 +123,7 @@ def main():
                     if executable == harness.probe:
                         target_pidfds[int(child)] = os.pidfd_open(int(child))
             assert len(target_pidfds) == 2, target_pidfds
+            original_launches = retain_original_launches(harness, target_pidfds)
             # The fixture has written once and cannot return an outcome. Kill
             # the real supervisor while its dispatch is still outstanding.
             host.kill()
@@ -155,6 +157,7 @@ def main():
             "terminated_target_pids": sorted(target_pidfds),
         },
     )
+    verify_original_launch_signatures(harness, original_launches)
     report = harness.run("recover-workers", command)
     assert report["complete"], report
     snapshots = {worker["process"]: worker for worker in report["workers"]}
@@ -225,11 +228,13 @@ def main():
         "retained_dispatch_commit": projection["retained_dispatch_commit"],
         "aggregate_projection": quotas,
         "custody_projection": claims,
+        "original_native_launches": original_launches,
         "worker_image": args.worker_image,
         "runner": report,
         "m5_acceptance_complete": False,
         "limits": [
             "raw store projections are external observations",
+            "original launch signatures are checked; PID linkage and death are external observations",
             "not a complete scenario artifact",
         ],
     }
