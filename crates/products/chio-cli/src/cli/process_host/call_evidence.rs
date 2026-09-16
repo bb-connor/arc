@@ -239,7 +239,11 @@ fn verify_operation(
                         operation.terminal_replay,
                         Some(AdmissionTerminalReplay::Incident { .. })
                     )
-                    && matches!(&call.decision, Some(Decision::Incomplete { reason }) if reason == "outcome_unknown_after_dispatch"),
+                    && matches!(&call.decision, Some(Decision::Deny { guard, .. }) if guard == "kernel")
+                    && projection.as_ref().is_some_and(|value| {
+                        value.tool_outcome_id.is_none() && value.tool_outcome_version.is_none()
+                    })
+                    && owned.is_null(),
                 "unknown operation must retain uncertainty without a terminal result",
             )?;
             true
@@ -291,6 +295,10 @@ fn verify_operation(
     };
     let mut episodes = BTreeSet::new();
     let mut retained = 0;
+    // Recovery signs the historical dispatch projection and a refusal to retry.
+    // There was no completed tool receipt carrying a runtime claim reference.
+    // Custody in this case is explicitly the exporter's signed store readback.
+    let unknown = operation.state == AdmissionOperationState::OutcomeUnknownAfterDispatch;
     for evidence in &operation.history {
         evidence.verify().map_err(error)?;
         let claim = &evidence.history;
@@ -302,16 +310,24 @@ fn verify_operation(
                 && episodes.insert(claim.reference.episode_id().as_str()),
             "substituted or duplicate continuation episode",
         )?;
-        if Some(&claim.reference) == reference.as_ref() {
+        let receipt_reference = Some(&claim.reference) == reference.as_ref();
+        let retained_unknown = unknown
+            && claim.disposition == RuntimeParticipantDisposition::RetainedAfterDispatchCommit;
+        if receipt_reference || retained_unknown {
             require(
                 committed
                     && claim.disposition
                         == RuntimeParticipantDisposition::RetainedAfterDispatchCommit
-                    && claim.intent.phase() == RuntimeParticipantPhase::Dispatch
-                    && owned["plan_sha256"] == claim.intent.plan_digest().as_str()
-                    && owned["resources_sha256"] == hash(&claim.intent.resources())?,
-                "retained continuation differs from original signed receipt",
+                    && claim.intent.phase() == RuntimeParticipantPhase::Dispatch,
+                "retained continuation contradicts dispatch custody",
             )?;
+            if receipt_reference {
+                require(
+                    owned["plan_sha256"] == claim.intent.plan_digest().as_str()
+                        && owned["resources_sha256"] == hash(&claim.intent.resources())?,
+                    "retained continuation differs from original signed receipt",
+                )?;
+            }
             retained += 1;
         } else {
             require(
@@ -322,7 +338,7 @@ fn verify_operation(
     }
     require(
         if committed {
-            reference.is_some() && retained == 1
+            (reference.is_some() || unknown) && retained == 1
         } else {
             reference.is_none() && retained == 0
         },
@@ -353,6 +369,11 @@ pub(super) fn verify_file(
         json!({"schema": "chio.process.call-verification.v1", "runtime_id": runtime,
         "process_id": evidence.context["process_id"], "request_id": evidence.response["request_id"],
         "observed_operation_state": evidence.operation.as_ref().map(|operation| operation.state),
+        "custody_binding": match evidence.operation.as_ref().map(|operation| operation.state) {
+            Some(AdmissionOperationState::Completed) => "original_call_commitment_and_signed_store_readback",
+            Some(_) => "signed_store_readback",
+            None => "no_custody_claim",
+        },
         "checks": ["signer_pin", "runtime_pin", "original_request", "issued_capability", "worker_response", "retained_operation", "continuation_custody"],
         "unchecked": ["task_authority", "aggregate_usage", "confinement", "physical_effects", "execution_nonces", "graph_completion", "scenario_matrix"],
         "m5_acceptance_complete": false})

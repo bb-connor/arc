@@ -307,11 +307,14 @@ chio process verify-call --artifact "$PWD/writer-call.json" \
 Keep the expected request, process/capability context, kernel key and runtime ID
 independently of the submitted artifact. Verification works offline on supported
 Unix hosts. It checks the signed provisioning record, worker response and the
-operation's observed state. For a dispatched call it also checks the original
-signed admission projection and continuation claim commitment. Completed calls
-must name their actual terminal receipt; uncertain calls retain their incident
-record and `outcome_unknown_after_dispatch` state. Compensated calls cannot claim
-a dispatch commitment or a retained continuation.
+operation's observed state. Completed calls must name their actual terminal
+receipt and its original continuation claim commitment. Uncertain calls retain
+their incident record and signed `outcome_unknown_after_dispatch` projection.
+Their caller response denies another dispatch; it is not a completed tool
+result. Their continuation custody is the exporter's signed store readback,
+identified separately in `custody_binding`, because no completed tool receipt
+exists to anchor that claim. Compensated calls cannot claim a dispatch commitment
+or a retained continuation.
 
 Export uses the existing fenced, anchored store read APIs and keeps the private
 admission request in the host. It signs only the public binding and custody
