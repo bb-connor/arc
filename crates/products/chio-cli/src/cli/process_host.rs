@@ -128,6 +128,13 @@ pub(crate) enum ProcessCommands {
         #[arg(long)]
         process: String,
     },
+    /// Permanently revoke the issued capability and its descendants while stopped.
+    RevokeCapability {
+        #[arg(long)]
+        state: PathBuf,
+        #[arg(long)]
+        process: String,
+    },
     /// Permanently cancel a process subtree while the host is stopped.
     Cancel {
         #[arg(long)]
@@ -219,6 +226,13 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
                     .revoke_credentials(&process)
                     .map_err(state::error)?;
                 println!("{}", serde_json::json!({"revoked_credentials": count}));
+                Ok(())
+            }
+            ProcessCommands::RevokeCapability { state, process } => {
+                let host = state::Host::open(&state, false)?;
+                let capability = host.runtime.process(&process).map_err(state::error)?.capability;
+                host.kernel.revoke_capability(&capability.id).map_err(state::error)?;
+                println!("{}", serde_json::json!({"process": process, "capability_id": capability.id, "capability_revoked": true}));
                 Ok(())
             }
             ProcessCommands::Cancel { state, process } => {

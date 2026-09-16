@@ -229,3 +229,54 @@ commitment named in the signed tool receipt and matches the retained token,
 prepared plan, request binding and terminal receipt. Historical evidence cannot
 authorize another effect. Execution nonces and the full M5 scenario matrix remain
 unverified; the report includes `m5_acceptance_complete: false`.
+
+## Revoke a task capability
+
+Stop the serving host, then revoke the capability originally issued to a process:
+
+```sh
+chio process revoke-capability --state "$PWD/run-state" --process reader
+```
+
+This writes through the kernel's persistent revocation store. A later host
+reopen preserves the revocation, and descendant capabilities also inherit the
+refusal. Revocation is permanent; it does not undo an already admitted effect.
+The command refuses while another host owns the state directory. The separate
+`process revoke` command invalidates worker connection credentials.
+
+## Run the local adversarial qualifiers
+
+The qualification scripts use an explicit `enforcement-probe` Cargo example.
+It attempts raw OS operations without the repository reader's own path checks.
+Build it as a static Linux x86_64 executable alongside the qualified helper:
+
+```sh
+umask 022
+RUSTFLAGS='-C target-feature=+crt-static -C relocation-model=pie' \
+  cargo build --locked --release --target x86_64-unknown-linux-gnu \
+  -p chio-reference-tools --example enforcement-probe
+
+docker build --platform linux/amd64 \
+  --build-arg BASE=python:3.11-slim@sha256:d1053354624536b044162aaab1e418bd000ea35184fb1ae098ab3166b1072e72 \
+  -f examples/reference-swarm/QualificationWorker.Dockerfile \
+  -t chio-process-qualification:local .
+WORKER_IMAGE=$(docker image inspect --format '{{.Id}}' chio-process-qualification:local)
+```
+
+For each scenario, use a fresh output directory and an existing private receipt
+anchor outside the tool's input paths. For example:
+
+```sh
+python3 examples/reference-swarm/qualify-process-filesystem.py \
+  --chio /absolute/path/to/chio --cage-init /absolute/path/to/chio-cage-init \
+  --probe "$PWD/target/x86_64-unknown-linux-gnu/release/examples/enforcement-probe" \
+  --worker-image "$WORKER_IMAGE" --output "$PWD/filesystem-qualification" \
+  --receipt-rollback-anchor-root /absolute/private/receipt-anchor
+```
+
+`qualify-process-network.py`, `qualify-process-authority.py` and
+`qualify-process-revocation.py` accept the same arguments. Run each on the
+supported Linux x86_64 cage profile as a non-root operator. The scripts retain
+commands, caller responses, signatures and external observations. Each reports
+`m5_acceptance_complete: false`; the complete scenario artifact and remaining
+contention/host-crash acceptance are still required.

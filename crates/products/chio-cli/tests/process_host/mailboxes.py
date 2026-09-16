@@ -3,6 +3,7 @@
 import json
 import select
 import signal
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -79,6 +80,10 @@ capabilities:
         assert line, host.stderr.read()
         assert json.loads(line)["ready"]
         client = ProcessClient(connection["socket_path"], connection["credential"])
+        refused = cli(
+            "revoke-capability", "--state", state, "--process", "root", success=False
+        )
+        assert "already in use" in refused, refused
         for key, tool, args, expected in [
             (
                 "send",
@@ -168,6 +173,52 @@ capabilities:
             host.kill()
             host.communicate(timeout=10)
             raise
+    revoked = cli("revoke-capability", "--state", state, "--process", "root")
+    assert revoked == {
+        "process": "root",
+        "capability_id": connection["capability_id"],
+        "capability_revoked": True,
+    }, revoked
+    assert cli("revoke-capability", "--state", state, "--process", "root") == revoked
+    host = subprocess.Popen(
+        [binary, "process", "serve", "--state", str(state), "--socket", str(socket)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert select.select([host.stdout], [], [], 90)[0], (
+            "revoked host startup timed out"
+        )
+        line = host.stdout.readline()
+        assert line and json.loads(line)["ready"], line
+        # The worker credential is still valid. The kernel's durable capability
+        # revocation must refuse the new effect after reopening the host.
+        client.inspect()
+        denied = client.invoke(
+            "revoked-send",
+            "chio-ipc",
+            "send_jobs",
+            {
+                "message_key": "must-not-exist",
+                "payload": {"forbidden": True},
+            },
+        )
+        assert denied["verdict"] == "deny" and "revoked" in denied["reason"].lower(), (
+            denied
+        )
+    finally:
+        if host.poll() is None:
+            host.send_signal(signal.SIGTERM)
+        host.communicate(timeout=15)
+    assert not (state / "mailboxes.db-wal").exists()
+    with sqlite3.connect(
+        f"file:{state / 'mailboxes.db'}?mode=ro&immutable=1", uri=True
+    ) as db:
+        assert db.execute("SELECT COUNT(*) FROM mailbox_messages").fetchone() == (2,)
+        assert db.execute(
+            "SELECT COUNT(*) FROM mailbox_messages WHERE message_key='must-not-exist'"
+        ).fetchone() == (0,)
     for number, change in enumerate(
         [
             {"mailboxes": [{"id": "jobs"}, {"id": "jobs"}]},
