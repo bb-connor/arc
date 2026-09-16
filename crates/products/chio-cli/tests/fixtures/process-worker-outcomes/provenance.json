@@ -1,0 +1,12 @@
+{
+  "v1-network": {
+    "runtime_source": "cb5a34e722b52c794f2aaf84fbcb02a40bac3f03",
+    "observer_source": "48c7b83148262ed83a415fc54dbed01ac21da54d",
+    "runtime_id": "a86fa37d-97ec-4e6b-afbd-b178dd9a10a8",
+    "source_directory": "outcomes-network-cb5a34e72-48c7b8314",
+    "sha256": "8fd7a5c8df02a55b209411b5f64c34ba0bda447f77a07aa447555c10c205f8d0",
+    "private_keys_exported": false,
+    "retrospective_observation": true,
+    "m5_acceptance_complete": false
+  }
+}

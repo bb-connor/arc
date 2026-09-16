@@ -406,3 +406,38 @@ pub(crate) fn verify_file(
     );
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retained_version_one_network_outcomes_keep_their_original_limits(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let key = PublicKey::from_hex(
+            include_str!(
+                "../../../../tests/fixtures/process-worker-outcomes/v1-network-kernel.pub"
+            )
+            .trim(),
+        )?;
+        let signed = crate::receipt_verify::verify_original_receipt(
+            include_str!("../../../../tests/fixtures/process-worker-outcomes/v1-network.json"),
+            &key,
+        )?;
+        let run: Outcomes = serde_json::from_value(signed.action.parameters.clone())?;
+        let runtime = "a86fa37d-97ec-4e6b-afbd-b178dd9a10a8";
+        assert_eq!(run.schema, LEGACY_OUTCOMES_SCHEMA);
+        assert_eq!(run.calls.len(), 2);
+        assert!(verify_outcomes(&signed, &run, &key, runtime, &BTreeMap::new())?.is_empty());
+        assert!(verify_outcomes(&signed, &run, &key, "other-runtime", &BTreeMap::new()).is_err());
+        assert!(verify_outcomes(
+            &signed,
+            &run,
+            &key,
+            runtime,
+            &BTreeMap::from([("network-probe".into(), key.clone())])
+        )
+        .is_err());
+        Ok(())
+    }
+}
