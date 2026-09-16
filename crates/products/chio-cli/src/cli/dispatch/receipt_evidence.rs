@@ -19,6 +19,13 @@ pub(crate) fn dispatch_receipt(
                     &response, &request, &context, &trusted_kernel_pubkey, json_output,
                 )
             },
+            ReceiptCommands::VerifyNativeStart {
+                signed_policy, enforcement, server_id, trusted_policy_signer,
+                expected_receipt_id, expected_target_sha256,
+            } => crate::mcp_cli::verify_native_start_file(
+                &signed_policy, &enforcement, &server_id, &trusted_policy_signer,
+                &expected_receipt_id, &expected_target_sha256,
+            ),
             ReceiptCommands::List {
                 capability,
                 tool_server,

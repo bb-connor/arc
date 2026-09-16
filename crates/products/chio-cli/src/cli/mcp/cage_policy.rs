@@ -12,7 +12,7 @@ const MAX_CAGE_POLICY_BYTES: usize = 4 * 1024 * 1024;
 
 #[path = "cage_policy/evidence.rs"]
 mod evidence;
-pub(crate) use evidence::{verify_native_launch_evidence, NativeLaunchEvidence};
+pub(crate) use evidence::{verify_native_launch_evidence, verify_native_start_file, NativeLaunchEvidence};
 #[cfg(target_os = "linux")]
 pub(crate) use evidence::export_native_launch_evidence;
 

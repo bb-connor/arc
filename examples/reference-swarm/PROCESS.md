@@ -288,6 +288,31 @@ prepared plan, request binding and terminal receipt. Historical evidence cannot
 authorize another effect. Execution nonces and the full M5 scenario matrix remain
 unverified; the report includes `m5_acceptance_complete: false`.
 
+### Verify a launch when the observing host died
+
+A recovered unknown-outcome response can refer to the replacement connection.
+Use the original launch receipt retained before the host died to inspect the
+earlier launch. Keep the server's policy signer, selected receipt ID and expected
+executable digest separately from the submitted files:
+
+```sh
+chio receipt verify-native-start \
+  --signed-policy original-native-launches/effect-probe-policy.json \
+  --enforcement original-native-launches/effect-probe-receipt.ndjson \
+  --server-id effect-probe \
+  --trusted-policy-signer "$EFFECT_LAUNCH_POLICY_SIGNER" \
+  --expected-receipt-id "$ORIGINAL_ENFORCEMENT_RECEIPT_ID" \
+  --expected-target-sha256 "$PROBE_SHA256"
+```
+
+This offline command verifies the signed Enforced policy, manifest, receipt
+semantics, helper and target digests, execution identity and selected launch.
+Its report includes the signed process ID and trace identity. Matching that ID
+to a live target and observing its death remain separate external observations.
+This check supplies no terminal receipt, completed tool result, or receipt-log
+inclusion proof. An unknown effect remains unknown. The completed fan-out
+verifier still requires the actual matching terminal receipt.
+
 ## Revoke a task capability
 
 Stop the serving host, then revoke the capability originally issued to a process:
@@ -332,9 +357,11 @@ python3 examples/reference-swarm/qualify-process-filesystem.py \
   --receipt-rollback-anchor-root /absolute/private/receipt-anchor
 ```
 
-`qualify-process-network.py`, `qualify-process-authority.py` and
-`qualify-process-revocation.py` accept the same arguments. Run each on the
+`qualify-process-network.py`, `qualify-process-authority.py`,
+`qualify-process-revocation.py`, `qualify-process-host-crash.py` and
+`qualify-process-budget.py` accept the same arguments. Run each on the
 supported Linux x86_64 cage profile as a non-root operator. The scripts retain
 commands, caller responses, signatures and external observations. Each reports
-`m5_acceptance_complete: false`; the complete scenario artifact and remaining
-contention/host-crash acceptance are still required.
+`m5_acceptance_complete: false`; the complete scenario artifact and final
+qualification remain required. Crash and budget fixtures also retain original
+native launch files for the separate offline check above.

@@ -127,7 +127,7 @@ mod wrap;
 
 pub(crate) use attestation::{attach_chio_verified_header, build_chio_verified_header};
 pub(crate) use cage_policy::{load_native_mcp_launch, SignedCagePolicyLaunchFactory};
-pub(crate) use cage_policy::{verify_native_launch_evidence, NativeLaunchEvidence};
+pub(crate) use cage_policy::{verify_native_launch_evidence, verify_native_start_file, NativeLaunchEvidence};
 #[cfg(target_os = "linux")]
 pub(crate) use cage_policy::export_native_launch_evidence;
 pub(crate) use emit_config::cmd_mcp_emit_config;

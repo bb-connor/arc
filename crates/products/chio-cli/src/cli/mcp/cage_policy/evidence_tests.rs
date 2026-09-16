@@ -163,3 +163,38 @@ fn native_run_evidence_requires_external_policy_pin_and_same_observed_launch() -
     assert!(verify(&changed).is_err());
     Ok(())
 }
+
+#[test]
+fn native_start_verification_binds_original_receipt_without_claiming_exit() -> Result {
+    let (evidence, policy, signer) = fixture()?;
+    let directory = tempfile::tempdir()?;
+    let policy_path = directory.path().join("policy.json");
+    let receipt_path = directory.path().join("receipt.json");
+    std::fs::write(&policy_path, &evidence.signed_policy)?;
+    std::fs::write(&receipt_path, canonical_json_bytes(&evidence.enforcement)?)?;
+    let pin = signer.public_key().to_hex();
+    let target = &policy.runtime.target_binding_digest;
+    let verify = |server: &str, key: &str, id: &str, target: &str| {
+        verify_native_start_file(&policy_path, &receipt_path, server, key, id, target)
+    };
+    verify("cage-policy-test", &pin, &evidence.enforcement.id, target)?;
+    assert!(verify("other-server", &pin, &evidence.enforcement.id, target).is_err());
+    assert!(verify(
+        "cage-policy-test",
+        &Keypair::from_seed(&[92; 32]).public_key().to_hex(),
+        &evidence.enforcement.id,
+        target,
+    )
+    .is_err());
+    assert!(verify("cage-policy-test", &pin, &"a".repeat(64), target).is_err());
+    assert!(verify("cage-policy-test", &pin, &evidence.enforcement.id, &"b".repeat(64)).is_err());
+
+    // A valid signed exit is not the selected original enforcement receipt.
+    std::fs::write(&receipt_path, canonical_json_bytes(&evidence.terminal)?)?;
+    assert!(verify("cage-policy-test", &pin, &evidence.terminal.id, target).is_err());
+    let mut changed = serde_json::to_value(&evidence.enforcement)?;
+    changed["invented_field"] = json!(true);
+    std::fs::write(&receipt_path, serde_json::to_vec(&changed)?)?;
+    assert!(verify("cage-policy-test", &pin, &evidence.enforcement.id, target).is_err());
+    Ok(())
+}

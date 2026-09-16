@@ -25,6 +25,24 @@ pub(crate) enum ReceiptCommands {
         #[arg(long)]
         trusted_kernel_pubkey: PathBuf,
     },
+    /// Verify a released native launch against its signed policy and external pins.
+    /// Does not establish target death, call completion or a terminal outcome.
+    VerifyNativeStart {
+        #[arg(long)]
+        signed_policy: PathBuf,
+        /// One original enforcement receipt, in JSON.
+        #[arg(long)]
+        enforcement: PathBuf,
+        #[arg(long)]
+        server_id: String,
+        /// Independently trusted policy signer, as algorithm-aware public-key hex.
+        #[arg(long)]
+        trusted_policy_signer: String,
+        #[arg(long)]
+        expected_receipt_id: String,
+        #[arg(long)]
+        expected_target_sha256: String,
+    },
     /// List receipts with optional filters. Output: one JSON receipt per line (JSON Lines).
     List {
         /// Filter by capability ID.

@@ -1,8 +1,14 @@
 //! Export and verify existing cage receipts without launching another tool.
 
 use super::*;
-use chio_cage::{verify_signed_cage_receipt_with_trusted_key, CageEnforcementState};
+use chio_cage::{
+    verify_signed_cage_receipt_with_trusted_key, CageEnforcementState, CageReceiptBody,
+};
 use chio_core::receipt::body::ChioReceipt;
+
+#[path = "evidence_start.rs"]
+mod start;
+pub(crate) use start::verify_native_start_file;
 
 #[cfg(test)]
 #[path = "evidence_tests.rs"]
@@ -35,18 +41,19 @@ fn require(condition: bool, message: &str) -> Result<(), CliError> {
     }
 }
 
-pub(crate) fn verify_native_launch_evidence(
-    evidence: &NativeLaunchEvidence,
+fn verify_policy_bound_enforcement(
+    signed_policy: &str,
+    receipt: &ChioReceipt,
     server_id: &str,
     trusted_policy_signer: &chio_core::PublicKey,
-) -> Result<NativeLaunchWindow, CliError> {
+) -> Result<(McpCageLaunchPolicy, CageReceiptBody), CliError> {
     require(
-        evidence.signed_policy.len() <= MAX_CAGE_POLICY_BYTES,
+        signed_policy.len() <= MAX_CAGE_POLICY_BYTES,
         "policy is too large",
     )?;
     let policy = decode_cage_policy(
         Path::new("exported-launch-policy"),
-        evidence.signed_policy.as_bytes(),
+        signed_policy.as_bytes(),
         trusted_policy_signer,
     )?;
     require(
@@ -68,29 +75,18 @@ pub(crate) fn verify_native_launch_evidence(
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     let key = chio_core::PublicKey::from_hex(&policy.receipt.trusted_signer_public_key)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    let enforcement = verify_signed_cage_receipt_with_trusted_key(&evidence.enforcement, &key)
+    let enforcement = verify_signed_cage_receipt_with_trusted_key(receipt, &key)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    let terminal = verify_signed_cage_receipt_with_trusted_key(&evidence.terminal, &key)
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    for receipt in [&evidence.enforcement, &evidence.terminal] {
-        require(
-            receipt.tool_server == server_id
-                && receipt.tool_name == "cage-launch"
-                && receipt.capability_id == policy.receipt.capability_id
-                && receipt.tenant_id == policy.receipt.tenant_id,
-            "receipt context differs from signed policy",
-        )?;
-    }
     require(
-        enforcement.enforcement_record.state == CageEnforcementState::FullyEnforced
-            && terminal.enforcement_record.state == CageEnforcementState::Exited
-            && enforcement.attempt_id == terminal.attempt_id
-            && enforcement.started_at_unix_ms == terminal.started_at_unix_ms
-            && enforcement.bindings == terminal.bindings
-            && enforcement.enforcement_record.fully_enforced
-                == terminal.enforcement_record.fully_enforced
-            && enforcement.recorded_at_unix_ms <= terminal.recorded_at_unix_ms,
-        "enforcement and terminal receipts belong to different launches",
+        receipt.tool_server == server_id
+            && receipt.tool_name == "cage-launch"
+            && receipt.capability_id == policy.receipt.capability_id
+            && receipt.tenant_id == policy.receipt.tenant_id,
+        "receipt context differs from signed policy",
+    )?;
+    require(
+        enforcement.enforcement_record.state == CageEnforcementState::FullyEnforced,
+        "receipt is not a released Enforced launch",
     )?;
     let actual = enforcement
         .enforcement_record
@@ -104,6 +100,41 @@ pub(crate) fn verify_native_launch_evidence(
             && prepared.target_binding_digest == policy.runtime.target_binding_digest
             && prepared.applied_execution_identity == policy.runtime.execution_identity,
         "observed launch differs from signed manifest, artifacts or execution identity",
+    )?;
+    Ok((policy, enforcement))
+}
+
+pub(crate) fn verify_native_launch_evidence(
+    evidence: &NativeLaunchEvidence,
+    server_id: &str,
+    trusted_policy_signer: &chio_core::PublicKey,
+) -> Result<NativeLaunchWindow, CliError> {
+    let (policy, enforcement) = verify_policy_bound_enforcement(
+        &evidence.signed_policy,
+        &evidence.enforcement,
+        server_id,
+        trusted_policy_signer,
+    )?;
+    let key = chio_core::PublicKey::from_hex(&policy.receipt.trusted_signer_public_key)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let terminal = verify_signed_cage_receipt_with_trusted_key(&evidence.terminal, &key)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    require(
+        evidence.terminal.tool_server == server_id
+            && evidence.terminal.tool_name == "cage-launch"
+            && evidence.terminal.capability_id == policy.receipt.capability_id
+            && evidence.terminal.tenant_id == policy.receipt.tenant_id,
+        "receipt context differs from signed policy",
+    )?;
+    require(
+        terminal.enforcement_record.state == CageEnforcementState::Exited
+            && enforcement.attempt_id == terminal.attempt_id
+            && enforcement.started_at_unix_ms == terminal.started_at_unix_ms
+            && enforcement.bindings == terminal.bindings
+            && enforcement.enforcement_record.fully_enforced
+                == terminal.enforcement_record.fully_enforced
+            && enforcement.recorded_at_unix_ms <= terminal.recorded_at_unix_ms,
+        "enforcement and terminal receipts belong to different launches",
     )?;
     let exit = terminal
         .enforcement_record
