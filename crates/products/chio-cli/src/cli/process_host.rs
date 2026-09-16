@@ -7,6 +7,9 @@ use clap::Subcommand;
 use crate::CliError;
 
 #[cfg(unix)]
+#[path = "process_host/call_evidence.rs"]
+mod call_evidence;
+#[cfg(unix)]
 #[path = "process_host/diagnostics.rs"]
 mod diagnostics;
 #[cfg(unix)]
@@ -36,6 +39,34 @@ mod swarm;
 
 #[derive(Subcommand)]
 pub(crate) enum ProcessCommands {
+    /// Observe one retained call and its continuation custody while stopped (Linux).
+    AttestCall {
+        #[arg(long)]
+        state: PathBuf,
+        #[arg(long)]
+        request: PathBuf,
+        #[arg(long)]
+        context: PathBuf,
+        #[arg(long)]
+        response: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Verify a retained call observation without opening host state.
+    VerifyCall {
+        #[arg(long)]
+        artifact: PathBuf,
+        #[arg(long)]
+        trusted_kernel_pubkey: PathBuf,
+        #[arg(long)]
+        runtime_id: String,
+        /// Original caller request, independently retained by the verifier.
+        #[arg(long)]
+        request: PathBuf,
+        /// Original runtime/process/capability context, independently retained.
+        #[arg(long)]
+        context: PathBuf,
+    },
     /// Attest completed fixed fan-out results and the retained aggregate usage (Linux).
     AttestRun {
         #[arg(long)]
@@ -158,6 +189,36 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
     #[cfg(unix)]
     {
         match command {
+            ProcessCommands::AttestCall {
+                state,
+                request,
+                context,
+                response,
+                out,
+            } => {
+                #[cfg(target_os = "linux")]
+                {
+                    call_evidence::export(&state, &request, &context, &response, &out)
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    let _ = (state, request, context, response, out);
+                    Err(state::error("call custody attestation requires Linux"))
+                }
+            }
+            ProcessCommands::VerifyCall {
+                artifact,
+                trusted_kernel_pubkey,
+                runtime_id,
+                request,
+                context,
+            } => call_evidence::verify_file(
+                &artifact,
+                &trusted_kernel_pubkey,
+                &runtime_id,
+                &request,
+                &context,
+            ),
             ProcessCommands::AttestRun { state, plan, out } => {
                 #[cfg(target_os = "linux")]
                 {
@@ -230,9 +291,18 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
             }
             ProcessCommands::RevokeCapability { state, process } => {
                 let host = state::Host::open(&state, false)?;
-                let capability = host.runtime.process(&process).map_err(state::error)?.capability;
-                host.kernel.revoke_capability(&capability.id).map_err(state::error)?;
-                println!("{}", serde_json::json!({"process": process, "capability_id": capability.id, "capability_revoked": true}));
+                let capability = host
+                    .runtime
+                    .process(&process)
+                    .map_err(state::error)?
+                    .capability;
+                host.kernel
+                    .revoke_capability(&capability.id)
+                    .map_err(state::error)?;
+                println!(
+                    "{}",
+                    serde_json::json!({"process": process, "capability_id": capability.id, "capability_revoked": true})
+                );
                 Ok(())
             }
             ProcessCommands::Cancel { state, process } => {

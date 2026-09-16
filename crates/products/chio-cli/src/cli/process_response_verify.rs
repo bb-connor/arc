@@ -58,7 +58,7 @@ fn require(condition: bool, field: &str) -> Result<(), CliError> {
     }
 }
 
-fn read_document<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, CliError> {
+pub(crate) fn read_document<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, CliError> {
     let file = std::fs::File::open(path).map_err(fail)?;
     require(
         file.metadata().map_err(fail)?.is_file(),
