@@ -17,7 +17,44 @@ remote refresh. Original PR threads have not been represented as resolved.
 
 ### Latest local continuation
 
-#### Current local evidence (2026-09-15, terminal updates through 00:47 UTC September 16)
+#### Current local evidence (2026-09-15, continued September 16 UTC)
+
+`eea8733b1` passes the full actual Enforced reference workflow with exported
+continuation custody, then passes the filesystem qualifier. The same raw OS
+probe first reads and modifies private fixture files unconfined. Under Enforced
+launch, both forbidden read and write return `EACCES`, the allowed read succeeds,
+the protected file is unchanged, and no secret reaches a worker. Its completed
+artifact verifies all three tool calls, aggregate capture, continuation claims
+and actual cage history. All ten runner stages terminate as expected in
+`linux-x86-reference-eea8733b1/`, including retained filesystem and completed-run
+artifacts. Binary identities are in `x86-executables-eea8733b1/manifest.json`.
+
+The Linux custody queue at `8f1da077c` passes both store regressions,
+`process_run_evidence` with 13 re-signed semantic substitutions, and strict
+all-target CLI/store Clippy (`linux-m5-8f1da077c/`). The prior `9dd317b6f` host and
+response suite passes all 15 cases, then Linux Clippy fails a Linux-only tuple
+complexity lint. `8f1da077c` replaces it with a named structure; the failed log
+remains retained. No lint suppression was added.
+
+`c11aaf538` adds stopped-host `process revoke-capability` through the existing
+persistent kernel revocation store. The macOS mailbox regression proves busy-host
+refusal, durable revocation across reopen, retained worker authentication and
+no new protected mailbox effect. Strict all-target CLI Clippy and source hygiene
+pass. The first test attempt's external SQLite readback fails on hardened WAL
+sidecars; the corrected read requires a closed, checkpointed immutable snapshot.
+Both logs remain as `process-capability-revocation*.log`. Linux qualification and
+an x86 build are queued at this source.
+
+The adversarial scripts additionally implement network and scope/peer/replay
+probes, deliberate worker death after checkpoint, and issued-capability
+revocation. They are not yet runtime-qualified. Network acceptance requires a
+working unconfined positive control, an empty external listener, a verified
+caller denial and the matching signed `SIGSYS` exit record. The full scenario
+artifact, contended budget denial and uncertain-effect host death remain open.
+The local current code is `c11aaf538` in `/tmp/arc-m5-evidence`; the foundation
+continues its frozen `810664017` flow/workspace queue.
+
+##### Preceding checkpoints
 
 The first actual Enforced repository-reader fan-out passes at `bcf81182a`.
 A fresh run at `9dd317b6f` also passes all nine stages: initialization, two
