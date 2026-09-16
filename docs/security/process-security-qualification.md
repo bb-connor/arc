@@ -38,6 +38,17 @@ inventory. Its histories remain 1,000, 100,000 and 1,000,000 receipts, with the
 unchanged ratio bound. The gate regression rejects empty, ignored, failed and
 substituted test output; the existing inventory verifier self-test also passes.
 The actual million-receipt campaign and retention issue #1045 remain open.
+At `1628feb14be889bb7eba21e02eee491392ef44de`, explicitly executing the
+unchanged retention property on macOS passes all 24 generated cases in
+77.33 seconds with `PROPTEST_RNG_SEED=20260916`; no Rust test is ignored in
+that selected invocation. `macos-retention-reproduction-1628feb14/` retains
+the command, log, source and executable hashes. This local result does not
+reproduce the slow-filesystem CI liveness failure described in the still-open
+[#1045](https://github.com/bb-connor/arc/issues/1045), so its quarantine remains.
+The corrected scale campaign is building the unchanged release profile in
+`/tmp/arc-m8-retention-1628feb14`, with a separate target and source owner;
+`macos-receipt-scale-1628feb14/` retains its progress. No scale result is claimed
+while that campaign is running.
 
 All seven retained runtime states now export and verify native-bound outcomes
 at `1ae9f9dda`. Independent macOS verification accepts all seven and rejects
