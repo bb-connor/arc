@@ -5,6 +5,8 @@ checks a declared denial, without retrying or turning it into execution success.
 """
 
 import json
+import os
+import signal
 import sys
 
 from chio_process import ProcessClient
@@ -21,6 +23,18 @@ def main():
     if expected not in ["allow", "deny"]:
         raise ValueError("unsupported expected verdict")
     client = ProcessClient(connection["socket_path"], connection["credential"])
+    observations = []
+    for probe in call.get("probes", []):
+        response = client.invoke(
+            probe["operation_key"],
+            probe["server_id"],
+            probe["tool_name"],
+            probe["arguments"],
+            governed_intent=probe["governed_intent"],
+        )
+        if response["verdict"] != "deny" or response.get("output") is not None:
+            raise RuntimeError("unauthorized probe released a result")
+        observations.append({"request": probe, "response": response})
     response = client.invoke(
         call["operation_key"],
         call["server_id"],
@@ -29,7 +43,35 @@ def main():
         governed_intent=call["governed_intent"],
     )
     current = client.inspect()["checkpoint"]
-    client.checkpoint(current["revision"], {"response": response})
+    previous = current["value"]
+    if previous and previous["response"]["receipt_json"] != response["receipt_json"]:
+        raise RuntimeError("recovery replaced the original tool receipt")
+    if call.get("check_replay"):
+        replay = client.invoke(
+            call["operation_key"],
+            call["server_id"],
+            call["tool_name"],
+            call["arguments"],
+            governed_intent=call["governed_intent"],
+        )
+        if replay != response:
+            raise RuntimeError("logical replay replaced the original response")
+        attempt = dict(call, operation_key="reused-continuation")
+        refused = client.invoke(
+            attempt["operation_key"],
+            attempt["server_id"],
+            attempt["tool_name"],
+            attempt["arguments"],
+            governed_intent=attempt["governed_intent"],
+        )
+        if refused["verdict"] != "deny" or refused.get("output") is not None:
+            raise RuntimeError("continuation authorized an additional result")
+        observations.append({"request": attempt, "response": refused})
+    client.checkpoint(
+        current["revision"], {"response": response, "probes": observations}
+    )
+    if call.get("crash_after_checkpoint") and bootstrap["attempt"] == 1:
+        os.kill(os.getpid(), signal.SIGKILL)
     if response["verdict"] != expected:
         raise RuntimeError(f"expected {expected}, received {response['verdict']}")
     print(

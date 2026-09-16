@@ -174,6 +174,10 @@ capabilities:
             ],
         )
         response = retained["data"]["checkpoint"]["value"]["response"]
+        self.verify_response(name, call, response)
+        return response
+
+    def verify_response(self, name, call, response):
         request = {
             field: call[field]
             for field in ["operation_key", "server_id", "tool_name", "arguments"]
@@ -185,8 +189,10 @@ capabilities:
         ]
         context = {
             "runtime_id": runtime,
-            "process_id": name,
-            "capability_id": bundle["action"]["parameters"]["capabilities"][name]["id"],
+            "process_id": call["process"],
+            "capability_id": bundle["action"]["parameters"]["capabilities"][
+                call["process"]
+            ]["id"],
         }
         folder = self.output / name
         folder.mkdir(mode=0o700)
