@@ -908,6 +908,7 @@ fn child_main(control: File) -> Result<(), BootstrapFault> {
             "execution_identity_verify",
         ));
     }
+    arm_parent_death(envelope.parent_process_id)?;
     // SAFETY: PR_SET_NO_NEW_PRIVS with argument one is irreversible for this
     // process and is required by both Landlock and seccomp.
     if unsafe { libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) } != 0 {

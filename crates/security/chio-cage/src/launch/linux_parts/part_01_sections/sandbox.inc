@@ -936,6 +936,31 @@ struct LandlockEnforcement {
     network: ObservedRulesetStatus,
 }
 
+fn arm_parent_death(expected_parent: u32) -> Result<(), BootstrapFault> {
+    // Credential changes clear this setting, so install it after the final
+    // execution identity. The admitted target cannot carry set-ID bits or
+    // file capabilities, and its seccomp profile cannot clear the setting.
+    // Linux binds it to the creating thread: that thread must remain alive
+    // for the target's lifetime. Host loss must not leave an effect-capable
+    // orphan after the launch trace has detached.
+    // SAFETY: PR_SET_PDEATHSIG consumes a signal number and no pointers.
+    if unsafe { libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL, 0, 0, 0) } != 0 {
+        return Err(BootstrapFault::new(
+            CageEnforcementFailureCode::UnsupportedKernel,
+            "parent_death_signal",
+        ));
+    }
+    // Arm before checking to close the parent-exited-before-prctl race.
+    // SAFETY: getppid takes no pointers and reports the current parent.
+    if u32::try_from(unsafe { libc::getppid() }).ok() != Some(expected_parent) {
+        return Err(BootstrapFault::new(
+            CageEnforcementFailureCode::InvalidPlan,
+            "parent_lost_before_enforcement",
+        ));
+    }
+    Ok(())
+}
+
 fn apply_landlock(plan: &CageInitPlan) -> Result<LandlockEnforcement, BootstrapFault> {
     if nono_chio::UPSTREAM_NONO_VERSION != PINNED_NONO_VERSION
         || nono_chio::CHIO_PATCH_VERSION != NONO_PATCH_VERSION

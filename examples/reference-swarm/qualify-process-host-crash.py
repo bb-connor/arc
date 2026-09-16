@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import platform
+import select
 import signal
 import sqlite3
 import subprocess
@@ -98,6 +99,7 @@ def main():
         (harness.output / "interrupted.stderr").open("w") as stderr,
     ):
         host = subprocess.Popen(command, stdout=stdout, stderr=stderr)
+        target_pidfds = {}
         try:
             deadline = time.monotonic() + 180
             while not effect.read_bytes():
@@ -108,14 +110,40 @@ def main():
                 "effect repeated before host death"
             )
             assert host.poll() is None, "host already finished before crash injection"
+            # Pin both actual targets before killing their parent. Polling
+            # pidfds observes those processes even if their numeric PIDs are
+            # reaped or reused during recovery.
+            for task in Path(f"/proc/{host.pid}/task").iterdir():
+                for child in (task / "children").read_text().split():
+                    try:
+                        executable = Path(f"/proc/{child}/exe").resolve(strict=True)
+                    except FileNotFoundError:
+                        continue
+                    if executable == harness.probe:
+                        target_pidfds[int(child)] = os.pidfd_open(int(child))
+            assert len(target_pidfds) == 2, target_pidfds
             # The fixture has written once and cannot return an outcome. Kill
             # the real supervisor while its dispatch is still outstanding.
             host.kill()
             assert host.wait(timeout=15) == -signal.SIGKILL
+            poller = select.poll()
+            for descriptor in target_pidfds.values():
+                poller.register(descriptor, select.POLLIN)
+            terminated = set()
+            deadline = time.monotonic() + 5
+            while len(terminated) != len(target_pidfds):
+                remaining = deadline - time.monotonic()
+                assert remaining > 0, "confined target survived host death"
+                for descriptor, event in poller.poll(max(1, int(remaining * 1000))):
+                    assert event & select.POLLIN, event
+                    terminated.add(descriptor)
+                    poller.unregister(descriptor)
         finally:
             if host.poll() is None:
                 host.kill()
                 host.wait(timeout=15)
+            for descriptor in target_pidfds.values():
+                os.close(descriptor)
     write(
         harness.output / "host-death.json",
         {
@@ -124,6 +152,7 @@ def main():
             "command": command,
             "observed_effect_sha256": hashlib.sha256(effect.read_bytes()).hexdigest(),
             "outcome_was_not_returned": True,
+            "terminated_target_pids": sorted(target_pidfds),
         },
     )
     report = harness.run("recover-workers", command)
@@ -190,6 +219,7 @@ def main():
         "request_id": projection["request_id"],
         "state": projection["projected_state"],
         "protected_effect_count": 1,
+        "confined_targets_terminated_on_host_death": len(target_pidfds),
         "recovered_worker_attempts": 2,
         "original_request_preserved": True,
         "retained_dispatch_commit": projection["retained_dispatch_commit"],

@@ -70,6 +70,7 @@ recreated after exec.
 - `pidfd_open`, `pidfd_send_signal`, and `waitid(P_PIDFD)`
 - parent-child `PTRACE_TRACEME` with `PTRACE_O_TRACEEXEC` and
   `PTRACE_O_EXITKILL`
+- `PR_SET_PDEATHSIG` with `SIGKILL` after the final execution identity
 - `close_range` and `execveat` with `AT_EMPTY_PATH`
 - a parent `RLIMIT_NOFILE` soft limit large enough for the collision-free
   bootstrap descriptor remap (the target limit is reduced to 192 afterwards)
@@ -99,6 +100,17 @@ prepared record, kernel `PTRACE_EVENT_EXEC`, and stopped post-exec target image
 are all mandatory before it detaches the tracee and returns `FullyEnforced`.
 Every unsupported, partial, malformed, timed-out, or identity-mismatched path
 terminates and reaps the child.
+
+After dropping privileges, the helper arms `SIGKILL` on parent death and checks
+that its authenticated parent still exists. This protection remains after the
+launch trace detaches. The admitted image cannot carry set-ID bits or file
+capabilities, and the target syscall profile cannot clear the setting. Linux
+ties this signal to the thread that created the helper, so callers must keep
+that thread alive for the target's lifetime. A host killed during an outstanding
+call cannot sign a terminal receipt; recovery retains the original dispatch
+and unknown outcome even though the kernel terminates the target. The process
+host-crash qualifier checks both target termination through pinned pidfds and
+the absence of a repeated protected effect.
 
 ## Signed cage receipts
 
