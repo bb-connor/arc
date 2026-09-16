@@ -448,3 +448,46 @@ commands, caller responses, signatures and external observations. Each reports
 `m5_acceptance_complete: false`; the complete scenario artifact and final
 qualification remain required. Crash and budget fixtures also retain original
 native launch files for the separate offline check above.
+
+### Run and verify the complete local matrix
+
+With Python 3.11 or newer, the same qualified static helper, probe and repository
+reader, and the immutable worker image above, run the seven scenarios serially:
+
+```sh
+python3 examples/reference-swarm/qualify-process-matrix.py run \
+  --chio /absolute/path/to/chio --runtime-source "$RUNTIME_SOURCE" \
+  --cage-init /absolute/path/to/chio-cage-init \
+  --probe /absolute/path/to/enforcement-probe \
+  --reader /absolute/path/to/chio-tool-repo-reader \
+  --worker-image "$WORKER_IMAGE" --output /absolute/fresh/matrix-run \
+  --receipt-rollback-anchor-root /absolute/private/fresh-matrix-anchor
+```
+
+`RUNTIME_SOURCE` is the full commit used to build the selected CLI. The command
+records the executable hashes, qualification source, script hashes and worker
+image, and refuses changing executables or scripts during the run. The output
+directory must be new. The existing private anchor must have no scenario
+subdirectories from another run. Existing scenario limits and assertions apply.
+
+The resulting `matrix.json` contains all seven signed worker-outcome artifacts,
+the successful graph-completion artifacts, eight original authority denials,
+six original pre-crash launch records, input hashes and external observations.
+Keep `operator-pins.json` separately through a trusted channel. It records the
+runtime and signer pins read from operator state and the exact capture digest.
+On another machine, use an independently built verifier:
+
+```sh
+python3 examples/reference-swarm/qualify-process-matrix.py verify \
+  --chio /absolute/path/to/independent/chio \
+  --artifact /received/matrix.json --trusted-pins /trusted/operator-pins.json
+```
+
+Verification rechecks the original signatures and joins the observations to
+the same worker identities, responses, launches and durable accounting. An
+operator's file, socket, contention or PID observation remains an external
+observation authenticated by the separately retained capture digest. It is not
+a signed tool exit. `local_matrix_verified: true` reports that local composition;
+`m5_acceptance_complete` stays false pending combined-foundation and designated
+platform qualification. Failed commands keep their logs and do not emit a
+passing matrix.
