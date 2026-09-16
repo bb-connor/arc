@@ -54,7 +54,7 @@ class Harness:
             )
         return json.loads(result.stdout) if success else result.stderr
 
-    def server(self, name, read_directory):
+    def server(self, name, read_directory, write_paths=()):
         launch = self.output / (name + "-launch")
         command = [
             self.chio,
@@ -84,6 +84,8 @@ class Harness:
         ]
         for gid in sorted(set(os.getgroups()) - {os.getgid()}):
             command.extend(["--execution-supplementary-gid", gid])
+        for path in write_paths:
+            command.extend(["--write-path", path])
         self.run("provision-" + name, command)
         report = json.loads((launch / "provision-report.json").read_text())
         assert report["securityMode"] == "enforced_cage", report

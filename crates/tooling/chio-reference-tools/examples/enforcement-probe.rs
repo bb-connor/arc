@@ -30,6 +30,7 @@ impl ToolServer for EnforcementProbe {
         [
             ("read_file", "path", true),
             ("write_file", "path", false),
+            ("append_and_wait", "path", false),
             ("connect_socket", "address", false),
         ]
         .into_iter()
@@ -59,6 +60,21 @@ impl ToolServer for EnforcementProbe {
                 Ok(observed(
                     std::fs::write(path, b"probe-effect\n").map(|()| json!(null)),
                 ))
+            }
+            "append_and_wait" => {
+                let path = string_argument(arguments, "path")?;
+                let result = std::fs::OpenOptions::new()
+                    .append(true)
+                    .open(path)
+                    .and_then(|mut file| file.write_all(b"probe-effect\n"));
+                if let Err(error) = result {
+                    return Ok(observed(Err(error)));
+                }
+                // The external harness kills the host after observing this
+                // write. Never return an outcome or issue a second effect.
+                loop {
+                    std::thread::yield_now();
+                }
             }
             "connect_socket" => {
                 let address = string_argument(arguments, "address")?;
