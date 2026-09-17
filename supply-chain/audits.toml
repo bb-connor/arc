@@ -1147,6 +1147,12 @@ criteria = "safe-to-deploy"
 version = "0.6.6"
 notes = "Reviewed checksum-verified manifests and all five source modules. Three upstream tests, five added encoding/localhost transport tests, two doc compilation checks and strict all-feature Clippy pass; two doc examples are ignored. Chio selects no Rekor features and uses body data models with separate cryptographic/content verification. HTTP results are untrusted: retrieval does not bind requested identity, V2 malformed numbers become zero, URLs/resources require caller limits, and optional caches require repository isolation. This is not a log-verifier certification. Full boundaries: supply-chain/reviews/sigstore-rekor-0.6.6.md."
 
+[[audits.sigstore-tsa]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.6.6"
+notes = "Reviewed checksum-verified manifests, all five modules, 15 upstream tests and timestamp/root fixtures. All upstream tests, four added trust/content/nonce boundary tests and strict all-feature Clippy pass. Empty roots intentionally skip chain/EKU checks and cannot establish trusted time; Chio requires an exact configured signing authority and window. All 45 owned-verifier tests pass, including a real embedded-signer negative control with authority removed. HTTP acquisition is unverified transport; full RFC profile, nonce/freshness/revocation and resource controls remain caller obligations. Details: supply-chain/reviews/sigstore-tsa-0.6.6.md."
+
 [[audits.sigstore-types]]
 who = "Codex (direct source review)"
 criteria = "safe-to-deploy"

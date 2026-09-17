@@ -713,6 +713,82 @@ mod tests {
     }
 
     #[test]
+    fn tsa_timestamp_requires_a_configured_signing_authority() {
+        use cms::cert::CertificateChoices;
+        use cms::content_info::ContentInfo;
+        use cms::signed_data::{CertificateSet, SignedData};
+
+        let mut bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let signature = extract_signature(&bundle.content).expect("bundle signature");
+        let mut root = TrustedRoot::production().expect("production root");
+
+        // Embed the real signer so rejection cannot depend on a missing
+        // certificate. The CMS signature does not cover this certificate set.
+        let token = &mut bundle
+            .verification_material
+            .timestamp_verification_data
+            .rfc3161_timestamps[0]
+            .signed_timestamp;
+        let mut content = match sigstore_tsa::TimeStampResp::from_der(token.as_bytes()) {
+            Ok(response) => ContentInfo::from_der(
+                &response
+                    .time_stamp_token
+                    .expect("timestamp token")
+                    .to_der()
+                    .expect("token DER"),
+            )
+            .expect("timestamp ContentInfo"),
+            Err(_) => ContentInfo::from_der(token.as_bytes()).expect("timestamp ContentInfo"),
+        };
+        let mut signed = SignedData::from_der(&content.content.to_der().expect("signed data DER"))
+            .expect("signed data");
+        let certificates = signed
+            .certificates
+            .get_or_insert_with(|| CertificateSet(Default::default()));
+        for authority in &root.timestamp_authorities {
+            for entry in &authority.cert_chain.certificates {
+                let certificate = CertificateChoices::Certificate(
+                    Certificate::from_der(entry.raw_bytes.as_bytes())
+                        .expect("authority certificate"),
+                );
+                if !certificates
+                    .0
+                    .iter()
+                    .any(|existing| existing == &certificate)
+                {
+                    certificates
+                        .0
+                        .insert(certificate)
+                        .expect("insert certificate");
+                }
+            }
+        }
+        content.content = x509_cert::der::Any::from_der(&signed.to_der().expect("signed data DER"))
+            .expect("signed data value");
+        *token = sigstore_types::TimestampToken::new(content.to_der().expect("timestamp DER"));
+
+        sigstore_tsa::verify_timestamp_response(
+            token.as_bytes(),
+            signature.as_bytes(),
+            sigstore_tsa::VerifyOpts::new(),
+        )
+        .expect("upstream signature-only mode accepts the embedded signer");
+        assert!(extract_tsa_timestamp(&bundle, signature.as_bytes(), &root)
+            .expect("configured signing authority")
+            .is_some());
+
+        root.timestamp_authorities.clear();
+        let error = extract_tsa_timestamp(&bundle, signature.as_bytes(), &root)
+            .expect_err("an embedded certificate must not supply missing trust authority");
+        assert!(
+            error
+                .to_string()
+                .contains("does not identify a trusted authority"),
+            "unexpected rejection: {error}"
+        );
+    }
+
+    #[test]
     fn certificate_chain_rejects_fulcio_anchors_outside_their_authority_window() {
         let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
         let certificate = bundle.signing_certificate().expect("signing certificate");
@@ -744,7 +820,7 @@ mod tests {
         let trusted_root = TrustedRoot::production().expect("production root");
         let expected = get_issuer_spki(
             &bundle.verification_material.content,
-            &certificate,
+            certificate,
             validation_time,
             &trusted_root,
         )
@@ -771,7 +847,7 @@ mod tests {
 
         let resolved = get_issuer_spki(
             &bundle.verification_material.content,
-            &certificate,
+            certificate,
             validation_time,
             &rotated_root,
         )

@@ -10,6 +10,7 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
+publish = false
 edition = "2021"
 rust-version = "1.70"
 name = "sigstore-verify"
@@ -176,3 +177,12 @@ features = [
     "builder",
     "sct",
 ]
+
+[workspace]
+
+[patch.crates-io]
+sigstore-crypto = { path = "../sigstore-crypto-chio" }
+sigstore-merkle = { path = "../sigstore-merkle-chio" }
+sigstore-trust-root = { path = "../sigstore-trust-root-chio" }
+crmf = { path = "../crmf-chio" }
+cmpv2 = { path = "../cmpv2-chio" }
