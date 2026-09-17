@@ -1369,6 +1369,12 @@ criteria = "safe-to-deploy"
 version = "0.6.1"
 notes = "Reviewed checksum-verified manifests and complete facade source, which only documents and re-exports typify-impl and the optional macro. Two upstream integration tests compare unchanged generated snapshots and compile 21 distinct fixtures; eight doc checks and strict all-target/all-feature Clippy pass. Selected through nono's build-time packaged schema generation; this is not a runtime schema validator or a certification of the separately reviewed backend. Details: supply-chain/reviews/typify-and-typify-macro-0.6.1.md."
 
+[[audits.typify-impl]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed checksum-verified manifests and all 14 production modules, test harness and integration cases. All 103 upstream unit tests, three integration tests, four doc checks and strict all-feature Clippy pass; two docs are ignored. Five additional generated-runtime/boundary tests pass, including the exact packaged nono schema. Generator has no unsafe, build script, network, filesystem or subprocess operations; diagnostics can print schemas. Requires trusted build inputs and separate validation: numeric ranges, const, uniqueness and other schema semantics are incomplete, unsupported inputs can panic/expand, substitutions carry source-code authority and unknown-crate Deny is not a hard rejection. Chio uses it through nono's packaged build schema and constructs confinement capabilities directly. Full limits: supply-chain/reviews/typify-impl-0.6.1.md."
+
 [[audits.typify-macro]]
 who = "Codex (direct source review)"
 criteria = "safe-to-deploy"
