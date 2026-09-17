@@ -409,6 +409,9 @@ audit-as-crates-io = false
 [policy.seccompiler]
 audit-as-crates-io = false
 
+[policy.sigstore-crypto]
+audit-as-crates-io = false
+
 [policy.sigstore-merkle]
 audit-as-crates-io = false
 

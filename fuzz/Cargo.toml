@@ -30,6 +30,7 @@ crmf = { path = "../third_party/crmf-chio" }
 cmpv2 = { path = "../third_party/cmpv2-chio" }
 seccompiler = { path = "../third_party/seccompiler-chio" }
 sigstore-merkle = { path = "../third_party/sigstore-merkle-chio" }
+sigstore-crypto = { path = "../third_party/sigstore-crypto-chio" }
 
 [dependencies]
 chio-a2a-adapter = { path = "../crates/protocol/chio-a2a-adapter", features = ["fuzz"] }
