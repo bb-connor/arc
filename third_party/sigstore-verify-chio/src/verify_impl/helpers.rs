@@ -658,6 +658,61 @@ mod tests {
         include_str!("../../test_data/bundles/cosign-v3-blob.sigstore.json");
 
     #[test]
+    fn certificate_chain_rejects_malformed_authority_dates() {
+        let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let validation_time = bundle.verification_material.tlog_entries[0].integrated_time;
+        let original_root = TrustedRoot::production().expect("production root");
+        verify_certificate_chain(
+            &bundle.verification_material.content,
+            validation_time,
+            &original_root,
+        )
+        .expect("original authority window");
+
+        for (start, end) in [(Some("invalid"), None), (None, Some("invalid"))] {
+            let mut root = original_root.clone();
+            for authority in &mut root.certificate_authorities {
+                authority.valid_for = Some(ValidityPeriod {
+                    start: start.map(str::to_owned),
+                    end: end.map(str::to_owned),
+                });
+            }
+            let error = verify_certificate_chain(
+                &bundle.verification_material.content,
+                validation_time,
+                &root,
+            )
+            .expect_err("malformed dates must not become absent constraints");
+            assert!(error.to_string().contains("validity period has an invalid"));
+        }
+    }
+
+    #[test]
+    fn tsa_timestamp_rejects_malformed_authority_dates() {
+        let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
+        let signature = extract_signature(&bundle.content).expect("bundle signature");
+        let original_root = TrustedRoot::production().expect("production root");
+        assert!(
+            extract_tsa_timestamp(&bundle, signature.as_bytes(), &original_root)
+                .expect("original authority window")
+                .is_some()
+        );
+
+        for (start, end) in [(Some("invalid"), None), (None, Some("invalid"))] {
+            let mut root = original_root.clone();
+            for authority in &mut root.timestamp_authorities {
+                authority.valid_for = Some(ValidityPeriod {
+                    start: start.map(str::to_owned),
+                    end: end.map(str::to_owned),
+                });
+            }
+            let error = extract_tsa_timestamp(&bundle, signature.as_bytes(), &root)
+                .expect_err("malformed dates must not authorize a timestamp");
+            assert!(error.to_string().contains("validity period has an invalid"));
+        }
+    }
+
+    #[test]
     fn certificate_chain_rejects_fulcio_anchors_outside_their_authority_window() {
         let bundle = Bundle::from_json(COSIGN_V3_BLOB_BUNDLE).expect("cosign bundle");
         let certificate = bundle.signing_certificate().expect("signing certificate");

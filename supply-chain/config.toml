@@ -415,6 +415,9 @@ audit-as-crates-io = false
 [policy.sigstore-merkle]
 audit-as-crates-io = false
 
+[policy.sigstore-trust-root]
+audit-as-crates-io = false
+
 [policy.sigstore-verify]
 audit-as-crates-io = false
 

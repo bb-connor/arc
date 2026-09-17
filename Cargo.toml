@@ -233,6 +233,8 @@ exclude = [
     "third_party/sigstore-merkle-chio",
     # Compatible prehashed signature repair for the selected Sigstore release.
     "third_party/sigstore-crypto-chio",
+    # Strict validity parsing for the selected Sigstore trust-root release.
+    "third_party/sigstore-trust-root-chio",
 ]
 
 [patch.crates-io]
@@ -243,6 +245,7 @@ cmpv2 = { path = "third_party/cmpv2-chio" }
 seccompiler = { path = "third_party/seccompiler-chio" }
 sigstore-merkle = { path = "third_party/sigstore-merkle-chio" }
 sigstore-crypto = { path = "third_party/sigstore-crypto-chio" }
+sigstore-trust-root = { path = "third_party/sigstore-trust-root-chio" }
 
 [workspace.package]
 version = "0.1.0"

@@ -7737,8 +7737,6 @@ dependencies = [
 [[package]]
 name = "sigstore-trust-root"
 version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee8762a4813252faffdf6f7e2040213078eb2482fbc351381134f3fc60c1be9c"
 dependencies = [
  "base64 0.22.1",
  "chrono",
