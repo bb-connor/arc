@@ -1141,6 +1141,12 @@ criteria = "safe-to-deploy"
 version = "0.6.6"
 notes = "Reviewed checksum-verified manifests and all production source, tests and fixture inventory. No unsafe code, build script or IO in this package. All 24 upstream tests, two audit boundary tests and strict all-feature Clippy pass; one upstream doc example is ignored. Validation does not authenticate certificates, signatures, timestamps or checkpoints and does not join duplicate root/size fields. Chio separately performs those checks in its owned verifier; six focused log-verifier tests pass. Builder fallback behavior also requires full verification. Details: supply-chain/reviews/sigstore-bundle-0.6.6.md."
 
+[[audits.sigstore-rekor]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.6.6"
+notes = "Reviewed checksum-verified manifests and all five source modules. Three upstream tests, five added encoding/localhost transport tests, two doc compilation checks and strict all-feature Clippy pass; two doc examples are ignored. Chio selects no Rekor features and uses body data models with separate cryptographic/content verification. HTTP results are untrusted: retrieval does not bind requested identity, V2 malformed numbers become zero, URLs/resources require caller limits, and optional caches require repository isolation. This is not a log-verifier certification. Full boundaries: supply-chain/reviews/sigstore-rekor-0.6.6.md."
+
 [[audits.sigstore-types]]
 who = "Codex (direct source review)"
 criteria = "safe-to-deploy"
