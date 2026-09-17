@@ -1363,6 +1363,18 @@ criteria = "safe-to-deploy"
 version = "1.19.0"
 notes = "Compile-time numeric types; build-time only, no IO."
 
+[[audits.typify]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed checksum-verified manifests and complete facade source, which only documents and re-exports typify-impl and the optional macro. Two upstream integration tests compare unchanged generated snapshots and compile 21 distinct fixtures; eight doc checks and strict all-target/all-feature Clippy pass. Selected through nono's build-time packaged schema generation; this is not a runtime schema validator or a certification of the separately reviewed backend. Details: supply-chain/reviews/typify-and-typify-macro-0.6.1.md."
+
+[[audits.typify-macro]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed checksum-verified manifests, both complete source modules and tests. Two unit tests, one doc check, five additional compile-boundary cases and strict all-target/all-feature Clippy pass. Macro reads caller-selected schema paths and emits backend-generated Rust; no unsafe, network, process or write operations. Paths and Rust configuration are trusted build inputs. Invalid JSON panics compilation; missing files and malformed settings reject. Resource bounds and backend schema semantics are separate obligations; unknown_crates Deny is not a security allowlist. Details: supply-chain/reviews/typify-and-typify-macro-0.6.1.md."
+
 [[audits.unicode-bidi]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
