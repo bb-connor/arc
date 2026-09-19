@@ -458,7 +458,7 @@ fn write_transition_projection(
     Ok(())
 }
 
-fn transition_decision_from_event(
+pub(super) fn transition_decision_from_event(
     store: &SqliteBudgetStore,
     transaction: &Transaction<'_>,
     event: BudgetMutationRecord,

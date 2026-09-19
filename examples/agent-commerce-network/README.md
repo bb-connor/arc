@@ -38,7 +38,7 @@ deterministic fallback flow (CI mode).
 
 ## What Chio Governs
 
-- **Budget limits** on capability grants (`maxTotalCost`, `maxCostPerInvocation`)
+- **Budget limits** on capability grants (`max_total_cost`, `max_cost_per_invocation`)
 - **Receipt signing** for every buyer API call (via `chio api protect`)
 - **Guard policies** on provider MCP tools (via `chio mcp serve-http`)
 - **Budget tracking** via trust-control's split budget endpoints (`/v1/budgets/authorize-exposure`, `/v1/budgets/release-exposure`, `/v1/budgets/reconcile-spend`)

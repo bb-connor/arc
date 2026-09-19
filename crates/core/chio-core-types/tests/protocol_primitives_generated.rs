@@ -43,6 +43,21 @@ fn generated_instance(schema_file: &str, instance: Value) -> Value {
 
 fn parse_generated(schema_file: &str, instance: Value) -> Result<Value, serde_json::Error> {
     match schema_file {
+        "receipt/record.schema.json" => {
+            round_trip::<generated::kernel_tool_call_response::ChioReceiptRecord>(instance)
+        }
+        "kernel/caller_dispatch_authorization.schema.json" => round_trip::<
+            generated::kernel_caller_dispatch_authorization::ChioSignedCallerDispatchAuthorization,
+        >(instance),
+        "kernel/caller_delivery_report.schema.json" => round_trip::<
+            generated::kernel_caller_delivery_report::ChioSignedCallerDeliveryReport,
+        >(instance),
+        "result/pending_approval.schema.json" => round_trip::<
+            generated::kernel_tool_call_response::ChioKernelMessageToolCallResponseResult,
+        >(instance),
+        "kernel/execution_nonce.schema.json" => {
+            round_trip::<generated::agent_tool_call_request::ChioSignedExecutionNonce>(instance)
+        }
         "capability/token.schema.json" => {
             round_trip::<generated::agent_tool_call_request::ChioCapabilityToken>(instance)
         }

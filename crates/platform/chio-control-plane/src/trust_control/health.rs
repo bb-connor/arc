@@ -1,5 +1,5 @@
 use super::cluster::{cluster_consensus_view, cluster_self_url};
-use super::report_validation::load_authority_status;
+use super::report_validation::load_authority_status_for_state;
 use super::*;
 
 pub(super) fn install_health_routes(
@@ -20,7 +20,7 @@ async fn handle_health(State(state): State<TrustServiceState>) -> Response {
         "leaderUrl": leader_url.clone(),
         "selfUrl": self_url.clone(),
         "clustered": state.cluster.is_some(),
-        "authority": trust_authority_health_snapshot(&state.config),
+        "authority": trust_authority_health_snapshot(&state),
         "stores": trust_store_health_snapshot(&state.config),
         "federation": trust_federation_health_snapshot(&state),
         "cluster": trust_cluster_health_snapshot(&state, consensus, leader_url, self_url),
@@ -28,15 +28,18 @@ async fn handle_health(State(state): State<TrustServiceState>) -> Response {
     .into_response()
 }
 
-fn trust_authority_health_snapshot(config: &TrustServiceConfig) -> Value {
+fn trust_authority_health_snapshot(state: &TrustServiceState) -> Value {
+    let config = &state.config;
     let backend_hint = if config.authority_db_path.is_some() {
         Some("sqlite")
+    } else if state.authority_keyring.is_some() {
+        Some("enterprise_keyring")
     } else if config.authority_seed_path.is_some() {
         Some("seed_file")
     } else {
         None
     };
-    match load_authority_status(config) {
+    match load_authority_status_for_state(state) {
         Ok(status) => json!({
             "configured": status.configured,
             "available": true,

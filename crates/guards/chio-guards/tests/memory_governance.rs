@@ -60,6 +60,7 @@ fn make_request_in_scope(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     (req, agent_id, server_id)
 }
@@ -80,6 +81,7 @@ fn eval_at<G: Guard>(
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index,
+        security_context: None,
     };
     guard.evaluate(&ctx).expect("guard evaluate").verdict
 }
@@ -609,6 +611,7 @@ fn finding_quarantine_rechecks_status_immediately_before_dispatch() {
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: None,
+        security_context: None,
     };
     assert!(matches!(
         guard.evaluate(&ctx).expect("initial evaluation").verdict,
@@ -655,6 +658,7 @@ fn finding_quarantine_rejects_unbounded_marker_keys() {
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: None,
+        security_context: None,
     };
     assert!(matches!(
         guard.evaluate(&ctx).expect("bounded evaluation").verdict,
@@ -692,6 +696,7 @@ fn finding_quarantine_binds_the_released_value_to_latest_write_provenance() {
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: None,
+        security_context: None,
     };
 
     assert!(guard

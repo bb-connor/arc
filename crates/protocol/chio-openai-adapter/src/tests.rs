@@ -117,7 +117,7 @@ impl RuntimeAdmissionHook for DenyingOpenAiRuntimeAdmissionHook {
 
 fn test_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "test-srv".to_string(),
         name: "Test".to_string(),
         description: None,
@@ -135,8 +135,14 @@ fn test_manifest() -> ToolManifest {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                },
                 latency_hint: None,
+                flow: None,
             },
             ToolDefinition {
                 name: "search".to_string(),
@@ -150,8 +156,14 @@ fn test_manifest() -> ToolManifest {
                 }),
                 output_schema: None,
                 pricing: None,
-                has_side_effects: false,
+                annotations: chio_manifest::ToolAnnotations {
+                    read_only: true,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                },
                 latency_hint: None,
+                flow: None,
             },
         ],
         server_tools: Vec::new(),
@@ -271,7 +283,7 @@ fn adapter_creates_from_manifest() {
 #[test]
 fn adapter_empty_manifests_errors() {
     let empty_manifest = ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "empty".to_string(),
         name: "Empty".to_string(),
         description: None,
@@ -367,6 +379,45 @@ fn execute_tool_call_success() {
             .and_then(Value::as_str),
         Some("select")
     );
+}
+
+#[test]
+fn openai_host_rejects_unnegotiated_authority_before_effect_or_receipt() {
+    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let mut kernel = ChioKernel::new(test_kernel_config());
+    let invocations = Arc::new(AtomicUsize::new(0));
+    kernel.register_tool_server(Box::new(CountingToolServer {
+        invocations: Arc::clone(&invocations),
+    }));
+    let agent = Keypair::generate();
+    let mut execution = test_execution_context(&kernel, &agent, "test-srv", "get_weather");
+    assert!(
+        !adapter
+            .execute_tool_call(&weather_tool_call(), &kernel, &execution)
+            .denied
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    let receipts = kernel.receipt_log().receipts().len();
+    execution.supplemental_authorization =
+        Some(serde_json::from_value(serde_json::json!({"signed_extension":"b3BhcXVl"})).unwrap());
+    let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
+    assert!(result.denied);
+    assert!(result
+        .content
+        .contains("opaque_supplemental_authorization was not negotiated"));
+    assert!(result.receipt.is_none());
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(kernel.receipt_log().receipts().len(), receipts);
+}
+
+#[test]
+fn openai_ordinary_host_rejects_flow_required_manifest_before_exposure() {
+    assert!(ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).is_ok());
+    let mut manifest = test_manifest();
+    manifest.tools[0].flow =
+        Some(serde_json::from_value(serde_json::json!({"egress":true})).unwrap());
+    let error = ChioOpenAiAdapter::new(test_config(), vec![manifest]).unwrap_err();
+    assert!(error.to_string().contains("verified cross-protocol host"));
 }
 
 #[test]
@@ -586,7 +637,7 @@ fn execute_tool_call_invalid_arguments() {
 #[test]
 fn execute_tool_call_server_error() {
     let manifest = ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "fail-srv".to_string(),
         name: "Fail".to_string(),
         description: None,
@@ -597,8 +648,14 @@ fn execute_tool_call_server_error() {
             input_schema: json!({"type": "object"}),
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: None,
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
@@ -834,6 +891,7 @@ fn execute_tool_calls_uses_per_call_execution_nonces() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         let preflight = kernel.evaluate_tool_call_blocking(&request).unwrap();
         execution.execution_nonces.insert(

@@ -2,6 +2,47 @@ use super::*;
 
 #[derive(Subcommand)]
 pub(crate) enum ReceiptCommands {
+    /// Verify receipt signatures, signer pin and action hashes offline (NDJSON).
+    /// Does not re-evaluate policy or establish log inclusion or completeness.
+    Verify {
+        /// One original JSON receipt per line. Blank lines are ignored.
+        #[arg(long)]
+        input: PathBuf,
+        /// Independently trusted kernel public key (raw bytes or algorithm-aware hex).
+        #[arg(long)]
+        trusted_kernel_pubkey: PathBuf,
+    },
+    /// Bind a process response to a frozen request and independently selected context.
+    /// Verifies the receipt, result content and decision. Does not verify execution nonces.
+    VerifyProcessResponse {
+        #[arg(long)]
+        response: PathBuf,
+        #[arg(long)]
+        request: PathBuf,
+        /// JSON object containing runtime_id, process_id and capability_id from the host.
+        #[arg(long)]
+        context: PathBuf,
+        #[arg(long)]
+        trusted_kernel_pubkey: PathBuf,
+    },
+    /// Verify a released native launch against its signed policy and external pins.
+    /// Does not establish target death, call completion or a terminal outcome.
+    VerifyNativeStart {
+        #[arg(long)]
+        signed_policy: PathBuf,
+        /// One original enforcement receipt, in JSON.
+        #[arg(long)]
+        enforcement: PathBuf,
+        #[arg(long)]
+        server_id: String,
+        /// Independently trusted policy signer, as algorithm-aware public-key hex.
+        #[arg(long)]
+        trusted_policy_signer: String,
+        #[arg(long)]
+        expected_receipt_id: String,
+        #[arg(long)]
+        expected_target_sha256: String,
+    },
     /// List receipts with optional filters. Output: one JSON receipt per line (JSON Lines).
     List {
         /// Filter by capability ID.

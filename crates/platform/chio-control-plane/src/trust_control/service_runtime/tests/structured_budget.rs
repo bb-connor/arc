@@ -513,6 +513,7 @@ fn structured_quota_exhaustion_denial_does_not_invent_usage_sequence(
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
+        recovery_fence: None,
     };
     store.cache_usage("cap-composite", 0, Some(5), Some(1), Some(0), Some(0))?;
     let BudgetAuthorizeHoldDecision::Denied(denied) = store.authorize_budget_hold(request)? else {
@@ -595,6 +596,7 @@ fn structured_authorization_rejects_substitution_before_cache_mutation(
         let store = RemoteBudgetStore {
             client: build_client(&server.url, "secret")?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
+            recovery_fence: None,
         };
         store.cache_usage("cap-composite", 0, Some(5), Some(5), Some(50), Some(25))?;
 
@@ -908,6 +910,7 @@ fn remote_budget_store_preserves_structured_capture_decision(
         let store = RemoteBudgetStore {
             client: build_client(&server.url, "secret")?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
+            recovery_fence: None,
         };
 
         let decision = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
@@ -1052,6 +1055,7 @@ fn remote_budget_store_rejects_structured_capture_identity_substitution(
         let store = RemoteBudgetStore {
             client: build_client(&server.url, "secret")?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
+            recovery_fence: None,
         };
         let result = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
             capability_id: "cap-composite".to_string(),
@@ -1170,6 +1174,7 @@ fn remote_capture_rejects_projection_downgrade_exact_usage_swap_and_quota_drift(
         let store = RemoteBudgetStore {
             client: build_client(&server.url, "secret")?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
+            recovery_fence: None,
         };
         let result = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
             capability_id: "cap-composite".to_string(),
@@ -1204,6 +1209,7 @@ fn remote_budget_store_rejects_structured_reconcile_mismatch_without_poisoning_c
         let store = RemoteBudgetStore {
             client: build_client(&server.url, "secret")?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
+            recovery_fence: None,
         };
         store.cache_usage("cap-composite", 0, Some(5), Some(5), Some(50), Some(25))?;
         let result = store.reconcile_budget_hold(BudgetReconcileHoldRequest {
@@ -1240,6 +1246,7 @@ fn remote_budget_store_rejects_v1_shape_on_versioned_lifecycle_endpoint(
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
+        recovery_fence: None,
     };
     store.cache_usage("cap-composite", 0, Some(5), Some(5), Some(50), Some(25))?;
 
@@ -1288,6 +1295,7 @@ fn remote_budget_store_rejects_structured_reconcile_identity_substitution_withou
         let store = RemoteBudgetStore {
             client: build_client(&server.url, "secret")?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
+            recovery_fence: None,
         };
         store.cache_usage("cap-composite", 0, Some(5), Some(5), Some(50), Some(25))?;
         let result = store.reconcile_budget_hold(BudgetReconcileHoldRequest {
@@ -1352,6 +1360,7 @@ fn remote_budget_store_rejects_impossible_structured_capture_event_state(
         let store = RemoteBudgetStore {
             client: build_client(&server.url, "secret")?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
+            recovery_fence: None,
         };
         let result = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
             capability_id: "cap-composite".to_string(),
@@ -1496,6 +1505,7 @@ fn remote_budget_store_rejects_structured_reverse_substitution_without_poisoning
         let store = RemoteBudgetStore {
             client: build_client(&server.url, "secret")?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
+            recovery_fence: None,
         };
         store.cache_usage("cap-composite", 0, Some(5), Some(5), Some(50), Some(25))?;
         let result = store.reverse_budget_hold(BudgetReverseHoldRequest {
@@ -1540,6 +1550,7 @@ fn fenced_reverse_requires_returned_cumulative_state_without_poisoning_cache(
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
+        recovery_fence: None,
     };
     store.cache_usage("cap-composite", 0, Some(5), Some(5), Some(50), Some(25))?;
 

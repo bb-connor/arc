@@ -9,7 +9,12 @@
 
 use std::sync::Arc;
 
-use chio_cohere_tools_adapter::{CohereAdapter, CohereAdapterConfig, CohereTransport};
+use chio_cohere_tools_adapter::{CohereAdapter, CohereAdapterConfig, CohereTransport, Transport};
+use chio_core::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+    TOOL_MANIFEST_SCHEMA,
+};
 use chio_tool_call_fabric::{ProviderError, ProviderId, ReceiptId, VerdictResult};
 use serde_json::json;
 use wiremock::matchers::{body_string, header, method, path};
@@ -23,6 +28,43 @@ fn config() -> CohereAdapterConfig {
         "deadbeef",
         "org_chio_live",
     )
+}
+
+fn registry_bound_adapter(transport: Arc<dyn Transport>) -> CohereAdapter {
+    let signer = Keypair::from_seed(&[78; 32]);
+    let mut config = config();
+    config.public_key = signer.public_key().to_hex();
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: config.server_id.clone(),
+        name: config.server_name.clone(),
+        description: None,
+        version: config.server_version.clone(),
+        tools: vec![ToolDefinition {
+            name: "get_weather".to_string(),
+            description: "Get weather".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: true,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: config.public_key.clone(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).unwrap();
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .unwrap();
+    CohereAdapter::new_with_registry(config, transport, &registry).unwrap()
 }
 
 #[tokio::test]
@@ -58,7 +100,7 @@ async fn chat_posts_to_v2_chat_with_bearer_and_lifts_tool_calls() {
         .await;
 
     let transport = CohereTransport::with_base_url(server.uri(), "live-key").unwrap();
-    let adapter = CohereAdapter::new(config(), Arc::new(transport));
+    let adapter = registry_bound_adapter(Arc::new(transport));
 
     let invocations = adapter.chat(request_body.as_bytes()).await.unwrap();
     assert_eq!(invocations.len(), 1);
@@ -102,7 +144,7 @@ async fn chat_stream_gates_sse_response() {
         .await;
 
     let transport = CohereTransport::with_base_url(server.uri(), "live-key").unwrap();
-    let adapter = CohereAdapter::new(config(), Arc::new(transport));
+    let adapter = registry_bound_adapter(Arc::new(transport));
 
     let gated = adapter
         .chat_stream(b"{\"stream\":true}", |_invocation| {

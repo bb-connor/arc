@@ -11,6 +11,7 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY .cargo ./.cargo
 COPY crates ./crates
+COPY third_party ./third_party
 COPY bench ./bench
 COPY contracts ./contracts
 COPY spec ./spec

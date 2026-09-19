@@ -13,7 +13,8 @@ mkdir -p \
   "${fixture_root}/scripts" \
   "${fixture_root}/formal/tla" \
   "${fixture_root}/formal/apalache" \
-  "${fixture_root}/crates/kernel/chio-kernel-core/src"
+  "${fixture_root}/crates/kernel/chio-kernel-core/src" \
+  "${fixture_root}/crates/economy/chio-open-market/src"
 cp "${REPO_ROOT}/scripts/check-mapping.sh" "${fixture_root}/scripts/check-mapping.sh"
 if [[ "$(grep -Ec 'LC_ALL=C comm -(13|23)' "${fixture_root}/scripts/check-mapping.sh")" -ne 4 ]]; then
   echo "check-mapping must run all sorted-set comparisons under the C locale" >&2
@@ -83,6 +84,8 @@ printf '%s\n' \
   > "${fixture_root}/formal/apalache/PostAdmissionDropGuard.tla"
 printf '%s\n' '// No Kani harnesses in this fixture.' \
   > "${fixture_root}/crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs"
+printf '%s\n' '// No Kani harnesses in this fixture.' \
+  > "${fixture_root}/crates/economy/chio-open-market/src/kani_public_harnesses.rs"
 printf '%s\n' '# fixture manifest' > "${fixture_root}/.loom/harnesses.toml"
 printf '%s\n' '# fixture manifest' > "${fixture_root}/.dst/harnesses.toml"
 printf '%s\n' \
@@ -124,7 +127,16 @@ remove_exact_line() {
   mv "${path}.tmp" "${path}"
 }
 
-run_gate "${fixture_root}" >/dev/null
+if ! baseline_output="$(run_gate "${fixture_root}")"; then
+  printf '%s\n' "${baseline_output}" >&2
+  exit 1
+fi
+
+unmapped_market="${TMP_DIR}/unmapped-market-harness"
+cp -R "${fixture_root}" "${unmapped_market}"
+printf '%s\n' '#[kani::proof]' 'pub fn unmapped_market_fixture() {}' \
+  > "${unmapped_market}/crates/economy/chio-open-market/src/kani_public_harnesses.rs"
+expect_failure "${unmapped_market}" "public Kani harness(es) are not cited"
 
 model_files=(
   'formal/tla/RevocationPropagation.tla'

@@ -12,6 +12,10 @@ BUILD_DIR="${ARTIFACT_ROOT}/build"
 mkdir -p "${LOG_DIR}" "${STATE_DIR}" "${BUILD_DIR}"
 
 if ! command -v cmake >/dev/null 2>&1; then
+  if [[ "${CHIO_DROGON_REQUIRE_DEPS:-0}" == "1" ]]; then
+    echo "hello-drogon qualification requires cmake" >&2
+    exit 1
+  fi
   echo "hello-drogon smoke skipped: cmake was not found on PATH"
   exit 0
 fi
@@ -22,6 +26,10 @@ if ! cmake -S "${EXAMPLE_ROOT}" -B "${BUILD_DIR}" >"${LOG_DIR}/configure.log" 2>
 fi
 
 if [[ -f "${BUILD_DIR}/hello-drogon.skip" ]]; then
+  if [[ "${CHIO_DROGON_REQUIRE_DEPS:-0}" == "1" ]]; then
+    echo "hello-drogon qualification requires Drogon dependencies" >&2
+    exit 1
+  fi
   echo "hello-drogon smoke skipped: $(tr -d '\n' < "${BUILD_DIR}/hello-drogon.skip")"
   exit 0
 fi
@@ -36,7 +44,7 @@ if ! cmake --build "${BUILD_DIR}" --target hello_drogon_contract_tests >"${LOG_D
   exit 1
 fi
 
-if ! ctest --test-dir "${BUILD_DIR}" --output-on-failure >"${LOG_DIR}/ctest.log" 2>&1; then
+if ! ctest --test-dir "${BUILD_DIR}" --output-on-failure --no-tests=error >"${LOG_DIR}/ctest.log" 2>&1; then
   echo "hello-drogon smoke contract tests failed; see ${LOG_DIR}/ctest.log" >&2
   exit 1
 fi

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-privileged-audit-commit-v1.schema.json",
+  "title": "Chio broker privileged audit commit request v1",
+  "description": "Second and final request binding runner and governed administrator authorization to a broker challenge.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "sessionNonce",
+    "sessionCommitmentSha256",
+    "runnerAuthorization",
+    "governedAdminAuthorization"
+  ],
+  "properties": {
+    "schema": { "const": "chio.broker-privileged-audit-commit.v1" },
+    "sessionNonce": { "$ref": "#/$defs/digest" },
+    "sessionCommitmentSha256": { "$ref": "#/$defs/digest" },
+    "runnerAuthorization": {
+      "$ref": "broker-audit-runner-authorization-envelope-v1.schema.json"
+    },
+    "governedAdminAuthorization": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 65536,
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 }
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

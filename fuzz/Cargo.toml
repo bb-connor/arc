@@ -24,6 +24,15 @@ path = "src/lib.rs"
 # that libFuzzer's nightly-only runtime cannot satisfy.
 [workspace]
 
+[patch.crates-io]
+enumflags2_derive = { path = "../third_party/enumflags2-derive-chio" }
+crmf = { path = "../third_party/crmf-chio" }
+cmpv2 = { path = "../third_party/cmpv2-chio" }
+seccompiler = { path = "../third_party/seccompiler-chio" }
+sigstore-merkle = { path = "../third_party/sigstore-merkle-chio" }
+sigstore-crypto = { path = "../third_party/sigstore-crypto-chio" }
+sigstore-trust-root = { path = "../third_party/sigstore-trust-root-chio" }
+
 [dependencies]
 chio-a2a-adapter = { path = "../crates/protocol/chio-a2a-adapter", features = ["fuzz"] }
 chio-acp-edge = { path = "../crates/protocol/chio-acp-edge", features = ["fuzz"] }
@@ -49,6 +58,8 @@ chio-kernel-core = { path = "../crates/kernel/chio-kernel-core", features = ["fu
 chio-mcp-adapter = { path = "../crates/protocol/chio-mcp-adapter", features = ["fuzz"] }
 chio-mcp-edge = { path = "../crates/protocol/chio-mcp-edge", features = ["fuzz"] }
 chio-openapi-mcp-bridge = { path = "../crates/protocol/chio-openapi-mcp-bridge", features = ["fuzz"] }
+chio-store-sqlite = { path = "../crates/platform/chio-store-sqlite", features = ["fuzz"] }
+chio-conformance = { path = "../crates/tooling/chio-conformance", default-features = false, features = ["fuzz"] }
 chio-policy = { path = "../crates/guards/chio-policy" }
 chio-revocation-oracle = { path = "../crates/trust/chio-revocation-oracle" }
 chio-wasm-guards = { path = "../crates/guards/chio-wasm-guards", features = ["fuzz"] }
@@ -258,6 +269,20 @@ bench = false
 [[bin]]
 name = "revocation_oracle_merkle"
 path = "fuzz_targets/revocation_oracle_merkle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "rollback_anchor_slots"
+path = "fuzz_targets/rollback_anchor_slots.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "peers_lock_decode"
+path = "fuzz_targets/peers_lock_decode.rs"
 test = false
 doc = false
 bench = false

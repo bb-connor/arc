@@ -589,6 +589,24 @@ impl SqliteReceiptStore {
             CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_decision
                 ON chio_tool_receipts(decision_kind);
 
+            CREATE TABLE IF NOT EXISTS chio_security_evidence_index (
+                evidence_id TEXT NOT NULL PRIMARY KEY,
+                receipt_id TEXT NOT NULL UNIQUE
+                    REFERENCES chio_tool_receipts(receipt_id) ON DELETE RESTRICT
+            );
+
+            CREATE TRIGGER IF NOT EXISTS chio_security_evidence_index_reject_update
+            BEFORE UPDATE ON chio_security_evidence_index
+            BEGIN
+                SELECT RAISE(ABORT, 'security evidence index entries are immutable');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_security_evidence_index_reject_delete
+            BEFORE DELETE ON chio_security_evidence_index
+            BEGIN
+                SELECT RAISE(ABORT, 'security evidence index entries are immutable');
+            END;
+
             CREATE TABLE IF NOT EXISTS chio_authorization_receipt_consumptions (
                 authorization_receipt_id TEXT PRIMARY KEY REFERENCES chio_tool_receipts(receipt_id) ON DELETE RESTRICT,
                 consumer_receipt_id TEXT NOT NULL UNIQUE,

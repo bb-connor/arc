@@ -152,6 +152,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         }
     }
 
@@ -175,6 +176,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
         guard.evaluate(&context).unwrap().verdict
     }
@@ -198,6 +200,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let result = guard.evaluate(&ctx);
@@ -234,6 +237,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let decision = guard.evaluate(&context).unwrap();
@@ -274,6 +278,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let decision = guard.evaluate(&context).unwrap();
@@ -336,6 +341,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let result = guard.evaluate(&ctx);
@@ -365,6 +371,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         // Advisory guards should allow even when the backend denies
@@ -445,6 +452,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let result = guard.evaluate(&ctx);
@@ -548,6 +556,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         }
     }
 
@@ -566,6 +575,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let req = WasmGuard::build_request(&ctx);
@@ -587,6 +597,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let req = WasmGuard::build_request(&ctx);
@@ -610,6 +621,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let req = WasmGuard::build_request(&ctx);
@@ -641,6 +653,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let req = WasmGuard::build_request(&ctx);
@@ -667,6 +680,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: Some(&roots),
             matched_grant_index: None,
+            security_context: None,
         };
 
         let req = WasmGuard::build_request(&ctx);
@@ -691,6 +705,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: Some(3),
+            security_context: None,
         };
 
         let req = WasmGuard::build_request(&ctx);
@@ -711,6 +726,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let req = WasmGuard::build_request(&ctx);

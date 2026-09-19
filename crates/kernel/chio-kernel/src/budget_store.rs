@@ -1045,12 +1045,16 @@ pub trait BudgetStore: Send + Sync {
         Ok(None)
     }
 
+    /// Authoritative recovery lookup. `None` means the store established that
+    /// the hold is absent; unsupported or unavailable reads must return an error.
     fn get_budget_hold(
         &self,
         hold_id: &str,
     ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
         let _ = hold_id;
-        Ok(None)
+        Err(BudgetStoreError::Invariant(
+            "budget store does not support authoritative hold lookup".to_owned(),
+        ))
     }
 
     fn mark_hold_reserved(

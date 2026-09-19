@@ -85,7 +85,16 @@ pub(crate) fn render_doctor_json(writer: &mut impl Write, run: &DoctorRun) -> st
 }
 
 pub(crate) fn render_doctor_human(writer: &mut impl Write, run: &DoctorRun) -> std::io::Result<()> {
-    writeln!(writer, "chio doctor")?;
+    render_titled_human(writer, "chio doctor", run)
+}
+
+/// Render a doctor-style run under the name of the command that produced it.
+pub(crate) fn render_titled_human(
+    writer: &mut impl Write,
+    title: &str,
+    run: &DoctorRun,
+) -> std::io::Result<()> {
+    writeln!(writer, "{title}")?;
     for report in &run.reports {
         write_doctor_report(writer, report)?;
     }

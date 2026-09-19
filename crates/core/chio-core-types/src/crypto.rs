@@ -12,10 +12,10 @@
 //! NIST P-256 (secp256r1), P-384 (secp384r1), and hybrid classical plus
 //! ML-DSA-65 signatures.
 //!
-//! The FIPS backends are gated behind the `fips` Cargo feature and link to
-//! `aws-lc-rs`, a FIPS 140-3 validated module. When the feature is disabled
-//! the only available backend is pure Ed25519, and the crate has no extra
-//! transitive dependencies. When enabled, callers may construct a
+//! The ECDSA backends are gated behind the `fips` Cargo feature and link to
+//! `aws-lc-rs` through `aws-lc-sys`. This feature selects algorithm support;
+//! enabling it alone is not a FIPS module-validation claim. The independent
+//! `pq` feature adds ML-DSA-65 support. With `fips` enabled, callers may construct a
 //! [`P256Backend`] or [`P384Backend`] and pass it to any Chio signing helper
 //! that accepts `&dyn SigningBackend`.
 //!
@@ -55,6 +55,8 @@ use sha2::{Digest, Sha256};
 
 use crate::canonical::{CanonicalBytes, CanonicalJsonWitness};
 use crate::error::{Error, Result};
+
+mod wire;
 
 /// Shared canonical JSON bytes suitable for signing and verification.
 pub type SharedCanonicalBytes = SharedCanonicalBytesInner<CanonicalBytes<CanonicalJsonWitness>>;
@@ -168,17 +170,7 @@ impl Keypair {
 
     /// Create from hex-encoded seed bytes (with optional `0x` prefix).
     pub fn from_seed_hex(hex_str: &str) -> Result<Self> {
-        let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes = hex::decode(hex_str).map_err(|e| Error::InvalidHex(e.to_string()))?;
-        if bytes.len() != 32 {
-            return Err(Error::InvalidSignature(format!(
-                "expected 32-byte seed, got {} bytes",
-                bytes.len()
-            )));
-        }
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(&bytes);
-        Ok(Self::from_seed(&arr))
+        Ok(Self::from_seed(&wire::seed_from_hex(hex_str)?))
     }
 
     #[must_use]
@@ -324,8 +316,11 @@ impl<'de> Deserialize<'de> for PublicKey {
     where
         D: serde::Deserializer<'de>,
     {
-        let hex_str = String::deserialize(deserializer)?;
-        Self::from_hex(&hex_str).map_err(serde::de::Error::custom)
+        crate::wire_text::deserialize(
+            deserializer,
+            "an algorithm-aware public-key string",
+            Self::from_hex,
+        )
     }
 }
 
@@ -402,34 +397,10 @@ impl PublicKey {
     ///
     /// The string may carry a `p256:` or `p384:` prefix to select an ECDSA
     /// key. Bare hex strings are interpreted as Ed25519 (the default algorithm).
+    /// Hybrid material may contain only one classical key. Encoded lengths are
+    /// bounded before decoding; curve-point validation still occurs at use.
     pub fn from_hex(hex_str: &str) -> Result<Self> {
-        if let Some(rest) = hex_str.strip_prefix("p256:") {
-            let rest = rest.strip_prefix("0x").unwrap_or(rest);
-            let bytes = hex::decode(rest).map_err(|e| Error::InvalidHex(e.to_string()))?;
-            return Self::from_p256_sec1(&bytes);
-        }
-        if let Some(rest) = hex_str.strip_prefix("p384:") {
-            let rest = rest.strip_prefix("0x").unwrap_or(rest);
-            let bytes = hex::decode(rest).map_err(|e| Error::InvalidHex(e.to_string()))?;
-            return Self::from_p384_sec1(&bytes);
-        }
-        if let Some(rest) = hex_str.strip_prefix("hybrid:") {
-            let (classical_hex, pq_hex, alg_set) = parse_hybrid_wire(rest)?;
-            let classical = Self::from_hex(classical_hex)?;
-            let pq = hex::decode(pq_hex).map_err(|e| Error::InvalidHex(e.to_string()))?;
-            return Self::from_hybrid_parts(classical, &pq, alg_set);
-        }
-        let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes = hex::decode(hex_str).map_err(|e| Error::InvalidHex(e.to_string()))?;
-        if bytes.len() != 32 {
-            return Err(Error::InvalidPublicKey(format!(
-                "expected 32 bytes, got {}",
-                bytes.len()
-            )));
-        }
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(&bytes);
-        Self::from_bytes(&arr)
+        wire::public_key_from_hex(hex_str)
     }
 
     /// Which algorithm this public key belongs to.
@@ -703,8 +674,11 @@ impl<'de> Deserialize<'de> for Signature {
     where
         D: serde::Deserializer<'de>,
     {
-        let hex_str = String::deserialize(deserializer)?;
-        Self::from_hex(&hex_str).map_err(serde::de::Error::custom)
+        crate::wire_text::deserialize(
+            deserializer,
+            "an algorithm-aware signature string",
+            Self::from_hex,
+        )
     }
 }
 
@@ -754,34 +728,10 @@ impl Signature {
     ///
     /// Bare hex strings are interpreted as Ed25519 (the default algorithm).
     /// A `p256:` or `p384:` prefix selects ECDSA.
+    /// Encoded lengths are bounded before decoding, and hybrid nesting rejects.
+    /// DER structure and cryptographic validity remain the verifier's responsibility.
     pub fn from_hex(hex_str: &str) -> Result<Self> {
-        if let Some(rest) = hex_str.strip_prefix("p256:") {
-            let rest = rest.strip_prefix("0x").unwrap_or(rest);
-            let bytes = hex::decode(rest).map_err(|e| Error::InvalidHex(e.to_string()))?;
-            return Ok(Self::from_p256_der(&bytes));
-        }
-        if let Some(rest) = hex_str.strip_prefix("p384:") {
-            let rest = rest.strip_prefix("0x").unwrap_or(rest);
-            let bytes = hex::decode(rest).map_err(|e| Error::InvalidHex(e.to_string()))?;
-            return Ok(Self::from_p384_der(&bytes));
-        }
-        if let Some(rest) = hex_str.strip_prefix("hybrid:") {
-            let (classical_hex, pq_hex, alg_set) = parse_hybrid_wire(rest)?;
-            let classical = Self::from_hex(classical_hex)?;
-            let pq = hex::decode(pq_hex).map_err(|e| Error::InvalidHex(e.to_string()))?;
-            return Self::from_hybrid_parts(classical, &pq, alg_set);
-        }
-        let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes = hex::decode(hex_str).map_err(|e| Error::InvalidHex(e.to_string()))?;
-        if bytes.len() != 64 {
-            return Err(Error::InvalidSignature(format!(
-                "expected 64 bytes, got {}",
-                bytes.len()
-            )));
-        }
-        let mut arr = [0u8; 64];
-        arr.copy_from_slice(&bytes);
-        Ok(Self::from_bytes(&arr))
+        wire::signature_from_hex(hex_str)
     }
 
     /// Hex encoding, with algorithm prefix for non-Ed25519 signatures.
@@ -887,6 +837,21 @@ impl SignedCanonicalPayload {
 // SigningBackend
 // ---------------------------------------------------------------------------
 
+/// One signing identity and detached signature captured as a single backend
+/// operation.
+///
+/// Rotating backends override the bound signing methods so the public key,
+/// algorithm, and signature are observed under the same selector lease.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SigningOutcome {
+    /// Public key that produced `signature`.
+    pub public_key: PublicKey,
+    /// Algorithm selected for this operation.
+    pub algorithm: SigningAlgorithm,
+    /// Detached signature over the requested bytes.
+    pub signature: Signature,
+}
+
 /// Abstraction over Chio signing algorithms.
 ///
 /// Every Chio artifact that requires a signature delegates to a
@@ -909,12 +874,56 @@ pub trait SigningBackend: Send + Sync {
     /// Produce a detached signature over `message`.
     fn sign_bytes(&self, message: &[u8]) -> Result<Signature>;
 
+    /// Capture identity and signature as one validated operation.
+    ///
+    /// A rotating backend must override this method and retain its selector
+    /// lease through signature creation and durable signing evidence.
+    fn sign_bytes_with_identity(&self, message: &[u8]) -> Result<SigningOutcome> {
+        let public_key = self.public_key();
+        let algorithm = self.algorithm();
+        if public_key.algorithm() != algorithm {
+            return Err(Error::InvalidSignature(
+                "signing backend algorithm does not match public key".to_string(),
+            ));
+        }
+        let signature = self.sign_bytes(message)?;
+        if signature.algorithm() != algorithm || !public_key.verify(message, &signature) {
+            return Err(Error::InvalidSignature(
+                "signing backend returned a signature from a different identity".to_string(),
+            ));
+        }
+        Ok(SigningOutcome {
+            public_key,
+            algorithm,
+            signature,
+        })
+    }
+
+    /// Sign only when the atomic backend identity equals `expected_key`.
+    ///
+    /// A rotating backend should override this method so it checks the key
+    /// before signing while the same selector lease remains held.
+    fn sign_bytes_for_identity(
+        &self,
+        expected_key: &PublicKey,
+        message: &[u8],
+    ) -> Result<SigningOutcome> {
+        let outcome = self.sign_bytes_with_identity(message)?;
+        if &outcome.public_key != expected_key {
+            return Err(Error::InvalidPublicKey(
+                "signing backend identity does not match the requested key".to_string(),
+            ));
+        }
+        Ok(outcome)
+    }
+
     /// Produce a detached signature over canonical JSON bytes.
     fn sign_canonical_bytes(
         &self,
         canonical: &CanonicalBytes<CanonicalJsonWitness>,
     ) -> Result<Signature> {
-        self.sign_bytes(canonical.as_bytes())
+        self.sign_bytes_with_identity(canonical.as_bytes())
+            .map(|outcome| outcome.signature)
     }
 }
 
@@ -929,8 +938,19 @@ pub fn sign_canonical_with_backend<T: Serialize>(
     value: &T,
 ) -> Result<(Signature, Vec<u8>)> {
     let canonical = CanonicalBytes::from_serializable(value)?;
-    let signature = backend.sign_canonical_bytes(&canonical)?;
-    Ok((signature, canonical.into_vec()))
+    let outcome = backend.sign_bytes_with_identity(canonical.as_bytes())?;
+    Ok((outcome.signature, canonical.into_vec()))
+}
+
+/// Sign canonical JSON while binding the operation to an embedded public key.
+pub fn sign_canonical_with_backend_for_identity<T: Serialize>(
+    backend: &dyn SigningBackend,
+    expected_key: &PublicKey,
+    value: &T,
+) -> Result<(SigningOutcome, Vec<u8>)> {
+    let canonical = CanonicalBytes::from_serializable(value)?;
+    let outcome = backend.sign_bytes_for_identity(expected_key, canonical.as_bytes())?;
+    Ok((outcome, canonical.into_vec()))
 }
 
 /// Sign shared canonical JSON bytes with the given backend.
@@ -941,8 +961,8 @@ pub fn sign_shared_canonical_with_backend(
     backend: &dyn SigningBackend,
     canonical: SharedCanonicalBytes,
 ) -> Result<SignedCanonicalPayload> {
-    let signature = backend.sign_canonical_bytes(canonical.as_ref())?;
-    Ok(SignedCanonicalPayload::new(signature, canonical))
+    let outcome = backend.sign_bytes_with_identity(canonical.as_ref().as_bytes())?;
+    Ok(SignedCanonicalPayload::new(outcome.signature, canonical))
 }
 
 /// Sign the canonical JSON form of `value` with the given backend and keep the
@@ -1234,25 +1254,6 @@ fn validate_mldsa65_signature_len(bytes: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn parse_hybrid_wire(rest: &str) -> Result<(&str, &str, &str)> {
-    let mut parts = rest.rsplitn(3, ':');
-    let alg_set = parts
-        .next()
-        .ok_or_else(|| Error::InvalidSignature("hybrid signature missing alg_set".to_string()))?;
-    let pq_hex = parts
-        .next()
-        .ok_or_else(|| Error::InvalidSignature("hybrid signature missing pq half".to_string()))?;
-    let classical_hex = parts.next().ok_or_else(|| {
-        Error::InvalidSignature("hybrid signature missing classical half".to_string())
-    })?;
-    if classical_hex.is_empty() || pq_hex.is_empty() || alg_set.is_empty() {
-        return Err(Error::InvalidSignature(
-            "hybrid signature contains empty component".to_string(),
-        ));
-    }
-    Ok((classical_hex, pq_hex, alg_set))
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -1469,6 +1470,55 @@ mod tests {
         let sig = backend.sign_bytes(msg).unwrap();
         assert_eq!(sig.algorithm(), SigningAlgorithm::Ed25519);
         assert!(backend.public_key().verify(msg, &sig));
+    }
+
+    #[test]
+    fn atomic_signing_outcome_binds_identity_algorithm_and_signature() {
+        let backend = Ed25519Backend::new(Keypair::from_seed(&[21_u8; 32]));
+        let outcome = backend
+            .sign_bytes_with_identity(b"atomic identity")
+            .unwrap();
+
+        assert_eq!(outcome.public_key, backend.public_key());
+        assert_eq!(outcome.algorithm, SigningAlgorithm::Ed25519);
+        assert!(outcome
+            .public_key
+            .verify(b"atomic identity", &outcome.signature));
+
+        let wrong = Ed25519Backend::new(Keypair::from_seed(&[22_u8; 32])).public_key();
+        assert!(backend
+            .sign_bytes_for_identity(&wrong, b"wrong identity")
+            .is_err());
+    }
+
+    #[test]
+    fn atomic_signing_rejects_a_signature_from_another_identity() {
+        struct MismatchedBackend {
+            advertised: Ed25519Backend,
+            signer: Ed25519Backend,
+        }
+
+        impl SigningBackend for MismatchedBackend {
+            fn algorithm(&self) -> SigningAlgorithm {
+                SigningAlgorithm::Ed25519
+            }
+
+            fn public_key(&self) -> PublicKey {
+                self.advertised.public_key()
+            }
+
+            fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
+                self.signer.sign_bytes(message)
+            }
+        }
+
+        let backend = MismatchedBackend {
+            advertised: Ed25519Backend::new(Keypair::from_seed(&[23_u8; 32])),
+            signer: Ed25519Backend::new(Keypair::from_seed(&[24_u8; 32])),
+        };
+        assert!(backend
+            .sign_bytes_with_identity(b"identity substitution")
+            .is_err());
     }
 
     #[test]

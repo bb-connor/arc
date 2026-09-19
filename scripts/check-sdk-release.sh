@@ -265,6 +265,7 @@ PY
     . "${builder_venv}/bin/activate"
     python -m pip install --quiet --upgrade pip build twine
     python -m build sdks/python/chio-py --sdist --wheel --outdir "${dist_dir}"
+    python -m build sdks/python/chio-process --sdist --wheel --outdir "${dist_dir}"
     python -m twine check "${dist_dir}"/*
     python - "${dist_dir}" <<'PY'
 from pathlib import Path
@@ -301,12 +302,15 @@ PY
     python3 -m venv "${wheel_venv}"
     . "${wheel_venv}/bin/activate"
     python -m pip install --quiet --upgrade pip
-    python -m pip install --quiet "${dist_dir}"/chio_sdk-*.whl
+    python -m pip install --quiet "${dist_dir}"/chio_sdk-*.whl "${dist_dir}"/chio_process-*.whl
     python - <<'PY'
 import importlib.metadata
 import chio
+from chio_process import ProcessClient
 
 assert importlib.metadata.version("chio-sdk") == chio.__version__
+assert importlib.metadata.version("chio-process")
+assert ProcessClient is not None
 assert chio.ChioClient is not None
 assert chio.ChioSession is not None
 assert chio.ReceiptQueryClient is not None
@@ -317,12 +321,15 @@ PY
     python3 -m venv "${sdist_venv}"
     . "${sdist_venv}/bin/activate"
     python -m pip install --quiet --upgrade pip
-    python -m pip install --quiet "${dist_dir}"/chio_sdk-*.tar.gz
+    python -m pip install --quiet "${dist_dir}"/chio_sdk-*.tar.gz "${dist_dir}"/chio_process-*.tar.gz
     python - <<'PY'
 import importlib.metadata
 import chio
+from chio_process import ProcessClient
 
 assert importlib.metadata.version("chio-sdk") == chio.__version__
+assert importlib.metadata.version("chio-process")
+assert ProcessClient is not None
 assert chio.ChioClient is not None
 assert chio.ChioSession is not None
 assert chio.ReceiptQueryClient is not None

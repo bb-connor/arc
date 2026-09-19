@@ -10,7 +10,7 @@ scope=(
 
 failed=0
 
-if rg -n --pcre2 '(msg|reason|error|body|body_text)[[:space:]]*=[[:space:]]*%(?!(redacted!|redact_for_operator_log)\()[A-Za-z_][A-Za-z0-9_]*' "${scope[@]}"; then
+if rg -n --pcre2 '(msg|reason|error|body|body_text)[[:space:]]*=[[:space:]]*%(?!(redacted!|chio_log_redact::redacted!|redact_for_operator_log)\()[A-Za-z_][A-Za-z0-9_]*' "${scope[@]}"; then
   echo "raw sensitive log field found; wrap sensitive values with redacted!()" >&2
   failed=1
 fi

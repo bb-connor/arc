@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::convert::Infallible;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::net::SocketAddr;
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -35,6 +35,7 @@ use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig, SerializedMcpTrans
 use chio_mcp_adapter::edge::{AdapterError, ChioMcpEdge, McpEdgeConfig, McpTransport};
 use chio_mcp_adapter::server::AdaptedMcpServer;
 use chio_mcp_adapter::transport::StdioMcpTransport;
+use hmac::{Hmac, Mac};
 use async_stream::stream;
 use axum::extract::{Form, Path as AxumPath, Query, Request, State};
 use axum::http::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, ORIGIN, WWW_AUTHENTICATE};
@@ -57,9 +58,11 @@ use serde::de::{DeserializeOwned, Deserializer};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use subtle::ConstantTimeEq;
 use tokio::sync::{broadcast, Mutex};
 use tracing::{error, info, warn};
 use url::Url;
+use zeroize::{Zeroize, Zeroizing};
 
 use chio_control_plane::policy::{load_policy, LoadedPolicy};
 use chio_control_plane::trust_control::{
@@ -77,6 +80,7 @@ use chio_control_plane::{
     validate_distinct_database_paths, validate_durable_admission_participant_paths,
     DurableAdmissionRuntime,
 };
+use chio_control_plane::trust_control::service_runtime::remote_authority::build_pinned_remote_capability_authority;
 
 const MCP_ENDPOINT_PATH: &str = "/mcp";
 const ADMIN_HEALTH_PATH: &str = "/admin/health";
@@ -119,7 +123,15 @@ const DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS: u64 = 30 * 60 * 1000;
 const IDENTITY_PROVIDER_FETCH_TIMEOUT_SECS: u64 = 5;
 const TOKEN_INTROSPECTION_TIMEOUT_SECS: u64 = 5;
 const IDENTITY_FEDERATION_DERIVATION_LABEL: &[u8] = b"chio.identity_federation.v1";
-const REMOTE_SESSION_RESUME_INTEGRITY_LABEL: &[u8] = b"chio.remote_mcp.resume_integrity.v1";
+const REMOTE_SESSION_RESUME_RECORD_HMAC_LABEL: &[u8] =
+    b"chio.remote_mcp.resume_record_hmac.v2";
+const REMOTE_SESSION_TOMBSTONE_HMAC_LABEL: &[u8] =
+    b"chio.remote_mcp.terminal_tombstone_hmac.v2";
+const REMOTE_SESSION_TERMINAL_FENCE_HMAC_LABEL: &[u8] =
+    b"chio.remote_mcp.terminal_fence_hmac.v2";
+const REMOTE_SESSION_HMAC_KEYRING_SCHEMA: &str = "chio.remote-mcp.resume-hmac-keyring.v1";
+const MAX_REMOTE_SESSION_HMAC_PREVIOUS_KEYS: usize = 4;
+const MAX_REMOTE_SESSION_HMAC_GRACE_MILLIS: u64 = 7 * 24 * 60 * 60 * 1_000;
 const SESSION_IDLE_EXPIRY_ENV: &str = "CHIO_MCP_SESSION_IDLE_EXPIRY_MILLIS";
 const SESSION_DRAIN_GRACE_ENV: &str = "CHIO_MCP_SESSION_DRAIN_GRACE_MILLIS";
 const SESSION_REAPER_INTERVAL_ENV: &str = "CHIO_MCP_SESSION_REAPER_INTERVAL_MILLIS";
@@ -148,6 +160,12 @@ pub struct RemoteServeHttpConfig {
     pub admin_token: Option<String>,
     pub control_url: Option<String>,
     pub control_token: Option<String>,
+    /// Dedicated trust-control bearer used only for remote capability issuance.
+    pub remote_authority_workload_token: Option<String>,
+    /// Exact current capability-authority key expected from trust-control.
+    pub control_authority_public_key: Option<PublicKey>,
+    /// Exact trusted capability-authority key set expected from trust-control.
+    pub control_authority_trusted_public_keys: Vec<PublicKey>,
     pub public_base_url: Option<String>,
     pub auth_servers: Vec<String>,
     pub auth_authorization_endpoint: Option<String>,
@@ -164,11 +182,19 @@ pub struct RemoteServeHttpConfig {
     pub authority_db_path: Option<PathBuf>,
     pub budget_db_path: Option<PathBuf>,
     pub session_db_path: Option<PathBuf>,
+    /// Dedicated, operator-managed HMAC keyring for durable session records.
+    /// This keyring must remain independent from authority and bearer secrets.
+    pub resume_hmac_keyring_path: Option<PathBuf>,
     pub policy_path: PathBuf,
     pub server_id: String,
     pub server_name: String,
     pub server_version: String,
+    pub signed_manifest_path: Option<PathBuf>,
     pub manifest_public_key: Option<String>,
+    /// Pinned authority that prepares every native launch. The factory must
+    /// fail closed when its policy, migration state, or manifest binding no
+    /// longer authorizes the exact subprocess.
+    pub native_launch_factory: Arc<dyn chio_mcp_adapter::transport::NativeMcpLaunchFactory>,
     pub page_size: usize,
     pub tools_list_changed: bool,
     pub shared_hosted_owner: bool,
@@ -195,7 +221,11 @@ struct RemoteAppState {
 
 struct RemoteSessionFactory {
     config: RemoteServeHttpConfig,
+    manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    runtime_contract_fingerprint: String,
     durable_admission: Option<DurableAdmissionRuntime>,
+    session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
+    resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
     shared_upstream_owner: Arc<StdMutex<Option<Arc<SharedUpstreamOwner>>>>,
     lifecycle_policy: SessionLifecyclePolicy,
 }
@@ -235,14 +265,101 @@ struct RemoteSessionResumeRecord {
     auth_mode_fingerprint: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     policy_fingerprint: Option<String>,
+    runtime_contract_fingerprint: String,
     hosted_isolation: RemoteHostedIsolationMode,
     lifecycle: RemoteSessionLifecycleSnapshot,
     protocol_version: Option<String>,
     peer_capabilities: PeerCapabilities,
     initialize_params: Value,
     issued_capabilities: Vec<CapabilityToken>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    resume_integrity_tag: Option<String>,
+    resume_generation: u64,
+    resume_integrity: RemoteSessionIntegrityTag,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+struct RemoteSessionIntegrityTag {
+    key_id: String,
+    key_version: u64,
+    tag: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct RemoteSessionTombstoneRecord {
+    record: RemoteSessionDiagnosticRecord,
+    resume_generation: u64,
+    terminal_epoch: u64,
+    resume_integrity: RemoteSessionIntegrityTag,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct RemoteSessionTerminalFence {
+    session_id: String,
+    terminal_at: u64,
+    terminal_state: RemoteSessionState,
+    resume_generation: u64,
+    terminal_epoch: u64,
+    resume_integrity: RemoteSessionIntegrityTag,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct RemoteSessionHmacKeyringFile {
+    schema: String,
+    current: RemoteSessionHmacKeyFile,
+    #[serde(default)]
+    previous: Vec<RemoteSessionPreviousHmacKeyFile>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct RemoteSessionHmacKeyFile {
+    key_id: String,
+    version: u64,
+    key_base64: String,
+}
+
+impl Drop for RemoteSessionHmacKeyFile {
+    fn drop(&mut self) {
+        self.key_base64.zeroize();
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct RemoteSessionPreviousHmacKeyFile {
+    key_id: String,
+    version: u64,
+    key_base64: String,
+    verify_until_millis: u64,
+}
+
+impl Drop for RemoteSessionPreviousHmacKeyFile {
+    fn drop(&mut self) {
+        self.key_base64.zeroize();
+    }
+}
+
+struct RemoteSessionHmacKey {
+    key_id: String,
+    version: u64,
+    key: Zeroizing<[u8; 32]>,
+    verify_until_millis: Option<u64>,
+}
+
+struct RemoteSessionHmacKeyring {
+    current: RemoteSessionHmacKey,
+    previous: Vec<RemoteSessionHmacKey>,
+}
+
+impl std::fmt::Debug for RemoteSessionHmacKeyring {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RemoteSessionHmacKeyring")
+            .field("current_key_id", &self.current.key_id)
+            .field("current_version", &self.current.version)
+            .field("previous_key_count", &self.previous.len())
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -257,6 +374,7 @@ struct RemoteSessionLedger {
     terminal: Arc<Mutex<HashMap<String, Arc<RemoteSessionDiagnosticRecord>>>>,
     lifecycle_policy: SessionLifecyclePolicy,
     tombstone_db_path: Option<PathBuf>,
+    resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
 }
 
 #[derive(Clone)]
@@ -270,6 +388,8 @@ struct SharedUpstreamOwner {
     upstream_server: Arc<AdaptedMcpServer>,
     notification_subscribers: NotificationSubscriberList,
     notification_stats: Arc<SharedUpstreamNotificationStats>,
+    notification_pump_stop: Arc<AtomicBool>,
+    notification_pump_thread: StdMutex<Option<thread::JoinHandle<()>>>,
 }
 
 struct SharedUpstreamNotificationTap {
@@ -338,6 +458,10 @@ impl RemoteSessionState {
             Self::Expired => "expired",
             Self::Closed => "closed",
         }
+    }
+
+    fn is_terminal(self) -> bool {
+        matches!(self, Self::Deleted | Self::Expired | Self::Closed)
     }
 }
 
@@ -484,6 +608,7 @@ struct RemoteSession {
     auth_context: SessionAuthContext,
     auth_mode_fingerprint: String,
     policy_fingerprint: String,
+    runtime_contract_fingerprint: String,
     hosted_isolation: RemoteHostedIsolationMode,
     lifecycle_policy: SessionLifecyclePolicy,
     protocol_version: StdMutex<Option<String>>,
@@ -497,7 +622,23 @@ struct RemoteSession {
     notification_stream_attached: Arc<AtomicBool>,
     next_event_id: Arc<AtomicU64>,
     session_db_path: Option<PathBuf>,
-    resume_integrity_secret: Option<[u8; 32]>,
+    session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
+    resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
+    resume_generation: AtomicU64,
+    terminalization: Mutex<()>,
+    upstream_transport: RemoteSessionUpstreamTransport,
+}
+
+struct RemoteSessionUpstreamTransport {
+    inner: Arc<dyn McpTransport>,
+}
+
+impl std::fmt::Debug for RemoteSessionUpstreamTransport {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RemoteSessionUpstreamTransport")
+            .finish_non_exhaustive()
+    }
 }
 
 struct RemoteSessionInit {
@@ -508,6 +649,7 @@ struct RemoteSessionInit {
     auth_context: SessionAuthContext,
     auth_mode_fingerprint: String,
     policy_fingerprint: String,
+    runtime_contract_fingerprint: String,
     hosted_isolation: RemoteHostedIsolationMode,
     lifecycle_policy: SessionLifecyclePolicy,
     protocol_version: Option<String>,
@@ -519,7 +661,10 @@ struct RemoteSessionInit {
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     next_event_id: Arc<AtomicU64>,
     session_db_path: Option<PathBuf>,
-    resume_integrity_secret: Option<[u8; 32]>,
+    session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
+    resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
+    resume_generation: u64,
+    upstream_transport: Arc<dyn McpTransport>,
 }
 
 struct NotificationStreamAttachment {
@@ -848,6 +993,8 @@ struct RemoteSessionCapability {
 }
 
 
+#[path = "session_core/authority_mode.rs"]
+mod session_core_authority_mode;
 #[path = "session_core/session.rs"]
 mod session_core_session;
 #[path = "session_core/factory.rs"]

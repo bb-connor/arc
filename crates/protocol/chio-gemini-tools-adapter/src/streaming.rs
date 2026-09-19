@@ -42,6 +42,14 @@ impl GeminiAdapter {
             for part in parts {
                 if let Some(call) = function_call_from_part(part)? {
                     let invocation = self.invocation_from_function_call(&call)?;
+                    if !invocation.bridge_security.as_ref().is_some_and(
+                        chio_manifest::BridgeSecurityMetadata::has_registry_coordinates,
+                    ) {
+                        return Err(ProviderError::Malformed(
+                            "Gemini stream evaluation requires a registry-admitted security sidecar"
+                                .to_string(),
+                        ));
+                    }
                     let verdict = evaluate(&invocation)?;
                     ensure_streaming_allow_no_redactions(
                         "Gemini",

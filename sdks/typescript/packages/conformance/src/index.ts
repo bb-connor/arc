@@ -14,6 +14,7 @@
  */
 
 export { canonicalJsonString, canonicalJsonBytes } from "./canonical.js";
+export { createWireSchemaValidator } from "@chio-protocol/node-http";
 export {
   validateReceiptStructure,
   verifyContentHash,

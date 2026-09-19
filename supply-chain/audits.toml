@@ -493,6 +493,12 @@ criteria = "safe-to-deploy"
 version = "0.4.44"
 notes = "Top-centrality certification seed. Reviewed for dependency role, declared build behavior, and no new trust-boundary expansion."
 
+[[audits.cms]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.2.3"
+notes = "Reviewed checksum-verified manifests, all production modules including the optional builder, and upstream tests. DER data model forbids unsafe code and has no build script or IO. All 26 upstream tests and strict all-feature Clippy pass with unchanged production/test bytes. Audit discretion: optional builder has collection panics, an explicit content-type check limitation and incomplete key cleanup on errors; Chio does not enable it. Parsing does not authenticate CMS content or enforce full RFC semantics. Details: supply-chain/reviews/cms-0.2.3.md."
+
 [[audits.coset]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
@@ -535,6 +541,12 @@ criteria = "safe-to-deploy"
 version = "0.1.0"
 notes = "cargo-vet drift closure. Reviewed for current workspace use and required cargo-vet criterion; deeper supplier evidence remains tracked separately."
 
+[[audits.der]]
+who = "Codex (OpenAI), local delta review"
+criteria = "safe-to-deploy"
+delta = "0.8.0 -> 0.8.2"
+notes = "Reviewed the published 0.8.0 to 0.8.1 and 0.8.1 to 0.8.2 source diffs: nested reader depth and bounds, restoration of trailing-data rejection, SET OF duplicate and ordering behavior, borrowed integer conversions, manifests and tests. The four source files containing unsafe transparent-newtype conversions are byte-identical to 0.8.0; no new unsafe code, build script or ambient filesystem/network/process access was introduced. Ran the published 0.8.2 crate tests with all features, including nesting, trailing-data and SET OF regressions. This is a delta review for the locked PKCS8/SPKI dependency update, not a new full audit of the exempt 0.8.0 baseline."
+
 [[audits.der-parser]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
@@ -576,6 +588,12 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "2.2.0"
 notes = "Top-centrality certification seed. Reviewed for dependency role, declared build behavior, and no new trust-boundary expansion."
+
+[[audits.enumflags2]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.7.12"
+notes = "Reviewed checksum-verified manifest and all five Rust modules: constructors, constant tokens, bitwise operations, serde, formatting and unsafe single-bit conversions. No build script or system IO. Valid-bit invariant requires the selected Chio-owned typed-default derive repair; unmodified enumflags2_derive 0.7.12 is not certified. Source reasoning, upstream inventory and positive/negative mutation results: supply-chain/reviews/enumflags2-0.7.12.md. This is not independent human review or downstream confinement qualification."
 
 [[audits.etcetera]]
 who = "Chio supply-chain reviewer"
@@ -780,6 +798,12 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "0.3.91"
 notes = "Exemption chase-down certification. Reviewed current workspace dependency role and removed the matching audit-this-later exemption row."
+
+[[audits.landlock]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.4.4"
+notes = "Reviewed checksum-verified manifest and complete production source: access masks, compatibility state, ruleset lifecycle, filesystem and TCP rules, scope restrictions, syscalls, prctl, fstat, packed ABI layouts and descriptor ownership. All 52 unit and 12 documentation tests pass on Linux x86_64 with the selected derive repair; the first-party cage gate passes 69 tests, 26 kernel outcomes and 10 mutations. Best-effort defaults and path helper omissions require caller validation; Chio requires full enforcement. Details: supply-chain/reviews/landlock-0.4.4.md."
 
 [[audits.leb128]]
 who = "Chio supply-chain reviewer"
@@ -1111,6 +1135,30 @@ criteria = "safe-to-deploy"
 version = "0.10.9"
 notes = "Top-centrality certification seed. Reviewed for dependency role, declared build behavior, and no new trust-boundary expansion."
 
+[[audits.sigstore-bundle]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.6.6"
+notes = "Reviewed checksum-verified manifests and all production source, tests and fixture inventory. No unsafe code, build script or IO in this package. All 24 upstream tests, two audit boundary tests and strict all-feature Clippy pass; one upstream doc example is ignored. Validation does not authenticate certificates, signatures, timestamps or checkpoints and does not join duplicate root/size fields. Chio separately performs those checks in its owned verifier; six focused log-verifier tests pass. Builder fallback behavior also requires full verification. Details: supply-chain/reviews/sigstore-bundle-0.6.6.md."
+
+[[audits.sigstore-rekor]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.6.6"
+notes = "Reviewed checksum-verified manifests and all five source modules. Three upstream tests, five added encoding/localhost transport tests, two doc compilation checks and strict all-feature Clippy pass; two doc examples are ignored. Chio selects no Rekor features and uses body data models with separate cryptographic/content verification. HTTP results are untrusted: retrieval does not bind requested identity, V2 malformed numbers become zero, URLs/resources require caller limits, and optional caches require repository isolation. This is not a log-verifier certification. Full boundaries: supply-chain/reviews/sigstore-rekor-0.6.6.md."
+
+[[audits.sigstore-tsa]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.6.6"
+notes = "Reviewed checksum-verified manifests, all five modules, 15 upstream tests and timestamp/root fixtures. All upstream tests, four added trust/content/nonce boundary tests and strict all-feature Clippy pass. Empty roots intentionally skip chain/EKU checks and cannot establish trusted time; Chio requires an exact configured signing authority and window. All 45 owned-verifier tests pass, including a real embedded-signer negative control with authority removed. HTTP acquisition is unverified transport; full RFC profile, nonce/freshness/revocation and resource controls remain caller obligations. Details: supply-chain/reviews/sigstore-tsa-0.6.6.md."
+
+[[audits.sigstore-types]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.6.6"
+notes = "Reviewed checksum-verified manifests and all nine source modules. No unsafe code, build script, IO or cryptographic primitive implementation. All 27 unit tests, three doc tests, five additional encoding-boundary tests and strict Clippy pass. Exact signed checkpoint text and DSSE byte lengths are preserved. Audit limits: decoded wrappers are untrusted, log indices require checked unsigned conversion, checkpoint JSON drops signed text, and semantic/input-size validation remains with callers. Details: supply-chain/reviews/sigstore-types-0.6.6.md."
+
 [[audits.smallvec]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
@@ -1314,6 +1362,24 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "1.19.0"
 notes = "Compile-time numeric types; build-time only, no IO."
+
+[[audits.typify]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed checksum-verified manifests and complete facade source, which only documents and re-exports typify-impl and the optional macro. Two upstream integration tests compare unchanged generated snapshots and compile 21 distinct fixtures; eight doc checks and strict all-target/all-feature Clippy pass. Selected through nono's build-time packaged schema generation; this is not a runtime schema validator or a certification of the separately reviewed backend. Details: supply-chain/reviews/typify-and-typify-macro-0.6.1.md."
+
+[[audits.typify-impl]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed checksum-verified manifests and all 14 production modules, test harness and integration cases. All 103 upstream unit tests, three integration tests, four doc checks and strict all-feature Clippy pass; two docs are ignored. Five additional generated-runtime/boundary tests pass, including the exact packaged nono schema. Generator has no unsafe, build script, network, filesystem or subprocess operations; diagnostics can print schemas. Requires trusted build inputs and separate validation: numeric ranges, const, uniqueness and other schema semantics are incomplete, unsupported inputs can panic/expand, substitutions carry source-code authority and unknown-crate Deny is not a hard rejection. Chio uses it through nono's packaged build schema and constructs confinement capabilities directly. Full limits: supply-chain/reviews/typify-impl-0.6.1.md."
+
+[[audits.typify-macro]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.6.1"
+notes = "Reviewed checksum-verified manifests, both complete source modules and tests. Two unit tests, one doc check, five additional compile-boundary cases and strict all-target/all-feature Clippy pass. Macro reads caller-selected schema paths and emits backend-generated Rust; no unsafe, network, process or write operations. Paths and Rust configuration are trusted build inputs. Invalid JSON panics compilation; missing files and malformed settings reject. Resource bounds and backend schema semantics are separate obligations; unknown_crates Deny is not a security allowlist. Details: supply-chain/reviews/typify-and-typify-macro-0.6.1.md."
 
 [[audits.unicode-bidi]]
 who = "Chio supply-chain reviewer"
@@ -1554,6 +1620,12 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "0.16.0"
 notes = "cargo-vet drift closure. Reviewed for current workspace use and required cargo-vet criterion; deeper supplier evidence remains tracked separately."
+
+[[audits.x509-tsp]]
+who = "Codex (direct source review)"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "Reviewed checksum-verified manifest and all production source. Pure DER data model with no unsafe code, build script, IO, process execution or cryptographic implementation. Request and OpenSSL response fixtures decode on the selected repaired cmpv2 graph; the sole upstream test mismatch is x509-cert display formatting after successful field checks. RFC semantic and cryptographic verification remain caller responsibilities. Details: supply-chain/reviews/x509-tsp-0.1.0.md."
 
 [[audits.zed_extension_api]]
 who = "Chio supply-chain reviewer"

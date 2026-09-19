@@ -620,6 +620,14 @@ jobs:
           test "$(jq -r '.base.repo.full_name' <<< "${stable_pr}")" = "${INPUT_BASE_REPOSITORY}"
           test "$(jq -r '.base.ref' <<< "${stable_pr}")" = "${INPUT_BASE_REF}"
           test "$(jq -r '.base.sha' <<< "${stable_pr}")" = "${INPUT_BASE_SHA}"
+          stable_labels_json="$(jq -cS '[.labels[].name] | sort' <<< "${stable_pr}")"
+          stable_labels_digest="$(printf '%s' "${stable_labels_json}" | sha256sum | cut -d' ' -f1)"
+          test "${stable_labels_digest}" = "${INPUT_LABELS_DIGEST}"
+          stable_mode=enforcement
+          if jq -e '.labels | any(.name == "refresh-linux-evidence")' <<< "${stable_pr}" > /dev/null; then
+            stable_mode=refresh
+          fi
+          test "${stable_mode}" = "${INPUT_MODE}"
           stable_merge_ref="$({
             gh api \
               -H "Accept: application/vnd.github+json" \
@@ -655,10 +663,10 @@ jobs:
             echo "controller_run_attempt=${INPUT_CONTROLLER_RUN_ATTEMPT}"
             echo "controller_run_id=${INPUT_CONTROLLER_RUN_ID}"
             echo "controller_workflow_id=${INPUT_CONTROLLER_WORKFLOW_ID}"
-            echo "labels_digest=${labels_digest}"
+            echo "labels_digest=${stable_labels_digest}"
             echo "merge_commit_sha=${INPUT_MERGE_COMMIT_SHA}"
             echo "merge_tree_sha=${INPUT_MERGE_TREE_SHA}"
-            echo "mode=${live_mode}"
+            echo "mode=${stable_mode}"
             echo "pr_number=${INPUT_PR_NUMBER}"
             echo "security_definition_sha=${INPUT_SECURITY_DEFINITION_SHA}"
             echo "source_repository=${INPUT_SOURCE_REPOSITORY}"
