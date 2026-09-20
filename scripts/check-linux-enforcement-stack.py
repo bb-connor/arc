@@ -250,7 +250,9 @@ def validate_record(data: dict) -> list[str]:
             if any(source_patch.get(key) != value for key, value in expected.items()):
                 errors.append("the nono source fork identity is invalid")
             if source_patch.get("changes") != [
-                "preserve explicit filesystem permissions across provenance tiers"
+                "preserve explicit filesystem permissions across provenance tiers",
+                "select repaired dependencies in standalone qualification",
+                "separate capability and keystore unit test modules",
             ]:
                 errors.append("the nono source fork patch inventory is incomplete")
             digest = source_patch.get("source_sha256")
@@ -358,6 +360,18 @@ def validate_manifests(root: Path, errors: list[str]) -> None:
         or nono_patch.get("path") != "third_party/nono-upstream-chio"
     ):
         errors.append("workspace must select the reviewed local nono source fork")
+    # Standalone qualification is a separate Cargo workspace. Parent patches
+    # do not apply when its manifest is selected directly.
+    qualification_patches = nono_fork.get("patch", {}).get("crates-io", {})
+    for dependency in ("ignore", "regress"):
+        selection = qualification_patches.get(dependency)
+        if (
+            not isinstance(selection, dict)
+            or selection.get("path") != f"../{dependency}-chio"
+        ):
+            errors.append(
+                f"nono standalone qualification must select the local {dependency} repair"
+            )
     nono_package = nono_fork.get("package", {})
     if (
         nono_package.get("name") != "nono"

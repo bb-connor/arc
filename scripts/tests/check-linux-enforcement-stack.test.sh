@@ -182,4 +182,19 @@ PYTEST
 test "$(run_checker "$missing_mutant_helper" "$work/missing-mutant-helper.out" "$work/missing-mutant-helper.err")" = 1
 grep -F 'real Linux runner is missing required contract: build_static_helper real-linux-enforcement,enforcement-mutants' "$work/missing-mutant-helper.err" >/dev/null
 
+for dependency in ignore regress; do
+  missing_patch="$work/missing-$dependency-qualification-patch"
+  cp -R "$valid" "$missing_patch"
+  python3 - "$missing_patch" "$dependency" <<'PYTEST'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1]) / "third_party/nono-upstream-chio/Cargo.toml"
+line = f'{sys.argv[2]} = {{ path = "../{sys.argv[2]}-chio" }}\n'
+assert line in p.read_text()
+p.write_text(p.read_text().replace(line, ""))
+PYTEST
+  test "$(run_checker "$missing_patch" "$work/missing-$dependency.out" "$work/missing-$dependency.err")" = 1
+  grep -F "nono standalone qualification must select the local $dependency repair" "$work/missing-$dependency.err" >/dev/null
+done
+
 printf 'check-linux-enforcement-stack.test.sh: all assertions passed\n'

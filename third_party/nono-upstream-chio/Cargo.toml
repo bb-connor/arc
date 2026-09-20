@@ -165,6 +165,8 @@ name = "permission_provenance"
 path = "tests/permission_provenance.rs"
 
 [patch.crates-io]
+ignore = { path = "../ignore-chio" }
+regress = { path = "../regress-chio" }
 sigstore-verify = { path = "../sigstore-verify-chio" }
 enumflags2_derive = { path = "../enumflags2-derive-chio" }
 crmf = { path = "../crmf-chio" }

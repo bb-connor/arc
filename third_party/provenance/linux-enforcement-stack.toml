@@ -35,8 +35,12 @@ kind = "fork"
 package_name = "nono"
 version = "0.53.0"
 status = "required"
-source_sha256 = "4ba8a0fd3b8d15d5a2d01997dc52102a8b2b7eb05f88772696e6597e81780436"
-changes = ["preserve explicit filesystem permissions across provenance tiers"]
+source_sha256 = "6a820da20745716b859667737701ce3914c895b8fee126d305a91af4ae733cf0"
+changes = [
+  "preserve explicit filesystem permissions across provenance tiers",
+  "select repaired dependencies in standalone qualification",
+  "separate capability and keystore unit test modules",
+]
 
 [landlock]
 name = "landlock"

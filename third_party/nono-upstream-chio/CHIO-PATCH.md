@@ -42,3 +42,15 @@ release or the unused upstream secret, supervisor, trust and rollback APIs.
 cargo test --locked --no-default-features --manifest-path third_party/nono-upstream-chio/Cargo.toml
 cargo clippy --locked --no-default-features --all-targets --manifest-path third_party/nono-upstream-chio/Cargo.toml -- -D warnings
 ```
+
+## Standalone qualification dependency selection
+
+The independent workspace explicitly patches `ignore` and `regress` to the
+same repaired local packages selected by Chio's root workspace. Cargo does not
+inherit a parent workspace's patches when this manifest is tested directly.
+The standalone lockfile retains the unrelated regress 0.10.5 selection.
+
+The capability and keystore unit-test bodies now live in child test modules.
+This preserves their module names, attributes and test bodies while bringing
+both production files below the repository's 2,000-line limit. The size gate
+and its allowlist are unchanged.
