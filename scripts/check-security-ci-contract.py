@@ -60,10 +60,10 @@ EXPECTED_SECURITY_IMAGE_FROM = (
     "667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67"
 )
 EXPECTED_APK_LOCK_SHA256 = (
-    "b4d4642b66191c1923fe7c293b408b570b71df9edb710ffa09bc518ca36a5ad8"
+    "86fad0ccb2b3f1cf2402c12ddade71d14b21e9995b3d113795259b899c0a57c0"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
-    "a4e631319b00c54f2cbc6457ad0149198a4a367db8dec060fcce376c98728b49"
+    "dde3e435b45deeebca46dbf9c76903aad86689a8f4ce2c2df2a11b83c999e3c8"
 )
 EXPECTED_RUST_TOOLCHAIN_SHA256 = (
     "d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0"
@@ -126,14 +126,14 @@ EXPECTED_DIRECT_APK_PACKAGES = (
     "coreutils=9.7-r1",
     "curl=8.14.1-r3",
     "git=2.49.1-r0",
-    "jq=1.8.1-r0",
+    "jq=1.8.2-r0",
     "linux-headers=6.14.2-r0",
-    "openssl-dev=3.5.7-r0",
+    "openssl-dev=3.5.8-r0",
     "pkgconf=2.4.3-r0",
     "protobuf=29.4-r0",
     "protobuf-dev=29.4-r0",
-    "python3=3.12.13-r0",
-    "util-linux=2.41-r9",
+    "python3=3.12.14-r0",
+    "util-linux=2.41.6-r1",
 )
 EXPECTED_TRUSTED_BOUNDARY_FILES = frozenset(
     {

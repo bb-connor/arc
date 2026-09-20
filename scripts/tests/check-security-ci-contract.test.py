@@ -635,11 +635,16 @@ assert_rejected(
     "exposes a repository secret to candidate work",
 )
 for assertion in sorted(CHECKER.REQUIRED_AGGREGATE_ASSERTIONS):
+    expected_rejection = (
+        "security aggregate omits nonce/FIPS success"
+        if assertion == "test '${{ needs.nonce-fips-contract.result }}' = success"
+        else "omits exact dependency assertions"
+    )
     assert_rejected(
         f"missing aggregate assertion: {assertion}",
         "ci.yml",
         replace_once(f"          {assertion}\n", ""),
-        "omits exact dependency assertions",
+        expected_rejection,
     )
 assert_rejected(
     "security context rename",
