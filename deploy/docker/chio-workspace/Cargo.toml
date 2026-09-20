@@ -6,6 +6,7 @@ resolver = "2"
 members = ["crates/products/chio-cli"]
 
 [patch.crates-io]
+ignore = { path = "third_party/ignore-chio" }
 nono = { path = "third_party/nono-upstream-chio" }
 sigstore-verify = { path = "third_party/sigstore-verify-chio" }
 enumflags2_derive = { path = "third_party/enumflags2-derive-chio" }

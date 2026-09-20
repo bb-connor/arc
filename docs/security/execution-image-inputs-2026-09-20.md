@@ -1,12 +1,16 @@
 # Execution image input qualification
 
 September 20, 2026. Confidence is high for the local input checks below.
-The image is built and locally validated. Registry publication, reviewed
+The image for the historical inputs below is built and locally validated.
+The current candidate includes later dependency repairs and requires a new
+image: its lock digest is
+`51af2e7dd4292a31f917b650c46c26a70cc263ac324cbe90fadbf742a8c7a8d0`.
+Registry publication, reviewed
 workflow-definition rotation and capture authorization remain outstanding.
 
-## Selected inputs
+## Validated historical inputs
 
-The runner Dockerfile and structural checker now agree on Cargo.lock SHA-256
+The validated runner Dockerfile and structural checker agreed on Cargo.lock SHA-256
 `dde3e435b45deeebca46dbf9c76903aad86689a8f4ce2c2df2a11b83c999e3c8`.
 This includes the selected dependency repairs through source
 `013af8f1fdaf4b7a7a8a7f2f2b0b4e5a5ff321b3`. The subsequent Typify backend
@@ -37,7 +41,7 @@ removed.
 
 ## Terminal validation
 
-The latest local image ID is
+The locally validated image ID for those inputs is
 `sha256:1c13c24c331e3aae2dbcc3706f84bc809955138d6c8ba755cb06970088f8033b`.
 This is a local Docker image identifier, not a published registry manifest
 digest and not an authorized execution-image pin.
