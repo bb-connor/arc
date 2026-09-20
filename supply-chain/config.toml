@@ -412,6 +412,9 @@ audit-as-crates-io = false
 [policy.nono]
 audit-as-crates-io = false
 
+[policy.regress]
+audit-as-crates-io = false
+
 [policy.seccompiler]
 audit-as-crates-io = false
 

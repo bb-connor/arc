@@ -6,6 +6,7 @@ resolver = "2"
 members = ["crates/products/chio-cli"]
 
 [patch.crates-io]
+regress = { path = "third_party/regress-chio" }
 ignore = { path = "third_party/ignore-chio" }
 nono = { path = "third_party/nono-upstream-chio" }
 sigstore-verify = { path = "third_party/sigstore-verify-chio" }
