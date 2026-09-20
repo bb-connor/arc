@@ -6,9 +6,10 @@ Upstream repository: <https://github.com/always-further/nono>
 
 Upstream commit: `c4b25b827330640cb95f85809d88d977191b42e7`
 
-The upstream package is consumed unchanged from crates.io. This directory is a
-reviewable wrapper patch, permitted by the enterprise hardening design, that
-changes the integration semantics without copying the upstream source tree.
+The upstream package is selected through `third_party/nono-upstream-chio`, which
+repairs filesystem grant provenance during deduplication. This directory is the
+separate wrapper patch, permitted by the enterprise hardening design, that
+changes the integration semantics. It does not call the upstream deduplicator.
 
 1. `CapabilitySet::new()` constructs upstream `nono::CapabilitySet` and calls
    `block_network()` before it can be returned.

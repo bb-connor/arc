@@ -16,9 +16,10 @@ Upstream repository: https://github.com/always-further/nono
 Reviewed upstream commit: c4b25b827330640cb95f85809d88d977191b42e7
 Licensed under the Apache License, Version 2.0.
 
-Chio consumes the upstream nono crate unchanged and includes the local
-`nono-chio` integration adapter under `third_party/nono-chio`. The adapter's
-source, license, and exact patch inventory are distributed with this product.
+Chio includes the upstream nono crate under `third_party/nono-upstream-chio`
+with a filesystem grant provenance repair, and the separate `nono-chio`
+integration adapter under `third_party/nono-chio`. Both components' source,
+license and exact patch inventories are distributed with this product.
 
 sigstore-verify 0.6.3
 Copyright 2025 prefix.dev GmbH

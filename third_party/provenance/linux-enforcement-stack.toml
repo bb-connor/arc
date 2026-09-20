@@ -29,6 +29,15 @@ status = "required"
 source_sha256 = "82e9bbb67df62ee123353e92a7d91102837aea8bd3c5f32a508b8a4577594d95"
 changes = ["return observed Landlock ABI and RulesetStatus", "reject partially enforced filesystem and network rules", "construct PathBeneath rules from caller-owned descriptors", "retain caller ownership through ruleset application", "grant directory listing without granting descendant file reads", "handle every filesystem and network right known to the detected ABI"]
 
+[nono.source_patch]
+directory = "third_party/nono-upstream-chio"
+kind = "fork"
+package_name = "nono"
+version = "0.53.0"
+status = "required"
+source_sha256 = "4ba8a0fd3b8d15d5a2d01997dc52102a8b2b7eb05f88772696e6597e81780436"
+changes = ["preserve explicit filesystem permissions across provenance tiers"]
+
 [landlock]
 name = "landlock"
 version = "0.4.4"

@@ -406,6 +406,9 @@ audit-as-crates-io = false
 [policy.enumflags2_derive]
 audit-as-crates-io = false
 
+[policy.nono]
+audit-as-crates-io = false
+
 [policy.seccompiler]
 audit-as-crates-io = false
 

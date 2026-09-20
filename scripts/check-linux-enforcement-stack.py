@@ -197,6 +197,29 @@ def seccompiler_source_sha256(root: Path) -> str:
     return digest.hexdigest()
 
 
+def nono_source_sha256(root: Path) -> str:
+    package = root / "third_party/nono-upstream-chio"
+    paths = [
+        package / "Cargo.toml",
+        package / "Cargo.toml.orig",
+        package / "build.rs",
+        package / "CHIO-PATCH.md",
+        package / "LICENSE-APACHE",
+        *package.glob("src/**/*.rs"),
+        *package.glob("tests/**/*.rs"),
+        *package.glob("schema/**/*.json"),
+    ]
+    digest = hashlib.sha256()
+    for path in sorted(paths):
+        relative = path.relative_to(package).as_posix().encode()
+        contents = path.read_bytes()
+        digest.update(len(relative).to_bytes(8, "big"))
+        digest.update(relative)
+        digest.update(len(contents).to_bytes(8, "big"))
+        digest.update(contents)
+    return digest.hexdigest()
+
+
 def validate_record(data: dict) -> list[str]:
     errors = []
     if data.get("schema") != "chio.linux-enforcement-stack.v1":
@@ -213,6 +236,26 @@ def validate_record(data: dict) -> list[str]:
     nono = data.get("nono")
     errors.extend(validate_pin(nono, NONO_PIN, "nono"))
     if isinstance(nono, dict):
+        source_patch = nono.get("source_patch")
+        if not isinstance(source_patch, dict):
+            errors.append("the required nono source fork record is missing")
+        else:
+            expected = {
+                "directory": "third_party/nono-upstream-chio",
+                "kind": "fork",
+                "package_name": "nono",
+                "version": "0.53.0",
+                "status": "required",
+            }
+            if any(source_patch.get(key) != value for key, value in expected.items()):
+                errors.append("the nono source fork identity is invalid")
+            if source_patch.get("changes") != [
+                "preserve explicit filesystem permissions across provenance tiers"
+            ]:
+                errors.append("the nono source fork patch inventory is incomplete")
+            digest = source_patch.get("source_sha256")
+            if not isinstance(digest, str) or len(digest) != 64:
+                errors.append("the nono source fork digest is invalid")
         if nono.get("default_network") != "blocked":
             errors.append("nono capability construction must start with network blocked")
         if nono.get("partially_enforced") != "reject":
@@ -275,6 +318,7 @@ def validate_manifests(root: Path, errors: list[str]) -> None:
         workspace = load_toml(root / "Cargo.toml")
         cage = load_toml(root / "crates/security/chio-cage/Cargo.toml")
         wrapper = load_toml(root / "third_party/nono-chio/Cargo.toml")
+        nono_fork = load_toml(root / "third_party/nono-upstream-chio/Cargo.toml")
         seccompiler_fork = load_toml(root / "third_party/seccompiler-chio/Cargo.toml")
     except (OSError, ValueError, tomllib.TOMLDecodeError) as error:
         errors.append(str(error))
@@ -308,6 +352,19 @@ def validate_manifests(root: Path, errors: list[str]) -> None:
         errors.append("nono-chio must pin nono =0.53.0 with default features disabled")
     if dependencies.get("landlock") != "=0.4.4":
         errors.append("nono-chio must pin landlock =0.4.4")
+    nono_patch = workspace.get("patch", {}).get("crates-io", {}).get("nono")
+    if (
+        not isinstance(nono_patch, dict)
+        or nono_patch.get("path") != "third_party/nono-upstream-chio"
+    ):
+        errors.append("workspace must select the reviewed local nono source fork")
+    nono_package = nono_fork.get("package", {})
+    if (
+        nono_package.get("name") != "nono"
+        or nono_package.get("version") != "0.53.0"
+        or nono_package.get("publish") is not False
+    ):
+        errors.append("nono source fork package identity is invalid")
     seccompiler_package = seccompiler_fork.get("package", {})
     if (
         seccompiler_package.get("name") != "seccompiler"
@@ -318,6 +375,14 @@ def validate_manifests(root: Path, errors: list[str]) -> None:
 
 
 def validate_sources(root: Path, data: dict, errors: list[str]) -> None:
+    expected_digest = data.get("nono", {}).get("source_patch", {}).get("source_sha256")
+    try:
+        actual_digest = nono_source_sha256(root)
+    except OSError as error:
+        errors.append(f"cannot hash nono source fork: {error}")
+    else:
+        if actual_digest != expected_digest:
+            errors.append("nono source fork digest does not match provenance")
     wrapper_root = root / "third_party/nono-chio"
     wrapper_source_path = wrapper_root / "src/lib.rs"
     wrapper_source = read_text(wrapper_source_path, errors, "nono-chio wrapper source")
@@ -544,10 +609,13 @@ def validate_lock(root: Path, errors: list[str]) -> None:
     except (OSError, ValueError, tomllib.TOMLDecodeError) as error:
         errors.append(str(error))
         return
-    for pin in [NONO_PIN, LANDLOCK_PIN]:
+    for pin in [LANDLOCK_PIN]:
         package = find_locked_package(lock, pin["name"], pin["version"])
         if package is None or package.get("source") != pin["source"] or package.get("checksum") != pin["checksum"]:
             errors.append(f"Cargo.lock does not contain the reviewed {pin['name']} pin")
+    nono = find_locked_package(lock, "nono", "0.53.0")
+    if nono is None or nono.get("source") is not None or nono.get("checksum") is not None:
+        errors.append("Cargo.lock does not contain the local nono source fork")
     wrapper = find_locked_package(lock, "nono-chio", "0.53.0-chio.2")
     if wrapper is None or wrapper.get("source") is not None:
         errors.append("Cargo.lock does not contain the local nono-chio wrapper")

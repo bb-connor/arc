@@ -30,6 +30,7 @@ make_fixture() {
   cp "$REPO_ROOT/third_party/nono-chio/src/lib.rs" \
     "$root/third_party/nono-chio/src/"
   cp -R "$REPO_ROOT/third_party/seccompiler-chio" "$root/third_party/"
+  cp -R "$REPO_ROOT/third_party/nono-upstream-chio" "$root/third_party/"
   cp "$REPO_ROOT/crates/security/chio-cage/Cargo.toml" \
     "$root/crates/security/chio-cage/"
   cp "$REPO_ROOT/crates/security/chio-cage/src/lib.rs" \
@@ -87,6 +88,43 @@ cp -R "$valid" "$tampered_seccompiler"
 printf '\n// provenance tamper\n' >>"$tampered_seccompiler/third_party/seccompiler-chio/src/lib.rs"
 test "$(run_checker "$tampered_seccompiler" "$work/tampered-seccompiler.out" "$work/tampered-seccompiler.err")" = 1
 grep -F 'seccompiler fork source digest does not match provenance' "$work/tampered-seccompiler.err" >/dev/null
+
+tampered_nono="$work/tampered-nono-source"
+cp -R "$valid" "$tampered_nono"
+printf '\n// provenance tamper\n' >>"$tampered_nono/third_party/nono-upstream-chio/src/capability.rs"
+test "$(run_checker "$tampered_nono" "$work/tampered-nono.out" "$work/tampered-nono.err")" = 1
+grep -F 'nono source fork digest does not match provenance' "$work/tampered-nono.err" >/dev/null
+
+registry_nono="$work/registry-nono-source"
+cp -R "$valid" "$registry_nono"
+python3 - "$registry_nono" <<'PYTEST'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1]) / "Cargo.toml"
+s = p.read_text()
+p.write_text(s.replace('nono = { path = "third_party/nono-upstream-chio" }', 'nono = "=0.53.0"', 1))
+PYTEST
+test "$(run_checker "$registry_nono" "$work/registry-nono.out" "$work/registry-nono.err")" = 1
+grep -F 'workspace must select the reviewed local nono source fork' "$work/registry-nono.err" >/dev/null
+
+registry_nono_lock="$work/registry-nono-lock"
+cp -R "$valid" "$registry_nono_lock"
+cp "$REPO_ROOT/Cargo.lock" "$registry_nono_lock/Cargo.lock"
+python3 "$CHECKER" --root "$registry_nono_lock" --require-lock >"$work/local-nono-lock.out"
+python3 - "$registry_nono_lock" <<'PYTEST'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1]) / "Cargo.lock"
+s = p.read_text()
+needle = 'name = "nono"\nversion = "0.53.0"\n'
+assert s.count(needle) == 1
+p.write_text(s.replace(needle, needle + 'source = "registry+https://github.com/rust-lang/crates.io-index"\nchecksum = "ae7eb523cc2036e9ad6527411c3da5dc2172dc454cc3447a03b910420a39bfee"\n'))
+PYTEST
+if python3 "$CHECKER" --root "$registry_nono_lock" --require-lock >"$work/registry-nono-lock.out" 2>"$work/registry-nono-lock.err"; then
+  echo 'registry nono lock substitution unexpectedly passed' >&2
+  exit 1
+fi
+grep -F 'Cargo.lock does not contain the local nono source fork' "$work/registry-nono-lock.err" >/dev/null
 
 registry_seccompiler="$work/registry-seccompiler"
 cp -R "$valid" "$registry_seccompiler"
