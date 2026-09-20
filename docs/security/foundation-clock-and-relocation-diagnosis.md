@@ -58,9 +58,68 @@ executable digest, first isolated failure and three-case umask matrix.
 The passing rebuilt case and its source, lock and binary identities are in
 `linux-foundation-6554383cc/relocation-umask-002.json` and its adjacent log.
 
+## Terminal foundation and forward clock steps
+
+The `6554383cc` workspace run finished September 17. Build, workspace format,
+generated security vectors and strict workspace Clippy passed. The full
+control-plane target passed all 1,138 tests, including native capture expiry.
+The workspace test command nevertheless exited 101 because one SQLite test
+failed:
+
+`admission_operation_store::tests::security_participant_state::mutations::authority_binding::first_join_cannot_substitute_another_valid_native_authority`.
+
+Its error was `trusted_now_unix_ms exceeds the permitted system-clock skew`.
+The SQLite target reported 1,675 passes, one failure and four ignored tests.
+Proof coverage separately failed on a stale input digest at that frozen source;
+the current candidate regenerates and checks it after dependency selection.
+
+Removing the guest agent's clock-setting capability prevented backward steps,
+but the retained observer still recorded five forward wall-clock jumps of
+approximately 6,636, 3,209, 924, 1,237 and 916 seconds. Each occurred within
+about one second of monotonic elapsed time. Every jump exceeds the authority's
+five-minute skew limit. The original test log has no timestamp for the failed
+case, so it cannot prove which jump coincided with the error.
+
+On September 20, the exact SQLite executable was copied and hash-verified before
+any new build. Its SHA-256 is
+`253a2856751216e1f872c73d0ba01e03e0e5860755e558ae29a55ae37581a177`.
+The isolated failing case passed. Its complete owning target then passed
+1,676 tests, with the same four ignored cases, in 1,426.49 seconds. The run used
+the frozen source, original serial execution and deadlines, umask 022, the
+recorded controller environment and Cargo's owning-package working directory.
+The original child environment was not captured in full; that limit is stated
+in the diagnostic identity record.
+
+This rerun temporarily disabled guest-agent clock setting, kept NTP active,
+inhibited host idle sleep with `caffeinate -i` and observed both backward steps
+and wall/monotonic divergence. It recorded zero discontinuities and restored
+the guest-agent service afterward.
+
+A separate fault-injection experiment used the same unchanged executable.
+A retained preload library adds 600 seconds to `CLOCK_REALTIME` after a selected
+read in that test process only; it does not set the guest clock or change
+`CLOCK_MONOTONIC`. Five injection positions reproduced the exact original
+skew error. Six other positions passed, as did no-step controls before and
+after the sweep. Thus a forward jump is a demonstrated cause of this error,
+with high confidence. Attribution of the historical failure to a particular
+recorded jump remains moderate confidence because that run lacks per-test
+timestamps. No production skew limit, lease duration or test deadline changed.
+
+Evidence under the same primary-checkout output root:
+
+- `linux-foundation-6554383cc/`: all terminal foundation gates and clock samples.
+- `foundation-sqlite-diagnostic-6554383cc/`: retained executable, launch identity,
+  full target log, clock observations and restored service state.
+- `foundation-sqlite-forward-step-6554383cc/`: injection library, all 13 cases,
+  commands, digests and explicit historical-attribution limit.
+- `resume-20260920/diagnose-sqlite.py`, `sqlite-forward-step.py` and
+  `realtime-step.c`: reproducible controllers and the injection source.
+
 ## Remaining acceptance
 
 The selected dependency graph has changed since the preserved executable was
 built. A frozen current-source workspace run and affected confinement gates
-remain required. The earlier passes are diagnostic evidence only. Inventory
+remain required. Qualification must reject both backward clock steps and
+forward discontinuities, and preserve a host-awake assertion for the run.
+The earlier passes are diagnostic evidence only. Inventory
 and fuzz queues require an explicit restart after a passing foundation.
