@@ -252,7 +252,8 @@ def validate_record(data: dict) -> list[str]:
             if source_patch.get("changes") != [
                 "preserve explicit filesystem permissions across provenance tiers",
                 "select repaired dependencies in standalone qualification",
-                "separate capability and keystore unit test modules",
+                "separate capability, keystore, diagnostic and Linux unit test modules",
+                "separate diagnostic context and Linux ABI modules",
             ]:
                 errors.append("the nono source fork patch inventory is incomplete")
             digest = source_patch.get("source_sha256")

@@ -11,6 +11,7 @@ extend an expiry without shrinking the file defeats the gate.
 from __future__ import annotations
 
 import argparse
+import hashlib
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -40,6 +41,14 @@ STATEMACHINE_GENERATED_HEADER_SOURCE = (
 STATEMACHINE_GENERATED_HEADER_CONST_MARKER = (
     'const STATE_MACHINE_GENERATED_HEADER_PREFIX: &str = "\\\n'
 )
+# Immutable generated files from the checksum-verified regress 0.11.1 archive.
+# These retain upstream paths for module resolution. Any byte change requires
+# renewed provenance review; a generated header alone cannot excuse a file.
+VENDORED_GENERATED_SHA256 = {
+    "third_party/regress-chio/src/unicodetables.rs": "c3ec026fcfb6bc607f0002915c824d1792a368ecb5bf489abc0f94aea586d963",
+    "third_party/regress-chio/tests/unicode_property_escapes.rs": "84301dee923b2a7822d393bb30cf8a05f9290450cb5380adcee0ca78a03d92c5",
+}
+
 TEXT_HYGIENE_PREFIXES = ("crates/", "docs/", "sdks/", "scripts/", "spec/", "xtask/")
 TEXT_HYGIENE_SUFFIXES = (".rs", ".md")
 TEXT_HYGIENE_PATTERNS = ("*.rs", "*.md")
@@ -569,7 +578,7 @@ def load_generated_header(root: Path, spec: GeneratedHeaderSpec) -> str | None:
 def classify(path: str) -> str:
     parts = path.split("/")
     name = parts[-1]
-    if "/_generated/" in f"/{path}/":
+    if path in VENDORED_GENERATED_SHA256 or "/_generated/" in f"/{path}/":
         return "generated"
     if path.startswith("examples/") or "/examples/" in f"/{path}/":
         return "example"
@@ -644,6 +653,12 @@ def validate_generated_headers(
                 )
 
     for path in generated_paths:
+        expected = VENDORED_GENERATED_SHA256.get(path)
+        if expected is not None:
+            covered_paths.add(path)
+            raw = (root / path).read_bytes()
+            if hashlib.sha256(raw).hexdigest() != expected:
+                failures.append(f"{path}: vendored generated source differs from reviewed archive")
         if path not in covered_paths:
             failures.append(
                 f"{path}: generated Rust path is not covered by a known generator header check"

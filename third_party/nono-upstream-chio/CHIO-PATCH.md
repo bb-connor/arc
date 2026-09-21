@@ -27,7 +27,7 @@ upstream pathname-based enforcement. This repair prevents retaining the known
 defect in the selected package; it does not establish a failure in Chio's
 descriptor enforcement path.
 
-All upstream production and test files are retained. One upstream unit test
+All upstream production and test contents are retained. One upstream unit test
 expected cross-tier widening from user Write plus group Read. Its expectation
 now requires exact user Write, matching the documented provenance contract.
 The original passing upstream suite and first repaired-suite failure are
@@ -54,3 +54,13 @@ The capability and keystore unit-test bodies now live in child test modules.
 This preserves their module names, attributes and test bodies while bringing
 both production files below the repository's 2,000-line limit. The size gate
 and its allowlist are unchanged.
+
+## Source layout
+
+Diagnostic context types and sanitization now live in `diagnostic/context.rs`;
+the public types remain re-exported from `diagnostic`. The unchanged detected
+Landlock ABI type and implementation live in `sandbox/linux/abi.rs`, re-exported
+from the original module. Diagnostic and Linux unit tests are child modules,
+with unchanged bodies and test names. These moves satisfy the existing file-size
+limits without altering sandbox decisions. Fresh Linux qualification is still
+required for this source identity.

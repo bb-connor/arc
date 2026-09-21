@@ -15,7 +15,7 @@ Two production hunks repair independently reproduced file-selection defects:
   retaining ordinary filenames ending in dots. Hidden-file filtering then
   recognizes `.hidden.` and `.hidden..` correctly.
 
-All upstream source, tests and fixtures remain present. No original test
+All upstream source, test and fixture contents remain present. No original test
 assertion changes. Seven additional tests cover these regressions, partial
 ignore-file errors, anchoring and escaped literals, serial/parallel/incremental
 selection, cached rules, lexical normalization, symlink descent and loops.
@@ -34,3 +34,11 @@ cargo test --locked --all-features --manifest-path third_party/ignore-chio/Cargo
 
 The original package does not pass strict Clippy on Rust 1.94.1. Those existing
 warnings are retained and documented in the review, rather than suppressed.
+
+## Source layout
+
+The walker keeps its public entrypoints in `walk.rs`. Work-stealing queue logic
+and entry checks live in private child modules; only the visibility needed by
+the parent module changes. Unit tests are moved intact to `walk/tests.rs`.
+This preserves the serial and parallel algorithms and keeps every Rust file
+below the existing size limit.

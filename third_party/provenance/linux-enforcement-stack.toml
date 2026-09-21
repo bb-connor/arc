@@ -35,11 +35,12 @@ kind = "fork"
 package_name = "nono"
 version = "0.53.0"
 status = "required"
-source_sha256 = "6a820da20745716b859667737701ce3914c895b8fee126d305a91af4ae733cf0"
+source_sha256 = "408b4180a8979b265d754168851c8df52cc266abf646269d68de93a9db5777cd"
 changes = [
   "preserve explicit filesystem permissions across provenance tiers",
   "select repaired dependencies in standalone qualification",
-  "separate capability and keystore unit test modules",
+  "separate capability, keystore, diagnostic and Linux unit test modules",
+  "separate diagnostic context and Linux ABI modules",
 ]
 
 [landlock]

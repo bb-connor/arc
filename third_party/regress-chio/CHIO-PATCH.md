@@ -13,3 +13,17 @@ This patch is not a certification of the entire dependency.
 
 One whitespace-only line in the inert upstream autofix workflow is normalized
 so the retained source passes the repository whitespace gate.
+
+## Source layout and generated inputs
+
+Parser construction helpers live in a private child module with parent-only
+visibility. The two handwritten monolithic test files include smaller case
+files in their original module scope. Concatenating the case files reconstructs
+the original test bodies exactly; test names and common helpers are preserved.
+
+The upstream-generated Unicode table and property-escape suite retain their
+original paths and exact archive bytes. The Rust hygiene checker recognizes
+only those two paths as generated and validates their SHA-256 values against
+the reviewed archive. An edited file fails integrity validation; other vendored
+Rust still faces the normal size limit. No Unicode data or generated assertion
+has been rewritten to satisfy a line count.
