@@ -84,8 +84,28 @@ def main():
                             "SELECT id, checkpoint FROM processes WHERE id != 'root'"
                         ) if raw != "null"
                     }
+                with closing(sqlite3.connect(
+                    f"file:{harness.state / 'runner.db'}?mode=ro", uri=True
+                )) as db:
+                    runner_states = {
+                        name: (state, attempts) for name, state, attempts in db.execute(
+                            "SELECT process,state,attempts FROM run_workers"
+                        )
+                    }
                 if len(written) == 2 and len(checkpoints) == 2:
                     assert set(written).isdisjoint(checkpoints), checkpoints
+                    if any(
+                        runner_states.get(name) != ("completed", 1)
+                        for name in checkpoints
+                    ):
+                        assert time.monotonic() < deadline, (
+                            "denied workers did not retain terminal attempt state"
+                        )
+                        time.sleep(0.05)
+                        continue
+                    assert all(
+                        runner_states.get(name) == ("running", 1) for name in written
+                    ), runner_states
                     for name, checkpoint in checkpoints.items():
                         response = checkpoint["response"]
                         assert response["verdict"] == "deny" and response["output"] is None, response
@@ -113,6 +133,7 @@ def main():
             write(harness.output / "overlap.json", {
                 "external_observation": True, "effect_workers": sorted(written),
                 "quota_denials": before_crash, "aggregate_projection": live_quota,
+                "runner_states": runner_states,
                 "admitted_tools_have_not_returned": True,
             })
             for task in Path(f"/proc/{host.pid}/task").iterdir():
