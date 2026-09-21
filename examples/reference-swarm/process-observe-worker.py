@@ -38,32 +38,37 @@ def main():
         print(f"invoke {label}: {result['verdict']}", file=sys.stderr, flush=True)
         return result
 
-    observations = []
-    for probe in call.get("probes", []):
-        response = invoke(probe)
-        if response["verdict"] != "deny" or response.get("output") is not None:
-            raise RuntimeError("unauthorized probe released a result")
-        observations.append({"request": probe, "response": response})
-    response = invoke(call)
     print("inspect: started", file=sys.stderr, flush=True)
     current = client.inspect()["checkpoint"]
     previous = current["value"]
-    if previous and previous["response"]["receipt_json"] != response["receipt_json"]:
-        raise RuntimeError("recovery replaced the original tool receipt")
-    if call.get("check_replay"):
-        replay = invoke(call)
-        if replay != response:
-            raise RuntimeError("logical replay replaced the original response")
-        attempt = dict(call, operation_key="reused-continuation")
-        refused = invoke(attempt)
-        if refused["verdict"] != "deny" or refused.get("output") is not None:
-            raise RuntimeError("continuation authorized an additional result")
-        observations.append({"request": attempt, "response": refused})
-    print("checkpoint: started", file=sys.stderr, flush=True)
-    client.checkpoint(
-        current["revision"], {"response": response, "probes": observations}
-    )
-    print("checkpoint: retained", file=sys.stderr, flush=True)
+    if previous is not None:
+        if set(previous) != {"response", "probes"}:
+            raise RuntimeError("retained observation checkpoint is malformed")
+        response = previous["response"]
+        observations = previous["probes"]
+        print("checkpoint: recovered", file=sys.stderr, flush=True)
+    else:
+        observations = []
+        for probe in call.get("probes", []):
+            response = invoke(probe)
+            if response["verdict"] != "deny" or response.get("output") is not None:
+                raise RuntimeError("unauthorized probe released a result")
+            observations.append({"request": probe, "response": response})
+        response = invoke(call)
+        if call.get("check_replay"):
+            replay = invoke(call)
+            if replay != response:
+                raise RuntimeError("logical replay replaced the original response")
+            attempt = dict(call, operation_key="reused-continuation")
+            refused = invoke(attempt)
+            if refused["verdict"] != "deny" or refused.get("output") is not None:
+                raise RuntimeError("continuation authorized an additional result")
+            observations.append({"request": attempt, "response": refused})
+        print("checkpoint: started", file=sys.stderr, flush=True)
+        client.checkpoint(
+            current["revision"], {"response": response, "probes": observations}
+        )
+        print("checkpoint: retained", file=sys.stderr, flush=True)
     if call.get("crash_after_checkpoint") and bootstrap["attempt"] == 1:
         print("crash-after-checkpoint: sigkill", file=sys.stderr, flush=True)
         os.kill(os.getpid(), signal.SIGKILL)

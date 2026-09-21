@@ -212,6 +212,8 @@ members = [
     "integrations/editors/zed-chio",
 ]
 exclude = [
+    # DES parity normalization and effective-key checks for the selected release.
+    "third_party/aws-lc-rs-chio",
     # Upstream UTF-8 search-start validation backported to the pinned release.
     "third_party/regress-chio",
     # PyO3 extension package: built through maturin with an explicit Python
@@ -244,6 +246,7 @@ exclude = [
 ]
 
 [patch.crates-io]
+aws-lc-rs = { path = "third_party/aws-lc-rs-chio" }
 regress = { path = "third_party/regress-chio" }
 ignore = { path = "third_party/ignore-chio" }
 nono = { path = "third_party/nono-upstream-chio" }

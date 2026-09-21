@@ -2,34 +2,34 @@
 
 ## Current checkpoint (2026-09-21)
 
-The current source candidate is
-`ce19d8f3f61f1e91376cf3dcaf1df5ba740e021b`. It preserves both required
-parent histories and includes the September 20 dependency continuation:
+The current local finalization candidate is based on
+`c4beda6ea02bc1dc988a52b904c8422608a06902`. It preserves both required
+parent histories and includes the September 20 dependency continuation plus
+the September 21 source-audit and native qualification repairs:
 
 - `0b33f3b3a7`: preserve ignore filters across size and filename cases.
 - `b36b1d5b69`: backport the upstream regress UTF-8 search-boundary repair.
 - `9f0a8a0648`: qualify nono against the repaired local dependencies.
 - `ce19d8f3f6`: close all remaining vendored Rust file-size violations.
+- `c4beda6ea0`: preserve complete seccomp ioctl request values on musl.
 
-The clean finalization checkout is
-`.worktrees/process-security-finalize` on
-`integration/process-security-pr-finalize`. Draft PR #1160 remains the delivery
-path. The complete review and continuation records are tracked under
-`docs/reviews/`.
+The clean execution checkout is `/tmp/arc-security-launch` on
+`integration/process-security-m4`. Draft PR #1160 remains the delivery path.
+The complete review and continuation records are tracked under `docs/reviews/`.
 
 | Area | Current state | Remaining boundary |
 | --- | --- | --- |
 | Ancestry and review dispositions | Both required parents and all 109 dispositions are retained. | Original review threads remain administratively unresolved. |
-| Foundation implementation | Combined process/security behavior and dependency repairs are present. | Run the exact-candidate workspace, process, flow, cage and fuzz inventories. |
-| Dependency policy | The original 26 cargo-vet gaps are reduced to three AWS-LC packages. Regress has a scoped first-party repair record. | Complete genuine source audits for `aws-lc-rs 1.18.1`, `aws-lc-sys 0.45.0` and `aws-lc-fips-sys 0.14.2`. |
-| Execution image | Source `eb040d592f` has a locally built and validated Linux/amd64 image, `sha256:62980968ebe634a11ff871d80e024b268b4f23f5f95c2ce46faacbab368a5b12`. | That image does not qualify this candidate. Build, validate, publish and authorize an exact-candidate image through the normal controls. |
-| M5 | The seven-scenario Linux/x86_64 matrix and independent substitution checks pass on earlier exact sources. | Complete the designated-runner run and one exact-candidate evidence join. `m5_acceptance_complete` remains false. |
+| Foundation implementation | Combined process/security behavior and dependency repairs are present. The 69-test cage inventory, 26 real probes and ten mutants pass at `c4beda6ea0` on native Linux/x86_64. | Run the remaining exact-candidate workspace, process, flow and fuzz inventories, then repeat affected cage evidence at final head. |
+| Dependency policy | The three AWS-LC sources were reviewed against their exact registry archives and upstream trees. A reproduced `legacy-des` parity flaw in `aws-lc-rs 1.18.1` is repaired in a local source selection with a failing-before, passing-after regression. Exact audits cover `aws-lc-sys 0.45.0` and `aws-lc-fips-sys 0.14.2`; locked cargo-vet passes. | Preserve the reviewed local repair and exact audit records through final integration. Do not replace them with exemptions. |
+| Execution image | Source `c4beda6ea0` has a locally built and validated Linux/amd64 image, `sha256:d76567ce471f44f70776aed86c8e6a8be4a7040b92bd878d55ba7fbfd6a10243`. It was not published or authorized for trusted capture. | The worker recovery and AWS-LC changes make that image historical. Rebuild and validate final head; publication and trusted-capture authorization remain separate. |
+| M5 | Six of seven scenarios pass at `c4beda6ea0` on the designated native Linux/x86_64 runner. The budget scenario exposed a retained-checkpoint recovery race after both effects and signed quota denials were durable. The worker now recovers that checkpoint before invoking. | Rerun all seven scenarios at final head and verify the joined artifact independently. `m5_acceptance_complete` remains false. |
 | M6-M10 | Individual broker, retention, recovery and packaging slices have evidence below. | No milestone-level M6-M10 acceptance is claimed. |
-| Delivery | The code candidate and review corpus were pushed to draft PR #1160 through `0a53085b76` on September 21. | Reconcile terminal hosted checks and the final PR head before merge. |
+| Delivery | Draft PR #1160 is open, draft and mergeable at remote head `bf8b666274095acb1d103e428f21eaaa7bfdeb54`. The latest refresh has 105 successes, 16 skips, 11 failures, one cancellation and one still-running MSRV job. | Keep the local finalization unpushed until exact-head gates complete, then reconcile terminal hosted checks and the final PR head before merge. |
 | M11 | Promotion remains explicitly separate. | No production promotion is claimed or authorized. |
 
-The candidate Cargo.lock SHA-256 is
-`4f1b3528664a77eea1e703c425e351904f79181f14264d6c6edc6651d5e4b569`.
+The local finalization Cargo.lock SHA-256 is
+`8e7154ee265ed4521d92130aeb145070c8da1026d02b2939761af758f447ade1`.
 Local validation retained for the September 20 continuation includes the full
 Rust hygiene gate and mutation fixtures, 693 nono tests, 201 ignore tests, the
 supported regress matrices, strict affected Clippy, workspace formatting,
@@ -37,11 +37,11 @@ structural security checks and a proof inventory of 59 rows and 170 artifacts.
 These results are source-bounded local evidence. They do not replace the
 exact-candidate Linux, hosted or trusted-runner gates.
 
-The next execution order is: finish the three AWS-LC audits; build and validate
-the exact-candidate execution image; run the remaining exact-head foundation,
-cage and M5 evidence-join gates; then reconcile hosted results and protected
-integration. Do not restart from the historical entries below unless a current
-gate points to a specific retained failure.
+The next execution order is: commit the reviewed recovery and dependency
+repairs; run the remaining exact-head foundation, cage and M5 evidence-join
+gates; rebuild and validate the exact-head execution image; then reconcile
+hosted results and protected integration. Do not restart from the historical
+entries below unless a current gate points to a specific retained failure.
 
 ## Historical qualification ledger
 
