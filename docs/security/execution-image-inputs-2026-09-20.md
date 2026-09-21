@@ -1,10 +1,12 @@
 # Execution image input qualification
 
 September 20, 2026. Confidence is high for the local input checks below.
-The image for the historical inputs below is built and locally validated.
-The current candidate includes later dependency repairs and requires a new
-image: its lock digest is
-`4f1b3528664a77eea1e703c425e351904f79181f14264d6c6edc6651d5e4b569`.
+The images for the historical inputs below are built and locally validated.
+The current local finalization candidate selects the reviewed AWS-LC repair;
+its lock digest is
+`8e7154ee265ed4521d92130aeb145070c8da1026d02b2939761af758f447ade1`.
+The Dockerfile and structural checker pin this exact digest. A fresh image
+build and validation remain required after this ratchet update.
 Registry publication, reviewed
 workflow-definition rotation and capture authorization remain outstanding.
 
