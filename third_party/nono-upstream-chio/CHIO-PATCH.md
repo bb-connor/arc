@@ -1,7 +1,7 @@
 # Chio nono permission provenance repair
 
-This unpublished fork retains nono 0.53.0 and changes one production expression
-in filesystem-capability deduplication. The separately owned `nono-chio`
+This unpublished fork retains nono 0.53.0 and repairs filesystem-capability
+deduplication and Linux ioctl literal typing. The separately owned `nono-chio`
 descriptor wrapper remains the confinement entrypoint.
 
 - Upstream release: `c4b25b827330640cb95f85809d88d977191b42e7`,
@@ -64,3 +64,12 @@ from the original module. Diagnostic and Linux unit tests are child modules,
 with unchanged bodies and test names. These moves satisfy the existing file-size
 limits without altering sandbox decisions. Fresh Linux qualification is still
 required for this source identity.
+
+## musl ioctl request literals
+
+The seccomp notification ioctl constants start as explicit `u32` literals before
+conversion to `libc::Ioctl`. On musl that alias is signed, and unsuffixed literals
+with the high bit set failed compilation. The conversion preserves all 32 Linux
+request bits on both musl and GNU libc. A regression checks all four request
+values; cross-target compilation exercises the signed musl alias. No ioctl
+operation or confinement decision changes.

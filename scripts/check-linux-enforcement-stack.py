@@ -254,6 +254,7 @@ def validate_record(data: dict) -> list[str]:
                 "select repaired dependencies in standalone qualification",
                 "separate capability, keystore, diagnostic and Linux unit test modules",
                 "separate diagnostic context and Linux ABI modules",
+                "preserve seccomp ioctl request bits on musl",
             ]:
                 errors.append("the nono source fork patch inventory is incomplete")
             digest = source_patch.get("source_sha256")

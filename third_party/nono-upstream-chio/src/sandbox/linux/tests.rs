@@ -1,6 +1,14 @@
 use super::*;
 
 #[test]
+fn seccomp_notification_ioctl_request_bits_match_linux_uapi() {
+    assert_eq!(SECCOMP_IOCTL_NOTIF_RECV as u32, 0xc0502100);
+    assert_eq!(SECCOMP_IOCTL_NOTIF_SEND as u32, 0xc0182101);
+    assert_eq!(SECCOMP_IOCTL_NOTIF_ID_VALID as u32, 0x40082102);
+    assert_eq!(SECCOMP_IOCTL_NOTIF_ADDFD as u32, 0x40182103);
+}
+
+#[test]
 fn test_is_supported() {
     // This test will pass or fail depending on kernel version
     // Just verify it doesn't panic
