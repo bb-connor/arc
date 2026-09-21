@@ -843,9 +843,21 @@ fn build_runtime_mount_spec(profile: RuntimeMountProfile) -> Result<RuntimeMount
         builder.add_executable(optional, false)?;
     }
 
-    if let Some(python) = builder.add_executable("python3", false)? {
+    if let Some(python_command) = executable_on_path("python3") {
+        let (python, _) = bounded_runtime_file(
+            &python_command,
+            &[
+                "-I",
+                "-S",
+                "-c",
+                "import sys; print(sys.executable)",
+            ],
+            "Python interpreter",
+        )?
+        .ok_or_else(|| "Python interpreter path is invalid".to_owned())?;
+        builder.add_runtime_file(python, PathBuf::from("/runtime/bin/python3"))?;
         let stdlib = bounded_runtime_path(
-            &python,
+            &python_command,
             &[
                 "-I",
                 "-S",
