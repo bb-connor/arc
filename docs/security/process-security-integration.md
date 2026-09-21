@@ -357,7 +357,7 @@ qualification and actual native enforcement remain separately named evidence.
 **Interfaces:** Current #1117 security foundation and the reconciled process
 candidate; no unrelated product or historical omnibus PR is pulled in.
 
-- [ ] Push the reviewed candidate and create or update a clearly based
+- [x] Push the reviewed candidate and create or update a clearly based
   integration PR preserving both ancestries and linking superseded review slices.
 - [ ] Reconcile local, remote and PR head SHA, required terminal CI attempts,
   unresolved threads and actual review decisions. Re-run after any source/base

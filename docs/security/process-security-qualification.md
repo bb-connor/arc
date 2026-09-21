@@ -25,7 +25,7 @@ path. The complete review and continuation records are tracked under
 | Execution image | Source `eb040d592f` has a locally built and validated Linux/amd64 image, `sha256:62980968ebe634a11ff871d80e024b268b4f23f5f95c2ce46faacbab368a5b12`. | That image does not qualify this candidate. Build, validate, publish and authorize an exact-candidate image through the normal controls. |
 | M5 | The seven-scenario Linux/x86_64 matrix and independent substitution checks pass on earlier exact sources. | Complete the designated-runner run and one exact-candidate evidence join. `m5_acceptance_complete` remains false. |
 | M6-M10 | Individual broker, retention, recovery and packaging slices have evidence below. | No milestone-level M6-M10 acceptance is claimed. |
-| Delivery | The candidate and documentation are prepared for PR #1160. | Reconcile the pushed PR head and terminal hosted checks before merge. |
+| Delivery | The code candidate and review corpus were pushed to draft PR #1160 through `0a53085b76` on September 21. | Reconcile terminal hosted checks and the final PR head before merge. |
 | M11 | Promotion remains explicitly separate. | No production promotion is claimed or authorized. |
 
 The candidate Cargo.lock SHA-256 is
