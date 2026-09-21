@@ -84,14 +84,18 @@ def main():
                             "SELECT id, checkpoint FROM processes WHERE id != 'root'"
                         ) if raw != "null"
                     }
-                with closing(sqlite3.connect(
-                    f"file:{harness.state / 'runner.db'}?mode=ro", uri=True
-                )) as db:
-                    runner_states = {
-                        name: (state, attempts) for name, state, attempts in db.execute(
-                            "SELECT process,state,attempts FROM run_workers"
-                        )
-                    }
+                runner_states = {}
+                runner_db = harness.state / "runner.db"
+                if runner_db.exists():
+                    with closing(sqlite3.connect(
+                        f"file:{runner_db}?mode=ro", uri=True
+                    )) as db:
+                        runner_states = {
+                            name: (state, attempts)
+                            for name, state, attempts in db.execute(
+                                "SELECT process,state,attempts FROM run_workers"
+                            )
+                        }
                 if len(written) == 2 and len(checkpoints) == 2:
                     assert set(written).isdisjoint(checkpoints), checkpoints
                     if any(
