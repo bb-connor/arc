@@ -4,9 +4,19 @@ September 20, 2026. Confidence is high for the local input checks below.
 The image for the historical inputs below is built and locally validated.
 The current candidate includes later dependency repairs and requires a new
 image: its lock digest is
-`51af2e7dd4292a31f917b650c46c26a70cc263ac324cbe90fadbf742a8c7a8d0`.
+`4f1b3528664a77eea1e703c425e351904f79181f14264d6c6edc6651d5e4b569`.
 Registry publication, reviewed
 workflow-definition rotation and capture authorization remain outstanding.
+
+An additional exact-source image was built after the historical run below.
+Source `eb040d592f17994e539f1eebf88bb46e85e5081b`, with Cargo.lock SHA-256
+`28ebb77f5c65fb7c434f25061415a5abdcc11697870783a475b1a203db77c24a`,
+produced locally validated Linux/amd64 image
+`sha256:62980968ebe634a11ff871d80e024b268b4f23f5f95c2ce46faacbab368a5b12`.
+Its structural contract, installed runtime inputs and network-disabled locked
+dependency fetch passed. It is unpublished and unauthorized for trusted capture.
+It does not qualify current candidate `ce19d8f3f`, whose dependency graph and
+lock digest changed afterward.
 
 ## Validated historical inputs
 
