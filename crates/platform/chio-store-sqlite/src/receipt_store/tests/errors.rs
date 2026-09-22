@@ -2,6 +2,71 @@ use super::super::*;
 use super::support::*;
 
 #[test]
+fn checkpoint_validation_rejects_a_signer_substitution_between_reads(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
+
+    let (_directory, path) = temp_db("chio-checkpoint-signer-read-race-")?;
+    let original_key = receipt_test_keypair();
+    let foreign_key = Keypair::from_seed(&[0x45; 32]);
+    let original = sample_receipt_with_keypair("signer-read-race", 1, &original_key);
+    let replacement = sample_receipt_with_keypair("signer-read-race", 1, &foreign_key);
+    let store = SqliteReceiptStore::open(&path)?;
+    let sequence = store.append_chio_receipt_returning_seq(&original)?;
+    store.flush_receipt_writes()?;
+    drop(store);
+
+    // This checkpoint is signed by the original kernel over a different
+    // kernel's valid receipt. No stable database state can validate both joins.
+    let checkpoint = build_checkpoint(
+        1,
+        sequence,
+        sequence,
+        &[canonical_json_bytes(&replacement)?],
+        &original_key,
+    )?;
+    let reader = Connection::open(&path)?;
+    let writer = Connection::open(&path)?;
+    writer.execute_batch("DROP TRIGGER claim_receipt_log_entries_reject_update;")?;
+    let replacement_json = serde_json::to_string(&replacement)?;
+    let sqlite_sequence = i64::try_from(sequence)?;
+    let injection_failed = Arc::new(AtomicBool::new(false));
+    let failed = Arc::clone(&injection_failed);
+    let mut receipt_reads = 0_u64;
+    reader.authorizer(Some(move |context: AuthContext<'_>| {
+        if let AuthAction::Read {
+            table_name: "claim_receipt_log_entries",
+            column_name: "raw_json",
+        } = context.action
+        {
+            receipt_reads += 1;
+            if receipt_reads == 2 {
+                match writer.execute(
+                    "UPDATE claim_receipt_log_entries SET raw_json = ?1 WHERE entry_seq = ?2",
+                    rusqlite::params![replacement_json, sqlite_sequence],
+                ) {
+                    Ok(1) => {}
+                    _ => {
+                        failed.store(true, Ordering::SeqCst);
+                        return Authorization::Deny;
+                    }
+                }
+            }
+        }
+        Authorization::Allow
+    }))?;
+
+    let result = validate_checkpoint_against_claim_log(&reader, &checkpoint);
+    reader.authorizer(None::<fn(AuthContext<'_>) -> Authorization>)?;
+    assert!(!injection_failed.load(Ordering::SeqCst));
+    assert!(
+        result.is_err(),
+        "a checkpoint accepted a foreign receipt after checking a different receipt's signer"
+    );
+    Ok(())
+}
+
+#[test]
 fn append_chio_receipt_rejects_invalid_signature() {
     let path = unique_db_path("chio-receipts-invalid-signature");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
