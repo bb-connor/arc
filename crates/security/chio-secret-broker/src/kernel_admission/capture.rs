@@ -1,14 +1,11 @@
 //! Broker projection of an original native kernel capture. All methods are reads.
 use super::{canonical, registration::registration_quotas, rejected};
 use crate::budget::{CaptureExecutionHoldRequest, CombinedCaptureCommit};
-use crate::protocol::BrokerExecuteRequest;
 use crate::service::broker_request_digest;
 use crate::store::derive_attempt_ids_for_operation;
 use crate::{BrokerError, Result};
 use chio_core_types::StoreMutationFence;
-use chio_kernel::admission_operation::{
-    AdmissionOperationId, AdmissionOperationStore, NativeSecurityAuthorityBindingV1,
-};
+use chio_kernel::admission_operation::{AdmissionOperationId, NativeSecurityAuthorityBindingV1};
 use chio_kernel::budget_store::BudgetInvocationCaptureDecision;
 use chio_kernel::supplemental_admission::SupplementalAdmissionAuthorityBindingV1;
 use chio_kernel::supplemental_quota::{
@@ -16,6 +13,8 @@ use chio_kernel::supplemental_quota::{
 };
 use chio_store_sqlite::admission_operation_store::SqliteAdmissionOperationStore;
 use chio_store_sqlite::SqliteAuthorityStore;
+
+mod original;
 
 /// Independently selected native and broker participants, pinned to a serving
 /// owner. This is historical accounting, not permission to send a provider
@@ -57,27 +56,11 @@ impl BrokerNativeCaptureReader {
         request.validate()?;
         let operation_id = AdmissionOperationId::from_persisted(request.operation_id.clone())
             .map_err(|_| rejected())?;
-        let Some((operation, original)) = self
-            .store
-            .load_retained_tool_request(&operation_id, &self.fence, trusted_now_unix_ms)
-            .map_err(unavailable)?
-        else {
+        let Some(original) = self.read_original(&operation_id, trusted_now_unix_ms)? else {
             return Ok(None);
         };
-        original
-            .validate_native_security_authority(&self.native)
-            .map_err(|_| rejected())?;
-        if original
-            .authority_profile()
-            .and_then(|profile| profile.supplemental_participant())
-            != Some(&self.participant)
-        {
-            return Err(rejected());
-        }
-        let retained = original.request_for_revalidation();
-        let execute: BrokerExecuteRequest =
-            serde_json::from_value(retained.arguments.clone()).map_err(|_| rejected())?;
-        execute.validate_bounds()?;
+        let operation = original.operation;
+        let execute = original.execute;
         let bytes = canonical(&execute)?;
         let ids = derive_attempt_ids_for_operation(
             &execute.capability.body.capability_id,
@@ -86,8 +69,7 @@ impl BrokerNativeCaptureReader {
             &broker_request_digest(&execute)?,
             operation_id.as_str(),
         )?;
-        if bytes != canonical(&retained.arguments)?
-            || request.invocation_id != execute.invocation_id
+        if request.invocation_id != execute.invocation_id
             || request.invocation_id != operation.binding().request_id().as_str()
             || request.parent_capability_id != execute.capability.body.parent_capability_id
             || request.parent_capability_id != operation.binding().capability_id().as_str()
@@ -164,5 +146,5 @@ impl BrokerNativeCaptureReader {
 }
 
 fn unavailable(_: chio_kernel::admission_operation::AdmissionOperationStoreError) -> BrokerError {
-    BrokerError::AuthorityUnavailable("original kernel capture readback failed".into())
+    BrokerError::AuthorityUnavailable("original kernel admission readback failed".into())
 }

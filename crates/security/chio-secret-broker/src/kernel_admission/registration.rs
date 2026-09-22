@@ -8,7 +8,9 @@ use crate::service::broker_request_digest;
 use crate::store::{derive_attempt_ids_for_operation, AttemptRegistration};
 use crate::{validate_identifier, Result};
 use chio_core_types::{PublicKey, Signature, SigningAlgorithm, SigningBackend, SigningOutcome};
-use chio_kernel::admission_operation::{AdmissionDigest, AdmissionIdentifier};
+use chio_kernel::admission_operation::{
+    AdmissionDigest, AdmissionIdentifier, AdmissionOperationBindingV1,
+};
 use chio_kernel::budget_store::{BudgetInvocationQuota, BudgetQuotaProfile};
 use chio_kernel::supplemental_admission::{
     SupplementalAdmissionAuthorityBindingV1, SupplementalAdmissionParticipant,
@@ -99,6 +101,10 @@ impl BrokerAdmissionParticipant {
         &self.binding
     }
 
+    pub(super) fn revocation_authority_domain(&self) -> &str {
+        &self.revocation_authority_domain
+    }
+
     fn register(&self, context: &SupplementalAdmissionRegistrationContext<'_>) -> Result<()> {
         let request: BrokerExecuteRequest =
             serde_json::from_value(context.request().arguments.clone()).map_err(|_| rejected())?;
@@ -111,38 +117,54 @@ impl BrokerAdmissionParticipant {
         {
             return Err(rejected());
         }
-        let request_digest = broker_request_digest(&request)?;
-        let registration = AttemptRegistration {
-            ids: derive_attempt_ids_for_operation(
-                &request.capability.body.capability_id,
-                &request.invocation_id,
-                &request.proof.body.nonce,
-                &request_digest,
-                operation.operation_id().as_str(),
-            )?,
-            invocation_id: request.invocation_id.clone(),
-            parent_capability_id: request.capability.body.parent_capability_id.clone(),
-            broker_capability_id: request.capability.body.capability_id.clone(),
-            request_digest,
-            request_canonical_digest: broker_execute_request_registration_digest(&request)?,
-            proof_digest: crate::proof::proof_digest(&request.proof)?,
-            proof_key_id: request.proof.body.authority_key.to_hex(),
-            proof_nonce: request.proof.body.nonce.clone(),
-            nonce_expires_at_unix_seconds: request
-                .proof
-                .body
-                .issued_at_unix_seconds
-                .checked_add(request.capability.body.proof.nonce_ttl_seconds)
-                .ok_or_else(rejected)?,
-            quotas: registration_quotas(&context.budget().invocation_quotas, &request)?,
-            authority_metadata_digest: operation.request_binding_hash().as_str().to_owned(),
-            revocation_authority_domain: self.revocation_authority_domain.clone(),
-        };
+        let registration = registration_for_original_request(
+            operation,
+            &request,
+            &context.budget().invocation_quotas,
+            &self.revocation_authority_domain,
+        )?;
         // The client authenticates the configured Unix peer and validates the
         // acknowledgement against the original operation and attempt identities.
         self.client.register_attempt(&registration, &request)?;
         Ok(())
     }
+}
+
+pub(super) fn registration_for_original_request(
+    operation: &AdmissionOperationBindingV1,
+    request: &BrokerExecuteRequest,
+    quotas: &[BudgetInvocationQuota],
+    revocation_authority_domain: &str,
+) -> Result<AttemptRegistration> {
+    let request_digest = broker_request_digest(request)?;
+    let registration = AttemptRegistration {
+        ids: derive_attempt_ids_for_operation(
+            &request.capability.body.capability_id,
+            &request.invocation_id,
+            &request.proof.body.nonce,
+            &request_digest,
+            operation.operation_id().as_str(),
+        )?,
+        invocation_id: request.invocation_id.clone(),
+        parent_capability_id: request.capability.body.parent_capability_id.clone(),
+        broker_capability_id: request.capability.body.capability_id.clone(),
+        request_digest,
+        request_canonical_digest: broker_execute_request_registration_digest(request)?,
+        proof_digest: crate::proof::proof_digest(&request.proof)?,
+        proof_key_id: request.proof.body.authority_key.to_hex(),
+        proof_nonce: request.proof.body.nonce.clone(),
+        nonce_expires_at_unix_seconds: request
+            .proof
+            .body
+            .issued_at_unix_seconds
+            .checked_add(request.capability.body.proof.nonce_ttl_seconds)
+            .ok_or_else(rejected)?,
+        quotas: registration_quotas(quotas, request)?,
+        authority_metadata_digest: operation.request_binding_hash().as_str().to_owned(),
+        revocation_authority_domain: revocation_authority_domain.into(),
+    };
+    registration.validate()?;
+    Ok(registration)
 }
 
 impl SupplementalAdmissionParticipant for BrokerAdmissionParticipant {

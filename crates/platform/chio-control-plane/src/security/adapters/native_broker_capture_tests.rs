@@ -10,7 +10,8 @@ use chio_kernel::supplemental_admission::{
 use chio_kernel::supplemental_quota::SupplementalQuotaVerifierError;
 use chio_secret_broker::budget::CaptureExecutionHoldRequest;
 use chio_secret_broker::kernel_admission::{
-    BrokerNativeCaptureReader, BrokerQuotaVerifier, BrokerQuotaVerifierConfig,
+    BrokerAdmissionParticipant, BrokerNativeCaptureReader, BrokerQuotaVerifier,
+    BrokerQuotaVerifierConfig,
 };
 use chio_secret_broker::protocol::*;
 use chio_secret_broker::{capability::issue_capability, proof::issue_request_proof};
@@ -18,6 +19,8 @@ use chio_secret_broker::{capability::issue_capability, proof::issue_request_proo
 struct ObserveRegistration {
     count: AtomicUsize,
     reader: BrokerNativeCaptureReader,
+    registrar: Arc<BrokerAdmissionParticipant>,
+    prepared: Mutex<Option<chio_secret_broker::store::AttemptRegistration>>,
 }
 
 impl SupplementalAdmissionParticipant for ObserveRegistration {
@@ -38,10 +41,71 @@ impl SupplementalAdmissionParticipant for ObserveRegistration {
                 binding.revocation_set.ids().to_vec(),
             )?;
             assert_eq!(self.reader.read_capture(&request, now_ms()?)?, None);
+            assert!(self
+                .reader
+                .read_registration(
+                    self.registrar.as_ref(),
+                    context.operation().binding().operation_id(),
+                    now_ms()?
+                )?
+                .is_none());
             self.count.fetch_add(1, Ordering::SeqCst);
             Ok(())
         };
         check().map_err(|_| SupplementalQuotaVerifierError::new("pre-capture readback failed"))
+    }
+}
+
+struct ObserveBrokerPreparation(Arc<ObserveRegistration>);
+
+#[async_trait::async_trait]
+impl ToolServerConnection for ObserveBrokerPreparation {
+    fn server_id(&self) -> &str {
+        "server-a"
+    }
+    fn tool_names(&self) -> Vec<String> {
+        vec!["send".into()]
+    }
+    async fn prepare_delivery(
+        &self,
+        context: &chio_kernel::ToolDispatchContext,
+    ) -> Result<(), KernelError> {
+        let read = || -> TestResult {
+            let operation = chio_kernel::admission_operation::AdmissionOperationId::from_persisted(
+                context.operation_id(),
+            )?;
+            let (registration, execute) = self
+                .0
+                .reader
+                .read_registration(self.0.registrar.as_ref(), &operation, now_ms()?)?
+                .ok_or("prepared original broker hold")?;
+            assert_eq!(registration.ids.operation_id, context.operation_id());
+            assert_eq!(registration.invocation_id, context.request_id());
+            assert_eq!(execute.invocation_id, context.request_id());
+            assert_eq!(
+                registration.revocation_authority_domain,
+                "native-broker-domain"
+            );
+            assert_eq!(registration.quotas.len(), 2);
+            assert!(registration
+                .quotas
+                .iter()
+                .all(|quota| quota.maximum_executions == 1));
+            registration.validate()?;
+            *self.0.prepared.lock().map_err(|_| "preparation lock")? = Some(registration);
+            Ok(())
+        };
+        read().map_err(|error| KernelError::GuardDenied(error.to_string()))
+    }
+    async fn invoke(
+        &self,
+        _: &str,
+        _: serde_json::Value,
+        _: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        Err(KernelError::GuardDenied(
+            "readback fixture stops at native capture".into(),
+        ))
     }
 }
 
@@ -56,7 +120,32 @@ fn native_broker_capture_reads_only_original_operation_and_never_recharges() -> 
         participant.clone(),
     )?;
     let ledger = run_capture(&mut fixture, true)?;
+    let registrar = registrations.registrar.clone();
+    let original_registration = reader
+        .read_registration(registrar.as_ref(), &ledger.operation_id, now_ms()?)?
+        .ok_or("original broker registration")?;
+    assert_eq!(original_registration.1, execute);
+    assert!(reader
+        .read_registration(
+            registrar.as_ref(),
+            &chio_kernel::admission_operation::AdmissionOperationId::from_persisted(
+                "f".repeat(64)
+            )?,
+            now_ms()?,
+        )?
+        .is_none());
     assert_eq!(registrations.count.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        registrations
+            .prepared
+            .lock()
+            .map_err(|_| "preparation lock")?
+            .as_ref()
+            .ok_or("preparation was not reached")?
+            .ids
+            .operation_id,
+        ledger.operation_id.as_str()
+    );
     let store = fixture.authority.admission_operation_store();
     let witness = store
         .load_native_dispatch_capture_witness(
@@ -142,13 +231,16 @@ fn native_broker_capture_reads_only_original_operation_and_never_recharges() -> 
         AdmissionIdentifier::try_new("verifier", "foreign-verifier")?,
         AdmissionDigest::try_new("verifier configuration", "c".repeat(64))?,
     );
-    assert!(BrokerNativeCaptureReader::new(
+    let wrong_reader = BrokerNativeCaptureReader::new(
         &fixture.authority,
         fixture.binding.clone(),
-        wrong_participant
-    )?
-    .read_capture(&request, now_ms()?)
-    .is_err());
+        wrong_participant,
+    )?;
+    assert!(wrong_reader.read_capture(&request, now_ms()?).is_err());
+    assert!(wrong_reader
+        .read_registration(registrar.as_ref(), &ledger.operation_id, now_ms()?)
+        .is_err());
+    drop(wrong_reader);
     assert!(fixture
         .authority
         .revocation_store()
@@ -156,6 +248,10 @@ fn native_broker_capture_reads_only_original_operation_and_never_recharges() -> 
     assert_eq!(
         reader.read_capture(&request, now_ms()?)?,
         Some(commit.clone())
+    );
+    assert_eq!(
+        reader.read_registration(registrar.as_ref(), &ledger.operation_id, now_ms()?)?,
+        Some(original_registration.clone())
     );
     assert_eq!(
         fixture.authority.budget_store().list_mutation_events(
@@ -186,6 +282,10 @@ fn native_broker_capture_reads_only_original_operation_and_never_recharges() -> 
     )?;
     let reader = BrokerNativeCaptureReader::new(&reopened, native, participant)?;
     assert_eq!(reader.read_capture(&request, now_ms()?)?, Some(commit));
+    assert_eq!(
+        reader.read_registration(registrar.as_ref(), &ledger.operation_id, now_ms()?)?,
+        Some(original_registration)
+    );
     Ok(())
 }
 
@@ -211,17 +311,32 @@ fn install_broker(
         Arc::new(chio_secret_broker::daemon::SystemDaemonClock),
     )?;
     let selected = verifier.binding().clone();
-    let participant = SupplementalAdmissionAuthorityBindingV1::new(
-        AdmissionIdentifier::try_new("participant", "capture-reader-observer")?,
-        AdmissionDigest::try_new("configuration", "d".repeat(64))?,
-        AdmissionIdentifier::try_new("verifier", &selected.verifier_identity)?,
-        AdmissionDigest::try_new("verifier configuration", &selected.configuration_digest)?,
-    );
+    // No broker transport is invoked by this custody-read test. Its production
+    // configuration still determines the exact original participant identity.
+    let registrar = Arc::new(BrokerAdmissionParticipant::new(
+        chio_secret_broker::ipc_client::BrokerIpcClientConfig {
+            socket_path: fixture._directory.path().join("b.sock"),
+            tenant_scope: "native-broker-tenant".into(),
+            timeout_ms: 1000,
+            expected_peer: chio_secret_broker::ipc_client::BrokerPeerIdentity {
+                process_id: std::process::id(),
+                user_id: 0,
+                group_id: 0,
+            },
+            trusted_receipt_signer: Keypair::from_seed(&[35; 32]).public_key(),
+        },
+        Arc::new(Ed25519Backend::new(Keypair::from_seed(&[34; 32]))),
+        "native-broker-domain".into(),
+        &verifier,
+    )?);
+    let participant = registrar.binding().clone();
     fixture
         .kernel
         .set_supplemental_quota_verifier(Arc::new(verifier), selected)?;
     let registrations = Arc::new(ObserveRegistration {
         count: AtomicUsize::new(0),
+        registrar,
+        prepared: Mutex::new(None),
         reader: BrokerNativeCaptureReader::new(
             &fixture.authority,
             fixture.binding.clone(),
@@ -231,6 +346,9 @@ fn install_broker(
     fixture
         .kernel
         .set_supplemental_admission_participant(registrations.clone(), participant.clone())?;
+    fixture
+        .kernel
+        .register_tool_server(Box::new(ObserveBrokerPreparation(registrations.clone())));
     let now = now_ms()? / 1000;
     let request = BrokerRequest {
         destination: BrokerDestination::parse("https://example.com/v1", "POST", false)?,
