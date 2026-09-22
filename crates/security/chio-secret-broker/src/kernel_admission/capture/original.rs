@@ -15,7 +15,7 @@ use chio_kernel::supplemental_quota::{
 
 pub(super) struct OriginalBrokerRequest {
     pub operation: AdmissionOperationV1,
-    retained: RetainedToolAdmissionRequestV1,
+    pub(super) retained: RetainedToolAdmissionRequestV1,
     pub execute: BrokerExecuteRequest,
 }
 

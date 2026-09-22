@@ -223,3 +223,92 @@ async fn blocking_cost_delivery_preserves_the_durable_idempotency_key() {
     assert!(cost.is_none());
     assert_eq!(*seen.lock().unwrap(), vec![expected]);
 }
+
+struct BlockingCallerContextProbe(Arc<Mutex<Vec<crate::ToolInvocationContext>>>);
+
+impl crate::BlockingToolServerConnection for BlockingCallerContextProbe {
+    fn server_id(&self) -> &str {
+        "caller-context"
+    }
+    fn tool_names(&self) -> Vec<String> {
+        vec!["work".into()]
+    }
+    fn invoke_blocking(
+        &self,
+        _: &str,
+        _: serde_json::Value,
+    ) -> Result<serde_json::Value, KernelError> {
+        Err(KernelError::GuardDenied(
+            "kernel caller context required".into(),
+        ))
+    }
+    fn invoke_blocking_with_context(
+        &self,
+        context: &crate::ToolInvocationContext,
+        _: serde_json::Value,
+    ) -> Result<serde_json::Value, KernelError> {
+        self.0
+            .lock()
+            .map_err(|_| KernelError::Internal("probe lock".into()))?
+            .push(context.clone());
+        Ok(serde_json::json!({"done": true}))
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn blocking_adapter_preserves_kernel_caller_binding_in_value_and_cost_paths(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let kernel = make_kernel(make_config());
+    let agent = make_keypair();
+    let capability = make_capability(
+        &kernel,
+        &agent,
+        make_scope(vec![make_grant("caller-context", "work")]),
+        300,
+    );
+    let request = make_request_with_arguments(
+        "blocking-caller",
+        &capability,
+        "work",
+        "caller-context",
+        serde_json::json!({"capability_id": "forged", "subject_key": "forged"}),
+    );
+    let observations = Arc::new(Mutex::new(Vec::new()));
+    let server = Arc::new(crate::BlockingToolServerAdapter::new(Arc::new(
+        BlockingCallerContextProbe(observations.clone()),
+    ))?);
+    assert!(server
+        .invoke("work", request.arguments.clone(), None)
+        .await
+        .is_err());
+    for monetary in [false, true] {
+        kernel
+            .dispatch_resolved_server_within_budget(
+                server.clone(),
+                &request,
+                monetary,
+                Some(durable_context(&request)),
+            )
+            .await?;
+    }
+    let observations = observations.lock().map_err(|_| "probe lock")?;
+    assert_eq!(observations.len(), 2);
+    for context in observations.iter() {
+        assert_eq!(context.request_id(), request.request_id);
+        assert_eq!(context.server_id(), request.server_id);
+        assert_eq!(context.tool_name(), request.tool_name);
+        assert_eq!(context.capability_id(), capability.id);
+        assert_eq!(context.subject_key(), agent.public_key().to_hex());
+        assert_eq!(
+            context.capability_hash(),
+            chio_core_types::crypto::sha256_hex(&chio_core_types::crypto::canonical_json_bytes(
+                &capability
+            )?,)
+        );
+        assert_eq!(
+            context.dispatch().ok_or("dispatch")?.operation_id(),
+            durable_context(&request).operation_id()
+        );
+    }
+    Ok(())
+}

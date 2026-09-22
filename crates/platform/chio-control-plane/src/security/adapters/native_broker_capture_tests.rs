@@ -16,6 +16,14 @@ use chio_secret_broker::kernel_admission::{
 use chio_secret_broker::protocol::*;
 use chio_secret_broker::{capability::issue_capability, proof::issue_request_proof};
 
+#[cfg(target_os = "linux")]
+mod connection {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_broker_connection_tests.rs"
+    ));
+}
+
 struct ObserveRegistration {
     count: AtomicUsize,
     reader: BrokerNativeCaptureReader,
@@ -320,8 +328,8 @@ fn install_broker(
             timeout_ms: 1000,
             expected_peer: chio_secret_broker::ipc_client::BrokerPeerIdentity {
                 process_id: std::process::id(),
-                user_id: 0,
-                group_id: 0,
+                user_id: rustix::process::geteuid().as_raw(),
+                group_id: rustix::process::getegid().as_raw(),
             },
             trusted_receipt_signer: Keypair::from_seed(&[35; 32]).public_key(),
         },

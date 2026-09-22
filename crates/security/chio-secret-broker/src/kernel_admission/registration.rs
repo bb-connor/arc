@@ -25,11 +25,11 @@ const PARTICIPANT_ID: &str = "chio.secret-broker.kernel-registration.v1";
 /// Production IPC registration only. The existing kernel still owns quota
 /// capture; provider preparation and execution require their separate ports.
 pub struct BrokerAdmissionParticipant {
-    client: BrokerIpcClient,
+    pub(super) client: BrokerIpcClient,
     revocation_authority_domain: String,
     binding: SupplementalAdmissionAuthorityBindingV1,
-    server_id: String,
-    tool_name: String,
+    pub(super) server_id: String,
+    pub(super) tool_name: String,
 }
 
 impl BrokerAdmissionParticipant {

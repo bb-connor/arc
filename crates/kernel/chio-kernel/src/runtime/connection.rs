@@ -156,7 +156,10 @@ pub trait ToolServerConnection: Send + Sync {
     /// effect; remote transports use it to check reachability.
     /// This runs under reversible admission ownership, before final mutable
     /// authorization checks and the security dispatch commitment. It must not
-    /// execute a tool or deliver tool arguments, even if it returns an error.
+    /// execute a tool or deliver arguments to an effectful tool endpoint, even
+    /// if it returns an error. A trusted admission participant may prepare its
+    /// already registered request over its authenticated control port, without
+    /// performing external provider effects.
     async fn prepare_delivery(&self, context: &ToolDispatchContext) -> Result<(), KernelError> {
         let _ = context;
         Ok(())

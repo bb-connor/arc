@@ -14,7 +14,9 @@ use chio_kernel::supplemental_quota::{
 use chio_store_sqlite::admission_operation_store::SqliteAdmissionOperationStore;
 use chio_store_sqlite::SqliteAuthorityStore;
 
+mod connection;
 mod original;
+pub use connection::BrokerKernelConnection;
 
 /// Independently selected native and broker participants, pinned to a serving
 /// owner. This is historical accounting, not permission to send a provider
