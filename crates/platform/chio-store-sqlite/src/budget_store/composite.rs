@@ -1,6 +1,7 @@
 use super::*;
 use rusqlite::{params, Connection, Transaction};
 
+mod admission_custody;
 mod caller_resume;
 mod cumulative_model;
 mod event_projection;

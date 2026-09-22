@@ -1,6 +1,9 @@
 //! Physical hold ownership is invariant across first capture and exact replay.
 use super::*;
 
+#[path = "custody_readback_tests.rs"]
+mod custody_readback;
+
 #[test]
 fn combined_capture_rechecks_all_original_revocation_members_before_any_mutation(
 ) -> AnchoredTestResult {

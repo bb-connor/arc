@@ -41,7 +41,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 
+mod budget_custody;
 mod caller_budget;
+pub use budget_custody::AdmissionBudgetCustodySnapshot;
 mod caller_dispatch_context;
 mod caller_wait;
 mod commit_chain;
