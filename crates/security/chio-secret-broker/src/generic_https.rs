@@ -430,7 +430,7 @@ impl DestinationResolver for SystemDestinationResolver {
     }
 }
 
-fn validate_request_before_secret_use(
+pub(crate) fn validate_request_before_secret_use(
     request: &BrokerRequest,
     constraints: &RequestConstraints,
 ) -> Result<()> {

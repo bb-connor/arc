@@ -17,6 +17,7 @@ path = "src/bin/chio-secret-brokerd.rs"
 
 [features]
 conformance = ["dep:chio-kernel"]
+kernel-admission = ["dep:chio-kernel"]
 
 [dependencies]
 chio-core-types = { workspace = true }
@@ -46,6 +47,7 @@ chio-keyring = { workspace = true }
 libc = "0.2"
 
 [dev-dependencies]
+async-trait = { workspace = true }
 chio-test-support = { workspace = true }
 rcgen = "0.13"
 tempfile = { workspace = true }

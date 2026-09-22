@@ -8,6 +8,30 @@ The supported daemon composition is `chio-secret-brokerd` on Linux, using a priv
 
 Production mode requires durable attempt and receipt stores, fresh liveness and revocation snapshots, capture-before-dispatch execution quotas, authenticated `RegisterAttempt` and `ReleaseAttempt` messages, and signed success or failure receipts. There is no direct-provider fallback when broker IPC, authority state, receipt persistence, or credential custody is unavailable.
 
+## Kernel quota admission
+
+The `kernel-admission` feature provides `kernel_admission::BrokerQuotaVerifier`
+for the kernel's `SupplementalQuotaVerifier` interface. The trusted composition
+root supplies `BrokerQuotaVerifierConfig`, a live `DaemonClock`, and installs
+the verifier together with its `binding()`. Configuration pins the broker
+issuer, audience, provider adapter, credential placement and kernel tool route.
+
+Both tool arguments and the supplemental extension contain the same complete
+`BrokerExecuteRequest`; the extension is exact typed canonical JSON. Its
+invocation ID must equal the kernel request ID. Verification authenticates the
+capability and caller proof, checks the complete request against the signed
+constraints, and limits the claim to the earlier capability or proof expiry.
+The kernel binds that claim to its own original operation, capability digest
+and authenticated namespace. Separate invocations retain the same broker quota
+owner. Parent, aggregate-family and broker quotas use the kernel's existing
+composite hold and revocation domain.
+
+This verifier performs no credential access, network access, attempt
+registration or budget mutation. A serving integration must still register and
+prepare the durable broker attempt before the kernel's budget mutation, then
+join execution to the original committed capture. The verifier alone does not
+install that handoff or qualify the complete enterprise topology.
+
 ## Privileged migration audit
 
 `BrokerDaemonRuntime::audit_compare_outbound_request` supports a designated-runner migration check without entering the execution state machine. The underlying service operation is crate-private. The runtime verifies a short-lived `chio.broker-audit-runner-authorization.v1` artifact against the configured runner key and exact deployment, broker, tenant, provider, request, authority-domain, audit-id, source, and blinded-reference bindings. It then validates the production capability, caller proof, parent liveness, revocation snapshot, provider binding, request constraints, and destination. A threshold-governed approval for that exact runner artifact is durably consumed before credential materialization. Reuse is denied across process restarts.

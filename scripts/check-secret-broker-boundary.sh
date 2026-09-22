@@ -182,6 +182,17 @@ run_tests "authority IPC signed response binding" yes \
   cargo test -p chio-secret-broker --lib \
   authority_ipc::tests::authority_rpc_requires_signed_exact_responses_and_full_capabilities
 
+run_tests "kernel broker capability and composite quota admission" yes "$(cat <<'EOF'
+kernel_admission::tests::broker_admission_rejects_substitution_even_when_kernel_hash_is_updated
+kernel_admission::tests::broker_admission_requires_bounded_exact_typed_canonical_json
+kernel_admission::tests::broker_admission_uses_installed_trust_and_live_clock
+kernel_admission::tests::broker_quota_identity_stays_constant_across_separate_invocations
+kernel_admission::tests::kernel::kernel_captures_parent_family_and_broker_once_and_denies_exhaustion
+kernel_admission::tests::signed_broker_request_cannot_move_between_kernel_requests
+kernel_admission::tests::signed_broker_request_produces_original_operation_bound_quota
+EOF
+)" cargo test --locked -p chio-secret-broker --features kernel-admission --lib kernel_admission::tests
+
 if [[ "$(uname -s)" == "Linux" ]]; then
   run_tests "sealed inherited FD master-key custody" no \
     "secure_inherited_key_file_owns_the_original_descriptor_and_closes_it_on_drop" \

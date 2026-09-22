@@ -11,6 +11,8 @@ pub mod daemon_runtime;
 pub mod generic_https;
 pub mod inherited_fd;
 pub mod ipc_client;
+#[cfg(feature = "kernel-admission")]
+pub mod kernel_admission;
 pub mod migration;
 pub mod privileged_audit;
 pub mod proof;
