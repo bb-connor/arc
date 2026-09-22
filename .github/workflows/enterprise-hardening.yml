@@ -285,7 +285,7 @@ jobs:
 
       - name: Install Rust toolchain
         run: |
-          rustup toolchain install --profile minimal --component clippy --component rustfmt
+          rustup toolchain install 1.94.1 --profile minimal --component clippy --component rustfmt
           rustup show active-toolchain
 
       - name: Install native prerequisites
@@ -355,15 +355,15 @@ jobs:
       - name: Native security conformance
         run: |
           set -euo pipefail
-          cargo test -p chio-conformance --all-targets
+          cargo test --locked -p chio-conformance --all-targets
 
           generated_vector_list_output="$(mktemp)"
           generated_vector_run_output="$(mktemp)"
           trap 'rm -f "${generated_vector_list_output}" "${generated_vector_run_output}"' EXIT
 
-          cargo test -p chio-core-types --test security_generated_vectors \
+          cargo test --locked -p chio-core-types --test security_generated_vectors \
             -- --list 2>&1 | tee "${generated_vector_list_output}"
-          cargo test -p chio-core-types --test security_generated_vectors \
+          cargo test --locked -p chio-core-types --test security_generated_vectors \
             2>&1 | tee "${generated_vector_run_output}"
           python3 scripts/check-exact-cargo-test-inventory.py \
             --label "Rust generated security vectors" \
@@ -376,7 +376,7 @@ jobs:
 
       - name: Strict changed-crate lint
         run: |
-          cargo clippy \
+          cargo clippy --locked \
             -p chio-core-types \
             -p chio-keyring \
             -p chio-secret-broker \
@@ -406,7 +406,7 @@ jobs:
 
       - name: Install Rust toolchain
         run: |
-          rustup toolchain install --profile minimal --component clippy
+          rustup toolchain install 1.94.1 --profile minimal --component clippy
           rustup target add wasm32-unknown-unknown
           rustup show active-toolchain
 

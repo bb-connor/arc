@@ -63,7 +63,7 @@ EXPECTED_APK_LOCK_SHA256 = (
     "86fad0ccb2b3f1cf2402c12ddade71d14b21e9995b3d113795259b899c0a57c0"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
-    "8e7154ee265ed4521d92130aeb145070c8da1026d02b2939761af758f447ade1"
+    "df06c6500b5f315def6feabd22fc701a5c3a785615a39cdcafd7efe42199d7c5"
 )
 EXPECTED_RUST_TOOLCHAIN_SHA256 = (
     "d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0"
@@ -934,15 +934,15 @@ EXPECTED_AGGREGATE_RUN = "\n".join(
 )
 EXPECTED_NATIVE_SECURITY_RUN = r"""
 set -euo pipefail
-cargo test -p chio-conformance --all-targets
+cargo test --locked -p chio-conformance --all-targets
 
 generated_vector_list_output="$(mktemp)"
 generated_vector_run_output="$(mktemp)"
 trap 'rm -f "${generated_vector_list_output}" "${generated_vector_run_output}"' EXIT
 
-cargo test -p chio-core-types --test security_generated_vectors \
+cargo test --locked -p chio-core-types --test security_generated_vectors \
   -- --list 2>&1 | tee "${generated_vector_list_output}"
-cargo test -p chio-core-types --test security_generated_vectors \
+cargo test --locked -p chio-core-types --test security_generated_vectors \
   2>&1 | tee "${generated_vector_run_output}"
 python3 scripts/check-exact-cargo-test-inventory.py \
   --label "Rust generated security vectors" \
