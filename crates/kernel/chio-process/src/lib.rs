@@ -359,6 +359,10 @@ impl ProcessRuntime {
         }
         let mut current = request.clone();
         loop {
+            if current.execution_nonce.is_none() && self.kernel.execution_nonce_required() {
+                current.execution_nonce = self
+                    .with_store(|store| store.retained_nonce(process_id, operation_key, attempt))?;
+            }
             let mut attribution = json!({
                 "chio_process": {"runtime_id": self.namespace, "process_id": process_id,
                     "operation_key": operation_key, "request_sha256": request_hash,
@@ -389,7 +393,31 @@ impl ProcessRuntime {
             // Even an error can follow a committed side effect. Keep the operation
             // identity and call reservation forever; recovery belongs to the kernel.
             self.with_store(|store| store.require_running(process_id))?;
-            let response = result?;
+            let mut response = result?;
+            if self.kernel.execution_nonce_required()
+                && current.execution_nonce.is_none()
+                && response.verdict == Verdict::Allow
+                && response.output.is_none()
+            {
+                let nonce = response
+                    .execution_nonce
+                    .take()
+                    .ok_or(ProcessError::Invalid(
+                        "strict nonce preflight returned no execution nonce",
+                    ))?;
+                // Save the original issuance before dispatch. A restart can only
+                // re-present this nonce to the original admission authority.
+                self.with_store(|store| {
+                    store.retain_nonce(process_id, operation_key, attempt, &binding_hash, &nonce)
+                })?;
+                current.execution_nonce = Some(*nonce);
+                continue;
+            }
+            // Returning historical nonce material never grants a new dispatch.
+            // In particular an unknown outcome still returns its signed refusal.
+            if response.execution_nonce.is_none() {
+                response.execution_nonce = current.execution_nonce.clone().map(Box::new);
+            }
             if attempt >= MAX_DISPATCH_ATTEMPTS
                 || known_outcome_only
                 || !outcome_unknown(&response)

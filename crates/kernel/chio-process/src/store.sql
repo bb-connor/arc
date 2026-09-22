@@ -26,6 +26,14 @@ CREATE TABLE IF NOT EXISTS process_calls (
     attempts INTEGER NOT NULL DEFAULT 1 CHECK (attempts >= 1),
     PRIMARY KEY (process_id, operation_key)
 );
+CREATE TABLE IF NOT EXISTS process_call_nonces (
+    process_id TEXT NOT NULL,
+    operation_key TEXT NOT NULL,
+    attempt INTEGER NOT NULL CHECK (attempt >= 1),
+    nonce_json BLOB NOT NULL CHECK (typeof(nonce_json) = 'blob' AND length(nonce_json) BETWEEN 1 AND 16384),
+    PRIMARY KEY (process_id, operation_key, attempt),
+    FOREIGN KEY (process_id, operation_key) REFERENCES process_calls(process_id, operation_key)
+);
 CREATE TABLE IF NOT EXISTS worker_credentials (
     credential_hash TEXT PRIMARY KEY,
     process_id TEXT NOT NULL REFERENCES processes(id),

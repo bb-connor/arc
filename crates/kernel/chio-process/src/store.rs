@@ -12,6 +12,7 @@ mod blobs;
 mod children;
 #[cfg(feature = "worker-server")]
 mod credentials;
+mod nonces;
 
 pub(crate) struct Store {
     connection: Connection,
