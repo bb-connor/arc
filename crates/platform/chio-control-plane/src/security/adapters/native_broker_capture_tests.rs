@@ -24,6 +24,13 @@ mod connection {
     ));
 }
 
+mod authority {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_broker_authority_tests.rs"
+    ));
+}
+
 struct ObserveRegistration {
     count: AtomicUsize,
     reader: BrokerNativeCaptureReader,

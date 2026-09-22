@@ -201,6 +201,7 @@ EOF
 run_tests "native kernel broker custody and preparation" yes "$(cat <<'EOF'
 security::adapters::tests::native_flow::support::capture::broker::native_broker_capture_reads_only_original_operation_and_never_recharges
 security::adapters::tests::native_flow::support::capture::broker::connection::native_broker_connection_prepares_original_and_refuses_misbound_acknowledgement
+security::adapters::tests::native_flow::support::capture::broker::authority::native_broker_authority_observes_original_lifecycle_without_mutating_custody
 EOF
 )" \
   cargo test --locked -p chio-control-plane --lib \

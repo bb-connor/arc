@@ -194,7 +194,7 @@ fn kernel_error(error: BrokerError) -> KernelError {
     KernelError::ToolServerError(error.diagnostic_code().into())
 }
 
-fn trusted_now_ms() -> Result<u64> {
+pub(super) fn trusted_now_ms() -> Result<u64> {
     let elapsed = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|_| rejected())?;

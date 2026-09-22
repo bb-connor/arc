@@ -28,7 +28,9 @@ const VERIFIER_ID: &str = "chio.secret-broker.kernel-quota-verifier.v1";
 mod registration;
 pub use registration::BrokerAdmissionParticipant;
 mod capture;
-pub use capture::{BrokerKernelConnection, BrokerNativeCaptureReader};
+pub use capture::{
+    BrokerKernelAdmissionAuthority, BrokerKernelConnection, BrokerNativeCaptureReader,
+};
 
 /// Independently installed trust and tool routing. An artifact cannot select
 /// its issuer, provider adapter, clock or kernel destination.
