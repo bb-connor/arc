@@ -325,13 +325,29 @@ capabilities:
     with sqlite3.connect(
         f"file:{state / 'authority.db'}?mode=ro&immutable=1", uri=True
     ) as db:
+        # Strict nonce issuance releases its preflight claim before dispatch
+        # acquires the same continuation under the original operation.
         claims = db.execute(
-            "SELECT participant_kind, resource_id FROM runtime_replay_claim_resources ORDER BY resource_id"
+            """SELECT resource.operation_id, resource.participant_kind,
+                      resource.resource_id,
+                      json_extract(CAST(episode.claim_json AS TEXT), '$.intent.phase'),
+                      released.operation_id IS NOT NULL
+               FROM runtime_replay_claim_resources AS resource
+               JOIN runtime_replay_claim_episodes AS episode
+                 USING (operation_id, episode_id)
+               LEFT JOIN runtime_replay_claim_releases AS released
+                 USING (operation_id, episode_id)
+               ORDER BY resource.resource_id, 4"""
         ).fetchall()
-        assert claims == [
-            ("swarm_continuation", "continue-alice"),
-            ("swarm_continuation", "continue-bob"),
+        assert [row[1:] for row in claims] == [
+            ("swarm_continuation", "continue-alice", "dispatch", 0),
+            ("swarm_continuation", "continue-alice", "nonce_preflight", 1),
+            ("swarm_continuation", "continue-bob", "dispatch", 0),
+            ("swarm_continuation", "continue-bob", "nonce_preflight", 1),
         ], claims
+        assert claims[0][0] == claims[1][0], claims
+        assert claims[2][0] == claims[3][0], claims
+        assert claims[0][0] != claims[2][0], claims
         assert (
             db.execute(
                 "SELECT COUNT(*) FROM runtime_replay_migration_events"
@@ -342,7 +358,7 @@ capabilities:
             db.execute("SELECT COUNT(*) FROM runtime_replay_claim_releases").fetchone()[
                 0
             ]
-            == 0
+            == 2
         )
     # A missing or altered profile cannot make this policy serve ordinary calls.
     profile_path = state / "swarm-profile.json"
