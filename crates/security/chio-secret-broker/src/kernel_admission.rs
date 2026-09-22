@@ -25,6 +25,9 @@ use crate::{validate_identifier, BrokerError, Result};
 
 const VERIFIER_ID: &str = "chio.secret-broker.kernel-quota-verifier.v1";
 
+mod registration;
+pub use registration::BrokerAdmissionParticipant;
+
 /// Independently installed trust and tool routing. An artifact cannot select
 /// its issuer, provider adapter, clock or kernel destination.
 #[derive(Debug, Clone, Serialize, Deserialize)]

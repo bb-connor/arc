@@ -11,6 +11,8 @@ mod authority_profile;
 mod dpop_acquisition;
 #[path = "admission_coordinator/dpop_custody.rs"]
 mod dpop_custody;
+#[path = "admission_coordinator/supplemental_participant.rs"]
+mod supplemental_participant;
 
 #[path = "admission_coordinator/caller_budget.rs"]
 mod caller_budget;
@@ -514,7 +516,8 @@ impl ChioKernel {
         let requires_authority_admission = native_security_selected
             || operation_owned_runtime
             || operation_owned_approval
-            || operation_owned_dpop;
+            || operation_owned_dpop
+            || authority_profile.supplemental_participant().is_some();
         // Only a grant that can serve this request may force the structured path. An
         // unrelated cumulative grant elsewhere in the capability must not withdraw an
         // otherwise exempt call.
@@ -822,7 +825,33 @@ impl ChioKernel {
             None
         };
         let operation = match operation.state() {
-            AdmissionOperationState::Prepared if nonce_preflight_pending => operation,
+            AdmissionOperationState::Prepared if nonce_preflight_pending => {
+                // Pin the verified artifact before the preflight hold without
+                // attaching an executable provider attempt. An existing nonce
+                // or preflight must never adopt a later supplemental artifact.
+                if operation.supplemental_authorization_digest().is_none()
+                    && operation.execution_nonce_preflight_digest().is_none()
+                    && operation.execution_nonce_issuance_digest().is_none()
+                {
+                    if let Some(digest) = supplemental_authorization_artifact_digest.as_ref() {
+                        self.apply_admission_command(
+                            operation,
+                            vec![AdmissionAttachment::SupplementalAuthorizationDigest(
+                                AdmissionDigest::try_new(
+                                    "supplemental_authorization_digest",
+                                    digest.clone(),
+                                )?,
+                            )],
+                            AdmissionOperationState::Prepared,
+                            trusted_now_unix_ms,
+                        )?
+                    } else {
+                        operation
+                    }
+                } else {
+                    operation
+                }
+            }
             AdmissionOperationState::Prepared => {
                 // The attempt binds to the operation's coordinator epoch, which is
                 // the fence epoch that prepared it. A nonce operation registers
@@ -1297,6 +1326,7 @@ impl ChioKernel {
         payment_journal: Option<crate::payment::PaymentJournalRecord>,
         trusted_now_unix_ms: u64,
     ) -> Result<crate::budget_store::BudgetAuthorizeHoldDecision, KernelError> {
+        self.register_supplemental_admission(admission, &request, trusted_now_unix_ms)?;
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);

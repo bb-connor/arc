@@ -36,6 +36,52 @@ fn profile() -> AdmissionAuthorityProfileV1 {
 }
 
 #[test]
+fn profile_pins_supplemental_participant_and_verifier_selection() {
+    let legacy = profile();
+    let mut wire = serde_json::to_value(&legacy).expect("profile wire");
+    wire["schema"] = "chio.admission-authority-profile.v3".into();
+    wire["supplemental_participant"] = serde_json::json!({
+        "participant_identity": "broker-registration",
+        "participant_configuration_digest": "d".repeat(64),
+        "verifier_identity": "broker-quota-verifier",
+        "verifier_configuration_digest": "e".repeat(64),
+    });
+    let pinned: AdmissionAuthorityProfileV1 =
+        serde_json::from_value(wire.clone()).expect("supplemental participant profile");
+    assert_ne!(pinned, legacy);
+    assert!(pinned.has_operation_owned_authority());
+    assert_eq!(serde_json::to_value(&pinned).expect("roundtrip"), wire);
+    for field in [
+        "participant_configuration_digest",
+        "verifier_configuration_digest",
+    ] {
+        let mut changed = wire.clone();
+        changed["supplemental_participant"][field] = "f".repeat(64).into();
+        assert_ne!(
+            serde_json::from_value::<AdmissionAuthorityProfileV1>(changed)
+                .expect("alternate generation"),
+            pinned
+        );
+    }
+    for mutation in 0..5 {
+        let mut invalid = wire.clone();
+        match mutation {
+            0 => invalid["schema"] = SCHEMA.into(),
+            1 => invalid["supplemental_participant"] = serde_json::Value::Null,
+            2 => {
+                invalid
+                    .as_object_mut()
+                    .expect("object")
+                    .remove("supplemental_participant");
+            }
+            3 => invalid["supplemental_participant"]["verifier_identity"] = "".into(),
+            _ => invalid["supplemental_participant"]["extra"] = true.into(),
+        }
+        assert!(serde_json::from_value::<AdmissionAuthorityProfileV1>(invalid).is_err());
+    }
+}
+
+#[test]
 fn profile_codec_checks_schema_fields_and_each_selected_generation() {
     let original = profile();
     let wire = serde_json::to_value(&original).expect("wire");

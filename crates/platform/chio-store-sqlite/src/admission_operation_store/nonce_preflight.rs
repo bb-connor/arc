@@ -94,6 +94,7 @@ pub(crate) fn bind_nonce_preflight_tx(
             !matches!(
                 attachment,
                 AdmissionAttachment::ExecutionNoncePreflightDigest(_)
+                    | AdmissionAttachment::SupplementalAuthorizationDigest(_)
                     | AdmissionAttachment::RuntimeParticipantLedgerDigest(_)
                     | AdmissionAttachment::GovernedApprovalLedgerDigest(_)
                     | AdmissionAttachment::DpopReplayLedgerDigest(_)
@@ -114,6 +115,12 @@ pub(crate) fn bind_nonce_preflight_tx(
         .as_ref()
         .ok_or_else(|| invariant("nonce preflight requires its budget binding"))?;
     if request.capability_id != operation.binding().capability_id().as_str()
+        || operation
+            .supplemental_authorization_digest()
+            .map(AdmissionDigest::as_str)
+            != admission
+                .supplemental_authorization_artifact_digest
+                .as_deref()
         || original
             .retained_matching_grant(request.grant_index)
             .is_none()

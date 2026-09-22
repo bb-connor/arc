@@ -63,12 +63,15 @@ pub(in crate::admission_operation_store) fn verify(
                 attachment,
                 AdmissionAttachment::ExecutionNonceIssuanceDigest(_)
                     | AdmissionAttachment::ExecutionNoncePreflightDigest(_)
+                    | AdmissionAttachment::SupplementalAuthorizationDigest(_)
                     | AdmissionAttachment::RuntimeParticipantLedgerDigest(_)
                     | AdmissionAttachment::GovernedApprovalLedgerDigest(_)
                     | AdmissionAttachment::DpopReplayLedgerDigest(_)
             )
         })
         || issued.execution_nonce_issuance_digest() != operation.execution_nonce_issuance_digest()
+        || issued.supplemental_authorization_digest()
+            != operation.supplemental_authorization_digest()
         || !history::preserves_attachments(&issued, operation)
         || issued.version() > operation.version()
         || encode_operation(&issued)? != snapshot

@@ -10,6 +10,11 @@ type TestResult<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 #[cfg(unix)]
 mod kernel;
 
+#[cfg(target_os = "linux")]
+mod registration_peer;
+
+mod registration;
+
 struct Clock(u64);
 impl DaemonClock for Clock {
     fn now_unix_seconds(&self) -> Result<u64> {

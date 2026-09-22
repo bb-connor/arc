@@ -88,6 +88,10 @@ impl ChioKernel {
             dpop: self.dpop_authority.clone(),
         })
         .map_err(durable_store_error)?;
+        let profile = match self.supplemental_admission_participant.as_ref() {
+            Some(participant) => profile.with_supplemental_participant(participant.binding.clone()),
+            None => profile,
+        };
         match self.caller_executor.as_ref() {
             Some(executor) => profile
                 .with_caller_executor(executor.clone())

@@ -55,6 +55,7 @@ impl SqliteAdmissionOperationStore {
                     attachment,
                     AdmissionAttachment::ExecutionNonceIssuanceDigest(_)
                         | AdmissionAttachment::ExecutionNoncePreflightDigest(_)
+                        | AdmissionAttachment::SupplementalAuthorizationDigest(_)
                         | AdmissionAttachment::RuntimeParticipantLedgerDigest(_)
                         | AdmissionAttachment::GovernedApprovalLedgerDigest(_)
                         | AdmissionAttachment::DpopReplayLedgerDigest(_)

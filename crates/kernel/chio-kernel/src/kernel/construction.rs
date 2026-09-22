@@ -352,6 +352,7 @@ impl ChioKernel {
             threshold_approval_policy_authorities: Vec::new(),
             governed_security_runtime_generation: 0,
             supplemental_quota_verifier: None,
+            supplemental_admission_participant: None,
             emergency_stopped: AtomicBool::new(false),
             emergency_stopped_since: AtomicU64::new(0),
             emergency_stop_reason: ArcSwap::from_pointee(Option::<String>::None),
@@ -1883,6 +1884,17 @@ impl ChioKernel {
         verifier: Arc<dyn crate::supplemental_quota::SupplementalQuotaVerifier>,
         binding: crate::supplemental_quota::SupplementalQuotaVerifierBinding,
     ) -> Result<(), crate::supplemental_quota::SupplementalQuotaError> {
+        if self
+            .supplemental_admission_participant
+            .as_ref()
+            .is_some_and(|participant| !participant.binding.matches_verifier(&binding))
+        {
+            return Err(
+                crate::supplemental_quota::SupplementalQuotaError::ContextMismatch(
+                    "supplemental participant verifier selection",
+                ),
+            );
+        }
         self.supplemental_quota_verifier = Some(
             crate::supplemental_quota::SupplementalQuotaVerifierRuntime::new(verifier, binding)?,
         );

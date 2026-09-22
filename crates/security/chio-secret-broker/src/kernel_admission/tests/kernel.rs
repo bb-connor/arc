@@ -4,8 +4,15 @@ use chio_core_types::capability::{
     attenuation::scope_hash,
     scope::{ChioScope, Operation, ToolGrant},
 };
-use chio_kernel::admission_operation::DurableAdmissionMode;
+use chio_core_types::SigningBackend;
+use chio_kernel::admission_operation::{
+    AdmissionDigest, AdmissionIdentifier, DurableAdmissionMode,
+};
 use chio_kernel::budget_store::{BudgetMutationKind, BudgetQuotaProfile};
+use chio_kernel::supplemental_admission::{
+    SupplementalAdmissionAuthorityBindingV1, SupplementalAdmissionParticipant,
+    SupplementalAdmissionRegistrationContext,
+};
 use chio_kernel::{
     BudgetStore, ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolServerConnection,
     Verdict,
@@ -13,6 +20,56 @@ use chio_kernel::{
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteReceiptStore};
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
+
+struct RegistrationBeforeHold {
+    budget: chio_store_sqlite::SqliteBudgetStore,
+    ipc: Option<Arc<BrokerAdmissionParticipant>>,
+    mode: AtomicUsize,
+    operations: Mutex<Vec<String>>,
+}
+
+impl SupplementalAdmissionParticipant for RegistrationBeforeHold {
+    fn requires_registration(&self, server_id: &str, tool_name: &str) -> bool {
+        self.ipc
+            .as_ref()
+            .is_none_or(|ipc| ipc.requires_registration(server_id, tool_name))
+    }
+
+    fn register_original(
+        &self,
+        context: &SupplementalAdmissionRegistrationContext<'_>,
+    ) -> std::result::Result<(), SupplementalQuotaVerifierError> {
+        let failure = || SupplementalQuotaVerifierError::new("registration refused");
+        let hold = context.budget().hold_id.as_deref().ok_or_else(failure)?;
+        if self
+            .budget
+            .get_budget_hold(hold)
+            .map_err(|_| failure())?
+            .is_some()
+        {
+            return Err(SupplementalQuotaVerifierError::new(
+                "budget preceded registration",
+            ));
+        }
+        self.operations.lock().map_err(|_| failure())?.push(
+            context
+                .operation()
+                .binding()
+                .operation_id()
+                .as_str()
+                .to_owned(),
+        );
+        match self.mode.load(Ordering::SeqCst) {
+            0 => match self.ipc.as_ref() {
+                Some(ipc) => ipc.register_original(context),
+                None => Ok(()),
+            },
+            1 => Err(failure()),
+            _ => panic!("registration acknowledgement lost"),
+        }
+    }
+}
 
 struct CountDispatch(Arc<AtomicUsize>);
 #[async_trait::async_trait]
@@ -36,6 +93,31 @@ impl ToolServerConnection for CountDispatch {
 
 #[test]
 fn kernel_captures_parent_family_and_broker_once_and_denies_exhaustion() -> TestResult {
+    registered_composite_execution(false, None)
+}
+
+#[test]
+fn strict_nonce_registers_original_broker_attempt_before_both_holds() -> TestResult {
+    registered_composite_execution(true, None)
+}
+
+enum ParticipantChange {
+    Remove,
+    Reconfigure,
+}
+
+#[test]
+fn issued_nonce_cannot_adopt_a_changed_or_removed_broker_participant() -> TestResult {
+    for change in [ParticipantChange::Remove, ParticipantChange::Reconfigure] {
+        registered_composite_execution(true, Some(change))?;
+    }
+    Ok(())
+}
+
+fn registered_composite_execution(
+    strict_nonce: bool,
+    participant_change: Option<ParticipantChange>,
+) -> TestResult {
     let directory = crate::private_tempdir()?;
     let locks = directory.path().join("locks");
     std::fs::create_dir(&locks)?;
@@ -77,6 +159,19 @@ fn kernel_captures_parent_family_and_broker_once_and_denies_exhaustion() -> Test
         authority.mutation_fence(),
     )?;
     kernel.configure_durable_admission(DurableAdmissionMode::All, false)?;
+    if strict_nonce {
+        let config = chio_kernel::execution_nonce::ExecutionNonceConfig {
+            require_nonce: true,
+            nonce_ttl_secs: 60,
+            nonce_store_capacity: 32,
+        };
+        kernel.set_execution_nonce_store(
+            config.clone(),
+            Box::new(
+                chio_kernel::execution_nonce::InMemoryExecutionNonceStore::from_config(&config),
+            ),
+        );
+    }
     let scope = ChioScope {
         grants: vec![ToolGrant {
             server_id: "broker-tools".into(),
@@ -99,7 +194,47 @@ fn kernel_captures_parent_family_and_broker_once_and_denies_exhaustion() -> Test
         Arc::new(crate::daemon::SystemDaemonClock),
     )?;
     let binding = verifier.binding().clone();
-    kernel.set_supplemental_quota_verifier(Arc::new(verifier), binding)?;
+    #[cfg(target_os = "linux")]
+    let (mut peer, ipc) = {
+        let signer = Arc::new(Ed25519Backend::new(Keypair::from_seed(&[34; 32])));
+        let peer =
+            super::registration_peer::RegistrationPeer::new(directory.path(), signer.public_key())?;
+        let ipc = Arc::new(BrokerAdmissionParticipant::new(
+            peer.config.clone(),
+            signer,
+            "broker-revocation-domain".into(),
+            &verifier,
+        )?);
+        (peer, Some(ipc))
+    };
+    #[cfg(not(target_os = "linux"))]
+    let ipc: Option<Arc<BrokerAdmissionParticipant>> = None;
+    let participant_binding = match ipc.as_ref() {
+        Some(ipc) => ipc.binding().clone(),
+        None => SupplementalAdmissionAuthorityBindingV1::new(
+            AdmissionIdentifier::try_new("participant", "broker-registration-fixture")?,
+            AdmissionDigest::try_new("participant configuration", "d".repeat(64))?,
+            AdmissionIdentifier::try_new("verifier", &binding.verifier_identity)?,
+            AdmissionDigest::try_new("verifier configuration", &binding.configuration_digest)?,
+        ),
+    };
+    let registrar = Arc::new(RegistrationBeforeHold {
+        budget: authority.budget_store(),
+        ipc,
+        mode: AtomicUsize::new(0),
+        operations: Mutex::new(Vec::new()),
+    });
+    assert!(kernel
+        .set_supplemental_admission_participant(registrar.clone(), participant_binding.clone(),)
+        .is_err());
+    let verifier = Arc::new(verifier);
+    kernel.set_supplemental_quota_verifier(verifier.clone(), binding.clone())?;
+    kernel.set_supplemental_admission_participant(registrar.clone(), participant_binding)?;
+    let mut changed_verifier_binding = binding.clone();
+    changed_verifier_binding.configuration_digest = "e".repeat(64);
+    assert!(kernel
+        .set_supplemental_quota_verifier(verifier, changed_verifier_binding)
+        .is_err());
     kernel.reconcile_durable_admission_startup()?;
     let caller = Keypair::from_seed(&[32; 32]);
     let parent = kernel.issue_aggregate_family_root(&caller.public_key(), scope, 300, 3)?;
@@ -133,10 +268,141 @@ fn kernel_captures_parent_family_and_broker_once_and_denies_exhaustion() -> Test
     let denied = kernel.evaluate_tool_call_blocking(&request(&changed)?)?;
     assert_eq!(denied.verdict, Verdict::Deny);
     assert_eq!(effects.load(Ordering::SeqCst), 0);
-    let original = request(&execute)?;
+    assert!(registrar
+        .operations
+        .lock()
+        .map_err(|_| "registration lock")?
+        .is_empty());
+    let mut omitted = execute.clone();
+    omitted.invocation_id = "registration-authorization-omitted".into();
+    let mut omitted = request(&omitted)?;
+    omitted.supplemental_authorization = None;
+    let denied = kernel.evaluate_tool_call_blocking(&omitted)?;
+    assert_eq!(
+        denied.verdict,
+        Verdict::Deny,
+        "a broker route requires its supplemental authority"
+    );
+    assert_eq!(effects.load(Ordering::SeqCst), 0);
+    assert!(authority
+        .budget_store()
+        .list_mutation_events(32, Some(&parent.id), None)?
+        .is_empty());
+    for mode in [1, 2] {
+        registrar.mode.store(mode, Ordering::SeqCst);
+        let mut refused = execute.clone();
+        refused.invocation_id = format!("registration-refused-{mode}");
+        let denied = kernel.evaluate_tool_call_blocking(&request(&refused)?)?;
+        assert_eq!(denied.verdict, Verdict::Deny);
+        assert_eq!(effects.load(Ordering::SeqCst), 0);
+        assert!(authority
+            .budget_store()
+            .list_mutation_events(32, Some(&parent.id), None)?
+            .is_empty());
+        assert_eq!(
+            registrar
+                .operations
+                .lock()
+                .map_err(|_| "registration lock")?
+                .len(),
+            mode,
+            "the refusal must come from the selected participant",
+        );
+    }
+    registrar.mode.store(0, Ordering::SeqCst);
+    #[cfg(target_os = "linux")]
+    {
+        peer.misbind_ack.store(true, Ordering::SeqCst);
+        let mut refused = execute.clone();
+        refused.invocation_id = "registration-ack-substituted".into();
+        refused.proof = issue_request_proof(
+            &refused.capability,
+            &refused.request,
+            "4".repeat(32),
+            now,
+            &caller,
+        )?;
+        let denied = kernel.evaluate_tool_call_blocking(&request(&refused)?)?;
+        assert_eq!(denied.verdict, Verdict::Deny);
+        assert_eq!(effects.load(Ordering::SeqCst), 0);
+        assert!(authority
+            .budget_store()
+            .list_mutation_events(32, Some(&parent.id), None)?
+            .is_empty());
+        peer.misbind_ack.store(false, Ordering::SeqCst);
+    }
+    registrar
+        .operations
+        .lock()
+        .map_err(|_| "registration lock")?
+        .clear();
+    let mut original = request(&execute)?;
+    if strict_nonce {
+        let preflight = kernel.evaluate_tool_call_blocking(&original)?;
+        assert_eq!(preflight.verdict, Verdict::Allow, "{:?}", preflight.reason);
+        assert_eq!(effects.load(Ordering::SeqCst), 0);
+        original.execution_nonce = Some(*preflight.execution_nonce.ok_or("original nonce")?);
+    }
+    if let Some(change) = participant_change {
+        match change {
+            ParticipantChange::Remove => kernel.clear_supplemental_admission_participant(),
+            ParticipantChange::Reconfigure => {
+                kernel.set_supplemental_admission_participant(
+                    registrar.clone(),
+                    SupplementalAdmissionAuthorityBindingV1::new(
+                        AdmissionIdentifier::try_new("participant", "broker-registration-fixture")?,
+                        AdmissionDigest::try_new("participant configuration", "f".repeat(64))?,
+                        AdmissionIdentifier::try_new("verifier", binding.verifier_identity)?,
+                        AdmissionDigest::try_new(
+                            "verifier configuration",
+                            binding.configuration_digest,
+                        )?,
+                    ),
+                )?;
+            }
+        }
+        let denied = kernel.evaluate_tool_call_blocking(&original)?;
+        assert_eq!(denied.verdict, Verdict::Deny);
+        assert_eq!(effects.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            registrar
+                .operations
+                .lock()
+                .map_err(|_| "registration lock")?
+                .len(),
+            1
+        );
+        assert!(authority
+            .budget_store()
+            .list_mutation_events(32, Some(&parent.id), None)?
+            .iter()
+            .all(|event| event.kind != BudgetMutationKind::CaptureInvocation));
+        #[cfg(target_os = "linux")]
+        {
+            let registered = peer.finish()?;
+            assert_eq!(
+                registered
+                    .iter()
+                    .filter(|attempt| attempt.invocation_id == execute.invocation_id)
+                    .count(),
+                1
+            );
+        }
+        return Ok(());
+    }
     let allowed = kernel.evaluate_tool_call_blocking(&original)?;
     assert_eq!(allowed.verdict, Verdict::Allow, "{:?}", allowed.reason);
     assert_eq!(effects.load(Ordering::SeqCst), 1);
+    {
+        let operations = registrar
+            .operations
+            .lock()
+            .map_err(|_| "registration lock")?;
+        assert_eq!(operations.len(), if strict_nonce { 2 } else { 1 });
+        assert!(operations
+            .iter()
+            .all(|operation| operation == &operations[0]));
+    }
     assert_eq!(
         canonical_json_bytes(&kernel.evaluate_tool_call_blocking(&original)?.receipt)?,
         canonical_json_bytes(&allowed.receipt)?
@@ -213,6 +479,17 @@ fn kernel_captures_parent_family_and_broker_once_and_denies_exhaustion() -> Test
             (current.reserved_invocations, current.captured_invocations),
             (0, 1)
         );
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let registered = peer.finish()?;
+        let original: Vec<_> = registered
+            .iter()
+            .filter(|attempt| attempt.invocation_id == "request-1")
+            .collect();
+        assert_eq!(original.len(), if strict_nonce { 2 } else { 1 });
+        assert!(original.windows(2).all(|pair| pair[0] == pair[1]));
+        assert_eq!(original[0].quotas.len(), 3);
     }
     Ok(())
 }

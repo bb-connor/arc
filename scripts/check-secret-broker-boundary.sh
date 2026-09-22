@@ -183,15 +183,20 @@ run_tests "authority IPC signed response binding" yes \
   authority_ipc::tests::authority_rpc_requires_signed_exact_responses_and_full_capabilities
 
 run_tests "kernel broker capability and composite quota admission" yes "$(cat <<'EOF'
+kernel_admission::registration::tests::registered_generation_cannot_sign_with_a_rotated_authority_key
 kernel_admission::tests::broker_admission_rejects_substitution_even_when_kernel_hash_is_updated
 kernel_admission::tests::broker_admission_requires_bounded_exact_typed_canonical_json
 kernel_admission::tests::broker_admission_uses_installed_trust_and_live_clock
 kernel_admission::tests::broker_quota_identity_stays_constant_across_separate_invocations
+kernel_admission::tests::kernel::issued_nonce_cannot_adopt_a_changed_or_removed_broker_participant
 kernel_admission::tests::kernel::kernel_captures_parent_family_and_broker_once_and_denies_exhaustion
+kernel_admission::tests::kernel::strict_nonce_registers_original_broker_attempt_before_both_holds
+kernel_admission::tests::registration::registration_generation_binds_transport_tenant_signers_domain_and_verifier
+kernel_admission::tests::registration::registration_quota_aliases_preserve_all_owners_and_reject_collisions
 kernel_admission::tests::signed_broker_request_cannot_move_between_kernel_requests
 kernel_admission::tests::signed_broker_request_produces_original_operation_bound_quota
 EOF
-)" cargo test --locked -p chio-secret-broker --features kernel-admission --lib kernel_admission::tests
+)" cargo test --locked -p chio-secret-broker --features kernel-admission --lib kernel_admission::
 
 if [[ "$(uname -s)" == "Linux" ]]; then
   run_tests "sealed inherited FD master-key custody" no \

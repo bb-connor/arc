@@ -70,6 +70,7 @@ pub(in crate::admission_operation_store) fn verify(
             !matches!(
                 attachment,
                 AdmissionAttachment::ExecutionNoncePreflightDigest(_)
+                    | AdmissionAttachment::SupplementalAuthorizationDigest(_)
                     | AdmissionAttachment::RuntimeParticipantLedgerDigest(_)
                     | AdmissionAttachment::GovernedApprovalLedgerDigest(_)
                     | AdmissionAttachment::DpopReplayLedgerDigest(_)
@@ -77,6 +78,8 @@ pub(in crate::admission_operation_store) fn verify(
         })
         || prepared.runtime_participant_ledger_digest()
             != operation.runtime_participant_ledger_digest()
+        || prepared.supplemental_authorization_digest()
+            != operation.supplemental_authorization_digest()
         || prepared
             .attachments()
             .iter()

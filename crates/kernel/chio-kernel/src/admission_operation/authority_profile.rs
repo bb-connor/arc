@@ -4,10 +4,12 @@ use super::governed_approval_claim::GovernedApprovalAuthorityBindingV1;
 use super::runtime_participant::RuntimeParticipantAuthorityBindingV1;
 use super::AdmissionOperationStoreError;
 use crate::dpop::authority::DpopReplayAuthorityV1;
+use crate::supplemental_admission::SupplementalAdmissionAuthorityBindingV1;
 use serde::{Deserialize, Deserializer, Serialize};
 
 const SCHEMA: &str = "chio.admission-authority-profile.v1";
 const CALLER_SCHEMA: &str = "chio.admission-authority-profile.v2";
+const SUPPLEMENTAL_SCHEMA: &str = "chio.admission-authority-profile.v3";
 
 /// Explicit selections, including absence, observed before original admission.
 /// Stable source generations and DPoP freshness policy are retained; current
@@ -45,6 +47,8 @@ pub struct AdmissionAuthorityProfileV1 {
     selection: AdmissionAuthoritySelectionV1,
     #[serde(skip_serializing_if = "Option::is_none")]
     caller_executor: Option<crate::caller_delivery::CallerExecutorIdentityV1>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    supplemental_participant: Option<SupplementalAdmissionAuthorityBindingV1>,
 }
 
 #[derive(Deserialize)]
@@ -54,6 +58,14 @@ struct Wire {
     selection: AdmissionAuthoritySelectionV1,
     #[serde(default, deserialize_with = "present_executor")]
     caller_executor: Option<crate::caller_delivery::CallerExecutorIdentityV1>,
+    #[serde(default, deserialize_with = "present_participant")]
+    supplemental_participant: Option<SupplementalAdmissionAuthorityBindingV1>,
+}
+
+fn present_participant<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<SupplementalAdmissionAuthorityBindingV1>, D::Error> {
+    SupplementalAdmissionAuthorityBindingV1::deserialize(deserializer).map(Some)
 }
 
 fn present_executor<'de, D: Deserializer<'de>>(
@@ -66,10 +78,21 @@ impl TryFrom<Wire> for AdmissionAuthorityProfileV1 {
     type Error = AdmissionOperationStoreError;
 
     fn try_from(wire: Wire) -> Result<Self, Self::Error> {
-        match (wire.schema.as_str(), wire.caller_executor) {
-            (SCHEMA, None) => Self::new(wire.selection),
-            (CALLER_SCHEMA, Some(executor)) => {
+        match (
+            wire.schema.as_str(),
+            wire.caller_executor,
+            wire.supplemental_participant,
+        ) {
+            (SCHEMA, None, None) => Self::new(wire.selection),
+            (CALLER_SCHEMA, Some(executor), None) => {
                 Self::new(wire.selection)?.with_caller_executor(executor)
+            }
+            (SUPPLEMENTAL_SCHEMA, executor, Some(participant)) => {
+                let mut profile = Self::new(wire.selection)?;
+                if let Some(executor) = executor {
+                    profile = profile.with_caller_executor(executor)?;
+                }
+                Ok(profile.with_supplemental_participant(participant))
             }
             _ => Err(invalid("unsupported admission authority profile selection")),
         }
@@ -101,6 +124,7 @@ impl AdmissionAuthorityProfileV1 {
             schema: SCHEMA.into(),
             selection,
             caller_executor: None,
+            supplemental_participant: None,
         })
     }
 
@@ -113,7 +137,12 @@ impl AdmissionAuthorityProfileV1 {
         executor
             .validate()
             .map_err(|_| invalid("invalid caller executor selection"))?;
-        self.schema = CALLER_SCHEMA.into();
+        self.schema = if self.supplemental_participant.is_some() {
+            SUPPLEMENTAL_SCHEMA
+        } else {
+            CALLER_SCHEMA
+        }
+        .into();
         self.caller_executor = Some(executor);
         Ok(self)
     }
@@ -121,6 +150,21 @@ impl AdmissionAuthorityProfileV1 {
     #[must_use]
     pub fn caller_executor(&self) -> Option<&crate::caller_delivery::CallerExecutorIdentityV1> {
         self.caller_executor.as_ref()
+    }
+
+    #[must_use]
+    pub fn with_supplemental_participant(
+        mut self,
+        participant: SupplementalAdmissionAuthorityBindingV1,
+    ) -> Self {
+        self.schema = SUPPLEMENTAL_SCHEMA.into();
+        self.supplemental_participant = Some(participant);
+        self
+    }
+
+    #[must_use]
+    pub fn supplemental_participant(&self) -> Option<&SupplementalAdmissionAuthorityBindingV1> {
+        self.supplemental_participant.as_ref()
     }
 
     #[must_use]
@@ -144,6 +188,7 @@ impl AdmissionAuthorityProfileV1 {
             || self.approval().is_some()
             || self.dpop().is_some()
             || self.caller_executor().is_some()
+            || self.supplemental_participant().is_some()
     }
 }
 

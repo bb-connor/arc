@@ -791,7 +791,7 @@ pub fn canonical_ipc_request_bytes(
     encoded.finish()
 }
 
-fn decode_canonical_ipc_request(frame: &[u8]) -> Result<AuthenticatedIpcRequest> {
+pub(crate) fn decode_canonical_ipc_request(frame: &[u8]) -> Result<AuthenticatedIpcRequest> {
     let mut parser = SensitiveJsonParser::new(frame);
     parser.expect_literal(b"{\"authorization\":")?;
     let authorization = parser.parse_byte_array::<65_536>()?;

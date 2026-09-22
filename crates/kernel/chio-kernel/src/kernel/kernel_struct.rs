@@ -686,6 +686,8 @@ pub struct ChioKernel {
     pub(super) governed_security_runtime_generation: u64,
     pub(super) supplemental_quota_verifier:
         Option<crate::supplemental_quota::SupplementalQuotaVerifierRuntime>,
+    pub(super) supplemental_admission_participant:
+        Option<crate::supplemental_admission::SupplementalAdmissionParticipantRuntime>,
     /// Emergency kill switch. When `true`, every evaluate entry point returns
     /// `Verdict::Deny` without performing capability validation or guard
     /// evaluation. Flipped by `emergency_stop` / `emergency_resume`.

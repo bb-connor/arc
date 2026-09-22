@@ -193,6 +193,7 @@ impl ChioKernel {
         request: BudgetAuthorizeHoldRequest,
         trusted_now_unix_ms: u64,
     ) -> Result<BudgetAuthorizeHoldDecision, KernelError> {
+        self.register_supplemental_admission(admission, &request, trusted_now_unix_ms)?;
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
