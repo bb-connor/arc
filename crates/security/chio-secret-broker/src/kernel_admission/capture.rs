@@ -20,6 +20,13 @@ mod original;
 pub use authority::BrokerKernelAdmissionAuthority;
 pub use connection::BrokerKernelConnection;
 
+pub(super) fn trusted_now_ms() -> Result<u64> {
+    let elapsed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|_| rejected())?;
+    u64::try_from(elapsed.as_millis()).map_err(|_| rejected())
+}
+
 /// Independently selected native and broker participants, pinned to a serving
 /// owner. This is historical accounting, not permission to send a provider
 /// request. Live parent checks and the broker's original prepared attempt still

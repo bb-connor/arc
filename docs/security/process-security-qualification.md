@@ -2,34 +2,41 @@
 
 ## Current checkpoint (2026-09-22)
 
-The current local source is `84c0ca4e89b89fd104ca5f2b36b8b501c759fd99`,
-six commits ahead of draft PR #1160 at `bf8b666274095acb1d103e428f21eaaa7bfdeb54`.
-Both required parents remain ancestors. The tracked worktree was clean at the
-start of this research; `output/` contains retained untracked evidence.
+The published continuation through `0d043f060d3f93afee2e089a5af64078456206b4`
+is on draft PR #1160. Both required parents remain ancestors. The primary
+checkout was fast-forwarded after its frozen workspace run terminated;
+`output/` retains untracked evidence. Qualification below names each source
+separately and does not establish a complete current-candidate workspace pass.
 Use the [completion execution plan](../superpowers/plans/2026-09-22-security-roadmap-completion.md)
 for the reconciled queue and original-requirement coverage. Older checkpoints
 below retain their historical source boundaries.
 
 | Area | Current evidence | Remaining boundary |
 | --- | --- | --- |
-| Foundation | Exact-source workspace build and flow pass. Native x86_64 process worker/mailbox, host, response verification, signed lineage and native restart inventories pass. | Full workspace run failed on external-target fixture discovery; explicitly root-bound regression passed, but full retry exited 143. Finish full tests and strict lint. |
-| Dependency and source policy | Fresh locked cargo-vet and structural security CI checks pass; fresh formal-mirror check reports 225 matching entries. | Preserve exact audits and repairs; finish final hosted qualification. Mirror matching is not a solver proof. |
-| Fuzz compilation | All 30 targets compile with ASan on x86_64 at current source; retained log hash matches. | Required fuzz campaigns and final-release requirements remain separate. |
-| Cage | Current-source native run reports 69 tests, 26 real probes and ten mutants with exit 0; retained log hash matches. | The retained runner's release-helper adaptation and trusted capture require their own acceptance. |
-| M5 | All seven current-source scenarios verify; independent observer accepts the bundle and rejects all 15 substitutions. | Execution nonces, receipt-log inclusion, combined-foundation qualification and trusted-runner authorization remain explicitly unchecked. |
-| Image | Current-source image build and validation pass; local image ID is `sha256:0cebffabd9bf06f7eb059c9994680877856d03b054592eeb845c0e1a4987ed4f`. | Publication, registry digest and trusted authority rotation remain separate. Changed input closure requires a new image. |
-| Hosted delivery | Live #1160 is open/draft, mergeable and blocked: 106 success, 12 failure, 16 skipped, one cancelled. MSRV passed. | Six local commits remain unpublished; current PR has no review submissions. Resolve owning failures and exact-head review before integration. |
-| M6-M11 | Component work remains preserved. | No milestone-level M6-M10 acceptance or M11 operational promotion is established. |
+| Foundation | The complete `b9c43fede2` workspace run terminated with three failed targets. The two CLI fixture/custody defects are repaired; the affected CLI integrations and all 91 runtime-admission cases pass. | One nested declassification capture case failed in the full run, then passed in isolation and on x86. Its cause remains unresolved. Final workspace tests and strict lint remain required. |
+| Dependency and source policy | Reviewed AWS-LC repairs and exact audits remain selected. All 225 formal mirrors match; current generated coverage has 59 rows and 170 artifacts. Structural image contract and mutation checks pass for the current lock pin. | The integration stub scan still reports older vendored occurrences requiring review. Preserve audit scope and qualify final hosted inputs. Mirror matching is not a solver proof. |
+| Fuzz compilation | All 30 targets compiled with ASan on x86_64 at `84c0ca4e89`; retained log hash matches. | Required fuzz campaigns and final-source requirements remain separate. |
+| Cage | The `84c0ca4e89` native run reports 69 tests, 26 real probes and ten mutants with exit 0; retained log hash matches. | The retained runner's release-helper adaptation and trusted capture require their own acceptance. |
+| M5 | Original nonce custody, receipt checkpoints and inclusion proofs are implemented. Runtime `317b3a9128` with qualifier `6170900d7f` passed all seven native scenarios and rejected 15 substitutions; a separately built aarch64 observer verified both inventories. | Final source, combined-foundation qualification and independently authorized trusted-runner acceptance remain open. The artifact does not claim full M5 acceptance. |
+| Image | Source `6170900d7f` built and passed identity, ownership, toolchain and offline locked-dependency checks. Image ID: `sha256:f17db010c5e6e5e1d6ad8eea8ce97f8e2a530888a737e59bbb16afdfdb1a245a`; all 199 archive hashes and 225 package pins match. | The current lock and broker gate differ. Rebuild and validate those inputs before authorized publication, registry identity verification or trust-root rotation. |
+| M6 | Original broker registration, authenticated hold/capture readback and kernel-bound delivery are implemented. The live authority now validates original signed parents through the kernel and reads the selected fenced revocation authority. Five native broker cases pass, including foreign-kernel/participant refusal, signed RPC, strict nonce, compensation and lost-reply accounting. | Real keyring/provider/cage composition, process cutpoints and complete artifact verification retain separate qualification. Component tests do not close M6. |
+| M7 | At `6170900d7f`, deception passed 82 tests; response recovery, flow and temporal gates exited 0. Temporal covered 10 inventories and 40 exact cases; retrieved hashes match. | The security adversarial inventory is missing. Its 28 archived definitions and 35 selections need semantic migration and current consumer integration. |
+| M8 | At `84c0ca4e89`, ordinary/delayed-fsync retention and million-receipt recovery passed. Checkpoint repair `517e28d1c4` separately passed 335 receipt-store cases with three retained campaign/property ignores. | The scale campaign included a declared ten-second profiling sample and predates the checkpoint repair. Final-source recovery and the unreproduced #1045 liveness failure remain open. |
+| Hosted delivery | #1160 publishes the continuation. Main prerequisite #1168 is at `2fb4a6c1c8`; definition-only #1167 retains `88b9b2a3cb`. Original hosted failures remain recorded. | New-head qualification, independent review, protected integration and the exact source/definition/image/verifier authority transition remain required. |
+| M9-M11 | Packaging and handoff work remains preserved. | No milestone-level M9-M10 acceptance or M11 operational promotion is established. |
 
-The native, process, fuzz and M5 statements above come from inspected retained
-artifacts under `output/process-security-20260915/resume-20260921/`, including
-`oci-remote/*84c0ca4e89*` and `m5-independent-84c0ca4e89/`. They were not rerun
-during planning. The execution plan indexes their exact files, diagnoses current
-hosted failures and distinguishes fresh checks from retained evidence.
+Retained native evidence is under
+`output/process-security-20260915/resume-20260921/oci-remote/`, including
+`m5-317b3a9128-retry1/`, `image-6170900d7f-offline/`, `m7-6170900d7f/` and
+`storage-20260922-84c0ca4e89/`. The M5 bundle SHA-256 is
+`7832b4cb4ef28661b632e8db692fbadf6001f62eea7080de6352a1c5cdf439ce`.
+Earlier cage and fuzz evidence retains its original `84c0ca4e89` identity.
+The current image input digest and publication boundary are recorded in
+[the image input record](execution-image-inputs-2026-09-20.md).
 
-Next: finish the explicit-checkout foundation gate, implement the two missing M5
-evidence joins, and prepare the complete source/workflow/image authority transition.
-Do not restart the superseded 26-audit queue or rebuild the unchanged M5 demo.
+Continue the original roadmap through M10 while completing the foundation and
+trusted-authority gates. M11 remains a separately authorized observed pilot.
+The accepted steps 1-4 map to packets 1-10 in the completion plan.
 
 ## Current checkpoint (2026-09-21)
 

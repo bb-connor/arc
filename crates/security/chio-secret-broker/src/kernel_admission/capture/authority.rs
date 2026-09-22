@@ -1,6 +1,5 @@
 //! The broker observes custody owned by the original native kernel lifecycle.
-use super::connection::trusted_now_ms;
-use super::{canonical, rejected, unavailable, BrokerNativeCaptureReader};
+use super::{canonical, rejected, trusted_now_ms, unavailable, BrokerNativeCaptureReader};
 use crate::authority_ipc::{AuthorityControlRequest, BrokerAdmissionAuthority};
 use crate::budget::{
     AuthorizeExecutionHoldRequest, BrokerExecutionBudget, CaptureExecutionHoldRequest,

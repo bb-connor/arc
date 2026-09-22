@@ -22,6 +22,30 @@ impl DurableToolAdmission {
 }
 
 impl ChioKernel {
+    /// Check independently selected native and supplemental participants against
+    /// this kernel's durable store owner. This configuration check neither
+    /// activates a participant nor authorizes an operation.
+    pub fn validate_native_admission_configuration(
+        &self,
+        fence: &StoreMutationFence,
+        native: &crate::admission_operation::NativeSecurityAuthorityBindingV1,
+        supplemental: &crate::supplemental_admission::SupplementalAdmissionAuthorityBindingV1,
+    ) -> Result<(), KernelError> {
+        if self.durable_runtime()?.fence != *fence
+            || self.security_pre_dispatch_policy != SecurityPreDispatchPolicy::Enforce
+            || self.native_security_authority_binding()?.as_ref() != Some(native)
+            || self
+                .admission_authority_profile()?
+                .supplemental_participant()
+                != Some(supplemental)
+        {
+            return Err(KernelError::DurableAdmission(
+                "selected native admission authority does not match this kernel".into(),
+            ));
+        }
+        Ok(())
+    }
+
     pub(super) fn load_original_request_for_finalization(
         &self,
         operation: &AdmissionOperationV1,

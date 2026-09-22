@@ -31,6 +31,14 @@ mod authority {
     ));
 }
 
+#[cfg(target_os = "linux")]
+mod live_authority {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_broker_live_authority_tests.rs"
+    ));
+}
+
 struct ObserveRegistration {
     count: AtomicUsize,
     reader: BrokerNativeCaptureReader,

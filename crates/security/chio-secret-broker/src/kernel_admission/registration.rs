@@ -30,6 +30,7 @@ pub struct BrokerAdmissionParticipant {
     binding: SupplementalAdmissionAuthorityBindingV1,
     pub(super) server_id: String,
     pub(super) tool_name: String,
+    pub(super) audience: String,
 }
 
 impl BrokerAdmissionParticipant {
@@ -93,6 +94,7 @@ impl BrokerAdmissionParticipant {
             binding,
             server_id: verifier.config.server_id.clone(),
             tool_name: verifier.config.tool_name.clone(),
+            audience: verifier.config.audience.clone(),
         })
     }
 

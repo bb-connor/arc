@@ -16,6 +16,8 @@ include!("tests/support_budget_store_impls.rs");
 include!("tests/support_monetary.rs");
 include!("tests/settlement_routing.rs");
 include!("tests/capability_validation.rs");
+#[path = "tests/capability_liveness.rs"]
+mod capability_liveness;
 include!("tests/guard_pipeline.rs");
 include!("tests/hot_path_deadlines.rs");
 include!("tests/receipts.rs");

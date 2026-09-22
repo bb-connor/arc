@@ -1,6 +1,6 @@
 //! Kernel-owned delivery over the independently configured broker control port.
 use super::original::OriginalBrokerRequest;
-use super::{canonical, rejected, unavailable, BrokerNativeCaptureReader};
+use super::{canonical, rejected, trusted_now_ms, unavailable, BrokerNativeCaptureReader};
 use crate::budget::CaptureExecutionHoldRequest;
 use crate::kernel_admission::BrokerAdmissionParticipant;
 use crate::{BrokerError, Result};
@@ -10,7 +10,6 @@ use chio_kernel::{
     BlockingToolServerConnection, KernelError, ToolDispatchContext, ToolInvocationContext,
 };
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Install through `BlockingToolServerAdapter`. Registration and preparation
 /// use the selected privileged broker port; execution additionally requires a
@@ -192,11 +191,4 @@ impl BlockingToolServerConnection for BrokerKernelConnection {
 
 fn kernel_error(error: BrokerError) -> KernelError {
     KernelError::ToolServerError(error.diagnostic_code().into())
-}
-
-pub(super) fn trusted_now_ms() -> Result<u64> {
-    let elapsed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| rejected())?;
-    u64::try_from(elapsed.as_millis()).map_err(|_| rejected())
 }

@@ -3,6 +3,35 @@
 use super::*;
 
 impl ChioKernel {
+    /// Revalidate an original signed capability snapshot against current kernel
+    /// trust, crypto policy, time, subject and every delegation revocation.
+    /// This observation grants no invocation, budget or dispatch permission.
+    pub fn verify_retained_capability_liveness(
+        &self,
+        capability_id: &str,
+        expected_subject: &chio_core::PublicKey,
+    ) -> Result<CapabilityToken, KernelError> {
+        let snapshot = self
+            .with_receipt_store(|store| Ok(store.get_capability_snapshot(capability_id)?))?
+            .flatten()
+            .ok_or_else(|| {
+                KernelError::GuardDenied("original capability snapshot is absent".into())
+            })?;
+        snapshot.validate_for_transport()?;
+        let capability = snapshot.signed_capability.ok_or_else(|| {
+            KernelError::GuardDenied(
+                "capability liveness requires original signed token evidence".into(),
+            )
+        })?;
+        if capability.id != capability_id {
+            return Err(KernelError::GuardDenied(
+                "original capability identity does not match".into(),
+            ));
+        }
+        self.validate_non_tool_capability(&capability, &expected_subject.to_hex())?;
+        Ok(capability)
+    }
+
     /// Resolve original signed intermediate scopes. Legacy scalar snapshots
     /// cannot serve as evidence for a narrowed recursive chain.
     pub(super) fn signed_capability_ancestors(

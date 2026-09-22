@@ -31,6 +31,8 @@ mod capture;
 pub use capture::{
     BrokerKernelAdmissionAuthority, BrokerKernelConnection, BrokerNativeCaptureReader,
 };
+mod live_authority;
+pub use live_authority::BrokerKernelAuthorityHandler;
 
 /// Independently installed trust and tool routing. An artifact cannot select
 /// its issuer, provider adapter, clock or kernel destination.
