@@ -206,15 +206,29 @@ def main():
             "SELECT max_invocations, reserved_invocations, captured_invocations FROM budget_invocation_quotas WHERE profile='chio.aggregate-family-invocation.v1'"
         ).fetchall()
         assert quotas == [(2, 0, 2)], quotas
+        # Nonce preflight releases its claim before dispatch retains custody.
+        # Recovery must preserve both episodes under the original operation.
         claims = db.execute(
-            "SELECT participant_kind, resource_id FROM runtime_replay_claim_resources WHERE operation_id=?",
+            """SELECT resource.participant_kind, resource.resource_id,
+                      json_extract(CAST(episode.claim_json AS TEXT), '$.intent.phase'),
+                      released.operation_id IS NOT NULL
+               FROM runtime_replay_claim_resources AS resource
+               JOIN runtime_replay_claim_episodes AS episode
+                 USING (operation_id, episode_id)
+               LEFT JOIN runtime_replay_claim_releases AS released
+                 USING (operation_id, episode_id)
+               WHERE resource.operation_id=?
+               ORDER BY 3""",
             (projection["operation_id"],),
         ).fetchall()
-        assert claims == [("swarm_continuation", "continue-writer")], claims
+        assert claims == [
+            ("swarm_continuation", "continue-writer", "dispatch", 0),
+            ("swarm_continuation", "continue-writer", "nonce_preflight", 1),
+        ], claims
         assert db.execute(
             "SELECT COUNT(*) FROM runtime_replay_claim_releases WHERE operation_id=?",
             (projection["operation_id"],),
-        ).fetchone() == (0,)
+        ).fetchone() == (1,)
     result = {
         "schema": "chio.reference-swarm.host-crash-qualification.v1",
         "caller_receipt_id": receipt["id"],
