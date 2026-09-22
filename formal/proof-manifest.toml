@@ -2953,9 +2953,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/budget_store/composite/transitions/capture.rs"
 rust_symbols = ["SqliteBudgetStore::capture_composite_invocation_inner"]
-normalized_sha256 = "0a7ee780a3ee679986e9c335c79fbf442eed2e677a3db2cabae64e0176576705"
+normalized_sha256 = "3d2b2c4d6c1fb25880206f22ea53859853b9527499f6eca07d976ef5b2650276"
 symbol_sha256 = [
-  { symbol = "SqliteBudgetStore::capture_composite_invocation_inner", sha256 = "8de7267d809d432148de9d26dfee1d19ca82c1834f6d75a833c473eed0d6d533" },
+  { symbol = "SqliteBudgetStore::capture_composite_invocation_inner", sha256 = "c0bceda29e77f004c4fe59d63629d3fa773b5e854bb7ab73c53867b47d3aedfd" },
 ]
 
 [[mirror]]

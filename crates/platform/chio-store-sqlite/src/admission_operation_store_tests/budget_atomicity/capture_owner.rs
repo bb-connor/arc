@@ -2,6 +2,106 @@
 use super::*;
 
 #[test]
+fn combined_capture_rechecks_all_original_revocation_members_before_any_mutation(
+) -> AnchoredTestResult {
+    use chio_kernel::RevocationStore;
+    let members = [
+        "shared-capability",
+        "delegation-ancestor",
+        "broker-capability",
+        "broker-revocation",
+    ];
+    for revoked in members.into_iter().chain(["unrelated-capability"]) {
+        let fixture = fixture();
+        let owner = pending(&fixture, "capture-revocation-race")?;
+        let capture = authorize_with_revocations(
+            &fixture,
+            owner.binding().operation_id().as_str(),
+            members.iter().map(|id| (*id).to_owned()).collect(),
+        )?;
+        // A valid authority write races the earlier admission checks. The
+        // capture transaction must authenticate the original complete set.
+        assert!(fixture.authority.revocation_store().revoke(revoked)?);
+        let lease = claim(&fixture, &owner, "capture-revocation-race", now_ms());
+        let before = counts(&fixture)?;
+        let result = fixture.store.capture_invocation_and_commit_dispatch(
+            &owner,
+            &lease,
+            capture,
+            &fixture.fence,
+            now_ms(),
+        );
+        let blocked = revoked != "unrelated-capability";
+        if blocked {
+            assert!(result.is_err(), "capture accepted revoked member {revoked}");
+            assert_eq!(counts(&fixture)?, before);
+            assert_eq!(
+                fixture
+                    .store
+                    .load_by_operation_id(owner.binding().operation_id())?,
+                Some(owner),
+            );
+        } else {
+            assert!(matches!(
+                result?.0,
+                BudgetInvocationCaptureDecision::Captured(_)
+            ));
+        }
+        let quota = fixture
+            .authority
+            .budget_store()
+            .get_invocation_quota_usage(&chio_kernel::budget_store::BudgetQuotaKey::grant(
+                "shared-capability",
+                0,
+            ))?
+            .ok_or("original physical quota")?;
+        assert_eq!(
+            (quota.reserved_invocations, quota.captured_invocations),
+            if blocked { (1, 0) } else { (0, 1) },
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn later_revocation_does_not_rewrite_an_original_capture_on_exact_replay() -> AnchoredTestResult {
+    use chio_kernel::RevocationStore;
+    let fixture = fixture();
+    let owner = pending(&fixture, "captured-before-revocation")?;
+    let capture = authorize(&fixture, owner.binding().operation_id().as_str())?;
+    let lease = claim(&fixture, &owner, "captured-before-revocation", now_ms());
+    let (decision, operation) = fixture.store.capture_invocation_and_commit_dispatch(
+        &owner,
+        &lease,
+        capture.clone(),
+        &fixture.fence,
+        now_ms(),
+    )?;
+    assert!(fixture
+        .authority
+        .revocation_store()
+        .revoke("shared-capability")?);
+    let before = counts(&fixture)?;
+    let (replayed, replayed_operation) = fixture.store.capture_invocation_and_commit_dispatch(
+        &owner,
+        &lease,
+        capture,
+        &fixture.fence,
+        now_ms(),
+    )?;
+    let BudgetInvocationCaptureDecision::Captured(original) = decision else {
+        return Err("expected original capture".into());
+    };
+    assert_eq!(
+        replayed,
+        BudgetInvocationCaptureDecision::AlreadyCaptured(original)
+    );
+    assert_eq!(replayed_operation, operation);
+    assert_eq!(counts(&fixture)?, before);
+    Ok(())
+}
+
+#[test]
 fn combined_capture_rejects_another_operations_hold_before_and_after_owner_capture(
 ) -> AnchoredTestResult {
     let fixture = fixture();
@@ -147,6 +247,14 @@ fn missing_committed_admission_cannot_be_reclassified_as_a_budget_only_reference
 }
 
 fn authorize(fixture: &Fixture, owner: &str) -> AnchoredTestResult<BudgetCaptureInvocationRequest> {
+    authorize_with_revocations(fixture, owner, vec!["shared-capability".into()])
+}
+
+fn authorize_with_revocations(
+    fixture: &Fixture,
+    owner: &str,
+    revocation_ids: Vec<String>,
+) -> AnchoredTestResult<BudgetCaptureInvocationRequest> {
     let authority = BudgetEventAuthority {
         authority_id: fixture.fence.store_uuid.clone(),
         lease_id: fixture.fence.lease_id.clone(),
@@ -162,9 +270,7 @@ fn authorize(fixture: &Fixture, owner: &str) -> AnchoredTestResult<BudgetCapture
             cumulative_approval: None,
             admission_binding: Some(BudgetAdmissionBinding {
                 operation_id: owner.into(),
-                revocation_set: CanonicalRevocationSet::canonicalize(vec![
-                    "shared-capability".into()
-                ])?,
+                revocation_set: CanonicalRevocationSet::canonicalize(revocation_ids)?,
                 authorization_artifact_digests: vec!["a".repeat(64)],
                 last_observed_revocation: None,
                 supplemental_verifier_id: None,

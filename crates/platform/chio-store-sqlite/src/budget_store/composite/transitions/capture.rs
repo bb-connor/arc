@@ -208,6 +208,24 @@ impl SqliteBudgetStore {
             request.grant_index,
             request.authority.as_ref(),
         )?;
+        // Reservation-time checks cannot authorize a later effect. Recheck
+        // every original parent, ancestor and supplemental member inside the
+        // same write transaction as capture. Exact historical replay above
+        // retains its original decision and never creates another effect.
+        if self.serving_owner.is_some() {
+            let mut statement = transaction.prepare(
+                "SELECT EXISTS(SELECT 1 FROM revoked_capabilities WHERE capability_id = ?1)",
+            )?;
+            for member in hold.admission.revocation_set.ids() {
+                let revoked: bool = statement.query_row([member], |row| row.get(0))?;
+                if revoked {
+                    return Err(BudgetStoreError::Invariant(
+                        "composite invocation capture includes a revoked authority member"
+                            .to_string(),
+                    ));
+                }
+            }
+        }
         let trusted_time = if self.serving_owner.is_some() {
             let value =
                 transaction.query_row("SELECT unixepoch()", [], |row| row.get::<_, i64>(0))?;
