@@ -55,6 +55,26 @@ write_file "$vendored_comments/third_party/aws-lc-rs-chio/src/cipher.rs" \
 assert_rc "$(run_checker "$vendored_comments" "$work/vendor-code.out" "$work/vendor-code.err")" 1 \
   "vendored executable incomplete implementation still fails"
 
+vendored_other="$work/vendored-other"
+init_case "$vendored_other"
+write_file "$vendored_other/third_party/regress-chio/src/bytesearch.rs" \
+  "// TODO."
+write_file "$vendored_other/third_party/ignore-chio/src/walk.rs" \
+  "// Placeholder implementation to allow compiling on non-standard platforms"
+track_case "$vendored_other"
+assert_rc "$(run_checker "$vendored_other" "$work/vendor-other.out" "$work/vendor-other.err")" 0 \
+  "exact reviewed dependency comments are allowed"
+write_file "$vendored_other/third_party/regress-chio/src/bytesearch.rs" \
+  "// TODO." \
+  "// TODO: skip validation"
+assert_rc "$(run_checker "$vendored_other" "$work/vendor-new-comment.out" "$work/vendor-new-comment.err")" 1 \
+  "new dependency TODO remains rejected"
+write_file "$vendored_other/third_party/regress-chio/src/bytesearch.rs" \
+  "// TODO." \
+  'pub fn search() { todo!(); }'
+assert_rc "$(run_checker "$vendored_other" "$work/vendor-new-code.out" "$work/vendor-new-code.err")" 1 \
+  "new dependency executable TODO remains rejected"
+
 init_case "$non_production"
 write_file "$non_production/docs/example.md" "TODO: documented follow-up"
 write_file "$non_production/tests/replay.rs" "fn test_stub() {}"
