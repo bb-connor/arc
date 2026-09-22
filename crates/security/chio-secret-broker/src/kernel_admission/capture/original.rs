@@ -6,17 +6,20 @@ use crate::protocol::BrokerExecuteRequest;
 use crate::store::AttemptRegistration;
 use crate::Result;
 use chio_kernel::admission_operation::{
-    AdmissionOperationId, AdmissionOperationStore, AdmissionOperationV1,
-    RetainedToolAdmissionRequestV1,
+    AdmissionOperationId, AdmissionOperationV1, RetainedToolAdmissionRequestV1,
 };
 use chio_kernel::supplemental_quota::{
     supplemental_authorization_artifact_digest, SupplementalQuotaVerifierBinding,
+};
+use chio_store_sqlite::admission_operation_store::{
+    AdmissionBudgetCustodySnapshot, RetainedToolAdmissionCustodySnapshot,
 };
 
 pub(super) struct OriginalBrokerRequest {
     pub operation: AdmissionOperationV1,
     pub(super) retained: RetainedToolAdmissionRequestV1,
     pub execute: BrokerExecuteRequest,
+    pub custody: Option<AdmissionBudgetCustodySnapshot>,
 }
 
 impl BrokerNativeCaptureReader {
@@ -35,13 +38,24 @@ impl BrokerNativeCaptureReader {
         let Some(original) = self.read_original(operation_id, trusted_now_unix_ms)? else {
             return Ok(None);
         };
-        let Some(custody) = self
-            .store
-            .load_admission_budget_custody(operation_id, &self.fence, trusted_now_unix_ms)
-            .map_err(unavailable)?
-        else {
+        let Some(registration) = self.registration_for_original(participant, &original)? else {
             return Ok(None);
         };
+        Ok(Some((registration, original.execute)))
+    }
+
+    pub(super) fn registration_for_original(
+        &self,
+        participant: &BrokerAdmissionParticipant,
+        original: &OriginalBrokerRequest,
+    ) -> Result<Option<AttemptRegistration>> {
+        if participant.binding() != &self.participant {
+            return Err(rejected());
+        }
+        let Some(custody) = &original.custody else {
+            return Ok(None);
+        };
+        let operation_id = original.operation.binding().operation_id();
         let admission = &custody.admission;
         let artifact = supplemental_authorization_artifact_digest(&canonical(&original.execute)?);
         let verifier = SupplementalQuotaVerifierBinding {
@@ -80,7 +94,7 @@ impl BrokerNativeCaptureReader {
             &custody.invocation_quotas,
             participant.revocation_authority_domain(),
         )?;
-        Ok(Some((registration, original.execute)))
+        Ok(Some(registration))
     }
 
     pub(super) fn read_original(
@@ -88,9 +102,13 @@ impl BrokerNativeCaptureReader {
         operation_id: &AdmissionOperationId,
         trusted_now_unix_ms: u64,
     ) -> Result<Option<OriginalBrokerRequest>> {
-        let Some((operation, retained)) = self
+        let Some(RetainedToolAdmissionCustodySnapshot {
+            operation,
+            request: retained,
+            custody,
+        }) = self
             .store
-            .load_retained_tool_request(operation_id, &self.fence, trusted_now_unix_ms)
+            .load_retained_tool_admission_custody(operation_id, &self.fence, trusted_now_unix_ms)
             .map_err(unavailable)?
         else {
             return Ok(None);
@@ -121,6 +139,7 @@ impl BrokerNativeCaptureReader {
             operation,
             retained,
             execute,
+            custody,
         }))
     }
 }

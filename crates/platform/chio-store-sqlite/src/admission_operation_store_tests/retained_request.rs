@@ -127,6 +127,9 @@ fn retained_request_reopens_under_the_current_fence_with_exact_bytes() -> TestRe
     } = fixture();
     let (operation, request) = original(&fence)?;
     let now = now_ms();
+    assert!(store
+        .load_retained_tool_admission_custody(operation.binding().operation_id(), &fence, now)?
+        .is_none());
     assert!(matches!(
         store.begin_with_retained_tool_request(&operation, &request, &fence, now)?,
         AdmissionBeginResult::Created(_)
@@ -141,10 +144,45 @@ fn retained_request_reopens_under_the_current_fence_with_exact_bytes() -> TestRe
         |row| row.get(0),
     )?;
     assert_eq!(count, 1, "exact replay must not append another begin");
+    let unheld = store
+        .load_retained_tool_admission_custody(operation.binding().operation_id(), &fence, now)?
+        .ok_or("missing original custody snapshot")?;
+    assert_eq!(unheld.operation, operation);
+    assert_eq!(unheld.request.canonical_bytes(), request.canonical_bytes());
+    assert!(unheld.custody.is_none());
+    assert!(!format!("{unheld:?}").contains("must-not-appear-in-debug"));
     drop(store);
     drop(authority);
     let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
     let store = reopened.admission_operation_store();
+    assert!(matches!(
+        store.load_retained_tool_admission_custody(
+            operation.binding().operation_id(),
+            &fence,
+            now_ms()
+        ),
+        Err(AdmissionOperationStoreError::Fenced)
+    ));
+    assert!(store
+        .load_retained_tool_admission_custody(
+            operation.binding().operation_id(),
+            &reopened.mutation_fence(),
+            0,
+        )
+        .is_err());
+    let reopened_snapshot = store
+        .load_retained_tool_admission_custody(
+            operation.binding().operation_id(),
+            &reopened.mutation_fence(),
+            now_ms(),
+        )?
+        .ok_or("missing reopened custody snapshot")?;
+    assert_eq!(reopened_snapshot.operation, operation);
+    assert_eq!(
+        reopened_snapshot.request.canonical_bytes(),
+        request.canonical_bytes()
+    );
+    assert!(reopened_snapshot.custody.is_none());
     assert!(matches!(
         store.load_retained_tool_request(operation.binding().operation_id(), &fence, now_ms()),
         Err(AdmissionOperationStoreError::Fenced)

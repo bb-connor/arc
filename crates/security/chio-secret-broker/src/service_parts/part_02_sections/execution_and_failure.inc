@@ -234,22 +234,25 @@ impl BrokerService {
             .into());
         }
 
-        let revocation_request = BrokerRevocationRequest {
-            broker_capability_id: request.capability.body.capability_id.clone(),
-            revocation_id: request.capability.body.revocation_id.clone(),
-            now_unix_seconds,
-        };
-        let second_revocation = self
-            .revocations
-            .check_broker_revocation(&revocation_request);
-        if let Err(error) = second_revocation.and_then(|snapshot| {
+        let second_revocation = (|| {
+            let observed = self.authority_observation_time(now_unix_seconds)?;
+            let snapshot = self
+                .revocations
+                .check_broker_revocation(&BrokerRevocationRequest {
+                    broker_capability_id: request.capability.body.capability_id.clone(),
+                    revocation_id: request.capability.body.revocation_id.clone(),
+                    now_unix_seconds: observed,
+                })?;
+            let observed = self.authority_observation_time(observed)?;
+            self.validate_request_core(request, observed)?;
             validate_revocation_snapshot(
                 &snapshot,
-                now_unix_seconds,
+                observed,
                 self.config.maximum_revocation_snapshot_age_seconds,
                 &trusted.revocation_authority_domain,
             )
-        }) {
+        })();
+        if let Err(error) = second_revocation {
             let released = self.attempts.release_captured_attempt_claim(
                 &ids.attempt_id,
                 &dispatch_claim_id,

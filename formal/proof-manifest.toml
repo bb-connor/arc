@@ -3243,9 +3243,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/budget_store/composite/native_capture.rs"
 rust_symbols = ["SqliteBudgetStore::load_native_capture_decision_tx","verify_capture_quota_delta","verify_capture_cumulative_delta"]
-normalized_sha256 = "c24a205080c3136f8d40e7d5bb99b172389e270ecd13d89b27aaf79ed10da264"
+normalized_sha256 = "a097fe192930ac8c56fe46cbe3ed4775bf26feab01259abeabab0d5e28a36d19"
 symbol_sha256 = [
-  { symbol = "SqliteBudgetStore::load_native_capture_decision_tx", sha256 = "2b1ea0eb20ff2baa5fba8ce94f06132a84c7833d8d0a25ff16e8b67fafc3418f" },
+  { symbol = "SqliteBudgetStore::load_native_capture_decision_tx", sha256 = "b1e68bec4fd7beec16f4ee3318258cfab8f15d5a5fa16567a0e6260423492cb6" },
   { symbol = "verify_capture_quota_delta", sha256 = "71c858211574a9110cb1b7a909b36a49bf823df07c6bf9e73f15c4839a39ea03" },
   { symbol = "verify_capture_cumulative_delta", sha256 = "d1d29fbdcda31b45f1068a76236afdc9c7ded5b93d6e3b4d6082986e2bd41e3f" },
 ]

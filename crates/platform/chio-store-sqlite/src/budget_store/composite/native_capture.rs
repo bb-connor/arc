@@ -75,6 +75,9 @@ impl SqliteBudgetStore {
             .ok_or_else(|| invalid("missing committed capture event"))?;
         let physical_hold = load_structured_hold(transaction, hold.as_str())?
             .ok_or_else(|| invalid("missing physical capture hold"))?;
+        // Authenticate current physical members in this same anchored snapshot.
+        // Callers need not perform a second full custody read before readback.
+        super::admission_custody::verify_committed_custody(transaction, &physical_hold)?;
         let grant_index = usize::try_from(event.grant_index)
             .map_err(|_| invalid("capture grant index exceeds its bound"))?;
         let authority = BudgetEventAuthority {
@@ -93,6 +96,7 @@ impl SqliteBudgetStore {
             || original.retained_matching_grant(grant_index).is_none()
             || physical_hold.grant_index != grant_index
             || physical_hold.capability_id != event.capability_id
+            || physical_hold.invocation_state != BudgetInvocationState::Captured
             || physical_hold.admission.operation_id != operation.binding().operation_id().as_str()
             || event.authority.as_ref() != Some(&authority)
             || event.invocation_state_before != BudgetInvocationState::Authorized

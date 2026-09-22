@@ -4949,10 +4949,14 @@ name = "chio-secret-broker"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chio-control-plane",
  "chio-core-types",
+ "chio-flow",
  "chio-kernel",
  "chio-keyring",
+ "chio-manifest",
  "chio-secure-ipc",
+ "chio-security-kernel",
  "chio-security-types",
  "chio-store-sqlite",
  "chio-test-support",

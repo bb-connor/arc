@@ -82,6 +82,7 @@ use crate::store::{derive_attempt_ids_for_operation, AttemptRegistration};
 use crate::{BrokerError, Result};
 
 const ROLE_ENV: &str = "CHIO_BOUNDARY_ROLE";
+const START_GATE_ENV: &str = "CHIO_BOUNDARY_START_GATE";
 const CONFIG_ENV: &str = "CHIO_BOUNDARY_CONFIG";
 const CERT_ENV: &str = "CHIO_BOUNDARY_CERT";
 const KEY_ENV: &str = "CHIO_BOUNDARY_KEY";
@@ -227,10 +228,19 @@ fn required_environment(name: &str) -> String {
 }
 
 fn install_fixed_panic_hook(marker: &'static str) {
-    std::panic::set_hook(Box::new(move |_| eprintln!("{marker}")));
+    std::panic::set_hook(Box::new(move |info| {
+        // Locations identify the failing assertion without printing its payload.
+        if let Some(location) = info.location() {
+            eprintln!("{marker} at {}:{}", location.file(), location.line());
+        } else {
+            eprintln!("{marker}");
+        }
+    }));
 }
 
 mod fixture;
+#[cfg(feature = "kernel-admission")]
+mod native;
 mod orchestration;
 mod roles;
 

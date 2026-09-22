@@ -14,6 +14,17 @@ impl DestinationResolver for StaticResolver {
 }
 
 pub(super) fn run_broker_helper() -> Result<()> {
+    if std::env::var_os(START_GATE_ENV).is_some() {
+        let mut ready = [0];
+        io::stdin().read_exact(&mut ready).map_err(|_| {
+            BrokerError::AuthorityUnavailable("native authority start gate closed".into())
+        })?;
+        if ready != [1] {
+            return Err(BrokerError::AuthorityUnavailable(
+                "native authority start gate refused".into(),
+            ));
+        }
+    }
     harden_broker_process_custody()?;
     let config = BrokerDaemonConfig::load(required_environment(CONFIG_ENV))?;
     let certificate = fs::read(required_environment(CERT_ENV))

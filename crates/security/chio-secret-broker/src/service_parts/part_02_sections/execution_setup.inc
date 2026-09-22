@@ -4,7 +4,10 @@ impl BrokerService {
         attempts: ProductionSqliteAttemptStore,
         authorities: BrokerServiceAuthorityBundle,
     ) -> Result<Self> {
-        Self::from_authorities(config, attempts.into_attempt_store()?, authorities)
+        let mut service =
+            Self::from_authorities(config, attempts.into_attempt_store()?, authorities)?;
+        service.authority_clock = Some(Arc::new(crate::daemon::SystemDaemonClock));
+        Ok(service)
     }
 
     #[cfg(test)]
@@ -36,6 +39,9 @@ impl BrokerService {
             migration_enforcer,
         } = authorities;
         Ok(Self {
+            // Only unit fixtures use their explicitly supplied observation time.
+            // The production constructor always installs the system clock.
+            authority_clock: None,
             config,
             trusted_issuer,
             backend,
@@ -52,6 +58,19 @@ impl BrokerService {
             retained_prepared_dispatches: Mutex::new(BTreeMap::new()),
             dispatch_claim_counter: AtomicU64::new(0),
         })
+    }
+
+    fn authority_observation_time(&self, previous: u64) -> Result<u64> {
+        let observed = match &self.authority_clock {
+            Some(clock) => clock.now_unix_seconds()?,
+            None => previous,
+        };
+        if observed < previous {
+            return Err(BrokerError::AuthorityUnavailable(
+                "broker authority observation clock moved backwards".into(),
+            ));
+        }
+        Ok(observed)
     }
 
     fn retained_prepared_dispatches(
@@ -92,10 +111,7 @@ impl BrokerService {
         ))
     }
 
-    pub(crate) fn require_migrations_for_provider(
-        &self,
-        credential_provider: &str,
-    ) -> Result<()> {
+    pub(crate) fn require_migrations_for_provider(&self, credential_provider: &str) -> Result<()> {
         self.migration_enforcer
             .require_provider_enforced(credential_provider)
     }
@@ -153,6 +169,7 @@ impl BrokerService {
                 &request.proof,
             )?;
         }
+        let now_unix_seconds = self.authority_observation_time(now_unix_seconds)?;
         let live_request = CapabilityLivenessRequest {
             parent_capability_id: request.capability.body.parent_capability_id.clone(),
             expected_subject: request.capability.body.subject.clone(),
@@ -160,8 +177,12 @@ impl BrokerService {
             now_unix_seconds,
         };
         let live_parent = self.liveness.verify_live_parent(&live_request)?;
+        let now_unix_seconds = self.authority_observation_time(now_unix_seconds)?;
         validate_parent_liveness(
-            &live_request,
+            &CapabilityLivenessRequest {
+                now_unix_seconds,
+                ..live_request.clone()
+            },
             &live_parent,
             self.config.maximum_liveness_snapshot_age_seconds,
         )?;
@@ -173,6 +194,16 @@ impl BrokerService {
         let revocation_snapshot = self
             .revocations
             .check_broker_revocation(&revocation_request)?;
+        let now_unix_seconds = self.authority_observation_time(now_unix_seconds)?;
+        self.validate_request_core(request, now_unix_seconds)?;
+        validate_parent_liveness(
+            &CapabilityLivenessRequest {
+                now_unix_seconds,
+                ..live_request
+            },
+            &live_parent,
+            self.config.maximum_liveness_snapshot_age_seconds,
+        )?;
         validate_revocation_snapshot(
             &revocation_snapshot,
             now_unix_seconds,
@@ -185,9 +216,7 @@ impl BrokerService {
             &request.capability.body.capability_id,
             &request.capability.body.revocation_id,
         )?;
-        Ok(ValidatedBrokerAuthorities {
-            revocation_set,
-        })
+        Ok(ValidatedBrokerAuthorities { revocation_set })
     }
 
     fn validate_audit_request_authorities(
@@ -197,6 +226,7 @@ impl BrokerService {
         now_unix_seconds: u64,
     ) -> Result<ValidatedBrokerAuditAuthorities> {
         self.validate_request_core(request, now_unix_seconds)?;
+        let now_unix_seconds = self.authority_observation_time(now_unix_seconds)?;
         let live_request = CapabilityLivenessRequest {
             parent_capability_id: request.capability.body.parent_capability_id.clone(),
             expected_subject: request.capability.body.subject.clone(),
@@ -220,8 +250,12 @@ impl BrokerService {
                 "liveness authority returned the wrong audit result".to_string(),
             ));
         };
+        let now_unix_seconds = self.authority_observation_time(now_unix_seconds)?;
         validate_parent_liveness(
-            &live_request,
+            &CapabilityLivenessRequest {
+                now_unix_seconds,
+                ..live_request.clone()
+            },
             live_parent,
             self.config.maximum_liveness_snapshot_age_seconds,
         )?;
@@ -250,15 +284,23 @@ impl BrokerService {
                 "revocation authority returned the wrong audit result".to_string(),
             ));
         };
+        let now_unix_seconds = self.authority_observation_time(now_unix_seconds)?;
+        self.validate_request_core(request, now_unix_seconds)?;
+        validate_parent_liveness(
+            &CapabilityLivenessRequest {
+                now_unix_seconds,
+                ..live_request
+            },
+            live_parent,
+            self.config.maximum_liveness_snapshot_age_seconds,
+        )?;
         validate_revocation_snapshot(
             revocation_snapshot,
             now_unix_seconds,
             self.config.maximum_revocation_snapshot_age_seconds,
             revocation_authority_domain,
         )?;
-        if liveness_exchange.trusted_authority()
-            != revocation_exchange.trusted_authority()
-        {
+        if liveness_exchange.trusted_authority() != revocation_exchange.trusted_authority() {
             return Err(BrokerError::AuthorizationDenied(
                 "broker audit authority responses use different trust roots".to_string(),
             ));
@@ -266,6 +308,7 @@ impl BrokerService {
         Ok(ValidatedBrokerAuditAuthorities {
             liveness_exchange,
             revocation_exchange,
+            validated_at_unix_seconds: now_unix_seconds,
         })
     }
 
@@ -289,9 +332,7 @@ impl BrokerService {
         let runner_authorization_sha256 = runner_authorization
             .runner_authorization_sha256()
             .to_string();
-        let reference_source_sha256 = runner_authorization
-            .reference_source_sha256()
-            .to_string();
+        let reference_source_sha256 = runner_authorization.reference_source_sha256().to_string();
         let revocation_authority_domain = runner_authorization.revocation_authority_domain();
         validate_identifier(
             revocation_authority_domain,
@@ -308,14 +349,12 @@ impl BrokerService {
             revocation_authority_domain,
             now_unix_seconds,
         )?;
-        let audit_authorization_sha256 = admin_authorizer.authorize_intent_digest(
-            admin_authorization,
-            &governed_audit_intent_sha256,
-        )?;
+        let now_unix_seconds = authorities.validated_at_unix_seconds;
+        let audit_authorization_sha256 = admin_authorizer
+            .authorize_intent_digest(admin_authorization, &governed_audit_intent_sha256)?;
         let capability_sha256 = capability_digest(&request.capability)?;
         let proof_sha256 = proof_digest(&request.proof)?;
-        let canonical_request_sha256 =
-            broker_execute_request_registration_digest(request)?;
+        let canonical_request_sha256 = broker_execute_request_registration_digest(request)?;
         let receipt_signer = self.receipt_signer.public_key();
         let trust = crate::audit::BrokerAuditTrustConfiguration {
             trusted_capability_issuer: &self.trusted_issuer,
@@ -542,11 +581,11 @@ impl BrokerService {
         }
         let revocation_set = self
             .validate_request_authorities(
-            request,
-            &registration.revocation_authority_domain,
-            now_unix_seconds,
-            true,
-        )?
+                request,
+                &registration.revocation_authority_domain,
+                now_unix_seconds,
+                true,
+            )?
             .revocation_set;
 
         let mut retained = self.retained_prepared_dispatches()?;
@@ -926,5 +965,4 @@ impl BrokerService {
             None,
         )
     }
-
 }

@@ -48,6 +48,10 @@ libc = "0.2"
 
 [dev-dependencies]
 async-trait = { workspace = true }
+chio-control-plane = { workspace = true }
+chio-flow = { workspace = true }
+chio-manifest = { workspace = true }
+chio-security-kernel = { workspace = true }
 chio-test-support = { workspace = true }
 rcgen = "0.13"
 tempfile = { workspace = true }

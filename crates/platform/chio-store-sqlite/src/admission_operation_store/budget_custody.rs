@@ -1,5 +1,6 @@
 //! Fenced observation of an admission's original composite hold.
 use super::*;
+use chio_kernel::admission_operation::RetainedToolAdmissionRequestV1;
 use chio_kernel::budget_store::{
     BudgetAdmissionBinding, BudgetInvocationQuota, BudgetInvocationState, BudgetMonetaryState,
 };
@@ -17,7 +18,48 @@ pub struct AdmissionBudgetCustodySnapshot {
     pub monetary_state: BudgetMonetaryState,
 }
 
+/// The immutable original request and its physical hold share one authenticated
+/// snapshot. Reading this view neither reserves custody nor permits dispatch.
+#[derive(Clone, Debug)]
+pub struct RetainedToolAdmissionCustodySnapshot {
+    pub operation: AdmissionOperationV1,
+    pub request: RetainedToolAdmissionRequestV1,
+    pub custody: Option<AdmissionBudgetCustodySnapshot>,
+}
+
 impl SqliteAdmissionOperationStore {
+    pub fn load_retained_tool_admission_custody(
+        &self,
+        operation_id: &AdmissionOperationId,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<Option<RetainedToolAdmissionCustodySnapshot>, AdmissionOperationStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        verify_active_owner(&transaction, &self.serving_owner, Some(active_fence))?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        let Some(stored) = load_by_operation_id_tx(&transaction, operation_id)? else {
+            return Ok(None);
+        };
+        stored.verify_decision_time(trusted_now_unix_ms)?;
+        let Some(request) =
+            retained_request::load_retained_request_tx(&transaction, &stored.operation)?
+        else {
+            return Ok(None);
+        };
+        let custody = crate::budget_store::SqliteBudgetStore::load_admission_budget_custody_tx(
+            &transaction,
+            &stored.operation,
+        )
+        .map_err(|error| invariant(error.to_string()))?;
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(Some(RetainedToolAdmissionCustodySnapshot {
+            operation: stored.operation,
+            request,
+            custody,
+        }))
+    }
+
     pub fn load_admission_budget_custody(
         &self,
         operation_id: &AdmissionOperationId,

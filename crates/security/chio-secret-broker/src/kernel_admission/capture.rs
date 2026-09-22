@@ -70,17 +70,29 @@ impl BrokerNativeCaptureReader {
         let Some(original) = self.read_original(&operation_id, trusted_now_unix_ms)? else {
             return Ok(None);
         };
-        let operation = original.operation;
-        let execute = original.execute;
-        let bytes = canonical(&execute)?;
+        self.read_capture_for_original(request, &original, trusted_now_unix_ms)
+    }
+
+    fn read_capture_for_original(
+        &self,
+        request: &CaptureExecutionHoldRequest,
+        original: &original::OriginalBrokerRequest,
+        trusted_now_unix_ms: u64,
+    ) -> Result<Option<CombinedCaptureCommit>> {
+        request.validate()?;
+        let operation = &original.operation;
+        let operation_id = operation.binding().operation_id();
+        let execute = &original.execute;
+        let bytes = canonical(execute)?;
         let ids = derive_attempt_ids_for_operation(
             &execute.capability.body.capability_id,
             &execute.invocation_id,
             &execute.proof.body.nonce,
-            &broker_request_digest(&execute)?,
+            &broker_request_digest(execute)?,
             operation_id.as_str(),
         )?;
-        if request.invocation_id != execute.invocation_id
+        if request.operation_id != operation_id.as_str()
+            || request.invocation_id != execute.invocation_id
             || request.invocation_id != operation.binding().request_id().as_str()
             || request.parent_capability_id != execute.capability.body.parent_capability_id
             || request.parent_capability_id != operation.binding().capability_id().as_str()
@@ -96,7 +108,7 @@ impl BrokerNativeCaptureReader {
         }
         let Some(witness) = self
             .store
-            .load_native_dispatch_capture_witness(&operation_id, &self.fence, trusted_now_unix_ms)
+            .load_native_dispatch_capture_witness(operation_id, &self.fence, trusted_now_unix_ms)
             .map_err(unavailable)?
         else {
             return Ok(None);
@@ -138,7 +150,7 @@ impl BrokerNativeCaptureReader {
                 .iter()
                 .map(|usage| usage.quota.clone())
                 .collect::<Vec<_>>(),
-            &execute,
+            execute,
         )?;
         let budget_commit_index = capture
             .metadata

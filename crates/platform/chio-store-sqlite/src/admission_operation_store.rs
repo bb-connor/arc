@@ -43,7 +43,7 @@ use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 
 mod budget_custody;
 mod caller_budget;
-pub use budget_custody::AdmissionBudgetCustodySnapshot;
+pub use budget_custody::{AdmissionBudgetCustodySnapshot, RetainedToolAdmissionCustodySnapshot};
 mod caller_dispatch_context;
 mod caller_wait;
 mod commit_chain;

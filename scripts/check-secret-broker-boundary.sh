@@ -182,6 +182,20 @@ run_tests "authority IPC signed response binding" yes \
   cargo test -p chio-secret-broker --lib \
   authority_ipc::tests::authority_rpc_requires_signed_exact_responses_and_full_capabilities
 
+run_tests "authority RPC completion time and audit binding" yes "$(cat <<'EOF'
+service::tests::authority_rpc_completion_rejects_future_expired_and_unavailable_time
+service::tests::authority_rpc_completion_time_is_bound_into_independently_verified_audit
+service::tests::authority_rpc_completion_uses_current_trusted_time
+EOF
+)" cargo test --locked -p chio-secret-broker --lib authority_rpc_completion_
+
+if [[ "$(uname -s)" == "Linux" ]]; then
+  run_tests "native kernel broker daemon and TLS provider" yes \
+    "process_boundary_tests::native::native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_crossing" \
+    cargo test --locked -p chio-secret-broker --features kernel-admission --lib \
+    process_boundary_tests::native::native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_crossing
+fi
+
 run_tests "kernel broker capability and composite quota admission" yes "$(cat <<'EOF'
 kernel_admission::registration::tests::registered_generation_cannot_sign_with_a_rotated_authority_key
 kernel_admission::tests::broker_admission_rejects_substitution_even_when_kernel_hash_is_updated

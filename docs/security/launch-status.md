@@ -1,9 +1,11 @@
 # Security launch: current execution status
 
 Updated 2026-09-22. The continuation on `integration/process-security-m4` in
-`/tmp/arc-security-launch` is published through `0d043f060d` on
+`/tmp/arc-security-launch` is maintained on
 [draft PR #1160](https://github.com/bb-connor/arc/pull/1160). Original nonce/log
-evidence joins and broker custody/delivery adapters are implemented. The newest
+evidence joins and broker custody/delivery adapters are implemented. The native
+kernel/broker daemon path now passes a real TLS exchange with original composite
+quota custody, exact replay and secret-boundary checks. The newest
 seven-scenario native matrix and independent observer use runtime `317b3a9128`
 and qualifier `6170900d7f`. Full foundation and trusted hosted qualification
 remain open; retained cage/fuzz results have their own earlier source identity.
@@ -38,7 +40,7 @@ acceptance is complete. This is not merge or release approval.
 | M3 | Complete: named local caller acceptance and current dependency qualification | All 61 exact cases, complete flow gate and current full workspace passed, including required native caller custody | [Acceptance closeout](#m3-local-acceptance-closeout), [caller contract](authenticated-caller-delivery.md) |
 | M4 | Complete: M4.0-M4.8 local consumer-boundary acceptance | Current 45-case M4, 61-case M3, 69-inventory flow, full workspace/build/Clippy, affected consumers and final source/document/calibration gates passed. Use the supported profiles for M5; no release or confinement qualification implied | [Completed execution checklist](m4-consumer-qualification.md), [local acceptance report](m4-local-acceptance.md), [consumer support ledger](consumer-support.md) |
 | M5 | Nonce/log joins implemented; native matrix and independent observer pass at their recorded inputs; full acceptance remains open | Finish final-source foundation and trusted-runner authorization | [Current source-bounded results](process-security-qualification.md#current-checkpoint-2026-09-22), [process reference profile](../../examples/reference-swarm/PROCESS.md) |
-| M6 | Original broker registration, hold/capture observation, kernel-bound delivery and live authority pass focused native tests; integrated topology unqualified | Complete keyring/provider/cage composition and receipt verification | [Current results](process-security-qualification.md#current-checkpoint-2026-09-22), [provisioning boundary](../../examples/reference-swarm/PROCESS.md#provision-brokered-launch-material) |
+| M6 | Native kernel/daemon/TLS composition and all 161 broker library cases pass; complete topology unqualified | Complete keyring/cage composition, process cutpoints and artifact verification | [Current results](process-security-qualification.md#current-checkpoint-2026-09-22), [provisioning boundary](../../examples/reference-swarm/PROCESS.md#provision-brokered-launch-material) |
 | M7 | Deception, response recovery, flow and temporal gates pass at `6170900d7f`; adversarial inventory missing | Port all recovered security cases and qualify final composed paths | Active-defense ledger and original plan |
 | M8 | Historical retention and million-receipt recovery pass; checkpoint race repaired | Qualify the final checkpoint implementation and resolve the original liveness failure | Retention #1045 and final-source million-receipt gate remain required |
 | M9 | Entry packages unpublished and external consumer unqualified | Package dependency closure and clean install after M4-M8 | Three intended entrypoints remain `publish = false` |

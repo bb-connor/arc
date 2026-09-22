@@ -29,7 +29,7 @@ pub struct BrokerKernelAdmissionAuthority {
 
 struct OriginalCustody {
     registration: AttemptRegistration,
-    execute: BrokerExecuteRequest,
+    original: super::original::OriginalBrokerRequest,
     custody: AdmissionBudgetCustodySnapshot,
 }
 
@@ -50,21 +50,19 @@ impl BrokerKernelAdmissionAuthority {
     fn original(&self, operation_id: &str, now: u64) -> Result<Option<OriginalCustody>> {
         let operation_id =
             AdmissionOperationId::from_persisted(operation_id).map_err(|_| rejected())?;
-        let Some((registration, execute)) =
-            self.reader
-                .read_registration(self.participant.as_ref(), &operation_id, now)?
+        let Some(original) = self.reader.read_original(&operation_id, now)? else {
+            return Ok(None);
+        };
+        let Some(registration) = self
+            .reader
+            .registration_for_original(self.participant.as_ref(), &original)?
         else {
             return Ok(None);
         };
-        let custody = self
-            .reader
-            .store
-            .load_admission_budget_custody(&operation_id, &self.reader.fence, now)
-            .map_err(unavailable)?
-            .ok_or_else(rejected)?;
+        let custody = original.custody.clone().ok_or_else(rejected)?;
         Ok(Some(OriginalCustody {
             registration,
-            execute,
+            original,
             custody,
         }))
     }
@@ -84,7 +82,7 @@ impl BrokerKernelAdmissionAuthority {
             )?,
             revocation_ids,
             authorization_artifact_digest: crate::capability::capability_digest(
-                &original.execute.capability,
+                &original.original.execute.capability,
             )?,
             authority_metadata_digest: registration.authority_metadata_digest.clone(),
         })
@@ -98,7 +96,11 @@ impl BrokerKernelAdmissionAuthority {
             BudgetInvocationState::Absent => Err(rejected()),
             BudgetInvocationState::Captured => self
                 .reader
-                .read_capture(&Self::capture_request(original)?, now)?
+                .read_capture_for_original(
+                    &Self::capture_request(original)?,
+                    &original.original,
+                    now,
+                )?
                 .map(ExecutionHoldState::Captured)
                 .ok_or_else(rejected),
         }
@@ -145,7 +147,7 @@ impl BrokerAdmissionAuthority for BrokerKernelAdmissionAuthority {
         let original = self
             .original(operation_id.as_str(), now)?
             .ok_or_else(rejected)?;
-        if canonical(&original.execute)? != canonical(request)?
+        if canonical(&original.original.execute)? != canonical(request)?
             || !matches!(self.state(&original, now)?, ExecutionHoldState::Captured(_))
         {
             return Err(rejected());
@@ -279,6 +281,13 @@ impl BrokerExecutionBudget for BrokerKernelAdmissionAuthority {
     ) -> Result<ExecutionHoldState> {
         request.validate()?;
         let now = trusted_now_ms()?;
+        // The native witness authenticates the exact original request, aliases,
+        // quota members, physical capture and authority commitments together.
+        // Re-reading that same capture through the generic hold projection adds
+        // no authority and can exhaust the broker's bounded IPC deadline.
+        if let Some(commit) = self.reader.read_capture(request, now)? {
+            return Ok(ExecutionHoldState::Captured(commit));
+        }
         let Some(original) = self.original(&request.operation_id, now)? else {
             return Ok(ExecutionHoldState::Unknown);
         };

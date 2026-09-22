@@ -2,8 +2,7 @@
 
 ## Current checkpoint (2026-09-22)
 
-The published continuation through `0d043f060d3f93afee2e089a5af64078456206b4`
-is on draft PR #1160. Both required parents remain ancestors. The primary
+The continuation is on draft PR #1160. Both required parents remain ancestors. The primary
 checkout was fast-forwarded after its frozen workspace run terminated;
 `output/` retains untracked evidence. Qualification below names each source
 separately and does not establish a complete current-candidate workspace pass.
@@ -14,16 +13,30 @@ below retain their historical source boundaries.
 | Area | Current evidence | Remaining boundary |
 | --- | --- | --- |
 | Foundation | The complete `b9c43fede2` workspace run terminated with three failed targets. The two CLI fixture/custody defects are repaired; the affected CLI integrations and all 91 runtime-admission cases pass. | One nested declassification capture case failed in the full run, then passed in isolation and on x86. Its cause remains unresolved. Final workspace tests and strict lint remain required. |
-| Dependency and source policy | Reviewed AWS-LC repairs and exact audits remain selected. All 225 formal mirrors match; current generated coverage has 59 rows and 170 artifacts. Structural image contract and mutation checks pass for the current lock pin. | The integration stub scan still reports older vendored occurrences requiring review. Preserve audit scope and qualify final hosted inputs. Mirror matching is not a solver proof. |
+| Dependency and source policy | Reviewed AWS-LC repairs and exact audits remain selected. Exact, expiring exceptions cover 34 inspected upstream text occurrences; the scanner passes on a clean source export and rejects new incomplete code. Current generated coverage has 59 rows and 170 artifacts. Structural image contract and mutation checks pass for lock digest `61c14992aa8551f0189cf7781cfba3defdb47fff09fec95ec2453580a5299c53`. | Preserve audit scope and qualify final hosted inputs. Prep's untracked diagnostic log remains separate from the source export. Mirror matching is not a solver proof. |
 | Fuzz compilation | All 30 targets compiled with ASan on x86_64 at `84c0ca4e89`; retained log hash matches. | Required fuzz campaigns and final-source requirements remain separate. |
 | Cage | The `84c0ca4e89` native run reports 69 tests, 26 real probes and ten mutants with exit 0; retained log hash matches. | The retained runner's release-helper adaptation and trusted capture require their own acceptance. |
 | M5 | Original nonce custody, receipt checkpoints and inclusion proofs are implemented. Runtime `317b3a9128` with qualifier `6170900d7f` passed all seven native scenarios and rejected 15 substitutions; a separately built aarch64 observer verified both inventories. | Final source, combined-foundation qualification and independently authorized trusted-runner acceptance remain open. The artifact does not claim full M5 acceptance. |
 | Image | Source `6170900d7f` built and passed identity, ownership, toolchain and offline locked-dependency checks. Image ID: `sha256:f17db010c5e6e5e1d6ad8eea8ce97f8e2a530888a737e59bbb16afdfdb1a245a`; all 199 archive hashes and 225 package pins match. | The current lock and broker gate differ. Rebuild and validate those inputs before authorized publication, registry identity verification or trust-root rotation. |
-| M6 | Original broker registration, authenticated hold/capture readback and kernel-bound delivery are implemented. The live authority now validates original signed parents through the kernel and reads the selected fenced revocation authority. Five native broker cases pass, including foreign-kernel/participant refusal, signed RPC, strict nonce, compensation and lost-reply accounting. | Real keyring/provider/cage composition, process cutpoints and complete artifact verification retain separate qualification. Component tests do not close M6. |
+| M6 | Original broker registration, authenticated hold/capture readback and kernel-bound delivery are implemented. The live authority validates original signed parents through the kernel and reads the selected fenced revocation authority. All 161 broker library tests, the owning portable boundary gate and strict all-target kernel/store/broker/control-plane lint pass. The native kernel/daemon/TLS invocation covers three original quota members, exact replay, substitution refusal and broker-death fallback denial. | Keyring/cage composition, process cutpoints and complete artifact verification retain separate qualification. Component tests do not close M6. |
 | M7 | At `6170900d7f`, deception passed 82 tests; response recovery, flow and temporal gates exited 0. Temporal covered 10 inventories and 40 exact cases; retrieved hashes match. | The security adversarial inventory is missing. Its 28 archived definitions and 35 selections need semantic migration and current consumer integration. |
-| M8 | At `84c0ca4e89`, ordinary/delayed-fsync retention and million-receipt recovery passed. Checkpoint repair `517e28d1c4` separately passed 335 receipt-store cases with three retained campaign/property ignores. | The scale campaign included a declared ten-second profiling sample and predates the checkpoint repair. Final-source recovery and the unreproduced #1045 liveness failure remain open. |
+| M8 | At `84c0ca4e89`, ordinary/delayed-fsync retention and million-receipt recovery passed. Checkpoint repair `517e28d1c4` separately passed 335 receipt-store cases with three retained campaign/property ignores. A fresh million-entry campaign is running at frozen `d5884b4d87`. | The old scale campaign included a declared ten-second profiling sample and predates the checkpoint repair. The new campaign has no terminal result yet. Final-source recovery and the unreproduced #1045 liveness failure remain open. |
 | Hosted delivery | #1160 publishes the continuation. Main prerequisite #1168 is at `2fb4a6c1c8`; definition-only #1167 retains `88b9b2a3cb`. Original hosted failures remain recorded. | New-head qualification, independent review, protected integration and the exact source/definition/image/verifier authority transition remain required. |
 | M9-M11 | Packaging and handoff work remains preserved. | No milestone-level M9-M10 acceptance or M11 operational promotion is established. |
+
+The daemon integration exposed a clock-boundary rejection and repeated custody
+reads that exhausted the provider observer's ten-second accept deadline. The
+broker now validates authority responses at trusted completion time and retains
+the original signed request times in independently verified audit evidence.
+Original request and physical custody are read in one authenticated snapshot;
+capture separately verifies its original commitments and current physical hold.
+All 13 budget atomicity and ten retained-request cases pass, including an
+owned-transaction corruption that previously accepted an altered quota limit.
+No freshness bound, IPC
+deadline, observer deadline or success assertion was increased or weakened.
+Original failures and the full 161-case passing retry remain in the execution
+ledger. The changed capture implementation anchor was reviewed against
+`PostAdmissionDropGuard.tla`; concrete SQL integrity remains outside that model.
 
 Retained native evidence is under
 `output/process-security-20260915/resume-20260921/oci-remote/`, including

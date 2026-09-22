@@ -190,6 +190,7 @@ impl BrokerServiceAuthorityBundle {
 }
 
 pub struct BrokerService {
+    authority_clock: Option<Arc<dyn crate::daemon::DaemonClock>>,
     config: BrokerServiceConfig,
     trusted_issuer: PublicKey,
     backend: Arc<EncryptedBlobSecretBackend>,
@@ -225,6 +226,7 @@ struct ValidatedBrokerAuthorities {
 struct ValidatedBrokerAuditAuthorities {
     liveness_exchange: crate::authority_ipc::VerifiedAuthorityExchange,
     revocation_exchange: crate::authority_ipc::VerifiedAuthorityExchange,
+    validated_at_unix_seconds: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

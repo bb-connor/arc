@@ -1084,7 +1084,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/schema.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/schema.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=d6296abd0c3f8e0f8739f15a98f41ab0864495231343d440bea18fb82c6a23f1, rust_symbols=recorded_version,digest_version,expected,verify_version)
 - `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=85231e0001f48e57a6c6da636f6e84c5fc9b54c16a35a99db5583646902310f9, rust_symbols=SqliteAdmissionOperationStore::join_native_security_flow,SqliteAdmissionOperationStore::load_native_security_flow_join,SqliteAdmissionOperationStore::observe_native_security_flow,SqliteAdmissionOperationStore::acquire_native_security_egress,SqliteAdmissionOperationStore::commit_native_security_egress,SqliteAdmissionOperationStore::load_native_security_egress,SqliteAdmissionOperationStore::join_native_security_input,SqliteAdmissionOperationStore::load_native_security_input_join,SqliteAdmissionOperationStore::compare_and_swap,SqliteAdmissionOperationStore::retain_native_dispatch_ledger,SqliteAdmissionOperationStore::load_native_dispatch_ledger,SqliteAdmissionOperationStore::join_native_security_output,SqliteAdmissionOperationStore::load_native_security_output_join,SqliteAdmissionOperationStore::join_native_security_nonce_preflight,SqliteAdmissionOperationStore::load_native_security_nonce_preflight_join)
 - `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/admission_operation_store/store/native_security.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/admission_operation_store/store/native_security.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=4fc3acf21b2e2c2fc25af1b457ecf8adfc8629d180358a5f016d55629f021381, rust_symbols=SqliteAdmissionOperationStore::resolve_native_egress_initialization,SqliteAdmissionOperationStore::acquire_native_egress_from_port,SqliteAdmissionOperationStore::commit_native_egress_from_port)
-- `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/budget_store/composite/native_capture.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/budget_store/composite/native_capture.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=c24a205080c3136f8d40e7d5bb99b172389e270ecd13d89b27aaf79ed10da264, rust_symbols=SqliteBudgetStore::load_native_capture_decision_tx,verify_capture_quota_delta,verify_capture_cumulative_delta)
+- `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/budget_store/composite/native_capture.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/budget_store/composite/native_capture.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=a097fe192930ac8c56fe46cbe3ed4775bf26feab01259abeabab0d5e28a36d19, rust_symbols=SqliteBudgetStore::load_native_capture_decision_tx,verify_capture_quota_delta,verify_capture_cumulative_delta)
 - `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/budget_store/composite/transitions.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/budget_store/composite/transitions.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=c51f69fc9b7bda7807b71785aeaf0d6013870bc92156d11c6aad387da0657202, rust_symbols=transition_decision_from_event)
 - `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/budget_store/composite/transitions/capture.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/budget_store/composite/transitions/capture.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=3d2b2c4d6c1fb25880206f22ea53859853b9527499f6eca07d976ef5b2650276, rust_symbols=SqliteBudgetStore::capture_composite_invocation_inner)
 - `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/lib.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/lib.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=be6e708af39e372710aad1d9de76145af91f80c4a12647d9eb4c0c2baa562f2e, rust_symbols=SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch,SqliteAdmissionOperationStore::load_native_dispatch_capture)
@@ -1178,7 +1178,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `40d87e2e1df961281fe5d77ed1f29f680e887e3d257b0882546fc64c4fc08658`
+- Input digest: `716e3fc673ab5c4709382a5a918e1ad8c0ddfb60d250185856b9d02b73be39fe`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1189,7 +1189,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `.dst/harnesses.toml`: `02c022579994294816ab40683c211766ef131b18a6cd13c2c5692f91fd62f1a1`
 - `.kani/harnesses.toml`: `3f12cf411266e86c99010bf031e3ad43420b39bdac59ef70cb592c0d33787c81`
 - `.loom/harnesses.toml`: `07b7f087e6e7f484c16be0d7cd079def72dcc35e536e02bf241337fc915b562b`
-- `Cargo.lock`: `b9d9447273164a977ec1c65ffcc07383ccf21779c94febb0ea55c336587c3c5a`
+- `Cargo.lock`: `61c14992aa8551f0189cf7781cfba3defdb47fff09fec95ec2453580a5299c53`
 - `Cargo.toml`: `f04cf84cf729326ae3fe18773f37e9536683b3ea8ebd86db44091e77515083d4`
 - `audits/evidence/mutants/chio-weights/2026-05-08.json`: `452aaf5734039a489967a629ec3c6b1b9d1351e06ec1f8e76c136ae389477ca7`
 - `audits/mutation/per-crate-configs/chio-anchor.toml`: `9d5a1f0e850ddadc3e621dd67282bb36460e13d3cb6e1af06a3fc03597af8ec3`
@@ -1400,7 +1400,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/mutation/evidence/spec-mutants-7b24142e8523fe08e501063dbf3d4f6cea3397be.json`: `82878e03aaafa1ceeb1f791386cffd57f9f88453b24113bd51e43b67996a66c2`
 - `formal/mutation/evidence/spec-mutants-d292f14df1c493873199f4f9d969ade00472ff28.json`: `d7b7a63401bfb071af87743ec07191e380c29ee1e306cca1fe35859a8194e623`
 - `formal/mutation/registry.toml`: `48387345d00fe7c53e777326f73e31370f7bc3d362a09f1059cadc06c98b6bb6`
-- `formal/proof-manifest.toml`: `26edcc06a0551a30bd021eafffd7d855e373e96bd8c980cd0efb3d7e9796fd8c`
+- `formal/proof-manifest.toml`: `197a00957db8aacefa59001bae0c871a7d52531b5c0643d948cc757c2a88019f`
 - `formal/rust-verification/creusot-contracts.toml`: `83000c98743013d3d6d468976a163edaf16d0d621070410d741f146bf61a28a5`
 - `formal/rust-verification/formal-mutants.toml`: `5f15de2f3833b11db3d783d05ab6efcd2c49840ede010fe7ec54fc2846c48fc6`
 - `formal/rust-verification/kani-harnesses.toml`: `f82442bef24ae67283c3f171cff15e8aa6cc4d808c7893b9e349b6bf315b50ce`
@@ -1419,7 +1419,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `e0fab0a4fa1c419568942078c2512563fb99c8c093f38cfd9d479f174107453f`
 - `fuzz/target-map.toml`: `e6feb8c431c9eafc03666d30406555b9213c3ca540b869575dca0a3703be1879`
-- `git-worktree://rust-files`: `f09f7952bdbea26ec96cf46ef5bda09fd1f812b4b4b1130fb41b893d4c9bed57`
+- `git-worktree://rust-files`: `2fcc86a6ea408bdca82ef2387beec23e0812e263a4aaae7decadf8c737258c8b`
 - `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
 - `rust-toolchain.toml`: `d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`

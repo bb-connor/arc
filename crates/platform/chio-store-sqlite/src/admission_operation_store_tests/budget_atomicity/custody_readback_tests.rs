@@ -3,6 +3,46 @@ use super::*;
 use chio_kernel::budget_store::BudgetInvocationState;
 
 #[test]
+fn native_capture_readback_authenticates_physical_members_inside_its_snapshot() -> AnchoredTestResult
+{
+    let fixture = fixture();
+    let owner = pending(&fixture, "native-capture-custody")?;
+    let capture = authorize(&fixture, owner.binding().operation_id().as_str())?;
+    let lease = claim(&fixture, &owner, "native-capture-custody", now_ms());
+    let (_, committed) = fixture.store.capture_invocation_and_commit_dispatch(
+        &owner,
+        &lease,
+        capture,
+        &fixture.fence,
+        now_ms(),
+    )?;
+    // This transaction-level port consumes the caller's already authenticated
+    // matching-grant inventory. Both fixtures select grant zero.
+    let (_, retained) = super::super::super::retained_request::original(&fixture.fence)?;
+    let budget = fixture.authority.budget_store();
+    let before = counts(&fixture)?;
+    for mutation in [
+        "UPDATE budget_hold_quota_members SET max_invocations = max_invocations + 1 WHERE hold_id = 'shared-hold'",
+        "DELETE FROM budget_hold_quota_members WHERE hold_id = 'shared-hold'",
+    ] {
+        let mut connection = fixture.store.connection()?;
+        let transaction = connection.transaction()?;
+        budget.load_native_capture_decision_tx(&transaction, &committed, &retained)?;
+        transaction.execute_batch("PRAGMA defer_foreign_keys = ON")?;
+        assert_eq!(transaction.execute(mutation, [])?, 1);
+        assert!(
+            budget
+                .load_native_capture_decision_tx(&transaction, &committed, &retained)
+                .is_err(),
+            "native capture accepted changed physical custody: {mutation}",
+        );
+        transaction.rollback()?;
+    }
+    assert_eq!(counts(&fixture)?, before);
+    Ok(())
+}
+
+#[test]
 fn budget_custody_readback_distinguishes_absent_unheld_and_reversed_operations(
 ) -> AnchoredTestResult {
     use chio_kernel::budget_store::BudgetReverseHoldRequest;

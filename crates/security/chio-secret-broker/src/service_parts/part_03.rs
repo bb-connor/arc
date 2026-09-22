@@ -1164,4 +1164,5 @@ mod tests {
     include!("tests_01.rs");
     include!("tests_02.rs");
     include!("tests_03.rs");
+    include!("tests_authority_time.rs");
 }

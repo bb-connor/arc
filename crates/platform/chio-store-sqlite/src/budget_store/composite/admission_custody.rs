@@ -35,7 +35,7 @@ impl SqliteBudgetStore {
     }
 }
 
-fn verify_committed_custody(
+pub(super) fn verify_committed_custody(
     transaction: &Transaction<'_>,
     hold: &StructuredHold,
 ) -> Result<(), BudgetStoreError> {

@@ -1,6 +1,6 @@
 //! Kernel-owned delivery over the independently configured broker control port.
 use super::original::OriginalBrokerRequest;
-use super::{canonical, rejected, trusted_now_ms, unavailable, BrokerNativeCaptureReader};
+use super::{canonical, rejected, trusted_now_ms, BrokerNativeCaptureReader};
 use crate::budget::CaptureExecutionHoldRequest;
 use crate::kernel_admission::BrokerAdmissionParticipant;
 use crate::{BrokerError, Result};
@@ -67,25 +67,17 @@ impl BrokerKernelConnection {
         ) {
             return Err(rejected());
         }
-        let operation_id = original.operation.binding().operation_id();
-        let (registration, execute) = self
+        let registration = self
             .reader
-            .read_registration(self.participant.as_ref(), operation_id, now)?
+            .registration_for_original(self.participant.as_ref(), &original)?
             .ok_or_else(rejected)?;
-        let custody = self
-            .reader
-            .store
-            .load_admission_budget_custody(operation_id, &self.reader.fence, now)
-            .map_err(unavailable)?
-            .ok_or_else(rejected)?;
-        if custody.invocation_state != BudgetInvocationState::Authorized
-            || execute != original.execute
-        {
+        let custody = original.custody.as_ref().ok_or_else(rejected)?;
+        if custody.invocation_state != BudgetInvocationState::Authorized {
             return Err(rejected());
         }
         self.participant
             .client
-            .prepare_dispatch(&registration, &execute)?;
+            .prepare_dispatch(&registration, &original.execute)?;
         Ok(())
     }
 
@@ -111,20 +103,12 @@ impl BrokerKernelConnection {
         {
             return Err(rejected());
         }
-        let operation_id = original.operation.binding().operation_id();
-        let (registration, execute) = self
+        let registration = self
             .reader
-            .read_registration(self.participant.as_ref(), operation_id, now)?
+            .registration_for_original(self.participant.as_ref(), &original)?
             .ok_or_else(rejected)?;
-        let custody = self
-            .reader
-            .store
-            .load_admission_budget_custody(operation_id, &self.reader.fence, now)
-            .map_err(unavailable)?
-            .ok_or_else(rejected)?;
-        if custody.invocation_state != BudgetInvocationState::Captured
-            || execute != original.execute
-        {
+        let custody = original.custody.as_ref().ok_or_else(rejected)?;
+        if custody.invocation_state != BudgetInvocationState::Captured {
             return Err(rejected());
         }
         let revocation_ids = custody.admission.revocation_set.ids().to_vec();
@@ -141,16 +125,16 @@ impl BrokerKernelConnection {
             revocation_ids,
             authority_metadata_digest: registration.authority_metadata_digest,
             authorization_artifact_digest: crate::capability::capability_digest(
-                &execute.capability,
+                &original.execute.capability,
             )?,
         };
         self.reader
-            .read_capture(&capture, now)?
+            .read_capture_for_original(&capture, &original, now)?
             .ok_or_else(rejected)?;
         // The broker rechecks live parent/revocation authority and its original
         // prepared state, and owns durable provider deduplication. Historical
         // capture readback alone never reaches this kernel-context entry point.
-        let response = self.participant.client.execute(&execute)?;
+        let response = self.participant.client.execute(&original.execute)?;
         serde_json::to_value(response).map_err(|_| rejected())
     }
 }

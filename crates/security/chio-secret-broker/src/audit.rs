@@ -1266,14 +1266,24 @@ pub fn broker_audit_authority_context_digest(
         )?;
     }
 
+    let AuthorityOperation::VerifyLiveParent(original_liveness_request) =
+        &authority.liveness.request().body.operation
+    else {
+        return Err(BrokerError::AuthorizationDenied(
+            "broker audit liveness evidence has the wrong operation".into(),
+        ));
+    };
     let liveness_request = CapabilityLivenessRequest {
         parent_capability_id: request.capability.body.parent_capability_id.clone(),
         expected_subject: request.capability.body.subject.clone(),
         expected_audience: trust.parent_audience.to_string(),
-        now_unix_seconds: validated_at_unix_seconds,
+        now_unix_seconds: original_liveness_request.now_unix_seconds,
     };
     if authority.liveness.request().body.operation
         != AuthorityOperation::VerifyLiveParent(liveness_request.clone())
+        || validated_at_unix_seconds
+            .checked_sub(liveness_request.now_unix_seconds)
+            .is_none_or(|age| age > trust.maximum_liveness_snapshot_age_seconds)
     {
         return Err(BrokerError::AuthorizationDenied(
             "broker audit liveness evidence is bound to another request".to_string(),
@@ -1286,18 +1296,31 @@ pub fn broker_audit_authority_context_digest(
         ));
     };
     validate_parent_liveness(
-        &liveness_request,
+        &CapabilityLivenessRequest {
+            now_unix_seconds: validated_at_unix_seconds,
+            ..liveness_request
+        },
         live_parent,
         trust.maximum_liveness_snapshot_age_seconds,
     )?;
 
+    let AuthorityOperation::CheckBrokerRevocation(original_revocation_request) =
+        &authority.revocation.request().body.operation
+    else {
+        return Err(BrokerError::AuthorizationDenied(
+            "broker audit revocation evidence has the wrong operation".into(),
+        ));
+    };
     let revocation_request = BrokerRevocationRequest {
         broker_capability_id: request.capability.body.capability_id.clone(),
         revocation_id: request.capability.body.revocation_id.clone(),
-        now_unix_seconds: validated_at_unix_seconds,
+        now_unix_seconds: original_revocation_request.now_unix_seconds,
     };
     if authority.revocation.request().body.operation
         != AuthorityOperation::CheckBrokerRevocation(revocation_request.clone())
+        || validated_at_unix_seconds
+            .checked_sub(revocation_request.now_unix_seconds)
+            .is_none_or(|age| age > trust.maximum_revocation_snapshot_age_seconds)
     {
         return Err(BrokerError::AuthorizationDenied(
             "broker audit revocation evidence is bound to another request".to_string(),

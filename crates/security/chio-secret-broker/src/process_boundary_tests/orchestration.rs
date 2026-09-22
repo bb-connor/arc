@@ -3,20 +3,20 @@ use super::roles::{assert_raw_absent, scan_tree_for_raw_canary};
 use super::*;
 use std::os::unix::process::CommandExt;
 
-struct ManagedChild {
+pub(super) struct ManagedChild {
     child: Option<Child>,
 }
 
 impl ManagedChild {
-    fn new(child: Child) -> Self {
+    pub(super) fn new(child: Child) -> Self {
         Self { child: Some(child) }
     }
 
-    fn id(&self) -> u32 {
+    pub(super) fn id(&self) -> u32 {
         self.child.as_ref().test_expect("managed child").id()
     }
 
-    fn try_wait(&mut self) -> Option<std::process::ExitStatus> {
+    pub(super) fn try_wait(&mut self) -> Option<std::process::ExitStatus> {
         self.child
             .as_mut()
             .test_expect("managed child")
@@ -24,7 +24,7 @@ impl ManagedChild {
             .test_expect("managed child status")
     }
 
-    fn wait_output(&mut self) -> Output {
+    pub(super) fn wait_output(&mut self) -> Output {
         self.child
             .take()
             .test_expect("managed child")
@@ -32,7 +32,7 @@ impl ManagedChild {
             .test_expect("managed child output")
     }
 
-    fn kill_and_output(&mut self) -> Output {
+    pub(super) fn kill_and_output(&mut self) -> Output {
         let mut child = self.child.take().test_expect("managed child");
         assert!(
             child
@@ -59,7 +59,7 @@ impl Drop for ManagedChild {
     }
 }
 
-fn helper_command(test_name: &str, role: &str, current_directory: &Path) -> Command {
+pub(super) fn helper_command(test_name: &str, role: &str, current_directory: &Path) -> Command {
     let mut command = Command::new(std::env::current_exe().test_expect("current test executable"));
     command
         .arg(test_name)
@@ -74,12 +74,16 @@ fn helper_command(test_name: &str, role: &str, current_directory: &Path) -> Comm
     command
 }
 
-fn spawn_with_stdin(mut command: Command, descriptor: OwnedFd, label: &str) -> ManagedChild {
+pub(super) fn spawn_with_stdin(
+    mut command: Command,
+    descriptor: OwnedFd,
+    label: &str,
+) -> ManagedChild {
     command.stdin(Stdio::from(descriptor));
     ManagedChild::new(command.spawn().test_expect(label))
 }
 
-fn inherit_seed_descriptors_in_child(command: &mut Command, descriptors: [i32; 2]) {
+pub(super) fn inherit_seed_descriptors_in_child(command: &mut Command, descriptors: [i32; 2]) {
     assert!(descriptors.iter().all(|descriptor| *descriptor >= 3));
     assert_ne!(descriptors[0], descriptors[1]);
     // SAFETY: pre_exec runs after fork in the broker child. The closure invokes
@@ -98,7 +102,7 @@ fn inherit_seed_descriptors_in_child(command: &mut Command, descriptors: [i32; 2
     }
 }
 
-fn report_from_output<T: for<'de> Deserialize<'de>>(output: &[u8], prefix: &str) -> T {
+pub(super) fn report_from_output<T: for<'de> Deserialize<'de>>(output: &[u8], prefix: &str) -> T {
     let text = std::str::from_utf8(output).test_expect("helper UTF-8 output");
     let line = text
         .lines()
@@ -107,7 +111,7 @@ fn report_from_output<T: for<'de> Deserialize<'de>>(output: &[u8], prefix: &str)
     serde_json::from_str(line).test_expect("helper report payload")
 }
 
-fn wait_for_broker(broker: &mut ManagedChild, config: &BrokerDaemonConfig) {
+pub(super) fn wait_for_broker(broker: &mut ManagedChild, config: &BrokerDaemonConfig) {
     let deadline = Instant::now() + Duration::from_secs(10);
     while !(config.ipc_socket_path.exists() && config.privileged_audit.socket_path.exists()) {
         assert!(
@@ -122,7 +126,10 @@ fn wait_for_broker(broker: &mut ManagedChild, config: &BrokerDaemonConfig) {
     }
 }
 
-fn expected_boundary_http_request(request: &BrokerExecuteRequest, canary: &[u8]) -> Vec<u8> {
+pub(super) fn expected_boundary_http_request(
+    request: &BrokerExecuteRequest,
+    canary: &[u8],
+) -> Vec<u8> {
     let destination = &request.request.destination;
     assert!(request.request.headers.is_empty());
     let mut expected = Vec::new();
