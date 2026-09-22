@@ -21,6 +21,10 @@ Five em dashes in upstream documentation and Rust documentation comments are
 normalized to hyphens for the repository text convention. They do not affect
 compiled behavior.
 
+Eight upstream test-vector files also have CRLF endings, trailing whitespace
+or trailing blank lines normalized for the repository diff check. The test
+parser already ignores these differences; vector keys and values are unchanged.
+
 The repository retains the registry archive, source provenance, review notes,
 negative result, repaired result, commands, and hashes under
 `output/process-security-20260915/resume-20260921/aws-lc/`.
