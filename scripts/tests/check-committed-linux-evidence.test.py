@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 
 import hashlib
+import importlib.util
+import os
+import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -302,6 +307,51 @@ class CommittedLinuxEvidenceContractTests(unittest.TestCase):
         result = self.check(source, evidence)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("working-tree changes", result.stderr)
+
+
+class VerifierSnapshotTests(unittest.TestCase):
+    def setUp(self) -> None:
+        spec = importlib.util.spec_from_file_location("snapshot_checker", CHECKER)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        self.checker = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.checker)
+
+    def exercise(self, replace_path: bool) -> None:
+        file_only_os = SimpleNamespace(
+            **{name: value for name, value in vars(os).items() if name != "memfd_create"}
+        )
+        original = b"#!/usr/bin/env python3\nprint('original pinned bytes')\n"
+        with mock.patch.object(self.checker, "os", file_only_os):
+            descriptor, executable, directory = self.checker.immutable_verifier_snapshot(
+                original
+            )
+        try:
+            self.assertIsNotNone(directory)
+            if replace_path:
+                path = directory / "chio-enterprise-evidence"
+                path.unlink()
+                path.write_text("#!/usr/bin/env python3\nprint('substituted bytes')\n")
+                path.chmod(0o500)
+            result = subprocess.run(
+                [str(executable)],
+                pass_fds=(descriptor,),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "original pinned bytes\n")
+        finally:
+            os.close(descriptor)
+            shutil.rmtree(directory)
+
+    def test_file_snapshot_executes_without_a_writable_descriptor(self) -> None:
+        self.exercise(False)
+
+    @unittest.skipUnless(Path("/proc/self/fd").is_dir(), "descriptor paths require procfs")
+    def test_file_snapshot_keeps_verified_inode_after_path_replacement(self) -> None:
+        self.exercise(True)
 
 
 if __name__ == "__main__":

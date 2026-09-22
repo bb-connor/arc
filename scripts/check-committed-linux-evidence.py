@@ -275,6 +275,26 @@ def immutable_verifier_snapshot(verifier_bytes: bytes) -> tuple[int, Path, Path 
             if add_seals is None or seals == 0:
                 raise EvidenceError("immutable verifier sealing is unavailable")
             fcntl.fcntl(descriptor, add_seals, seals)
+        else:
+            # Linux refuses to execute an inode while a writable descriptor is
+            # open. Keep the private snapshot pinned through a read-only handle
+            # and check its identity before closing the writer.
+            readonly = os.open(
+                verifier_path,
+                os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+            )
+            try:
+                written = os.fstat(descriptor)
+                retained = os.fstat(readonly)
+                if (written.st_dev, written.st_ino) != (retained.st_dev, retained.st_ino):
+                    raise EvidenceError("enterprise evidence verifier snapshot was replaced")
+            except Exception:
+                os.close(readonly)
+                raise
+            os.close(descriptor)
+            descriptor = readonly
+            if Path("/proc/self/fd").is_dir():
+                verifier_path = Path("/proc/self/fd") / str(descriptor)
         return descriptor, verifier_path, cleanup_directory
     except Exception:
         os.close(descriptor)
