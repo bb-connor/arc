@@ -20,6 +20,13 @@ fn native_capture_physical_corruption_denies_readback_and_reopen() -> TestResult
             let capture = store
                 .load_native_dispatch_capture(&ledger.operation_id, &fence, now_ms()?)?
                 .ok_or("uncorrupted capture readback")?;
+            assert_eq!(
+                store
+                    .load_native_dispatch_capture_witness(&ledger.operation_id, &fence, now_ms()?)?
+                    .ok_or("uncorrupted capture witness")?
+                    .capture,
+                capture,
+            );
             let chio_kernel::budget_store::BudgetInvocationCaptureDecision::Captured(decision) =
                 &capture.decision
             else {
@@ -59,6 +66,12 @@ fn native_capture_physical_corruption_denies_readback_and_reopen() -> TestResult
                     .load_native_dispatch_capture(&ledger.operation_id, &fence, now_ms()?)
                     .is_err(),
                 "corrupt live readback succeeded: egress={egress}, {mutation}"
+            );
+            assert!(
+                store
+                    .load_native_dispatch_capture_witness(&ledger.operation_id, &fence, now_ms()?)
+                    .is_err(),
+                "corrupt capture witness succeeded: egress={egress}, {mutation}",
             );
             assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
             drop(store);

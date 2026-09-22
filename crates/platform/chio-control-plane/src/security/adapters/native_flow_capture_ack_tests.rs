@@ -5,6 +5,105 @@ use chio_kernel::AdmissionBudgetCapture;
 use chio_store_sqlite::admission_operation_store::NativeDispatchCaptureResponseTestFault as Fault;
 
 #[test]
+fn native_capture_witness_preserves_original_commit_indices_after_revocation_and_reopen(
+) -> TestResult {
+    use chio_kernel::RevocationStore;
+    for egress in [false, true] {
+        let mut fixture = super::super::super::public_fixture()?;
+        let revocations = fixture.authority.revocation_store();
+        assert!(revocations.revoke("unrelated-before-native-capture")?);
+        let ledger = run_capture(&mut fixture, egress)?;
+        let store = fixture.authority.admission_operation_store();
+        let old_fence = fixture.authority.mutation_fence();
+        let witness = store
+            .load_native_dispatch_capture_witness(&ledger.operation_id, &old_fence, now_ms()?)?
+            .ok_or("original native capture witness")?;
+        assert_eq!(
+            Some(&witness.capture),
+            store
+                .load_native_dispatch_capture(&ledger.operation_id, &old_fence, now_ms()?)?
+                .as_ref(),
+        );
+        let observed = revocations
+            .observe_revocation("unrelated-before-native-capture")?
+            .commit
+            .ok_or("current revocation commit")?;
+        assert_eq!(witness.revocation_commit_index, observed.commit_index);
+        assert!(witness.authority_commit_index > 0);
+        assert!(revocations.revoke(&fixture.request.capability.id)?);
+        let later = revocations
+            .observe_revocation(&fixture.request.capability.id)?
+            .commit
+            .ok_or("later revocation commit")?;
+        assert!(later.commit_index > witness.revocation_commit_index);
+        assert_eq!(
+            store.load_native_dispatch_capture_witness(
+                &ledger.operation_id,
+                &old_fence,
+                now_ms()?
+            )?,
+            Some(witness.clone()),
+        );
+        drop(store);
+        drop(revocations);
+        let Fixture {
+            kernel,
+            authority,
+            _directory,
+            ..
+        } = fixture;
+        drop(kernel);
+        drop(authority);
+        let reopened = SqliteAuthorityStore::open_serving(
+            _directory.path().join("admission.db"),
+            _directory.path().join("locks"),
+        )?;
+        let store = reopened.admission_operation_store();
+        assert!(store
+            .load_native_dispatch_capture_witness(&ledger.operation_id, &old_fence, now_ms()?,)
+            .is_err());
+        assert_eq!(
+            store.load_native_dispatch_capture_witness(
+                &ledger.operation_id,
+                &reopened.mutation_fence(),
+                now_ms()?,
+            )?,
+            Some(witness),
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn native_capture_witness_rejects_missing_or_substituted_revocation_history() -> TestResult {
+    use chio_kernel::RevocationStore;
+    for mutation in [
+        "DELETE FROM admission_authority_commits WHERE capability_id = 'original-revocation'",
+        "UPDATE admission_authority_commits SET capability_id = 'foreign-revocation' WHERE capability_id = 'original-revocation'",
+    ] {
+        let mut fixture = super::super::super::public_fixture()?;
+        let revocations = fixture.authority.revocation_store();
+        assert!(revocations.revoke("original-revocation")?);
+        assert!(revocations.revoke("foreign-revocation")?);
+        let ledger = run_capture(&mut fixture, true)?;
+        let store = fixture.authority.admission_operation_store();
+        let fence = fixture.authority.mutation_fence();
+        assert!(store
+            .load_native_dispatch_capture_witness(&ledger.operation_id, &fence, now_ms()?)?
+            .is_some());
+        let connection = rusqlite::Connection::open(fixture._directory.path().join("admission.db"))?;
+        assert_eq!(connection.execute(mutation, [])?, 1);
+        assert!(
+            store
+                .load_native_dispatch_capture_witness(&ledger.operation_id, &fence, now_ms()?)
+                .is_err(),
+            "corrupt revocation history was accepted: {mutation}",
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn native_capture_acknowledgement_faults_preserve_committed_accounting() -> TestResult {
     for egress in [false, true] {
         for fault in Fault::ALL.into_iter().filter(|fault| !fault.is_readback()) {

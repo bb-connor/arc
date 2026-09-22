@@ -601,6 +601,8 @@ run_exact_target --label "native post-join policy" --allow-filtered --expected \
   security::adapters::tests::native_flow::support::capture::corruption::native_capture_physical_corruption_denies_readback_and_reopen \
   security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_acknowledgement_faults_preserve_committed_accounting \
   security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_readback_faults_preserve_committed_accounting \
+  security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_witness_preserves_original_commit_indices_after_revocation_and_reopen \
+  security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_witness_rejects_missing_or_substituted_revocation_history \
   security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_lost_ack_retains_owned_dpop_without_reclaim \
   security::adapters::tests::native_flow::ledger::faults::ledger_write_failures_preserve_committed_egress_through_compensation_and_reopen \
   security::adapters::tests::native_flow::support::capture::native_atomic_capture_faults_roll_back_budget_and_operation_together \

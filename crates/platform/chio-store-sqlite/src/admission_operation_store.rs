@@ -60,6 +60,7 @@ mod governed_approval_claim;
 pub(crate) use dpop_claim::{verify_dpop_budget_selection_tx, verify_fresh_dpop_tx};
 mod governed_approval_replay;
 mod native_capture_readback;
+pub use native_capture_readback::NativeDispatchCaptureWitness;
 #[cfg(feature = "admission-test-support")]
 mod native_capture_test_support;
 pub(crate) use governed_approval_claim::{

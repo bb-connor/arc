@@ -3232,9 +3232,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/native_capture_readback.rs"
 rust_symbols = ["SqliteAdmissionOperationStore::load_native_dispatch_capture"]
-normalized_sha256 = "3fd09d0cec2fb0feb169a1b3760939ac8eaa1d7f27884844cdde41fdb398cc31"
+normalized_sha256 = "3d7f26b3edbda2bbf50d8a6029e5759eb034759593b124cc80fdd88b410bd211"
 symbol_sha256 = [
-  { symbol = "SqliteAdmissionOperationStore::load_native_dispatch_capture", sha256 = "94aa4578ba0edfb6addb43e2e876cffe87899656ad66c5d10c77b73ab4dcd337" },
+  { symbol = "SqliteAdmissionOperationStore::load_native_dispatch_capture", sha256 = "b336d0e19f12d62973dab440fe2a6cfe7fd9576fde0d6d4a5a7e14faceea3272" },
 ]
 
 [[mirror]]
