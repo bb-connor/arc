@@ -81,6 +81,12 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
         )?;
         let report = success(verify(&artifact, runtime, &folder, &key)?)?;
         assert_eq!(report["m5_acceptance_complete"], false);
+        for check in ["execution_nonces", "receipt_log_inclusion"] {
+            assert!(report["checks"]
+                .as_array()
+                .ok_or("checks")?
+                .contains(&json!(check)));
+        }
         let original: ChioReceipt = serde_json::from_slice(&std::fs::read(&artifact)?)?;
         let state = original.action.parameters["operation"]["state"]
             .as_str()
@@ -103,6 +109,8 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
         };
         assert!(!verify(&artifact, runtime, &other, &key)?.status.success());
         let mut cases = vec![
+            ("/receipt_log", Value::Null),
+            ("/receipt_log/inclusion/receipt_seq", json!(999)),
             ("/runtime_id", json!("another-runtime")),
             ("/request/arguments", json!({"substituted": true})),
             ("/context/process_id", json!("another-worker")),
@@ -113,17 +121,26 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
             ("/operation/dispatch_state", json!("not_committed")),
             ("/operation/state", json!("awaiting_caller_report")),
         ];
+        let retained_pointer;
         if state == "completed" {
+            let retained = original.action.parameters["operation"]["history"]
+                .as_array()
+                .ok_or("history")?
+                .iter()
+                .position(|entry| {
+                    entry["history"]["disposition"] == "retained_after_dispatch_commit"
+                })
+                .ok_or("retained episode")?;
+            retained_pointer = format!("/operation/history/{retained}/history/disposition");
             cases.extend([
+                ("/nonce", Value::Null),
+                ("/response/execution_nonce_json", Value::Null),
                 ("/operation/version", json!(999)),
                 ("/operation", Value::Null),
                 ("/operation/terminal_replay", Value::Null),
                 ("/operation/dispatch_commit", Value::Null),
                 ("/operation/history", json!([])),
-                (
-                    "/operation/history/0/history/disposition",
-                    json!("released_before_dispatch"),
-                ),
+                (retained_pointer.as_str(), json!("released_before_dispatch")),
                 (
                     "/operation/history/0/claim/intent/expectationId",
                     json!("another-generation"),

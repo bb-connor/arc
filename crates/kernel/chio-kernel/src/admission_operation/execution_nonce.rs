@@ -11,7 +11,7 @@ use super::{
 use crate::execution_nonce::{validate_execution_nonce, NonceBinding, SignedExecutionNonce};
 
 mod profile;
-pub use profile::OPERATION_EXECUTION_NONCE_SCHEMA;
+pub use profile::{verify_operation_execution_nonce_at, OPERATION_EXECUTION_NONCE_SCHEMA};
 
 const MAX_NONCE_BYTES: usize = 16 * 1024;
 

@@ -175,5 +175,60 @@ async fn strict_nonce_subprocess() -> Result {
         std::fs::write(retained, serde_json::to_vec(&nonce)?)?;
     }
     assert_eq!(runtime.process("root")?.tree_calls, 1);
+    let projection: chio_kernel::admission_operation::AdmissionReceiptMetadataV1 =
+        serde_json::from_value(metadata["admission_operation"].clone())?;
+    drop(runtime);
+    drop(kernel);
+    let authority = chio_store_sqlite::SqliteAuthorityStore::open_serving(
+        directory.join("authority.db"),
+        directory.join("locks"),
+    )?;
+    let now = u64::try_from(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_millis(),
+    )?;
+    let custody = authority
+        .admission_operation_store()
+        .load_execution_nonce_evidence(&projection.operation_id, &authority.mutation_fence(), now)?
+        .ok_or("missing unknown nonce custody")?;
+    assert_eq!(custody.signed_nonce, *nonce);
+    assert_eq!(
+        custody.operation.state,
+        chio_kernel::admission_operation::AdmissionOperationState::OutcomeUnknownAfterDispatch
+    );
+    assert!(custody.reserved_at_unix_ms.is_some());
+    chio_kernel::admission_operation::verify_operation_execution_nonce_at(
+        &custody.signed_nonce,
+        &projection.operation_id,
+        &support::issuer().public_key(),
+        &nonce.nonce.bound_to,
+        i64::try_from(custody.verified_at_unix_ms / 1000)?,
+    )?;
+    let receipts = chio_store_sqlite::SqliteReceiptStore::open(directory.join("receipts.db"))?;
+    receipts.create_next_receipt_checkpoint(1024, &support::issuer())?;
+    let bundle = receipts.build_evidence_export_bundle(
+        &chio_kernel::evidence_export::EvidenceExportQuery::admin_all(),
+    )?;
+    let retained = bundle
+        .tool_receipts
+        .iter()
+        .find(|record| record.receipt.id == response.receipt.id)
+        .ok_or("unknown refusal is missing from receipt log")?;
+    let proof = bundle
+        .inclusion_proofs
+        .iter()
+        .find(|proof| proof.receipt_seq == retained.seq)
+        .ok_or("unknown refusal has no inclusion proof")?;
+    let checkpoint = bundle
+        .checkpoints
+        .iter()
+        .find(|checkpoint| checkpoint.body.checkpoint_seq == proof.checkpoint_seq)
+        .ok_or("unknown refusal has no checkpoint")?;
+    chio_kernel::checkpoint::validate_checkpoint(checkpoint)?;
+    assert!(proof.verify(
+        &chio_core_types::crypto::canonical_json_bytes(&response.receipt)?,
+        &checkpoint.body.merkle_root
+    ));
     Ok(())
 }

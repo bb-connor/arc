@@ -10,6 +10,9 @@ use super::*;
 
 pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), CliError> {
     let host = Host::open(state, false)?;
+    if host.record.config.execution_nonces {
+        host.checkpoint_receipts()?;
+    }
     let directory = host.lease.directory.path();
     let runner = super::super::runner::completed_snapshot(&host, plan)?;
     require(
@@ -69,6 +72,16 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
             "every joined task must have an allowed result",
         )?;
         let custody = super::custody::export(&host, &receipt, now)?;
+        let (nonce, receipt_log) = if host.record.config.execution_nonces {
+            (
+                super::super::nonce_evidence::export(&host, &receipt, now)?,
+                Some(super::super::receipt_evidence::export(
+                    &host, &receipt, now,
+                )?),
+            )
+        } else {
+            (None, None)
+        };
         parents.push(SwarmJoinParentReceipt {
             task_id: process.into(),
             receipt_id: receipt.id,
@@ -82,6 +95,8 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
                         context,
                         response,
                         custody,
+                        nonce,
+                        receipt_log,
                     },
                 )
                 .is_none(),
@@ -174,7 +189,12 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
     authority.terminal_receipts.push(terminal);
     let native = super::native::export(&host.record.config, &results)?;
     let evidence = Evidence {
-        schema: SCHEMA.into(),
+        schema: if host.record.config.execution_nonces {
+            SCHEMA
+        } else {
+            LEGACY_SCHEMA
+        }
+        .into(),
         runtime_id: host.runtime.runtime_id().into(),
         bootstrap,
         host_record: host.record,

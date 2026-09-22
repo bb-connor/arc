@@ -26,6 +26,7 @@ pub(super) fn verify(
     )?;
     let mut parents = BTreeMap::new();
     let mut receipt_ids = BTreeSet::new();
+    let mut nonce_ids = BTreeSet::new();
     for (process, call) in &evidence.results {
         let cap = &caps[process];
         require(
@@ -39,6 +40,30 @@ pub(super) fn verify(
             &call.response,
             key,
         )?;
+        if evidence.schema == SCHEMA {
+            let id = super::super::super::nonce_evidence::verify(
+                call.nonce.as_ref(),
+                &receipt,
+                &call.response,
+                cap,
+                key,
+                bundle.now_unix_ms,
+            )?
+            .ok_or_else(|| error("missing completed execution nonce"))?;
+            require(
+                nonce_ids.insert(id),
+                "execution nonce reused across workers",
+            )?;
+            call.receipt_log
+                .as_ref()
+                .ok_or_else(|| error("missing receipt log inclusion"))?
+                .verify(&receipt, key, bundle.now_unix_ms)?;
+        } else {
+            require(
+                call.nonce.is_none() && call.receipt_log.is_none(),
+                "legacy run carries unsupported nonce or log claims",
+            )?;
+        }
         require(
             receipt.decision == Some(Decision::Allow)
                 && receipt.timestamp >= evidence.bootstrap.timestamp
@@ -72,7 +97,13 @@ pub(super) fn verify(
             .iter()
             .find(|route| route.route_plan_id == token.route_plan_receipt_id)
             .ok_or_else(|| error("missing task route"))?;
-        super::super::custody::verify(&call.custody, &receipt, token, &evidence.runtime_id)?;
+        super::super::custody::verify(
+            &call.custody,
+            &receipt,
+            token,
+            &evidence.runtime_id,
+            call.nonce.as_ref(),
+        )?;
         require(
             receipt
                 .metadata

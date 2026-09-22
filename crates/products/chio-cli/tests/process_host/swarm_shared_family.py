@@ -37,6 +37,7 @@ capabilities:
 
     config = write(directory / "config.json", {
         "schema": "chio.process.host.v1", "policy": str(policy),
+        "execution_nonces": True,
         "mailboxes": [{"id": "jobs"}],
         "children": [{
             "id": name, "parent": "root", "budget_share_bps": 2500,

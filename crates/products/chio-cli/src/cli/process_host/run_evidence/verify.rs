@@ -23,7 +23,9 @@ pub(super) fn verify(
     verified_receipt(signed, key)?;
     observation(signed, "attest_completed_fanout")?;
     require(
-        !runtime_id.is_empty() && evidence.runtime_id == runtime_id && evidence.schema == SCHEMA,
+        !runtime_id.is_empty()
+            && evidence.runtime_id == runtime_id
+            && matches!(evidence.schema.as_str(), SCHEMA | LEGACY_SCHEMA),
         "run schema or pinned runtime differs",
     )?;
     require(
@@ -37,6 +39,10 @@ pub(super) fn verify(
         "host record differs from original provisioning",
     )?;
     super::super::state::require_abi(&evidence.host_record.abi, "completed run")?;
+    require(
+        (evidence.schema == SCHEMA) == evidence.host_record.config.execution_nonces,
+        "run nonce profile differs from original provisioning",
+    )?;
     super::native::verify(evidence, native_pins)?;
     observation(&evidence.bootstrap, "provision_swarm")?;
     require(

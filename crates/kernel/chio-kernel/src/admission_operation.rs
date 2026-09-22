@@ -38,7 +38,10 @@ pub use authority_profile::{AdmissionAuthorityProfileV1, AdmissionAuthoritySelec
 pub use caller_budget::AdmissionCallerBudgetShare;
 pub use caller_dispatch_context::AdmissionCallerDispatchContextV1;
 pub use capture::*;
-pub use execution_nonce::{AdmissionExecutionNonceReservationV1, OPERATION_EXECUTION_NONCE_SCHEMA};
+pub use execution_nonce::{
+    verify_operation_execution_nonce_at, AdmissionExecutionNonceReservationV1,
+    OPERATION_EXECUTION_NONCE_SCHEMA,
+};
 pub use identity::*;
 pub use native_caller_custody::{NativeCallerReleaseCustodyV1, NATIVE_CALLER_CONTEXT_SCHEMA};
 pub use native_dispatch_ledger::{

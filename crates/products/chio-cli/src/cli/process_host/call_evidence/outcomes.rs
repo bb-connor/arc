@@ -21,7 +21,8 @@ pub(crate) use self::exporting::export;
 #[path = "outcomes_native.rs"]
 mod native;
 
-const OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v2";
+const OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v3";
+const PREVIOUS_OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v2";
 const LEGACY_OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v1";
 
 #[derive(Serialize, Deserialize)]
@@ -62,7 +63,10 @@ fn verify_outcomes(
     observation(&run.bootstrap, "provision_swarm")?;
     require(
         !runtime.is_empty()
-            && (run.schema == OUTCOMES_SCHEMA || run.schema == LEGACY_OUTCOMES_SCHEMA)
+            && matches!(
+                run.schema.as_str(),
+                OUTCOMES_SCHEMA | PREVIOUS_OUTCOMES_SCHEMA | LEGACY_OUTCOMES_SCHEMA
+            )
             && run.runtime_id == runtime
             && run.bootstrap.action.parameters["runtime_id"] == runtime
             && signed.action.parameters == serde_json::to_value(run).map_err(error)?
@@ -77,6 +81,10 @@ fn verify_outcomes(
         "outcome observation differs from pinned provisioning",
     )?;
     super::super::state::require_abi(&run.host_record.abi, "worker outcomes")?;
+    require(
+        (run.schema == OUTCOMES_SCHEMA) == run.host_record.config.execution_nonces,
+        "outcome nonce profile differs from original provisioning",
+    )?;
     let caps: BTreeMap<String, CapabilityToken> =
         serde_json::from_value(run.bootstrap.action.parameters["capabilities"].clone())
             .map_err(error)?;
@@ -196,10 +204,21 @@ fn verify_outcomes(
     )?;
     let mut committed = 0;
     let mut requests = BTreeSet::new();
+    let mut nonce_ids = BTreeSet::new();
     for (process, signed_call) in &run.calls {
         let evidence: Evidence =
             serde_json::from_value(signed_call.action.parameters.clone()).map_err(error)?;
         super::verify(signed_call, &evidence, key, runtime)?;
+        require(
+            (run.schema == OUTCOMES_SCHEMA) == (evidence.schema == super::SCHEMA),
+            "worker call nonce and receipt-log profile differs from its run",
+        )?;
+        if let Some(nonce) = &evidence.nonce {
+            require(
+                nonce_ids.insert(nonce.signed_nonce.nonce.nonce_id.clone()),
+                "execution nonce reused across workers",
+            )?;
+        }
         let cap = &caps[process];
         require(
             hash(&evidence.bootstrap)? == hash(&run.bootstrap)?
@@ -370,7 +389,6 @@ pub(crate) fn verify_file(
     let launches = verify_outcomes(&signed, &run, &key, runtime, &pins)?;
     let mut unchecked = vec![
         "physical_effects",
-        "execution_nonces",
         "scenario_matrix",
         "original_interrupted_launch",
         "target_death_without_terminal",
@@ -384,6 +402,11 @@ pub(crate) fn verify_file(
         "continuation_custody",
         "aggregate_usage",
     ];
+    if run.schema == OUTCOMES_SCHEMA {
+        checks.extend(["execution_nonces", "receipt_log_inclusion"]);
+    } else {
+        unchecked.extend(["execution_nonces", "receipt_log_inclusion"]);
+    }
     if run.schema == LEGACY_OUTCOMES_SCHEMA {
         unchecked.push("confinement");
     } else {

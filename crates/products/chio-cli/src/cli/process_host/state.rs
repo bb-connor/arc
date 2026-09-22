@@ -6,12 +6,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chio_control_plane::{
-    build_kernel, configure_capability_authority, configure_receipt_store, policy,
-    DurableAdmissionRuntime,
+    build_kernel, configure_capability_authority, policy, DurableAdmissionRuntime,
 };
 use chio_control_plane::{prepare_private_directory, PreparedPrivateDirectory};
 use chio_core_types::capability::attenuation::scope_hash;
 use chio_kernel::admission_operation::DurableAdmissionMode;
+use chio_kernel::execution_nonce::{ExecutionNonceConfig, ExecutionNonceStore};
 use chio_kernel::ChioKernel;
 use chio_manifest::ToolManifest;
 use chio_mcp_adapter::transport::StdioRequestTimeouts;
@@ -40,6 +40,19 @@ pub(super) struct Config {
     pub spawn_templates: Vec<SpawnTemplate>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub supervised_children: bool,
+    /// Require the original operation-owned nonce before every tool dispatch.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub execution_nonces: bool,
+}
+
+struct NoLegacyNonce;
+
+impl ExecutionNonceStore for NoLegacyNonce {
+    fn reserve(&self, _: &str) -> Result<bool, chio_kernel::KernelError> {
+        Err(chio_kernel::KernelError::Internal(
+            "process hosts require operation-owned execution nonce custody".into(),
+        ))
+    }
 }
 
 fn is_false(value: &bool) -> bool {
@@ -393,11 +406,13 @@ pub(super) fn kernel(
     directory: &Path,
     loaded: policy::LoadedPolicy,
     initializing: bool,
+    execution_nonces: bool,
 ) -> Result<
     (
         ChioKernel,
         chio_core_types::crypto::Keypair,
         DurableAdmissionRuntime,
+        Arc<chio_store_sqlite::SqliteReceiptStore>,
     ),
     CliError,
 > {
@@ -419,13 +434,26 @@ pub(super) fn kernel(
     let authority = DurableAdmissionRuntime::open(&directory.join("authority.db"))?;
     let key = authority.kernel_keypair();
     let mut kernel = build_kernel(loaded, &key);
+    if execution_nonces {
+        kernel.set_execution_nonce_store(
+            ExecutionNonceConfig {
+                require_nonce: true,
+                ..ExecutionNonceConfig::default()
+            },
+            Box::new(NoLegacyNonce),
+        );
+    }
     kernel.set_capability_trust_root(key.public_key(), scope_hash(&root_scope).map_err(error)?);
-    configure_receipt_store(
-        &mut kernel,
-        Some(&directory.join("receipts.db")),
-        None,
-        None,
-    )?;
+    let receipts = Arc::new(chio_store_sqlite::SqliteReceiptStore::open(
+        directory.join("receipts.db"),
+    )?);
+    receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
+    kernel
+        .set_receipt_store_handle(receipts.clone())
+        .map_err(error)?;
+    kernel
+        .validate_web3_evidence_prerequisites()
+        .map_err(error)?;
     if swarm_required && !initializing {
         super::swarm::install(directory, &authority, &mut kernel)?;
     }
@@ -442,7 +470,7 @@ pub(super) fn kernel(
         issuance,
         assurance,
     )?;
-    Ok((kernel, key, authority))
+    Ok((kernel, key, authority, receipts))
 }
 
 pub(super) struct Host {
@@ -450,6 +478,8 @@ pub(super) struct Host {
     pub record: Record,
     pub runtime: ProcessRuntime,
     pub kernel: Arc<ChioKernel>,
+    #[cfg(target_os = "linux")]
+    pub receipts: Arc<chio_store_sqlite::SqliteReceiptStore>,
     #[cfg(target_os = "linux")]
     pub authority: DurableAdmissionRuntime,
     #[cfg(target_os = "linux")]
@@ -469,7 +499,12 @@ impl Host {
             return Err(error("policy changed since initialization; restore the original policy to recover this host"));
         }
         let swarm_required = policy.kernel.require_swarm_admission;
-        let (mut kernel, issuer, authority) = kernel(lease.directory.path(), policy, false)?;
+        let (mut kernel, issuer, authority, _receipts) = kernel(
+            lease.directory.path(),
+            policy,
+            false,
+            record.config.execution_nonces,
+        )?;
         let lifecycle = if connect && !record.config.spawn_templates.is_empty() {
             Some(Arc::new(super::lifecycle::Service::new(
                 chio_process::ProcessRegistry::open(
@@ -530,10 +565,27 @@ impl Host {
             runtime,
             kernel,
             #[cfg(target_os = "linux")]
+            receipts: _receipts,
+            #[cfg(target_os = "linux")]
             authority,
             #[cfg(target_os = "linux")]
             lifecycle,
         })
+    }
+
+    /// Seal the already committed tail through the host's existing writer.
+    #[cfg(target_os = "linux")]
+    pub fn checkpoint_receipts(&self) -> Result<(), CliError> {
+        let key = self.authority.kernel_keypair();
+        loop {
+            let report = self.receipts.create_next_receipt_checkpoint(1024, &key)?;
+            if !report.created {
+                if report.latest_committed_entry_seq != report.latest_checkpointed_entry_seq {
+                    return Err(error("receipt log tail is not checkpointed"));
+                }
+                return Ok(());
+            }
+        }
     }
 }
 

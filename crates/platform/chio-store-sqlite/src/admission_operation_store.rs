@@ -73,7 +73,9 @@ pub use native_capture_test_support::NativeDispatchCaptureResponseTestFault;
 pub use native_capture_test_support::NativeDispatchCaptureTransactionTestCutpoint;
 #[cfg(feature = "admission-test-support")]
 pub use security_participant_state::output::NativeOutputJoinTestFault;
+mod nonce_evidence;
 mod nonce_preflight;
+pub use nonce_evidence::ExecutionNonceEvidenceV1;
 pub(crate) use nonce_preflight::bind_nonce_preflight_tx;
 mod factor_assignment;
 mod obligation;

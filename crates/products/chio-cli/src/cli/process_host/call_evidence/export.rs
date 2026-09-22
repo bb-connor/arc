@@ -17,6 +17,9 @@ pub(crate) fn export(
     let context: Value = crate::process_response_verify::read_document(context)?;
     let response: Value = crate::process_response_verify::read_document(response)?;
     let host = Host::open(state, false)?;
+    if host.record.config.execution_nonces {
+        host.checkpoint_receipts()?;
+    }
     let now = u64::try_from(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -137,7 +140,12 @@ pub(super) fn observe(
         None
     };
     let evidence = Evidence {
-        schema: SCHEMA.into(),
+        schema: if host.record.config.execution_nonces {
+            SCHEMA
+        } else {
+            LEGACY_SCHEMA
+        }
+        .into(),
         runtime_id: host.runtime.runtime_id().into(),
         observed_at_unix_ms: now,
         bootstrap,
@@ -145,6 +153,16 @@ pub(super) fn observe(
         context,
         response,
         operation,
+        nonce: if host.record.config.execution_nonces {
+            super::super::nonce_evidence::export(host, &call, now)?
+        } else {
+            None
+        },
+        receipt_log: if host.record.config.execution_nonces {
+            Some(super::super::receipt_evidence::export(host, &call, now)?)
+        } else {
+            None
+        },
     };
     let parameters = serde_json::to_value(&evidence).map_err(error)?;
     let mut body = evidence.bootstrap.body();

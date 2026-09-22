@@ -150,9 +150,16 @@ def verify_observations(name, case, verified, identity):
     calls, observed = run["calls"], case["observation"]
     states = verified["observed_operations"]
     require(
-        verified["artifact_schema"] == "chio.process.worker-outcomes.v2",
-        "matrix requires native-bound outcomes v2",
+        verified["artifact_schema"] in (
+            "chio.process.worker-outcomes.v2", "chio.process.worker-outcomes.v3"
+        ),
+        "matrix requires native-bound outcomes v2 or v3",
     )
+    if verified["artifact_schema"] == "chio.process.worker-outcomes.v3":
+        require(
+            {"execution_nonces", "receipt_log_inclusion"} <= set(verified["checks"]),
+            "nonce-aware outcomes require nonce custody and receipt-log verification",
+        )
     require(
         set(verified["native_launches"]) == set(calls),
         "matrix requires a verified native launch for every worker",
@@ -507,6 +514,11 @@ def verify_bundle(chio, artifact, trusted_pins):
                     == set(verified["observed_operations"]),
                     "completed run differs from outcomes",
                 )
+                if verified["artifact_schema"] == "chio.process.worker-outcomes.v3":
+                    require(
+                        {"execution_nonces", "receipt_log_inclusion"} <= set(joined["checks"]),
+                        "completed run omits verified nonce custody or receipt-log inclusion",
+                    )
                 completed_calls = case["completed_run"]["action"]["parameters"][
                     "results"
                 ]
@@ -639,6 +651,11 @@ def verify_bundle(chio, artifact, trusted_pins):
                         "original launch differs from pinned process observation",
                     )
             reports[name] = verified
+    joined_checks = {"execution_nonces", "receipt_log_inclusion"}
+    checked = sorted(
+        check for check in joined_checks
+        if all(check in report["checks"] for report in reports.values())
+    )
     return {
         "schema": SCHEMA + ".verification",
         "scenarios": reports,
@@ -646,12 +663,11 @@ def verify_bundle(chio, artifact, trusted_pins):
         "local_matrix_verified": True,
         "m5_acceptance_complete": False,
         "external_observation_authority": "independently retained operator bundle digest",
+        "checks": checked,
         "unchecked": [
             "designated_runner_authorization",
             "combined_foundation_qualification",
-            "execution_nonces",
-            "receipt_log_inclusion",
-        ],
+        ] + sorted(joined_checks - set(checked)),
     }
 
 

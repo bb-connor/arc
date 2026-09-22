@@ -126,6 +126,7 @@ capabilities:
         share, remainder = divmod(10000, len(calls))
         config = {
             "schema": "chio.process.host.v1",
+            "execution_nonces": True,
             "policy": str(policy),
             "servers": self.servers,
             "limits": {

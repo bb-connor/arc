@@ -77,6 +77,7 @@ pub(super) fn verify(
     receipt: &ChioReceipt,
     token: &chio_swarm_authority::SwarmContinuationToken,
     runtime_id: &str,
+    nonce: Option<&super::super::nonce_evidence::Evidence>,
 ) -> Result<(), CliError> {
     let owned = replay(receipt)?;
     let reference: RuntimeParticipantClaimReferenceV1 =
@@ -114,6 +115,24 @@ pub(super) fn verify(
             "continuation custody history has substituted or duplicate episodes",
         )?;
         if claim.reference == reference {
+            if let Some(nonce) = nonce {
+                let original =
+                    chio_kernel::admission_operation::AdmissionOperationV1::from_persisted(
+                        evidence.operation.clone(),
+                    )
+                    .map_err(error)?;
+                let current =
+                    chio_kernel::admission_operation::AdmissionOperationV1::from_persisted(
+                        nonce.operation.clone(),
+                    )
+                    .map_err(error)?;
+                require(
+                    original.binding() == current.binding()
+                        && original.execution_nonce_issuance_digest()
+                            == current.execution_nonce_issuance_digest(),
+                    "execution nonce differs from original continuation commitment",
+                )?;
+            }
             require(
                 claim.disposition == RuntimeParticipantDisposition::RetainedAfterDispatchCommit,
                 "completed continuation custody is not retained",

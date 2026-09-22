@@ -263,10 +263,33 @@ fn verify_decision(response: &Response, receipt: &ChioReceipt) -> Result<(), Cli
     // A nonce is a separate signed artifact. Retain it without claiming its
     // validity, expiry or usability from receipt verification alone.
     require(
-        response.execution_nonce_json.is_null()
-            || (verdict == "allow" && response.execution_nonce_json.is_string()),
+        response.execution_nonce_json.is_null() || response.execution_nonce_json.is_string(),
         "execution nonce shape",
     )
+}
+
+/// Parse transported material without implying consumption or dispatch authority.
+pub(crate) fn response_nonce(
+    response: &Value,
+) -> Result<Option<chio_kernel::execution_nonce::SignedExecutionNonce>, CliError> {
+    let value = &response["execution_nonce_json"];
+    if value.is_null() {
+        return Ok(None);
+    }
+    let text = value
+        .as_str()
+        .ok_or_else(|| fail("execution nonce must be JSON text"))?;
+    require(
+        !text.is_empty() && text.len() <= 16_384,
+        "execution nonce size",
+    )?;
+    let value = checked_json::parse(text)?;
+    let nonce = serde_json::from_value(value.clone()).map_err(fail)?;
+    require(
+        serde_json::to_value(&nonce).map_err(fail)? == value,
+        "execution nonce fields",
+    )?;
+    Ok(Some(nonce))
 }
 
 fn verify_output(response: &Response, receipt: &ChioReceipt) -> Result<(), CliError> {

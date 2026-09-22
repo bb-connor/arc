@@ -78,13 +78,108 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
     assert_eq!(report["verified_workers"], json!(["alice", "bob"]));
     assert_eq!(report["captured_invocations"], 2);
     assert_eq!(report["m5_acceptance_complete"], false);
+    for check in ["execution_nonces", "receipt_log_inclusion"] {
+        assert!(report["checks"]
+            .as_array()
+            .ok_or("checks")?
+            .contains(&json!(check)));
+        assert!(!report["unchecked"]
+            .as_array()
+            .ok_or("unchecked")?
+            .contains(&json!(check)));
+    }
     assert!(!verify(&artifact, "another-runtime")?.status.success());
     let original: ChioReceipt = serde_json::from_slice(&std::fs::read(&artifact)?)?;
+    for worker in ["alice", "bob"] {
+        assert!(
+            original.action.parameters["results"][worker]["response"]["execution_nonce_json"]
+                .is_string(),
+            "the reference worker must retain its original execution nonce"
+        );
+    }
     let signer = chio_control_plane::load_existing_authority_keypair(
         &state.join("authority.db.kernel.seed"),
     )?;
     assert_eq!(signer.public_key(), original.kernel_key);
+    // This proof and checkpoint really verify, but for a receipt from another
+    // runtime. An outer signature must not make them evidence for this call.
+    let tool_receipt: ChioReceipt = serde_json::from_str(
+        original.action.parameters["results"]["alice"]["response"]["receipt_json"]
+            .as_str()
+            .ok_or("tool receipt")?,
+    )?;
+    let mut foreign_body = tool_receipt.body();
+    foreign_body.id.clear();
+    foreign_body.metadata.as_mut().ok_or("metadata")?["chio_process"]["runtime_id"] =
+        json!("another-runtime");
+    let foreign = ChioReceipt::sign(foreign_body, &signer)?;
+    let foreign_bytes = canonical_json_bytes(&foreign)?;
+    let tree = chio_core::merkle::MerkleTree::from_leaves(std::slice::from_ref(&foreign_bytes))?;
+    let mut checkpoint = chio_kernel::checkpoint::build_checkpoint(
+        1,
+        1,
+        1,
+        std::slice::from_ref(&foreign_bytes),
+        &signer,
+    )?;
+    checkpoint.body.issued_at = original.timestamp;
+    checkpoint.signature = signer.sign(&canonical_json_bytes(&checkpoint.body)?);
+    chio_kernel::checkpoint::validate_checkpoint(&checkpoint)?;
+    let proof = chio_kernel::checkpoint::build_inclusion_proof(&tree, 0, 1, 1)?;
+    assert!(proof.verify(&foreign_bytes, &checkpoint.body.merkle_root));
+    let foreign_log = json!({"checkpoint": checkpoint, "inclusion": proof});
+    let mut extra_nonce: Value = serde_json::from_str(
+        original.action.parameters["results"]["alice"]["response"]["execution_nonce_json"]
+            .as_str()
+            .ok_or("nonce JSON")?,
+    )?;
+    extra_nonce["nonce"]["unrecognized_authority"] = json!(true);
+    let retained_episode = original.action.parameters["results"]["alice"]["custody"]["history"]
+        .as_array()
+        .ok_or("custody history")?
+        .iter()
+        .position(|entry| entry["history"]["disposition"] == "retained_after_dispatch_commit")
+        .ok_or("retained dispatch episode")?;
+    let retained_pointer =
+        format!("/results/alice/custody/history/{retained_episode}/history/disposition");
     let cases = [
+        (
+            "/results/alice/response/execution_nonce_json",
+            json!(serde_json::to_string(&extra_nonce)?),
+            "execution nonce fields",
+        ),
+        (
+            "/results/alice/receipt_log",
+            foreign_log,
+            "receipt log inclusion",
+        ),
+        (
+            "/results/alice/response/execution_nonce_json",
+            original.action.parameters["results"]["bob"]["response"]["execution_nonce_json"]
+                .clone(),
+            "execution nonce differs",
+        ),
+        (
+            "/results/alice/response/execution_nonce_json",
+            Value::Null,
+            "execution nonce differs",
+        ),
+        (
+            "/results/alice/nonce/verified_at_unix_ms",
+            json!(1),
+            "issuance interval",
+        ),
+        ("/results/alice/receipt_log", Value::Null, "payload differs"),
+        (
+            "/results/alice/receipt_log",
+            original.action.parameters["results"]["bob"]["receipt_log"].clone(),
+            "receipt log inclusion",
+        ),
+        (
+            "/results/alice/receipt_log/inclusion/leaf_index",
+            json!(999),
+            "receipt log inclusion",
+        ),
         (
             "/results/alice/custody/terminal_receipt_id",
             json!("another-receipt"),
@@ -96,7 +191,7 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
             "custody history is absent",
         ),
         (
-            "/results/alice/custody/history/0/history/disposition",
+            retained_pointer.as_str(),
             json!("released_before_dispatch"),
             "custody is not retained",
         ),
@@ -174,6 +269,20 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
             String::from_utf8_lossy(&denied.stderr)
         );
     }
+    let mut copied = original.body();
+    copied.id.clear();
+    copied.action.parameters["results"]["alice"]["nonce"] =
+        original.action.parameters["results"]["bob"]["nonce"].clone();
+    copied.action.parameters["results"]["alice"]["response"]["execution_nonce_json"] =
+        original.action.parameters["results"]["bob"]["response"]["execution_nonce_json"].clone();
+    copied.content_hash = sha256_hex(&canonical_json_bytes(&copied.action.parameters)?);
+    copied.action = ToolCallAction::from_parameters(copied.action.parameters)?;
+    let copied = ChioReceipt::sign(copied, &signer)?;
+    let path = root.join("coherent-copied-nonce.json");
+    std::fs::write(&path, canonical_json_bytes(&copied)?)?;
+    let denied = verify(&path, runtime)?;
+    assert!(!denied.status.success());
+    assert!(String::from_utf8_lossy(&denied.stderr).contains("execution nonce differs"));
     // Unsigned payload edits also fail at the signature boundary.
     let mut altered: Value = serde_json::to_value(&original)?;
     altered["action"]["parameters"]["runtime_id"] = json!("tampered");

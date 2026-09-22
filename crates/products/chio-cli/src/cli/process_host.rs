@@ -16,8 +16,14 @@ mod diagnostics;
 #[path = "process_host/lifecycle.rs"]
 mod lifecycle;
 #[cfg(unix)]
+#[path = "process_host/nonce_evidence.rs"]
+mod nonce_evidence;
+#[cfg(unix)]
 #[path = "process_host/provision.rs"]
 mod provision;
+#[cfg(unix)]
+#[path = "process_host/receipt_evidence.rs"]
+mod receipt_evidence;
 #[cfg(unix)]
 #[path = "process_host/relocation.rs"]
 mod relocation;

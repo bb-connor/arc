@@ -285,8 +285,20 @@ the issued family limit. Each completed call also carries fenced readback of its
 operation-owned continuation claims. The verifier recomputes the original claim
 commitment named in the signed tool receipt and matches the retained token,
 prepared plan, request binding and terminal receipt. Historical evidence cannot
-authorize another effect. Execution nonces and the full M5 scenario matrix remain
-unverified; the report includes `m5_acceptance_complete: false`.
+authorize another effect. Hosts provisioned with `execution_nonces: true` produce
+version 3 artifacts. The process runtime retains the original operation-bound
+nonce before dispatch and reuses it during recovery. Export reads its issuance,
+reservation and historical validation time from the anchored admission store.
+Verification binds that nonce to the exact request, capability, operation and
+original continuation commitment, and checks its historical validity interval.
+
+Version 3 also includes the original call receipt's Merkle inclusion proof and
+signed checkpoint from the host's receipt store. Export checkpoints the committed
+tail through the existing writer. Verification checks the pinned signer, receipt
+bytes, sequence, leaf index, tree size and root. These are local log membership
+claims; external checkpoint publication and the full M5 matrix remain separate.
+Version 2 artifacts retain explicit unchecked nonce and log claims. Every report
+still includes `m5_acceptance_complete: false`.
 
 ### Observe a denied or uncertain call
 
@@ -365,8 +377,11 @@ process exit; they do not assert that the call completed inside its lifetime.
 
 A recovery refusal's connection can be a replacement connection. Its launch
 evidence does not identify the earlier external effect or establish that the
-original target died. Those observations, physical effects, execution nonces
-and the complete scenario matrix still require additional evidence.
+original target died. Those observations, physical effects and the complete
+scenario matrix still require additional evidence. Version 3 outcomes carry
+version 2 call observations with the original nonce custody and receipt-log
+inclusion, including signed recovery refusals. An uncertain effect stays uncertain;
+the proof authenticates that refusal without inventing a completed tool result.
 `m5_acceptance_complete` remains false. Version 1 artifacts remain verifiable
 with their original limits and no native policy signer options. The separate
 completed-run verifier continues to require actual terminal launch receipts.

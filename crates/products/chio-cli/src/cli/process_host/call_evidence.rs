@@ -28,7 +28,8 @@ mod exporting;
 #[cfg(target_os = "linux")]
 pub(super) use exporting::export;
 
-const SCHEMA: &str = "chio.process.call-observation.v1";
+const SCHEMA: &str = "chio.process.call-observation.v2";
+const LEGACY_SCHEMA: &str = "chio.process.call-observation.v1";
 const LIMIT: u64 = 32 * 1024 * 1024;
 
 #[cfg(test)]
@@ -52,6 +53,10 @@ struct Evidence {
     context: Value,
     response: Value,
     operation: Option<Operation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    nonce: Option<super::nonce_evidence::Evidence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    receipt_log: Option<super::receipt_evidence::Evidence>,
 }
 
 /// Only public binding digests and the existing claim commitment preimages.
@@ -131,7 +136,7 @@ fn verify(
     require(
         !runtime.is_empty()
             && evidence.runtime_id == runtime
-            && evidence.schema == SCHEMA
+            && matches!(evidence.schema.as_str(), SCHEMA | LEGACY_SCHEMA)
             && signed.action.parameters == serde_json::to_value(evidence).map_err(error)?,
         "call schema, runtime pin or signed payload differs",
     )?;
@@ -169,6 +174,39 @@ fn verify(
         call.timestamp >= evidence.bootstrap.timestamp && call.timestamp <= signed.timestamp,
         "call receipt is outside observation interval",
     )?;
+    if evidence.schema == SCHEMA {
+        super::nonce_evidence::verify(
+            evidence.nonce.as_ref(),
+            &call,
+            &evidence.response,
+            &cap,
+            key,
+            evidence.observed_at_unix_ms,
+        )?;
+        evidence
+            .receipt_log
+            .as_ref()
+            .ok_or_else(|| error("missing receipt log inclusion"))?
+            .verify(&call, key, evidence.observed_at_unix_ms)?;
+        if let Some(nonce) = &evidence.nonce {
+            let operation = evidence
+                .operation
+                .as_ref()
+                .ok_or_else(|| error("nonce has no owning operation"))?;
+            require(
+                nonce.operation.binding == operation.binding
+                    && nonce.operation.state == operation.state
+                    && nonce.operation.version == operation.version
+                    && nonce.operation.dispatch_commit == operation.dispatch_commit,
+                "execution nonce custody differs from observed operation",
+            )?;
+        }
+    } else {
+        require(
+            evidence.nonce.is_none() && evidence.receipt_log.is_none(),
+            "legacy call carries unsupported nonce or log claims",
+        )?;
+    }
     verify_operation(
         evidence.operation.as_ref(),
         &call,
@@ -387,6 +425,28 @@ pub(super) fn verify_file(
         .metadata
         .as_ref()
         .is_some_and(|metadata| !metadata["chio_runtime"]["operation_owned_replay"].is_null());
+    let mut checks = vec![
+        "signer_pin",
+        "runtime_pin",
+        "original_request",
+        "issued_capability",
+        "worker_response",
+        "retained_operation",
+        "continuation_custody",
+    ];
+    let mut unchecked = vec![
+        "task_authority",
+        "aggregate_usage",
+        "confinement",
+        "physical_effects",
+        "graph_completion",
+        "scenario_matrix",
+    ];
+    if evidence.schema == SCHEMA {
+        checks.extend(["execution_nonces", "receipt_log_inclusion"]);
+    } else {
+        unchecked.extend(["execution_nonces", "receipt_log_inclusion"]);
+    }
     println!(
         "{}",
         json!({"schema": "chio.process.call-verification.v1", "runtime_id": runtime,
@@ -397,8 +457,7 @@ pub(super) fn verify_file(
             (true, false) => "signed_store_readback",
             (false, _) => "no_custody_claim",
         },
-        "checks": ["signer_pin", "runtime_pin", "original_request", "issued_capability", "worker_response", "retained_operation", "continuation_custody"],
-        "unchecked": ["task_authority", "aggregate_usage", "confinement", "physical_effects", "execution_nonces", "graph_completion", "scenario_matrix"],
+        "artifact_schema": evidence.schema, "checks": checks, "unchecked": unchecked,
         "m5_acceptance_complete": false})
     );
     Ok(())
