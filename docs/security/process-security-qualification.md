@@ -1,5 +1,36 @@
 # Combined process and M4 qualification
 
+## Current checkpoint (2026-09-22)
+
+The current local source is `84c0ca4e89b89fd104ca5f2b36b8b501c759fd99`,
+six commits ahead of draft PR #1160 at `bf8b666274095acb1d103e428f21eaaa7bfdeb54`.
+Both required parents remain ancestors. The tracked worktree was clean at the
+start of this research; `output/` contains retained untracked evidence.
+Use the [completion execution plan](../superpowers/plans/2026-09-22-security-roadmap-completion.md)
+for the reconciled queue and original-requirement coverage. Older checkpoints
+below retain their historical source boundaries.
+
+| Area | Current evidence | Remaining boundary |
+| --- | --- | --- |
+| Foundation | Exact-source workspace build and flow pass. Native x86_64 process worker/mailbox, host, response verification, signed lineage and native restart inventories pass. | Full workspace run failed on external-target fixture discovery; explicitly root-bound regression passed, but full retry exited 143. Finish full tests and strict lint. |
+| Dependency and source policy | Fresh locked cargo-vet and structural security CI checks pass; fresh formal-mirror check reports 225 matching entries. | Preserve exact audits and repairs; finish final hosted qualification. Mirror matching is not a solver proof. |
+| Fuzz compilation | All 30 targets compile with ASan on x86_64 at current source; retained log hash matches. | Required fuzz campaigns and final-release requirements remain separate. |
+| Cage | Current-source native run reports 69 tests, 26 real probes and ten mutants with exit 0; retained log hash matches. | The retained runner's release-helper adaptation and trusted capture require their own acceptance. |
+| M5 | All seven current-source scenarios verify; independent observer accepts the bundle and rejects all 15 substitutions. | Execution nonces, receipt-log inclusion, combined-foundation qualification and trusted-runner authorization remain explicitly unchecked. |
+| Image | Current-source image build and validation pass; local image ID is `sha256:0cebffabd9bf06f7eb059c9994680877856d03b054592eeb845c0e1a4987ed4f`. | Publication, registry digest and trusted authority rotation remain separate. Changed input closure requires a new image. |
+| Hosted delivery | Live #1160 is open/draft, mergeable and blocked: 106 success, 12 failure, 16 skipped, one cancelled. MSRV passed. | Six local commits remain unpublished; current PR has no review submissions. Resolve owning failures and exact-head review before integration. |
+| M6-M11 | Component work remains preserved. | No milestone-level M6-M10 acceptance or M11 operational promotion is established. |
+
+The native, process, fuzz and M5 statements above come from inspected retained
+artifacts under `output/process-security-20260915/resume-20260921/`, including
+`oci-remote/*84c0ca4e89*` and `m5-independent-84c0ca4e89/`. They were not rerun
+during planning. The execution plan indexes their exact files, diagnoses current
+hosted failures and distinguishes fresh checks from retained evidence.
+
+Next: finish the explicit-checkout foundation gate, implement the two missing M5
+evidence joins, and prepare the complete source/workflow/image authority transition.
+Do not restart the superseded 26-audit queue or rebuild the unchanged M5 demo.
+
 ## Current checkpoint (2026-09-21)
 
 The current local finalization candidate is based on

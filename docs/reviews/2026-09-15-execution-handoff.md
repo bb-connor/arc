@@ -1,8 +1,9 @@
 # Execution handoff: converge Chio and complete the supported runtime
 
 Current implementation checkpoint: see the
-[September 21 current qualification status](../security/process-security-qualification.md#current-checkpoint-2026-09-21).
-Candidate `ce19d8f3f` includes the September 20 dependency and hygiene
+[September 22 current qualification status](../security/process-security-qualification.md#current-checkpoint-2026-09-22)
+and [reconciled completion plan](../superpowers/plans/2026-09-22-security-roadmap-completion.md).
+Candidate `84c0ca4e89` includes the dependency, image-input, recovery and interpreter
 continuations. Resume from that status before using the historical queue below.
 
 Latest continuation: [September 16 review and execution directive](2026-09-16-execution-directive.md).

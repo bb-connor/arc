@@ -1,14 +1,15 @@
 # Security launch: current execution status
 
-Updated 2026-09-16 UTC. Local M5 work is on
-`integration/process-security-m5-evidence` in `/tmp/arc-m5-evidence`. The retained
-integration checkpoint is on `integration/process-security-m4` in
-`/tmp/arc-security-launch`, published as [draft PR #1160](https://github.com/bb-connor/arc/pull/1160).
-The complete process ancestry is reconciled locally with M4. Combined
-qualification and protected merge remain open; M5 is not complete. The user
-authorized local M5 implementation before that merge on 2026-09-15. See the
-[integration order](process-security-integration.md) and
-[current qualification results](process-security-qualification.md).
+Updated 2026-09-22. The local candidate is `84c0ca4e89` on
+`integration/process-security-m4` in `/tmp/arc-security-launch`, six commits ahead
+of [draft PR #1160](https://github.com/bb-connor/arc/pull/1160). Current-source
+retained evidence includes the complete seven-scenario M5 matrix, independent
+artifact verification, native cage and all 30 fuzz builds. Full foundation,
+nonce/log evidence joins and trusted hosted qualification remain open.
+The user authorized local M5 implementation before protected merge on 2026-09-15.
+See the [reconciled completion plan](../superpowers/plans/2026-09-22-security-roadmap-completion.md)
+and [current qualification results](process-security-qualification.md#current-checkpoint-2026-09-22)
+before using historical entries below.
 
 The following checkpoint and milestone closeouts describe the earlier M4
 candidate, not qualification of the combined process branch. This is the working
@@ -35,12 +36,12 @@ acceptance is complete. This is not merge or release approval.
 | M2 | Complete: local native failure/restart safety acceptance | Preserve exact failure/recovery contracts during M4 repairs | [Acceptance closeout](#m2-local-acceptance-closeout), [cutpoints and downstream contract](native-restart-safety.md) |
 | M3 | Complete: named local caller acceptance and current dependency qualification | All 61 exact cases, complete flow gate and current full workspace passed, including required native caller custody | [Acceptance closeout](#m3-local-acceptance-closeout), [caller contract](authenticated-caller-delivery.md) |
 | M4 | Complete: M4.0-M4.8 local consumer-boundary acceptance | Current 45-case M4, 61-case M3, 69-inventory flow, full workspace/build/Clippy, affected consumers and final source/document/calibration gates passed. Use the supported profiles for M5; no release or confinement qualification implied | [Completed execution checklist](m4-consumer-qualification.md), [local acceptance report](m4-local-acceptance.md), [consumer support ledger](consumer-support.md) |
-| M5 | Fresh seven-scenario Enforced matrix and independent joined-artifact verification pass locally; complete acceptance remains open | Finish combined-foundation and full cage gates, then authorized qualification | [Current implementation and exact-source results](process-security-qualification.md#current-local-evidence-2026-09-15-continued-september-16-utc), [process reference profile](../../examples/reference-swarm/PROCESS.md) |
+| M5 | Seven-scenario Enforced matrix, independent verification and cage inventory pass at `84c0ca4e89`; full acceptance remains open | Finish foundation, execution-nonce and receipt-log joins, and trusted-runner authorization | [Current exact-source results](process-security-qualification.md#current-checkpoint-2026-09-22), [process reference profile](../../examples/reference-swarm/PROCESS.md) |
 | M6 | Broker-aware launch provisioning and actual Linux peer checks pass; integrated topology unqualified | Compose the real broker authority, original composite hold, keyring and receipts; designated runner remains required | [Provisioning boundary](../../examples/reference-swarm/PROCESS.md#provision-brokered-launch-material), enterprise ledger and original plan |
 | M7 | Active-defense components present, composed paths unqualified | Complete flow, response and rollback acceptance in controlled profiles | Active-defense ledger and original plan |
 | M8 | Retention, scale and operational recovery unqualified | Real campaigns after lifecycle integration | Retention #1045 and million-receipt gates remain required |
 | M9 | Entry packages unpublished and external consumer unqualified | Package dependency closure and clean install after M4-M8 | Three intended entrypoints remain `publish = false` |
-| M10 | Not release qualified | Complete exact-candidate hosted lanes, audits and authorized publication steps. Serial hosted control-plane passed all 17 earlier failures, but MSRV exhausted its outer job limit during SQLite; the bounded capacity repair still needs a complete hosted pass | Candidate lacks passing exact-head hosted qualification; supply-chain, advisory and controller-authorization blockers remain |
+| M10 | Not release qualified; locked local cargo-vet and published-head MSRV now pass | Complete final local/hosted inventories, review, trusted authority transition and publication gates | [Current qualification and owning blockers](process-security-qualification.md#current-checkpoint-2026-09-22) |
 | M11 | Not started | Authorized observed pilot and signed promotion stages | [Numeric operator contract](active-defense-rollout.md) |
 
 ## M3 local acceptance closeout
