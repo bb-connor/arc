@@ -1,14 +1,25 @@
 # Execution image input qualification
 
-September 20, 2026. Confidence is high for the local input checks below.
+Updated September 22, 2026.
 The images for the historical inputs below are built and locally validated.
-The current local finalization candidate selects the reviewed AWS-LC repair;
-its lock digest is
-`8e7154ee265ed4521d92130aeb145070c8da1026d02b2939761af758f447ade1`.
+The current candidate retains the reviewed AWS-LC repair and adds the existing
+broker package to the control-plane test dependencies. Its lock digest is
+`b9d9447273164a977ec1c65ffcc07383ccf21779c94febb0ea55c336587c3c5a`.
 The Dockerfile and structural checker pin this exact digest. A fresh image
-build and validation remain required after this ratchet update.
+build and validation remain required after this ratchet update and the native
+broker preparation gate update.
 Registry publication, reviewed
 workflow-definition rotation and capture authorization remain outstanding.
+
+Source `6170900d7f02f325c5e33ade2e06be384e870370`, with Cargo.lock SHA-256
+`df06c6500b5f315def6feabd22fc701a5c3a785615a39cdcafd7efe42199d7c5`,
+produced locally validated Linux/amd64 image
+`sha256:f17db010c5e6e5e1d6ad8eea8ce97f8e2a530888a737e59bbb16afdfdb1a245a`.
+The existing offline APK procedure verified all 199 archive digests and all
+225 installed package pins. Boundary ownership, source digests, tool versions
+and network-disabled locked dependency closure passed. Evidence is retained in
+`output/process-security-20260915/resume-20260921/oci-remote/image-6170900d7f-offline/`.
+This image is unpublished and does not qualify the current lock or gate inputs.
 
 An additional exact-source image was built after the historical run below.
 Source `eb040d592f17994e539f1eebf88bb46e85e5081b`, with Cargo.lock SHA-256
