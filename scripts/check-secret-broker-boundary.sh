@@ -198,6 +198,11 @@ kernel_admission::tests::signed_broker_request_produces_original_operation_bound
 EOF
 )" cargo test --locked -p chio-secret-broker --features kernel-admission --lib kernel_admission::
 
+run_tests "native kernel broker capture readback" yes \
+  "security::adapters::tests::native_flow::support::capture::broker::native_broker_capture_reads_only_original_operation_and_never_recharges" \
+  cargo test --locked -p chio-control-plane --lib \
+  native_broker_capture_reads_only_original_operation_and_never_recharges
+
 if [[ "$(uname -s)" == "Linux" ]]; then
   run_tests "sealed inherited FD master-key custody" no \
     "secure_inherited_key_file_owns_the_original_descriptor_and_closes_it_on_drop" \

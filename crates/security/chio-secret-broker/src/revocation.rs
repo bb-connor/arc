@@ -4,9 +4,8 @@ use sha2::{Digest, Sha256};
 
 use crate::{validate_digest, validate_identifier, BrokerError, Result};
 
-// This is the protocol-owned revocation-set domain shared with the kernel's
-// CanonicalRevocationSet. Broker capture must carry the exact same digest that
-// the combined authority authorized.
+// Broker wire domain. The kernel's admission domain is distinct: an adapter
+// must authenticate the exact canonical members before translating a digest.
 const REVOCATION_SET_DOMAIN: &[u8] = b"chio.revocation-set.v1\0";
 const MAX_REVOCATION_MEMBERS: usize = 128;
 

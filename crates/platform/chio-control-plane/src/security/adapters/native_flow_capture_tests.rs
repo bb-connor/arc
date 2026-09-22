@@ -29,6 +29,13 @@ mod corruption {
     ));
 }
 
+mod broker {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_broker_capture_tests.rs"
+    ));
+}
+
 impl Fixture {
     fn configure_native_capture_dpop(&mut self) -> TestResult {
         use chio_kernel::admission_operation::AdmissionDigest;

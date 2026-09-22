@@ -599,6 +599,7 @@ run_exact_target --label "native post-join policy" --allow-filtered --expected \
   security::adapters::tests::native_flow::support::capture::combined_credentials::expiry::runtime_expiry_after_native_verification_rolls_back_physical_capture \
   security::adapters::tests::native_flow::support::capture::combined_credentials::native_combined_credentials_deny_missing_proof_or_changed_approved_intent_before_capture \
   security::adapters::tests::native_flow::support::capture::corruption::native_capture_physical_corruption_denies_readback_and_reopen \
+  security::adapters::tests::native_flow::support::capture::broker::native_broker_capture_reads_only_original_operation_and_never_recharges \
   security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_acknowledgement_faults_preserve_committed_accounting \
   security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_readback_faults_preserve_committed_accounting \
   security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_witness_preserves_original_commit_indices_after_revocation_and_reopen \

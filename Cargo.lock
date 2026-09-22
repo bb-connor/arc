@@ -3243,6 +3243,7 @@ dependencies = [
  "chio-revocation-oracle",
  "chio-risk-comptroller",
  "chio-runtime-core",
+ "chio-secret-broker",
  "chio-secure-ipc",
  "chio-security-kernel",
  "chio-security-types",

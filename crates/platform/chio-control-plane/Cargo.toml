@@ -115,6 +115,7 @@ windows-sys = { version = "0.60.2", features = [
 
 [dev-dependencies]
 chio-anchor = { workspace = true }
+chio-secret-broker = { workspace = true, features = ["kernel-admission"] }
 chio-runtime-core = { workspace = true }
 chio-kernel = { workspace = true, features = ["admission-test-support"] }
 chio-link = { workspace = true }
