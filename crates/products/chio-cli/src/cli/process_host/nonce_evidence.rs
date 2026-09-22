@@ -7,8 +7,8 @@ use chio_core::{
     PublicKey,
 };
 use chio_kernel::admission_operation::{
-    verify_operation_execution_nonce_at, AdmissionOperationId, AdmissionOperationV1,
-    AdmissionReceiptMetadataV1,
+    verify_operation_execution_nonce_at, AdmissionOperationId, AdmissionOperationState,
+    AdmissionOperationV1, AdmissionReceiptMetadataV1,
 };
 use chio_kernel::execution_nonce::NonceBinding;
 use serde_json::{json, Value};
@@ -52,7 +52,10 @@ pub(super) fn verify(
             .as_ref()
             .and_then(|m| m.get("admission_operation"));
         if nonce.is_some()
-            || receipt.decision == Some(chio_core::receipt::decision::Decision::Allow)
+            || !matches!(
+                receipt.decision,
+                Some(chio_core::receipt::decision::Decision::Deny { .. })
+            )
             || projection.is_some_and(|p| !p["retained_dispatch_commit"].is_null())
         {
             return Err(error("missing original execution nonce custody"));
@@ -62,6 +65,16 @@ pub(super) fn verify(
     let operation =
         AdmissionOperationV1::from_persisted(evidence.operation.clone()).map_err(error)?;
     let binding = operation.binding();
+    // A pre-dispatch refusal may omit an admission projection even after nonce
+    // issuance. Its owning operation is authenticated by the signed store
+    // readback, then joined to the original request and nonce below.
+    let compensated_readback = id.is_none()
+        && matches!(
+            receipt.decision,
+            Some(chio_core::receipt::decision::Decision::Deny { .. })
+        )
+        && operation.state() == AdmissionOperationState::CompensatedBeforeDispatch
+        && operation.dispatch_commit().is_none();
     let metadata = receipt
         .metadata
         .as_ref()
@@ -78,7 +91,7 @@ pub(super) fn verify(
         parameter_hash: receipt.action.parameter_hash.clone(),
     };
     if nonce.as_ref() != Some(&evidence.signed_nonce)
-        || id.as_ref() != Some(binding.operation_id())
+        || (id.as_ref() != Some(binding.operation_id()) && !compensated_readback)
         || binding.request_id().as_str() != expected.request_id
         || binding.capability_id().as_str() != cap.id
         || evidence
@@ -146,9 +159,18 @@ pub(super) fn verify(
 pub(super) fn export(
     host: &super::state::Host,
     receipt: &ChioReceipt,
+    retained_operation: Option<&AdmissionOperationId>,
     now: u64,
 ) -> Result<Option<Evidence>, CliError> {
-    let Some(id) = operation_id(receipt)? else {
+    let signed_id = operation_id(receipt)?;
+    if signed_id
+        .as_ref()
+        .zip(retained_operation)
+        .is_some_and(|(signed, retained)| signed != retained)
+    {
+        return Err(error("nonce operation differs from retained request"));
+    }
+    let Some(id) = signed_id.as_ref().or(retained_operation) else {
         return Ok(None);
     };
     let (store, fence) = host
@@ -156,6 +178,6 @@ pub(super) fn export(
         .local_runtime_participant()
         .ok_or_else(|| error("missing original nonce authority"))?;
     store
-        .load_execution_nonce_evidence(&id, &fence, now)
+        .load_execution_nonce_evidence(id, &fence, now)
         .map_err(error)
 }

@@ -11,6 +11,61 @@ const KEY: &str = include_str!(concat!(
 const RUNTIME: &str = "714d3643-e7f7-42f9-95b5-6a3a0d734ce8";
 
 #[test]
+fn real_denial_after_nonce_issuance_keeps_custody_without_an_admission_projection(
+) -> Result<(), CliError> {
+    // Retained from the real four-worker shared-family scenario. This worker
+    // received its nonce before another worker exhausted the executable budget.
+    let key =
+        PublicKey::from_hex("b4cdc34f12b6f9b4bca630d008b3c15333b82df760f801516c40c921b9257534")
+            .map_err(error)?;
+    let signed = crate::receipt_verify::verify_original_receipt(
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/process-call-observation/issued-denial.json"
+        )),
+        &key,
+    )?;
+    let evidence: Evidence =
+        serde_json::from_value(signed.action.parameters.clone()).map_err(error)?;
+    verify(
+        &signed,
+        &evidence,
+        &key,
+        "36a636ba-8aac-4f8c-be8e-d14cae008583",
+    )?;
+    let call = crate::process_response_verify::verify_values(
+        &evidence.request,
+        &evidence.context,
+        &evidence.response,
+        &key,
+    )?;
+    assert!(matches!(call.decision, Some(Decision::Deny { .. })));
+    assert!(
+        call.metadata.as_ref().ok_or_else(|| error("metadata"))?["admission_operation"].is_null()
+    );
+    let nonce = evidence.nonce.as_ref().ok_or_else(|| error("nonce"))?;
+    assert!(nonce.reserved_at_unix_ms.is_none());
+    assert_eq!(
+        nonce.operation.state,
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    let cap: CapabilityToken = serde_json::from_value(
+        evidence.bootstrap.action.parameters["capabilities"]["alice"].clone(),
+    )
+    .map_err(error)?;
+    assert!(super::super::nonce_evidence::verify(
+        None,
+        &call,
+        &evidence.response,
+        &cap,
+        &key,
+        evidence.observed_at_unix_ms,
+    )
+    .is_err());
+    Ok(())
+}
+
+#[test]
 fn real_interrupted_call_keeps_its_original_signed_custody_reference() -> Result<(), CliError> {
     let text = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),

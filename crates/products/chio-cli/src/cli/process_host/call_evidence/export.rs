@@ -134,8 +134,21 @@ pub(super) fn observe(
             dispatch_state: operation.dispatch_state(),
             dispatch_commit: operation.dispatch_commit().cloned(),
             terminal_replay: operation.terminal_replay().cloned(),
+            execution_nonce_issuance_digest: operation.execution_nonce_issuance_digest().cloned(),
             history,
         })
+    } else {
+        None
+    };
+    let nonce = if host.record.config.execution_nonces {
+        super::super::nonce_evidence::export(
+            host,
+            &call,
+            operation
+                .as_ref()
+                .map(|operation| &operation.binding.operation_id),
+            now,
+        )?
     } else {
         None
     };
@@ -153,11 +166,7 @@ pub(super) fn observe(
         context,
         response,
         operation,
-        nonce: if host.record.config.execution_nonces {
-            super::super::nonce_evidence::export(host, &call, now)?
-        } else {
-            None
-        },
+        nonce,
         receipt_log: if host.record.config.execution_nonces {
             Some(super::super::receipt_evidence::export(host, &call, now)?)
         } else {

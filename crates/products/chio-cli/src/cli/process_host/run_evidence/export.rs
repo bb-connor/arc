@@ -74,7 +74,7 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
         let custody = super::custody::export(&host, &receipt, now)?;
         let (nonce, receipt_log) = if host.record.config.execution_nonces {
             (
-                super::super::nonce_evidence::export(&host, &receipt, now)?,
+                super::super::nonce_evidence::export(&host, &receipt, None, now)?,
                 Some(super::super::receipt_evidence::export(
                     &host, &receipt, now,
                 )?),

@@ -121,6 +121,18 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
             ("/operation/dispatch_state", json!("not_committed")),
             ("/operation/state", json!("awaiting_caller_report")),
         ];
+        let has_nonce = !original.action.parameters["nonce"].is_null();
+        assert_eq!(
+            has_nonce,
+            !original.action.parameters["operation"]["execution_nonce_issuance_digest"].is_null()
+        );
+        if has_nonce {
+            cases.extend([
+                ("/nonce", Value::Null),
+                ("/response/execution_nonce_json", Value::Null),
+                ("/operation/execution_nonce_issuance_digest", Value::Null),
+            ]);
+        }
         let retained_pointer;
         if state == "completed" {
             let retained = original.action.parameters["operation"]["history"]
@@ -133,8 +145,6 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
                 .ok_or("retained episode")?;
             retained_pointer = format!("/operation/history/{retained}/history/disposition");
             cases.extend([
-                ("/nonce", Value::Null),
-                ("/response/execution_nonce_json", Value::Null),
                 ("/operation/version", json!(999)),
                 ("/operation", Value::Null),
                 ("/operation/terminal_replay", Value::Null),
@@ -146,6 +156,25 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
                     json!("another-generation"),
                 ),
             ]);
+        }
+        if has_nonce {
+            // Stripping both copies cannot conceal an issuance retained by the
+            // original operation, including a denial before executable capture.
+            let mut body = original.body();
+            body.action.parameters["nonce"] = Value::Null;
+            body.action.parameters["response"]["execution_nonce_json"] = Value::Null;
+            let parameters = body.action.parameters.clone();
+            body.action = ToolCallAction::from_parameters(parameters.clone())?;
+            body.content_hash = sha256_hex(&canonical_json_bytes(&parameters)?);
+            body.id.clear();
+            let signed = ChioReceipt::sign(body, &signer)?;
+            let path = folder.join("stripped-nonce-custody.json");
+            std::fs::write(&path, canonical_json_bytes(&signed)?)?;
+            let rejected = verify(&path, runtime, &folder, &key)?;
+            assert!(
+                !rejected.status.success(),
+                "accepted stripped {name} nonce custody"
+            );
         }
         for (index, (pointer, value)) in cases.into_iter().enumerate() {
             let mut body = original.body();

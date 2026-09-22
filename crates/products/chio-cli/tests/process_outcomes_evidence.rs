@@ -65,7 +65,7 @@ fn supervised_outcomes_bind_multiple_graphs_and_authoritative_family_usage() -> 
     assert_eq!(report["workers"], 4);
     assert_eq!(report["captured_invocations"], 2);
     assert_eq!(report["m5_acceptance_complete"], false);
-    assert_eq!(report["artifact_schema"], "chio.process.worker-outcomes.v2");
+    assert_eq!(report["artifact_schema"], "chio.process.worker-outcomes.v3");
     assert_eq!(report["native_launches"], json!({}));
     assert!(!verify(&artifact, "another-runtime")?.status.success());
     let original: ChioReceipt = serde_json::from_slice(&std::fs::read(&artifact)?)?;

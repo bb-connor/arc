@@ -12,9 +12,9 @@ use chio_kernel::admission_operation::{
         RuntimeParticipantClaimEvidenceV1, RuntimeParticipantClaimReferenceV1,
         RuntimeParticipantDisposition, RuntimeParticipantPhase, MAX_RUNTIME_PARTICIPANT_EPISODES,
     },
-    AdmissionDispatchCommitBindingV1, AdmissionDispatchState, AdmissionOperationBindingV1,
-    AdmissionOperationKind, AdmissionOperationState, AdmissionReceiptMetadataV1,
-    AdmissionTerminalReplay, PersistedAdmissionOperationBindingV1,
+    AdmissionDigest, AdmissionDispatchCommitBindingV1, AdmissionDispatchState,
+    AdmissionOperationBindingV1, AdmissionOperationKind, AdmissionOperationState,
+    AdmissionReceiptMetadataV1, AdmissionTerminalReplay, PersistedAdmissionOperationBindingV1,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -70,6 +70,8 @@ struct Operation {
     dispatch_state: AdmissionDispatchState,
     dispatch_commit: Option<AdmissionDispatchCommitBindingV1>,
     terminal_replay: Option<AdmissionTerminalReplay>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    execution_nonce_issuance_digest: Option<AdmissionDigest>,
     history: Vec<RuntimeParticipantClaimEvidenceV1>,
 }
 
@@ -175,6 +177,14 @@ fn verify(
         "call receipt is outside observation interval",
     )?;
     if evidence.schema == SCHEMA {
+        require(
+            evidence.nonce.is_some()
+                == evidence
+                    .operation
+                    .as_ref()
+                    .is_some_and(|operation| operation.execution_nonce_issuance_digest.is_some()),
+            "nonce evidence differs from retained issuance commitment",
+        )?;
         super::nonce_evidence::verify(
             evidence.nonce.as_ref(),
             &call,
@@ -189,6 +199,11 @@ fn verify(
             .ok_or_else(|| error("missing receipt log inclusion"))?
             .verify(&call, key, evidence.observed_at_unix_ms)?;
         if let Some(nonce) = &evidence.nonce {
+            let nonce_operation =
+                chio_kernel::admission_operation::AdmissionOperationV1::from_persisted(
+                    nonce.operation.clone(),
+                )
+                .map_err(error)?;
             let operation = evidence
                 .operation
                 .as_ref()
@@ -197,7 +212,9 @@ fn verify(
                 nonce.operation.binding == operation.binding
                     && nonce.operation.state == operation.state
                     && nonce.operation.version == operation.version
-                    && nonce.operation.dispatch_commit == operation.dispatch_commit,
+                    && nonce.operation.dispatch_commit == operation.dispatch_commit
+                    && nonce_operation.execution_nonce_issuance_digest()
+                        == operation.execution_nonce_issuance_digest.as_ref(),
                 "execution nonce custody differs from observed operation",
             )?;
         }
