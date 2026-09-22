@@ -40,9 +40,11 @@ fn live_swarm_without_future_results_uses_durable_continuation_custody() -> Test
         false,
     )?;
     kernel.set_revocation_store(Box::new(fixture.authority.revocation_store()));
-    kernel.set_receipt_store(Box::new(chio_store_sqlite::SqliteReceiptStore::open(
+    let receipts = chio_store_sqlite::SqliteReceiptStore::open(
         fixture._directory.path().join("receipts.sqlite3"),
-    )?))?;
+    )?;
+    receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
+    kernel.set_receipt_store(Box::new(receipts))?;
     kernel.reconcile_durable_admission_startup()?;
     let response = kernel.evaluate_tool_call_blocking_with_metadata(
         &fixture.request,
