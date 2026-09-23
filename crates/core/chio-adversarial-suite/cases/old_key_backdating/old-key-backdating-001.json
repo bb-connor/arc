@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "old-key-backdating-001",
+  "class": "old_key_backdating",
+  "expected_verdict": "DENY",
+  "expected_reason": "old_key_backdating_detected",
+  "threat_id": "kernel_impersonation",
+  "pending": true,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "artifact_time_control",
+        "package": "chio-keyring",
+        "test_source": "crates/security/chio-keyring/tests/state.rs",
+        "target_kind": "test",
+        "target": "state",
+        "test_name": "trusted_artifact_time_evidence_blocks_post_deactivation_and_preactivation_use"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "old_key_backdating",
+        "control_id": "artifact_time_control",
+        "package": "chio-keyring",
+        "source": "crates/security/chio-keyring/src/state.rs",
+        "function": "KeyLogState::verification_key_for_artifact",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": ">=",
+          "replacement": "<",
+          "occurrence": 1
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/old_key_backdating/mutants.out/outcomes.json"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+  ]
+}

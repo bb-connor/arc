@@ -2,6 +2,7 @@
 //! against the SQLite admission store.
 
 #[path = "threshold_kernel_lifecycle/support.rs"]
+#[allow(dead_code)]
 mod support;
 
 use std::sync::atomic::Ordering;
