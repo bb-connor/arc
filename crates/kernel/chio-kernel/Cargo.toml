@@ -85,7 +85,7 @@ chrono = { workspace = true, features = ["serde"] }
 chio-kernel-core = { workspace = true }
 chio-credit = { workspace = true }
 chio-federation = { workspace = true }
-chio-link = { path = "../../economy/chio-link", default-features = false }
+chio-link = { version = "=0.1.0", path = "../../economy/chio-link", default-features = false }
 chio-log-redact = { workspace = true }
 chio-manifest = { workspace = true }
 chio-metrics-spec = { workspace = true }

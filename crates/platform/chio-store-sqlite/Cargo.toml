@@ -37,7 +37,7 @@ fuzz = []
 [dependencies]
 chacha20poly1305 = { workspace = true }
 chio-agent-web-interop = { workspace = true }
-chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-credit = { workspace = true }
 chio-federation = { workspace = true }
 chio-federation-authority = { workspace = true }
@@ -47,7 +47,7 @@ chio-kernel = { workspace = true, features = ["finding-market"] }
 chio-kernel-core = { workspace = true }
 chio-security-types = { workspace = true, features = ["std"] }
 chio-settle = { workspace = true }
-chio-sqlite-file-identity = { path = "../chio-sqlite-file-identity" }
+chio-sqlite-file-identity = { version = "=0.1.0", path = "../chio-sqlite-file-identity" }
 chio-supervisor = { workspace = true }
 chio-transaction-passport = { workspace = true }
 hex = { workspace = true }

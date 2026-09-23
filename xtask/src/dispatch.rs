@@ -55,10 +55,14 @@ pub(crate) fn dispatch(command: cli::Command) -> Result<(), XtaskError> {
         cli::Command::Formal { command } => match command {
             FormalCommand::ItfToRegression(args) => formal::itf_to_regression::run(&args),
         },
+        cli::Command::Release { command } => match command {
+            cli::ReleaseCommand::RustPreview { out, allow_dirty } => {
+                crate::rust_packages::run(&out, allow_dirty)
+            }
+        },
         // -- noun-group parents with no implemented leaves (fail closed) --
         cli::Command::Fuzz { .. }
         | cli::Command::Mutants { .. }
-        | cli::Command::Release { .. }
         | cli::Command::SupplyChain { .. }
         | cli::Command::Tools { .. } => Err(XtaskError::Usage(
             "this command group has no implemented subcommands yet".into(),

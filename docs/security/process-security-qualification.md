@@ -24,6 +24,43 @@ below retain their historical source boundaries.
 | Hosted delivery | #1160 publishes the continuation. Main prerequisite #1168 is at `2fb4a6c1c8`; definition-only #1167 retains `88b9b2a3cb`. Original hosted failures remain recorded. | New-head qualification, independent review, protected integration and the exact source/definition/image/verifier authority transition remain required. |
 | M9-M11 | Packaging and handoff work remains preserved. | No milestone-level M9-M10 acceptance or M11 operational promotion is established. |
 
+The Rust packaging continuation implements
+[`cargo xtask release rust-preview`](rust-preview-packages.md). It packages the
+selected 50 Chio libraries plus reviewed AWS-LC source into an isolated offline
+registry, verifies original upstream archives against the unchanged workspace
+lock, and records each artifact's digest and source identity. Internal package
+dependencies now have exact versions; publication remains disabled. The final
+assembler binds its registry namespace to source and artifact contents, hashes
+the consumer sources, and includes the project license and notice.
+
+An external x86_64 consumer resolves all 706 packages offline with an empty Cargo
+home, builds the packaged libraries, permits an echo call, denies an out-of-scope
+call, and verifies three receipt signatures against its pinned example key. A
+new process reopens the original SQLite authority under a newer serving fence
+and replays the identical receipt and output with exactly one durable tool
+effect. Consumer Clippy passes with warnings denied; strict all-target xtask
+Clippy, source hygiene, formatting and all 225 formal-source mirrors pass.
+
+These are development-package results on the Rust/package patch based on
+`8027eb525b`, not a published registry or complete native installation. The
+assembled library archive hashes are identical between the two successful
+registry assemblies; the consumer's initial output-enum compile error is
+retained separately from its corrected terminal build and execution. The
+original reserved upstream filename and missing target-dependency resolver
+failures are also retained. The final assembler's content-bound registry still
+resolves 706 packages offline. Local evidence is under
+`output/process-security-20260915/m9-rust-closure-20260923/`; native evidence is
+under the corresponding `m9-rust-consumer-20260923/` directory. The example uses
+explicit demonstration credentials and ephemeral transparency/revocation views;
+it does not claim native confinement or operational signing custody.
+
+The preparatory auditable build on `e621bb2040` completed native companions in
+38m59s and cage-init in 7m22s. The remaining old-source musl build was explicitly
+cancelled to qualify the new external consumer. Its logs and cancellation record
+are retained as `m9-auditable-e621-preparation-20260923.tgz`, SHA-256
+`b2d4278dafcc811627617d7ea4e727aa2ec085cf204e9549c7792911c108318b`.
+This is not a complete or current release build.
+
 The September 23 M7 recovery continuation services previously authorized
 responses before new correlation/planning work and independent declassification
 outbox maintenance. Three real-store outage cases verify that admission remains

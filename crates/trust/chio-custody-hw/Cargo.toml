@@ -89,7 +89,7 @@ tempfile = { workspace = true }
 # `default-features = false` so a `--no-default-features` (mobile/staticlib)
 # test profile is not silently re-enabled with `default = ["passkey"]` (and the
 # OpenSSL-backed webauthn-rs graph) via feature unification on this self edge.
-chio-custody-hw = { path = ".", default-features = false, features = ["dev-fixtures"] }
+chio-custody-hw = { version = "=0.1.0", path = ".", default-features = false, features = ["dev-fixtures"] }
 
 [lints]
 workspace = true
