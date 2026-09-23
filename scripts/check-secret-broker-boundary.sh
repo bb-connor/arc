@@ -123,6 +123,19 @@ run_tests "broker execution concurrency and recovery" no \
   cargo test -p chio-secret-broker --test concurrency
 
 if [[ "$(uname -s)" == "Linux" ]]; then
+  run_tests "single-use prepared broker MCP protocol" yes "$(cat <<'EOF'
+prepared_mcp::tests::malformed_or_oversized_stdio_never_reaches_the_broker
+prepared_mcp::tests::missing_handshake_or_wrong_tool_closes_without_any_broker_request
+prepared_mcp::tests::original_prepared_stream_executes_once_and_returns_only_signed_structured_content
+EOF
+)" cargo test --locked -p chio-secret-broker --lib prepared_mcp::tests::
+
+  run_tests "prepared broker MCP executable custody" no "$(cat <<'EOF'
+executable_preserves_one_broker_dispatch_and_rejects_a_tampered_completion
+executable_refuses_an_inherited_regular_file_without_mcp_output
+EOF
+)" cargo test --locked -p chio-secret-broker --test prepared_mcp_stdio
+
   run_tests "prepared broker cage descriptor identity" yes \
     "transport::stdio::cage_launch_tests::prepared_broker_descriptor_rejects_another_socket_with_the_same_peer" \
     cargo test --locked -p chio-mcp-adapter --lib prepared_broker_descriptor_

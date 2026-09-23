@@ -55,6 +55,23 @@ An inherited-FD-only policy cannot be substituted for this signed endpoint.
 Native cage enforcement currently supports Linux x86_64; other architectures
 retain the existing refusal.
 
+`chio-broker-mcp` is the tool-side executable for this connection. Its arguments
+are `--tenant-scope`, `--tool-name` and `--receipt-signer`; all three are public
+configuration bound by the signed launch policy. It adopts the inherited socket
+at BrokeredNativeV1 slot 8 without duplicating it, opening a socket or changing
+the host's deadlines. No credential or registration signer is passed to it.
+`PreparedBrokerMcpConfig::tool_definition()` returns the exact discovery surface
+to include in the publisher-signed manifest.
+
+The executable requires initialization and discovery before accepting one
+`tools/call`. Input frames and pre-call message counts are bounded. It passes
+the original signed request to the broker and verifies the signed response
+before returning empty content plus structured completion. It then closes the
+channel and exits. Queued replay, malformed input, a failed broker exchange or
+invalid completion cannot trigger another request. Diagnostics contain fixed
+codes only. These stdio and inherited-descriptor process tests do not establish
+native confinement by themselves.
+
 The existing process regression still uses a child broker client and a real TLS
 peer through an MCP-shaped connection. Qualification of the new production
 stdio/cage composition, keyring composition, process cutpoints and complete

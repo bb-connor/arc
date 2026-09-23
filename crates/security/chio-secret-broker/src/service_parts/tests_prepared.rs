@@ -8,6 +8,9 @@ use crate::registration::{
 // tests separately require the production daemon and original kernel capture.
 struct PreparedHandler {
     executes: Arc<AtomicU64>,
+    // Framing cases share a fixed authorization clock. Real connection expiry
+    // and frame deadlines below continue to use the production clock.
+    verified_at_unix_seconds: u64,
 }
 
 impl PreparedHandler {
@@ -44,7 +47,7 @@ impl BrokerIpcHandler for PreparedHandler {
         let authorization: SignedRegisterAttemptAuthorization =
             serde_json::from_slice(&request.authorization)
                 .map_err(|_| BrokerError::AuthorizationDenied("invalid authorization".into()))?;
-        let now = now();
+        let now = self.verified_at_unix_seconds;
         verify_register_attempt_authorization(
             &authorization,
             &authenticated.registration,
@@ -79,11 +82,11 @@ fn authority() -> Ed25519Backend {
     Ed25519Backend::new(Keypair::from_seed(&[86; 32]))
 }
 
-fn requests() -> (AuthenticatedIpcRequest, AuthenticatedIpcRequest) {
+fn requests(issued_at_unix_seconds: u64) -> (AuthenticatedIpcRequest, AuthenticatedIpcRequest) {
     let fixture = fixture(1, false, false);
     let (mut request, trusted) = execution(&fixture, 87, 1);
     let mut body = request.capability.body;
-    body.issued_at_unix_seconds = now();
+    body.issued_at_unix_seconds = issued_at_unix_seconds;
     body.not_before_unix_seconds = body.issued_at_unix_seconds;
     body.expires_at_unix_seconds = body.issued_at_unix_seconds + 120;
     request.capability = issue_capability(body, &Ed25519Backend::new(fixture.issuer.clone()), true)
@@ -92,7 +95,7 @@ fn requests() -> (AuthenticatedIpcRequest, AuthenticatedIpcRequest) {
         &request.capability,
         &request.request,
         "nonce-prepared-connection".into(),
-        now(),
+        issued_at_unix_seconds,
         &fixture.caller,
     )
     .test_expect("current signed proof");
@@ -107,7 +110,7 @@ fn requests() -> (AuthenticatedIpcRequest, AuthenticatedIpcRequest) {
         RegisterAttemptAction::Prepare,
         "tenant-prepared".into(),
         &registration,
-        now(),
+        issued_at_unix_seconds,
         &authority(),
     )
     .test_expect("signed preparation");
@@ -137,11 +140,18 @@ fn requests() -> (AuthenticatedIpcRequest, AuthenticatedIpcRequest) {
     (prepare, execute)
 }
 
-fn endpoint(root: &Path, executes: Arc<AtomicU64>) -> UnixBrokerEndpoint {
+fn endpoint(
+    root: &Path,
+    executes: Arc<AtomicU64>,
+    verified_at_unix_seconds: u64,
+) -> UnixBrokerEndpoint {
     let uid = rustix::process::geteuid().as_raw();
     UnixBrokerEndpoint::bind_with_deadlines(
         root.join("broker.sock"),
-        Arc::new(PreparedHandler { executes }),
+        Arc::new(PreparedHandler {
+            executes,
+            verified_at_unix_seconds,
+        }),
         uid,
         uid,
         BrokerIpcDeadlines::from_millis(100, 1_000).test_expect("ordinary deadlines"),
@@ -173,8 +183,9 @@ fn exchange(
 fn prepared_connection_waits_without_blocking_control_and_executes_once() {
     let directory = crate::private_tempdir().test_expect("directory");
     let executes = Arc::new(AtomicU64::new(0));
-    let endpoint = endpoint(directory.path(), Arc::clone(&executes));
-    let (prepare, execute) = requests();
+    let issued_at = now();
+    let endpoint = endpoint(directory.path(), Arc::clone(&executes), issued_at);
+    let (prepare, execute) = requests(issued_at);
     let (mut stream, ack) = exchange(&endpoint, &prepare);
     assert!(ack.accepted);
     thread::sleep(Duration::from_millis(150));
@@ -212,8 +223,9 @@ fn prepared_connection_waits_without_blocking_control_and_executes_once() {
 fn prepared_connection_rejects_unauthorized_capacity_and_substituted_frames() {
     let directory = crate::private_tempdir().test_expect("directory");
     let executes = Arc::new(AtomicU64::new(0));
-    let endpoint = endpoint(directory.path(), Arc::clone(&executes));
-    let (mut prepare, execute) = requests();
+    let issued_at = now();
+    let endpoint = endpoint(directory.path(), Arc::clone(&executes), issued_at);
+    let (mut prepare, execute) = requests(issued_at);
     let authorization = prepare.authorization.as_slice().to_vec();
     prepare.authorization = b"invalid".to_vec().into();
     assert!(!exchange(&endpoint, &prepare).1.accepted);
@@ -254,8 +266,9 @@ fn prepared_connection_rejects_unauthorized_capacity_and_substituted_frames() {
 fn prepared_connection_expiry_eof_and_trickle_release_capacity() {
     let directory = crate::private_tempdir().test_expect("directory");
     let executes = Arc::new(AtomicU64::new(0));
-    let endpoint = endpoint(directory.path(), Arc::clone(&executes));
-    let (prepare, _) = requests();
+    let issued_at = now();
+    let endpoint = endpoint(directory.path(), Arc::clone(&executes), issued_at);
+    let (prepare, _) = requests(issued_at);
     let (stream, ack) = exchange(&endpoint, &prepare);
     assert!(ack.accepted);
     // Advance the private test deadline without waiting for the production cap.
@@ -306,7 +319,7 @@ fn prepared_connection_expiry_eof_and_trickle_release_capacity() {
 
 #[test]
 fn prepared_connection_lifetime_respects_capability_and_nonce_expiry() {
-    let (prepare, _) = requests();
+    let (prepare, _) = requests(now());
     let mut authenticated: AuthenticatedAttemptRequest =
         serde_json::from_slice(&prepare.payload).test_expect("prepared request");
     let (_, deadline) = prepared_connection_binding(&prepare.tenant_scope, &authenticated)

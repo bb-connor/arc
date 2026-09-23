@@ -16,6 +16,8 @@ pub mod kernel_admission;
 pub mod migration;
 #[cfg(all(feature = "native-mcp", target_os = "linux"))]
 pub mod native_mcp;
+#[cfg(unix)]
+pub mod prepared_mcp;
 pub mod privileged_audit;
 pub mod proof;
 pub mod protocol;

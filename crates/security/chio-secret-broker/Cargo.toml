@@ -15,6 +15,10 @@ name = "chio_secret_broker"
 name = "chio-secret-brokerd"
 path = "src/bin/chio-secret-brokerd.rs"
 
+[[bin]]
+name = "chio-broker-mcp"
+path = "src/bin/chio-broker-mcp.rs"
+
 [features]
 conformance = ["dep:chio-kernel"]
 kernel-admission = ["dep:chio-kernel", "dep:async-trait", "dep:tokio"]

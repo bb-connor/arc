@@ -2,6 +2,42 @@ use std::fs::File;
 
 use crate::{BrokerError, Result};
 
+/// The inherited broker socket slot in the BrokeredNativeV1 cage ABI.
+#[cfg(target_os = "linux")]
+pub const PREPARED_BROKER_FD: i32 = 8;
+
+/// Take ownership of the original prepared socket without duplicating it.
+/// The cage restricts broker send/receive syscalls to this descriptor number.
+///
+/// # Safety
+///
+/// Process launch must transfer descriptor 8 exclusively to this caller. No
+/// Rust value or concurrent code may own, access, replace or close it.
+#[cfg(target_os = "linux")]
+#[allow(unsafe_code)]
+pub unsafe fn adopt_prepared_broker_stream() -> Result<std::os::unix::net::UnixStream> {
+    use std::os::fd::FromRawFd;
+
+    let mut metadata = std::mem::MaybeUninit::<libc::stat>::uninit();
+    // SAFETY: fstat accepts the integer descriptor, reports EBADF for a missing
+    // transfer, and writes only to the allocated stat value on success.
+    if unsafe { libc::fstat(PREPARED_BROKER_FD, metadata.as_mut_ptr()) } != 0 {
+        return Err(BrokerError::Custody(
+            "prepared broker descriptor is unavailable".into(),
+        ));
+    }
+    // SAFETY: successful fstat initialized the complete metadata value.
+    let metadata = unsafe { metadata.assume_init() };
+    if metadata.st_mode & libc::S_IFMT != libc::S_IFSOCK {
+        return Err(BrokerError::Custody(
+            "prepared broker descriptor is not a socket".into(),
+        ));
+    }
+    // SAFETY: successful fstat established a live socket; the caller's launch
+    // transfer contract gives this value exclusive ownership of the same slot.
+    Ok(unsafe { std::os::unix::net::UnixStream::from_raw_fd(PREPARED_BROKER_FD) })
+}
+
 /// Atomically duplicate an exclusively transferred inherited descriptor with
 /// close-on-exec set, then retire the original descriptor number.
 ///
