@@ -43,6 +43,16 @@ selector attempts remain recorded; only the corrected 16-case execution counts
 as kernel evidence. Logs are under
 `output/process-security-20260915/m9-rust-closure-20260923/`.
 
+Post-merge dependency checks preserve both non-importable DER reviews in
+cargo-vet's canonical order and restore the existing CLI import mapping for
+workspace version `0.1.0`. Locked vet passes with 585 fully audited, seven
+partially audited and 731 previously exempted packages. The hosted OSV report
+identified [GHSA-9643-4qgh-g8mx](https://github.com/elysiajs/elysia/security/advisories/GHSA-9643-4qgh-g8mx)
+in the Elysia member lock. The adapter now requires patched Elysia `>=1.4.29`,
+tests exactly `1.4.29`, and aligns its member and workspace locks. Its build,
+nine existing cases and the complete owning OSV scan pass without changing the
+ignore policy. All four generated-language check lanes also pass.
+
 The resource-owner launcher now requires pinned signed manifest and native
 launch-policy inputs plus the private resume-HMAC keyring. Restart revalidates
 their recorded hashes and command bindings. It creates private owner files
@@ -55,6 +65,17 @@ integration changed its input closure. Its complete original inventory and raw
 outputs are retained in `m7-partial-d621-native-host-complete-20260923.tgz`,
 SHA-256 `3f774a756c67cf348e3598735de6770c2cbfd08a08b953c53a4055ee0321b614`.
 Those results do not replace the complete combined-source M7 campaign.
+The later `f6a3686c8a` queue caught and promoted two campaigns before stopping
+for the dependency reconciliation above. Its complete initial inventory and
+original raw outcomes are retained separately.
+
+At `f6a3686c8a`, a concurrent delayed-sync diagnostic passes all 82 selected
+retention cases in 425.16 seconds, including the original quarantined property
+and its unchanged 24-case configuration. It uses three libtest threads,
+25 ms fsync/fdatasync delay, seed `20260916` and verbose property progress.
+The separate million-entry campaign was excluded. No failure or shrinking was
+observed. This diagnostic does not reproduce the original x86 CI hang or close
+#1045; the original MSRV job log and this run remain separately retained.
 
 The Rust packaging continuation implements
 [`cargo xtask release rust-preview`](rust-preview-packages.md). It packages the
