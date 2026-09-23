@@ -5,15 +5,15 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
+use crate::canonical::canonical_json_bytes;
 use crate::crypto::{
-    is_default_optional_algorithm, sign_canonical_with_backend,
-    sign_canonical_with_backend_for_identity, Keypair, PublicKey, Signature, SigningAlgorithm,
-    SigningBackend,
+    is_default_optional_algorithm, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
 };
 use crate::error::{Error, Result};
 use crate::schema_binding::ensure_schema_matches;
 use crate::signer_binding::{
     ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
+    sign_bytes_for_embedded_key,
 };
 
 use super::aggregate_invocation::{
@@ -740,7 +740,8 @@ impl CapabilityToken {
     ///
     /// Use this entry point to produce FIPS-algorithm (P-256 / P-384) tokens
     /// when operating under the `fips` feature. The `body.issuer` field must
-    /// equal `backend.public_key()`; otherwise verification will fail.
+    /// equal the backend's atomic signing identity. Rotation away from that
+    /// identity refuses issuance before a token can be returned.
     ///
     /// The resulting token's `algorithm` envelope field is populated with the
     /// backend's algorithm. It is informational only -- verification
@@ -760,7 +761,12 @@ impl CapabilityToken {
             attenuation_proof: None,
             budget_share_bps: None,
         };
-        let (signature, _bytes) = sign_canonical_with_backend(backend, &signing_body)?;
+        let signature = sign_bytes_for_embedded_key(
+            &body.issuer,
+            backend,
+            &canonical_json_bytes(&signing_body)?,
+        )?;
+        let algorithm = body.issuer.algorithm();
         let token = Self {
             schema: CHIO_CAPABILITY_SCHEMA.to_string(),
             id: body.id,
@@ -771,7 +777,7 @@ impl CapabilityToken {
             expires_at: body.expires_at,
             delegation_chain: body.delegation_chain,
             aggregate_invocation_budget: body.aggregate_invocation_budget,
-            algorithm: Some(backend.algorithm()),
+            algorithm: Some(algorithm),
             caveats: Vec::new(),
             scope_attenuations: None,
             attenuation_proof: None,
@@ -808,16 +814,11 @@ impl CapabilityToken {
             attenuation_proof: None,
             budget_share_bps: None,
         };
-        let (outcome, canonical_bytes) =
-            sign_canonical_with_backend_for_identity(backend, &expected_issuer, &signing_body)?;
-        if outcome.algorithm != expected_algorithm
-            || outcome.signature.algorithm() != expected_algorithm
-            || !expected_issuer.verify(&canonical_bytes, &outcome.signature)
-        {
-            return Err(Error::InvalidSignature(
-                "security-bound capability backend returned a mismatched signature".to_string(),
-            ));
-        }
+        let signature = sign_bytes_for_embedded_key(
+            &expected_issuer,
+            backend,
+            &canonical_json_bytes(&signing_body)?,
+        )?;
         let token = Self {
             schema: CHIO_CAPABILITY_SCHEMA.to_string(),
             id: body.id,
@@ -833,7 +834,7 @@ impl CapabilityToken {
             scope_attenuations: None,
             attenuation_proof: None,
             budget_share_bps: None,
-            signature: outcome.signature,
+            signature,
         };
         token.validate_schema()?;
         Ok(token)
