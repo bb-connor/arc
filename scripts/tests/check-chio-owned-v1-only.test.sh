@@ -11,6 +11,8 @@ cp "${root}/scripts/check-chio-owned-v1-only.sh" "${fixture}/scripts/"
 printf '%s\n' \
   'const SCHEMA: &str = "chio.cage-migration-posture.v2";' \
   > "${fixture}/crates/independent-security.rs"
+printf 'struct ChioSignedBrokerExecutionReceipt%s; const ChioBrokerExecutionReceipt%s: &str = "broker";\n' 'V2' 'V2' \
+  >> "${fixture}/crates/independent-security.rs"
 bash "${fixture}/scripts/check-chio-owned-v1-only.sh" >/dev/null
 
 printf 'struct CapabilityToken%s;\n' 'V2' > "${fixture}/crates/core-capability.rs"
@@ -20,6 +22,12 @@ if bash "${fixture}/scripts/check-chio-owned-v1-only.sh" >/dev/null 2>&1; then
 fi
 
 rm "${fixture}/crates/core-capability.rs"
+printf 'struct ChioSignedBrokerExecutionReceipt%s; struct Receipt%s;\n' 'V2' 'V2' \
+  > "${fixture}/crates/core-receipt.rs"
+if bash "${fixture}/scripts/check-chio-owned-v1-only.sh" >/dev/null 2>&1; then
+  echo "a broker envelope hid a future core receipt on the same line" >&2
+  exit 1
+fi
 printf 'const PATH: &str = "receipt/%s.schema.json";\n' 'v2' \
   > "${fixture}/crates/core-receipt.rs"
 if bash "${fixture}/scripts/check-chio-owned-v1-only.sh" >/dev/null 2>&1; then

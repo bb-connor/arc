@@ -87,6 +87,16 @@ while IFS= read -r line; do
   rest="${line#*:}"
   text="${rest#*:}"
 
+  # Broker execution receipts have their own versioned evidence envelope.
+  # Remove only those generated type names before rechecking the line, so an
+  # adjacent future core receipt or capability still fails this gate.
+  broker_text="${text//ChioSignedBrokerExecutionReceiptV2/}"
+  broker_text="${broker_text//ChioBrokerExecutionReceiptV2/}"
+  if [[ "$broker_text" != "$text" ]] && \
+     ! rg -q "$pattern|$normative_claim_pattern" <<<"$broker_text"; then
+    continue
+  fi
+
   # Future-version negative fixtures intentionally use .v9-style schema IDs.
   if [[ "$text" =~ chio\.[A-Za-z0-9_.-]+\.v9[0-9]* ]]; then
     continue
