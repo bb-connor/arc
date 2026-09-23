@@ -571,6 +571,10 @@ fn signed_receipt(signer: &Keypair) -> chio_secret_broker::receipt::SignedBroker
                 leader_epoch: 13,
                 upstream_status: 200,
                 response_body_sha256: "44".repeat(32),
+                response_headers_sha256: chio_secret_broker::generic_https::response_header_digest(
+                    &[],
+                )
+                .test_expect("response header digest"),
             },
             operation_id: "operation-production-1".to_string(),
             authorize_event_id: "authorize-event-production-1".to_string(),
@@ -743,6 +747,13 @@ fn durable_completed_response_replays_exact_bytes_after_restart() {
     let signer = Keypair::from_seed(&[43; 32]);
     let response = completed_response(&signer);
     let sink = SqliteBrokerReceiptSink::open(&path, signer.public_key()).test_expect("sink");
+
+    let mut substituted = response.clone();
+    substituted.headers.push(
+        chio_secret_broker::protocol::HeaderField::normalized("content-type", b"text/html")
+            .test_expect("valid substituted header"),
+    );
+    assert!(sink.persist_completed(&substituted).is_err());
 
     let first = sink
         .persist_completed(&response)

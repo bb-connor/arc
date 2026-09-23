@@ -11,6 +11,7 @@ use std::sync::Mutex;
 pub(super) enum CompletionFault {
     LoseReply,
     ChangeBody,
+    ChangeHeaders,
     ExtraContent,
 }
 
@@ -154,6 +155,13 @@ impl ToolServerConnection for McpTool {
         match self.fault {
             Some(CompletionFault::LoseReply) => return Err(transport_error()),
             Some(CompletionFault::ChangeBody) => response.body.push(b'!'),
+            Some(CompletionFault::ChangeHeaders) => {
+                response.headers =
+                    vec![
+                        crate::protocol::HeaderField::normalized("content-type", b"text/html")
+                            .map_err(|_| transport_error())?,
+                    ];
+            }
             Some(CompletionFault::ExtraContent) => {
                 content.push(serde_json::json!({"type": "text", "text": "unbound output"}));
             }

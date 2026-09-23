@@ -3,6 +3,36 @@
   "operation_format": "RFC 6902 single-operation subset plus append_bytes",
   "cases": [
     {
+      "id": "v2_response_headers_rebound",
+      "base": "positive/broker-execute-response-v2.json",
+      "mutation": { "op": "replace", "path": "/headers/1/value", "value": [116, 101, 120, 116, 47, 104, 116, 109, 108] },
+      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "response_header_binding_mismatch" }
+    },
+    {
+      "id": "v2_evidence_requires_response_header_commitment",
+      "base": "positive/broker-execution-evidence-v2.json",
+      "mutation": { "op": "remove", "path": "/responseHeadersSha256" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "missing_response_header_digest" }
+    },
+    {
+      "id": "v2_response_refuses_legacy_evidence",
+      "base": "positive/broker-execute-response-v2.json",
+      "mutation": { "op": "replace", "path": "/evidence/schema", "value": "chio.broker-execution-evidence.v1" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "legacy_evidence_downgrade" }
+    },
+    {
+      "id": "v2_receipt_body_requires_response_header_commitment",
+      "base": "positive/broker-execution-receipt-body-v2.json",
+      "mutation": { "op": "remove", "path": "/evidence/responseHeadersSha256" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "missing_response_header_digest" }
+    },
+    {
+      "id": "v2_receipt_envelope_refuses_legacy_body",
+      "base": "positive/broker-execution-receipt-envelope-v2.json",
+      "mutation": { "op": "replace", "path": "/body/schema", "value": "chio.broker-execution-receipt.v1" },
+      "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "legacy_receipt_downgrade" }
+    },
+    {
       "id": "capability_noncanonical_trailing_newline",
       "base": "positive/broker-capability-envelope-v1.json",
       "mutation": { "op": "append_bytes", "hex": "0a" },
@@ -52,37 +82,37 @@
     },
     {
       "id": "receipt_capture_revocation_digest_tampered",
-      "base": "positive/broker-execution-receipt-envelope-v1.json",
+      "base": "positive/broker-execution-receipt-envelope-v2.json",
       "mutation": { "op": "replace", "path": "/body/evidence/revocationSetDigest", "value": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" },
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "receipt_signature_or_capture_binding" }
     },
     {
       "id": "receipt_quota_not_canonical",
-      "base": "positive/broker-execution-receipt-envelope-v1.json",
+      "base": "positive/broker-execution-receipt-envelope-v2.json",
       "mutation": { "op": "replace", "path": "/body/quotas/0/keyId", "value": "z-quota-production" },
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "noncanonical_quota_order" }
     },
     {
       "id": "receipt_forbidden_credential_value",
-      "base": "positive/broker-execution-receipt-body-v1.json",
+      "base": "positive/broker-execution-receipt-body-v2.json",
       "mutation": { "op": "add", "path": "/credentialValue", "value": "never-on-wire" },
       "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "unknown_secret_field" }
     },
     {
       "id": "receipt_signature_tampered",
-      "base": "positive/broker-execution-receipt-envelope-v1.json",
+      "base": "positive/broker-execution-receipt-envelope-v2.json",
       "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "invalid_receipt_signature" }
     },
     {
       "id": "execute_response_receipt_missing",
-      "base": "positive/broker-execute-response-v1.json",
+      "base": "positive/broker-execute-response-v2.json",
       "mutation": { "op": "remove", "path": "/receipt" },
       "expected": { "json_parse_valid": true, "json_schema_valid": false, "semantic_valid": false, "failure": "missing_receipt_envelope" }
     },
     {
       "id": "execute_response_receipt_signature_tampered",
-      "base": "positive/broker-execute-response-v1.json",
+      "base": "positive/broker-execute-response-v2.json",
       "mutation": { "op": "replace", "path": "/receipt/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "invalid_response_receipt_signature" }
     },

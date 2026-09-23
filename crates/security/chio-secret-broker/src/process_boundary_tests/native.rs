@@ -50,6 +50,7 @@ fn native_kernel_broker_mcp_tool_keeps_capture_on_lost_or_invalid_completion(
     for fault in [
         mcp::CompletionFault::LoseReply,
         mcp::CompletionFault::ChangeBody,
+        mcp::CompletionFault::ChangeHeaders,
         mcp::CompletionFault::ExtraContent,
     ] {
         run_native_delivery(DeliveryRoute::ObservedMcp, Some(fault))?;

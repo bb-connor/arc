@@ -50372,6 +50372,3823 @@ pub mod security_broker_execute_response_v1 {
         }
     }
 }
+pub mod security_broker_execute_response_v2 {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioBrokerExecuteResponseV2`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-execute-response-v2.schema.json",
+    ///  "title": "Chio broker execute response v2",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "body",
+    ///    "evidence",
+    ///    "headers",
+    ///    "receipt",
+    ///    "receiptReference",
+    ///    "status"
+    ///  ],
+    ///  "properties": {
+    ///    "body": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 2097152
+    ///    },
+    ///    "evidence": {
+    ///      "title": "Chio broker execution evidence v2",
+    ///      "type": "object",
+    ///      "required": [
+    ///        "attemptId",
+    ///        "authorityCommitIndex",
+    ///        "budgetCommitIndex",
+    ///        "capabilityDigest",
+    ///        "holdId",
+    ///        "invocationId",
+    ///        "leaderEpoch",
+    ///        "requestDigest",
+    ///        "responseBodySha256",
+    ///        "responseHeadersSha256",
+    ///        "revocationCommitIndex",
+    ///        "revocationSetDigest",
+    ///        "schema",
+    ///        "upstreamStatus"
+    ///      ],
+    ///      "properties": {
+    ///        "attemptId": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "authorityCommitIndex": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        },
+    ///        "budgetCommitIndex": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        },
+    ///        "capabilityDigest": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "holdId": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "invocationId": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "leaderEpoch": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        },
+    ///        "requestDigest": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "responseBodySha256": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "responseHeadersSha256": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "revocationCommitIndex": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        },
+    ///        "revocationSetDigest": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "schema": {
+    ///          "const": "chio.broker-execution-evidence.v2"
+    ///        },
+    ///        "upstreamStatus": {
+    ///          "type": "integer",
+    ///          "maximum": 599.0,
+    ///          "minimum": 100.0
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "headers": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "object",
+    ///        "required": [
+    ///          "name",
+    ///          "value"
+    ///        ],
+    ///        "properties": {
+    ///          "name": {
+    ///            "type": "string",
+    ///            "maxLength": 128,
+    ///            "minLength": 1,
+    ///            "pattern": "^[a-z0-9-]+$"
+    ///          },
+    ///          "value": {
+    ///            "type": "array",
+    ///            "items": {
+    ///              "type": "integer",
+    ///              "maximum": 255.0,
+    ///              "minimum": 0.0
+    ///            },
+    ///            "maxItems": 8192
+    ///          }
+    ///        },
+    ///        "additionalProperties": false
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    "receipt": {
+    ///      "title": "Chio signed broker execution receipt v2",
+    ///      "type": "object",
+    ///      "required": [
+    ///        "algorithm",
+    ///        "body",
+    ///        "signature",
+    ///        "signer"
+    ///      ],
+    ///      "properties": {
+    ///        "algorithm": {
+    ///          "enum": [
+    ///            "ed25519",
+    ///            "p256",
+    ///            "p384",
+    ///            "hybrid"
+    ///          ]
+    ///        },
+    ///        "body": {
+    ///          "title": "Chio broker execution receipt body v2",
+    ///          "type": "object",
+    ///          "required": [
+    ///            "authorizeEventId",
+    ///            "brokerCapabilityId",
+    ///            "brokerQuotaKeyId",
+    ///            "callerHeadersSha256",
+    ///            "callerOptionsSha256",
+    ///            "captureEventId",
+    ///            "credentialReferenceHash",
+    ///            "credentialVersion",
+    ///            "evidence",
+    ///            "issuedAtUnixSeconds",
+    ///            "normalizedDestination",
+    ///            "operationId",
+    ///            "outcome",
+    ///            "parentCapabilityId",
+    ///            "providerAdapterId",
+    ///            "providerAdapterVersion",
+    ///            "quotas",
+    ///            "receiptId",
+    ///            "requestBodyBytes",
+    ///            "requestBodySha256",
+    ///            "responseBodyBytes",
+    ///            "schema",
+    ///            "sourceReceiptIds",
+    ///            "subject"
+    ///          ],
+    ///          "properties": {
+    ///            "authorizeEventId": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            },
+    ///            "brokerCapabilityId": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            },
+    ///            "brokerQuotaKeyId": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            },
+    ///            "callerHeadersSha256": {
+    ///              "$ref": "#/$defs/digest"
+    ///            },
+    ///            "callerOptionsSha256": {
+    ///              "$ref": "#/$defs/digest"
+    ///            },
+    ///            "captureEventId": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            },
+    ///            "credentialReferenceHash": {
+    ///              "$ref": "#/$defs/digest"
+    ///            },
+    ///            "credentialVersion": {
+    ///              "type": "integer",
+    ///              "minimum": 1.0
+    ///            },
+    ///            "evidence": {
+    ///              "title": "Chio broker execution evidence v2",
+    ///              "type": "object",
+    ///              "required": [
+    ///                "attemptId",
+    ///                "authorityCommitIndex",
+    ///                "budgetCommitIndex",
+    ///                "capabilityDigest",
+    ///                "holdId",
+    ///                "invocationId",
+    ///                "leaderEpoch",
+    ///                "requestDigest",
+    ///                "responseBodySha256",
+    ///                "responseHeadersSha256",
+    ///                "revocationCommitIndex",
+    ///                "revocationSetDigest",
+    ///                "schema",
+    ///                "upstreamStatus"
+    ///              ],
+    ///              "properties": {
+    ///                "attemptId": {
+    ///                  "$ref": "#/$defs/identifier"
+    ///                },
+    ///                "authorityCommitIndex": {
+    ///                  "type": "integer",
+    ///                  "minimum": 0.0
+    ///                },
+    ///                "budgetCommitIndex": {
+    ///                  "type": "integer",
+    ///                  "minimum": 0.0
+    ///                },
+    ///                "capabilityDigest": {
+    ///                  "$ref": "#/$defs/digest"
+    ///                },
+    ///                "holdId": {
+    ///                  "$ref": "#/$defs/identifier"
+    ///                },
+    ///                "invocationId": {
+    ///                  "$ref": "#/$defs/identifier"
+    ///                },
+    ///                "leaderEpoch": {
+    ///                  "type": "integer",
+    ///                  "minimum": 0.0
+    ///                },
+    ///                "requestDigest": {
+    ///                  "$ref": "#/$defs/digest"
+    ///                },
+    ///                "responseBodySha256": {
+    ///                  "$ref": "#/$defs/digest"
+    ///                },
+    ///                "responseHeadersSha256": {
+    ///                  "$ref": "#/$defs/digest"
+    ///                },
+    ///                "revocationCommitIndex": {
+    ///                  "type": "integer",
+    ///                  "minimum": 0.0
+    ///                },
+    ///                "revocationSetDigest": {
+    ///                  "$ref": "#/$defs/digest"
+    ///                },
+    ///                "schema": {
+    ///                  "const": "chio.broker-execution-evidence.v2"
+    ///                },
+    ///                "upstreamStatus": {
+    ///                  "type": "integer",
+    ///                  "maximum": 599.0,
+    ///                  "minimum": 100.0
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            "issuedAtUnixSeconds": {
+    ///              "type": "integer",
+    ///              "minimum": 1.0
+    ///            },
+    ///            "normalizedDestination": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "exactPathAndQuery",
+    ///                "explicitPort",
+    ///                "method",
+    ///                "normalizedHost",
+    ///                "scheme"
+    ///              ],
+    ///              "properties": {
+    ///                "exactPathAndQuery": {
+    ///                  "type": "string",
+    ///                  "maxLength": 16384,
+    ///                  "minLength": 1,
+    ///                  "pattern": "^/[^#\\\\\\u0000-\\u0020\\u007f]*$"
+    ///                },
+    ///                "explicitPort": {
+    ///                  "type": "integer",
+    ///                  "maximum": 65535.0,
+    ///                  "minimum": 1.0
+    ///                },
+    ///                "method": {
+    ///                  "enum": [
+    ///                    "GET",
+    ///                    "HEAD",
+    ///                    "POST",
+    ///                    "PUT",
+    ///                    "PATCH",
+    ///                    "DELETE",
+    ///                    "OPTIONS"
+    ///                  ]
+    ///                },
+    ///                "normalizedHost": {
+    ///                  "type": "string",
+    ///                  "maxLength": 253,
+    ///                  "minLength": 1,
+    ///                  "pattern": "^[^A-Z\\s/*]+$"
+    ///                },
+    ///                "scheme": {
+    ///                  "enum": [
+    ///                    "https",
+    ///                    "http"
+    ///                  ]
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            "operationId": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            },
+    ///            "outcome": {
+    ///              "const": "completed"
+    ///            },
+    ///            "parentCapabilityId": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            },
+    ///            "providerAdapterId": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            },
+    ///            "providerAdapterVersion": {
+    ///              "type": "integer",
+    ///              "maximum": 4294967295.0,
+    ///              "minimum": 1.0
+    ///            },
+    ///            "quotas": {
+    ///              "type": "array",
+    ///              "items": {
+    ///                "$ref": "#/$defs/quota"
+    ///              },
+    ///              "maxItems": 8,
+    ///              "minItems": 1,
+    ///              "uniqueItems": true
+    ///            },
+    ///            "receiptId": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            },
+    ///            "requestBodyBytes": {
+    ///              "type": "integer",
+    ///              "maximum": 524288.0,
+    ///              "minimum": 0.0
+    ///            },
+    ///            "requestBodySha256": {
+    ///              "$ref": "#/$defs/digest"
+    ///            },
+    ///            "responseBodyBytes": {
+    ///              "type": "integer",
+    ///              "maximum": 2097152.0,
+    ///              "minimum": 0.0
+    ///            },
+    ///            "schema": {
+    ///              "const": "chio.broker-execution-receipt.v2"
+    ///            },
+    ///            "sourceReceiptIds": {
+    ///              "type": "array",
+    ///              "items": {
+    ///                "$ref": "#/$defs/identifier"
+    ///              },
+    ///              "maxItems": 64,
+    ///              "minItems": 0,
+    ///              "uniqueItems": true
+    ///            },
+    ///            "subject": {
+    ///              "$ref": "#/$defs/publicKey"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "signature": {
+    ///          "$ref": "#/$defs/signature"
+    ///        },
+    ///        "signer": {
+    ///          "$ref": "#/$defs/publicKey"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "receiptReference": {
+    ///      "type": "string",
+    ///      "maxLength": 86,
+    ///      "minLength": 86,
+    ///      "pattern": "^broker-receipt-sha256-[0-9a-f]{64}$"
+    ///    },
+    ///    "status": {
+    ///      "type": "integer",
+    ///      "maximum": 599.0,
+    ///      "minimum": 100.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioBrokerExecuteResponseV2 {
+        pub body: ::std::vec::Vec<u8>,
+        pub evidence: ChioBrokerExecutionEvidenceV2,
+        pub headers: ::std::vec::Vec<ChioBrokerExecuteResponseV2HeadersItem>,
+        pub receipt: ChioSignedBrokerExecutionReceiptV2,
+        #[serde(rename = "receiptReference")]
+        pub receipt_reference: ChioBrokerExecuteResponseV2ReceiptReference,
+        pub status: i64,
+    }
+    impl ::std::convert::From<&ChioBrokerExecuteResponseV2> for ChioBrokerExecuteResponseV2 {
+        fn from(value: &ChioBrokerExecuteResponseV2) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioBrokerExecuteResponseV2HeadersItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "name",
+    ///    "value"
+    ///  ],
+    ///  "properties": {
+    ///    "name": {
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[a-z0-9-]+$"
+    ///    },
+    ///    "value": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 8192
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioBrokerExecuteResponseV2HeadersItem {
+        pub name: ChioBrokerExecuteResponseV2HeadersItemName,
+        pub value: ::std::vec::Vec<u8>,
+    }
+    impl ::std::convert::From<&ChioBrokerExecuteResponseV2HeadersItem>
+        for ChioBrokerExecuteResponseV2HeadersItem
+    {
+        fn from(value: &ChioBrokerExecuteResponseV2HeadersItem) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioBrokerExecuteResponseV2HeadersItemName`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[a-z0-9-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioBrokerExecuteResponseV2HeadersItemName(::std::string::String);
+    impl ::std::ops::Deref for ChioBrokerExecuteResponseV2HeadersItemName {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioBrokerExecuteResponseV2HeadersItemName> for ::std::string::String {
+        fn from(value: ChioBrokerExecuteResponseV2HeadersItemName) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioBrokerExecuteResponseV2HeadersItemName>
+        for ChioBrokerExecuteResponseV2HeadersItemName
+    {
+        fn from(value: &ChioBrokerExecuteResponseV2HeadersItemName) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioBrokerExecuteResponseV2HeadersItemName {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[a-z0-9-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[a-z0-9-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioBrokerExecuteResponseV2HeadersItemName {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioBrokerExecuteResponseV2HeadersItemName
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioBrokerExecuteResponseV2HeadersItemName {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioBrokerExecuteResponseV2HeadersItemName {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioBrokerExecuteResponseV2ReceiptReference`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 86,
+    ///  "minLength": 86,
+    ///  "pattern": "^broker-receipt-sha256-[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioBrokerExecuteResponseV2ReceiptReference(::std::string::String);
+    impl ::std::ops::Deref for ChioBrokerExecuteResponseV2ReceiptReference {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioBrokerExecuteResponseV2ReceiptReference> for ::std::string::String {
+        fn from(value: ChioBrokerExecuteResponseV2ReceiptReference) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioBrokerExecuteResponseV2ReceiptReference>
+        for ChioBrokerExecuteResponseV2ReceiptReference
+    {
+        fn from(value: &ChioBrokerExecuteResponseV2ReceiptReference) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioBrokerExecuteResponseV2ReceiptReference {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 86usize {
+                return Err("longer than 86 characters".into());
+            }
+            if value.chars().count() < 86usize {
+                return Err("shorter than 86 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^broker-receipt-sha256-[0-9a-f]{64}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^broker-receipt-sha256-[0-9a-f]{64}$\"".into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioBrokerExecuteResponseV2ReceiptReference {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioBrokerExecuteResponseV2ReceiptReference
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioBrokerExecuteResponseV2ReceiptReference
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioBrokerExecuteResponseV2ReceiptReference {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioBrokerExecutionEvidenceV2`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Chio broker execution evidence v2",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "attemptId",
+    ///    "authorityCommitIndex",
+    ///    "budgetCommitIndex",
+    ///    "capabilityDigest",
+    ///    "holdId",
+    ///    "invocationId",
+    ///    "leaderEpoch",
+    ///    "requestDigest",
+    ///    "responseBodySha256",
+    ///    "responseHeadersSha256",
+    ///    "revocationCommitIndex",
+    ///    "revocationSetDigest",
+    ///    "schema",
+    ///    "upstreamStatus"
+    ///  ],
+    ///  "properties": {
+    ///    "attemptId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "authorityCommitIndex": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "budgetCommitIndex": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "capabilityDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "holdId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "invocationId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "leaderEpoch": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "requestDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "responseBodySha256": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "responseHeadersSha256": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "revocationCommitIndex": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "revocationSetDigest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.broker-execution-evidence.v2"
+    ///    },
+    ///    "upstreamStatus": {
+    ///      "type": "integer",
+    ///      "maximum": 599.0,
+    ///      "minimum": 100.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioBrokerExecutionEvidenceV2 {
+        #[serde(rename = "attemptId")]
+        pub attempt_id: Identifier,
+        #[serde(rename = "authorityCommitIndex")]
+        pub authority_commit_index: u64,
+        #[serde(rename = "budgetCommitIndex")]
+        pub budget_commit_index: u64,
+        #[serde(rename = "capabilityDigest")]
+        pub capability_digest: Digest,
+        #[serde(rename = "holdId")]
+        pub hold_id: Identifier,
+        #[serde(rename = "invocationId")]
+        pub invocation_id: Identifier,
+        #[serde(rename = "leaderEpoch")]
+        pub leader_epoch: u64,
+        #[serde(rename = "requestDigest")]
+        pub request_digest: Digest,
+        #[serde(rename = "responseBodySha256")]
+        pub response_body_sha256: Digest,
+        #[serde(rename = "responseHeadersSha256")]
+        pub response_headers_sha256: Digest,
+        #[serde(rename = "revocationCommitIndex")]
+        pub revocation_commit_index: u64,
+        #[serde(rename = "revocationSetDigest")]
+        pub revocation_set_digest: Digest,
+        pub schema: ::serde_json::Value,
+        #[serde(rename = "upstreamStatus")]
+        pub upstream_status: i64,
+    }
+    impl ::std::convert::From<&ChioBrokerExecutionEvidenceV2> for ChioBrokerExecutionEvidenceV2 {
+        fn from(value: &ChioBrokerExecutionEvidenceV2) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioBrokerExecutionReceiptBodyV2`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Chio broker execution receipt body v2",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "authorizeEventId",
+    ///    "brokerCapabilityId",
+    ///    "brokerQuotaKeyId",
+    ///    "callerHeadersSha256",
+    ///    "callerOptionsSha256",
+    ///    "captureEventId",
+    ///    "credentialReferenceHash",
+    ///    "credentialVersion",
+    ///    "evidence",
+    ///    "issuedAtUnixSeconds",
+    ///    "normalizedDestination",
+    ///    "operationId",
+    ///    "outcome",
+    ///    "parentCapabilityId",
+    ///    "providerAdapterId",
+    ///    "providerAdapterVersion",
+    ///    "quotas",
+    ///    "receiptId",
+    ///    "requestBodyBytes",
+    ///    "requestBodySha256",
+    ///    "responseBodyBytes",
+    ///    "schema",
+    ///    "sourceReceiptIds",
+    ///    "subject"
+    ///  ],
+    ///  "properties": {
+    ///    "authorizeEventId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "brokerCapabilityId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "brokerQuotaKeyId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "callerHeadersSha256": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "callerOptionsSha256": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "captureEventId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "credentialReferenceHash": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "credentialVersion": {
+    ///      "type": "integer",
+    ///      "minimum": 1.0
+    ///    },
+    ///    "evidence": {
+    ///      "title": "Chio broker execution evidence v2",
+    ///      "type": "object",
+    ///      "required": [
+    ///        "attemptId",
+    ///        "authorityCommitIndex",
+    ///        "budgetCommitIndex",
+    ///        "capabilityDigest",
+    ///        "holdId",
+    ///        "invocationId",
+    ///        "leaderEpoch",
+    ///        "requestDigest",
+    ///        "responseBodySha256",
+    ///        "responseHeadersSha256",
+    ///        "revocationCommitIndex",
+    ///        "revocationSetDigest",
+    ///        "schema",
+    ///        "upstreamStatus"
+    ///      ],
+    ///      "properties": {
+    ///        "attemptId": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "authorityCommitIndex": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        },
+    ///        "budgetCommitIndex": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        },
+    ///        "capabilityDigest": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "holdId": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "invocationId": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "leaderEpoch": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        },
+    ///        "requestDigest": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "responseBodySha256": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "responseHeadersSha256": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "revocationCommitIndex": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        },
+    ///        "revocationSetDigest": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "schema": {
+    ///          "const": "chio.broker-execution-evidence.v2"
+    ///        },
+    ///        "upstreamStatus": {
+    ///          "type": "integer",
+    ///          "maximum": 599.0,
+    ///          "minimum": 100.0
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "issuedAtUnixSeconds": {
+    ///      "type": "integer",
+    ///      "minimum": 1.0
+    ///    },
+    ///    "normalizedDestination": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "exactPathAndQuery",
+    ///        "explicitPort",
+    ///        "method",
+    ///        "normalizedHost",
+    ///        "scheme"
+    ///      ],
+    ///      "properties": {
+    ///        "exactPathAndQuery": {
+    ///          "type": "string",
+    ///          "maxLength": 16384,
+    ///          "minLength": 1,
+    ///          "pattern": "^/[^#\\\\\\u0000-\\u0020\\u007f]*$"
+    ///        },
+    ///        "explicitPort": {
+    ///          "type": "integer",
+    ///          "maximum": 65535.0,
+    ///          "minimum": 1.0
+    ///        },
+    ///        "method": {
+    ///          "enum": [
+    ///            "GET",
+    ///            "HEAD",
+    ///            "POST",
+    ///            "PUT",
+    ///            "PATCH",
+    ///            "DELETE",
+    ///            "OPTIONS"
+    ///          ]
+    ///        },
+    ///        "normalizedHost": {
+    ///          "type": "string",
+    ///          "maxLength": 253,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^A-Z\\s/*]+$"
+    ///        },
+    ///        "scheme": {
+    ///          "enum": [
+    ///            "https",
+    ///            "http"
+    ///          ]
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "operationId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "outcome": {
+    ///      "const": "completed"
+    ///    },
+    ///    "parentCapabilityId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "providerAdapterId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "providerAdapterVersion": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "quotas": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/quota"
+    ///      },
+    ///      "maxItems": 8,
+    ///      "minItems": 1,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "receiptId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "requestBodyBytes": {
+    ///      "type": "integer",
+    ///      "maximum": 524288.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "requestBodySha256": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "responseBodyBytes": {
+    ///      "type": "integer",
+    ///      "maximum": 2097152.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.broker-execution-receipt.v2"
+    ///    },
+    ///    "sourceReceiptIds": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/identifier"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 0,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "subject": {
+    ///      "$ref": "#/$defs/publicKey"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioBrokerExecutionReceiptBodyV2 {
+        #[serde(rename = "authorizeEventId")]
+        pub authorize_event_id: Identifier,
+        #[serde(rename = "brokerCapabilityId")]
+        pub broker_capability_id: Identifier,
+        #[serde(rename = "brokerQuotaKeyId")]
+        pub broker_quota_key_id: Identifier,
+        #[serde(rename = "callerHeadersSha256")]
+        pub caller_headers_sha256: Digest,
+        #[serde(rename = "callerOptionsSha256")]
+        pub caller_options_sha256: Digest,
+        #[serde(rename = "captureEventId")]
+        pub capture_event_id: Identifier,
+        #[serde(rename = "credentialReferenceHash")]
+        pub credential_reference_hash: Digest,
+        #[serde(rename = "credentialVersion")]
+        pub credential_version: ::std::num::NonZeroU64,
+        pub evidence: ChioBrokerExecutionEvidenceV2,
+        #[serde(rename = "issuedAtUnixSeconds")]
+        pub issued_at_unix_seconds: ::std::num::NonZeroU64,
+        #[serde(rename = "normalizedDestination")]
+        pub normalized_destination: ChioBrokerExecutionReceiptBodyV2NormalizedDestination,
+        #[serde(rename = "operationId")]
+        pub operation_id: Identifier,
+        pub outcome: ::serde_json::Value,
+        #[serde(rename = "parentCapabilityId")]
+        pub parent_capability_id: Identifier,
+        #[serde(rename = "providerAdapterId")]
+        pub provider_adapter_id: Identifier,
+        #[serde(rename = "providerAdapterVersion")]
+        pub provider_adapter_version: ::std::num::NonZeroU64,
+        pub quotas: Vec<Quota>,
+        #[serde(rename = "receiptId")]
+        pub receipt_id: Identifier,
+        #[serde(rename = "requestBodyBytes")]
+        pub request_body_bytes: i64,
+        #[serde(rename = "requestBodySha256")]
+        pub request_body_sha256: Digest,
+        #[serde(rename = "responseBodyBytes")]
+        pub response_body_bytes: i64,
+        pub schema: ::serde_json::Value,
+        #[serde(rename = "sourceReceiptIds")]
+        pub source_receipt_ids: Vec<Identifier>,
+        pub subject: PublicKey,
+    }
+    impl ::std::convert::From<&ChioBrokerExecutionReceiptBodyV2> for ChioBrokerExecutionReceiptBodyV2 {
+        fn from(value: &ChioBrokerExecutionReceiptBodyV2) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioBrokerExecutionReceiptBodyV2NormalizedDestination`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "exactPathAndQuery",
+    ///    "explicitPort",
+    ///    "method",
+    ///    "normalizedHost",
+    ///    "scheme"
+    ///  ],
+    ///  "properties": {
+    ///    "exactPathAndQuery": {
+    ///      "type": "string",
+    ///      "maxLength": 16384,
+    ///      "minLength": 1,
+    ///      "pattern": "^/[^#\\\\\\u0000-\\u0020\\u007f]*$"
+    ///    },
+    ///    "explicitPort": {
+    ///      "type": "integer",
+    ///      "maximum": 65535.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "method": {
+    ///      "enum": [
+    ///        "GET",
+    ///        "HEAD",
+    ///        "POST",
+    ///        "PUT",
+    ///        "PATCH",
+    ///        "DELETE",
+    ///        "OPTIONS"
+    ///      ]
+    ///    },
+    ///    "normalizedHost": {
+    ///      "type": "string",
+    ///      "maxLength": 253,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^A-Z\\s/*]+$"
+    ///    },
+    ///    "scheme": {
+    ///      "enum": [
+    ///        "https",
+    ///        "http"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioBrokerExecutionReceiptBodyV2NormalizedDestination {
+        #[serde(rename = "exactPathAndQuery")]
+        pub exact_path_and_query:
+            ChioBrokerExecutionReceiptBodyV2NormalizedDestinationExactPathAndQuery,
+        #[serde(rename = "explicitPort")]
+        pub explicit_port: ::std::num::NonZeroU64,
+        pub method: ChioBrokerExecutionReceiptBodyV2NormalizedDestinationMethod,
+        #[serde(rename = "normalizedHost")]
+        pub normalized_host: ChioBrokerExecutionReceiptBodyV2NormalizedDestinationNormalizedHost,
+        pub scheme: ChioBrokerExecutionReceiptBodyV2NormalizedDestinationScheme,
+    }
+    impl ::std::convert::From<&ChioBrokerExecutionReceiptBodyV2NormalizedDestination>
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestination
+    {
+        fn from(value: &ChioBrokerExecutionReceiptBodyV2NormalizedDestination) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioBrokerExecutionReceiptBodyV2NormalizedDestinationExactPathAndQuery`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "minLength": 1,
+    ///  "pattern": "^/[^#\\\\\\u0000-\\u0020\\u007f]*$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioBrokerExecutionReceiptBodyV2NormalizedDestinationExactPathAndQuery(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationExactPathAndQuery {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl
+        ::std::convert::From<ChioBrokerExecutionReceiptBodyV2NormalizedDestinationExactPathAndQuery>
+        for ::std::string::String
+    {
+        fn from(
+            value: ChioBrokerExecutionReceiptBodyV2NormalizedDestinationExactPathAndQuery,
+        ) -> Self {
+            value.0
+        }
+    }
+    impl
+        ::std::convert::From<
+            &ChioBrokerExecutionReceiptBodyV2NormalizedDestinationExactPathAndQuery,
+        > for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationExactPathAndQuery
+    {
+        fn from(
+            value: &ChioBrokerExecutionReceiptBodyV2NormalizedDestinationExactPathAndQuery,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationExactPathAndQuery
+    {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^/[^#\\\\\\u0000-\\u0020\\u007f]*$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^/[^#\\\\\\u0000-\\u0020\\u007f]*$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationExactPathAndQuery
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationExactPathAndQuery
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationExactPathAndQuery
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationExactPathAndQuery
+    {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioBrokerExecutionReceiptBodyV2NormalizedDestinationMethod`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "GET",
+    ///    "HEAD",
+    ///    "POST",
+    ///    "PUT",
+    ///    "PATCH",
+    ///    "DELETE",
+    ///    "OPTIONS"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioBrokerExecutionReceiptBodyV2NormalizedDestinationMethod {
+        #[serde(rename = "GET")]
+        Get,
+        #[serde(rename = "HEAD")]
+        Head,
+        #[serde(rename = "POST")]
+        Post,
+        #[serde(rename = "PUT")]
+        Put,
+        #[serde(rename = "PATCH")]
+        Patch,
+        #[serde(rename = "DELETE")]
+        Delete,
+        #[serde(rename = "OPTIONS")]
+        Options,
+    }
+    impl ::std::convert::From<&Self> for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationMethod {
+        fn from(value: &ChioBrokerExecutionReceiptBodyV2NormalizedDestinationMethod) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationMethod {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Get => f.write_str("GET"),
+                Self::Head => f.write_str("HEAD"),
+                Self::Post => f.write_str("POST"),
+                Self::Put => f.write_str("PUT"),
+                Self::Patch => f.write_str("PATCH"),
+                Self::Delete => f.write_str("DELETE"),
+                Self::Options => f.write_str("OPTIONS"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationMethod {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "GET" => Ok(Self::Get),
+                "HEAD" => Ok(Self::Head),
+                "POST" => Ok(Self::Post),
+                "PUT" => Ok(Self::Put),
+                "PATCH" => Ok(Self::Patch),
+                "DELETE" => Ok(Self::Delete),
+                "OPTIONS" => Ok(Self::Options),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationMethod {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationMethod
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationMethod
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioBrokerExecutionReceiptBodyV2NormalizedDestinationNormalizedHost`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 253,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^A-Z\\s/*]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioBrokerExecutionReceiptBodyV2NormalizedDestinationNormalizedHost(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationNormalizedHost {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioBrokerExecutionReceiptBodyV2NormalizedDestinationNormalizedHost>
+        for ::std::string::String
+    {
+        fn from(
+            value: ChioBrokerExecutionReceiptBodyV2NormalizedDestinationNormalizedHost,
+        ) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioBrokerExecutionReceiptBodyV2NormalizedDestinationNormalizedHost>
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationNormalizedHost
+    {
+        fn from(
+            value: &ChioBrokerExecutionReceiptBodyV2NormalizedDestinationNormalizedHost,
+        ) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationNormalizedHost {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 253usize {
+                return Err("longer than 253 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^A-Z\\s/*]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^A-Z\\s/*]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationNormalizedHost
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationNormalizedHost
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationNormalizedHost
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationNormalizedHost
+    {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioBrokerExecutionReceiptBodyV2NormalizedDestinationScheme`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "https",
+    ///    "http"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioBrokerExecutionReceiptBodyV2NormalizedDestinationScheme {
+        #[serde(rename = "https")]
+        Https,
+        #[serde(rename = "http")]
+        Http,
+    }
+    impl ::std::convert::From<&Self> for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationScheme {
+        fn from(value: &ChioBrokerExecutionReceiptBodyV2NormalizedDestinationScheme) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationScheme {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Https => f.write_str("https"),
+                Self::Http => f.write_str("http"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationScheme {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "https" => Ok(Self::Https),
+                "http" => Ok(Self::Http),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationScheme {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationScheme
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioBrokerExecutionReceiptBodyV2NormalizedDestinationScheme
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioSignedBrokerExecutionReceiptV2`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Chio signed broker execution receipt v2",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "algorithm",
+    ///    "body",
+    ///    "signature",
+    ///    "signer"
+    ///  ],
+    ///  "properties": {
+    ///    "algorithm": {
+    ///      "enum": [
+    ///        "ed25519",
+    ///        "p256",
+    ///        "p384",
+    ///        "hybrid"
+    ///      ]
+    ///    },
+    ///    "body": {
+    ///      "title": "Chio broker execution receipt body v2",
+    ///      "type": "object",
+    ///      "required": [
+    ///        "authorizeEventId",
+    ///        "brokerCapabilityId",
+    ///        "brokerQuotaKeyId",
+    ///        "callerHeadersSha256",
+    ///        "callerOptionsSha256",
+    ///        "captureEventId",
+    ///        "credentialReferenceHash",
+    ///        "credentialVersion",
+    ///        "evidence",
+    ///        "issuedAtUnixSeconds",
+    ///        "normalizedDestination",
+    ///        "operationId",
+    ///        "outcome",
+    ///        "parentCapabilityId",
+    ///        "providerAdapterId",
+    ///        "providerAdapterVersion",
+    ///        "quotas",
+    ///        "receiptId",
+    ///        "requestBodyBytes",
+    ///        "requestBodySha256",
+    ///        "responseBodyBytes",
+    ///        "schema",
+    ///        "sourceReceiptIds",
+    ///        "subject"
+    ///      ],
+    ///      "properties": {
+    ///        "authorizeEventId": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "brokerCapabilityId": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "brokerQuotaKeyId": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "callerHeadersSha256": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "callerOptionsSha256": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "captureEventId": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "credentialReferenceHash": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "credentialVersion": {
+    ///          "type": "integer",
+    ///          "minimum": 1.0
+    ///        },
+    ///        "evidence": {
+    ///          "title": "Chio broker execution evidence v2",
+    ///          "type": "object",
+    ///          "required": [
+    ///            "attemptId",
+    ///            "authorityCommitIndex",
+    ///            "budgetCommitIndex",
+    ///            "capabilityDigest",
+    ///            "holdId",
+    ///            "invocationId",
+    ///            "leaderEpoch",
+    ///            "requestDigest",
+    ///            "responseBodySha256",
+    ///            "responseHeadersSha256",
+    ///            "revocationCommitIndex",
+    ///            "revocationSetDigest",
+    ///            "schema",
+    ///            "upstreamStatus"
+    ///          ],
+    ///          "properties": {
+    ///            "attemptId": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            },
+    ///            "authorityCommitIndex": {
+    ///              "type": "integer",
+    ///              "minimum": 0.0
+    ///            },
+    ///            "budgetCommitIndex": {
+    ///              "type": "integer",
+    ///              "minimum": 0.0
+    ///            },
+    ///            "capabilityDigest": {
+    ///              "$ref": "#/$defs/digest"
+    ///            },
+    ///            "holdId": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            },
+    ///            "invocationId": {
+    ///              "$ref": "#/$defs/identifier"
+    ///            },
+    ///            "leaderEpoch": {
+    ///              "type": "integer",
+    ///              "minimum": 0.0
+    ///            },
+    ///            "requestDigest": {
+    ///              "$ref": "#/$defs/digest"
+    ///            },
+    ///            "responseBodySha256": {
+    ///              "$ref": "#/$defs/digest"
+    ///            },
+    ///            "responseHeadersSha256": {
+    ///              "$ref": "#/$defs/digest"
+    ///            },
+    ///            "revocationCommitIndex": {
+    ///              "type": "integer",
+    ///              "minimum": 0.0
+    ///            },
+    ///            "revocationSetDigest": {
+    ///              "$ref": "#/$defs/digest"
+    ///            },
+    ///            "schema": {
+    ///              "const": "chio.broker-execution-evidence.v2"
+    ///            },
+    ///            "upstreamStatus": {
+    ///              "type": "integer",
+    ///              "maximum": 599.0,
+    ///              "minimum": 100.0
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "issuedAtUnixSeconds": {
+    ///          "type": "integer",
+    ///          "minimum": 1.0
+    ///        },
+    ///        "normalizedDestination": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "exactPathAndQuery",
+    ///            "explicitPort",
+    ///            "method",
+    ///            "normalizedHost",
+    ///            "scheme"
+    ///          ],
+    ///          "properties": {
+    ///            "exactPathAndQuery": {
+    ///              "type": "string",
+    ///              "maxLength": 16384,
+    ///              "minLength": 1,
+    ///              "pattern": "^/[^#\\\\\\u0000-\\u0020\\u007f]*$"
+    ///            },
+    ///            "explicitPort": {
+    ///              "type": "integer",
+    ///              "maximum": 65535.0,
+    ///              "minimum": 1.0
+    ///            },
+    ///            "method": {
+    ///              "enum": [
+    ///                "GET",
+    ///                "HEAD",
+    ///                "POST",
+    ///                "PUT",
+    ///                "PATCH",
+    ///                "DELETE",
+    ///                "OPTIONS"
+    ///              ]
+    ///            },
+    ///            "normalizedHost": {
+    ///              "type": "string",
+    ///              "maxLength": 253,
+    ///              "minLength": 1,
+    ///              "pattern": "^[^A-Z\\s/*]+$"
+    ///            },
+    ///            "scheme": {
+    ///              "enum": [
+    ///                "https",
+    ///                "http"
+    ///              ]
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "operationId": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "outcome": {
+    ///          "const": "completed"
+    ///        },
+    ///        "parentCapabilityId": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "providerAdapterId": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "providerAdapterVersion": {
+    ///          "type": "integer",
+    ///          "maximum": 4294967295.0,
+    ///          "minimum": 1.0
+    ///        },
+    ///        "quotas": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/quota"
+    ///          },
+    ///          "maxItems": 8,
+    ///          "minItems": 1,
+    ///          "uniqueItems": true
+    ///        },
+    ///        "receiptId": {
+    ///          "$ref": "#/$defs/identifier"
+    ///        },
+    ///        "requestBodyBytes": {
+    ///          "type": "integer",
+    ///          "maximum": 524288.0,
+    ///          "minimum": 0.0
+    ///        },
+    ///        "requestBodySha256": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "responseBodyBytes": {
+    ///          "type": "integer",
+    ///          "maximum": 2097152.0,
+    ///          "minimum": 0.0
+    ///        },
+    ///        "schema": {
+    ///          "const": "chio.broker-execution-receipt.v2"
+    ///        },
+    ///        "sourceReceiptIds": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/identifier"
+    ///          },
+    ///          "maxItems": 64,
+    ///          "minItems": 0,
+    ///          "uniqueItems": true
+    ///        },
+    ///        "subject": {
+    ///          "$ref": "#/$defs/publicKey"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "signature": {
+    ///      "$ref": "#/$defs/signature"
+    ///    },
+    ///    "signer": {
+    ///      "$ref": "#/$defs/publicKey"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioSignedBrokerExecutionReceiptV2 {
+        pub algorithm: ChioSignedBrokerExecutionReceiptV2Algorithm,
+        pub body: ChioBrokerExecutionReceiptBodyV2,
+        pub signature: Signature,
+        pub signer: PublicKey,
+    }
+    impl ::std::convert::From<&ChioSignedBrokerExecutionReceiptV2>
+        for ChioSignedBrokerExecutionReceiptV2
+    {
+        fn from(value: &ChioSignedBrokerExecutionReceiptV2) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioSignedBrokerExecutionReceiptV2Algorithm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "ed25519",
+    ///    "p256",
+    ///    "p384",
+    ///    "hybrid"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioSignedBrokerExecutionReceiptV2Algorithm {
+        #[serde(rename = "ed25519")]
+        Ed25519,
+        #[serde(rename = "p256")]
+        P256,
+        #[serde(rename = "p384")]
+        P384,
+        #[serde(rename = "hybrid")]
+        Hybrid,
+    }
+    impl ::std::convert::From<&Self> for ChioSignedBrokerExecutionReceiptV2Algorithm {
+        fn from(value: &ChioSignedBrokerExecutionReceiptV2Algorithm) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioSignedBrokerExecutionReceiptV2Algorithm {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Ed25519 => f.write_str("ed25519"),
+                Self::P256 => f.write_str("p256"),
+                Self::P384 => f.write_str("p384"),
+                Self::Hybrid => f.write_str("hybrid"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioSignedBrokerExecutionReceiptV2Algorithm {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "ed25519" => Ok(Self::Ed25519),
+                "p256" => Ok(Self::P256),
+                "p384" => Ok(Self::P384),
+                "hybrid" => Ok(Self::Hybrid),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioSignedBrokerExecutionReceiptV2Algorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioSignedBrokerExecutionReceiptV2Algorithm
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioSignedBrokerExecutionReceiptV2Algorithm
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`CredentialRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "credentialId",
+    ///    "provider",
+    ///    "version"
+    ///  ],
+    ///  "properties": {
+    ///    "credentialId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "provider": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "version": {
+    ///      "type": "integer",
+    ///      "minimum": 1.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CredentialRef {
+        #[serde(rename = "credentialId")]
+        pub credential_id: Identifier,
+        pub provider: Identifier,
+        pub version: ::std::num::NonZeroU64,
+    }
+    impl ::std::convert::From<&CredentialRef> for CredentialRef {
+        fn from(value: &CredentialRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`Destination`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "exactPathAndQuery",
+    ///    "explicitPort",
+    ///    "method",
+    ///    "normalizedHost",
+    ///    "scheme"
+    ///  ],
+    ///  "properties": {
+    ///    "exactPathAndQuery": {
+    ///      "type": "string",
+    ///      "maxLength": 16384,
+    ///      "minLength": 1,
+    ///      "pattern": "^/[^#\\\\\\u0000-\\u0020\\u007f]*$"
+    ///    },
+    ///    "explicitPort": {
+    ///      "type": "integer",
+    ///      "maximum": 65535.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "method": {
+    ///      "enum": [
+    ///        "GET",
+    ///        "HEAD",
+    ///        "POST",
+    ///        "PUT",
+    ///        "PATCH",
+    ///        "DELETE",
+    ///        "OPTIONS"
+    ///      ]
+    ///    },
+    ///    "normalizedHost": {
+    ///      "type": "string",
+    ///      "maxLength": 253,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^A-Z\\s/*]+$"
+    ///    },
+    ///    "scheme": {
+    ///      "enum": [
+    ///        "https",
+    ///        "http"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Destination {
+        #[serde(rename = "exactPathAndQuery")]
+        pub exact_path_and_query: DestinationExactPathAndQuery,
+        #[serde(rename = "explicitPort")]
+        pub explicit_port: ::std::num::NonZeroU64,
+        pub method: DestinationMethod,
+        #[serde(rename = "normalizedHost")]
+        pub normalized_host: DestinationNormalizedHost,
+        pub scheme: DestinationScheme,
+    }
+    impl ::std::convert::From<&Destination> for Destination {
+        fn from(value: &Destination) -> Self {
+            value.clone()
+        }
+    }
+    ///`DestinationExactPathAndQuery`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "minLength": 1,
+    ///  "pattern": "^/[^#\\\\\\u0000-\\u0020\\u007f]*$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct DestinationExactPathAndQuery(::std::string::String);
+    impl ::std::ops::Deref for DestinationExactPathAndQuery {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<DestinationExactPathAndQuery> for ::std::string::String {
+        fn from(value: DestinationExactPathAndQuery) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&DestinationExactPathAndQuery> for DestinationExactPathAndQuery {
+        fn from(value: &DestinationExactPathAndQuery) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for DestinationExactPathAndQuery {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^/[^#\\\\\\u0000-\\u0020\\u007f]*$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^/[^#\\\\\\u0000-\\u0020\\u007f]*$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for DestinationExactPathAndQuery {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for DestinationExactPathAndQuery {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for DestinationExactPathAndQuery {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for DestinationExactPathAndQuery {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`DestinationMethod`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "GET",
+    ///    "HEAD",
+    ///    "POST",
+    ///    "PUT",
+    ///    "PATCH",
+    ///    "DELETE",
+    ///    "OPTIONS"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum DestinationMethod {
+        #[serde(rename = "GET")]
+        Get,
+        #[serde(rename = "HEAD")]
+        Head,
+        #[serde(rename = "POST")]
+        Post,
+        #[serde(rename = "PUT")]
+        Put,
+        #[serde(rename = "PATCH")]
+        Patch,
+        #[serde(rename = "DELETE")]
+        Delete,
+        #[serde(rename = "OPTIONS")]
+        Options,
+    }
+    impl ::std::convert::From<&Self> for DestinationMethod {
+        fn from(value: &DestinationMethod) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for DestinationMethod {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Get => f.write_str("GET"),
+                Self::Head => f.write_str("HEAD"),
+                Self::Post => f.write_str("POST"),
+                Self::Put => f.write_str("PUT"),
+                Self::Patch => f.write_str("PATCH"),
+                Self::Delete => f.write_str("DELETE"),
+                Self::Options => f.write_str("OPTIONS"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for DestinationMethod {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "GET" => Ok(Self::Get),
+                "HEAD" => Ok(Self::Head),
+                "POST" => Ok(Self::Post),
+                "PUT" => Ok(Self::Put),
+                "PATCH" => Ok(Self::Patch),
+                "DELETE" => Ok(Self::Delete),
+                "OPTIONS" => Ok(Self::Options),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for DestinationMethod {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for DestinationMethod {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for DestinationMethod {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`DestinationNormalizedHost`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 253,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^A-Z\\s/*]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct DestinationNormalizedHost(::std::string::String);
+    impl ::std::ops::Deref for DestinationNormalizedHost {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<DestinationNormalizedHost> for ::std::string::String {
+        fn from(value: DestinationNormalizedHost) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&DestinationNormalizedHost> for DestinationNormalizedHost {
+        fn from(value: &DestinationNormalizedHost) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for DestinationNormalizedHost {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 253usize {
+                return Err("longer than 253 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^A-Z\\s/*]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^A-Z\\s/*]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for DestinationNormalizedHost {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for DestinationNormalizedHost {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for DestinationNormalizedHost {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for DestinationNormalizedHost {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`DestinationScheme`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "https",
+    ///    "http"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum DestinationScheme {
+        #[serde(rename = "https")]
+        Https,
+        #[serde(rename = "http")]
+        Http,
+    }
+    impl ::std::convert::From<&Self> for DestinationScheme {
+        fn from(value: &DestinationScheme) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for DestinationScheme {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Https => f.write_str("https"),
+                Self::Http => f.write_str("http"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for DestinationScheme {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "https" => Ok(Self::Https),
+                "http" => Ok(Self::Http),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for DestinationScheme {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for DestinationScheme {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for DestinationScheme {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Digest(::std::string::String);
+    impl ::std::ops::Deref for Digest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for ::std::string::String {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Digest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Digest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`DigestOrNull`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    {
+    ///      "type": "null"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct DigestOrNull(pub ::std::option::Option<Digest>);
+    impl ::std::ops::Deref for DigestOrNull {
+        type Target = ::std::option::Option<Digest>;
+        fn deref(&self) -> &::std::option::Option<Digest> {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<DigestOrNull> for ::std::option::Option<Digest> {
+        fn from(value: DigestOrNull) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&DigestOrNull> for DigestOrNull {
+        fn from(value: &DigestOrNull) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::option::Option<Digest>> for DigestOrNull {
+        fn from(value: ::std::option::Option<Digest>) -> Self {
+            Self(value)
+        }
+    }
+    ///`Header`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "name",
+    ///    "value"
+    ///  ],
+    ///  "properties": {
+    ///    "name": {
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[a-z0-9-]+$"
+    ///    },
+    ///    "value": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 8192
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Header {
+        pub name: HeaderName,
+        pub value: ::std::vec::Vec<u8>,
+    }
+    impl ::std::convert::From<&Header> for Header {
+        fn from(value: &Header) -> Self {
+            value.clone()
+        }
+    }
+    ///`HeaderName`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[a-z0-9-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct HeaderName(::std::string::String);
+    impl ::std::ops::Deref for HeaderName {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<HeaderName> for ::std::string::String {
+        fn from(value: HeaderName) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&HeaderName> for HeaderName {
+        fn from(value: &HeaderName) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for HeaderName {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[a-z0-9-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[a-z0-9-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for HeaderName {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for HeaderName {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for HeaderName {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for HeaderName {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`HeaderNames`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "items": {
+    ///    "type": "string",
+    ///    "maxLength": 128,
+    ///    "minLength": 1,
+    ///    "pattern": "^[a-z0-9-]+$"
+    ///  },
+    ///  "maxItems": 64,
+    ///  "uniqueItems": true
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct HeaderNames(pub Vec<HeaderNamesItem>);
+    impl ::std::ops::Deref for HeaderNames {
+        type Target = Vec<HeaderNamesItem>;
+        fn deref(&self) -> &Vec<HeaderNamesItem> {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<HeaderNames> for Vec<HeaderNamesItem> {
+        fn from(value: HeaderNames) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&HeaderNames> for HeaderNames {
+        fn from(value: &HeaderNames) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<Vec<HeaderNamesItem>> for HeaderNames {
+        fn from(value: Vec<HeaderNamesItem>) -> Self {
+            Self(value)
+        }
+    }
+    ///`HeaderNamesItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[a-z0-9-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct HeaderNamesItem(::std::string::String);
+    impl ::std::ops::Deref for HeaderNamesItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<HeaderNamesItem> for ::std::string::String {
+        fn from(value: HeaderNamesItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&HeaderNamesItem> for HeaderNamesItem {
+        fn from(value: &HeaderNamesItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for HeaderNamesItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[a-z0-9-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[a-z0-9-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for HeaderNamesItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for HeaderNamesItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for HeaderNamesItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for HeaderNamesItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Identifier`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Options`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "responseLimitBytes",
+    ///    "streaming",
+    ///    "timeoutMs"
+    ///  ],
+    ///  "properties": {
+    ///    "responseLimitBytes": {
+    ///      "type": "integer",
+    ///      "maximum": 2097152.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "streaming": {
+    ///      "type": "boolean"
+    ///    },
+    ///    "timeoutMs": {
+    ///      "type": "integer",
+    ///      "maximum": 120000.0,
+    ///      "minimum": 1.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Options {
+        #[serde(rename = "responseLimitBytes")]
+        pub response_limit_bytes: ::std::num::NonZeroU64,
+        pub streaming: bool,
+        #[serde(rename = "timeoutMs")]
+        pub timeout_ms: ::std::num::NonZeroU64,
+    }
+    impl ::std::convert::From<&Options> for Options {
+        fn from(value: &Options) -> Self {
+            value.clone()
+        }
+    }
+    ///`ProofBinding`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "callerPublicKey",
+    ///    "mode",
+    ///    "nonceTtlSeconds"
+    ///  ],
+    ///  "properties": {
+    ///    "callerPublicKey": {
+    ///      "$ref": "#/$defs/publicKey"
+    ///    },
+    ///    "mode": {
+    ///      "enum": [
+    ///        "public_key",
+    ///        "loopback_bearer"
+    ///      ]
+    ///    },
+    ///    "nonceTtlSeconds": {
+    ///      "type": "integer",
+    ///      "maximum": 300.0,
+    ///      "minimum": 1.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ProofBinding {
+        #[serde(rename = "callerPublicKey")]
+        pub caller_public_key: PublicKey,
+        pub mode: ProofBindingMode,
+        #[serde(rename = "nonceTtlSeconds")]
+        pub nonce_ttl_seconds: ::std::num::NonZeroU64,
+    }
+    impl ::std::convert::From<&ProofBinding> for ProofBinding {
+        fn from(value: &ProofBinding) -> Self {
+            value.clone()
+        }
+    }
+    ///`ProofBindingMode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "public_key",
+    ///    "loopback_bearer"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ProofBindingMode {
+        #[serde(rename = "public_key")]
+        PublicKey,
+        #[serde(rename = "loopback_bearer")]
+        LoopbackBearer,
+    }
+    impl ::std::convert::From<&Self> for ProofBindingMode {
+        fn from(value: &ProofBindingMode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ProofBindingMode {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::PublicKey => f.write_str("public_key"),
+                Self::LoopbackBearer => f.write_str("loopback_bearer"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ProofBindingMode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "public_key" => Ok(Self::PublicKey),
+                "loopback_bearer" => Ok(Self::LoopbackBearer),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ProofBindingMode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ProofBindingMode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ProofBindingMode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`PublicKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PublicKey(::std::string::String);
+    impl ::std::ops::Deref for PublicKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PublicKey> for ::std::string::String {
+        fn from(value: PublicKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PublicKey> for PublicKey {
+        fn from(value: &PublicKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PublicKey {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PublicKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PublicKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Quota`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "keyId",
+    ///    "maximumExecutions"
+    ///  ],
+    ///  "properties": {
+    ///    "keyId": {
+    ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "maximumExecutions": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 1.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Quota {
+        #[serde(rename = "keyId")]
+        pub key_id: Identifier,
+        #[serde(rename = "maximumExecutions")]
+        pub maximum_executions: ::std::num::NonZeroU64,
+    }
+    impl ::std::convert::From<&Quota> for Quota {
+        fn from(value: &Quota) -> Self {
+            value.clone()
+        }
+    }
+    ///`Request`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "approvedPreviewSha256",
+    ///    "body",
+    ///    "destination",
+    ///    "headers",
+    ///    "options"
+    ///  ],
+    ///  "properties": {
+    ///    "approvedPreviewSha256": {
+    ///      "$ref": "#/$defs/digestOrNull"
+    ///    },
+    ///    "body": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 524288
+    ///    },
+    ///    "destination": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "exactPathAndQuery",
+    ///        "explicitPort",
+    ///        "method",
+    ///        "normalizedHost",
+    ///        "scheme"
+    ///      ],
+    ///      "properties": {
+    ///        "exactPathAndQuery": {
+    ///          "type": "string",
+    ///          "maxLength": 16384,
+    ///          "minLength": 1,
+    ///          "pattern": "^/[^#\\\\\\u0000-\\u0020\\u007f]*$"
+    ///        },
+    ///        "explicitPort": {
+    ///          "type": "integer",
+    ///          "maximum": 65535.0,
+    ///          "minimum": 1.0
+    ///        },
+    ///        "method": {
+    ///          "enum": [
+    ///            "GET",
+    ///            "HEAD",
+    ///            "POST",
+    ///            "PUT",
+    ///            "PATCH",
+    ///            "DELETE",
+    ///            "OPTIONS"
+    ///          ]
+    ///        },
+    ///        "normalizedHost": {
+    ///          "type": "string",
+    ///          "maxLength": 253,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^A-Z\\s/*]+$"
+    ///        },
+    ///        "scheme": {
+    ///          "enum": [
+    ///            "https",
+    ///            "http"
+    ///          ]
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "headers": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/header"
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    "options": {
+    ///      "$ref": "#/$defs/options"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Request {
+        #[serde(rename = "approvedPreviewSha256")]
+        pub approved_preview_sha256: DigestOrNull,
+        pub body: ::std::vec::Vec<u8>,
+        pub destination: RequestDestination,
+        pub headers: ::std::vec::Vec<Header>,
+        pub options: Options,
+    }
+    impl ::std::convert::From<&Request> for Request {
+        fn from(value: &Request) -> Self {
+            value.clone()
+        }
+    }
+    ///`RequestConstraints`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allowedCallerHeaders",
+    ///    "maximumBodyBytes",
+    ///    "maximumResponseBytes",
+    ///    "maximumTimeoutMs",
+    ///    "providerOwnedHeaders",
+    ///    "redirectPolicy",
+    ///    "requiredBodySha256",
+    ///    "requiredPreviewSha256",
+    ///    "streamingAllowed"
+    ///  ],
+    ///  "properties": {
+    ///    "allowedCallerHeaders": {
+    ///      "$ref": "#/$defs/headerNames"
+    ///    },
+    ///    "maximumBodyBytes": {
+    ///      "type": "integer",
+    ///      "maximum": 524288.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "maximumResponseBytes": {
+    ///      "type": "integer",
+    ///      "maximum": 2097152.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "maximumTimeoutMs": {
+    ///      "type": "integer",
+    ///      "maximum": 120000.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "providerOwnedHeaders": {
+    ///      "$ref": "#/$defs/headerNames"
+    ///    },
+    ///    "redirectPolicy": {
+    ///      "const": "disabled"
+    ///    },
+    ///    "requiredBodySha256": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "requiredPreviewSha256": {
+    ///      "oneOf": [
+    ///        {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        {
+    ///          "type": "null"
+    ///        }
+    ///      ]
+    ///    },
+    ///    "streamingAllowed": {
+    ///      "type": "boolean"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RequestConstraints {
+        #[serde(rename = "allowedCallerHeaders")]
+        pub allowed_caller_headers: HeaderNames,
+        #[serde(rename = "maximumBodyBytes")]
+        pub maximum_body_bytes: i64,
+        #[serde(rename = "maximumResponseBytes")]
+        pub maximum_response_bytes: ::std::num::NonZeroU64,
+        #[serde(rename = "maximumTimeoutMs")]
+        pub maximum_timeout_ms: ::std::num::NonZeroU64,
+        #[serde(rename = "providerOwnedHeaders")]
+        pub provider_owned_headers: HeaderNames,
+        #[serde(rename = "redirectPolicy")]
+        pub redirect_policy: ::serde_json::Value,
+        #[serde(rename = "requiredBodySha256")]
+        pub required_body_sha256: Digest,
+        #[serde(rename = "requiredPreviewSha256")]
+        pub required_preview_sha256: ::std::option::Option<Digest>,
+        #[serde(rename = "streamingAllowed")]
+        pub streaming_allowed: bool,
+    }
+    impl ::std::convert::From<&RequestConstraints> for RequestConstraints {
+        fn from(value: &RequestConstraints) -> Self {
+            value.clone()
+        }
+    }
+    ///`RequestDestination`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "exactPathAndQuery",
+    ///    "explicitPort",
+    ///    "method",
+    ///    "normalizedHost",
+    ///    "scheme"
+    ///  ],
+    ///  "properties": {
+    ///    "exactPathAndQuery": {
+    ///      "type": "string",
+    ///      "maxLength": 16384,
+    ///      "minLength": 1,
+    ///      "pattern": "^/[^#\\\\\\u0000-\\u0020\\u007f]*$"
+    ///    },
+    ///    "explicitPort": {
+    ///      "type": "integer",
+    ///      "maximum": 65535.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "method": {
+    ///      "enum": [
+    ///        "GET",
+    ///        "HEAD",
+    ///        "POST",
+    ///        "PUT",
+    ///        "PATCH",
+    ///        "DELETE",
+    ///        "OPTIONS"
+    ///      ]
+    ///    },
+    ///    "normalizedHost": {
+    ///      "type": "string",
+    ///      "maxLength": 253,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^A-Z\\s/*]+$"
+    ///    },
+    ///    "scheme": {
+    ///      "enum": [
+    ///        "https",
+    ///        "http"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RequestDestination {
+        #[serde(rename = "exactPathAndQuery")]
+        pub exact_path_and_query: RequestDestinationExactPathAndQuery,
+        #[serde(rename = "explicitPort")]
+        pub explicit_port: ::std::num::NonZeroU64,
+        pub method: RequestDestinationMethod,
+        #[serde(rename = "normalizedHost")]
+        pub normalized_host: RequestDestinationNormalizedHost,
+        pub scheme: RequestDestinationScheme,
+    }
+    impl ::std::convert::From<&RequestDestination> for RequestDestination {
+        fn from(value: &RequestDestination) -> Self {
+            value.clone()
+        }
+    }
+    ///`RequestDestinationExactPathAndQuery`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "minLength": 1,
+    ///  "pattern": "^/[^#\\\\\\u0000-\\u0020\\u007f]*$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct RequestDestinationExactPathAndQuery(::std::string::String);
+    impl ::std::ops::Deref for RequestDestinationExactPathAndQuery {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<RequestDestinationExactPathAndQuery> for ::std::string::String {
+        fn from(value: RequestDestinationExactPathAndQuery) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&RequestDestinationExactPathAndQuery>
+        for RequestDestinationExactPathAndQuery
+    {
+        fn from(value: &RequestDestinationExactPathAndQuery) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for RequestDestinationExactPathAndQuery {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^/[^#\\\\\\u0000-\\u0020\\u007f]*$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^/[^#\\\\\\u0000-\\u0020\\u007f]*$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RequestDestinationExactPathAndQuery {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for RequestDestinationExactPathAndQuery {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for RequestDestinationExactPathAndQuery {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for RequestDestinationExactPathAndQuery {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`RequestDestinationMethod`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "GET",
+    ///    "HEAD",
+    ///    "POST",
+    ///    "PUT",
+    ///    "PATCH",
+    ///    "DELETE",
+    ///    "OPTIONS"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum RequestDestinationMethod {
+        #[serde(rename = "GET")]
+        Get,
+        #[serde(rename = "HEAD")]
+        Head,
+        #[serde(rename = "POST")]
+        Post,
+        #[serde(rename = "PUT")]
+        Put,
+        #[serde(rename = "PATCH")]
+        Patch,
+        #[serde(rename = "DELETE")]
+        Delete,
+        #[serde(rename = "OPTIONS")]
+        Options,
+    }
+    impl ::std::convert::From<&Self> for RequestDestinationMethod {
+        fn from(value: &RequestDestinationMethod) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for RequestDestinationMethod {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Get => f.write_str("GET"),
+                Self::Head => f.write_str("HEAD"),
+                Self::Post => f.write_str("POST"),
+                Self::Put => f.write_str("PUT"),
+                Self::Patch => f.write_str("PATCH"),
+                Self::Delete => f.write_str("DELETE"),
+                Self::Options => f.write_str("OPTIONS"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for RequestDestinationMethod {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "GET" => Ok(Self::Get),
+                "HEAD" => Ok(Self::Head),
+                "POST" => Ok(Self::Post),
+                "PUT" => Ok(Self::Put),
+                "PATCH" => Ok(Self::Patch),
+                "DELETE" => Ok(Self::Delete),
+                "OPTIONS" => Ok(Self::Options),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RequestDestinationMethod {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for RequestDestinationMethod {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for RequestDestinationMethod {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`RequestDestinationNormalizedHost`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 253,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^A-Z\\s/*]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct RequestDestinationNormalizedHost(::std::string::String);
+    impl ::std::ops::Deref for RequestDestinationNormalizedHost {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<RequestDestinationNormalizedHost> for ::std::string::String {
+        fn from(value: RequestDestinationNormalizedHost) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&RequestDestinationNormalizedHost> for RequestDestinationNormalizedHost {
+        fn from(value: &RequestDestinationNormalizedHost) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for RequestDestinationNormalizedHost {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 253usize {
+                return Err("longer than 253 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^A-Z\\s/*]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^A-Z\\s/*]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RequestDestinationNormalizedHost {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for RequestDestinationNormalizedHost {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for RequestDestinationNormalizedHost {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for RequestDestinationNormalizedHost {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`RequestDestinationScheme`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "https",
+    ///    "http"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum RequestDestinationScheme {
+        #[serde(rename = "https")]
+        Https,
+        #[serde(rename = "http")]
+        Http,
+    }
+    impl ::std::convert::From<&Self> for RequestDestinationScheme {
+        fn from(value: &RequestDestinationScheme) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for RequestDestinationScheme {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Https => f.write_str("https"),
+                Self::Http => f.write_str("http"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for RequestDestinationScheme {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "https" => Ok(Self::Https),
+                "http" => Ok(Self::Http),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RequestDestinationScheme {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for RequestDestinationScheme {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for RequestDestinationScheme {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Signature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Signature(::std::string::String);
+    impl ::std::ops::Deref for Signature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Signature> for ::std::string::String {
+        fn from(value: Signature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Signature> for Signature {
+        fn from(value: &Signature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Signature {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Signature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Signature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+}
 pub mod security_broker_prepare_dispatch_acknowledgement_v1 {
     /// Error types.
     pub mod error {

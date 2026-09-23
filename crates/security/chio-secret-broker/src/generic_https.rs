@@ -730,6 +730,18 @@ pub(crate) fn response_digest(body: &[u8]) -> String {
     hex::encode(Sha256::digest(body))
 }
 
+/// Commit the exact sanitized header vector returned by the broker. The
+/// response domain is distinct from caller-controlled request headers.
+pub fn response_header_digest(headers: &[HeaderField]) -> Result<String> {
+    let canonical = chio_core_types::canonical_json_bytes(&headers).map_err(|error| {
+        BrokerError::Invariant(format!("response header encoding failed: {error}"))
+    })?;
+    let mut digest = Sha256::new();
+    digest.update(b"chio.broker-response-headers.v1\0");
+    digest.update(canonical);
+    Ok(hex::encode(digest.finalize()))
+}
+
 #[cfg(test)]
 mod tests {
     use chio_test_support::prelude::*;

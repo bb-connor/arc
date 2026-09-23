@@ -29,6 +29,8 @@ const CAPABILITY_ISSUER_HEX: &str =
     "17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce";
 const RECEIPT_AND_REGISTRATION_AUTHORITY_HEX: &str =
     "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565";
+const COMPLETION_RECEIPT_AUTHORITY_HEX: &str =
+    "4508a07aa941707f3eb2db94c8897a80b2c1197476b6de213ac273df7d86c4ff";
 const BROKER_AUDIENCE: &str = "broker-service-production";
 const VERIFICATION_TIME: u64 = 100;
 const MAXIMUM_CLOCK_SKEW_SECONDS: u64 = 1;
@@ -37,9 +39,16 @@ const MAXIMUM_CLOCK_SKEW_SECONDS: u64 = 1;
 enum ErrorKind {
     InvalidRequest,
     AuthorizationDenied,
+    ResponseRejected,
 }
 
-const SEMANTIC_CASES: [(&str, &str, ErrorKind, &str); 18] = [
+const SEMANTIC_CASES: [(&str, &str, ErrorKind, &str); 19] = [
+    (
+        "v2_response_headers_rebound",
+        "response_header_binding_mismatch",
+        ErrorKind::ResponseRejected,
+        "response headers differ from signed evidence",
+    ),
     (
         "capability_noncanonical_trailing_newline",
         "noncanonical_capability_bytes",
@@ -150,7 +159,11 @@ const SEMANTIC_CASES: [(&str, &str, ErrorKind, &str); 18] = [
     ),
 ];
 
-const SCHEMA_REJECTED_CASES: [&str; 2] = [
+const SCHEMA_REJECTED_CASES: [&str; 6] = [
+    "v2_evidence_requires_response_header_commitment",
+    "v2_response_refuses_legacy_evidence",
+    "v2_receipt_body_requires_response_header_commitment",
+    "v2_receipt_envelope_refuses_legacy_body",
     "execute_response_receipt_missing",
     "receipt_forbidden_credential_value",
 ];
@@ -360,14 +373,14 @@ fn verify_semantics(id: &str, bytes: &[u8]) -> Result<()> {
         | "receipt_quota_not_canonical"
         | "receipt_signature_tampered" => {
             let receipt: SignedBrokerReceipt = decode_json(bytes, "broker receipt")?;
-            verify_execution_receipt(&receipt, &receipt_and_registration_authority())
+            verify_execution_receipt(&receipt, &completion_receipt_authority())
         }
-        "execute_response_receipt_signature_tampered" => {
+        "execute_response_receipt_signature_tampered" | "v2_response_headers_rebound" => {
             let response: BrokerExecuteResponse = decode_json(bytes, "broker execute response")?;
             validate_execute_response(
                 &related_execute_request(),
                 &response,
-                &receipt_and_registration_authority(),
+                &completion_receipt_authority(),
             )
         }
         "attempt_registration_id_rebound" => {
@@ -454,10 +467,16 @@ fn receipt_and_registration_authority() -> PublicKey {
         .test_expect("fixed receipt and registration authority must parse")
 }
 
+fn completion_receipt_authority() -> PublicKey {
+    PublicKey::from_hex(COMPLETION_RECEIPT_AUTHORITY_HEX)
+        .test_expect("fixed v2 completion receipt authority must parse")
+}
+
 fn assert_error(id: &str, error: &BrokerError, kind: ErrorKind, message: &str) {
     let actual_kind = match error {
         BrokerError::InvalidRequest(_) => ErrorKind::InvalidRequest,
         BrokerError::AuthorizationDenied(_) => ErrorKind::AuthorizationDenied,
+        BrokerError::ResponseRejected(_) => ErrorKind::ResponseRejected,
         _ => panic!("{id} failed at the wrong boundary: {error}"),
     };
     assert_eq!(actual_kind, kind, "{id} returned the wrong error kind");

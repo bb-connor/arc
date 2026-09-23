@@ -38,7 +38,7 @@ fn command(descriptor: &impl AsRawFd) -> Command {
             "--tool-name",
             "send",
             "--receipt-signer",
-            "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+            "4508a07aa941707f3eb2db94c8897a80b2c1197476b6de213ac273df7d86c4ff",
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -90,7 +90,7 @@ fn executable_preserves_one_broker_dispatch_and_rejects_a_tampered_completion() 
                 .set_write_timeout(Some(Duration::from_secs(5)))
                 .test_expect("write deadline");
         }
-        let mut response: BrokerExecuteResponse = fixture("broker-execute-response-v1.json");
+        let mut response: BrokerExecuteResponse = fixture("broker-execute-response-v2.json");
         if tampered {
             response.body.extend(b"untrusted-secret-sentinel");
         }

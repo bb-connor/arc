@@ -13,6 +13,7 @@ pub(super) struct CapturedBrokerDelivery {
     pub(super) execute: BrokerExecuteRequest,
     registration: AttemptRegistration,
     capture: CombinedCaptureCommit,
+    earliest_completion_unix_seconds: u64,
 }
 
 impl CapturedBrokerDelivery {
@@ -20,13 +21,19 @@ impl CapturedBrokerDelivery {
         &self,
         participant: &BrokerAdmissionParticipant,
         response: &BrokerExecuteResponse,
+        trusted_now_unix_ms: u64,
     ) -> Result<()> {
         participant
             .client
             .validate_completed_response(&self.execute, response)?;
         let receipt = &response.receipt.body;
         let evidence = &response.evidence;
-        if receipt.operation_id != self.registration.ids.operation_id
+        // Completion can be observed after capability expiry. Authenticate its
+        // historical time against original authority and the trusted receiver
+        // clock; do not turn this read into a new live authorization check.
+        if receipt.issued_at_unix_seconds < self.earliest_completion_unix_seconds
+            || receipt.issued_at_unix_seconds > trusted_now_unix_ms / 1_000
+            || receipt.operation_id != self.registration.ids.operation_id
             || receipt.quotas != self.registration.quotas
             || evidence.revocation_set_digest != self.capture.checked_revocation_set_digest
             || evidence.budget_commit_index != self.capture.budget_commit_index
@@ -55,7 +62,7 @@ impl BrokerNativeCaptureReader {
             .read_original(operation_id, trusted_now_unix_ms)?
             .ok_or_else(rejected)?;
         self.captured_delivery(participant, &original, trusted_now_unix_ms)?
-            .verify_response(participant, response)
+            .verify_response(participant, response, trusted_now_unix_ms)
     }
 
     pub(super) fn captured_delivery(
@@ -95,6 +102,12 @@ impl BrokerNativeCaptureReader {
             execute: original.execute.clone(),
             registration,
             capture,
+            earliest_completion_unix_seconds: original
+                .retained
+                .request_for_revalidation()
+                .capability
+                .issued_at
+                .max(original.execute.capability.body.not_before_unix_seconds),
         })
     }
 }

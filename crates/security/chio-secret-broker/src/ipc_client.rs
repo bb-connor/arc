@@ -727,6 +727,8 @@ mod preconnected_execution_tests {
     use super::*;
 
     const RECEIPT_SIGNER_HEX: &str =
+        "4508a07aa941707f3eb2db94c8897a80b2c1197476b6de213ac273df7d86c4ff";
+    const FAILURE_RECEIPT_SIGNER_HEX: &str =
         "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565";
     const TENANT_SCOPE: &str = "tenant-production";
 
@@ -734,7 +736,7 @@ mod preconnected_execution_tests {
     fn preconnected_execute_returns_validated_outcome_and_exact_canonical_frames() {
         let request: BrokerExecuteRequest = read_vector("broker-execute-request-v1.json");
         let execute_response: BrokerExecuteResponse =
-            read_vector("broker-execute-response-v1.json");
+            read_vector("broker-execute-response-v2.json");
         let response_frame = canonical_json_bytes(&IpcResponse {
             operation: IpcOperation::Execute,
             accepted: true,
@@ -823,7 +825,8 @@ mod preconnected_execution_tests {
             write_bounded_frame(&mut server, &response_frame).test_expect("failure response frame");
         });
 
-        let signer = PublicKey::from_hex(RECEIPT_SIGNER_HEX).test_expect("receipt signer");
+        let signer =
+            PublicKey::from_hex(FAILURE_RECEIPT_SIGNER_HEX).test_expect("failure receipt signer");
         let transcript = BrokerIpcClient::execute_evidenced_on_authenticated_stream(
             client,
             TENANT_SCOPE,
@@ -845,7 +848,8 @@ mod preconnected_execution_tests {
     fn preconnected_execute_rejects_rebound_or_tampered_signed_failures() {
         let request: BrokerExecuteRequest = read_vector("broker-execute-request-v1.json");
         let failure: BrokerExecuteFailure = read_vector("broker-execute-failure-v1.json");
-        let signer = PublicKey::from_hex(RECEIPT_SIGNER_HEX).test_expect("receipt signer");
+        let signer =
+            PublicKey::from_hex(FAILURE_RECEIPT_SIGNER_HEX).test_expect("failure receipt signer");
 
         let mut rebound_failure = failure.clone();
         rebound_failure.diagnostic_code = "chio.broker.conflict".to_string();
@@ -921,7 +925,7 @@ mod preconnected_execution_tests {
         let mut request: BrokerExecuteRequest = read_vector("broker-execute-request-v1.json");
         request.invocation_id = "invocation-production-misbound".to_string();
         let execute_response: BrokerExecuteResponse =
-            read_vector("broker-execute-response-v1.json");
+            read_vector("broker-execute-response-v2.json");
         let response_frame = canonical_json_bytes(&IpcResponse {
             operation: IpcOperation::Execute,
             accepted: true,

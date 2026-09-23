@@ -438,6 +438,7 @@ impl BrokerService {
                     leader_epoch: commit.leader_epoch,
                     upstream_status: status,
                     response_body_sha256: response_body_sha256.clone(),
+                    response_headers_sha256: crate::generic_https::response_header_digest(&headers)?,
                 };
                 let receipt_id = format!("broker-receipt-{}", ids.attempt_id);
                 let receipt = sign_execution_receipt(

@@ -593,6 +593,8 @@ mod tests {
             leader_epoch: attempt.leader_epoch.test_expect("leader epoch"),
             upstream_status: 200,
             response_body_sha256: hex::encode(Sha256::digest(&body)),
+            response_headers_sha256: crate::generic_https::response_header_digest(&[])
+                .test_expect("response header digest"),
         };
         let receipt = sign_execution_receipt(
             BrokerReceiptBody {

@@ -20,6 +20,20 @@ pub(super) fn reject_signed_capture_substitutions(
         response,
         now()?,
     )?;
+    let historical_observation = host
+        .request
+        .capability
+        .expires_at
+        .max(host.execute.capability.body.expires_at_unix_seconds)
+        .checked_add(1)
+        .and_then(|seconds| seconds.checked_mul(1_000))
+        .ok_or("historical observation time overflow")?;
+    host.reader.verify_completed_response(
+        host.participant.as_ref(),
+        operation_id,
+        response,
+        historical_observation,
+    )?;
     for field in [
         "operation",
         "quota",
@@ -28,6 +42,8 @@ pub(super) fn reject_signed_capture_substitutions(
         "authority",
         "leader",
         "revocation_set",
+        "future_completion",
+        "predated_completion",
     ] {
         let mut changed = response.clone();
         let receipt = &mut changed.receipt.body;
@@ -38,6 +54,8 @@ pub(super) fn reject_signed_capture_substitutions(
             "revocation" => receipt.evidence.revocation_commit_index += 1,
             "authority" => receipt.evidence.authority_commit_index += 1,
             "leader" => receipt.evidence.leader_epoch += 1,
+            "future_completion" => receipt.issued_at_unix_seconds = now()? / 1_000 + 3_600,
+            "predated_completion" => receipt.issued_at_unix_seconds = 1,
             _ => receipt.evidence.revocation_set_digest = "f".repeat(64),
         }
         changed.evidence = receipt.evidence.clone();

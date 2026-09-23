@@ -16,9 +16,9 @@ use crate::protocol::{
 use crate::sqlite::DurableBrokerDatabaseFile;
 use crate::{validate_identifier, BrokerError, Result};
 
-pub const BROKER_RECEIPT_SCHEMA: &str = "chio.broker-execution-receipt.v1";
+pub const BROKER_RECEIPT_SCHEMA: &str = "chio.broker-execution-receipt.v2";
 pub const BROKER_FAILURE_RECEIPT_SCHEMA: &str = "chio.broker-execution-failure-receipt.v1";
-const RECEIPT_DOMAIN: &str = "chio.broker-execution-receipt-signature.v1\0";
+const RECEIPT_DOMAIN: &str = "chio.broker-execution-receipt-signature.v2\0";
 const FAILURE_RECEIPT_DOMAIN: &str = "chio.broker-execution-failure-receipt-signature.v1\0";
 const CREDENTIAL_REFERENCE_DOMAIN: &[u8] = b"chio.broker-credential-reference.v1\0";
 const MAX_SOURCE_RECEIPT_IDS: usize = 64;
@@ -1108,6 +1108,13 @@ pub(crate) fn validate_durable_completed_response(
             ));
         }
         previous = Some(&header.name);
+    }
+    if response.evidence.response_headers_sha256
+        != crate::generic_https::response_header_digest(&response.headers)?
+    {
+        return Err(BrokerError::ResponseRejected(
+            "completed broker response headers differ from signed evidence".to_string(),
+        ));
     }
     Ok(())
 }

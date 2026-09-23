@@ -18,11 +18,31 @@ below retain their historical source boundaries.
 | Cage | The `84c0ca4e89` native run reports 69 tests, 26 real probes and ten mutants with exit 0; retained log hash matches. | The retained runner's release-helper adaptation and trusted capture require their own acceptance. |
 | M5 | Original nonce custody, receipt checkpoints and inclusion proofs are implemented. Runtime `317b3a9128` with qualifier `6170900d7f` passed all seven native scenarios and rejected 15 substitutions; a separately built aarch64 observer verified both inventories. | Final source, combined-foundation qualification and independently authorized trusted-runner acceptance remain open. The artifact does not claim full M5 acceptance. |
 | Image | Source `6170900d7f` built and passed identity, ownership, toolchain and offline locked-dependency checks. Image ID: `sha256:f17db010c5e6e5e1d6ad8eea8ce97f8e2a530888a737e59bbb16afdfdb1a245a`; all 199 archive hashes and 225 package pins match. | The current lock and broker gate differ. Rebuild and validate those inputs before authorized publication, registry identity verification or trust-root rotation. |
-| M6 | The real confined kernel/broker/MCP/TLS invocation composes governed keyring issuance, witnessed rotation, contiguous synchronization and stale signer fencing. Three cold-process positive runs pass; the final two use exact `36ddfcf69e`. The next patch passes the expanded portable boundary gate, strict all-target broker Clippy and the real x86 confined positive plus all three broker-death cutpoints. Original parent, aggregate and broker charges remain captured after uncertain effects; replay cannot enter dispatch again. | Complete independently verified broker/keyring/cage artifact joins and the ordinary process-host integration remain open. Direct-host execution is not designated trusted capture. ARM retains the existing native-enforcement refusal. M6 is not complete. |
+| M6 | The real confined kernel/broker/MCP/TLS invocation composes governed keyring issuance, witnessed rotation, contiguous synchronization and stale signer fencing. The v2 completion repair signs returned headers and rejects future or predated native completion time. All 206 broker tests pass on x86 with every feature and target, including confinement and three broker-death cutpoints. The portable gate and strict all-feature/all-target broker Clippy pass. Original parent, aggregate and broker charges remain captured after uncertain effects; replay cannot enter dispatch again. | Complete independently verified broker/keyring/cage artifact joins and the ordinary process-host integration remain open. Direct-host execution is not designated trusted capture. ARM retains the existing native-enforcement refusal. M6 is not complete. |
 | M7 | At `6170900d7f`, deception passed 82 tests; response recovery, flow and temporal gates exited 0. Temporal covered 10 inventories and 40 exact cases; retrieved hashes match. The 28 archived adversarial definitions and 35 campaign identities are restored as pending cases. Broker quota controls now target the owning SQLite composite authority; corpus consumers exclude pending cases from completed coverage. | All 35 campaigns need current-source control and caught-mutation evidence before promotion. Restored definitions and historical outcome hashes do not close M7. |
 | M8 | At frozen `d5884b4d87`, the fresh million-receipt recovery campaign passes in 6,869.58 seconds with 1,000,000 actual appends and no profiling intervention. It verifies integrity, pagination, backup, reopen, half archive, retained append and restored append. The unchanged 24-case retention property also passes under declared 25 ms fsync/fdatasync delay in 265.71 seconds. | Both results are tied to their frozen source. The delayed-sync diagnostic did not reproduce #1045, so its quarantine remains. Final-source qualification and the liveness repair remain open. |
 | Hosted delivery | #1160 publishes the continuation. Main prerequisite #1168 is at `2fb4a6c1c8`; definition-only #1167 retains `88b9b2a3cb`. Original hosted failures remain recorded. | New-head qualification, independent review, protected integration and the exact source/definition/image/verifier authority transition remain required. |
 | M9-M11 | Packaging and handoff work remains preserved. | No milestone-level M9-M10 acceptance or M11 operational promotion is established. |
+
+The completion repair reproduced two accepted substitutions: altered response
+headers under the original signature, and a correctly signed native receipt
+claiming completion one hour in the future. V2 evidence commits to the exact
+canonical sanitized header vector under a separate digest domain; v2 receipts
+use a new signature domain. Shared live and durable response verification checks
+that commitment. Native completion also binds original parent issuance and
+broker activation to the trusted receiver's observation time, while historical
+verification remains valid after capability expiry. Historical v1 schemas and
+positive vectors remain unchanged; they cannot authorize a v2 completion.
+
+The qualified Rust, protocol and binding patch on `3dd65e1fba` has full-index
+SHA-256 `469eea553c2a14a0b04761bfca1722f5153a34dfd9d3a54ebae1de0fc0ed611f`.
+The 175 x86 unit tests and 31 integration tests pass with no ignored tests;
+retrieved archive `output/process-security-20260915/chio-broker-v2-final-3dd65e1fba-20260923.tgz`
+hashes to `766927873a413a16cb0279c0ec8d40216de00578d91a3a43c55ad2046421cc5f`.
+The existing wire checker passes five indexes, 90 positives and 264 negatives.
+All four binding generators and their check modes pass. Original failing
+regressions and the obsolete-v1-fixture gate failure remain retained separately.
+Only this qualification ledger is added after the qualified patch.
 
 The broker-death patch is retained as full-index SHA-256
 `c5a4a390284a7550e11b7b2ede9a9d1d8170584b9a121871c9f0be5257c68407`

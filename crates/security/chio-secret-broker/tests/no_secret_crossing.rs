@@ -31,6 +31,8 @@ fn public_response_and_daemon_diagnostics_do_not_contain_seeded_credential() {
         leader_epoch: 4,
         upstream_status: 200,
         response_body_sha256: "d".repeat(64),
+        response_headers_sha256: chio_secret_broker::generic_https::response_header_digest(&[])
+            .test_expect("response header digest"),
     };
     let signer = Keypair::from_seed(&[77; 32]);
     let signer_backend = Ed25519Backend::new(signer);

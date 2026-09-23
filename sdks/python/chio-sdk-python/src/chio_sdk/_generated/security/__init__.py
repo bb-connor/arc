@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 3c63e54835ec987b42a61fe8865d0f757cc628bffa531bc98266267703973d8f
+# Schema sha256: a2de5a34e01a3345c9d1cfd8af54ab7b51bd57eed8cf608d3b84ede910af0a3e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -28,11 +28,15 @@ from .broker_capability_envelope_v1_schema import Algorithm, ChioSignedBrokerCap
 from .broker_execute_failure_v1_schema import ChioBrokerExecuteFailureV1
 from .broker_execute_request_v1_schema import BodyItem, ChioBrokerExecuteRequestV1, Digest, DigestOrNull, Header, Identifier, Options, Request, ValueItem
 from .broker_execute_response_v1_schema import BodyItem, ChioBrokerExecuteResponseV1
+from .broker_execute_response_v2_schema import BodyItem, ChioBrokerExecuteResponseV2
 from .broker_execution_evidence_v1_schema import ChioBrokerExecutionEvidenceV1, Digest, Identifier
+from .broker_execution_evidence_v2_schema import ChioBrokerExecutionEvidenceV2, Digest, Identifier
 from .broker_execution_failure_receipt_body_v1_schema import ChioBrokerExecutionFailureReceiptBodyV1, Digest, DigestOrNull, DispatchKnowledge, Identifier, IdentifierOrNull, Outcome, Stage
 from .broker_execution_failure_receipt_envelope_v1_schema import Algorithm, ChioSignedBrokerExecutionFailureReceiptV1, PublicKey, Signature
 from .broker_execution_receipt_body_v1_schema import ChioBrokerExecutionReceiptBodyV1, Digest, Identifier, PublicKey, Quota
+from .broker_execution_receipt_body_v2_schema import ChioBrokerExecutionReceiptBodyV2, Digest, Identifier, PublicKey, Quota
 from .broker_execution_receipt_envelope_v1_schema import Algorithm, ChioSignedBrokerExecutionReceiptV1, PublicKey, Signature
+from .broker_execution_receipt_envelope_v2_schema import Algorithm, ChioSignedBrokerExecutionReceiptV2, PublicKey, Signature
 from .broker_prepare_dispatch_acknowledgement_v1_schema import ChioBrokerPrepareDispatchAcknowledgementV1, Identifier
 from .broker_privileged_audit_challenge_v1_schema import Algorithm, ChallengeBody, ChioSignedBrokerPrivilegedAuditChallengeV1, Digest, PositiveU64, PublicKey, Signature
 from .broker_privileged_audit_commit_v1_schema import ChioBrokerPrivilegedAuditCommitRequestV1, Digest, GovernedAdminAuthorizationItem
@@ -148,9 +152,12 @@ __all__ = [
     "ChioBrokerExecuteFailureV1",
     "ChioBrokerExecuteRequestV1",
     "ChioBrokerExecuteResponseV1",
+    "ChioBrokerExecuteResponseV2",
     "ChioBrokerExecutionEvidenceV1",
+    "ChioBrokerExecutionEvidenceV2",
     "ChioBrokerExecutionFailureReceiptBodyV1",
     "ChioBrokerExecutionReceiptBodyV1",
+    "ChioBrokerExecutionReceiptBodyV2",
     "ChioBrokerPrepareDispatchAcknowledgementV1",
     "ChioBrokerPrivilegedAuditCommitRequestV1",
     "ChioBrokerPrivilegedAuditEvidenceBundleV1",
@@ -213,6 +220,7 @@ __all__ = [
     "ChioSignedBrokerCapabilityV1",
     "ChioSignedBrokerExecutionFailureReceiptV1",
     "ChioSignedBrokerExecutionReceiptV1",
+    "ChioSignedBrokerExecutionReceiptV2",
     "ChioSignedBrokerPrivilegedAuditChallengeV1",
     "ChioSignedBrokerRegisterAttemptAuthorizationV1",
     "ChioSignedBrokerRequestProofV1",

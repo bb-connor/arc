@@ -287,6 +287,10 @@ fn native_broker_death_after_provider_effect_retains_capture_and_refuses_replay(
 
 #[cfg(feature = "real-linux-enforcement")]
 #[test]
+#[cfg_attr(
+    not(target_arch = "x86_64"),
+    ignore = "requires Linux x86_64 cage enforcement"
+)]
 fn confined_broker_process_cutpoints_preserve_provider_and_quota_observations() -> TestResult {
     for point in [Point::Registered, Point::Captured, Point::ProviderEffect] {
         run_native_delivery_with_cutpoint(DeliveryRoute::ConfinedMcp, None, Some(point))?;

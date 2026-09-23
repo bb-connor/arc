@@ -117,7 +117,7 @@ impl BrokerKernelConnection {
         // The daemon still checks current parent/revocation authority and owns
         // provider deduplication. This connector never retries a lost reply.
         let response = self.participant.client.execute(&delivery.execute)?;
-        delivery.verify_response(self.participant.as_ref(), &response)?;
+        delivery.verify_response(self.participant.as_ref(), &response, trusted_now_ms()?)?;
         serde_json::to_value(response).map_err(|_| rejected())
     }
 

@@ -12,7 +12,7 @@ use crate::service::{
     IpcResponse,
 };
 
-const SIGNER: &str = "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565";
+const SIGNER: &str = "4508a07aa941707f3eb2db94c8897a80b2c1197476b6de213ac273df7d86c4ff";
 
 fn fixture<T: serde::de::DeserializeOwned>(name: &str) -> T {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -68,7 +68,7 @@ fn lines(messages: &[Value]) -> Vec<u8> {
 #[test]
 fn original_prepared_stream_executes_once_and_returns_only_signed_structured_content() {
     let request: BrokerExecuteRequest = fixture("broker-execute-request-v1.json");
-    let response: BrokerExecuteResponse = fixture("broker-execute-response-v1.json");
+    let response: BrokerExecuteResponse = fixture("broker-execute-response-v2.json");
     let envelope = canonical_json_bytes(&IpcResponse {
         operation: IpcOperation::Execute,
         accepted: true,

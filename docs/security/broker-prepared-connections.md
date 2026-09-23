@@ -37,6 +37,25 @@ The wrapper verifies both the response signature and its original capture
 metadata. A lost or invalid completion leaves the kernel's captured accounting
 in its unknown-outcome state; this layer neither retries nor refunds it.
 
+Completion evidence and receipts use v2. The signed evidence includes
+`responseHeadersSha256`, the SHA-256 of the domain
+`chio.broker-response-headers.v1\0` followed by the RFC 8785 encoding of the
+exact sanitized header vector. Names, values, ordering, additions and omissions
+are covered. Live clients, the MCP wrapper, durable replay and receipt-store
+readback reject a header vector that differs from this commitment. The receipt
+signature domain is `chio.broker-execution-receipt-signature.v2\0`.
+
+The v1 schemas and fixtures remain available for historical decoding. Current
+completion verification requires v2 and does not infer header authentication
+from v1 signatures. Legacy stored evidence cannot authorize redispatch or a
+refund. New signatures are never fabricated for old stored completions.
+
+Native completion time must be at or after the original parent issuance and
+broker capability activation, and no later than the trusted receiver's observed
+time. Live delivery samples that clock after receiving the response. Historical
+verification does not require the original capabilities to remain unexpired and
+does not create new execution authority.
+
 The optional `native-mcp` feature provides `NativeBrokerMcpTool`, a connection
 owned for one invocation. It uses the production stdio adapter after preparing
 the broker descriptor. The selected factory must return an enforced brokered
