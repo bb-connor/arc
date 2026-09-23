@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const CHIO: &str = "/usr/local/bin/chio";
+const BROKER: &str = "/usr/local/bin/chio-secret-brokerd";
 const KEYLOG_BINARIES: [&str; 2] = [
     "/usr/local/bin/chio-keylog-witness",
     "/usr/local/bin/chio-keylog-audit",
@@ -385,7 +386,10 @@ fn validate_command(unit: &Unit, key: &str, args: &[String], usage: &mut Usage) 
         }
     }
     if program == CHIO {
-        for binding in flag_values(rest, "--credential-env") {
+        for binding in ["--credential-env", "--credential-fd"]
+            .into_iter()
+            .flat_map(|flag| flag_values(rest, flag))
+        {
             let (_, name) = binding
                 .split_once('=')
                 .unwrap_or_else(|| panic!("{context}: malformed credential binding {binding}"));
@@ -397,7 +401,10 @@ fn validate_command(unit: &Unit, key: &str, args: &[String], usage: &mut Usage) 
         let wrapped_program = wrapped
             .first()
             .unwrap_or_else(|| panic!("{context}: nothing after --"));
-        if wrapped_program == CHIO || KEYLOG_BINARIES.contains(&wrapped_program.as_str()) {
+        if wrapped_program == CHIO
+            || wrapped_program == BROKER
+            || KEYLOG_BINARIES.contains(&wrapped_program.as_str())
+        {
             let inner = validate_command(unit, key, &wrapped, usage);
             return if inner.is_empty() { wrapped } else { inner };
         }
@@ -411,6 +418,14 @@ fn validate_command(unit: &Unit, key: &str, args: &[String], usage: &mut Usage) 
             return wrapped;
         }
         panic!("{context}: the wrapped command {wrapped_program} is not a chio binary or an environment reference");
+    }
+    if program == BROKER {
+        assert_eq!(
+            rest,
+            ["--config", "/etc/chio/secret-broker/broker.json"],
+            "{context}: broker launch takes its private canonical configuration"
+        );
+        return Vec::new();
     }
     if KEYLOG_BINARIES.contains(&program.as_str()) {
         let binary = Path::new(program)

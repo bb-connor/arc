@@ -21,7 +21,8 @@ edge carries only public pins and the wrapped command.
 | `systemd/chio-mcp-edge.service` | remote MCP edge on `127.0.0.1:8931`, preflight with `--require-enforcement`, readiness on `/admin/health` |
 | `systemd/chio-keylog-witness@.service` | key-log witness instance (`a`, `b`, `c`) |
 | `systemd/chio-keylog-audit@.service` | key-log audit monitor instance (`a`, `b`) |
-| `sysusers.d/chio.conf` | the `chio-trust`, `chio-edge` and `chio-keylog` accounts |
+| `systemd/chio-secret-broker.service` | separately provisioned broker with descriptor credentials and child-bound socket readiness |
+| `sysusers.d/chio.conf` | the `chio-trust`, `chio-edge`, `chio-keylog` and `chio-broker` accounts |
 | `tmpfiles.d/chio.conf` | `/etc/chio` and the credential, launch and keylog directories |
 | `env/chio-mcp-edge.env.example` | public pins and the wrapped command for the edge |
 | `keylog/witness-a.json.example`, `keylog/audit-a.json.example` | service configs for one witness and one monitor |
@@ -77,6 +78,37 @@ baseline is present, and the keylog example configs agree with the units.
    file must be private, singly linked and owned by the service user. Binary
    bytes, including trailing newlines, are transferred unchanged. Descriptor
    delivery supports supervised launch; it is incompatible with `--exec`.
+
+   The packaged `chio-secret-broker.service` supplies these bindings. Before
+   enabling it, provision the canonical broker configuration and enterprise
+   migration state for the selected authority and service accounts:
+
+   - Install `broker.json` under `/etc/chio/secret-broker`, owned by
+     `chio-broker:chio-broker`, mode `0600`.
+   - Set `trustedServiceUid` to the `chio-broker` UID. Set `authorizedClientUid`
+     for the trusted host that prepares broker connections; the private socket
+     remains mode `0600`, so that host must also have access to this UID's socket.
+   - Use `/run/chio-secret-broker/broker.sock` for normal IPC and
+     `/run/chio-secret-broker/audit.sock` for privileged audit. Keep all five
+     durable database paths beneath `/var/lib/chio-secret-broker`, with private
+     files owned by the broker account. Pin the separately managed authority's
+     endpoint and key in the configuration.
+   - Install the distinct 32-byte master and signing keys as root-owned `0600`
+     files `/etc/chio/credentials/broker-master-key` and `broker-signing-key`.
+     Preserve the provisioned master key across upgrades and restarts; replacing
+     it would make existing encrypted credentials unreadable.
+
+   `systemctl enable --now chio-secret-broker.service` starts only the configured
+   broker. Readiness checks the kernel-reported PID of the listening child.
+   Capability issuance and migration promotion retain their existing governed
+   authorization. Stop grants up to 60 seconds for current requests to finish,
+   then the supervisor escalates; the manager owns runtime-directory cleanup.
+
+   The response authority requires a fresh combined deployment configuration
+   binding its exact PID and the client's PID to its immutable store. Its
+   launcher must prepare that configuration for each process start; it cannot
+   reuse a static configuration under an automatic `Restart=` unit. The packaged
+   authority executable and provisioning commands retain that requirement.
 
 2. Create the accounts and directories, then install the units.
 
