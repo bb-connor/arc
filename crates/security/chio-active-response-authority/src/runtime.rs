@@ -241,15 +241,43 @@ fn spawn_workers(
 ) -> Result<Vec<thread::JoinHandle<()>>> {
     let mut workers = Vec::with_capacity(count);
     for index in 0..count {
-        let receiver = Arc::clone(&receiver);
-        let server = Arc::clone(&server);
-        let stop = Arc::clone(&stop);
-        let fatal = Arc::clone(&fatal);
+        let worker_receiver = Arc::clone(&receiver);
+        let worker_server = Arc::clone(&server);
+        let worker_stop = Arc::clone(&stop);
+        let worker_fatal = Arc::clone(&fatal);
         let worker = thread::Builder::new()
             .name(format!("authority-worker-{index}"))
-            .spawn(move || worker_loop(&receiver, &server, &stop, &fatal))
-            .map_err(|error| AuthorityError::Runtime(format!("worker spawn failed: {error}")))?;
-        workers.push(worker);
+            .spawn(move || {
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    worker_loop(
+                        &worker_receiver,
+                        &worker_server,
+                        &worker_stop,
+                        &worker_fatal,
+                    );
+                }));
+                if result.is_err() {
+                    set_fatal(
+                        &worker_fatal,
+                        &worker_stop,
+                        "authority worker panicked".to_string(),
+                    );
+                }
+            });
+        match worker {
+            Ok(worker) => workers.push(worker),
+            Err(error) => {
+                // Startup owns every worker already created. Publish the stop
+                // before joining so an empty queue cannot strand those owners.
+                set_fatal(&fatal, &stop, format!("worker spawn failed: {error}"));
+                for worker in workers {
+                    let _join_result = worker.join();
+                }
+                return Err(AuthorityError::Runtime(format!(
+                    "worker spawn failed: {error}"
+                )));
+            }
+        }
     }
     Ok(workers)
 }
@@ -374,7 +402,10 @@ mod tests {
     #[test]
     #[ignore = "helper process launched by the process-boundary test"]
     fn active_response_authority_helper_process() {
-        if std::env::var(PROCESS_ROLE_ENV).as_deref() != Ok("authority") {
+        let Ok(role) = std::env::var(PROCESS_ROLE_ENV) else {
+            return;
+        };
+        if !matches!(role.as_str(), "authority" | "authority-worker-panic") {
             return;
         }
         let config_path = PathBuf::from(
@@ -396,8 +427,39 @@ mod tests {
         #[allow(unsafe_code)]
         let signing_key = unsafe { InheritedSecretFile::adopt(descriptor, "test signing key") }
             .test_expect("adopt authority helper signing key");
-        AuthorityDaemonRuntime::build(config, signing_key)
-            .test_expect("build authority helper runtime")
+        let mut runtime = AuthorityDaemonRuntime::build(config.clone(), signing_key)
+            .test_expect("build authority helper runtime");
+        if role == "authority-worker-panic" {
+            let store = Arc::new(
+                AuthorityStore::open(
+                    &config.store_path,
+                    config.trusted_service_uid,
+                    config.deployment_digest,
+                    config.store_digest,
+                    &config.authority_identity,
+                )
+                .test_expect("open authority store for panic injection"),
+            );
+            runtime.server = Arc::new(
+                ActiveResponseAuthorityProtocolServer::new(
+                    ActiveResponseAuthorityProtocolServerConfig {
+                        expected_client_peer: config.expected_client_peer,
+                        trusted_client: config.trusted_client,
+                        deployment_digest: config.deployment_digest,
+                        store_digest: config.store_digest,
+                        timeout_ms: config.timeout_ms,
+                        maximum_clock_skew_seconds: config.maximum_clock_skew_seconds,
+                        maximum_replay_entries: config.maximum_replay_entries,
+                    },
+                    Arc::new(Ed25519Backend::new(Keypair::from_seed(&[0x62; 32]))),
+                    Arc::new(PanicOnHealthHandler(PreAdmittedAuthorityHandler::new(
+                        store,
+                    ))),
+                )
+                .test_expect("build panic-injecting authority server"),
+            );
+        }
+        runtime
             .serve()
             .test_expect("serve authority helper runtime");
     }
@@ -417,6 +479,15 @@ mod tests {
 
     #[test]
     fn daemon_health_crosses_an_authenticated_process_boundary() {
+        exercise_authority_process(false);
+    }
+
+    #[test]
+    fn daemon_worker_panic_stops_the_listener_and_joins_workers() {
+        exercise_authority_process(true);
+    }
+
+    fn exercise_authority_process(panic_on_health: bool) {
         let directory = tempfile::tempdir().test_expect("authority process directory");
         std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
             .test_expect("private authority process directory");
@@ -457,7 +528,14 @@ mod tests {
             .arg("--ignored")
             .arg("--nocapture")
             .arg("--test-threads=1")
-            .env(PROCESS_ROLE_ENV, "authority")
+            .env(
+                PROCESS_ROLE_ENV,
+                if panic_on_health {
+                    "authority-worker-panic"
+                } else {
+                    "authority"
+                },
+            )
             .env(PROCESS_CONFIG_ENV, &config_path)
             .env(PROCESS_SIGNING_FD_ENV, raw_descriptor.to_string())
             .stdin(Stdio::null())
@@ -564,7 +642,7 @@ mod tests {
         let client_signer: Arc<dyn SigningBackend> = Arc::new(Ed25519Backend::new(client.clone()));
         let protocol_client = ProductionActiveResponseAuthorityClient::new(
             ProductionActiveResponseAuthorityFileConfig {
-                socket_path,
+                socket_path: socket_path.clone(),
                 expected_peer: service_identity,
                 trusted_authority: authority.public_key(),
                 deployment_digest,
@@ -575,8 +653,57 @@ mod tests {
             client_signer,
         )
         .test_expect("build process-boundary authority client");
-        protocol_client
-            .ensure_ready()
-            .test_expect("authenticated authority health response");
+        if panic_on_health {
+            assert!(protocol_client.ensure_ready().is_err());
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                if let Some(status) = child.0.try_wait().test_expect("poll failed authority") {
+                    assert!(!status.success(), "worker panic must fail the daemon");
+                    break;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "authority survived its worker panic"
+                );
+                thread::sleep(Duration::from_millis(2));
+            }
+            assert!(
+                !socket_path.exists(),
+                "failed authority retained its listener"
+            );
+        } else {
+            protocol_client
+                .ensure_ready()
+                .test_expect("authenticated authority health response");
+        }
+    }
+
+    struct PanicOnHealthHandler(PreAdmittedAuthorityHandler);
+
+    impl chio_control_plane::security::ActiveResponseAuthorityHandler for PanicOnHealthHandler {
+        fn health(&self) -> chio_control_plane::security::ActiveResponseAuthorityHandlerResult<()> {
+            panic!("injected authority worker failure");
+        }
+
+        fn select_policy(
+            &self,
+            evidence_id: &chio_security_types::ports::OpaqueReceiptRef,
+            finding: &chio_core::receipt::security::CorrelatedFindingReceiptBody,
+            binding: &chio_security_types::ports::AttestedFindingBatchBinding,
+        ) -> chio_control_plane::security::ActiveResponseAuthorityHandlerResult<
+            chio_control_plane::security::ActiveResponsePolicySelectionWire,
+        > {
+            self.0.select_policy(evidence_id, finding, binding)
+        }
+
+        fn load_artifacts(
+            &self,
+            response_plan: &chio_security_types::ResponsePlan,
+            admission_artifact_ref: &chio_security_types::ports::AdmissionArtifactRef,
+        ) -> chio_control_plane::security::ActiveResponseAuthorityHandlerResult<
+            chio_control_plane::security::ActiveResponseAdmissionArtifactsDraftWire,
+        > {
+            self.0.load_artifacts(response_plan, admission_artifact_ref)
+        }
     }
 }

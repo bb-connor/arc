@@ -67,6 +67,13 @@ panic propagation case and strict all-target broker Clippy also pass. These
 results and the initial test-only signal-constant compile correction are retained
 under `output/process-security-20260915/m9-broker-shutdown-20260923/`.
 
+The response authority publishes a request-worker panic as a fatal stop and
+joins workers already created if a later worker cannot start. The authenticated
+process regression requires failure exit and removal of the owned socket.
+All 17 authority tests and strict all-target Clippy pass; the two ignored helper
+entrypoints run inside the process tests. Evidence is retained under
+`output/process-security-20260915/m7-authority-worker-20260923/`.
+
 The governed-host qualified full-index patch on `3dd65e1fba` is
 `47b5f18164ac39f4c48ec4debcaad14bd977724879d702462066c51a8a136f73`.
 Its real CLI case passes in 95.45 seconds, including witnessed rotation after
