@@ -46,9 +46,7 @@ use alloc::string::{String, ToString};
 use alloc::sync::Arc as SharedCanonicalBytesInner;
 use alloc::vec::Vec;
 
-use ed25519_dalek::{
-    Signature as DalekSignature, Signer as DalekSigner, SigningKey, Verifier, VerifyingKey,
-};
+use ed25519_dalek::{Signature as DalekSignature, Signer as DalekSigner, SigningKey, VerifyingKey};
 use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -56,6 +54,7 @@ use sha2::{Digest, Sha256};
 use crate::canonical::{CanonicalBytes, CanonicalJsonWitness};
 use crate::error::{Error, Result};
 
+mod ed25519_verification;
 mod wire;
 
 /// Shared canonical JSON bytes suitable for signing and verification.
@@ -437,7 +436,7 @@ impl PublicKey {
             (
                 PublicKeyMaterial::Ed25519 { verifying_key },
                 SignatureMaterial::Ed25519 { inner },
-            ) => verifying_key.verify(message, inner).is_ok(),
+            ) => ed25519_verification::verify(verifying_key, message, inner, false),
             (PublicKeyMaterial::P256 { encoded_point }, SignatureMaterial::P256 { der }) => {
                 verify_ecdsa_p256(encoded_point, message, der)
             }
@@ -476,7 +475,7 @@ impl PublicKey {
             (
                 PublicKeyMaterial::Ed25519 { verifying_key },
                 SignatureMaterial::Ed25519 { inner },
-            ) => verifying_key.verify_strict(message, inner).is_ok(),
+            ) => ed25519_verification::verify(verifying_key, message, inner, true),
             (PublicKeyMaterial::P256 { encoded_point }, SignatureMaterial::P256 { der }) => {
                 verify_ecdsa_p256(encoded_point, message, der)
             }
