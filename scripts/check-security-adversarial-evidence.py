@@ -80,7 +80,7 @@ BINARY_REPLACEMENTS: dict[str, frozenset[str]] = {
     "||": frozenset(("&&",)),
     ">": frozenset(("<",)),
     ">=": frozenset(("<",)),
-    "<": frozenset((">",)),
+    "<": frozenset((">", "<=")),
     "<=": frozenset((">",)),
 }
 MANIFEST_SCHEMA_VERSION = 1

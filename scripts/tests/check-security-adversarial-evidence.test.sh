@@ -2970,7 +2970,7 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         refresh_campaign="",
     )
     if set(trusted_listing_index) != {
-        "ingest_time_substitution",
+        "sandbox_fd_leak",
         "sandbox_env_leak",
     }:
         raise AssertionError("trusted pending inventory changed campaign membership")
@@ -3576,13 +3576,18 @@ with checker.refresh_lock(root):
         )
         if name == "owner.json" and not owner_swap_injected[0]:
             owner_swap_injected[0] = True
-            checker.os.unlink(name, dir_fd=directory_descriptor)
             checker.write_new_fsynced_at(
                 directory_descriptor,
-                name,
+                "owner.replacement.json",
                 payload,
                 0o600,
                 label,
+            )
+            checker.os.rename(
+                "owner.replacement.json",
+                name,
+                src_dir_fd=directory_descriptor,
+                dst_dir_fd=directory_descriptor,
             )
         return payload, metadata
 
