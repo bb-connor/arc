@@ -14,6 +14,9 @@ use chio_kernel::{BudgetStore, ToolCallOutput, Verdict};
 mod confined;
 #[path = "native_host.rs"]
 mod host;
+#[cfg(feature = "real-linux-enforcement")]
+#[path = "native_keyring.rs"]
+mod keyring;
 #[path = "native_mcp.rs"]
 mod mcp;
 #[path = "native_response_tests.rs"]
@@ -69,6 +72,14 @@ fn run_native_delivery(
     let issuer = Keypair::from_seed(&[213; 32]);
     let authority_key = Keypair::from_seed(&[214; 32]);
     let caller = Keypair::from_seed(&[215; 32]);
+    #[cfg(feature = "real-linux-enforcement")]
+    let keyring = (route == DeliveryRoute::ConfinedMcp)
+        .then(|| keyring::KeyringDelivery::new(kernel_directory.path(), &caller.public_key()))
+        .transpose()?;
+    #[cfg(feature = "real-linux-enforcement")]
+    let parent = keyring.as_ref().map(|keyring| keyring.parent.clone());
+    #[cfg(not(feature = "real-linux-enforcement"))]
+    let parent = None;
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
     let port = listener.local_addr()?.port();
     let mut fixture = boundary_fixture(
@@ -150,11 +161,20 @@ fn run_native_delivery(
         kernel_directory.path(),
         &fixture.config,
         broker.id(),
-        (&issuer, &caller, &authority_key),
+        host::NativeAuthority {
+            issuer: &issuer,
+            caller: &caller,
+            authority_signer: &authority_key,
+            parent,
+        },
         execution_request(port, credential.clone(), &issuer, &caller),
         connection,
         registry,
     )?;
+    #[cfg(feature = "real-linux-enforcement")]
+    if let Some(keyring) = keyring.as_ref() {
+        keyring.verify_parent(&host.request.capability)?;
+    }
     let runtime = mcp_route
         .then(|| {
             tokio::runtime::Builder::new_current_thread()
@@ -271,6 +291,10 @@ fn run_native_delivery(
     #[cfg(feature = "real-linux-enforcement")]
     if let Some(confined) = confined.as_ref() {
         confined.verify_receipts(&canary)?;
+    }
+    #[cfg(feature = "real-linux-enforcement")]
+    if let Some(keyring) = keyring.as_ref() {
+        keyring.verify_parent(&host.request.capability)?;
     }
     let store = host.authority.admission_operation_store();
     let fence = host.authority.mutation_fence();

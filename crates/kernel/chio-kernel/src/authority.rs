@@ -545,6 +545,39 @@ impl GovernedCapabilityAuthority {
     pub fn new(backend: Arc<dyn SigningBackend>, clock: Arc<dyn CapabilityAuthorityClock>) -> Self {
         Self { backend, clock }
     }
+
+    /// Issue a capability with an explicit aggregate limit over its own calls.
+    /// Delegation-family limits use `issue_aggregate_family_root` instead.
+    pub fn issue_capability_with_aggregate_budget(
+        &self,
+        subject: &PublicKey,
+        scope: ChioScope,
+        ttl_seconds: u64,
+        max_invocations: u32,
+    ) -> Result<CapabilityToken, KernelError> {
+        use chio_core::capability::aggregate_invocation::{
+            AggregateInvocationBudget, AggregateInvocationScope,
+        };
+
+        ensure_capability_issuance_supported(&scope)?;
+        let now = capability_authority_now_unix_secs(self.clock.as_ref())?;
+        let body = CapabilityTokenBody {
+            id: capability_id_at(now)?,
+            issuer: self.backend.public_key(),
+            subject: subject.clone(),
+            scope,
+            issued_at: now,
+            expires_at: now.saturating_add(ttl_seconds),
+            delegation_chain: vec![],
+            aggregate_invocation_budget: Some(AggregateInvocationBudget {
+                scope: AggregateInvocationScope::Capability,
+                max_invocations,
+                root_binding: None,
+            }),
+        };
+        sign_capability_with_backend(body, self.backend.as_ref())
+            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
+    }
 }
 
 impl CapabilityAuthority for GovernedCapabilityAuthority {

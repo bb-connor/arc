@@ -1584,6 +1584,7 @@ mod config_and_public_tests {
             authority_seed_path: None,
             authority_db_path: None,
             authority_keyring_config_path: None,
+            authority_keyring_receipt_anchor_root: None,
             budget_db_path: None,
             joint_authority_db_path: None,
             fiscal_runtime: None,

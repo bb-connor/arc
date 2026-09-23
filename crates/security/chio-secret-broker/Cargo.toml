@@ -63,6 +63,7 @@ async-trait = { workspace = true }
 chio-cage = { workspace = true }
 chio-control-plane = { workspace = true }
 chio-flow = { workspace = true }
+chio-keyring = { workspace = true }
 chio-manifest = { workspace = true }
 chio-security-kernel = { workspace = true }
 chio-test-support = { workspace = true }

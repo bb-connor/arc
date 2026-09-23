@@ -1,5 +1,7 @@
 //! Production composition for witnessed authority-key transparency.
 
+mod capability;
+
 use std::collections::BTreeMap;
 #[cfg(not(unix))]
 use std::fs::OpenOptions;
@@ -196,21 +198,6 @@ impl KeyringRuntimeComposition {
             ));
         }
         Ok(())
-    }
-
-    pub(crate) fn key_log_synchronization_response(
-        &self,
-        base: Option<&chio_keyring::KeyLogPin>,
-    ) -> Result<chio_keyring::KeyLogSyncResponse, CliError> {
-        self.require_key_log_verification()?;
-        self.store
-            .synchronization_response(base)
-            .map_err(|error| CliError::cli_other_error(error.to_string()))
-    }
-
-    #[must_use]
-    pub(crate) fn authority_signing_backend(&self) -> Arc<dyn SigningBackend> {
-        self.authority_backend.clone()
     }
 
     pub fn authority_status(&self) -> Result<KeyringRuntimeAuthorityStatus, CliError> {
@@ -703,15 +690,17 @@ struct KeyLogVerificationMigrationPosture<'a> {
     key_log_configuration_binding: chio_core::Hash,
 }
 
-fn key_log_verification_migration_posture_digest(
-    config: &KeyLogVerificationMigrationConfig,
+/// Bind an operator's migration transition to the exact key-log trust policy.
+pub fn key_log_verification_migration_posture_digest(
+    deployment_id: &RecordId,
+    stage: EnterpriseMigrationStage,
     key_log_configuration_binding: chio_core::Hash,
 ) -> Result<Digest32, CliError> {
     let canonical = chio_core::canonical_json_bytes(&KeyLogVerificationMigrationPosture {
         schema: "chio.key-log-verification-migration-posture.v1",
-        deployment_id: &config.deployment_id,
+        deployment_id,
         control: EnterpriseMigrationControl::KeyLogVerification,
-        stage: config.stage,
+        stage,
         key_log_configuration_binding,
     })?;
     Ok(Digest32::new(
@@ -756,7 +745,8 @@ fn load_key_log_verification_migration_binding(
         &config.state_database_path,
     )?;
     let posture_digest = key_log_verification_migration_posture_digest(
-        config,
+        &config.deployment_id,
+        config.stage,
         key_log_policy
             .configuration_binding()
             .map_err(|error| CliError::cli_other_error(error.to_string()))?,

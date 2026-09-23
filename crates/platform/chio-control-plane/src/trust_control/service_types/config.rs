@@ -79,6 +79,8 @@ pub struct TrustServiceConfig {
     /// Witnessed key-log runtime configuration for seed-file authority custody.
     /// When present, direct seed signing is disabled after startup.
     pub authority_keyring_config_path: Option<PathBuf>,
+    /// Private receipt rollback anchors on a separate filesystem device.
+    pub authority_keyring_receipt_anchor_root: Option<PathBuf>,
     pub budget_db_path: Option<PathBuf>,
     pub joint_authority_db_path: Option<PathBuf>,
     pub fiscal_runtime: Option<TrustFiscalRuntimeConfig>,
@@ -122,10 +124,11 @@ impl TrustServiceConfig {
             if self.authority_seed_path.is_none()
                 || self.authority_db_path.is_some()
                 || self.receipt_db_path.is_none()
+                || self.authority_keyring_receipt_anchor_root.is_none()
                 || self.authority_workload_token.is_none()
             {
                 return Err(CliError::cli_other_error(
-                    "authority keyring configuration requires --authority-seed-file, --receipt-db, and --authority-workload-token and forbids --authority-db"
+                    "authority keyring configuration requires --authority-seed-file, --receipt-db, --authority-keyring-receipt-anchor-root, and --authority-workload-token and forbids --authority-db"
                         .to_string(),
                 ));
             }
@@ -135,6 +138,13 @@ impl TrustServiceConfig {
                         .to_string(),
                 ));
             }
+        }
+        if self.authority_keyring_receipt_anchor_root.is_some()
+            && self.authority_keyring_config_path.is_none()
+        {
+            return Err(CliError::cli_other_error(
+                "authority keyring receipt anchors require --authority-keyring-config".to_string(),
+            ));
         }
         for (tenant_id, token) in &self.tenant_read_tokens {
             if tenant_id.trim().is_empty() {
@@ -291,6 +301,7 @@ mod service_config_tests {
             authority_seed_path: None,
             authority_db_path: None,
             authority_keyring_config_path: None,
+            authority_keyring_receipt_anchor_root: None,
             budget_db_path: None,
             joint_authority_db_path: None,
             fiscal_runtime: None,
@@ -408,6 +419,13 @@ mod service_config_tests {
         config.authority_seed_path = Some(PathBuf::from("authority.seed"));
         config.receipt_db_path = Some(PathBuf::from("receipts.sqlite3"));
         config.authority_workload_token = Some("authority-only".to_string());
+        let unanchored = config
+            .validate()
+            .test_expect_err("keyring receipt custody requires independent rollback anchors");
+        assert!(unanchored
+            .to_string()
+            .contains("--authority-keyring-receipt-anchor-root"));
+        config.authority_keyring_receipt_anchor_root = Some(PathBuf::from("/anchors/keyring"));
         config
             .validate()
             .test_expect("complete single-node keyring config is valid");

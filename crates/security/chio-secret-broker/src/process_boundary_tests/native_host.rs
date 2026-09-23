@@ -34,6 +34,29 @@ type TestResult<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 pub(super) const SERVER: &str = "native-broker";
 pub(super) const TOOL: &str = "send";
 
+pub(super) fn parent_scope() -> ChioScope {
+    ChioScope {
+        grants: vec![ToolGrant {
+            server_id: SERVER.into(),
+            tool_name: TOOL.into(),
+            operations: vec![Operation::Invoke],
+            constraints: Vec::new(),
+            max_invocations: Some(1),
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }],
+        ..ChioScope::default()
+    }
+}
+
+pub(super) struct NativeAuthority<'a> {
+    pub issuer: &'a Keypair,
+    pub caller: &'a Keypair,
+    pub authority_signer: &'a Keypair,
+    pub parent: Option<CapabilityToken>,
+}
+
 pub(super) struct NativeHost {
     pub kernel: Arc<ChioKernel>,
     pub authority: SqliteAuthorityStore,
@@ -50,12 +73,17 @@ impl NativeHost {
         directory: &Path,
         config: &BrokerDaemonConfig,
         broker_pid: u32,
-        keys: (&Keypair, &Keypair, &Keypair),
+        keys: NativeAuthority<'_>,
         mut execute: BrokerExecuteRequest,
         tool: Option<Arc<dyn crate::kernel_admission::BrokerMcpToolConnection>>,
         manifest_registry: Arc<VerifiedManifestRegistry>,
     ) -> TestResult<Self> {
-        let (issuer, caller, authority_signer) = keys;
+        let NativeAuthority {
+            issuer,
+            caller,
+            authority_signer,
+            parent,
+        } = keys;
         let locks = directory.join("kernel-locks");
         fs::create_dir(&locks)?;
         fs::set_permissions(&locks, fs::Permissions::from_mode(0o700))?;
@@ -63,7 +91,10 @@ impl NativeHost {
         SqliteAuthorityStore::provision(&database, &locks)?;
         let authority = SqliteAuthorityStore::open_serving(database, locks)?;
         let mut kernel = ChioKernel::new(KernelConfig {
-            ca_public_keys: vec![authority_signer.public_key()],
+            ca_public_keys: vec![parent.as_ref().map_or_else(
+                || authority_signer.public_key(),
+                |parent| parent.issuer.clone(),
+            )],
             keypair: authority_signer.clone(),
             max_delegation_depth: 5,
             policy_hash: chio_core_types::crypto::sha256_hex(b"native-broker-process-policy"),
@@ -92,35 +123,26 @@ impl NativeHost {
         kernel.set_revocation_store_handle(Arc::new(authority.revocation_store()));
         kernel.reconcile_durable_admission_startup()?;
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        let parent = CapabilityToken::sign(
-            CapabilityTokenBody {
-                id: "native-parent-process-boundary".into(),
-                issuer: authority_signer.public_key(),
-                subject: caller.public_key(),
-                issued_at: now.saturating_sub(1),
-                expires_at: now + 300,
-                delegation_chain: Vec::new(),
-                scope: ChioScope {
-                    grants: vec![ToolGrant {
-                        server_id: SERVER.into(),
-                        tool_name: TOOL.into(),
-                        operations: vec![Operation::Invoke],
-                        constraints: Vec::new(),
-                        max_invocations: Some(1),
-                        max_cost_per_invocation: None,
-                        max_total_cost: None,
-                        dpop_required: None,
-                    }],
-                    ..ChioScope::default()
+        let parent = match parent {
+            Some(parent) => parent,
+            None => CapabilityToken::sign(
+                CapabilityTokenBody {
+                    id: "native-parent-process-boundary".into(),
+                    issuer: authority_signer.public_key(),
+                    subject: caller.public_key(),
+                    issued_at: now.saturating_sub(1),
+                    expires_at: now + 300,
+                    delegation_chain: Vec::new(),
+                    scope: parent_scope(),
+                    aggregate_invocation_budget: Some(AggregateInvocationBudget {
+                        scope: AggregateInvocationScope::Capability,
+                        max_invocations: 1,
+                        root_binding: None,
+                    }),
                 },
-                aggregate_invocation_budget: Some(AggregateInvocationBudget {
-                    scope: AggregateInvocationScope::Capability,
-                    max_invocations: 1,
-                    root_binding: None,
-                }),
-            },
-            authority_signer,
-        )?;
+                authority_signer,
+            )?,
+        };
         kernel.register_delegation_parent(&parent)?;
         execute.capability.body.parent_capability_id = parent.id.clone();
         execute.capability = issue_capability(

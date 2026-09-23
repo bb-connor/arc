@@ -53,6 +53,8 @@ of the following together:
 - `--authority-keyring-config <path>` for the durable key log and fixed trust
   topology
 - `--receipt-db <path>` for key-transition receipt forwarding
+- `--authority-keyring-receipt-anchor-root <path>` for private receipt rollback
+  anchors on a separate filesystem device from the receipt database
 - `--authority-workload-token` distinct from every other bearer
 
 Do not combine this profile with `--authority-db` or any `--peer-url`. Startup
@@ -214,7 +216,8 @@ command above with:
 
 ```bash
 --authority-seed-file /run/credentials/chio/authority.seed \
---authority-keyring-config /etc/chio/authority-keyring.yaml
+--authority-keyring-config /etc/chio/authority-keyring.yaml \
+--authority-keyring-receipt-anchor-root /mnt/chio-anchors/keyring
 ```
 
 After startup, verify the backend reports `enterprise_keyring` and fetch a

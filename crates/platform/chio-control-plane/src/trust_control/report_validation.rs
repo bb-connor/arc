@@ -629,16 +629,12 @@ fn load_capability_authority_with_lineage_mode(
         }
     };
     if let Some(keyring) = state.authority_keyring.as_ref() {
-        keyring.ensure_bound_signing_topology().map_err(|_| {
+        let authority = keyring.capability_authority().map_err(|_| {
             plain_http_error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 "witnessed capability authority is unavailable",
             )
         })?;
-        let authority = chio_kernel::GovernedCapabilityAuthority::new(
-            keyring.authority_signing_backend(),
-            Arc::new(chio_kernel::SystemCapabilityAuthorityClock),
-        );
         return Ok(wrap(Box::new(authority)));
     }
     match (

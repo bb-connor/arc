@@ -387,6 +387,8 @@ mod cli_env_tests {
             "authority-workload-secret",
             "--authority-keyring-config",
             "/etc/chio/keyring.yaml",
+            "--authority-keyring-receipt-anchor-root",
+            "/anchors/keyring",
         ])
         .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
 
@@ -395,6 +397,7 @@ mod cli_env_tests {
                 command:
                     TrustCommands::Serve {
                         authority_keyring_config,
+                        authority_keyring_receipt_anchor_root,
                         authority_workload_token,
                         ..
                     },
@@ -406,6 +409,10 @@ mod cli_env_tests {
                 assert_eq!(
                     authority_workload_token.as_deref(),
                     Some("authority-workload-secret")
+                );
+                assert_eq!(
+                    authority_keyring_receipt_anchor_root.as_deref(),
+                    Some(std::path::Path::new("/anchors/keyring"))
                 );
             }
             _ => panic!("expected trust serve command"),

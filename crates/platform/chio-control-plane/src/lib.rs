@@ -47,8 +47,9 @@ pub mod transaction_passport_risk;
 pub mod trust_control;
 pub use chio_trust_market_context as trust_market;
 pub use keyring_runtime::{
-    load_keyring_runtime_composition, load_keyring_runtime_from_authority_seed,
-    KeyringRuntimeAuthorityStatus, KeyringRuntimeComposition,
+    key_log_verification_migration_posture_digest, load_keyring_runtime_composition,
+    load_keyring_runtime_from_authority_seed, KeyringRuntimeAuthorityStatus,
+    KeyringRuntimeComposition,
 };
 struct LoadedThresholdApprovalResolver(ThresholdApprovalRequirement);
 

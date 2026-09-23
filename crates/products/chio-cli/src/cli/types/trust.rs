@@ -36,10 +36,15 @@ pub(crate) enum TrustCommands {
         /// Witnessed authority-key transparency runtime configuration.
         ///
         /// This requires the global `--authority-seed-file`, `--receipt-db`,
-        /// and `--authority-workload-token` options. Startup also requires all
+        /// `--authority-keyring-receipt-anchor-root`, and
+        /// `--authority-workload-token` options. Startup also requires all
         /// configured witness and audit services to prove readiness.
         #[arg(long)]
         authority_keyring_config: Option<PathBuf>,
+
+        /// Private receipt rollback anchors on a separate filesystem device.
+        #[arg(long, requires = "authority_keyring_config")]
+        authority_keyring_receipt_anchor_root: Option<PathBuf>,
 
         /// Public base URL this trust-control node advertises to peers and clients.
         #[arg(long)]

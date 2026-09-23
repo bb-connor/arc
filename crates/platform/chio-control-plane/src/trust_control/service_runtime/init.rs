@@ -63,16 +63,18 @@ async fn serve_async_inner(
         config.authority_keyring_config_path.as_deref(),
         authority_keyring_seed_path.as_deref(),
         config.receipt_db_path.as_deref(),
+        config.authority_keyring_receipt_anchor_root.as_deref(),
     ) {
-        (Some(keyring_config), Some(seed_path), Some(receipt_path)) => {
+        (Some(keyring_config), Some(seed_path), Some(receipt_path), Some(anchor_root)) => {
             let (_, composition) =
                 crate::load_keyring_runtime_from_authority_seed(keyring_config, seed_path)?;
-            let receipt_store: Arc<dyn chio_kernel::ReceiptStore> =
-                Arc::new(SqliteReceiptStore::open(receipt_path)?);
-            composition.attach_receipt_store(receipt_store)?;
+            let receipt_store =
+                SqliteReceiptStore::open_for_finding_pool(receipt_path, anchor_root)?;
+            receipt_store.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
+            composition.attach_receipt_store(Arc::new(receipt_store))?;
             Some(composition)
         }
-        (None, None, _) => None,
+        (None, None, _, None) => None,
         _ => {
             return Err(CliError::cli_other_error(
                 "validated keyring runtime configuration is incomplete".to_string(),
@@ -337,6 +339,7 @@ mod tests {
             authority_seed_path: None,
             authority_db_path: None,
             authority_keyring_config_path: None,
+            authority_keyring_receipt_anchor_root: None,
             budget_db_path: None,
             joint_authority_db_path: Some(joint_authority_db_path),
             fiscal_runtime: None,
@@ -483,6 +486,7 @@ mod windows_authority_tests {
             authority_seed_path: None,
             authority_db_path: None,
             authority_keyring_config_path: None,
+            authority_keyring_receipt_anchor_root: None,
             budget_db_path: None,
             joint_authority_db_path: Some(database.clone()),
             fiscal_runtime: None,

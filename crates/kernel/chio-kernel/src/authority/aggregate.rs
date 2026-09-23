@@ -163,4 +163,48 @@ mod tests {
         )?;
         Ok(())
     }
+
+    #[test]
+    fn backend_capability_budget_preserves_its_exact_scope_and_limit(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let key = Keypair::generate();
+        let subject = Keypair::generate().public_key();
+        let backend = Arc::new(chio_core::crypto::Ed25519Backend::new(key.clone()));
+        let authority =
+            GovernedCapabilityAuthority::new(backend, Arc::new(SystemCapabilityAuthorityClock));
+        let mut requested_scope = scope();
+        assert!(authority
+            .issue_capability_with_aggregate_budget(&subject, requested_scope.clone(), 300, 2)
+            .is_err());
+        requested_scope.grants[0].operations = vec![Operation::Invoke];
+        let issued = authority.issue_capability_with_aggregate_budget(
+            &subject,
+            requested_scope.clone(),
+            300,
+            2,
+        )?;
+        let budget = issued
+            .aggregate_invocation_budget
+            .as_ref()
+            .ok_or("budget")?;
+        assert_eq!(budget.scope, AggregateInvocationScope::Capability);
+        assert_eq!(budget.max_invocations, 2);
+        assert!(budget.root_binding.is_none());
+        assert_eq!(issued.issuer, key.public_key());
+        assert_eq!(issued.subject, subject);
+        assert_eq!(
+            chio_core::canonical_json_bytes(&issued.scope)?,
+            chio_core::canonical_json_bytes(&requested_scope)?
+        );
+        assert_eq!(issued.expires_at - issued.issued_at, 300);
+        assert!(issued.verify_signature()?);
+        let mut changed = issued;
+        changed
+            .aggregate_invocation_budget
+            .as_mut()
+            .ok_or("budget")?
+            .max_invocations = 3;
+        assert!(!changed.verify_signature()?);
+        Ok(())
+    }
 }

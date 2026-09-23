@@ -283,8 +283,11 @@ if [[ "${mode}" == "--release" ]]; then
     -p chio-cage --bin chio-cage-init
   cargo build --locked --target x86_64-unknown-linux-musl \
     -p chio-secret-broker --bin chio-broker-mcp
+  cargo build --locked -p chio-keyring --bins
   export CHIO_CAGE_TEST_HELPER="$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/debug/chio-cage-init"
   export CHIO_BROKER_MCP_TOOL="$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/debug/chio-broker-mcp"
+  export CHIO_KEYLOG_WITNESS="$CARGO_TARGET_DIR/debug/chio-keylog-witness"
+  export CHIO_KEYLOG_AUDIT="$CARGO_TARGET_DIR/debug/chio-keylog-audit"
   run_tests "confined native broker MCP and terminal cage receipts" yes \
     "process_boundary_tests::native::confined::native_kernel_confined_broker_mcp_preserves_capture_and_terminal_receipts" \
     cargo test --locked -p chio-secret-broker --features real-linux-enforcement --lib \

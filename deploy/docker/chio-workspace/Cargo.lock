@@ -2963,6 +2963,7 @@ dependencies = [
  "chio-revocation-oracle",
  "chio-risk-comptroller",
  "chio-runtime-core",
+ "chio-secret-broker",
  "chio-secure-ipc",
  "chio-security-kernel",
  "chio-security-types",
@@ -4352,6 +4353,45 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-secret-broker"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chio-cage",
+ "chio-control-plane",
+ "chio-core-types",
+ "chio-flow",
+ "chio-kernel",
+ "chio-keyring",
+ "chio-manifest",
+ "chio-mcp-adapter",
+ "chio-secure-ipc",
+ "chio-security-kernel",
+ "chio-security-types",
+ "chio-store-sqlite",
+ "chio-test-support",
+ "hex",
+ "hmac 0.12.1",
+ "libc",
+ "rand_core 0.6.4",
+ "rcgen 0.13.2",
+ "rusqlite",
+ "rustix",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "subtle",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing-subscriber",
+ "url",
+ "webpki-roots 1.0.6",
+ "zeroize",
 ]
 
 [[package]]
