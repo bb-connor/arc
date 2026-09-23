@@ -157,8 +157,9 @@ async fn strict_nonce_subprocess() -> Result {
         .as_ref()
         .ok_or("receipt metadata")?;
     assert_eq!(
-        metadata["admission_operation"]["projected_state"],
-        "outcome_unknown_after_dispatch"
+        metadata["admission_operation"]["projected_state"], "outcome_unknown_after_dispatch",
+        "recovery refusal lost its original operation: reason={:?}, metadata={metadata}",
+        response.reason
     );
     assert!(metadata["admission_operation"]["retained_dispatch_commit"].is_object());
     let nonce = response

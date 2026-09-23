@@ -74,6 +74,16 @@ All 17 authority tests and strict all-target Clippy pass; the two ignored helper
 entrypoints run inside the process tests. Evidence is retained under
 `output/process-security-20260915/m7-authority-worker-20260923/`.
 
+The `c114eb2042` hosted worker lane failed on the second strict-nonce recovery
+with missing retained-operation metadata. Its original log is retained. The
+process fixture now uses the production host's receipt-writer startup barrier
+before admission. The complete worker-server/mailboxes process suite and strict
+all-target Clippy pass locally, with the original custody and one-effect
+assertions unchanged. Eight diagnostic runs before this fixture change also
+passed, so the exact hosted failure cause and hosted resolution remain
+unconfirmed. Logs are under
+`output/process-security-20260915/nonce-recovery-hosted-20260923/`.
+
 The governed-host qualified full-index patch on `3dd65e1fba` is
 `47b5f18164ac39f4c48ec4debcaad14bd977724879d702462066c51a8a136f73`.
 Its real CLI case passes in 95.45 seconds, including witnessed rotation after

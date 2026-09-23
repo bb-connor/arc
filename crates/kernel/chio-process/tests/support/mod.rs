@@ -92,9 +92,11 @@ pub fn kernel_with_artifacts(
         issuer().public_key(),
         scope_hash(&scope(&["append", "read"]))?,
     );
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(
-        path.join("receipts.db"),
-    )?))?;
+    let receipts = SqliteReceiptStore::open(path.join("receipts.db"))?;
+    // Match the production host's startup barrier. A reopened writer verifies
+    // its persisted head asynchronously and must stay closed until that ends.
+    receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
+    kernel.set_receipt_store(Box::new(receipts))?;
     kernel.set_revocation_store(Box::new(authority.revocation_store()));
     kernel.set_budget_store(Box::new(authority.budget_store()));
     kernel.set_durable_admission_store(
