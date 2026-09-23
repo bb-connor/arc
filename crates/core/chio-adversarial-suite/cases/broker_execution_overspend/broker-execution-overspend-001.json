@@ -14,7 +14,7 @@
         "package": "chio-store-sqlite",
         "test_source": "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs",
         "target_kind": "lib",
-        "test_name": "budget_store::tests::composite::every_quota_participant_exhausts_atomically_and_maximum_is_immutable"
+        "test_name": "budget_store::tests::composite_lifecycle::every_quota_participant_exhausts_atomically_and_maximum_is_immutable"
       }
     ],
     "campaigns": [

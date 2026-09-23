@@ -14,7 +14,7 @@
         "package": "chio-store-sqlite",
         "test_source": "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs",
         "target_kind": "lib",
-        "test_name": "budget_store::tests::composite::composite_authorize_capture_and_settlement_survive_response_loss_and_restart"
+        "test_name": "budget_store::tests::composite_lifecycle::composite_authorize_capture_and_settlement_survive_response_loss_and_restart"
       }
     ],
     "campaigns": [
