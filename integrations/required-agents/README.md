@@ -29,7 +29,7 @@ four tools. The guest credential cannot initialize sessions, issue authority,
 reach admin APIs or select another session. Budgets are per issued grant, not a
 global account budget. Credential rotation preserves the same grant and fence.
 
-## Select the qualified RC artifacts
+## Select the qualified artifacts
 
 The current security branch requires a Linux resource owner with authenticated
 session-store custody. Select an existing publisher-signed manifest, its independent
@@ -42,9 +42,9 @@ qualified migration. The earlier artifacts and host observations below predate
 this integration and do not qualify the combined security source.
 
 Use the checksummed kernel and resource image selected by the companion delivery
-manifest. The candidate CLI version is `0.1.1-rc.1`. The historical public CLI
-`0.1.0` and the older debug candidate with the same version label are not this
-combination. Neither version text nor an arbitrary rebuild is a release identity.
+manifest. The retained bundles below identify the historical `0.1.1-rc.1`
+candidate. A build of the combined security source requires its own manifest and
+qualification. Neither version text nor an arbitrary rebuild is a release identity.
 
 Run `python3 verify.py verify-bundle --bundle . --images` from the assembled
 bundle before creating installs or runtime state. This verifies the complete

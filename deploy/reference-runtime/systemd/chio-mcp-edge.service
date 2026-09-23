@@ -12,6 +12,8 @@ Description=Chio remote MCP edge
 Requires=chio-trust-control.service
 After=network-online.target chio-trust-control.service
 Wants=network-online.target
+RequiresMountsFor=/srv/chio-receipt-anchors
+AssertPathIsMountPoint=/srv/chio-receipt-anchors
 
 [Service]
 Type=notify
@@ -91,6 +93,9 @@ PrivateDevices=true
 ProtectHome=true
 ProtectSystem=strict
 ReadOnlyPaths=/etc/chio
+# The signed launch profile pins this independent rollback anchor. Keep its
+# persistent mount writable while the rest of the host remains read-only.
+ReadWritePaths=/srv/chio-receipt-anchors/mcp-edge
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectKernelLogs=true

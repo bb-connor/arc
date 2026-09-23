@@ -128,6 +128,24 @@ pub(crate) struct ProvisionReferenceRuntimeArgs {
 pub(crate) fn cmd_provision_reference_runtime(
     args: &ProvisionReferenceRuntimeArgs,
 ) -> Result<(), CliError> {
+    if args.stage == ProvisionStage::Enforced && args.receipt_rollback_anchor_root.is_none() {
+        return Err(CliError::cli_other_error(
+            "Enforced provisioning requires --receipt-rollback-anchor-root on a separate persistent filesystem from the receipt database".to_string(),
+        ));
+    }
+    let receipt_rollback_anchor_root = args
+        .receipt_rollback_anchor_root
+        .as_ref()
+        .map(|path| {
+            let path = require_exact_canonical_path(path, "receipt rollback anchor")?;
+            if !std::fs::metadata(&path)?.is_dir() {
+                return Err(CliError::cli_other_error(
+                    "receipt rollback anchor must be a directory".to_string(),
+                ));
+            }
+            Ok(path)
+        })
+        .transpose()?;
     let broker = args
         .broker_binding
         .as_ref()
@@ -194,11 +212,7 @@ pub(crate) fn cmd_provision_reference_runtime(
     };
     let profile = ProvisionProfile {
         max_artifact_bytes: args.max_artifact_bytes,
-        receipt_rollback_anchor_root: args
-            .receipt_rollback_anchor_root
-            .as_ref()
-            .map(|path| require_exact_canonical_path(path, "receipt rollback anchor"))
-            .transpose()?,
+        receipt_rollback_anchor_root,
         report_schema: REPORT_SCHEMA,
         security_mode,
         warning,

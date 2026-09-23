@@ -171,15 +171,28 @@ baseline is present, and the keylog example configs agree with the units.
    source checkout or compiler. The archive includes their command and grant
    reference in `reference-runtime/reference-tools.md`.
 
+   Mount a separately managed persistent filesystem at
+   `/srv/chio-receipt-anchors` before provisioning. Its device must differ from
+   the receipt database under `/var/lib/chio-mcp-edge`; the runtime checks this
+   boundary. Retain its contents across restarts and upgrades, and never restore
+   it with a database snapshot or replace it with a temporary filesystem. The
+   edge unit requires this mount and allows writes only to its private anchor
+   directory in addition to its managed state and runtime directories.
+
    ```bash
    install -d -m 0755 /usr/local/libexec/chio
    install -m 0755 chio-cage-init chio-tool-repo-reader chio-tool-artifact-writer chio-tool-digest \
      /usr/local/libexec/chio/
    install -d -m 0750 -g chio-edge /srv/chio/repository
+   mountpoint -q /srv/chio-receipt-anchors
+   install -d -m 0700 -o chio-edge -g chio-edge /var/lib/chio-mcp-edge \
+     /srv/chio-receipt-anchors/mcp-edge
    chio security provision-reference-runtime \
      --output-dir /etc/chio/mcp-edge/provision \
      --runtime-security-dir /var/lib/chio-mcp-edge/security \
      --cage-init /usr/local/libexec/chio/chio-cage-init \
+     --max-artifact-bytes 67108864 \
+     --receipt-rollback-anchor-root /srv/chio-receipt-anchors/mcp-edge \
      --discover-tools \
      --target /usr/local/libexec/chio/chio-tool-repo-reader \
      --target-arg --root --target-arg /srv/chio/repository \
@@ -211,7 +224,10 @@ baseline is present, and the keylog example configs agree with the units.
    the receipt signer seed under the runtime security directory, which the
    edge writes receipts into, so that directory lives in the edge's state
    directory and holds only those three files; every other signer seed stays
-   in the root-only provisioning directory. Fill the environment file from
+   in the root-only provisioning directory. The signed 64 MiB artifact ceiling
+   must accommodate each selected binary; review and explicitly select a larger
+   bound if the release requires it. Enforced provisioning refuses a missing
+   rollback anchor before creating artifacts. Fill the environment file from
    `launch/manifest-public-key`,
    `launch/cage-policy-signer` and the authority key above, and set
    `CHIO_MCP_UPSTREAM_COMMAND` to exactly the provisioned command. Run the

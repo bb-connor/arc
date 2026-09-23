@@ -142,7 +142,7 @@ impl Fixture {
         self.root.path().join(name)
     }
 
-    fn provision(&self, output: &Path, extra: &[&str]) -> Output {
+    fn command(&self, output: &Path) -> Command {
         let mut command = Command::new(chio());
         command
             .args(["security", "provision-reference-runtime", "--output-dir"])
@@ -166,8 +166,20 @@ impl Fixture {
                 "10001",
                 "--server-id",
                 "reference-repo-reader",
-            ])
-            .args(extra);
+            ]);
+        command
+    }
+
+    fn provision(&self, output: &Path, extra: &[&str]) -> Output {
+        let mut command = self.command(output);
+        if !extra.contains(&"--receipt-rollback-anchor-root") {
+            // These synthetic artifacts exercise signed path binding. The
+            // native sink tests own the separate-filesystem requirement.
+            command
+                .arg("--receipt-rollback-anchor-root")
+                .arg(self.root.path());
+        }
+        command.args(extra);
         command.output().expect("run provisioner")
     }
 }
@@ -202,6 +214,8 @@ fn broker_command(fixture: &Fixture, output: &Path, binding: &Path) -> Command {
         .arg(&fixture.target)
         .arg("--broker-binding")
         .arg(binding)
+        .arg("--receipt-rollback-anchor-root")
+        .arg(fixture.root.path())
         .args([
             "--execution-uid",
             "10001",
@@ -409,6 +423,36 @@ fn an_explicit_artifact_ceiling_is_signed_and_cannot_change_on_reopen() {
 }
 
 #[test]
+fn enforced_provisioning_refuses_missing_anchor_before_creating_artifacts() {
+    let fixture = Fixture::new();
+    for extra in [&[][..], &["--stage", "enforced"][..]] {
+        let output = fixture.output("missing-anchor");
+        let refused = fixture
+            .command(&output)
+            .args(extra)
+            .output()
+            .expect("run provisioner");
+        assert!(!refused.status.success());
+        assert!(stderr(&refused).contains("--receipt-rollback-anchor-root"));
+        assert!(
+            !output.exists(),
+            "failed provisioning created operator state"
+        );
+    }
+    let output = fixture.output("file-anchor");
+    let refused = fixture.provision(
+        &output,
+        &[
+            "--receipt-rollback-anchor-root",
+            fixture.tools.to_str().unwrap(),
+        ],
+    );
+    assert!(!refused.status.success());
+    assert!(stderr(&refused).contains("receipt rollback anchor must be a directory"));
+    assert!(!output.exists());
+}
+
+#[test]
 fn the_receipt_anchor_is_signed_and_cannot_change_on_reopen() {
     let fixture = Fixture::new();
     let first_anchor = fixture.output("anchor-one");
@@ -450,7 +494,11 @@ fn the_receipt_anchor_is_signed_and_cannot_change_on_reopen() {
             second_anchor.to_str().unwrap(),
         ],
     ] {
-        let refused = fixture.provision(&output, &extra);
+        let refused = fixture
+            .command(&output)
+            .args(&extra)
+            .output()
+            .expect("reopen provisioner");
         assert!(!refused.status.success());
         assert_eq!(std::fs::read(&path).expect("retained policy"), retained);
     }
@@ -567,7 +615,11 @@ fn an_enforced_provision_binds_the_helper_the_grants_and_a_promoted_ledger() {
 fn a_shadow_provision_authorizes_without_containment() {
     let fixture = Fixture::new();
     let output = fixture.output("shadow");
-    let provisioned = fixture.provision(&output, &["--stage", "shadow"]);
+    let provisioned = fixture
+        .command(&output)
+        .args(["--stage", "shadow"])
+        .output()
+        .expect("provision shadow profile without an anchor");
     assert!(provisioned.status.success(), "{}", stderr(&provisioned));
     let report = report(&provisioned);
     assert_eq!(report["securityMode"], "shadow_legacy_authorized");

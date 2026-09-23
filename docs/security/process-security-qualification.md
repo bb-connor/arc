@@ -60,6 +60,20 @@ regardless of the invoking shell's file mask. Historical native-host captures
 remain historical: all six I01-I08 profiles, including Cursor's unresolved
 server-side restriction contract, still require current-source acceptance.
 
+Enforced reference provisioning now rejects a missing independent receipt
+anchor, or a non-directory anchor, before creating operator state. Explicit
+Shadow provisioning remains available. The reference edge unit requires the
+persistent anchor mount and grants write access to its private anchor directory
+under the existing read-only filesystem policy. Installation instructions create
+the service-owned directories and select an explicit signed artifact ceiling.
+All 12 provisioning cases, four reference-unit cases and strict all-target CLI
+Clippy pass on base `a986606442` plus patch SHA-256
+`fa923d58c8d39837fc917c6d57c6d409ff5a1f3e8df5495c2d7a0254d33647a8`.
+The native evidence archive is
+`m9-anchor-provision-a986606-20260923.tgz`, SHA-256
+`e3c4a9adf80fa56960a49f9cb4e650dbff7c3512b79347887a50a855eb04054e`.
+These owning checks do not establish a complete native installation.
+
 The d621 M7 queue stopped after three caught and promoted campaigns before this
 integration changed its input closure. Its complete original inventory and raw
 outputs are retained in `m7-partial-d621-native-host-complete-20260923.tgz`,
