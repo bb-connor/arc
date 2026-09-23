@@ -42,7 +42,22 @@ hashes to `766927873a413a16cb0279c0ec8d40216de00578d91a3a43c55ad2046421cc5f`.
 The existing wire checker passes five indexes, 90 positives and 264 negatives.
 All four binding generators and their check modes pass. Original failing
 regressions and the obsolete-v1-fixture gate failure remain retained separately.
-Only this qualification ledger is added after the qualified patch.
+The `5d643420b1` checkpoint adds only this ledger after the qualified patch.
+
+Native broker composition now obtains its local serving owner from
+`DurableAdmissionRuntime`, the same runtime used by the process host. Its kernel
+uses the persisted runtime identity and the original runtime attachment path.
+The broker reader, authority handler and native flow share that exact owner;
+remote authority profiles have no local handle. All eight native scenarios pass
+on x86 in 276.45 seconds, including real cage/keyring delivery and all death and
+invalid-completion cases. The original MCP completion case also passes locally,
+and strict all-target Clippy passes for both affected crates. The two-file Rust
+patch on `5d643420b1` hashes to
+`82655f12a16be6e45aa684a2625843dcaf19d4dddb796db9d907c264371caa0d`.
+Retrieved archive `output/process-security-20260915/chio-broker-runtime-authority-20260923.tgz`
+hashes to `d16a4d6342fd629c51a59da2ac65ea0f2b798e37b41ccfec2d9d956bd74e7e98`.
+Only documentation follows this qualified Rust patch. Ordinary process-host
+broker routing and complete offline artifact joins remain open.
 
 The broker-death patch is retained as full-index SHA-256
 `c5a4a390284a7550e11b7b2ede9a9d1d8170584b9a121871c9f0be5257c68407`

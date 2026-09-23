@@ -5,6 +5,7 @@ use crate::kernel_admission::{
     BrokerMcpConnection, BrokerNativeCaptureReader, BrokerQuotaVerifier, BrokerQuotaVerifierConfig,
 };
 use chio_control_plane::security::adapters::{FlowResolverConfig, NativeFlowResolver};
+use chio_control_plane::DurableAdmissionRuntime;
 use chio_core_types::capability::aggregate_invocation::{
     AggregateInvocationBudget, AggregateInvocationScope,
 };
@@ -60,7 +61,7 @@ pub(super) struct NativeAuthority<'a> {
 
 pub(super) struct NativeHost {
     pub kernel: Arc<ChioKernel>,
-    pub authority: SqliteAuthorityStore,
+    pub authority: Arc<SqliteAuthorityStore>,
     pub handler: Arc<BrokerKernelAuthorityHandler>,
     pub reader: BrokerNativeCaptureReader,
     pub participant: Arc<BrokerAdmissionParticipant>,
@@ -86,18 +87,17 @@ impl NativeHost {
             parent,
             cutpoint,
         } = keys;
-        let locks = directory.join("kernel-locks");
-        fs::create_dir(&locks)?;
-        fs::set_permissions(&locks, fs::Permissions::from_mode(0o700))?;
         let database = directory.join("kernel-authority.sqlite3");
-        SqliteAuthorityStore::provision(&database, &locks)?;
-        let authority = SqliteAuthorityStore::open_serving(database, locks)?;
+        let runtime = DurableAdmissionRuntime::open(&database)?;
+        let authority = runtime
+            .local_authority_store()
+            .ok_or("native broker requires the host's local admission authority")?;
         let mut kernel = ChioKernel::new(KernelConfig {
             ca_public_keys: vec![parent.as_ref().map_or_else(
                 || authority_signer.public_key(),
                 |parent| parent.issuer.clone(),
             )],
-            keypair: authority_signer.clone(),
+            keypair: runtime.kernel_keypair(),
             max_delegation_depth: 5,
             policy_hash: chio_core_types::crypto::sha256_hex(b"native-broker-process-policy"),
             allow_sampling: false,
@@ -116,14 +116,7 @@ impl NativeHost {
         let receipts = SqliteReceiptStore::open(directory.join("kernel-receipts.sqlite3"))?;
         receipts.wait_for_writer_ready(Duration::from_secs(30))?;
         kernel.set_receipt_store_handle(Arc::new(receipts))?;
-        kernel.set_durable_admission_store(
-            Arc::new(authority.admission_operation_store()),
-            Arc::new(authority.tool_outcome_store()),
-            authority.mutation_fence(),
-        )?;
-        kernel.set_budget_store_handle(Arc::new(authority.budget_store()));
-        kernel.set_revocation_store_handle(Arc::new(authority.revocation_store()));
-        kernel.reconcile_durable_admission_startup()?;
+        runtime.attach(&mut kernel)?;
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         let parent = match parent {
             Some(parent) => parent,

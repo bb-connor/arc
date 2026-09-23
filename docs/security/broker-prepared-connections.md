@@ -56,6 +56,13 @@ time. Live delivery samples that clock after receiving the response. Historical
 verification does not require the original capabilities to remain unexpired and
 does not create new execution authority.
 
+Local host composition uses `DurableAdmissionRuntime::local_authority_store()`
+to share the same serving owner, mutation fence, physical captures and quotas
+already attached to the kernel. The broker reader and authority handler use
+that retained store. Remote authority profiles return `None` and cannot supply
+this local composition. `DurableAdmissionRuntime::attach` still requires the
+kernel's signing key to match its persisted authority identity.
+
 The optional `native-mcp` feature provides `NativeBrokerMcpTool`, a connection
 owned for one invocation. It uses the production stdio adapter after preparing
 the broker descriptor. The selected factory must return an enforced brokered

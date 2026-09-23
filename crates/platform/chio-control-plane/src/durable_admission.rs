@@ -24,6 +24,7 @@ pub struct DurableAdmissionRuntime {
     outcomes: Arc<dyn QualifiedToolOutcomeStore>,
     budget: Arc<dyn BudgetStore>,
     revocations: Arc<dyn RevocationStore>,
+    local_authority: Option<Arc<SqliteAuthorityStore>>,
     local_operations: Option<chio_store_sqlite::SqliteAdmissionOperationStore>,
     local_budget: Option<SqliteBudgetStore>,
     local_revocations: Option<SqliteRevocationStore>,
@@ -46,7 +47,7 @@ impl DurableAdmissionRuntime {
         let lock_root = durable_admission_lock_root(path)?;
         create_private_directory(&lock_root)?;
         SqliteAuthorityStore::provision(path, &lock_root)?;
-        let authority = SqliteAuthorityStore::open_serving(path, &lock_root)?;
+        let authority = Arc::new(SqliteAuthorityStore::open_serving(path, &lock_root)?);
         let budget = authority.budget_store();
         let revocations = authority.revocation_store();
         let kernel_keypair =
@@ -58,6 +59,7 @@ impl DurableAdmissionRuntime {
             outcomes: Arc::new(authority.tool_outcome_store()),
             budget: Arc::new(budget.clone()),
             revocations: Arc::new(revocations.clone()),
+            local_authority: Some(authority.clone()),
             local_operations: Some(authority.admission_operation_store()),
             local_budget: Some(budget),
             local_revocations: Some(revocations),
@@ -188,6 +190,7 @@ impl DurableAdmissionRuntime {
             outcomes: stores.outcomes,
             budget: stores.budget,
             revocations,
+            local_authority: None,
             local_operations: None,
             local_budget: None,
             local_revocations: None,
@@ -199,6 +202,14 @@ impl DurableAdmissionRuntime {
     #[must_use]
     pub fn kernel_keypair(&self) -> Keypair {
         self.kernel_keypair.clone()
+    }
+
+    /// The existing local serving owner for native flow and broker composition.
+    /// This shares the authority attached to the kernel without opening another
+    /// store or creating another mutation fence. Remote profiles have no local port.
+    #[must_use]
+    pub fn local_authority_store(&self) -> Option<Arc<SqliteAuthorityStore>> {
+        self.local_authority.clone()
     }
 
     #[must_use]
