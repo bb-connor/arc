@@ -27,7 +27,11 @@ pub struct SuperviseArgs {
 
     /// Open a private binary credential and append --ARGUMENT FD to the
     /// service command. Bytes stay out of environment variables and arguments.
-    #[arg(long = "credential-fd", value_name = "ARGUMENT=CREDENTIAL", conflicts_with = "exec")]
+    #[arg(
+        long = "credential-fd",
+        value_name = "ARGUMENT=CREDENTIAL",
+        conflicts_with = "exec"
+    )]
     pub credential_fd: Vec<DescriptorCredentialBinding>,
 
     /// Report readiness once a GET of this operator-selected HTTP(S) URL succeeds.
@@ -40,7 +44,8 @@ pub struct SuperviseArgs {
     #[arg(long, value_name = "VARIABLE", requires = "ready_http")]
     pub ready_http_bearer_env: Option<String>,
 
-    /// Report readiness once this Unix socket accepts a connection.
+    /// Report readiness once this Unix socket accepts a connection and its
+    /// kernel-reported peer PID matches the supervised service.
     #[arg(long, value_name = "PATH")]
     pub ready_unix_socket: Option<PathBuf>,
 

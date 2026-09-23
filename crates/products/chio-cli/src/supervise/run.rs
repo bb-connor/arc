@@ -80,12 +80,19 @@ impl fmt::Display for SuperviseError {
         match self {
             Self::Spawn(error) => write!(f, "the service could not be started: {error}"),
             Self::Signals(error) => write!(f, "stop signals could not be installed: {error}"),
-            Self::Readiness(error) => write!(f, "the readiness probe could not be prepared: {error}"),
+            Self::Readiness(error) => {
+                write!(f, "the readiness probe could not be prepared: {error}")
+            }
             Self::Wait(error) => write!(f, "waiting for the service failed: {error}"),
             Self::ReadinessTimeout(exit) => {
-                write!(f, "the service did not become ready in time and was stopped ({exit})")
+                write!(
+                    f,
+                    "the service did not become ready in time and was stopped ({exit})"
+                )
             }
-            Self::ExitedBeforeReady(exit) => write!(f, "the service ended before it was ready ({exit})"),
+            Self::ExitedBeforeReady(exit) => {
+                write!(f, "the service ended before it was ready ({exit})")
+            }
         }
     }
 }
@@ -144,6 +151,9 @@ pub async fn supervise(supervision: Supervision) -> Result<Exit, SuperviseError>
         .configure(command.as_std_mut())
         .map_err(SuperviseError::Spawn)?;
     let mut child = command.spawn().map_err(SuperviseError::Spawn)?;
+    let child_id = child.id().ok_or_else(|| {
+        SuperviseError::Spawn(io::Error::other("spawned service has no process identity"))
+    })?;
     // The daemon now owns its inherited copies; retain no parent credential
     // descriptors for the rest of its supervision lifetime.
     drop(command);
@@ -156,6 +166,7 @@ pub async fn supervise(supervision: Supervision) -> Result<Exit, SuperviseError>
         let mut next_probe = tokio::time::Instant::now();
         loop {
             tokio::select! {
+                biased;
                 status = child.wait() => {
                     let exit = Exit::from(status.map_err(SuperviseError::Wait)?);
                     return Err(SuperviseError::ExitedBeforeReady(exit));
@@ -169,8 +180,11 @@ pub async fn supervise(supervision: Supervision) -> Result<Exit, SuperviseError>
                     let exit = stop(&mut child, libc::SIGTERM, stop_grace).await?;
                     return Err(SuperviseError::ReadinessTimeout(exit));
                 }
-                () = tokio::time::sleep_until(next_probe) => {
-                    if probe.probe().await {
+                ready = async {
+                    tokio::time::sleep_until(next_probe).await;
+                    probe.probe_for_child(child_id).await
+                } => {
+                    if ready {
                         break;
                     }
                     next_probe = tokio::time::Instant::now() + READINESS_POLL_INTERVAL;
@@ -240,7 +254,10 @@ mod tests {
         Supervision {
             program: PathBuf::from("/bin/sh"),
             args: vec![OsString::from("-c"), OsString::from(script)],
-            environment: vec![("CHIO_TEST_SECRET".to_string(), "from-credential".to_string())],
+            environment: vec![(
+                "CHIO_TEST_SECRET".to_string(),
+                "from-credential".to_string(),
+            )],
             descriptor_credentials: DescriptorCredentials::default(),
             readiness: Readiness::Immediate,
             ready_timeout: Duration::from_secs(5),
@@ -251,9 +268,11 @@ mod tests {
 
     #[tokio::test]
     async fn the_service_exit_code_and_environment_are_preserved() {
-        let outcome = supervise(shell("[ \"$CHIO_TEST_SECRET\" = from-credential ] && exit 7"))
-            .await
-            .unwrap_or_else(|error| panic!("{error}"));
+        let outcome = supervise(shell(
+            "[ \"$CHIO_TEST_SECRET\" = from-credential ] && exit 7",
+        ))
+        .await
+        .unwrap_or_else(|error| panic!("{error}"));
         assert_eq!(outcome, Exit::Code(7));
     }
 
@@ -277,44 +296,77 @@ mod tests {
         let started = std::time::Instant::now();
         assert!(matches!(
             supervise(supervision).await,
-            Err(SuperviseError::ReadinessTimeout(Exit::Signal(libc::SIGTERM)))
+            Err(SuperviseError::ReadinessTimeout(Exit::Signal(
+                libc::SIGTERM
+            )))
         ));
         assert!(started.elapsed() < Duration::from_secs(10));
     }
 
     #[tokio::test]
-    async fn readiness_is_reported_once_the_service_listens() {
+    async fn an_unrelated_listener_cannot_report_service_readiness() {
         let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("{error}"));
         let socket = directory.path().join("service.sock");
         let notify = directory.path().join("notify.sock");
         let manager = std::os::unix::net::UnixDatagram::bind(&notify)
             .unwrap_or_else(|error| panic!("{error}"));
         manager
-            .set_read_timeout(Some(Duration::from_secs(10)))
+            .set_nonblocking(true)
             .unwrap_or_else(|error| panic!("{error}"));
-        let listener_path = socket.clone();
-        let listener = tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(400)).await;
-            tokio::net::UnixListener::bind(&listener_path).unwrap_or_else(|error| panic!("{error}"))
-        });
+        let _listener =
+            tokio::net::UnixListener::bind(&socket).unwrap_or_else(|error| panic!("{error}"));
         let mut supervision = shell("sleep 0.9; exit 3");
         supervision.readiness = Readiness::UnixSocket(socket);
         supervision.notifier = Notifier::for_socket(notify.as_os_str());
-        let outcome = supervise(supervision)
-            .await
-            .unwrap_or_else(|error| panic!("{error}"));
-        assert_eq!(outcome, Exit::Code(3));
-        drop(listener.await.unwrap_or_else(|error| panic!("{error}")));
+        assert!(matches!(
+            supervise(supervision).await,
+            Err(SuperviseError::ExitedBeforeReady(Exit::Code(3)))
+        ));
         let mut messages = Vec::new();
         let mut buffer = [0_u8; 256];
         while let Ok(length) = manager.recv(&mut buffer) {
             messages.push(String::from_utf8_lossy(&buffer[..length]).into_owned());
-            if messages.last().is_some_and(|message| message == "STATUS=ready") {
-                break;
-            }
         }
-        assert!(messages.iter().any(|message| message.starts_with("STATUS=starting")));
-        assert!(messages.contains(&"READY=1".to_string()));
-        assert!(messages.contains(&"STATUS=ready".to_string()));
+        assert!(messages
+            .iter()
+            .any(|message| message.starts_with("STATUS=starting")));
+        assert!(!messages.contains(&"READY=1".to_string()));
+        assert!(!messages.contains(&"STATUS=ready".to_string()));
+    }
+
+    #[tokio::test]
+    async fn readiness_deadline_cancels_a_stalled_http_probe() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .unwrap_or_else(|error| panic!("{error}"));
+        let address = listener
+            .local_addr()
+            .unwrap_or_else(|error| panic!("{error}"));
+        let mut supervision = shell("exec sleep 30");
+        supervision.readiness = Readiness::Http {
+            url: format!("http://{address}/health"),
+            bearer: None,
+        };
+        supervision.ready_timeout = Duration::from_millis(300);
+        let started = std::time::Instant::now();
+        let stalled = async {
+            let (_stream, _) = listener
+                .accept()
+                .await
+                .unwrap_or_else(|error| panic!("{error}"));
+            std::future::pending::<()>().await;
+        };
+        tokio::pin!(stalled);
+        let outcome = tokio::select! {
+            outcome = supervise(supervision) => outcome,
+            () = &mut stalled => unreachable!(),
+        };
+        assert!(matches!(
+            outcome,
+            Err(SuperviseError::ReadinessTimeout(Exit::Signal(
+                libc::SIGTERM
+            )))
+        ));
+        assert!(started.elapsed() < Duration::from_secs(1));
     }
 }

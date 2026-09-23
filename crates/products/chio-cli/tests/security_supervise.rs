@@ -271,6 +271,16 @@ fn the_service_exit_code_is_the_supervisor_exit_code() {
 }
 
 #[test]
+#[ignore = "subprocess entry point exercised by the supervision process test"]
+fn supervised_socket_child() {
+    let path = std::env::var_os("CHIO_SUPERVISE_TEST_SOCKET").expect("child socket path");
+    let listener = std::os::unix::net::UnixListener::bind(path).expect("child binds socket");
+    for stream in listener.incoming() {
+        drop(stream.expect("readiness connection"));
+    }
+}
+
+#[test]
 fn readiness_reaches_the_manager_and_a_stop_signal_reaches_the_service() {
     let directory = tempfile::tempdir().expect("tempdir");
     let socket = directory.path().join("service.sock");
@@ -279,21 +289,18 @@ fn readiness_reaches_the_manager_and_a_stop_signal_reaches_the_service() {
     let mut supervisor = supervise(directory.path())
         .args(["--ready-unix-socket"])
         .arg(&socket)
+        .args(["--ready-timeout", "20", "--stop-grace", "5", "--"])
+        .arg(std::env::current_exe().expect("test executable"))
         .args([
-            "--ready-timeout",
-            "20",
-            "--stop-grace",
-            "5",
-            "--",
-            "/bin/sh",
-            "-c",
-            "exec sleep 60",
+            "--exact",
+            "supervised_socket_child",
+            "--ignored",
+            "--nocapture",
         ])
+        .env("CHIO_SUPERVISE_TEST_SOCKET", &socket)
         .env("NOTIFY_SOCKET", &notify)
         .spawn()
         .expect("spawn supervisor");
-    std::thread::sleep(Duration::from_millis(600));
-    let _listener = std::os::unix::net::UnixListener::bind(&socket).expect("bind service socket");
     let messages = notify_messages(&manager, "STATUS=ready", Duration::from_secs(20));
     assert!(
         messages
@@ -315,6 +322,48 @@ fn readiness_reaches_the_manager_and_a_stop_signal_reaches_the_service() {
         Some(libc::SIGTERM),
         "the supervisor ends by the signal that ended its service: {status:?}"
     );
+}
+
+#[test]
+fn a_stop_signal_interrupts_a_stalled_readiness_probe() {
+    let directory = tempfile::tempdir().expect("tempdir");
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("health listener");
+    listener
+        .set_nonblocking(true)
+        .expect("nonblocking listener");
+    let address = listener.local_addr().expect("health address");
+    let mut supervisor = supervise(directory.path())
+        .args([
+            "--ready-http",
+            &format!("http://{address}/health"),
+            "--ready-timeout",
+            "30",
+            "--stop-grace",
+            "1",
+            "--",
+            "/bin/sh",
+            "-c",
+            "exec sleep 60",
+        ])
+        .spawn()
+        .expect("spawn supervisor");
+    let connected = Instant::now();
+    let _stream = loop {
+        match listener.accept() {
+            Ok((stream, _)) => break stream,
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                assert!(
+                    connected.elapsed() < Duration::from_secs(5),
+                    "probe never connected"
+                );
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) => panic!("health accept: {error}"),
+        }
+    };
+    terminate(&supervisor);
+    let status = wait_with_deadline(&mut supervisor, Duration::from_secs(1));
+    assert_eq!(status.signal(), Some(libc::SIGTERM));
 }
 
 #[test]
