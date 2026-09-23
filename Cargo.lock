@@ -4974,6 +4974,7 @@ dependencies = [
  "subtle",
  "tempfile",
  "thiserror 1.0.69",
+ "tokio",
  "url",
  "webpki-roots 1.0.6",
  "zeroize",

@@ -775,18 +775,40 @@ impl BrokerDaemonRuntime {
         use std::sync::mpsc;
         use std::time::Duration;
 
+        // Control, prepared execution, and audit each have a fixed worker.
+        // An authenticated idle execution descriptor never occupies control
+        // or audit capacity, and clients cannot create additional threads.
+        const NORMAL_IPC_WORKERS: usize = 1;
         self.endpoint.set_nonblocking(true)?;
         self.privileged_audit_endpoint.set_nonblocking(true)?;
         let stop = AtomicBool::new(false);
-        let (failure_sender, failure_receiver) = mpsc::sync_channel::<BrokerError>(2);
+        let (failure_sender, failure_receiver) =
+            mpsc::sync_channel::<BrokerError>(NORMAL_IPC_WORKERS + 2);
         std::thread::scope(|scope| {
-            let normal_sender = failure_sender.clone();
-            let normal_stop = &stop;
-            let normal_endpoint = &self.endpoint;
+            for _ in 0..NORMAL_IPC_WORKERS {
+                let normal_sender = failure_sender.clone();
+                let normal_stop = &stop;
+                let normal_endpoint = &self.endpoint;
+                scope.spawn(move || {
+                    run_daemon_serving_worker("normal IPC", normal_sender, || {
+                        while !normal_stop.load(Ordering::Acquire) {
+                            match normal_endpoint.try_serve_one() {
+                                Ok(Some(_)) => {}
+                                Ok(None) => std::thread::sleep(Duration::from_millis(2)),
+                                Err(error) => return Err(error),
+                            }
+                        }
+                        Ok(())
+                    });
+                });
+            }
+            let prepared_sender = failure_sender.clone();
+            let prepared_stop = &stop;
+            let prepared_endpoint = &self.endpoint;
             scope.spawn(move || {
-                run_daemon_serving_worker("normal IPC", normal_sender, || {
-                    while !normal_stop.load(Ordering::Acquire) {
-                        match normal_endpoint.try_serve_one() {
+                run_daemon_serving_worker("prepared execution", prepared_sender, || {
+                    while !prepared_stop.load(Ordering::Acquire) {
+                        match prepared_endpoint.try_serve_prepared() {
                             Ok(Some(_)) => {}
                             Ok(None) => std::thread::sleep(Duration::from_millis(2)),
                             Err(error) => return Err(error),

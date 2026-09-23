@@ -11,12 +11,43 @@ use chio_kernel::{BudgetStore, ToolCallOutput, Verdict};
 
 #[path = "native_host.rs"]
 mod host;
+#[path = "native_mcp.rs"]
+mod mcp;
+#[path = "native_response_tests.rs"]
+mod responses;
 
 #[test]
 fn native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_crossing(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    run_native_delivery(false, None)
+}
+
+#[test]
+fn native_kernel_broker_mcp_tool_preserves_original_capture_and_signed_completion(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    run_native_delivery(true, None)
+}
+
+#[test]
+fn native_kernel_broker_mcp_tool_keeps_capture_on_lost_or_invalid_completion(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    for fault in [
+        mcp::CompletionFault::LoseReply,
+        mcp::CompletionFault::ChangeBody,
+        mcp::CompletionFault::ExtraContent,
+    ] {
+        run_native_delivery(true, Some(fault))?;
+    }
+    Ok(())
+}
+
+fn run_native_delivery(
+    mcp_route: bool,
+    fault: Option<mcp::CompletionFault>,
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let directory = crate::private_tempdir()?;
     let kernel_directory = crate::private_tempdir()?;
+    let tool_directory = crate::private_tempdir()?;
     let root = fs::canonicalize(directory.path())?;
     let canary = random_canary();
     let probe = CanaryProbe::from_bytes(&canary);
@@ -59,13 +90,48 @@ fn native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_c
         credential_id: CREDENTIAL_ID.into(),
         version: 1,
     };
+    let tool = Arc::new(mcp::McpTool {
+        // Broker custody is not the tool's working directory. The controller
+        // separately scans every private tree after the live observation.
+        directory: fs::canonicalize(tool_directory.path())?,
+        peer: BrokerPeerIdentity {
+            process_id: broker.id(),
+            user_id: fixture.config.trusted_service_uid,
+            group_id: rustix::process::getegid().as_raw(),
+        },
+        signer: broker_key.public_key(),
+        probe: probe.clone(),
+        calls: std::sync::atomic::AtomicUsize::new(0),
+        prepared: std::sync::Mutex::new(None),
+        prepared_stream: std::sync::Mutex::new(None),
+        completion: std::sync::Mutex::new(None),
+        fault,
+    });
     let host = host::NativeHost::new(
         kernel_directory.path(),
         &fixture.config,
         broker.id(),
         (&issuer, &caller, &authority_key),
         execution_request(port, credential.clone(), &issuer, &caller),
+        mcp_route
+            .then(|| tool.clone() as Arc<dyn crate::kernel_admission::BrokerMcpToolConnection>),
     )?;
+    let runtime = mcp_route
+        .then(|| {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+        })
+        .transpose()?;
+    let invoke = || match runtime.as_ref() {
+        Some(runtime) => runtime.block_on(
+            host.kernel
+                .evaluate_tool_call_with_security_context(&host.request, &host.context),
+        ),
+        None => host
+            .kernel
+            .evaluate_tool_call_blocking_with_security_context(&host.request, &host.context),
+    };
     let authority_server = AuthorityRpcServer::bind(
         &fixture.config.authority_socket_path,
         broker_key.public_key(),
@@ -96,10 +162,8 @@ fn native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_c
         OwnedFd::from(listener),
         "native TLS observer",
     );
-    let outcome = host
-        .kernel
-        .evaluate_tool_call_blocking_with_security_context(&host.request, &host.context)?;
-    if outcome.verdict != Verdict::Allow {
+    let outcome = invoke();
+    if fault.is_none() && !matches!(&outcome, Ok(response) if response.verdict == Verdict::Allow) {
         let retained = host
             .authority
             .admission_operation_store()
@@ -123,15 +187,31 @@ fn native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_c
         };
         panic!(
             "native broker denied: {:?}; broker diagnostic: {}; upstream: {}",
-            outcome.reason,
+            outcome
+                .as_ref()
+                .map(|response| &response.reason)
+                .map_err(|error| error.to_string()),
             String::from_utf8_lossy(&stopped.stderr),
             upstream_diagnostic,
         );
     }
-    let Some(ToolCallOutput::Value(value)) = &outcome.output else {
-        return Err("native broker call has no value".into());
+    let response: BrokerExecuteResponse = if fault.is_some() {
+        assert!(
+            !matches!(&outcome, Ok(response) if response.verdict == Verdict::Allow),
+            "{fault:?}: {outcome:?}"
+        );
+        tool.completion
+            .lock()
+            .map_err(|_| "MCP observation lock")?
+            .clone()
+            .ok_or("no independently observed broker completion")?
+    } else {
+        let outcome = outcome.as_ref().map_err(|error| error.to_string())?;
+        let Some(ToolCallOutput::Value(value)) = &outcome.output else {
+            return Err("native broker call has no value".into());
+        };
+        serde_json::from_value(value.clone())?
     };
-    let response: BrokerExecuteResponse = serde_json::from_value(value.clone())?;
     assert_eq!(response.status, 200);
     assert_eq!(response.body, b"ok");
     verify_execution_receipt(&response.receipt, &broker_key.public_key())?;
@@ -160,11 +240,19 @@ fn native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_c
             now_ms()?,
         )?
         .ok_or("original native operation")?;
-    assert!(operation.state().is_terminal());
-    assert_ne!(
-        operation.state(),
-        AdmissionOperationState::OutcomeUnknownAfterDispatch
-    );
+    if fault.is_some() {
+        assert_eq!(
+            operation.state(),
+            AdmissionOperationState::OutcomeUnknownAfterDispatch,
+            "{fault:?}: {outcome:?}"
+        );
+    } else {
+        assert!(operation.state().is_terminal());
+        assert_ne!(
+            operation.state(),
+            AdmissionOperationState::OutcomeUnknownAfterDispatch
+        );
+    }
     let operation_id = operation.binding().operation_id();
     let (registration, original) = host
         .reader
@@ -195,11 +283,17 @@ fn native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_c
         assert_eq!(usage.reserved_invocations, 0);
     }
     let events = budget.list_mutation_events(100, Some(&host.request.capability.id), None)?;
-    let replay = host
-        .kernel
-        .evaluate_tool_call_blocking_with_security_context(&host.request, &host.context)?;
-    assert_eq!(replay.verdict, Verdict::Allow, "{replay:?}");
-    assert_eq!(replay.output, outcome.output);
+    let replay = invoke();
+    if fault.is_some() {
+        assert!(
+            !matches!(&replay, Ok(response) if response.verdict == Verdict::Allow),
+            "{fault:?}: {replay:?}"
+        );
+    } else {
+        let replay = replay?;
+        assert_eq!(replay.verdict, Verdict::Allow, "{replay:?}");
+        assert_eq!(replay.output, outcome?.output);
+    }
     assert_eq!(
         budget.list_mutation_events(100, Some(&host.request.capability.id), None)?,
         events
@@ -292,6 +386,21 @@ fn native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_c
     );
     scan_tree_for_raw_canary(&canary, &root);
     scan_tree_for_raw_canary(&canary, kernel_directory.path());
+    scan_tree_for_raw_canary(&canary, tool_directory.path());
     authority.stop();
+    assert_eq!(tool.calls.load(Ordering::SeqCst), usize::from(mcp_route));
+    responses::reject_signed_capture_substitutions(&host, operation_id, &response, &broker_key)?;
+    let (after_verification, _) = store
+        .load_unambiguous_retained_tool_request(
+            &AdmissionIdentifier::try_new("request", &host.request.request_id)?,
+            &fence,
+            now_ms()?,
+        )?
+        .ok_or("operation after historical verification")?;
+    assert_eq!(after_verification.state(), operation.state());
+    assert_eq!(
+        budget.list_mutation_events(100, Some(&host.request.capability.id), None)?,
+        events
+    );
     Ok(())
 }

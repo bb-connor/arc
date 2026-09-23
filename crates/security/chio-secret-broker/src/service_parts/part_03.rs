@@ -146,6 +146,7 @@ pub fn broker_request_digest(request: &BrokerExecuteRequest) -> Result<String> {
 pub enum IpcOperation {
     RegisterAttempt,
     PrepareDispatch,
+    PrepareConnection,
     ReleaseAttempt,
     Issue,
     Revoke,
@@ -162,6 +163,7 @@ impl IpcOperation {
         match self {
             Self::RegisterAttempt => "register_attempt",
             Self::PrepareDispatch => "prepare_dispatch",
+            Self::PrepareConnection => "prepare_connection",
             Self::ReleaseAttempt => "release_attempt",
             Self::Issue => "issue",
             Self::Revoke => "revoke",
@@ -284,10 +286,7 @@ impl<const MAXIMUM: usize> BoundedZeroizingByteArray<MAXIMUM> {
     }
 
     fn into_sensitive(mut self) -> SensitiveIpcBytes {
-        SensitiveIpcBytes(std::mem::replace(
-            &mut self.0,
-            Zeroizing::new(Vec::new()),
-        ))
+        SensitiveIpcBytes(std::mem::replace(&mut self.0, Zeroizing::new(Vec::new())))
     }
 }
 
@@ -299,10 +298,7 @@ impl<const MAXIMUM: usize> std::ops::Deref for BoundedZeroizingByteArray<MAXIMUM
     }
 }
 
-impl<const MAXIMUM: usize> zeroize::ZeroizeOnDrop
-    for BoundedZeroizingByteArray<MAXIMUM>
-{
-}
+impl<const MAXIMUM: usize> zeroize::ZeroizeOnDrop for BoundedZeroizingByteArray<MAXIMUM> {}
 
 impl<const MAXIMUM: usize> Drop for BoundedZeroizingByteArray<MAXIMUM> {
     fn drop(&mut self) {
@@ -435,9 +431,7 @@ impl<'a> SensitiveJsonParser<'a> {
                                     .and_then(|value| value.checked_add(nibble))
                                     .ok_or_else(sensitive_json_invalid)?;
                             }
-                            if code > 0x1f
-                                || matches!(code, 0x08 | 0x09 | 0x0a | 0x0c | 0x0d)
-                            {
+                            if code > 0x1f || matches!(code, 0x08 | 0x09 | 0x0a | 0x0c | 0x0d) {
                                 return Err(sensitive_json_invalid());
                             }
                             value.push(char::from(code))?;
@@ -762,10 +756,8 @@ pub fn canonical_ipc_request_bytes(
         canonical_json_byte_array_length(request.authorization.as_slice())?,
     )?;
     exact_length = checked_canonical_length(exact_length, b",\"operation\":".len())?;
-    exact_length = checked_canonical_length(
-        exact_length,
-        canonical_json_string_length(operation)?,
-    )?;
+    exact_length =
+        checked_canonical_length(exact_length, canonical_json_string_length(operation)?)?;
     exact_length = checked_canonical_length(exact_length, b",\"payload\":".len())?;
     exact_length = checked_canonical_length(
         exact_length,
@@ -800,6 +792,7 @@ pub(crate) fn decode_canonical_ipc_request(frame: &[u8]) -> Result<Authenticated
     let operation = match operation.as_str() {
         "register_attempt" => IpcOperation::RegisterAttempt,
         "prepare_dispatch" => IpcOperation::PrepareDispatch,
+        "prepare_connection" => IpcOperation::PrepareConnection,
         "release_attempt" => IpcOperation::ReleaseAttempt,
         "issue" => IpcOperation::Issue,
         "revoke" => IpcOperation::Revoke,
@@ -844,6 +837,11 @@ pub struct IpcResponse {
 pub trait BrokerIpcHandler: Send + Sync {
     fn register_attempt(&self, request: AuthenticatedIpcRequest) -> Result<IpcResponse>;
     fn prepare_dispatch(&self, request: AuthenticatedIpcRequest) -> Result<IpcResponse>;
+    fn prepare_connection(&self, _request: AuthenticatedIpcRequest) -> Result<IpcResponse> {
+        Err(BrokerError::AuthorizationDenied(
+            "prepared execution connections are unsupported".into(),
+        ))
+    }
     fn release_attempt(&self, request: AuthenticatedIpcRequest) -> Result<IpcResponse>;
     fn issue(&self, request: AuthenticatedIpcRequest) -> Result<IpcResponse>;
     fn revoke(&self, request: AuthenticatedIpcRequest) -> Result<IpcResponse>;
@@ -856,6 +854,7 @@ pub trait BrokerIpcHandler: Send + Sync {
 }
 
 include!("ipc_deadline.inc");
+include!("ipc_prepared.inc");
 
 #[cfg(unix)]
 #[derive(Debug)]
@@ -881,6 +880,7 @@ pub struct UnixBrokerEndpoint {
     socket_identity: BrokerSocketIdentity,
     trusted_service_uid: u32,
     _lifecycle_lock: File,
+    prepared: PreparedIpcSlot,
 }
 
 #[cfg(unix)]
@@ -943,6 +943,7 @@ impl UnixBrokerEndpoint {
             socket_identity,
             trusted_service_uid,
             _lifecycle_lock: lifecycle_lock,
+            prepared: PreparedIpcSlot::default(),
         };
         provisional_cleanup.disarm();
         Ok(endpoint)
@@ -959,19 +960,17 @@ impl UnixBrokerEndpoint {
             .map_err(|error| BrokerError::Storage(format!("IPC accept failed: {error}")))?;
         match self.serve_stream(stream) {
             Ok(()) => Ok(BrokerIpcServeOutcome::ResponseWritten),
-            Err(BrokerIpcServeFailure::Client(error)) => {
-                Ok(BrokerIpcServeOutcome::ClientFault {
-                    diagnostic_code: error.diagnostic_code(),
-                })
-            }
+            Err(BrokerIpcServeFailure::Client(error)) => Ok(BrokerIpcServeOutcome::ClientFault {
+                diagnostic_code: error.diagnostic_code(),
+            }),
             Err(BrokerIpcServeFailure::Internal(error)) => Err(error),
         }
     }
 
     pub fn set_nonblocking(&self, nonblocking: bool) -> Result<()> {
-        self.listener.set_nonblocking(nonblocking).map_err(|error| {
-            BrokerError::Storage(format!("IPC listener mode failed: {error}"))
-        })
+        self.listener
+            .set_nonblocking(nonblocking)
+            .map_err(|error| BrokerError::Storage(format!("IPC listener mode failed: {error}")))
     }
 
     /// Serve at most one connection from a nonblocking listener.
@@ -1023,9 +1022,11 @@ impl UnixBrokerEndpoint {
         let request = decode_canonical_ipc_request(frame.as_slice())
             .map_err(BrokerIpcServeFailure::Client)?;
         if request.authorization.is_empty() || request.authorization.len() > 65_536 {
-            return Err(BrokerIpcServeFailure::Client(BrokerError::AuthorizationDenied(
-                "IPC operation authorization is missing or oversized".to_string(),
-            )));
+            return Err(BrokerIpcServeFailure::Client(
+                BrokerError::AuthorizationDenied(
+                    "IPC operation authorization is missing or oversized".to_string(),
+                ),
+            ));
         }
         validate_identifier(&request.tenant_scope, "IPC tenant scope", 512)
             .map_err(BrokerIpcServeFailure::Client)?;
@@ -1035,9 +1036,13 @@ impl UnixBrokerEndpoint {
             )));
         }
         let operation = request.operation;
+        if operation == IpcOperation::PrepareConnection {
+            return self.prepare_connection(stream, request);
+        }
         let handled = match operation {
             IpcOperation::RegisterAttempt => self.handler.register_attempt(request),
             IpcOperation::PrepareDispatch => self.handler.prepare_dispatch(request),
+            IpcOperation::PrepareConnection => self.handler.prepare_connection(request),
             IpcOperation::ReleaseAttempt => self.handler.release_attempt(request),
             IpcOperation::Issue => self.handler.issue(request),
             IpcOperation::Revoke => self.handler.revoke(request),
@@ -1066,7 +1071,9 @@ fn validate_broker_peer_uid(
     authorized_client_uid: u32,
 ) -> Result<()> {
     let credentials = rustix::net::sockopt::socket_peercred(stream).map_err(|error| {
-        BrokerError::Storage(format!("broker IPC client credential lookup failed: {error}"))
+        BrokerError::Storage(format!(
+            "broker IPC client credential lookup failed: {error}"
+        ))
     })?;
     if credentials.uid.as_raw() != authorized_client_uid {
         return Err(BrokerError::AuthorizationDenied(
@@ -1105,10 +1112,7 @@ fn read_bounded_sensitive_frame(reader: &mut impl Read) -> Result<Zeroizing<Vec<
     Ok(frame)
 }
 
-fn read_sensitive_frame_body(
-    reader: &mut impl Read,
-    frame: &mut Zeroizing<Vec<u8>>,
-) -> Result<()> {
+fn read_sensitive_frame_body(reader: &mut impl Read, frame: &mut Zeroizing<Vec<u8>>) -> Result<()> {
     if let Err(error) = reader.read_exact(frame.as_mut_slice()) {
         frame.zeroize();
         return Err(BrokerError::InvalidRequest(format!(
@@ -1164,5 +1168,9 @@ mod tests {
     include!("tests_01.rs");
     include!("tests_02.rs");
     include!("tests_03.rs");
+    #[cfg(target_os = "linux")]
+    mod prepared_connection_tests {
+        include!("tests_prepared.rs");
+    }
     include!("tests_authority_time.rs");
 }

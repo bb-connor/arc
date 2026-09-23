@@ -1,7 +1,7 @@
 //! Kernel-owned delivery over the independently configured broker control port.
+use super::delivery::CapturedBrokerDelivery;
 use super::original::OriginalBrokerRequest;
 use super::{canonical, rejected, trusted_now_ms, BrokerNativeCaptureReader};
-use crate::budget::CaptureExecutionHoldRequest;
 use crate::kernel_admission::BrokerAdmissionParticipant;
 use crate::{BrokerError, Result};
 use chio_kernel::admission_operation::{AdmissionOperationId, AdmissionOperationState};
@@ -10,6 +10,11 @@ use chio_kernel::{
     BlockingToolServerConnection, KernelError, ToolDispatchContext, ToolInvocationContext,
 };
 use std::sync::Arc;
+
+#[cfg(unix)]
+mod mcp;
+#[cfg(unix)]
+pub use mcp::{BrokerMcpConnection, BrokerMcpToolConnection};
 
 /// Install through `BlockingToolServerAdapter`. Registration and preparation
 /// use the selected privileged broker port; execution additionally requires a
@@ -57,6 +62,31 @@ impl BrokerKernelConnection {
     }
 
     fn prepare(&self, context: &ToolDispatchContext) -> Result<()> {
+        let (registration, execute) = self.prepared_registration(context)?;
+        self.participant
+            .client
+            .prepare_dispatch(&registration, &execute)?;
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    fn prepare_connection(
+        &self,
+        context: &ToolDispatchContext,
+    ) -> Result<std::os::unix::net::UnixStream> {
+        let (registration, execute) = self.prepared_registration(context)?;
+        self.participant
+            .client
+            .prepare_dispatch_connection(&registration, &execute)
+    }
+
+    fn prepared_registration(
+        &self,
+        context: &ToolDispatchContext,
+    ) -> Result<(
+        crate::store::AttemptRegistration,
+        crate::protocol::BrokerExecuteRequest,
+    )> {
         let now = trusted_now_ms()?;
         let original = self.original_delivery(context, now)?;
         if !matches!(
@@ -75,10 +105,7 @@ impl BrokerKernelConnection {
         if custody.invocation_state != BudgetInvocationState::Authorized {
             return Err(rejected());
         }
-        self.participant
-            .client
-            .prepare_dispatch(&registration, &original.execute)?;
-        Ok(())
+        Ok((registration, original.execute))
     }
 
     fn execute(
@@ -86,6 +113,19 @@ impl BrokerKernelConnection {
         context: &ToolInvocationContext,
         arguments: serde_json::Value,
     ) -> Result<serde_json::Value> {
+        let delivery = self.validate_delivery(context, &arguments)?;
+        // The daemon still checks current parent/revocation authority and owns
+        // provider deduplication. This connector never retries a lost reply.
+        let response = self.participant.client.execute(&delivery.execute)?;
+        delivery.verify_response(self.participant.as_ref(), &response)?;
+        serde_json::to_value(response).map_err(|_| rejected())
+    }
+
+    fn validate_delivery(
+        &self,
+        context: &ToolInvocationContext,
+        arguments: &serde_json::Value,
+    ) -> Result<CapturedBrokerDelivery> {
         let now = trusted_now_ms()?;
         let dispatch = context.dispatch().ok_or_else(rejected)?;
         let original = self.original_delivery(dispatch, now)?;
@@ -99,43 +139,12 @@ impl BrokerKernelConnection {
             || context.capability_hash()
                 != chio_core_types::crypto::sha256_hex(&canonical(&request.capability)?)
             || dispatch.caller_capability_sha256() != Some(context.capability_hash())
-            || canonical(&arguments)? != canonical(&original.execute)?
+            || canonical(arguments)? != canonical(&original.execute)?
         {
             return Err(rejected());
         }
-        let registration = self
-            .reader
-            .registration_for_original(self.participant.as_ref(), &original)?
-            .ok_or_else(rejected)?;
-        let custody = original.custody.as_ref().ok_or_else(rejected)?;
-        if custody.invocation_state != BudgetInvocationState::Captured {
-            return Err(rejected());
-        }
-        let revocation_ids = custody.admission.revocation_set.ids().to_vec();
-        let capture = CaptureExecutionHoldRequest {
-            operation_id: registration.ids.operation_id,
-            invocation_id: registration.invocation_id,
-            parent_capability_id: registration.parent_capability_id,
-            broker_capability_id: registration.broker_capability_id,
-            hold_id: registration.ids.hold_id,
-            capture_event_id: registration.ids.capture_event_id,
-            revocation_set_digest: crate::revocation::digest_canonical_revocation_ids(
-                &revocation_ids,
-            )?,
-            revocation_ids,
-            authority_metadata_digest: registration.authority_metadata_digest,
-            authorization_artifact_digest: crate::capability::capability_digest(
-                &original.execute.capability,
-            )?,
-        };
         self.reader
-            .read_capture_for_original(&capture, &original, now)?
-            .ok_or_else(rejected)?;
-        // The broker rechecks live parent/revocation authority and its original
-        // prepared state, and owns durable provider deduplication. Historical
-        // capture readback alone never reaches this kernel-context entry point.
-        let response = self.participant.client.execute(&original.execute)?;
-        serde_json::to_value(response).map_err(|_| rejected())
+            .captured_delivery(self.participant.as_ref(), &original, now)
     }
 }
 

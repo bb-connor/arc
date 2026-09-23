@@ -190,10 +190,22 @@ EOF
 )" cargo test --locked -p chio-secret-broker --lib authority_rpc_completion_
 
 if [[ "$(uname -s)" == "Linux" ]]; then
-  run_tests "native kernel broker daemon and TLS provider" yes \
-    "process_boundary_tests::native::native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_crossing" \
+  run_tests "prepared broker descriptor binding and deadlines" yes "$(cat <<'EOF'
+service::tests::prepared_connection_tests::prepared_connection_expiry_eof_and_trickle_release_capacity
+service::tests::prepared_connection_tests::prepared_connection_lifetime_respects_capability_and_nonce_expiry
+service::tests::prepared_connection_tests::prepared_connection_rejects_unauthorized_capacity_and_substituted_frames
+service::tests::prepared_connection_tests::prepared_connection_waits_without_blocking_control_and_executes_once
+EOF
+)" cargo test --locked -p chio-secret-broker --lib prepared_connection_tests::
+
+  run_tests "native kernel broker daemon, MCP and TLS provider" yes "$(cat <<'EOF'
+process_boundary_tests::native::native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_crossing
+process_boundary_tests::native::native_kernel_broker_mcp_tool_keeps_capture_on_lost_or_invalid_completion
+process_boundary_tests::native::native_kernel_broker_mcp_tool_preserves_original_capture_and_signed_completion
+EOF
+)" \
     cargo test --locked -p chio-secret-broker --features kernel-admission --lib \
-    process_boundary_tests::native::native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_crossing
+    process_boundary_tests::native::
 fi
 
 run_tests "kernel broker capability and composite quota admission" yes "$(cat <<'EOF'

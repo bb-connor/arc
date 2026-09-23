@@ -31,6 +31,8 @@ mod capture;
 pub use capture::{
     BrokerKernelAdmissionAuthority, BrokerKernelConnection, BrokerNativeCaptureReader,
 };
+#[cfg(unix)]
+pub use capture::{BrokerMcpConnection, BrokerMcpToolConnection};
 mod live_authority;
 pub use live_authority::BrokerKernelAuthorityHandler;
 

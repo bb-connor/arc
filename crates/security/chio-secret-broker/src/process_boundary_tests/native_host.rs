@@ -2,7 +2,7 @@
 use super::*;
 use crate::kernel_admission::{
     BrokerAdmissionParticipant, BrokerKernelAuthorityHandler, BrokerKernelConnection,
-    BrokerNativeCaptureReader, BrokerQuotaVerifier, BrokerQuotaVerifierConfig,
+    BrokerMcpConnection, BrokerNativeCaptureReader, BrokerQuotaVerifier, BrokerQuotaVerifierConfig,
 };
 use chio_control_plane::security::adapters::{FlowResolverConfig, NativeFlowResolver};
 use chio_core_types::capability::aggregate_invocation::{
@@ -52,6 +52,7 @@ impl NativeHost {
         broker_pid: u32,
         keys: (&Keypair, &Keypair, &Keypair),
         mut execute: BrokerExecuteRequest,
+        tool: Option<Arc<dyn crate::kernel_admission::BrokerMcpToolConnection>>,
     ) -> TestResult<Self> {
         let (issuer, caller, authority_signer) = keys;
         let locks = directory.join("kernel-locks");
@@ -215,16 +216,19 @@ impl NativeHost {
             participant.clone(),
             participant.binding().clone(),
         )?;
-        kernel.register_tool_server(Box::new(BlockingToolServerAdapter::new(Arc::new(
-            BrokerKernelConnection::new(
-                BrokerNativeCaptureReader::new(
-                    &authority,
-                    native.clone(),
-                    participant.binding().clone(),
-                )?,
-                participant.clone(),
+        let connection = Arc::new(BrokerKernelConnection::new(
+            BrokerNativeCaptureReader::new(
+                &authority,
+                native.clone(),
+                participant.binding().clone(),
             )?,
-        ))?));
+            participant.clone(),
+        )?);
+        let connection: Box<dyn chio_kernel::ToolServerConnection> = match tool {
+            Some(tool) => Box::new(BrokerMcpConnection::new(connection, tool)?),
+            None => Box::new(BlockingToolServerAdapter::new(connection)?),
+        };
+        kernel.register_tool_server(connection);
         let kernel = Arc::new(kernel);
         let handler = Arc::new(BrokerKernelAuthorityHandler::new(
             &authority,

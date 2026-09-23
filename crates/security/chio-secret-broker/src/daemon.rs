@@ -635,6 +635,16 @@ impl BrokerIpcHandler for BrokerDaemonHandler {
         accepted_response(IpcOperation::PrepareDispatch, &acknowledgement)
     }
 
+    fn prepare_connection(&self, mut request: AuthenticatedIpcRequest) -> Result<IpcResponse> {
+        self.validate_envelope(&request, IpcOperation::PrepareConnection)?;
+        // The same signed registration, live authority, and original request
+        // checks apply before a descriptor may wait for native capture.
+        request.operation = IpcOperation::PrepareDispatch;
+        let mut response = self.prepare_dispatch(request)?;
+        response.operation = IpcOperation::PrepareConnection;
+        Ok(response)
+    }
+
     fn release_attempt(&self, request: AuthenticatedIpcRequest) -> Result<IpcResponse> {
         self.validate_envelope(&request, IpcOperation::ReleaseAttempt)?;
         let authenticated: AuthenticatedAttemptRequest =

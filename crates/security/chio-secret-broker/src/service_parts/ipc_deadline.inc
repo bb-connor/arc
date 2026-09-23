@@ -79,7 +79,10 @@ impl<S: BrokerIpcDeadlineStream> BrokerIpcDeadlineIo<S> {
     fn new(stream: S, deadlines: BrokerIpcDeadlines) -> std::io::Result<Self> {
         let accepted_at = Instant::now();
         let read_deadline = accepted_at.checked_add(deadlines.read).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidInput, "IPC read deadline overflow")
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "IPC read deadline overflow",
+            )
         })?;
         stream.set_broker_read_timeout(Some(deadlines.read))?;
         stream.set_broker_write_timeout(Some(deadlines.write))?;
@@ -95,6 +98,10 @@ impl<S: BrokerIpcDeadlineStream> BrokerIpcDeadlineIo<S> {
 
     fn stream(&self) -> &S {
         &self.stream
+    }
+
+    fn into_inner(self) -> S {
+        self.stream
     }
 
     fn read_deadline_setup_failed(&self) -> bool {
@@ -116,13 +123,15 @@ impl<S: BrokerIpcDeadlineStream> BrokerIpcDeadlineIo<S> {
         let deadline = match self.write_deadline {
             Some(deadline) => deadline,
             None => {
-                let deadline = Instant::now().checked_add(self.write_budget).ok_or_else(|| {
-                    self.write_deadline_setup_failed = true;
-                    std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        "IPC write deadline overflow",
-                    )
-                })?;
+                let deadline = Instant::now()
+                    .checked_add(self.write_budget)
+                    .ok_or_else(|| {
+                        self.write_deadline_setup_failed = true;
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            "IPC write deadline overflow",
+                        )
+                    })?;
                 self.write_deadline = Some(deadline);
                 deadline
             }

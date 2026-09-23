@@ -13,12 +13,12 @@ below retain their historical source boundaries.
 | Area | Current evidence | Remaining boundary |
 | --- | --- | --- |
 | Foundation | The complete `b9c43fede2` workspace run terminated with three failed targets. The two CLI fixture/custody defects are repaired; the affected CLI integrations and all 91 runtime-admission cases pass. | One nested declassification capture case failed in the full run, then passed in isolation and on x86. Its cause remains unresolved. Final workspace tests and strict lint remain required. |
-| Dependency and source policy | Reviewed AWS-LC repairs and exact audits remain selected. Exact, expiring exceptions cover 34 inspected upstream text occurrences; the scanner passes on a clean source export and rejects new incomplete code. Current generated coverage has 59 rows and 170 artifacts. Structural image contract and mutation checks pass for lock digest `61c14992aa8551f0189cf7781cfba3defdb47fff09fec95ec2453580a5299c53`. | Preserve audit scope and qualify final hosted inputs. Prep's untracked diagnostic log remains separate from the source export. Mirror matching is not a solver proof. |
+| Dependency and source policy | Reviewed AWS-LC repairs and exact audits remain selected. Exact, expiring exceptions cover 34 inspected upstream text occurrences; the scanner passes on a clean source export and rejects new incomplete code. Current generated coverage has 59 rows and 170 artifacts. Structural image contract and mutation checks pass for lock digest `4eee6f2fb7d278d9c22b6fad695c732cd57185bf198c3312cb590da11a773e87`. | Preserve audit scope and qualify final hosted inputs. Prep's untracked diagnostic log remains separate from the source export. Mirror matching is not a solver proof. |
 | Fuzz compilation | All 30 targets compiled with ASan on x86_64 at `84c0ca4e89`; retained log hash matches. | Required fuzz campaigns and final-source requirements remain separate. |
 | Cage | The `84c0ca4e89` native run reports 69 tests, 26 real probes and ten mutants with exit 0; retained log hash matches. | The retained runner's release-helper adaptation and trusted capture require their own acceptance. |
 | M5 | Original nonce custody, receipt checkpoints and inclusion proofs are implemented. Runtime `317b3a9128` with qualifier `6170900d7f` passed all seven native scenarios and rejected 15 substitutions; a separately built aarch64 observer verified both inventories. | Final source, combined-foundation qualification and independently authorized trusted-runner acceptance remain open. The artifact does not claim full M5 acceptance. |
 | Image | Source `6170900d7f` built and passed identity, ownership, toolchain and offline locked-dependency checks. Image ID: `sha256:f17db010c5e6e5e1d6ad8eea8ce97f8e2a530888a737e59bbb16afdfdb1a245a`; all 199 archive hashes and 225 package pins match. | The current lock and broker gate differ. Rebuild and validate those inputs before authorized publication, registry identity verification or trust-root rotation. |
-| M6 | Original broker registration, authenticated hold/capture readback and kernel-bound delivery are implemented. The live authority validates original signed parents through the kernel and reads the selected fenced revocation authority. All 161 broker library tests, the owning portable boundary gate and strict all-target kernel/store/broker/control-plane lint pass. The native kernel/daemon/TLS invocation covers three original quota members, exact replay, substitution refusal and broker-death fallback denial. | Keyring/cage composition, process cutpoints and complete artifact verification retain separate qualification. Component tests do not close M6. |
+| M6 | Original broker registration, live authority and physical capture bind direct and MCP completion. A privileged prepared descriptor survives final kernel authorization under its own bounded lifetime. All 167 broker library tests, the owning portable boundary gate and strict all-target kernel/store/broker/control-plane lint pass. Real daemon/TLS and child-tool paths cover three original quotas, exact replay, signed capture substitutions and lost or invalid completion. Four descriptor cases enforce authorization, capacity, expiry and ordinary frame deadlines. | The child path uses an MCP-shaped connection. Production stdio MCP/cage wiring, keyring composition, remaining process cutpoints and complete artifact verification retain separate qualification. Component tests do not close M6. |
 | M7 | At `6170900d7f`, deception passed 82 tests; response recovery, flow and temporal gates exited 0. Temporal covered 10 inventories and 40 exact cases; retrieved hashes match. | The security adversarial inventory is missing. Its 28 archived definitions and 35 selections need semantic migration and current consumer integration. |
 | M8 | At `84c0ca4e89`, ordinary/delayed-fsync retention and million-receipt recovery passed. Checkpoint repair `517e28d1c4` separately passed 335 receipt-store cases with three retained campaign/property ignores. A fresh million-entry campaign is running at frozen `d5884b4d87`. | The old scale campaign included a declared ten-second profiling sample and predates the checkpoint repair. The new campaign has no terminal result yet. Final-source recovery and the unreproduced #1045 liveness failure remain open. |
 | Hosted delivery | #1160 publishes the continuation. Main prerequisite #1168 is at `2fb4a6c1c8`; definition-only #1167 retains `88b9b2a3cb`. Original hosted failures remain recorded. | New-head qualification, independent review, protected integration and the exact source/definition/image/verifier authority transition remain required. |
@@ -37,6 +37,21 @@ deadline, observer deadline or success assertion was increased or weakened.
 Original failures and the full 161-case passing retry remain in the execution
 ledger. The changed capture implementation anchor was reviewed against
 `PostAdmissionDropGuard.tla`; concrete SQL integrity remains outside that model.
+
+The subsequent MCP composition exposed a distinct lifecycle problem: a raw
+preconnected descriptor expired during legitimate final kernel authorization
+and capture. The host now authenticates and prepares the exact original
+request before passing that descriptor to the selected tool transport. A fixed
+worker services one retained connection, bounded by 30 seconds and both signed
+capability and registered nonce expiry. Ordinary frame and response deadlines
+are unchanged. Completion must match the original signed capture; lost replies,
+altered bodies and extra MCP content retain unknown-outcome accounting and
+refuse retry. See the [prepared connection contract](broker-prepared-connections.md).
+The full library passed 167 cases in 290.15 seconds; the boundary gate also
+passed all three native process cases and five control-plane integrations.
+The existing source-policy scan passes on the staged source export, and the
+updated image input contract passes its complete mutation suite. This does not
+qualify a rebuilt execution image or the complete M6 topology.
 
 Retained native evidence is under
 `output/process-security-20260915/resume-20260921/oci-remote/`, including

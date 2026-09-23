@@ -138,6 +138,51 @@ impl BrokerIpcClient {
         registration: &AttemptRegistration,
         request: &BrokerExecuteRequest,
     ) -> Result<PrepareDispatchAcknowledgement> {
+        let (authorization, payload) = self.encode_preparation(registration, request)?;
+        let response = self.call(IpcOperation::PrepareDispatch, authorization, payload)?;
+        let acknowledgement: PrepareDispatchAcknowledgement =
+            decode_canonical_response(&response.response, "prepare-dispatch acknowledgement")?;
+        acknowledgement.validate_for(registration, request)?;
+        Ok(acknowledgement)
+    }
+
+    /// Prepare one authenticated connection for the exact original execute
+    /// request. The host may pass this descriptor into a confined tool without
+    /// giving that tool the privileged registration signer. The daemon retains
+    /// at most one such connection for at most 30 seconds or capability expiry,
+    /// whichever comes first. Execution still requires the original capture.
+    #[cfg(unix)]
+    pub fn prepare_dispatch_connection(
+        &self,
+        registration: &AttemptRegistration,
+        request: &BrokerExecuteRequest,
+    ) -> Result<UnixStream> {
+        let (authorization, payload) = self.encode_preparation(registration, request)?;
+        let operation = IpcOperation::PrepareConnection;
+        let encoded = canonical_ipc_request_bytes(&AuthenticatedIpcRequest {
+            operation,
+            tenant_scope: self.config.tenant_scope.clone(),
+            authorization: authorization.into(),
+            payload: payload.into(),
+        })?;
+        let mut stream = self.connect_authenticated()?;
+        let (response, _) = exchange_ipc_envelope(&mut stream, operation, &encoded)?;
+        if !response.accepted {
+            return Err(BrokerError::AuthorizationDenied(
+                "broker declined the prepared execution connection".into(),
+            ));
+        }
+        let acknowledgement: PrepareDispatchAcknowledgement =
+            decode_canonical_response(&response.response, "prepare-dispatch acknowledgement")?;
+        acknowledgement.validate_for(registration, request)?;
+        Ok(stream)
+    }
+
+    fn encode_preparation(
+        &self,
+        registration: &AttemptRegistration,
+        request: &BrokerExecuteRequest,
+    ) -> Result<(Vec<u8>, Vec<u8>)> {
         registration.validate()?;
         let authenticated = AuthenticatedAttemptRequest {
             registration: registration.clone(),
@@ -159,11 +204,7 @@ impl BrokerIpcClient {
                 "prepare-dispatch authorization encoding failed: {error}"
             ))
         })?;
-        let response = self.call(IpcOperation::PrepareDispatch, authorization, payload)?;
-        let acknowledgement: PrepareDispatchAcknowledgement =
-            decode_canonical_response(&response.response, "prepare-dispatch acknowledgement")?;
-        acknowledgement.validate_for(registration, request)?;
-        Ok(acknowledgement)
+        Ok((authorization, payload))
     }
 
     pub fn release_attempt(
@@ -216,6 +257,15 @@ impl BrokerIpcClient {
         let (authorization, payload) = encode_execute_call(request)?;
         let response = self.call_envelope(IpcOperation::Execute, authorization, payload)?;
         decode_execute_outcome(request, &response, &self.config.trusted_receipt_signer)
+    }
+
+    #[cfg(feature = "kernel-admission")]
+    pub(crate) fn validate_completed_response(
+        &self,
+        request: &BrokerExecuteRequest,
+        response: &BrokerExecuteResponse,
+    ) -> Result<()> {
+        validate_execute_response(request, response, &self.config.trusted_receipt_signer)
     }
 
     /// Execute one request over a caller-authenticated, deadline-bounded stream.
