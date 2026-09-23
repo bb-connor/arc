@@ -1,6 +1,6 @@
 # Combined process and M4 qualification
 
-## Current checkpoint (2026-09-22)
+## Current checkpoint (2026-09-23)
 
 The continuation is on draft PR #1160. Both required parents remain ancestors. The primary
 checkout was fast-forwarded after its frozen workspace run terminated;
@@ -12,17 +12,30 @@ below retain their historical source boundaries.
 
 | Area | Current evidence | Remaining boundary |
 | --- | --- | --- |
-| Foundation | The complete `b9c43fede2` workspace run terminated with three failed targets. The two CLI fixture/custody defects are repaired; the affected CLI integrations and all 91 runtime-admission cases pass. | One nested declassification capture case failed in the full run, then passed in isolation and on x86. Its cause remains unresolved. Final workspace tests and strict lint remain required. |
-| Dependency and source policy | Reviewed AWS-LC repairs and exact audits remain selected. Exact, expiring exceptions cover 34 inspected upstream text occurrences; the scanner passes on a clean source export and rejects new incomplete code. Current generated coverage has 59 rows and 170 artifacts. Structural image contract and mutation checks pass for lock digest `332210447c8aefb07b786be0e85f018d3adc866a6093f6168fe140aea4c2d9b9`. The native MCP feature adds one existing-package dependency edge and changes no package version. | Preserve audit scope and qualify final hosted inputs. Prep's untracked diagnostic log remains separate from the source export. Mirror matching is not a solver proof. |
+| Foundation | The locked x86 workspace run at `36ddfcf69e` stopped on three CLI sandbox tests. Their original failure occurred before sandboxed code because the host lacked its Bubblewrap AppArmor profile. All three exact cases pass with the matching stock Ubuntu profile, unchanged namespace restrictions and capability-denied children. | The unchanged full workspace retry and strict Clippy remain in progress. Earlier failures and source identities remain retained separately. |
+| Dependency and source policy | Reviewed AWS-LC repairs and exact audits remain selected. Exact, expiring exceptions cover 34 inspected upstream text occurrences; the scanner passes on a clean source export and rejects new incomplete code. Current generated coverage has 59 rows and 170 artifacts. The root lock digest is `96a356e25cff74651fab9469f07177d410cfd17c303685c79a54b272121de852`; Docker lock regeneration changes no registry version. The runner handoff repair at `900f0ff639` passes the existing behavior, structural contract and full mutation suites. | Preserve audit scope and qualify final hosted inputs. Retained source archives remain separate from clean-source qualification. Mirror matching is not a solver proof. |
 | Fuzz compilation | All 30 targets compiled with ASan on x86_64 at `84c0ca4e89`; retained log hash matches. | Required fuzz campaigns and final-source requirements remain separate. |
 | Cage | The `84c0ca4e89` native run reports 69 tests, 26 real probes and ten mutants with exit 0; retained log hash matches. | The retained runner's release-helper adaptation and trusted capture require their own acceptance. |
 | M5 | Original nonce custody, receipt checkpoints and inclusion proofs are implemented. Runtime `317b3a9128` with qualifier `6170900d7f` passed all seven native scenarios and rejected 15 substitutions; a separately built aarch64 observer verified both inventories. | Final source, combined-foundation qualification and independently authorized trusted-runner acceptance remain open. The artifact does not claim full M5 acceptance. |
 | Image | Source `6170900d7f` built and passed identity, ownership, toolchain and offline locked-dependency checks. Image ID: `sha256:f17db010c5e6e5e1d6ad8eea8ce97f8e2a530888a737e59bbb16afdfdb1a245a`; all 199 archive hashes and 225 package pins match. | The current lock and broker gate differ. Rebuild and validate those inputs before authorized publication, registry identity verification or trust-root rotation. |
-| M6 | Original broker registration, live authority and physical capture bind direct and MCP completion. The new single-use native MCP connection retains the original prepared socket through the production cage launch factory and stdio adapter. The updated owning boundary gate, strict broker/adapter/CLI lint, socket-identity regression and nine ARM-applicable policy cases pass. The preceding prepared-connection checkpoint passed all 167 broker library tests. | The full confined stdio/provider/keyring invocation, remaining process cutpoints and complete artifact verification still need qualification. Positive descriptor retention policy cases are being qualified separately on Linux x86_64. ARM retains the existing native-enforcement refusal. Component tests do not close M6. |
+| M6 | The real confined kernel/broker/MCP/TLS invocation composes governed keyring issuance, witnessed rotation, contiguous synchronization and stale signer fencing. Three cold-process positive runs pass; the final two use exact `36ddfcf69e`. The next patch passes the expanded portable boundary gate, strict all-target broker Clippy and the real x86 confined positive plus all three broker-death cutpoints. Original parent, aggregate and broker charges remain captured after uncertain effects; replay cannot enter dispatch again. | Complete independently verified broker/keyring/cage artifact joins and the ordinary process-host integration remain open. Direct-host execution is not designated trusted capture. ARM retains the existing native-enforcement refusal. M6 is not complete. |
 | M7 | At `6170900d7f`, deception passed 82 tests; response recovery, flow and temporal gates exited 0. Temporal covered 10 inventories and 40 exact cases; retrieved hashes match. The 28 archived adversarial definitions and 35 campaign identities are restored as pending cases. Broker quota controls now target the owning SQLite composite authority; corpus consumers exclude pending cases from completed coverage. | All 35 campaigns need current-source control and caught-mutation evidence before promotion. Restored definitions and historical outcome hashes do not close M7. |
 | M8 | At frozen `d5884b4d87`, the fresh million-receipt recovery campaign passes in 6,869.58 seconds with 1,000,000 actual appends and no profiling intervention. It verifies integrity, pagination, backup, reopen, half archive, retained append and restored append. The unchanged 24-case retention property also passes under declared 25 ms fsync/fdatasync delay in 265.71 seconds. | Both results are tied to their frozen source. The delayed-sync diagnostic did not reproduce #1045, so its quarantine remains. Final-source qualification and the liveness repair remain open. |
 | Hosted delivery | #1160 publishes the continuation. Main prerequisite #1168 is at `2fb4a6c1c8`; definition-only #1167 retains `88b9b2a3cb`. Original hosted failures remain recorded. | New-head qualification, independent review, protected integration and the exact source/definition/image/verifier authority transition remain required. |
 | M9-M11 | Packaging and handoff work remains preserved. | No milestone-level M9-M10 acceptance or M11 operational promotion is established. |
+
+The broker-death patch is retained as full-index SHA-256
+`c5a4a390284a7550e11b7b2ede9a9d1d8170584b9a121871c9f0be5257c68407`
+on `900f0ff639`. Its test-only adapters interrupt the original production
+participant after registration, the transport after composite capture, or the
+broker after an independent TLS peer validates the actual request. The provider
+observes zero connections before send and exactly one authenticated request after
+send. Existing report-loss, substitution, credential-leak and replay assertions
+remain in the owning gate. The two confined tests pass in 81.87 seconds.
+Retrieved raw logs, build identities and terminal markers verify against
+`output/process-security-20260915/chio-broker-cutpoints-900f0ff639-20260923.tgz`,
+SHA-256 `f43cac431602a97a03b45e6c32af903c72d1daffcbd278e814d8379ba5a2eb54`.
+These observations do not grant retry authority or authorize release capture.
 
 The daemon integration exposed a clock-boundary rejection and repeated custody
 reads that exhausted the provider observer's ten-second accept deadline. The

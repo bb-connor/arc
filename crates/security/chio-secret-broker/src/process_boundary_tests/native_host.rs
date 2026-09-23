@@ -55,6 +55,7 @@ pub(super) struct NativeAuthority<'a> {
     pub caller: &'a Keypair,
     pub authority_signer: &'a Keypair,
     pub parent: Option<CapabilityToken>,
+    pub cutpoint: Option<Arc<cutpoints::Control>>,
 }
 
 pub(super) struct NativeHost {
@@ -83,6 +84,7 @@ impl NativeHost {
             caller,
             authority_signer,
             parent,
+            cutpoint,
         } = keys;
         let locks = directory.join("kernel-locks");
         fs::create_dir(&locks)?;
@@ -236,7 +238,7 @@ impl NativeHost {
         let selected = verifier.binding().clone();
         kernel.set_supplemental_quota_verifier(Arc::new(verifier), selected)?;
         kernel.set_supplemental_admission_participant(
-            participant.clone(),
+            cutpoints::wrap_participant(participant.clone(), cutpoint),
             participant.binding().clone(),
         )?;
         let connection = Arc::new(BrokerKernelConnection::new(

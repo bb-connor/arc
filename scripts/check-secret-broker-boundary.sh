@@ -224,6 +224,9 @@ EOF
 )" cargo test --locked -p chio-secret-broker --lib prepared_connection_tests::
 
   run_tests "native kernel broker daemon, MCP and TLS provider" yes "$(cat <<'EOF'
+process_boundary_tests::native::cutpoints::native_broker_death_after_capture_retains_all_quotas_without_effect
+process_boundary_tests::native::cutpoints::native_broker_death_after_provider_effect_retains_capture_and_refuses_replay
+process_boundary_tests::native::cutpoints::native_broker_death_after_registration_has_no_effect_or_capture
 process_boundary_tests::native::native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_crossing
 process_boundary_tests::native::native_kernel_broker_mcp_tool_keeps_capture_on_lost_or_invalid_completion
 process_boundary_tests::native::native_kernel_broker_mcp_tool_preserves_original_capture_and_signed_completion
@@ -288,10 +291,13 @@ if [[ "${mode}" == "--release" ]]; then
   export CHIO_BROKER_MCP_TOOL="$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/debug/chio-broker-mcp"
   export CHIO_KEYLOG_WITNESS="$CARGO_TARGET_DIR/debug/chio-keylog-witness"
   export CHIO_KEYLOG_AUDIT="$CARGO_TARGET_DIR/debug/chio-keylog-audit"
-  run_tests "confined native broker MCP and terminal cage receipts" yes \
-    "process_boundary_tests::native::confined::native_kernel_confined_broker_mcp_preserves_capture_and_terminal_receipts" \
+  run_tests "confined native broker MCP, process death and terminal cage receipts" yes "$(cat <<'EOF'
+process_boundary_tests::native::confined::native_kernel_confined_broker_mcp_preserves_capture_and_terminal_receipts
+process_boundary_tests::native::cutpoints::confined_broker_process_cutpoints_preserve_provider_and_quota_observations
+EOF
+)" \
     cargo test --locked -p chio-secret-broker --features real-linux-enforcement --lib \
-    process_boundary_tests::native::confined::native_kernel_confined_broker_mcp_preserves_capture_and_terminal_receipts
+    confined_broker_
 fi
 
 echo "Secret broker boundary gate passed"

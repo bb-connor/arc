@@ -12,6 +12,8 @@ use chio_kernel::{BudgetStore, ToolCallOutput, Verdict};
 #[cfg(feature = "real-linux-enforcement")]
 #[path = "native_confined.rs"]
 mod confined;
+#[path = "native_cutpoints.rs"]
+pub(super) mod cutpoints;
 #[path = "native_host.rs"]
 mod host;
 #[cfg(feature = "real-linux-enforcement")]
@@ -58,6 +60,14 @@ fn native_kernel_broker_mcp_tool_keeps_capture_on_lost_or_invalid_completion(
 fn run_native_delivery(
     route: DeliveryRoute,
     fault: Option<mcp::CompletionFault>,
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    run_native_delivery_with_cutpoint(route, fault, None)
+}
+
+fn run_native_delivery_with_cutpoint(
+    route: DeliveryRoute,
+    fault: Option<mcp::CompletionFault>,
+    crash: Option<cutpoints::Point>,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mcp_route = route != DeliveryRoute::Direct;
     let directory = crate::private_tempdir()?;
@@ -108,6 +118,7 @@ fn run_native_delivery(
     let mut child = command.spawn()?;
     let mut ready = child.stdin.take().ok_or("native broker start gate")?;
     let mut broker = ManagedChild::new(child);
+    let cutpoint = crash.map(|point| Arc::new(cutpoints::Control::new(point, broker.id(), &root)));
     let credential = CredentialRef {
         provider: CREDENTIAL_PROVIDER.into(),
         credential_id: CREDENTIAL_ID.into(),
@@ -166,9 +177,10 @@ fn run_native_delivery(
             caller: &caller,
             authority_signer: &authority_key,
             parent,
+            cutpoint: cutpoint.clone(),
         },
         execution_request(port, credential.clone(), &issuer, &caller),
-        connection,
+        connection.map(|connection| cutpoints::wrap_connection(connection, cutpoint.clone())),
         registry,
     )?;
     #[cfg(feature = "real-linux-enforcement")]
@@ -216,12 +228,47 @@ fn run_native_delivery(
         .env(FALLBACK_MARKER_ENV, &fixture.fallback_marker_path)
         .env(CANARY_LENGTH_ENV, probe.length.to_string())
         .env(CANARY_DIGEST_ENV, hex::encode(probe.sha256));
+    let observer = cutpoint
+        .as_ref()
+        .and_then(|control| control.start_observer(&mut upstream_command));
     let mut upstream = spawn_with_stdin(
         upstream_command,
         OwnedFd::from(listener),
         "native TLS observer",
     );
     let outcome = invoke();
+    if let Some(control) = cutpoint.as_ref() {
+        if let Some(observer) = observer {
+            observer
+                .join()
+                .map_err(|_| "provider cutpoint observer panicked")?;
+        }
+        assert!(
+            !matches!(&outcome, Ok(response) if response.verdict == Verdict::Allow),
+            "{crash:?}: {outcome:?}"
+        );
+        control.verify_capture_and_replay(
+            &host,
+            || matches!(invoke(), Ok(response) if response.verdict == Verdict::Allow),
+        )?;
+        let broker_output = broker.wait_output();
+        assert!(!broker_output.status.success());
+        assert_raw_absent(&canary, &broker_output.stdout, "killed broker stdout");
+        assert_raw_absent(&canary, &broker_output.stderr, "killed broker stderr");
+        write_private(&fixture.fallback_marker_path, b"complete");
+        control.verify_provider(&upstream.wait_output(), &host.execute, &canary)?;
+        #[cfg(feature = "real-linux-enforcement")]
+        if control.was_captured() {
+            if let Some(confined) = confined.as_ref() {
+                confined.verify_receipts(&canary)?;
+            }
+        }
+        scan_tree_for_raw_canary(&canary, &root);
+        scan_tree_for_raw_canary(&canary, kernel_directory.path());
+        scan_tree_for_raw_canary(&canary, tool_directory.path());
+        authority.stop();
+        return Ok(());
+    }
     if fault.is_none() && !matches!(&outcome, Ok(response) if response.verdict == Verdict::Allow) {
         #[cfg(feature = "real-linux-enforcement")]
         if let Some(confined) = confined.as_ref() {

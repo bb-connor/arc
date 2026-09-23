@@ -325,6 +325,10 @@ pub(super) fn run_fake_upstream_helper() {
     listener
         .set_nonblocking(true)
         .test_expect("upstream nonblocking listener");
+    #[cfg(feature = "kernel-admission")]
+    if super::native::cutpoints::observe_no_effect(&listener) {
+        return;
+    }
     let accept_deadline = Instant::now() + Duration::from_secs(10);
     let socket = loop {
         match listener.accept() {
@@ -394,10 +398,16 @@ pub(super) fn run_fake_upstream_helper() {
         .map(str::to_string)
         .collect::<Vec<_>>()
     );
-    stream
-        .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok")
-        .test_expect("upstream response");
-    stream.flush().test_expect("upstream response flush");
+    #[cfg(feature = "kernel-admission")]
+    let hold_response = super::native::cutpoints::hold_provider_response();
+    #[cfg(not(feature = "kernel-admission"))]
+    let hold_response = false;
+    if !hold_response {
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok")
+            .test_expect("upstream response");
+        stream.flush().test_expect("upstream response flush");
+    }
     drop(stream);
 
     let fallback_marker = PathBuf::from(required_environment(FALLBACK_MARKER_ENV));
