@@ -82,9 +82,27 @@ fn combined_deployment_binds_processes_paths_keys_and_store() {
 
 #[test]
 fn runtime_config_rejects_same_process_role_aliasing() {
-    let mut config = deployment().response_authority;
-    config.expected_client_peer = config.service_identity;
-    assert!(config.validate().is_err());
+    let original = deployment();
+    let authority = original.response_authority.service_identity;
+    for (user_id, group_id) in [
+        (authority.user_id, authority.group_id),
+        (authority.user_id + 1, authority.group_id),
+        (authority.user_id, authority.group_id + 1),
+        (authority.user_id + 1, authority.group_id + 1),
+    ] {
+        let mut combined = original.clone();
+        let client = PeerIdentity {
+            process_id: authority.process_id,
+            user_id,
+            group_id,
+        };
+        combined.response_authority.expected_client_peer = client;
+        combined.secret_broker.service_identity = client;
+        assert!(combined.response_authority.validate().is_err());
+        // Reject the invalid process boundary before an operator can bind it
+        // into a deployment digest, irrespective of the supplied credentials.
+        assert!(combined.compute_deployment_digest().is_err());
+    }
 }
 
 #[test]

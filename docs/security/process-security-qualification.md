@@ -74,6 +74,15 @@ The native evidence archive is
 `e3c4a9adf80fa56960a49f9cb4e650dbff7c3512b79347887a50a855eb04054e`.
 These owning checks do not establish a complete native installation.
 
+The dedicated response-authority configuration now rejects equal service and
+client PIDs even when their supplied UIDs or GIDs differ. The existing aliasing
+regression covers all four credential combinations at runtime validation and
+before computing the deployment digest. All eight configuration cases and
+strict all-target authority-crate Clippy pass. Native evidence is retained in
+`m7-authority-pid-20260923.tgz`, SHA-256
+`a107b9f685baec32578be9c65a8c04b887517b199dee5a8f66199226f824cc98`.
+The two-file authority change is outside the 50-library package closure below.
+
 The d621 M7 queue stopped after three caught and promoted campaigns before this
 integration changed its input closure. Its complete original inventory and raw
 outputs are retained in `m7-partial-d621-native-host-complete-20260923.tgz`,
@@ -98,6 +107,16 @@ and its unchanged 24-case configuration. It uses three libtest threads,
 The separate million-entry campaign was excluded. No failure or shrinking was
 observed. This diagnostic does not reproduce the original x86 CI hang or close
 #1045; the original MSRV job log and this run remain separately retained.
+
+The original CI environment sets `PROPTEST_CASES=256`, which overrides that
+nominal 24-case configuration. At the actual CI workload, a subsequent
+delayed-sync diagnostic passes all 256 head-property cases but encounters
+`SQLITE_FULL` after 72 successful retention cases. Its original log, persisted
+sequence and database files are retained under
+`m8-retention-ci-workload-a986606-20260923/`. The sequence passes on replay; a
+full retention retry traces failed storage syscalls after reclaiming completed
+build caches. The original hang and its cause remain unproven, and the
+quarantine remains in place.
 
 The Rust packaging continuation implements
 [`cargo xtask release rust-preview`](rust-preview-packages.md). It packages the
@@ -128,6 +147,18 @@ resolves 706 packages offline. Local evidence is under
 under the corresponding `m9-rust-consumer-20260923/` directory. The example uses
 explicit demonstration credentials and ephemeral transparency/revocation views;
 it does not claim native confinement or operational signing custody.
+
+The clean package at `6e4135a73d9ff4f391335f528ea7d40ebcf7e0b6` now also passes
+the complete external consumer check on Linux x86_64 with Rust 1.94.1. An empty
+Cargo home resolves all 706 dependencies offline; the locked build, actual
+allow/deny/three-signature/restart-replay execution and strict consumer Clippy
+all exit 0. Execution reports exactly one durable tool effect. Assembly records
+1,223 packages with `source_dirty=false`. Its package manifest SHA-256 is
+`9c4cfd8a29e8e2525f1fc02cea640c3135cd666b27ebe3be89cfa44214d15ed7`;
+the retained archive `m9-rust-consumer-6e4135a73d-20260923.tgz` has SHA-256
+`18390587c774f1ae75e1b42fff8349b21faa3a40d39b03607fcabec9773d54b0`.
+This qualifies the identified offline library package. Full confined-service
+installation and publication remain separate.
 
 The preparatory auditable build on `e621bb2040` completed native companions in
 38m59s and cage-init in 7m22s. The remaining old-source musl build was explicitly

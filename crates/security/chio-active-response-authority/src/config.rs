@@ -55,7 +55,7 @@ impl AuthorityRuntimeConfig {
             || self.store_digest.is_zero()
             || self.service_identity.process_id == 0
             || self.expected_client_peer.process_id == 0
-            || self.service_identity == self.expected_client_peer
+            || self.service_identity.process_id == self.expected_client_peer.process_id
             || self.service_identity.user_id != self.trusted_service_uid
             || self.authority_identity == self.trusted_client
             || self.timeout_ms == 0
