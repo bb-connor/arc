@@ -7,6 +7,7 @@
 //! manager sees exactly how the service stopped.
 
 pub mod credentials;
+pub mod descriptor_credentials;
 #[cfg(unix)]
 pub mod notify;
 #[cfg(unix)]
@@ -15,6 +16,9 @@ pub mod readiness;
 pub mod run;
 
 pub use credentials::{load_bindings, CredentialBinding};
+pub use descriptor_credentials::DescriptorCredentialBinding;
+#[cfg(unix)]
+pub use descriptor_credentials::DescriptorCredentials;
 #[cfg(unix)]
 pub use notify::Notifier;
 #[cfg(unix)]

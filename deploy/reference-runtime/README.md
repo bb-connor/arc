@@ -55,6 +55,29 @@ baseline is present, and the keylog example configs agree with the units.
    enforcement requires the signed profile and the supported Linux kernel;
    installing these files does not provision credentials or enable responses.
 
+   The broker and active-response authority consume binary credential files
+   through inherited descriptors. Their supervisor bindings append the actual
+   descriptor options to the daemon command, without putting key bytes in the
+   environment or argument list:
+
+   ```bash
+   chio security supervise --credentials-dir /run/credentials/chio-secret-broker.service \
+     --credential-fd master-key-fd=master-key \
+     --credential-fd signing-key-fd=signing-key \
+     --ready-unix-socket /run/chio/broker.sock \
+     -- chio-secret-brokerd --config /etc/chio/broker.json
+   chio security supervise --credentials-dir /run/credentials/chio-active-response.service \
+     --credential-fd signing-key-fd=signing-key \
+     --ready-unix-socket /run/chio/response-authority.sock \
+     -- chio-active-response-authorityd --config /etc/chio/response-authority.json
+   ```
+
+   Use the socket paths from the provisioned daemon configurations and declare
+   these credential names with `LoadCredential=` in the operator's units. Each
+   file must be private, singly linked and owned by the service user. Binary
+   bytes, including trailing newlines, are transferred unchanged. Descriptor
+   delivery supports supervised launch; it is incompatible with `--exec`.
+
    To build the existing supervision profile from source instead:
 
    ```bash

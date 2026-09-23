@@ -66,7 +66,7 @@ fn is_variable_name(variable: &str) -> bool {
         && chars.all(|c| c == '_' || c.is_ascii_alphanumeric())
 }
 
-fn is_credential_name(name: &str) -> bool {
+pub(super) fn is_credential_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= 255
         && !name.starts_with('.')

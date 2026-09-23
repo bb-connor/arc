@@ -44,6 +44,77 @@ fn stderr(output: &std::process::Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
 
+#[test]
+fn inherited_credentials_preserve_binary_bytes_and_distinct_descriptors() {
+    let directory = tempfile::tempdir().expect("credential directory");
+    let master = [0_u8, 255, b'\n', b' '];
+    let signing = [254_u8, 0, b'\r', 1];
+    write_credential(directory.path(), "master", &master);
+    write_credential(directory.path(), "signing", &signing);
+    let output = supervise(directory.path())
+        .args([
+            "--credential-fd", "master-key-fd=master",
+            "--credential-fd", "signing-key-fd=signing",
+            "--", "/bin/sh", "-c",
+            "test \"$1\" = --master-key-fd && test \"$3\" = --signing-key-fd && test \"$2\" != \"$4\" && cat /dev/fd/\"$2\" /dev/fd/\"$4\"",
+            "service",
+        ])
+        .output()
+        .expect("run descriptor service");
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert_eq!(output.stdout, [master, signing].concat());
+}
+
+#[test]
+fn unsafe_or_ambiguous_descriptor_credentials_refuse_service_start() {
+    let directory = tempfile::tempdir().expect("credential directory");
+    let marker = directory.path().join("started");
+    write_credential(directory.path(), "private", b"private test key");
+    write_credential(directory.path(), "exposed", b"exposed test key");
+    std::fs::set_permissions(
+        directory.path().join("exposed"),
+        std::fs::Permissions::from_mode(0o644),
+    )
+    .expect("expose fixture");
+    std::os::unix::fs::symlink("private", directory.path().join("alias")).expect("symlink");
+    std::fs::hard_link(
+        directory.path().join("private"),
+        directory.path().join("linked"),
+    )
+    .expect("hard link");
+    for binding in [
+        "signing-key-fd=exposed",
+        "signing-key-fd=alias",
+        "signing-key-fd=linked",
+        "signing-key-fd=../private",
+    ] {
+        let output = supervise(directory.path())
+            .args(["--credential-fd", binding, "--", "/usr/bin/touch"])
+            .arg(&marker)
+            .output()
+            .expect("refused descriptor launch");
+        assert!(!output.status.success());
+        assert!(!marker.exists(), "invalid credential started the service");
+    }
+    std::fs::remove_file(directory.path().join("linked")).expect("remove alias");
+    for supplied in ["--signing-key-fd", "--signing-key-fd=3"] {
+        let output = supervise(directory.path())
+            .args([
+                "--credential-fd",
+                "signing-key-fd=private",
+                "--",
+                "/usr/bin/touch",
+            ])
+            .arg(&marker)
+            .arg(supplied)
+            .output()
+            .expect("refused duplicate option");
+        assert!(!output.status.success());
+        assert!(stderr(&output).contains("already supplied"));
+        assert!(!marker.exists());
+    }
+}
+
 fn wait_with_deadline(child: &mut Child, deadline: Duration) -> std::process::ExitStatus {
     let started = Instant::now();
     loop {

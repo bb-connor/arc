@@ -9,7 +9,7 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use crate::supervise::CredentialBinding;
+use crate::supervise::{CredentialBinding, DescriptorCredentialBinding};
 use crate::CliError;
 
 /// Arguments for `chio security supervise`.
@@ -24,6 +24,11 @@ pub struct SuperviseArgs {
     /// Repeat for every secret; the variable must not be set already.
     #[arg(long = "credential-env", value_name = "VARIABLE=CREDENTIAL")]
     pub credential_env: Vec<CredentialBinding>,
+
+    /// Open a private binary credential and append --ARGUMENT FD to the
+    /// service command. Bytes stay out of environment variables and arguments.
+    #[arg(long = "credential-fd", value_name = "ARGUMENT=CREDENTIAL", conflicts_with = "exec")]
+    pub credential_fd: Vec<DescriptorCredentialBinding>,
 
     /// Report readiness once a GET of this operator-selected HTTP(S) URL succeeds.
     /// Redirects, userinfo and fragments are rejected; responses are limited to 64 KiB.
@@ -63,7 +68,8 @@ pub fn cmd_security_supervise(args: &SuperviseArgs) -> Result<(), CliError> {
     use std::time::Duration;
 
     use crate::supervise::{
-        exec_with_credentials, load_bindings, supervise, Exit, Notifier, Supervision,
+        exec_with_credentials, load_bindings, supervise, DescriptorCredentials, Exit, Notifier,
+        Supervision,
     };
 
     let Some((program, rest)) = args.command.split_first() else {
@@ -87,6 +93,9 @@ pub fn cmd_security_supervise(args: &SuperviseArgs) -> Result<(), CliError> {
     }
 
     let readiness = readiness(args, &credentials)?;
+    let descriptor_credentials =
+        DescriptorCredentials::load(args.credentials_dir.as_deref(), &args.credential_fd)
+            .map_err(|error| CliError::cli_other_error(format!("supervise: {error}")))?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -97,6 +106,7 @@ pub fn cmd_security_supervise(args: &SuperviseArgs) -> Result<(), CliError> {
         program: PathBuf::from(program),
         args: rest.to_vec(),
         environment: credentials,
+        descriptor_credentials,
         readiness,
         ready_timeout: Duration::from_secs(args.ready_timeout),
         stop_grace: Duration::from_secs(args.stop_grace),

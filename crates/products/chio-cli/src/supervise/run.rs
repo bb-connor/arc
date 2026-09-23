@@ -21,6 +21,7 @@ use tokio::signal::unix::{signal, Signal, SignalKind};
 
 use super::notify::Notifier;
 use super::readiness::{Readiness, ReadinessError};
+use super::DescriptorCredentials;
 
 const READINESS_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
@@ -29,6 +30,7 @@ pub struct Supervision {
     pub program: PathBuf,
     pub args: Vec<OsString>,
     pub environment: Vec<(String, String)>,
+    pub descriptor_credentials: DescriptorCredentials,
     pub readiness: Readiness,
     pub ready_timeout: Duration,
     pub stop_grace: Duration,
@@ -128,6 +130,7 @@ pub async fn supervise(supervision: Supervision) -> Result<Exit, SuperviseError>
         program,
         args,
         environment,
+        descriptor_credentials,
         readiness,
         ready_timeout,
         stop_grace,
@@ -135,12 +138,15 @@ pub async fn supervise(supervision: Supervision) -> Result<Exit, SuperviseError>
     } = supervision;
     let probe = readiness.prepare().map_err(SuperviseError::Readiness)?;
     let mut signals = StopSignals::install().map_err(SuperviseError::Signals)?;
-    let mut child = Command::new(&program)
-        .args(&args)
-        .envs(environment)
-        .kill_on_drop(true)
-        .spawn()
+    let mut command = Command::new(&program);
+    command.args(&args).envs(environment).kill_on_drop(true);
+    descriptor_credentials
+        .configure(command.as_std_mut())
         .map_err(SuperviseError::Spawn)?;
+    let mut child = command.spawn().map_err(SuperviseError::Spawn)?;
+    // The daemon now owns its inherited copies; retain no parent credential
+    // descriptors for the rest of its supervision lifetime.
+    drop(command);
     report(&notifier, |notifier| {
         notifier.status(&format!("starting, waiting for {}", readiness.describe()))
     });
@@ -235,6 +241,7 @@ mod tests {
             program: PathBuf::from("/bin/sh"),
             args: vec![OsString::from("-c"), OsString::from(script)],
             environment: vec![("CHIO_TEST_SECRET".to_string(), "from-credential".to_string())],
+            descriptor_credentials: DescriptorCredentials::default(),
             readiness: Readiness::Immediate,
             ready_timeout: Duration::from_secs(5),
             stop_grace: Duration::from_secs(5),

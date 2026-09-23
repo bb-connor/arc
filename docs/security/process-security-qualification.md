@@ -44,6 +44,20 @@ mirrors pass. The original shutdown deadlock, captured thread stacks, crash-stat
 failure, compile-path mistake, and fixture correction are retained separately
 from the passing retries under `output/process-security-20260915/m7-recovery-20260923/`.
 
+The M9 continuation adds the six runtime companion binaries, their SBOMs and
+digests, and provisioning assets to the Linux x86 release archive. A remote
+staging-mechanism check validates all seven real x86 executables and static
+confinement helpers. Its inputs are explicitly labeled historical `a24204b42b`
+debug binaries, so it does not qualify a current release build. The supervisor
+also implements `--credential-fd ARGUMENT=CREDENTIAL` for the broker and response
+authority: it transfers private, owned files through child-only inherited
+descriptors and supplies the actual descriptor numbers as daemon options.
+Nine process-supervision cases and four existing reference-unit cases pass,
+including exact binary bytes, distinct descriptors, unsafe-file refusal and
+conflicting-option refusal. Strict all-target CLI Clippy and source hygiene
+pass. Current release builds, full installation and the Rust registry package
+closure remain separate M9 work.
+
 The governed-host qualified full-index patch on `3dd65e1fba` is
 `47b5f18164ac39f4c48ec4debcaad14bd977724879d702462066c51a8a136f73`.
 Its real CLI case passes in 95.45 seconds, including witnessed rotation after
