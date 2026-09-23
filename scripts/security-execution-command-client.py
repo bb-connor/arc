@@ -12,7 +12,14 @@ from pathlib import Path
 
 MAX_HEADER_BYTES = 64 * 1024
 MAX_RESPONSE_BYTES = 16 * 1024 * 1024
-FORWARDED_EXACT = frozenset({"CARGO_TARGET_DIR", "LC_ALL", "RUSTFLAGS"})
+FORWARDED_EXACT = frozenset({
+    "CARGO_TARGET_DIR",
+    "CHIO_BROKER_MCP_TOOL",
+    "CHIO_KEYLOG_AUDIT",
+    "CHIO_KEYLOG_WITNESS",
+    "LC_ALL",
+    "RUSTFLAGS",
+})
 
 
 def read_line(connection: socket.socket) -> bytes:

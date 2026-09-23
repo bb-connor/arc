@@ -81,13 +81,13 @@ EXPECTED_CARGO_MUTANTS_LOCK_SHA256 = (
     "0810d8fe5d67224340e560656f51619cf8f78925a4bfeedd2e5f22d199ac92a4"
 )
 EXPECTED_SECURITY_ENTRYPOINT_SHA256 = (
-    "9ef4a772a4deed79fe182b57ef29db3ce55230e36b6c916f834f329bfd566d63"
+    "3cb6f4edeace2ef29a2cd35f5ac4b736ef3a5a6ed8e98379cbd5abc6c6157e4e"
 )
 EXPECTED_SECURITY_ENTRYPOINT_FUNCTION_GRAPH_SHA256 = (
-    "be133a9585857c0101e7a698661725ca171c4ab660a565190f923d46817f2d9c"
+    "d0da4a2df05b9c34922b0c1b47aedfae347ef1d7bf2abff34dab43a1c9a6316f"
 )
 EXPECTED_SECURITY_COMMAND_CLIENT_SHA256 = (
-    "51cfd01140812db5df3310271c0cc12e123d41ddea2e13e9f82b23cfaec18cde"
+    "f4002072a4c7be0b2f7e97cf8f196b0947561332dbd27aa1ec9302764f7d2d20"
 )
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_SHA256 = (
     "0e7f172fe2d9a2ae0001adaedff3eba89531c30b16ade761f32cfc09a6c49c38"
@@ -3026,6 +3026,15 @@ if forwarded:
     for key, value in forwarded.items():
         if key.startswith("CHIO_CAGE_"):
             environment[key] = value
+        elif key in {"CHIO_BROKER_MCP_TOOL", "CHIO_KEYLOG_AUDIT", "CHIO_KEYLOG_WITNESS"}:
+            helper = {
+                "CHIO_BROKER_MCP_TOOL": "x86_64-unknown-linux-musl/debug/chio-broker-mcp",
+                "CHIO_KEYLOG_AUDIT": "debug/chio-keylog-audit",
+                "CHIO_KEYLOG_WITNESS": "debug/chio-keylog-witness",
+            }[key]
+            if value != os.fspath(target / helper):
+                raise EntrypointError("candidate helper path differs from its built executable")
+            environment[key] = value
         elif key == "RUSTFLAGS":
             environment[key] = value
         elif key == "LC_ALL" and value == "C":
@@ -3939,7 +3948,14 @@ except BaseException as primary_error:
     if (
         command_client.splitlines()[0] != "#!/usr/bin/python3 -I"
         or literal_top_level_assignment(client_tree, "FORWARDED_EXACT")
-        != frozenset({"CARGO_TARGET_DIR", "LC_ALL", "RUSTFLAGS"})
+        != frozenset({
+            "CARGO_TARGET_DIR",
+            "CHIO_BROKER_MCP_TOOL",
+            "CHIO_KEYLOG_AUDIT",
+            "CHIO_KEYLOG_WITNESS",
+            "LC_ALL",
+            "RUSTFLAGS",
+        })
         or imports != {"json", "os", "socket", "sys"}
         or imported_names != {("__future__", "annotations"), ("pathlib", "Path")}
     ):

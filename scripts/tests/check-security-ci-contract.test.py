@@ -1225,6 +1225,24 @@ assert_boundary_file_rejected(
     "candidate command supervision control flow changed",
 )
 assert_boundary_file_rejected(
+    "security entrypoint rejects unchecked candidate helper paths",
+    Path("scripts/security-execution-container-entrypoint.py"),
+    replace_once(
+        "if value != os.fspath(target / helper):",
+        "if False:",
+    ),
+    "candidate environment forwarding changed",
+)
+assert_boundary_file_rejected(
+    "candidate command client rejects forwarding key material",
+    Path("scripts/security-execution-command-client.py"),
+    replace_once(
+        '    "CHIO_KEYLOG_WITNESS",',
+        '    "CHIO_KEYLOG_WITNESS",\n    "CHIO_KEYLOG_SEED",',
+    ),
+    "candidate command client authority changed",
+)
+assert_boundary_file_rejected(
     "security entrypoint rejects a later candidate-env mutation",
     Path("scripts/security-execution-container-entrypoint.py"),
     replace_once(

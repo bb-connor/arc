@@ -582,6 +582,15 @@ def candidate_environment(
         for key, value in forwarded.items():
             if key.startswith("CHIO_CAGE_"):
                 environment[key] = value
+            elif key in {"CHIO_BROKER_MCP_TOOL", "CHIO_KEYLOG_AUDIT", "CHIO_KEYLOG_WITNESS"}:
+                helper = {
+                    "CHIO_BROKER_MCP_TOOL": "x86_64-unknown-linux-musl/debug/chio-broker-mcp",
+                    "CHIO_KEYLOG_AUDIT": "debug/chio-keylog-audit",
+                    "CHIO_KEYLOG_WITNESS": "debug/chio-keylog-witness",
+                }[key]
+                if value != os.fspath(target / helper):
+                    raise EntrypointError("candidate helper path differs from its built executable")
+                environment[key] = value
             elif key == "RUSTFLAGS":
                 environment[key] = value
             elif key == "LC_ALL" and value == "C":

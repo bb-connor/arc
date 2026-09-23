@@ -36,6 +36,14 @@ if ENTRYPOINT_SPEC is None or ENTRYPOINT_SPEC.loader is None:
     raise SystemExit("unable to load security execution entrypoint")
 ENTRYPOINT = importlib.util.module_from_spec(ENTRYPOINT_SPEC)
 ENTRYPOINT_SPEC.loader.exec_module(ENTRYPOINT)
+CLIENT_SPEC = importlib.util.spec_from_file_location(
+    "security_execution_command_client",
+    ROOT / "scripts/security-execution-command-client.py",
+)
+if CLIENT_SPEC is None or CLIENT_SPEC.loader is None:
+    raise SystemExit("unable to load security execution command client")
+CLIENT = importlib.util.module_from_spec(CLIENT_SPEC)
+CLIENT_SPEC.loader.exec_module(CLIENT)
 
 
 def run(
@@ -86,31 +94,74 @@ def assert_rejected(label: str, callback) -> None:
     )
 
 
+def candidate_helper_environment_tests() -> None:
+    helpers = {
+        "CHIO_BROKER_MCP_TOOL": "/target/build/x86_64-unknown-linux-musl/debug/chio-broker-mcp",
+        "CHIO_KEYLOG_WITNESS": "/target/build/debug/chio-keylog-witness",
+        "CHIO_KEYLOG_AUDIT": "/target/build/debug/chio-keylog-audit",
+    }
+    forbidden = {
+        "CHIO_KEYLOG_SEED": "secret",
+        "CHIO_SECURITY_BROKER_TOKEN": "secret",
+        "LD_PRELOAD": "/tmp/hostile.so",
+        "RUSTC_WRAPPER": "/tmp/hostile",
+        "SOURCE_SHA": "f" * 40,
+    }
+    with mock.patch.dict(os.environ, helpers | forbidden, clear=True):
+        forwarded = CLIENT.forwarded_environment()
+    if forwarded != helpers:
+        raise AssertionError("candidate client did not forward exactly the helper paths")
+    candidate = ENTRYPOINT.candidate_environment(forwarded=forwarded)
+    if any(candidate.get(key) != value for key, value in helpers.items()):
+        raise AssertionError("candidate command lost an authorized helper path")
+    for key, authorized in helpers.items():
+        for invalid in (
+            "",
+            "debug/" + Path(authorized).name,
+            "/tmp/" + Path(authorized).name,
+            authorized.replace("/build/", "/build/../"),
+            authorized + "-substituted",
+            helpers[next(name for name in helpers if name != key)],
+        ):
+            try:
+                ENTRYPOINT.candidate_environment(forwarded={key: invalid})
+            except ENTRYPOINT.EntrypointError:
+                continue
+            raise AssertionError(f"candidate accepted substituted helper {key}: {invalid}")
+    for key, value in forbidden.items():
+        try:
+            ENTRYPOINT.candidate_environment(forwarded={key: value})
+        except ENTRYPOINT.EntrypointError:
+            continue
+        raise AssertionError(f"candidate accepted an unsafe environment key: {key}")
+
+
 def static_contract_tests() -> None:
     dockerfile = DOCKERFILE_PATH.read_text(encoding="utf-8")
     expected_base = (
-        "FROM --platform=linux/amd64 rust:1.93.0-alpine3.22@sha256:"
-        "efc08a6cc70a6ad8bdcf24176e3e0bdbbc7b984e7471fabf78b90de33b136f51"
+        "FROM --platform=linux/amd64 rust:1.94.1-alpine3.22@sha256:"
+        "667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67"
     )
     if expected_base not in dockerfile:
         raise AssertionError(
-            "security image base is not pinned to the reviewed Rust 1.93 digest"
+            "security image base is not pinned to the reviewed Rust 1.94.1 digest"
         )
     for marker in (
         "bash=5.2.37-r0",
         "security-evidence-apk.lock",
-        "1148e06bad43e30705b952c61d5d3a493b19b67be02ac281d8008df22dc05503",
-        "a78e673aa77a24f1e47fce31ba61cf4937450976da91e33c406476a5263742a1",
+        "86fad0ccb2b3f1cf2402c12ddade71d14b21e9995b3d113795259b899c0a57c0",
+        "637f50a513c887136bfd8c5b8ad946ee8c185f75041a1d9a091db998455efeda",
+        "a1492d1c91d82b8d2101220accedffb1c2af7c97ea0793915c4a97d5c3d7424b",
         "47040c9cded7996c38b9976af0a9c46c4902ec5eb59369fffec758410dba8028",
         "cargo install \\",
         "--path /tmp/cargo-mutants-25.3.1",
         "chmod 0755 /usr/local/cargo /usr/local/cargo/bin",
         "chmod 0555 /usr/local/cargo/bin/cargo-mutants",
-        'test "$(rustc --version)" = "rustc 1.93.0 (254b59607 2026-01-19)"',
-        'test "$(cargo clippy --version)" = "clippy 0.1.93 '
-        '(254b59607d 2026-01-19)"',
+        'test "$(rustc --version)" = "rustc 1.94.1 (e408947bf 2026-03-25)"',
+        'test "$(cargo clippy --version)" = "clippy 0.1.94 '
+        '(e408947bfd 2026-03-25)"',
         'test "$(cargo fmt --version)" = "rustfmt 1.8.0-stable '
-        '(254b59607d 2026-01-19)"',
+        '(e408947bfd 2026-03-25)"',
         'ENTRYPOINT ["/usr/bin/python3", "-I", "/opt/chio-security/entrypoint.py"]',
         "/opt/chio-security/command-client.py",
         "/opt/chio-security/verifier-bin/cargo",
@@ -2253,7 +2304,7 @@ exec "$real" "$@"
             raise AssertionError(
                 "candidate Cargo, target, temp, Python, or detached poison ran"
             )
-        if "cargo 1.93.0" not in cargo_log:
+        if "cargo 1.94.1" not in cargo_log:
             raise AssertionError("fresh disposable Cargo verification did not run")
         if "detached candidate quiescence verified" not in cargo_log:
             raise AssertionError("detached Cargo process quiescence was not verified")
@@ -2268,6 +2319,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    candidate_helper_environment_tests()
     static_contract_tests()
     copy_and_output_tests()
     refresh_inventory_tests()
