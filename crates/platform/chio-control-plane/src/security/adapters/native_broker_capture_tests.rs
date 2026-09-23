@@ -336,6 +336,14 @@ fn install_broker(
     let selected = verifier.binding().clone();
     // No broker transport is invoked by this custody-read test. Its production
     // configuration still determines the exact original participant identity.
+    #[cfg(unix)]
+    let (user_id, group_id) = (
+        rustix::process::geteuid().as_raw(),
+        rustix::process::getegid().as_raw(),
+    );
+    // Non-Unix custody tests retain a fixed configuration without opening IPC.
+    #[cfg(not(unix))]
+    let (user_id, group_id) = (0, 0);
     let registrar = Arc::new(BrokerAdmissionParticipant::new(
         chio_secret_broker::ipc_client::BrokerIpcClientConfig {
             socket_path: fixture._directory.path().join("b.sock"),
@@ -343,8 +351,8 @@ fn install_broker(
             timeout_ms: 1000,
             expected_peer: chio_secret_broker::ipc_client::BrokerPeerIdentity {
                 process_id: std::process::id(),
-                user_id: rustix::process::geteuid().as_raw(),
-                group_id: rustix::process::getegid().as_raw(),
+                user_id,
+                group_id,
             },
             trusted_receipt_signer: Keypair::from_seed(&[35; 32]).public_key(),
         },

@@ -4,8 +4,6 @@ pub mod audit;
 pub mod authority_ipc;
 pub mod budget;
 pub mod capability;
-#[cfg(feature = "conformance")]
-pub mod conformance;
 pub mod daemon;
 pub mod daemon_runtime;
 pub mod generic_https;

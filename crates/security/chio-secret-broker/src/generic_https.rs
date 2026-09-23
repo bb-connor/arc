@@ -181,7 +181,7 @@ impl GenericHttpsExecutor {
         })
     }
 
-    #[cfg(any(test, feature = "conformance"))]
+    #[cfg(test)]
     pub(crate) fn new(
         resolver: Arc<dyn DestinationResolver>,
         transport: Arc<dyn PinnedHttpsTransport>,

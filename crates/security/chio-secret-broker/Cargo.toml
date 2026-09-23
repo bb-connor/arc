@@ -20,7 +20,9 @@ name = "chio-broker-mcp"
 path = "src/bin/chio-broker-mcp.rs"
 
 [features]
-conformance = ["dep:chio-kernel"]
+# Compatibility selection for the production durable authority exercised by
+# the broker boundary gate. Conformance does not expose a second coordinator.
+conformance = ["kernel-admission"]
 kernel-admission = ["dep:chio-kernel", "dep:async-trait", "dep:tokio"]
 native-mcp = ["kernel-admission", "dep:chio-mcp-adapter", "dep:chio-manifest"]
 real-linux-enforcement = ["native-mcp"]

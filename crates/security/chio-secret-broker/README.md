@@ -32,6 +32,14 @@ prepare the durable broker attempt before the kernel's budget mutation, then
 join execution to the original committed capture. The verifier alone does not
 install that handoff or qualify the complete enterprise topology.
 
+The `conformance` feature is a compatibility alias for `kernel-admission`.
+The boundary gate exercises the original kernel operation with durable parent,
+aggregate and broker quotas, broker restart/replay behavior and sealed key
+custody. The obsolete standalone conformance coordinator has been removed;
+it had no remaining callers and depended on superseded budget APIs. Test-only
+migration bypasses and network policies remain unavailable to library consumers,
+including builds with all features enabled.
+
 ## Privileged migration audit
 
 `BrokerDaemonRuntime::audit_compare_outbound_request` supports a designated-runner migration check without entering the execution state machine. The underlying service operation is crate-private. The runtime verifies a short-lived `chio.broker-audit-runner-authorization.v1` artifact against the configured runner key and exact deployment, broker, tenant, provider, request, authority-domain, audit-id, source, and blinded-reference bindings. It then validates the production capability, caller proof, parent liveness, revocation snapshot, provider binding, request constraints, and destination. A threshold-governed approval for that exact runner artifact is durably consumed before credential materialization. Reuse is denied across process restarts.

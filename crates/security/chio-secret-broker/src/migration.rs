@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-#[cfg(any(test, feature = "conformance"))]
+#[cfg(test)]
 use std::collections::BTreeSet;
 #[cfg(test)]
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -175,7 +175,7 @@ impl BrokerMigrationEnforcer for ProductionBrokerMigrationEnforcer {
     }
 }
 
-#[cfg(any(test, feature = "conformance"))]
+#[cfg(test)]
 pub(crate) struct TestBrokerMigrationEnforcer {
     credential_providers: BTreeSet<String>,
     #[cfg(test)]
@@ -184,7 +184,7 @@ pub(crate) struct TestBrokerMigrationEnforcer {
     quota_enforcement_enforced: AtomicBool,
 }
 
-#[cfg(any(test, feature = "conformance"))]
+#[cfg(test)]
 impl TestBrokerMigrationEnforcer {
     pub(crate) fn new(credential_providers: impl IntoIterator<Item = String>) -> Arc<Self> {
         Arc::new(Self {
@@ -219,7 +219,7 @@ impl TestBrokerMigrationEnforcer {
     }
 }
 
-#[cfg(any(test, feature = "conformance"))]
+#[cfg(test)]
 impl BrokerMigrationEnforcer for TestBrokerMigrationEnforcer {
     fn ensure_ready(&self) -> Result<()> {
         let provider = self.credential_providers.first().ok_or_else(|| {
