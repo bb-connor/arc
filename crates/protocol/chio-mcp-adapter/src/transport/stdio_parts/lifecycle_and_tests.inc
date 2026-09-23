@@ -465,6 +465,35 @@ mod cage_launch_tests {
         std::iter::repeat_n(byte, 64).collect()
     }
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn prepared_broker_descriptor_rejects_another_socket_with_the_same_peer() {
+        use std::os::fd::OwnedFd;
+        use std::os::unix::fs::MetadataExt;
+        use std::os::unix::net::UnixStream;
+
+        // Both channels belong to this process. A duplicated descriptor must
+        // match, while a second channel from the same peer must be refused.
+        let (original, _original_peer) = UnixStream::pair().test_expect("original channel");
+        let (substitute, _substitute_peer) = UnixStream::pair().test_expect("substitute channel");
+        let retained = std::fs::File::from(OwnedFd::from(
+            original.try_clone().test_expect("retained socket"),
+        ));
+        let original_identity = retained.metadata().test_expect("original identity");
+        verify_prepared_broker_descriptor(
+            original_identity.dev(),
+            original_identity.ino(),
+            &original,
+        )
+        .test_expect("original retained");
+        assert!(verify_prepared_broker_descriptor(
+            original_identity.dev(),
+            original_identity.ino(),
+            &substitute,
+        )
+        .is_err());
+    }
+
     fn identity() -> chio_cage::FileIdentity {
         serde_json::from_value(serde_json::json!({
             "device": 1,

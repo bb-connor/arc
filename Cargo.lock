@@ -4955,6 +4955,7 @@ dependencies = [
  "chio-kernel",
  "chio-keyring",
  "chio-manifest",
+ "chio-mcp-adapter",
  "chio-secure-ipc",
  "chio-security-kernel",
  "chio-security-types",

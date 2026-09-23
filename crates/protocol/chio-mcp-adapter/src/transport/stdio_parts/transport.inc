@@ -87,9 +87,19 @@ struct ActiveCageReceiptPersistence {
 }
 
 impl ActiveCageReceiptPersistence {
-    fn bind_preparation(&mut self, bindings: chio_cage::CageReceiptBindings) -> Result<(), AdapterError> {
-        self.persistence.context = self.persistence.context.with_launch_bindings(&self.bindings, &bindings)
-            .map_err(|error| AdapterError::ConnectionFailed(format!("cage prepared receipt binding failed: {error}")))?;
+    fn bind_preparation(
+        &mut self,
+        bindings: chio_cage::CageReceiptBindings,
+    ) -> Result<(), AdapterError> {
+        self.persistence.context = self
+            .persistence
+            .context
+            .with_launch_bindings(&self.bindings, &bindings)
+            .map_err(|error| {
+                AdapterError::ConnectionFailed(format!(
+                    "cage prepared receipt binding failed: {error}"
+                ))
+            })?;
         self.bindings = bindings;
         Ok(())
     }
@@ -437,9 +447,50 @@ pub trait NativeMcpLaunchFactory:
         expected_server_id: &str,
         admitted_manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
     ) -> Result<NativeMcpLaunch, AdapterError>;
+
+    /// Retain the original authenticated broker connection in an enforced
+    /// launch. This must not connect to the broker again or fall back to a
+    /// legacy launch. Factories without this composition refuse by default.
+    #[cfg(target_os = "linux")]
+    fn prepare_broker_launch(
+        &self,
+        _command: &str,
+        _args: &[&str],
+        _expected_server_id: &str,
+        _admitted_manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+        _stream: std::os::unix::net::UnixStream,
+    ) -> Result<CageRequiredLaunch, AdapterError> {
+        Err(AdapterError::ConnectionFailed(
+            "prepared broker cage launch is not installed".to_string(),
+        ))
+    }
 }
 
 impl CageRequiredLaunch {
+    /// Verify that the factory retained this exact open prepared socket. The
+    /// same daemon can own many sockets, so peer identity alone is insufficient.
+    #[cfg(target_os = "linux")]
+    pub fn verify_prepared_broker_stream(
+        &self,
+        stream: &std::os::unix::net::UnixStream,
+    ) -> Result<(), AdapterError> {
+        if self.compiled.admitted().native_syscall_profile()
+            != chio_manifest::NativeSyscallProfile::BrokeredNativeV1
+        {
+            return Err(AdapterError::ConnectionFailed(
+                "prepared broker launch requires the brokered native profile".to_string(),
+            ));
+        }
+        self.compiled.verify_retained_bindings().map_err(|_| {
+            AdapterError::ConnectionFailed("prepared broker cage bindings changed".to_string())
+        })?;
+        let broker = self.compiled.broker_ipc().ok_or_else(|| {
+            AdapterError::ConnectionFailed("prepared broker descriptor is absent".to_string())
+        })?;
+        let identity = broker.identity();
+        verify_prepared_broker_descriptor(identity.device(), identity.inode(), stream)
+    }
+
     /// Bind a compiled cage to the same live registry that authorized it.
     ///
     /// Construction and launch both re-derive the non-forgeable cage
@@ -488,6 +539,28 @@ impl CageRequiredLaunch {
         self.launch_options = launch_options;
         self
     }
+}
+
+#[cfg(target_os = "linux")]
+fn verify_prepared_broker_descriptor(
+    expected_device: u64,
+    expected_inode: u64,
+    stream: &std::os::unix::net::UnixStream,
+) -> Result<(), AdapterError> {
+    use std::os::fd::OwnedFd;
+    use std::os::unix::fs::MetadataExt;
+
+    let mismatch = || {
+        AdapterError::ConnectionFailed(
+            "cage factory substituted the original prepared broker descriptor".to_string(),
+        )
+    };
+    let witness = std::fs::File::from(OwnedFd::from(stream.try_clone().map_err(|_| mismatch())?));
+    let metadata = witness.metadata().map_err(|_| mismatch())?;
+    if expected_device != metadata.dev() || expected_inode != metadata.ino() {
+        return Err(mismatch());
+    }
+    Ok(())
 }
 
 fn validate_cage_migration_identity(

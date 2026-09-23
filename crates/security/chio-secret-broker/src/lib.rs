@@ -14,6 +14,8 @@ pub mod ipc_client;
 #[cfg(feature = "kernel-admission")]
 pub mod kernel_admission;
 pub mod migration;
+#[cfg(all(feature = "native-mcp", target_os = "linux"))]
+pub mod native_mcp;
 pub mod privileged_audit;
 pub mod proof;
 pub mod protocol;

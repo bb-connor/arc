@@ -123,6 +123,10 @@ run_tests "broker execution concurrency and recovery" no \
   cargo test -p chio-secret-broker --test concurrency
 
 if [[ "$(uname -s)" == "Linux" ]]; then
+  run_tests "prepared broker cage descriptor identity" yes \
+    "transport::stdio::cage_launch_tests::prepared_broker_descriptor_rejects_another_socket_with_the_same_peer" \
+    cargo test --locked -p chio-mcp-adapter --lib prepared_broker_descriptor_
+
   run_tests "broker isolation secret boundary" no "$(cat <<'EOF'
 linux_process::brokerd_process_governed_provisioning_keeps_seeded_secret_inside_broker
 public_response_and_daemon_diagnostics_do_not_contain_seeded_credential
@@ -204,7 +208,7 @@ process_boundary_tests::native::native_kernel_broker_mcp_tool_keeps_capture_on_l
 process_boundary_tests::native::native_kernel_broker_mcp_tool_preserves_original_capture_and_signed_completion
 EOF
 )" \
-    cargo test --locked -p chio-secret-broker --features kernel-admission --lib \
+    cargo test --locked -p chio-secret-broker --features native-mcp --lib \
     process_boundary_tests::native::
 fi
 
@@ -222,7 +226,7 @@ kernel_admission::tests::registration::registration_quota_aliases_preserve_all_o
 kernel_admission::tests::signed_broker_request_cannot_move_between_kernel_requests
 kernel_admission::tests::signed_broker_request_produces_original_operation_bound_quota
 EOF
-)" cargo test --locked -p chio-secret-broker --features kernel-admission --lib kernel_admission::
+)" cargo test --locked -p chio-secret-broker --features native-mcp --lib kernel_admission::
 
 run_tests "native kernel broker custody and preparation" yes "$(cat <<'EOF'
 security::adapters::tests::native_flow::support::capture::broker::native_broker_capture_reads_only_original_operation_and_never_recharges

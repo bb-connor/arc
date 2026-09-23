@@ -37,7 +37,26 @@ The wrapper verifies both the response signature and its original capture
 metadata. A lost or invalid completion leaves the kernel's captured accounting
 in its unknown-outcome state; this layer neither retries nor refunds it.
 
-This API does not establish cage enforcement by itself. The process regression
-uses the existing child broker client and a real TLS peer through an MCP-shaped
-connection. Production stdio MCP/cage wiring, keyring composition, process
-cutpoints and complete artifact verification remain separate M6 requirements.
+The optional `native-mcp` feature provides `NativeBrokerMcpTool`, a connection
+owned for one invocation. It uses the production stdio adapter after preparing
+the broker descriptor. The selected factory must return an enforced brokered
+cage, retain the same open socket and match discovery to the signed manifest.
+Plain invocation, unbound caller context and connection reuse refuse delivery.
+The caller keeps this connection inside `BrokerMcpConnection` and drops its owner
+after a pre-dispatch refusal. Completion and failure shut down the child through
+the adapter's terminal-receipt path. Cancellation drops that same child owner;
+neither cancellation nor a failed terminal receipt permits redispatch.
+
+`NativeMcpLaunchFactory::prepare_broker_launch` refuses by default. The CLI's
+signed policy factory implements it by consuming the prepared descriptor. It
+checks the signed socket endpoint, the actual kernel peer credentials and the
+policy's enforcing migration state, without opening a replacement connection.
+An inherited-FD-only policy cannot be substituted for this signed endpoint.
+Native cage enforcement currently supports Linux x86_64; other architectures
+retain the existing refusal.
+
+The existing process regression still uses a child broker client and a real TLS
+peer through an MCP-shaped connection. Qualification of the new production
+stdio/cage composition, keyring composition, process cutpoints and complete
+artifact verification remain separate M6 requirements. The generic process host
+continues to refuse flow-required tools until their full runtime is installed.
