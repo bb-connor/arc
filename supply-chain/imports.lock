@@ -70,7 +70,7 @@ version = "0.1.0"
 audited_as = "0.1.2"
 
 [[unpublished.chio-cli]]
-version = "0.1.1-rc.1"
+version = "0.1.0"
 audited_as = "0.1.2"
 
 [[unpublished.chio-cohere-tools-adapter]]
