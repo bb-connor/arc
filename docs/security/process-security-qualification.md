@@ -69,6 +69,14 @@ The later `f6a3686c8a` queue caught and promoted two campaigns before stopping
 for the dependency reconciliation above. Its complete initial inventory and
 original raw outcomes are retained separately.
 
+The evidence validator now compares POSIX path components directly instead of
+rebuilding ancestor paths for every input. No content is cached or omitted;
+descriptor custody, symlink rejection and digest framing remain unchanged.
+Native profiling of the same two completed `f6a3686c8a` campaigns falls from
+187.121 to 73.944 seconds, with their original input bindings accepted and
+identical pending output. The full existing adversarial command contract and
+structural security-CI check pass, including path parity against `pathlib`.
+
 At `f6a3686c8a`, a concurrent delayed-sync diagnostic passes all 82 selected
 retention cases in 425.16 seconds, including the original quarantined property
 and its unchanged 24-case configuration. It uses three libtest threads,

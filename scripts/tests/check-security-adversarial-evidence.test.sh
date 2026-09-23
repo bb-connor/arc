@@ -63,6 +63,28 @@ sys.modules[module_spec.name] = checker
 module_spec.loader.exec_module(checker)
 
 
+def check_lexical_path_parity() -> None:
+    paths = [Path(value) for value in (
+        ".", "workspace", "workspace/tool", "workspace/../outside",
+        "/", "/workspace", "/workspace/tool", "/workspace-other/tool",
+        "/workspace/../outside", "/workspace/tool/../../outside", "//workspace/tool",
+    )]
+    for candidate in paths:
+        for base in paths:
+            try:
+                expected = candidate.relative_to(base)
+            except ValueError:
+                try:
+                    checker.lexical_relative_path(candidate, base)
+                except ValueError:
+                    continue
+                raise AssertionError(f"relative path escaped its base: {candidate}, {base}")
+            assert checker.lexical_relative_path(candidate, base) == expected
+
+
+check_lexical_path_parity()
+
+
 def write_json(path: Path, body: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")

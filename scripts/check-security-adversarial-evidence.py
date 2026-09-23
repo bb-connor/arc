@@ -344,7 +344,7 @@ def package_input_closure(
                 f"{raw_path}: Cargo input path cannot be resolved: {error}"
             ) from error
         try:
-            relative = path.relative_to(root)
+            relative = lexical_relative_path(path, root)
         except ValueError as error:
             raise EvidenceError(
                 f"{raw_path}: Cargo input symlink escaped the repository"
@@ -377,9 +377,25 @@ def package_input_closure(
     return inputs, visited_directories, absent_optional_paths
 
 
+def lexical_relative_path(path: Path, root: Path) -> Path:
+    """Match relative_to without constructing every POSIX ancestor path.
+
+    This is a component comparison, not a filesystem resolution. Callers still
+    reject parent traversal and open every directory through no-follow handles.
+    Keep pathlib's native comparison for non-POSIX path flavors.
+    """
+
+    if os.name != "posix":
+        return path.relative_to(root)
+    path_parts, root_parts = path.parts, root.parts
+    if path.anchor != root.anchor or path_parts[: len(root_parts)] != root_parts:
+        raise ValueError(f"{path} is not beneath {root}")
+    return Path(*path_parts[len(root_parts) :])
+
+
 def relative_input_path(root: Path, path: Path) -> PurePosixPath | None:
     try:
-        relative = path.relative_to(root)
+        relative = lexical_relative_path(path, root)
     except ValueError:
         return None
     return PurePosixPath(relative.as_posix())
@@ -397,11 +413,14 @@ def is_derived_or_state_input(relative: PurePosixPath) -> bool:
         return True
     if relative == DERIVED_MANIFEST_PATH:
         return True
-    if relative == DERIVED_CASES_ROOT or DERIVED_CASES_ROOT in relative.parents:
+    if parts[: len(DERIVED_CASES_ROOT.parts)] == DERIVED_CASES_ROOT.parts:
         return True
-    if relative == DERIVED_THREATS_ROOT or DERIVED_THREATS_ROOT in relative.parents:
+    if parts[: len(DERIVED_THREATS_ROOT.parts)] == DERIVED_THREATS_ROOT.parts:
         return True
-    if DERIVED_MUTATION_ROOT in relative.parents:
+    if (
+        len(parts) > len(DERIVED_MUTATION_ROOT.parts)
+        and parts[: len(DERIVED_MUTATION_ROOT.parts)] == DERIVED_MUTATION_ROOT.parts
+    ):
         mutation_tail = parts[len(DERIVED_MUTATION_ROOT.parts) :]
         if mutation_tail and mutation_tail[0] != ".gitignore":
             return True
@@ -643,7 +662,7 @@ def campaign_input_snapshot(
     requested_captures = set(captured_files) if captured_files is not None else set()
     for path in sorted(input_paths, key=lambda item: item.as_posix()):
         try:
-            relative = path.relative_to(root).as_posix()
+            relative = lexical_relative_path(path, root).as_posix()
         except ValueError as error:
             raise EvidenceError(
                 f"{path}: input binding file escaped the repository"
@@ -673,7 +692,7 @@ def campaign_input_snapshot(
     directories: list[dict[str, str]] = []
     for path in sorted(input_directories, key=lambda item: item.as_posix()):
         try:
-            relative = path.relative_to(root).as_posix()
+            relative = lexical_relative_path(path, root).as_posix()
         except ValueError as error:
             raise EvidenceError(
                 f"{path}: input inventory directory escaped the repository"
@@ -686,7 +705,7 @@ def campaign_input_snapshot(
     absent: list[str] = []
     for path in sorted(absent_optional_paths, key=lambda item: item.as_posix()):
         try:
-            relative = path.relative_to(root).as_posix()
+            relative = lexical_relative_path(path, root).as_posix()
         except ValueError as error:
             raise EvidenceError(
                 f"{path}: absent input guard escaped the repository"
@@ -814,7 +833,7 @@ def lexical_path_below_root(
     root = root.resolve()
     candidate = path if path.is_absolute() else root / path
     try:
-        relative = candidate.relative_to(root)
+        relative = lexical_relative_path(candidate, root)
     except ValueError as error:
         raise EvidenceError(f"{label}: path escaped the transaction root") from error
     canonical_repository_path(relative.as_posix(), label, allow_root=allow_root)
@@ -840,7 +859,7 @@ def lexical_path_below_root(
 def open_parent_directory_below_root(root: Path, path: Path, label: str) -> int:
     root = root.resolve()
     candidate = lexical_path_below_root(root, path, label)
-    relative = candidate.relative_to(root)
+    relative = lexical_relative_path(candidate, root)
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
     flags |= getattr(os, "O_CLOEXEC", 0)
     descriptor: int | None = None
@@ -895,7 +914,7 @@ def read_regular_file_no_follow(
     if root is not None:
         candidate = path if path.is_absolute() else root / path
         try:
-            candidate.relative_to(root)
+            lexical_relative_path(candidate, root)
         except ValueError:
             pass
         else:
@@ -1756,7 +1775,7 @@ def prepare_transaction_journal(
                     staged.append((path, journal / replacement_name))
                     entries.append(
                         {
-                            "destination": destination.relative_to(root).as_posix(),
+                            "destination": lexical_relative_path(destination, root).as_posix(),
                             "original_state": original_state,
                             "original_backup": backup_name,
                             "original_sha256": original_digest,
@@ -1778,7 +1797,7 @@ def prepare_transaction_journal(
                     )
                     guard_entries.append(
                         {
-                            "path": guard_path.relative_to(root).as_posix(),
+                            "path": lexical_relative_path(guard_path, root).as_posix(),
                             "sha256": hashlib.sha256(payload).hexdigest(),
                         }
                     )
