@@ -57,6 +57,8 @@ impl Arguments {
 }
 
 fn run() -> Result<()> {
+    #[cfg(target_os = "linux")]
+    let shutdown = chio_active_response_authority::install_daemon_stop_handlers()?;
     let arguments = Arguments::parse()?;
     harden_process_custody().map_err(|error| AuthorityError::Custody(error.to_string()))?;
     let config = load_runtime_config(&arguments.config_path)?;
@@ -65,7 +67,15 @@ fn run() -> Result<()> {
     let signing_key =
         unsafe { InheritedSecretFile::adopt(arguments.signing_key_fd, "authority signing key") }
             .map_err(|error| AuthorityError::Custody(error.to_string()))?;
-    AuthorityDaemonRuntime::build(config, signing_key)?.serve()
+    let runtime = AuthorityDaemonRuntime::build(config, signing_key)?;
+    #[cfg(target_os = "linux")]
+    {
+        runtime.serve_until_stopped(shutdown)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        runtime.serve()
+    }
 }
 
 fn main() -> ExitCode {

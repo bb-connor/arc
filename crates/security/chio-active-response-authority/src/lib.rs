@@ -3,6 +3,8 @@
 mod config;
 #[cfg(unix)]
 mod runtime;
+#[cfg(target_os = "linux")]
+mod shutdown;
 #[cfg(unix)]
 mod store;
 
@@ -13,6 +15,8 @@ pub use config::{
 };
 #[cfg(unix)]
 pub use runtime::AuthorityDaemonRuntime;
+#[cfg(target_os = "linux")]
+pub use shutdown::install_daemon_stop_handlers;
 #[cfg(unix)]
 pub use store::{
     artifact_lookup_key, build_authority_store, compute_authority_store_digest,

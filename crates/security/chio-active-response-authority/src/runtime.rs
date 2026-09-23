@@ -102,12 +102,20 @@ impl AuthorityDaemonRuntime {
     }
 
     pub fn serve(self) -> Result<()> {
+        self.serve_until_stopped(&std::sync::atomic::AtomicBool::new(false))
+    }
+
+    /// Stop accepting and discard queued requests, then join in-progress
+    /// workers under their existing I/O deadlines. Signal policy belongs to
+    /// the host; this method does not alter handlers or thread signal masks.
+    pub fn serve_until_stopped(self, shutdown: &std::sync::atomic::AtomicBool) -> Result<()> {
         #[cfg(target_os = "linux")]
         {
-            self.serve_linux()
+            self.serve_linux(shutdown)
         }
         #[cfg(not(target_os = "linux"))]
         {
+            let _ = shutdown;
             Err(AuthorityError::Runtime(
                 "active-response authority runtime requires Linux".to_string(),
             ))
@@ -115,9 +123,8 @@ impl AuthorityDaemonRuntime {
     }
 
     #[cfg(target_os = "linux")]
-    fn serve_linux(self) -> Result<()> {
+    fn serve_linux(self, shutdown: &AtomicBool) -> Result<()> {
         let stop = Arc::new(AtomicBool::new(false));
-        install_signal_waiter(Arc::clone(&stop))?;
         self.listener
             .set_nonblocking(true)
             .map_err(|error| AuthorityError::Runtime(error.to_string()))?;
@@ -131,7 +138,8 @@ impl AuthorityDaemonRuntime {
             Arc::clone(&stop),
             Arc::clone(&fatal),
         )?;
-        let accept_result = self.accept_until_stopped(&sender, &stop, &fatal);
+        let accept_result = self.accept_until_stopped(&sender, &stop, &fatal, shutdown);
+        stop.store(true, Ordering::Release);
         drop(sender);
         let mut worker_panicked = false;
         for worker in workers {
@@ -158,8 +166,9 @@ impl AuthorityDaemonRuntime {
         sender: &SyncSender<std::os::unix::net::UnixStream>,
         stop: &Arc<AtomicBool>,
         fatal: &Arc<Mutex<Option<String>>>,
+        shutdown: &AtomicBool,
     ) -> Result<()> {
-        while !stop.load(Ordering::Acquire) {
+        while !stop.load(Ordering::Acquire) && !shutdown.load(Ordering::Acquire) {
             match self.listener.try_accept_authenticated() {
                 Ok(Some(stream)) => match sender.try_send(stream) {
                     Ok(()) => {}
@@ -210,25 +219,6 @@ fn read_keypair(mut file: File) -> Result<Keypair> {
         ));
     }
     Ok(Keypair::from_seed(&seed))
-}
-
-#[cfg(target_os = "linux")]
-fn install_signal_waiter(stop: Arc<AtomicBool>) -> Result<()> {
-    use nix::sys::signal::{pthread_sigmask, SigSet, SigmaskHow, Signal};
-
-    let mut signals = SigSet::empty();
-    signals.add(Signal::SIGINT);
-    signals.add(Signal::SIGTERM);
-    pthread_sigmask(SigmaskHow::SIG_BLOCK, Some(&signals), None)
-        .map_err(|error| AuthorityError::Runtime(format!("signal mask failed: {error}")))?;
-    thread::Builder::new()
-        .name("authority-signal".to_string())
-        .spawn(move || {
-            let _signal = signals.wait();
-            stop.store(true, Ordering::Release);
-        })
-        .map_err(|error| AuthorityError::Runtime(format!("signal thread failed: {error}")))?;
-    Ok(())
 }
 
 #[cfg(target_os = "linux")]
@@ -290,7 +280,7 @@ fn worker_loop(
     fatal: &Arc<Mutex<Option<String>>>,
 ) {
     loop {
-        if fatal.lock().is_ok_and(|state| state.is_some()) {
+        if stop.load(Ordering::Acquire) || fatal.lock().is_ok_and(|state| state.is_some()) {
             return;
         }
         let received = match receiver.lock() {
@@ -306,6 +296,9 @@ fn worker_loop(
         };
         match received {
             Ok(stream) => {
+                if stop.load(Ordering::Acquire) {
+                    return;
+                }
                 if let Err(error) = server.serve_one(stream) {
                     set_fatal(fatal, stop, format!("protocol server failed: {error}"));
                     return;
@@ -408,6 +401,7 @@ mod tests {
         if !matches!(role.as_str(), "authority" | "authority-worker-panic") {
             return;
         }
+        let shutdown = crate::install_daemon_stop_handlers().test_expect("daemon stop handlers");
         let config_path = PathBuf::from(
             std::env::var(PROCESS_CONFIG_ENV).test_expect("authority helper config path"),
         );
@@ -460,7 +454,7 @@ mod tests {
             );
         }
         runtime
-            .serve()
+            .serve_until_stopped(shutdown)
             .test_expect("serve authority helper runtime");
     }
 
@@ -479,15 +473,27 @@ mod tests {
 
     #[test]
     fn daemon_health_crosses_an_authenticated_process_boundary() {
-        exercise_authority_process(false);
+        exercise_authority_process(AuthorityExercise::Health);
     }
 
     #[test]
     fn daemon_worker_panic_stops_the_listener_and_joins_workers() {
-        exercise_authority_process(true);
+        exercise_authority_process(AuthorityExercise::WorkerPanic);
     }
 
-    fn exercise_authority_process(panic_on_health: bool) {
+    #[test]
+    fn daemon_stop_discards_queued_requests_and_joins_inflight_workers() {
+        exercise_authority_process(AuthorityExercise::QueuedStop);
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum AuthorityExercise {
+        Health,
+        WorkerPanic,
+        QueuedStop,
+    }
+
+    fn exercise_authority_process(exercise: AuthorityExercise) {
         let directory = tempfile::tempdir().test_expect("authority process directory");
         std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
             .test_expect("private authority process directory");
@@ -530,7 +536,7 @@ mod tests {
             .arg("--test-threads=1")
             .env(
                 PROCESS_ROLE_ENV,
-                if panic_on_health {
+                if exercise == AuthorityExercise::WorkerPanic {
                     "authority-worker-panic"
                 } else {
                     "authority"
@@ -653,7 +659,7 @@ mod tests {
             client_signer,
         )
         .test_expect("build process-boundary authority client");
-        if panic_on_health {
+        if exercise == AuthorityExercise::WorkerPanic {
             assert!(protocol_client.ensure_ready().is_err());
             let deadline = Instant::now() + Duration::from_secs(5);
             loop {
@@ -675,6 +681,40 @@ mod tests {
             protocol_client
                 .ensure_ready()
                 .test_expect("authenticated authority health response");
+            let mut pending = Vec::new();
+            if exercise == AuthorityExercise::QueuedStop {
+                // Hold both workers plus the four queue slots with real
+                // authenticated peer connections that send no request bytes.
+                for _ in 0..6 {
+                    pending.push(UnixStream::connect(&socket_path).test_expect("idle client"));
+                }
+                thread::sleep(Duration::from_millis(100));
+            }
+            nix::sys::signal::kill(
+                nix::unistd::Pid::from_raw(i32::try_from(child.0.id()).test_expect("child PID")),
+                nix::sys::signal::Signal::SIGTERM,
+            )
+            .test_expect("request authority shutdown");
+            let deadline = Instant::now() + Duration::from_secs(2);
+            loop {
+                if let Some(status) = child.0.try_wait().test_expect("poll stopped authority") {
+                    assert!(
+                        status.success(),
+                        "authority did not drain cleanly: {status:?}"
+                    );
+                    break;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "shutdown kept draining queued requests"
+                );
+                thread::sleep(Duration::from_millis(2));
+            }
+            assert!(
+                !socket_path.exists(),
+                "stopped authority retained its listener"
+            );
+            drop(pending);
         }
     }
 

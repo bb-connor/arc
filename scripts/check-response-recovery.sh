@@ -31,6 +31,7 @@ main() {
   export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
 
   run_tests "authority worker crash closes service" cargo test --locked -p chio-active-response-authority --lib runtime::tests::daemon_worker_panic_stops_the_listener_and_joins_workers -- --exact
+  run_tests "authority shutdown bounds queued work" cargo test --locked -p chio-active-response-authority --lib runtime::tests::daemon_stop_discards_queued_requests_and_joins_inflight_workers -- --exact
   run_tests "response transition state machine" cargo test -p chio-quarantine --test state_machine state_machine_accepts_exactly_the_nineteen_specified_edges -- --exact
   run_tests "applying-to-applying lease renewal" cargo test -p chio-quarantine --test response_executor applying_lease_renewal_requires_an_unexpired_application_lease_and_exact_live_fence -- --exact
 

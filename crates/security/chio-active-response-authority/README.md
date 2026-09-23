@@ -26,6 +26,12 @@ descriptor must be transferred exclusively by the launcher, owned by the
 configured service UID, and contain exactly 32 bytes. Key paths and key
 environment variables are intentionally unsupported.
 
+The daemon owns SIGINT/SIGTERM handling at process startup. Shutdown stops
+acceptance, drops requests still in the bounded queue, and joins requests
+already being served under their existing deadlines before releasing the
+listener. Library hosts pass their own stop flag to `serve_until_stopped`;
+`serve` leaves signal ownership with its caller.
+
 Plan, build, and validate operator artifacts with:
 
 ```text
