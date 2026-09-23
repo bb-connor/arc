@@ -1,5 +1,7 @@
 //! Reuse the real SQLite collection fixture rather than model approval authority.
 extern crate chio_core_types as chio_core;
+// Other integration targets use the remaining shared fixture helpers.
+#[allow(dead_code)]
 #[path = "../../../platform/chio-store-sqlite/tests/threshold_kernel_lifecycle/support.rs"]
 mod support;
 

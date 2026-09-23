@@ -177,8 +177,11 @@ fn unbound_issuance_still_expires_before_execution() -> TestResult {
     let fixture = nonce_fixture(1)?;
     let runtime = fixture.open()?;
     let request = fixture.request(&runtime, "expired-before-binding")?;
+    let issued_at = now();
+    let issuance_clock = chio_kernel::scope_fixed_runtime_for_current_thread(issued_at, []);
     let nonce = preflight(&runtime, &request)?;
-    std::thread::sleep(Duration::from_secs(2));
+    drop(issuance_clock);
+    let _expired_clock = chio_kernel::scope_fixed_runtime_for_current_thread(issued_at + 2, []);
     let denied = evaluate(&runtime, &with_nonce(&request, &nonce))?;
     assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
     assert!(
