@@ -44,6 +44,16 @@ mirrors pass. The original shutdown deadlock, captured thread stacks, crash-stat
 failure, compile-path mistake, and fixture correction are retained separately
 from the passing retries under `output/process-security-20260915/m7-recovery-20260923/`.
 
+The subsequent retention repair fix (`a0d97a9090`) keeps writer ownership through
+archive I/O and head revalidation, accounts for queue admission, and rebuilds
+verified serving state in both incremental and legacy modes. A failed checkpoint
+or receipt-cost verification keeps serving poisoned; a successful repair can
+recover the same serving handle. The 81 selected retention tests pass, including
+real SQLite write contention and tampered-checkpoint recovery in both modes.
+Two existing campaigns remain ignored, including #1045; this is not a claimed
+reproduction of that failure. Strict all-target store and CLI Clippy pass.
+Evidence is under `output/process-security-20260915/m8-retention-repair-20260923/`.
+
 The M9 continuation adds the nine runtime companion binaries, their SBOMs and
 digests, and provisioning assets to the Linux x86 release archive. A remote
 initial staging-mechanism check validates seven real x86 executables and static
@@ -57,6 +67,20 @@ including exact binary bytes, distinct descriptors, unsafe-file refusal and
 conflicting-option refusal. Strict all-target CLI Clippy and source hygiene
 pass. Current release builds, full installation and the Rust registry package
 closure remain separate M9 work.
+
+Supervisor readiness (`ab9fcf221a`) remains cancellable while its HTTP or Unix
+probe is pending, so the child's exit, stop signal and startup deadline retain
+priority. Unix readiness requires the listener's kernel-reported PID to match
+the actual child. All 19 supervisor unit tests and ten process tests pass; one
+ignored process-helper entrypoint is exercised by those cases. Evidence is under
+`output/process-security-20260915/m9-supervision-readiness-20260923/`.
+The broker now has a packaged systemd unit with its own service account,
+descriptor credentials, private durable state, child-bound readiness and bounded
+supervised stop. All four reference-unit contract tests and their strict Clippy
+check pass. This is packaging validation, not a clean systemd installation.
+The response authority still requires a coordinated launcher that provisions
+its exact daemon/client PID bindings on each start; a static restart unit cannot
+reuse that configuration.
 
 The archive also includes the three reference tools and their command reference,
 so its installation instructions require no checkout or tool compilation. All
@@ -82,15 +106,33 @@ All 17 authority tests and strict all-target Clippy pass; the two ignored helper
 entrypoints run inside the process tests. Evidence is retained under
 `output/process-security-20260915/m7-authority-worker-20260923/`.
 
+The authority's standalone daemon now owns SIGINT/SIGTERM explicitly. Its
+process-wide atomic handler also works when host threads predate the serving
+thread; embedded callers supply their own stop flag. Shutdown discards queued
+requests and joins only work already in flight, preserving the existing I/O
+deadlines. All 18 authority tests pass, including clean SIGTERM/socket cleanup
+and a full request queue; two child-helper entrypoints remain intentionally
+ignored by direct discovery. Strict all-target authority Clippy passes.
+Evidence is under `output/process-security-20260915/m7-authority-shutdown-20260923/`.
+
 The `c114eb2042` hosted worker lane failed on the second strict-nonce recovery
 with missing retained-operation metadata. Its original log is retained. The
 process fixture now uses the production host's receipt-writer startup barrier
 before admission. The complete worker-server/mailboxes process suite and strict
 all-target Clippy pass locally, with the original custody and one-effect
 assertions unchanged. Eight diagnostic runs before this fixture change also
-passed, so the exact hosted failure cause and hosted resolution remain
-unconfirmed. Logs are under
+passed, so the exact original hosted failure cause remains unconfirmed. The
+authenticated Python/JavaScript worker lane passes on hosted head `e621bb2040`.
+Logs are under
 `output/process-security-20260915/nonce-recovery-hosted-20260923/`.
+
+The `e621bb2040` codegen job incorrectly treated generated broker V2 type names
+as forbidden future core receipt types. Fix `1e71db981e` excludes only the two
+independently versioned broker type-name substrings before applying the existing
+core-version scan. A forbidden core type on the same line still fails. The
+owning scan, its existing shell fixture and ShellCheck pass. The original hosted
+failure remains in `output/process-security-20260915/resume-e621bb2040-20260923/`;
+final-head hosted qualification remains required.
 
 The governed-host qualified full-index patch on `3dd65e1fba` is
 `47b5f18164ac39f4c48ec4debcaad14bd977724879d702462066c51a8a136f73`.
