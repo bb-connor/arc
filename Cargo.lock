@@ -2996,6 +2996,7 @@ dependencies = [
  "chio-hosted-mcp",
  "chio-http-serve",
  "chio-kernel",
+ "chio-keyring",
  "chio-lineage",
  "chio-listing",
  "chio-log-redact",

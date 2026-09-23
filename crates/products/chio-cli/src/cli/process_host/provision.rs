@@ -17,7 +17,9 @@ use chio_process::worker::WorkerService;
 use chio_process::{ProcessRuntime, ProcessState};
 use serde_json::json;
 
-use super::state::{error, kernel, write_secret, Child, Config, Host, Lease, Record};
+use super::state::{
+    error, kernel, write_secret, Child, Config, Host, KernelAssembly, Lease, Record,
+};
 use crate::CliError;
 
 fn select_scope(
@@ -141,11 +143,21 @@ pub(super) fn init(
     let identity = policy.identity.clone();
     let defaults = policy.default_capabilities.clone();
     let lease = Lease::acquire(state, true)?;
-    let (mut kernel, issuer, authority, _receipts) = kernel(
+    let KernelAssembly {
+        mut kernel,
+        key: issuer,
+        authority,
+        receipts: _receipts,
+        keyring,
+    } = kernel(
         lease.directory.path(),
         policy,
         true,
         config.execution_nonces,
+        config
+            .native_broker
+            .as_ref()
+            .and_then(|broker| broker.keyring.as_ref()),
     )?;
     let (servers, manifests, _) = super::serving::connect(
         &config,
@@ -170,6 +182,9 @@ pub(super) fn init(
         ),
     }
     .map_err(error)?;
+    if let Some(keyring) = &keyring {
+        keyring.evidence(&root)?;
+    }
     for template in &config.spawn_templates {
         select_scope(
             &root.scope,

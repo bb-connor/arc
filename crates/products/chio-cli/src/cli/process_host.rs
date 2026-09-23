@@ -13,6 +13,9 @@ mod call_evidence;
 #[path = "process_host/diagnostics.rs"]
 mod diagnostics;
 #[cfg(unix)]
+#[path = "process_host/keyring.rs"]
+mod keyring;
+#[cfg(unix)]
 #[path = "process_host/lifecycle.rs"]
 mod lifecycle;
 #[cfg(unix)]
@@ -114,6 +117,9 @@ pub(crate) enum ProcessCommands {
         /// Independently retained, normalized host config for brokered calls.
         #[arg(long)]
         trusted_broker_host_config: Option<PathBuf>,
+        /// Existing independently synchronized verifier for governed parent issuance.
+        #[arg(long)]
+        trusted_keylog_verifier: Option<PathBuf>,
     },
     /// Attest completed fixed fan-out results and the retained aggregate usage (Linux).
     AttestRun {
@@ -283,6 +289,7 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
                 request,
                 context,
                 trusted_broker_host_config,
+                trusted_keylog_verifier,
             } => call_evidence::verify_file(
                 &artifact,
                 &trusted_kernel_pubkey,
@@ -290,6 +297,7 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
                 &request,
                 &context,
                 trusted_broker_host_config.as_deref(),
+                trusted_keylog_verifier.as_deref(),
             ),
             ProcessCommands::AttestRun { state, plan, out } => {
                 #[cfg(target_os = "linux")]

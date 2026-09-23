@@ -13,22 +13,52 @@ below retain their historical source boundaries.
 | Area | Current evidence | Remaining boundary |
 | --- | --- | --- |
 | Foundation | The locked x86 workspace run at `36ddfcf69e` stopped on three CLI sandbox tests. All three exact cases pass with the matching stock Ubuntu Bubblewrap profile and unchanged restrictions. The full retry is terminal, exit 101, on `auth_live`: Node 18.19.1 cannot import the TypeScript SDK. The temporary profile cleanup completed, with namespace restrictions restored to 1/1. | Complete workspace and workspace-Clippy passes remain open. Original failures and the cleanup record are retained in `chio-workspace-36dd-terminal-20260923.tgz`, SHA-256 `51098e8f1182b07fc84476cda9f54a4786b9d0de3dcb0b345b8299768ae0425e`, under `output/process-security-20260915/`. |
-| Dependency and source policy | Reviewed AWS-LC repairs and exact audits remain selected. Exact, expiring exceptions cover 34 inspected upstream text occurrences; the scanner passes on a clean source export and rejects new incomplete code. Current generated coverage has 59 rows and 170 artifacts. The root lock digest is `c7d66a39f24a5cb54709061c22bbf350b68dc7d4e4e5abf36d8fc5173327eab4`; the process-host dependency selections change no registry version. The image and structural contract pins match. The runner handoff repair at `900f0ff639` passes the existing behavior, structural contract and full mutation suites. | Preserve audit scope and qualify final hosted inputs. Retained source archives remain separate from clean-source qualification. Mirror matching is not a solver proof. |
+| Dependency and source policy | Reviewed AWS-LC repairs and exact audits remain selected. Exact, expiring exceptions cover 34 inspected upstream text occurrences; the scanner passes on a clean source export and rejects new incomplete code. Current generated coverage has 59 rows and 170 artifacts. The root lock digest is `e3f42ccac4fd0397f507cc3767a25eda3436fd4f43296359d740e39de7cd8d76`; the process-host dependency selections change no registry version. The image and structural contract pins match. The runner handoff repair at `900f0ff639` passes the existing behavior, structural contract and full mutation suites. | Preserve audit scope and qualify final hosted inputs. Retained source archives remain separate from clean-source qualification. Mirror matching is not a solver proof. |
 | Fuzz compilation | All 30 targets compiled with ASan on x86_64 at `84c0ca4e89`; retained log hash matches. | Required fuzz campaigns and final-source requirements remain separate. |
 | Cage | The `84c0ca4e89` native run reports 69 tests, 26 real probes and ten mutants with exit 0; retained log hash matches. | The retained runner's release-helper adaptation and trusted capture require their own acceptance. |
 | M5 | Original nonce custody, receipt checkpoints and inclusion proofs are implemented. Runtime `317b3a9128` with qualifier `6170900d7f` passed all seven native scenarios and rejected 15 substitutions; a separately built aarch64 observer verified both inventories. | Final source, combined-foundation qualification and independently authorized trusted-runner acceptance remain open. The artifact does not claim full M5 acceptance. |
 | Image | Source `6170900d7f` built and passed identity, ownership, toolchain and offline locked-dependency checks. Image ID: `sha256:f17db010c5e6e5e1d6ad8eea8ce97f8e2a530888a737e59bbb16afdfdb1a245a`; all 199 archive hashes and 225 package pins match. | The current lock and broker gate differ. Rebuild and validate those inputs before authorized publication, registry identity verification or trust-root rotation. |
-| M6 | The real confined kernel/broker/MCP/TLS invocation composes governed keyring issuance, witnessed rotation, contiguous synchronization and stale signer fencing. V2 completion signs returned headers and checks original completion time; its full 206-test broker inventory passes. The ordinary process host now routes broker calls through the same durable authority, retains invocation-owned confined children, and exports independently pinned v3 capture/cage/nonce/log evidence. Its real CLI allow, private-data refusal, restart replay and artifact verification pass on x86. | Keyring issuance and key-authority evidence still need integration into this ordinary host and its artifact. Direct-host execution is not designated trusted capture. ARM retains the existing native-enforcement refusal. M6 is not complete. |
+| M6 | The real confined kernel/broker/MCP/TLS invocation composes governed keyring issuance, witnessed rotation, contiguous synchronization and stale signer fencing. V2 completion signs returned headers and checks original completion time; its recorded 206-test broker inventory passes. Ordinary process hosts now use the same durable authority and invocation-owned confined children. The governed single-root profile issues through the keyring, retains original authority across rotation and restart, and exports v3 keyring/capture/cage/nonce/log joins. The real x86 CLI flow and a separately built ARM artifact verifier pass. | Final-source owning gates and designated trusted capture remain separate acceptance work. Governed delegation is explicitly unsupported; the existing non-keyring profile retains static children. ARM verifies artifacts but retains the native-enforcement refusal. Full M6 acceptance is not claimed. |
 | M7 | At `6170900d7f`, deception passed 82 tests; response recovery, flow and temporal gates exited 0. Temporal covered 10 inventories and 40 exact cases; retrieved hashes match. The 28 archived adversarial definitions and 35 campaign identities are restored as pending cases. Broker quota controls now target the owning SQLite composite authority; corpus consumers exclude pending cases from completed coverage. | All 35 campaigns need current-source control and caught-mutation evidence before promotion. Restored definitions and historical outcome hashes do not close M7. |
 | M8 | At frozen `d5884b4d87`, the fresh million-receipt recovery campaign passes in 6,869.58 seconds with 1,000,000 actual appends and no profiling intervention. It verifies integrity, pagination, backup, reopen, half archive, retained append and restored append. The unchanged 24-case retention property also passes under declared 25 ms fsync/fdatasync delay in 265.71 seconds. | Both results are tied to their frozen source. The delayed-sync diagnostic did not reproduce #1045, so its quarantine remains. Final-source qualification and the liveness repair remain open. |
 | Hosted delivery | #1160 publishes the continuation. Main prerequisite #1168 is at `2fb4a6c1c8`; definition-only #1167 retains `88b9b2a3cb`. Original hosted failures remain recorded. | New-head qualification, independent review, protected integration and the exact source/definition/image/verifier authority transition remain required. |
 | M9-M11 | Packaging and handoff work remains preserved. | No milestone-level M9-M10 acceptance or M11 operational promotion is established. |
+
+The governed-host qualified full-index patch on `3dd65e1fba` is
+`47b5f18164ac39f4c48ec4debcaad14bd977724879d702462066c51a8a136f73`.
+Its real CLI case passes in 95.45 seconds, including witnessed rotation after
+parent issuance, missing-verifier startup refusal, one provider effect, private
+input refusal, restart replay and independently pinned artifact verification.
+The original mixed-signer checkpoint failure led to separate anchored keyring
+audit and kernel call logs. Shutdown retains the host lease until signer and
+writer custody is released. The provisioning fixture's original duplicate
+selector-owner failure is retained separately.
+
+The public artifact also passes all 14 reported checks on a separately built
+ARM observer; physical effects, complete graph/task authority and aggregate
+history remain explicit unchecked claims. The x86 CLI binary hashes to
+`f70ef0c90acc4c955f62f8c3925b9d749b269d19450d087e186a693142336053`;
+the ARM observer hashes to
+`82d91eecdf4d0ceb6e7704caebaee4d674cf1cbe9e0f7a0cf44afc0e0a62af10`.
+The observer was built from patch `98e56527da971188eb3bee39996f99f5fb6f73b9d84282bcec77ad0a0834d6fe`,
+before the final host-only field drop ordering change; its verification code is
+unchanged. Initial observer invocations correctly rejected a relative database
+path and group-writable ancestors; the retained retry uses a private absolute
+path. Archive `output/process-security-20260915/chio-governed-process-host-20260923.tgz`
+has SHA-256 `cd20929f622b75207456888622ca9644d6d1e45cc0d42e029bfb18684def6e24`;
+its manifest verifies locally. Strict all-target CLI/broker Clippy, formatting,
+source hygiene, structural CI, formal mirrors and generated coverage pass.
+Only qualification documentation and generated coverage follow the qualified
+Rust patch.
 
 The ordinary-host Rust patch qualified on `3dd65e1fba` has full-index SHA-256
 `150d589e642d5c422bcd92ffdf556bcbcbd5e2ab7d61cd37b7bb2cb65ef73746`.
 The shipped CLI case passes in 76.18 seconds with the original deadlines and
 one independently observed TLS provider effect across restart replay. Missing
 external host pins and a substituted broker key both reject the v3 artifact.
+All eight prior native scenarios also pass at that Rust source in 280.14 seconds.
+The retrieved original-host archive has SHA-256
+`c8de5f14117e55f91e43ce0265f4afe64b43fe37c7aa66ffbf473f077a8ec354`.
 Nine kernel delivery lifecycle cases, the native nonce-generation regression,
 16 process cases and 33 host unit cases pass in their recorded slices. Strict
 all-target Clippy passes for CLI, process, broker and control-plane at this

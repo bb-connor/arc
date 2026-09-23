@@ -16,12 +16,15 @@ type TestResult<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 pub(super) struct KeyringDelivery {
     pub parent: CapabilityToken,
-    runtime: chio_control_plane::KeyringRuntimeComposition,
+    runtime: Option<chio_control_plane::KeyringRuntimeComposition>,
     evidence: KeyringSigningResult,
     policy: chio_keyring::KeyLogPolicy,
     verifier_path: PathBuf,
     _services: KeyServices,
     _receipt_anchors: tempfile::TempDir,
+    config_path: PathBuf,
+    seed_path: PathBuf,
+    policy_document: chio_keyring::KeyLogPolicyDocument,
 }
 
 impl KeyringDelivery {
@@ -193,12 +196,15 @@ impl KeyringDelivery {
         runtime.attach_receipt_store(receipts)?;
         Ok(Self {
             parent,
-            runtime,
+            runtime: Some(runtime),
             evidence,
             policy,
             verifier_path,
             _services: services,
             _receipt_anchors: receipt_anchors,
+            config_path,
+            seed_path,
+            policy_document: document,
         })
     }
 
@@ -207,7 +213,11 @@ impl KeyringDelivery {
             canonical_json_bytes(original)?,
             canonical_json_bytes(&self.parent)?
         );
-        let retained = self.runtime.capability_signing_evidence(original)?;
+        let retained = self
+            .runtime
+            .as_ref()
+            .ok_or("key selector was handed to the process host")?
+            .capability_signing_evidence(original)?;
         assert_eq!(retained, self.evidence);
         let verifier = SqlitePinnedKeyLogVerifier::open(
             &self.verifier_path,
@@ -224,5 +234,59 @@ impl KeyringDelivery {
         )?;
         assert_eq!(key.public_key, original.issuer);
         Ok(())
+    }
+
+    pub fn process_host_config(&self) -> serde_json::Value {
+        serde_json::json!({
+            "runtime_config": self.config_path,
+            "authority_seed_file": self.seed_path,
+            "receipt_anchor_directory": self._receipt_anchors.path(),
+            "verification_policy": self.policy_document,
+        })
+    }
+
+    pub fn into_process_host(mut self) -> Self {
+        // The real CLI must acquire sole selector custody after provisioning.
+        // Keep independent witnesses, auditors and public verifier state alive.
+        self.runtime.take();
+        self
+    }
+
+    pub fn rotate_process_host_authority(&self, original: &CapabilityToken) -> TestResult {
+        assert!(self.runtime.is_none(), "the host must own the selector");
+        let (_, runtime) = chio_control_plane::load_keyring_runtime_from_authority_seed(
+            &self.config_path,
+            &self.seed_path,
+        )?;
+        let receipts = Arc::new(SqliteReceiptStore::open_for_finding_pool(
+            self.config_path.with_file_name("key-receipts.sqlite3"),
+            self._receipt_anchors.path(),
+        )?);
+        receipts.wait_for_writer_ready(Duration::from_secs(30))?;
+        runtime.attach_receipt_store(receipts)?;
+        let (rotated, _) = runtime.rotate_remote_authority_seed(&self.seed_path)?;
+        assert_ne!(rotated, original.issuer);
+        let verifier = SqlitePinnedKeyLogVerifier::open(
+            &self.verifier_path,
+            self.policy.clone(),
+            Arc::new(SystemTrustedClock),
+        )?;
+        let base = verifier.pin()?.ok_or("independent receiver pin")?;
+        verifier.apply_sync(&runtime.key_log_synchronization_response(Some(&base))?)?;
+        let evidence = runtime.capability_signing_evidence(original)?;
+        let key = verifier.verify_artifact_signing_evidence(
+            &canonical_json_bytes(&original.signing_body())?,
+            &evidence.evidence,
+            evidence
+                .time_anchor
+                .as_ref()
+                .ok_or("original issuance time")?,
+        )?;
+        assert_eq!(key.public_key, original.issuer);
+        Ok(())
+    }
+
+    pub fn verifier_path(&self) -> &Path {
+        &self.verifier_path
     }
 }

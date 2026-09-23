@@ -207,6 +207,7 @@ pub(super) fn observe(
         &key,
         host.runtime.runtime_id(),
         Some(&host.record.config),
+        host.keyring.as_ref().map(|keyring| &keyring.verifier),
     )?;
     Ok(signed)
 }

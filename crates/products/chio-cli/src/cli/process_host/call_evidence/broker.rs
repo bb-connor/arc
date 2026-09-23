@@ -10,6 +10,8 @@ pub(super) struct Evidence {
     host_record: super::super::state::Record,
     capture: NativeBrokerCompletionEvidence,
     confinement: crate::mcp_cli::NativeLaunchEvidence,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keyring: Option<super::super::keyring::Evidence>,
 }
 
 fn response(value: &Value) -> Result<BrokerExecuteResponse, CliError> {
@@ -26,12 +28,25 @@ pub(super) fn verify(
     call: &ChioReceipt,
     parent: &CapabilityToken,
     trusted: &super::super::state::Config,
+    keylog_verifier: Option<&chio_keyring::SqlitePinnedKeyLogVerifier>,
 ) -> Result<(), CliError> {
     trusted.validate()?;
     let config = trusted
         .native_broker
         .as_ref()
         .ok_or_else(|| error("trusted host configuration has no broker route"))?;
+    require(
+        config.keyring.is_some() == evidence.keyring.is_some(),
+        "governed parent evidence differs from the independently pinned host profile",
+    )?;
+    if let Some(keyring) = &evidence.keyring {
+        keyring.verify(
+            parent,
+            keylog_verifier.ok_or_else(|| {
+                error("governed parent requires an independently retained key-log verifier")
+            })?,
+        )?;
+    }
     require(
         hash(&evidence.host_record.config)? == hash(trusted)?
             && call_evidence.bootstrap.action.parameters["record_sha256"]
@@ -197,5 +212,13 @@ pub(super) fn export(
         host_record: host.record.clone(),
         capture,
         confinement,
+        keyring: host
+            .keyring
+            .as_ref()
+            .map(|keyring| {
+                let process = host.runtime.process("root").map_err(error)?;
+                keyring.evidence(&process.capability)
+            })
+            .transpose()?,
     })
 }

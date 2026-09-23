@@ -139,7 +139,7 @@ fn verify(
     key: &PublicKey,
     runtime: &str,
 ) -> Result<(), CliError> {
-    verify_with_broker_config(signed, evidence, key, runtime, None)
+    verify_with_broker_config(signed, evidence, key, runtime, None, None)
 }
 
 fn verify_with_broker_config(
@@ -148,6 +148,7 @@ fn verify_with_broker_config(
     key: &PublicKey,
     runtime: &str,
     broker_config: Option<&super::state::Config>,
+    keylog_verifier: Option<&chio_keyring::SqlitePinnedKeyLogVerifier>,
 ) -> Result<(), CliError> {
     receipt(signed, key)?;
     observation(signed, "attest_retained_call")?;
@@ -265,7 +266,7 @@ fn verify_with_broker_config(
         !ordinary,
     )?;
     if let Some(broker) = &evidence.broker {
-        broker::verify(broker, evidence, &call, &cap, broker_config.ok_or_else(|| error("broker call verification requires an independently selected host configuration"))?)?;
+        broker::verify(broker, evidence, &call, &cap, broker_config.ok_or_else(|| error("broker call verification requires an independently selected host configuration"))?, keylog_verifier)?;
     }
     Ok(())
 }
@@ -476,6 +477,7 @@ pub(super) fn verify_file(
     request: &Path,
     context: &Path,
     broker_config: Option<&Path>,
+    keylog_verifier: Option<&Path>,
 ) -> Result<(), CliError> {
     let key = crate::load_trusted_kernel_pubkey(key).map_err(error)?;
     let signed = crate::receipt_verify::verify_original_receipt(&text(path)?, &key)?;
@@ -490,7 +492,21 @@ pub(super) fn verify_file(
     let broker_config = broker_config
         .map(super::state::read_json::<super::state::Config>)
         .transpose()?;
-    verify_with_broker_config(&signed, &evidence, &key, runtime, broker_config.as_ref())?;
+    let keylog = keylog_verifier.map(|path| {
+        broker_config.as_ref()
+            .and_then(|host| host.native_broker.as_ref())
+            .and_then(|broker| broker.keyring.as_ref())
+            .ok_or_else(|| error("key-log verification requires the independently pinned governed host profile"))?
+            .verifier(path)
+    }).transpose()?;
+    verify_with_broker_config(
+        &signed,
+        &evidence,
+        &key,
+        runtime,
+        broker_config.as_ref(),
+        keylog.as_ref(),
+    )?;
     let call: ChioReceipt = serde_json::from_str(
         evidence.response["receipt_json"]
             .as_str()
@@ -531,6 +547,15 @@ pub(super) fn verify_file(
             "confinement",
         ]);
         unchecked.retain(|check| *check != "confinement");
+    }
+    if evidence
+        .broker
+        .as_ref()
+        .is_some_and(|broker| broker.keyring.is_some())
+    {
+        checks.push("witnessed_parent_authority");
+    } else {
+        unchecked.push("witnessed_parent_authority");
     }
     println!(
         "{}",

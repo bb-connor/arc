@@ -44,6 +44,8 @@ mod classification;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Config {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keyring: Option<super::keyring::Config>,
     pub security: chio_process::ProcessSecurityProfile,
     pub quota: BrokerQuotaVerifierConfig,
     pub broker_identity: PublicKey,
@@ -100,6 +102,14 @@ impl Config {
     }
 
     pub fn validate(&self, host: &HostConfig) -> Result<(), CliError> {
+        if let Some(keyring) = &self.keyring {
+            keyring.validate()?;
+            if !host.children.is_empty() || !host.spawn_templates.is_empty() {
+                return Err(error(
+                    "governed broker hosts currently require one root process",
+                ));
+            }
+        }
         self.security.validate().map_err(error)?;
         if !self.authority_seed_file.is_absolute() {
             return Err(error("broker authority seed path must be absolute"));

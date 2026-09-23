@@ -94,6 +94,19 @@ fn invoke(socket: &Path, descriptor: &Value, request: &Value) -> TestResult<Valu
     ignore = "requires Linux x86_64 cage enforcement"
 )]
 fn confined_broker_process_host_exports_original_call_and_replays_after_restart() -> TestResult {
+    process_host(false)
+}
+
+#[test]
+#[cfg_attr(
+    not(target_arch = "x86_64"),
+    ignore = "requires Linux x86_64 cage enforcement"
+)]
+fn governed_broker_process_host_verifies_original_keyring_authority() -> TestResult {
+    process_host(true)
+}
+
+fn process_host(governed: bool) -> TestResult {
     // The owning release runner builds chio beside the original witness binary.
     let binary = fs::canonicalize(
         PathBuf::from(required_environment("CHIO_KEYLOG_WITNESS")).with_file_name("chio"),
@@ -102,6 +115,10 @@ fn confined_broker_process_host_exports_original_call_and_replays_after_restart(
     let helper = fs::canonicalize(required_environment("CHIO_CAGE_TEST_HELPER"))?;
     let directory = crate::private_tempdir()?;
     let root = fs::canonicalize(directory.path())?;
+    let keyring = governed
+        .then(|| keyring::KeyringDelivery::new(&root, &Keypair::from_seed(&[227; 32]).public_key()))
+        .transpose()?
+        .map(keyring::KeyringDelivery::into_process_host);
     let state = root.join("host");
     let socket = root.join("worker.sock");
     let security = root.join("launch");
@@ -238,6 +255,7 @@ fn confined_broker_process_host_exports_original_call_and_replays_after_restart(
             "limits":{"max_calls":2,"max_processes":1,"max_depth":0},
             "execution_nonces":true,
             "native_broker": {
+                "keyring":keyring.as_ref().map(|keyring| keyring.process_host_config()),
                 "security":{"tenant_id":TENANT_SCOPE,"isolation_epoch_id":"host-epoch-1","generation":1},
                 "quota":{"issuer":issuer.public_key(),"audience":BROKER_AUDIENCE,"server_id":host::SERVER,"tool_name":host::TOOL,"provider_adapter_id":PROVIDER_ADAPTER_ID,"provider_adapter_version":1,"credential_placement":"bearer_authorization"},
                 "broker_identity":broker_key.public_key(),"authority_seed_file":seed,"authority_public_key":authority_key.public_key(),
@@ -264,6 +282,9 @@ fn confined_broker_process_host_exports_original_call_and_replays_after_restart(
         serde_json::from_slice(&fs::read(state.join("process-bootstrap.json"))?)?;
     let parent: chio_core_types::capability::token::CapabilityToken =
         serde_json::from_value(bootstrap.action.parameters["capabilities"]["root"].clone())?;
+    if let Some(keyring) = &keyring {
+        keyring.rotate_process_host_authority(&parent)?;
+    }
     let credential = CredentialRef {
         provider: CREDENTIAL_PROVIDER.into(),
         credential_id: CREDENTIAL_ID.into(),
@@ -367,6 +388,27 @@ fn confined_broker_process_host_exports_original_call_and_replays_after_restart(
         ],
     )?;
     let descriptor: Value = serde_json::from_slice(&fs::read(descriptor_file)?)?;
+    if governed {
+        let verifier = state.join("keylog-verifier.db");
+        let retained = state.join("keylog-verifier.retained");
+        fs::rename(&verifier, &retained)?;
+        let refused = Command::new(&binary)
+            .args([
+                "process",
+                "serve",
+                "--state",
+                path(&state),
+                "--socket",
+                path(&socket),
+            ])
+            .output();
+        fs::rename(&retained, &verifier)?;
+        let refused = refused?;
+        probe.assert_absent(&refused.stderr, "missing key authority diagnostic");
+        assert!(!refused.status.success() && !socket.exists());
+        assert!(String::from_utf8_lossy(&refused.stderr)
+            .contains("cannot open pinned key-log verifier"));
+    }
     let request = json!({"operation_key":"original-send","server_id":host::SERVER,"tool_name":host::TOOL,"arguments":prepared,"known_outcome_only":false});
     let mut process = serve(&binary, &state, &socket)?;
     ready.write_all(&[1])?;
@@ -552,11 +594,29 @@ fn confined_broker_process_host_exports_original_call_and_replays_after_restart(
         "broker evidence requires independent host pins"
     );
     verify.extend(["--trusted-broker-host-config", path(&pin)]);
+    if let Some(keyring) = &keyring {
+        assert!(
+            !Command::new(&binary)
+                .args(&verify)
+                .output()?
+                .status
+                .success(),
+            "governed parent evidence requires the observer's retained key-log verifier"
+        );
+        verify.extend(["--trusted-keylog-verifier", path(keyring.verifier_path())]);
+    }
     let verified = cli(&binary, &verify)?;
     assert!(verified["checks"]
         .as_array()
         .ok_or("verification checks")?
         .contains(&json!("original_composite_capture")));
+    assert_eq!(
+        verified["checks"]
+            .as_array()
+            .ok_or("verification checks")?
+            .contains(&json!("witnessed_parent_authority")),
+        governed
+    );
     assert_eq!(
         verified["artifact_schema"],
         "chio.process.call-observation.v3"
@@ -576,5 +636,30 @@ fn confined_broker_process_host_exports_original_call_and_replays_after_restart(
     assert_raw_absent(&canary, &output.stdout, "broker stdout");
     assert_raw_absent(&canary, &output.stderr, "broker stderr");
     scan_tree_for_raw_canary(&canary, &root);
+    if let Some(keyring) = &keyring {
+        // Retain only public observations and independently selected pins for
+        // verification by a separately built observer after this host exits.
+        write_private(&pin, &canonical_json_bytes(&record["config"])?);
+        let public = crate::private_tempdir()?;
+        for (source, name) in [
+            (&artifact, "observation.json"),
+            (&request_file, "request.json"),
+            (&context_file, "context.json"),
+            (&kernel_key, "kernel.pub"),
+            (&pin, "trusted-host.json"),
+        ] {
+            fs::copy(source, public.path().join(name))?;
+        }
+        // The fixture's independent verifier has no open connection here;
+        // its completed WAL was checkpointed when provisioning returned.
+        fs::copy(
+            keyring.verifier_path(),
+            public.path().join("keylog-verifier.db"),
+        )?;
+        eprintln!(
+            "governed broker public artifacts: {}",
+            public.keep().display()
+        );
+    }
     Ok(())
 }

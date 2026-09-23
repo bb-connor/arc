@@ -296,6 +296,7 @@ if [[ "${mode}" == "--release" ]]; then
 process_boundary_tests::native::confined::native_kernel_confined_broker_mcp_preserves_capture_and_terminal_receipts
 process_boundary_tests::native::cutpoints::confined_broker_process_cutpoints_preserve_provider_and_quota_observations
 process_boundary_tests::native::process_host::confined_broker_process_host_exports_original_call_and_replays_after_restart
+process_boundary_tests::native::process_host::governed_broker_process_host_verifies_original_keyring_authority
 EOF
 )" \
     cargo test --locked -p chio-secret-broker --features real-linux-enforcement --lib \

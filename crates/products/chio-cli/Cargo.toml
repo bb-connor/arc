@@ -120,6 +120,7 @@ tar = "0.4"
 zstd = "0.13"
 libc = "0.2"
 zeroize = { workspace = true }
+chio-keyring = { workspace = true }
 rand_core = { workspace = true }
 semver = "1"
 uuid = { workspace = true, features = ["v4"] }

@@ -204,9 +204,37 @@ kernel receipt-log inclusion. `process verify-call` requires
 kernel key and runtime pins. Retain the normalized `config` from `STATE/host.json`
 independently at provisioning; do not obtain that pin from the observed artifact.
 
+For governed parent issuance, set `native_broker.keyring` to an object with
+absolute `runtime_config`, `authority_seed_file`, and `receipt_anchor_directory`
+paths, plus the independently selected `verification_policy` document
+(`chio.key-log.policy.v1`). The runtime configuration retains the existing
+witness, auditor and migration requirements. The receipt anchor must satisfy
+the existing independent-filesystem rollback boundary. This profile currently
+requires one root process; configured children and dynamic spawn templates are
+refused before host initialization.
+
+The host issues through the generation-fenced keyring signer while retaining its
+distinct kernel receipt key. It provisions `STATE/keylog-verifier.db` once and
+requires that same verifier during recovery, synchronizing contiguous updates
+from its retained pin. Before opening tool connections it verifies the original
+parent signature, signing epoch and trusted issuance time. A missing verifier,
+missing issuance evidence or stale authority seed refuses startup. Existing
+capabilities are never re-signed during recovery or export.
+Keyring audit receipts stay in `STATE/keyring-receipts.db`; kernel call receipts
+stay in `STATE/receipts.db`. Both use the selected rollback anchor directory.
+The host releases its exclusive lease after the signer and receipt writers.
+
+Governed v3 observations include that original signing evidence and trusted-time
+anchor. Verification additionally requires `--trusted-keylog-verifier PATH`, an
+existing independently synchronized `SqlitePinnedKeyLogVerifier` under the
+operator-pinned public verification policy. Use its absolute path. Artifact verification neither
+provisions nor synchronizes this observer database from the untrusted artifact.
+Its pin must already cover the original witnessed issuance epoch. Removing
+governed evidence cannot downgrade the independently pinned host profile.
+
 This is authenticated historical host readback. It does not independently prove
-the provider's physical effects or complete the keyring and full M6 acceptance
-joins. Legacy v1/v2 observations keep their existing explicit claim boundaries.
+the provider's physical effects or establish full M6 acceptance. Legacy v1/v2
+observations keep their existing explicit claim boundaries.
 Hosts without this explicit broker profile continue to refuse flow-required
 tools. The real Linux broker gate exercises the shipped CLI, confined tool,
 original TLS provider request, restart replay and v3 verification together.

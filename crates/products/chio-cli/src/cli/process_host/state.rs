@@ -407,20 +407,21 @@ impl Lease {
     }
 }
 
+pub(super) struct KernelAssembly {
+    pub kernel: ChioKernel,
+    pub key: chio_core_types::crypto::Keypair,
+    pub authority: DurableAdmissionRuntime,
+    pub receipts: Arc<chio_store_sqlite::SqliteReceiptStore>,
+    pub keyring: Option<super::keyring::HostKeyring>,
+}
+
 pub(super) fn kernel(
     directory: &Path,
     loaded: policy::LoadedPolicy,
     initializing: bool,
     execution_nonces: bool,
-) -> Result<
-    (
-        ChioKernel,
-        chio_core_types::crypto::Keypair,
-        DurableAdmissionRuntime,
-        Arc<chio_store_sqlite::SqliteReceiptStore>,
-    ),
-    CliError,
-> {
+    keyring_config: Option<&super::keyring::Config>,
+) -> Result<KernelAssembly, CliError> {
     if loaded.default_capabilities.len() != 1 {
         return Err(error(
             "host policy must define one default capability TTL group",
@@ -438,6 +439,9 @@ pub(super) fn kernel(
     let assurance = loaded.runtime_assurance_policy.clone();
     let authority = DurableAdmissionRuntime::open(&directory.join("authority.db"))?;
     let key = authority.kernel_keypair();
+    let keyring = keyring_config
+        .map(|config| super::keyring::HostKeyring::open(config, directory, initializing))
+        .transpose()?;
     let mut kernel = build_kernel(loaded, &key);
     if execution_nonces {
         kernel.set_execution_nonce_store(
@@ -449,9 +453,13 @@ pub(super) fn kernel(
         );
     }
     kernel.set_capability_trust_root(key.public_key(), scope_hash(&root_scope).map_err(error)?);
-    let receipts = Arc::new(chio_store_sqlite::SqliteReceiptStore::open(
-        directory.join("receipts.db"),
-    )?);
+    let receipts = Arc::new(match keyring_config {
+        Some(config) => chio_store_sqlite::SqliteReceiptStore::open_for_finding_pool(
+            directory.join("receipts.db"),
+            &config.receipt_anchor_directory,
+        )?,
+        None => chio_store_sqlite::SqliteReceiptStore::open(directory.join("receipts.db"))?,
+    });
     receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
     kernel
         .set_receipt_store_handle(receipts.clone())
@@ -463,34 +471,64 @@ pub(super) fn kernel(
         super::swarm::install(directory, &authority, &mut kernel)?;
     }
     authority.attach(&mut kernel)?;
-    configure_capability_authority(
-        &mut kernel,
-        &key,
-        None,
-        None,
-        Some(&directory.join("receipts.db")),
-        None,
-        None,
-        None,
-        issuance,
-        assurance,
-    )?;
-    Ok((kernel, key, authority, receipts))
+    if let Some(keyring) = &keyring {
+        let governed = keyring.authority()?;
+        kernel.set_capability_trust_root(
+            governed.authority_public_key(),
+            scope_hash(&root_scope).map_err(error)?,
+        );
+        kernel.set_capability_authority(chio_control_plane::issuance::wrap_capability_authority(
+            governed,
+            issuance,
+            assurance,
+            Some(&directory.join("receipts.db")),
+            None,
+        ));
+        if !initializing {
+            let registry =
+                chio_process::ProcessRegistry::open(directory.join("process.db"), &kernel)
+                    .map_err(error)?;
+            keyring.evidence(&registry.process("root").map_err(error)?.capability)?;
+        }
+    } else {
+        configure_capability_authority(
+            &mut kernel,
+            &key,
+            None,
+            None,
+            Some(&directory.join("receipts.db")),
+            None,
+            None,
+            None,
+            issuance,
+            assurance,
+        )?;
+    }
+    Ok(KernelAssembly {
+        kernel,
+        key,
+        authority,
+        receipts,
+        keyring,
+    })
 }
 
 pub(super) struct Host {
-    // Stop the authority worker before releasing the exclusive host lease.
+    // Stop the authority worker before dropping its kernel and signer owners.
     _broker_service: Option<super::native_broker::AuthorityService>,
-    pub lease: Lease,
     pub record: Record,
     pub runtime: ProcessRuntime,
     pub kernel: Arc<ChioKernel>,
+    pub keyring: Option<super::keyring::HostKeyring>,
     #[cfg(target_os = "linux")]
     pub receipts: Arc<chio_store_sqlite::SqliteReceiptStore>,
     #[cfg(target_os = "linux")]
     pub authority: DurableAdmissionRuntime,
     #[cfg(target_os = "linux")]
     pub lifecycle: Option<Arc<super::lifecycle::Service>>,
+    // Fields drop in declaration order. A replacement host cannot acquire the
+    // lease while this host still owns a key selector or receipt writer.
+    pub lease: Lease,
 }
 
 impl Host {
@@ -513,11 +551,22 @@ impl Host {
             return Err(error("policy changed since initialization; restore the original policy to recover this host"));
         }
         let swarm_required = policy.kernel.require_swarm_admission;
-        let (mut kernel, issuer, authority, _receipts) = kernel(
+        let KernelAssembly {
+            mut kernel,
+            key: issuer,
+            authority,
+            receipts: _receipts,
+            keyring,
+        } = kernel(
             lease.directory.path(),
             policy,
             false,
             record.config.execution_nonces,
+            record
+                .config
+                .native_broker
+                .as_ref()
+                .and_then(|broker| broker.keyring.as_ref()),
         )?;
         let lifecycle = if connect && !record.config.spawn_templates.is_empty() {
             Some(Arc::new(super::lifecycle::Service::new(
@@ -608,6 +657,7 @@ impl Host {
             record,
             runtime,
             kernel,
+            keyring,
             _broker_service: broker_service,
             #[cfg(target_os = "linux")]
             receipts: _receipts,

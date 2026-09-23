@@ -5,9 +5,11 @@ The images for the historical inputs below are built and locally validated.
 The current candidate retains the reviewed AWS-LC repair and composes the
 existing broker with the ordinary process host. Process signing keys now use
 the existing zeroize dependency, and native broker preparation uses the existing
-tracing dependency for operator diagnostics. No registry version changes.
+tracing dependency for operator diagnostics. Governed process-host issuance
+adds the existing keyring crate to the CLI's direct dependencies. No registry
+version changes.
 The lock digest is
-`c7d66a39f24a5cb54709061c22bbf350b68dc7d4e4e5abf36d8fc5173327eab4`.
+`e3f42ccac4fd0397f507cc3767a25eda3436fd4f43296359d740e39de7cd8d76`.
 The Dockerfile and structural checker pin this exact digest. A fresh image
 build and validation remain required after this ratchet update and the native
 broker preparation gate update.
