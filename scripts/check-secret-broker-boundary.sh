@@ -33,6 +33,14 @@ fi
 export CARGO_INCREMENTAL=0
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
 
+if [[ "${mode}" == "--release" ]]; then
+  if [[ "${CHIO_ENTERPRISE_SECURITY_RUNNER:-0}" != "1" ]] ||
+    [[ "$(uname -s):$(uname -m)" != "Linux:x86_64" ]]; then
+    echo "confined broker release evidence requires the designated Linux x86_64 runner" >&2
+    exit 1
+  fi
+fi
+
 run_tests() {
   local label="$1"
   local allow_filtered="$2"
@@ -262,6 +270,25 @@ elif [[ "${mode}" == "--release" ]]; then
 else
   echo "Broker portable gate passed; no Linux inherited-FD custody evidence was produced"
   exit 0
+fi
+
+if [[ "${mode}" == "--release" ]]; then
+  # Rebuild both executables from this candidate. The standard musl target
+  # supplies static binaries without broadening the tool's filesystem grants.
+  export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$workspace/target}"
+  if [[ "$CARGO_TARGET_DIR" != /* ]]; then
+    export CARGO_TARGET_DIR="$workspace/$CARGO_TARGET_DIR"
+  fi
+  cargo build --locked --target x86_64-unknown-linux-musl \
+    -p chio-cage --bin chio-cage-init
+  cargo build --locked --target x86_64-unknown-linux-musl \
+    -p chio-secret-broker --bin chio-broker-mcp
+  export CHIO_CAGE_TEST_HELPER="$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/debug/chio-cage-init"
+  export CHIO_BROKER_MCP_TOOL="$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/debug/chio-broker-mcp"
+  run_tests "confined native broker MCP and terminal cage receipts" yes \
+    "process_boundary_tests::native::confined::native_kernel_confined_broker_mcp_preserves_capture_and_terminal_receipts" \
+    cargo test --locked -p chio-secret-broker --features real-linux-enforcement --lib \
+    process_boundary_tests::native::confined::native_kernel_confined_broker_mcp_preserves_capture_and_terminal_receipts
 fi
 
 echo "Secret broker boundary gate passed"

@@ -143,6 +143,7 @@ fn build_seccomp_plan(
         NativeSyscallProfile::BrokeredNativeV1 => {
             allowed.extend(STANDARD.iter().copied());
             allowed.extend(BROKERED.iter().copied());
+            allowed.insert("fcntl");
         }
     }
     for forbidden in [
@@ -183,6 +184,24 @@ fn build_seccomp_plan(
                 }],
             );
         }
+        // Rust checks descriptor validity before closing an owned socket.
+        // Permit only F_GETFD on the retained broker slot. Duplication, flag
+        // mutation, and inspection of every other descriptor remain denied.
+        argument_constraints.insert(
+            "fcntl".to_string(),
+            vec![
+                SyscallArgumentConstraint {
+                    argument_index: 0,
+                    comparison: SeccompArgumentComparison::Equal,
+                    value: u64::from(BROKER_IPC_FD_SLOT),
+                },
+                SyscallArgumentConstraint {
+                    argument_index: 1,
+                    comparison: SeccompArgumentComparison::Equal,
+                    value: 1, // Linux F_GETFD on both supported architectures.
+                },
+            ],
+        );
     }
     Ok(SeccompProfilePlan {
         architecture,

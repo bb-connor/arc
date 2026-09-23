@@ -27,7 +27,9 @@ fn fixture<T: serde::de::DeserializeOwned>(name: &str) -> T {
 }
 
 fn command(descriptor: &impl AsRawFd) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_chio-broker-mcp"));
+    let executable = std::env::var_os("CHIO_BROKER_MCP_TOOL")
+        .unwrap_or_else(|| env!("CARGO_BIN_EXE_chio-broker-mcp").into());
+    let mut command = Command::new(executable);
     command
         .env_clear()
         .args([

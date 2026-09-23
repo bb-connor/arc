@@ -22,6 +22,7 @@ static long invoke5(long number, long first, long second, long third, long fourt
 #define SYS_READ 0
 #define SYS_WRITE 1
 #define SYS_CLOSE 3
+#define SYS_FCNTL 72
 #define SYS_OPENAT 257
 #define SYS_SOCKET 41
 #define SYS_CLONE 56
@@ -72,6 +73,7 @@ static long invoke5(long number, long first, long second, long third, long fourt
 #define SYS_READ 63
 #define SYS_WRITE 64
 #define SYS_CLOSE 57
+#define SYS_FCNTL 25
 #define SYS_OPENAT 56
 #define SYS_SOCKET 198
 #define SYS_CLONE 220
@@ -364,6 +366,15 @@ __attribute__((noreturn, used)) void probe_start(long *initial_stack) {
     static const char path[] = "/tmp/chio-cage-allowed-directory/late-forbidden-link";
     long result = invoke(SYS_OPENAT, AT_FDCWD, (long)path, O_RDONLY, 0);
     terminate(result == -13 ? 0 : 128);
+#elif PROBE_MODE == 28
+    if (initial_stack[0] != 3) {
+        terminate(129);
+    }
+    const char **arguments = (const char **)&initial_stack[1];
+    long descriptor = arguments[1][0] - '0';
+    long operation = arguments[2][0] - '0';
+    long result = invoke(SYS_FCNTL, descriptor, operation, 0, 0);
+    terminate(result == 0 ? 0 : 130);
 #else
 #error invalid probe mode
 #endif

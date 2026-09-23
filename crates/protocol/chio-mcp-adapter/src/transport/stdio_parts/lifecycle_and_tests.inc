@@ -335,7 +335,14 @@ fn validate_cage_required_inputs(
             || !compiled.admitted().read_resources().is_empty()
             || !compiled.admitted().write_resources().is_empty()
             || !compiled.admitted().environment_variables().is_empty()
-            || !compiled.plan().environment.is_empty())
+            // Cage compilation supplies only these fixed locale values even
+            // when the manifest grants no inherited environment variables.
+            || compiled.plan().environment
+                != std::collections::BTreeMap::from([
+                    ("LANG".to_string(), "C".to_string()),
+                    ("LC_ALL".to_string(), "C".to_string()),
+                    ("TZ".to_string(), "UTC".to_string()),
+                ]))
     {
         return Err(AdapterError::ConnectionFailed(
             "brokered cage launch requires only authenticated preconnected broker IPC and no raw file or environment grants".into(),

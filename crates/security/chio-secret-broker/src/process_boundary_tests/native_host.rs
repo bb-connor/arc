@@ -31,8 +31,8 @@ use chio_store_sqlite::{SqliteAuthorityStore, SqliteReceiptStore, SqliteSecurity
 use std::collections::{BTreeMap, BTreeSet};
 
 type TestResult<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
-const SERVER: &str = "native-broker";
-const TOOL: &str = "send";
+pub(super) const SERVER: &str = "native-broker";
+pub(super) const TOOL: &str = "send";
 
 pub(super) struct NativeHost {
     pub kernel: Arc<ChioKernel>,
@@ -53,6 +53,7 @@ impl NativeHost {
         keys: (&Keypair, &Keypair, &Keypair),
         mut execute: BrokerExecuteRequest,
         tool: Option<Arc<dyn crate::kernel_admission::BrokerMcpToolConnection>>,
+        manifest_registry: Arc<VerifiedManifestRegistry>,
     ) -> TestResult<Self> {
         let (issuer, caller, authority_signer) = keys;
         let locks = directory.join("kernel-locks");
@@ -165,7 +166,7 @@ impl NativeHost {
         let native = initialize_native(&authority, directory)?;
         let resolver = NativeFlowResolver::new(
             native.clone(),
-            manifests(authority_signer)?,
+            manifest_registry,
             Arc::new(EmptyClassifier),
             Arc::new(SystemSecurityClock),
             FlowResolverConfig::new(
@@ -279,20 +280,37 @@ fn initialize_native(
         .admission_binding()?)
 }
 
-fn manifests(signer: &Keypair) -> TestResult<Arc<VerifiedManifestRegistry>> {
+pub(super) fn manifests(
+    signer: &Keypair,
+    confined: bool,
+) -> TestResult<Arc<VerifiedManifestRegistry>> {
     let manifest = ToolManifest {
         schema: TOOL_MANIFEST_SCHEMA.into(),
         server_id: SERVER.into(),
         name: "Native broker".into(),
-        description: None,
+        description: confined.then(|| "MCP server adapted to Chio protocol".into()),
         version: "1.0.0".into(),
         tools: vec![ToolDefinition {
             name: TOOL.into(),
-            description: "Send through the broker".into(),
+            description: if confined {
+                "Execute one originally admitted request through the credential broker"
+            } else {
+                "Send through the broker"
+            }
+            .into(),
             input_schema: serde_json::json!({"type":"object"}),
             output_schema: None,
             pricing: None,
-            annotations: ToolAnnotations::default(),
+            annotations: if confined {
+                ToolAnnotations {
+                    read_only: false,
+                    destructive: true,
+                    idempotent: false,
+                    requires_approval: true,
+                }
+            } else {
+                ToolAnnotations::default()
+            },
             latency_hint: None,
             flow: Some(ToolFlowDeclaration::new(
                 Some(InformationLabel::bottom()),
@@ -302,7 +320,13 @@ fn manifests(signer: &Keypair) -> TestResult<Arc<VerifiedManifestRegistry>> {
             )?),
         }],
         server_tools: Vec::new(),
-        required_permissions: None,
+        required_permissions: confined.then_some(chio_manifest::RequiredPermissions {
+            read_paths: None,
+            write_paths: None,
+            network_destinations: None,
+            environment_variables: None,
+            native_syscall_profile: chio_manifest::NativeSyscallProfile::BrokeredNativeV1,
+        }),
         public_key: signer.public_key().to_hex(),
     };
     let policy = AuthoritativeToolPolicy::new(
@@ -315,7 +339,14 @@ fn manifests(signer: &Keypair) -> TestResult<Arc<VerifiedManifestRegistry>> {
         sign_manifest(&manifest, signer)?,
         &signer.public_key(),
         &BTreeMap::from([(TOOL.into(), policy)]),
-        &BTreeMap::from([(TOOL.into(), RuntimeToolTopology::remote())]),
+        &BTreeMap::from([(
+            TOOL.into(),
+            if confined {
+                RuntimeToolTopology::brokered()
+            } else {
+                RuntimeToolTopology::remote()
+            },
+        )]),
     )?;
     Ok(Arc::new(registry))
 }

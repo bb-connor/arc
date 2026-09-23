@@ -60,7 +60,7 @@ else
 fi
 crate="$root/crates/security/chio-cage"
 
-for mode in $(seq 1 27); do
+for mode in $(seq 1 28); do
   if [[ "$mode" == 10 ]]; then
     continue
   fi
@@ -142,6 +142,7 @@ export CHIO_CAGE_TEST_UNDECLARED_EXEC="$probe_dir/probe-24"
 export CHIO_CAGE_TEST_IGNORE_TERM="$probe_dir/probe-25"
 export CHIO_CAGE_TEST_DIRECTORY_READ="$probe_dir/probe-26"
 export CHIO_CAGE_TEST_DIRECTORY_HARD_LINK="$probe_dir/probe-27"
+export CHIO_CAGE_TEST_BROKER_FCNTL="$probe_dir/probe-28"
 export CHIO_CAGE_TEST_DYNAMIC="$dynamic_probe"
 CHIO_CAGE_TEST_DYNAMIC_RUNTIME="$(printf '%s\n' "${dynamic_runtime_paths[@]}")"
 export CHIO_CAGE_TEST_DYNAMIC_RUNTIME
@@ -156,13 +157,13 @@ if [[ "${CHIO_ENTERPRISE_SECURITY_RUNNER:-0}" == "1" ]]; then
 else
   static_target_dir="$CARGO_TARGET_DIR/static-pie"
 fi
-static_rustflags="${RUSTFLAGS:+${RUSTFLAGS} }-C target-feature=+crt-static -C relocation-model=pie"
 build_static_helper() {
   local features="$1" destination="$2"
-  # An explicit target keeps crt-static off host procedural macros and build scripts.
-  RUSTFLAGS="$static_rustflags" CARGO_TARGET_DIR="$static_target_dir" \
-    cargo build --target x86_64-unknown-linux-gnu -p chio-cage --bin chio-cage-init --features "$features"
-  static_helper="$static_target_dir/x86_64-unknown-linux-gnu/debug/chio-cage-init"
+  # The execution image ships the musl target, which produces a static PIE
+  # using its standard settings and does not alter host build-script flags.
+  CARGO_TARGET_DIR="$static_target_dir" \
+    cargo build --locked --target x86_64-unknown-linux-musl -p chio-cage --bin chio-cage-init --features "$features"
+  static_helper="$static_target_dir/x86_64-unknown-linux-musl/debug/chio-cage-init"
   if [[ ! -x "$static_helper" ]]; then
     echo "static PIE cage-init build did not produce an executable" >&2
     exit 1

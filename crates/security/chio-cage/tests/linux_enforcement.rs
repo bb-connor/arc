@@ -31,6 +31,9 @@ use chio_test_support::prelude::*;
 
 static NEXT_TREE: AtomicU64 = AtomicU64::new(1);
 
+#[path = "support/broker_status.inc"]
+mod broker_status;
+
 fn cage_init_helper() -> PathBuf {
     std::env::var_os("CHIO_CAGE_TEST_HELPER")
         .map(PathBuf::from)
@@ -1115,6 +1118,7 @@ fn default_deny_blocks_ipv4_and_ipv6_connect_and_bind() {
 #[test]
 fn default_deny_blocks_unreviewed_syscall() {
     assert_probe_sigsys("CHIO_CAGE_TEST_FORBIDDEN_SYSCALL");
+    broker_status::check_broker_descriptor_status();
 }
 
 #[test]

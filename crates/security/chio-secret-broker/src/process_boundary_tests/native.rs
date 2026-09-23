@@ -9,6 +9,9 @@ use chio_kernel::admission_operation::{
 use chio_kernel::budget_store::BudgetInvocationState;
 use chio_kernel::{BudgetStore, ToolCallOutput, Verdict};
 
+#[cfg(feature = "real-linux-enforcement")]
+#[path = "native_confined.rs"]
+mod confined;
 #[path = "native_host.rs"]
 mod host;
 #[path = "native_mcp.rs"]
@@ -16,16 +19,24 @@ mod mcp;
 #[path = "native_response_tests.rs"]
 mod responses;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DeliveryRoute {
+    Direct,
+    ObservedMcp,
+    #[cfg(feature = "real-linux-enforcement")]
+    ConfinedMcp,
+}
+
 #[test]
 fn native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_crossing(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    run_native_delivery(false, None)
+    run_native_delivery(DeliveryRoute::Direct, None)
 }
 
 #[test]
 fn native_kernel_broker_mcp_tool_preserves_original_capture_and_signed_completion(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    run_native_delivery(true, None)
+    run_native_delivery(DeliveryRoute::ObservedMcp, None)
 }
 
 #[test]
@@ -36,15 +47,16 @@ fn native_kernel_broker_mcp_tool_keeps_capture_on_lost_or_invalid_completion(
         mcp::CompletionFault::ChangeBody,
         mcp::CompletionFault::ExtraContent,
     ] {
-        run_native_delivery(true, Some(fault))?;
+        run_native_delivery(DeliveryRoute::ObservedMcp, Some(fault))?;
     }
     Ok(())
 }
 
 fn run_native_delivery(
-    mcp_route: bool,
+    route: DeliveryRoute,
     fault: Option<mcp::CompletionFault>,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let mcp_route = route != DeliveryRoute::Direct;
     let directory = crate::private_tempdir()?;
     let kernel_directory = crate::private_tempdir()?;
     let tool_directory = crate::private_tempdir()?;
@@ -107,14 +119,41 @@ fn run_native_delivery(
         completion: std::sync::Mutex::new(None),
         fault,
     });
+    #[cfg(feature = "real-linux-enforcement")]
+    let confined = (route == DeliveryRoute::ConfinedMcp)
+        .then(|| {
+            confined::ConfinedDelivery::new(
+                tool_directory.path(),
+                &fixture.config,
+                broker.id(),
+                &authority_key,
+            )
+        })
+        .transpose()?;
+    let (connection, registry) = match route {
+        DeliveryRoute::Direct => (None, host::manifests(&authority_key, false)?),
+        DeliveryRoute::ObservedMcp => (
+            Some(tool.clone() as Arc<dyn crate::kernel_admission::BrokerMcpToolConnection>),
+            host::manifests(&authority_key, false)?,
+        ),
+        #[cfg(feature = "real-linux-enforcement")]
+        DeliveryRoute::ConfinedMcp => {
+            let confined = confined.as_ref().ok_or("confined delivery absent")?;
+            (
+                Some(confined.tool.clone()
+                    as Arc<dyn crate::kernel_admission::BrokerMcpToolConnection>),
+                confined.registry.clone(),
+            )
+        }
+    };
     let host = host::NativeHost::new(
         kernel_directory.path(),
         &fixture.config,
         broker.id(),
         (&issuer, &caller, &authority_key),
         execution_request(port, credential.clone(), &issuer, &caller),
-        mcp_route
-            .then(|| tool.clone() as Arc<dyn crate::kernel_admission::BrokerMcpToolConnection>),
+        connection,
+        registry,
     )?;
     let runtime = mcp_route
         .then(|| {
@@ -164,6 +203,10 @@ fn run_native_delivery(
     );
     let outcome = invoke();
     if fault.is_none() && !matches!(&outcome, Ok(response) if response.verdict == Verdict::Allow) {
+        #[cfg(feature = "real-linux-enforcement")]
+        if let Some(confined) = confined.as_ref() {
+            confined.diagnose_preparation(&fixture.config);
+        }
         let retained = host
             .authority
             .admission_operation_store()
@@ -225,6 +268,10 @@ fn run_native_delivery(
         &canonical_json_bytes(&host.request)?,
         "native tool request",
     );
+    #[cfg(feature = "real-linux-enforcement")]
+    if let Some(confined) = confined.as_ref() {
+        confined.verify_receipts(&canary)?;
+    }
     let store = host.authority.admission_operation_store();
     let fence = host.authority.mutation_fence();
     let now_ms = || -> std::result::Result<u64, Box<dyn std::error::Error>> {
@@ -388,7 +435,10 @@ fn run_native_delivery(
     scan_tree_for_raw_canary(&canary, kernel_directory.path());
     scan_tree_for_raw_canary(&canary, tool_directory.path());
     authority.stop();
-    assert_eq!(tool.calls.load(Ordering::SeqCst), usize::from(mcp_route));
+    assert_eq!(
+        tool.calls.load(Ordering::SeqCst),
+        usize::from(route == DeliveryRoute::ObservedMcp)
+    );
     responses::reject_signed_capture_substitutions(&host, operation_id, &response, &broker_key)?;
     let (after_verification, _) = store
         .load_unambiguous_retained_tool_request(

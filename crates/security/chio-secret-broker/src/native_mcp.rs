@@ -100,11 +100,12 @@ impl BrokerMcpToolConnection for NativeBrokerMcpTool {
         context: &ToolDispatchContext,
         stream: UnixStream,
     ) -> Result<(), KernelError> {
-        if context.caller_capability_sha256().is_none()
-            || self
-                .preparation_started
-                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-                .is_err()
+        // Readiness precedes final authorization. The kernel binds the caller
+        // capability when it creates the invocation context after preparation.
+        if self
+            .preparation_started
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
         {
             return Err(refused());
         }
@@ -132,7 +133,12 @@ impl BrokerMcpToolConnection for NativeBrokerMcpTool {
                 registry.as_ref(),
                 NativeMcpLaunch::CageRequired(Box::new(launch)),
             )
-            .map_err(|_| refused())?;
+            .map_err(|error| {
+                #[cfg(test)]
+                eprintln!("confined MCP adapter preparation failed: {error}");
+                let _ = error;
+                refused()
+            })?;
             let prepared = PreparedDelivery { context, server };
             if prepared.server.native_enforcement_evidence().is_none()
                 || prepared.server.native_enforcement_receipt().is_none()
@@ -198,7 +204,12 @@ impl ToolServerConnection for NativeBrokerMcpTool {
         let prepared = {
             let mut slot = self.prepared.lock().map_err(|_| refused())?;
             let original = slot.as_ref().ok_or_else(refused)?;
-            if &original.context != dispatch
+            if original.context.request_id() != dispatch.request_id()
+                || original.context.attempt() != dispatch.attempt()
+                || original
+                    .context
+                    .caller_capability_sha256()
+                    .is_some_and(|digest| digest != context.capability_hash())
                 || context.server_id() != self.server_id()
                 || context.tool_name() != self.tool_name
                 || dispatch.caller_capability_sha256() != Some(context.capability_hash())

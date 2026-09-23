@@ -23,6 +23,7 @@ path = "src/bin/chio-broker-mcp.rs"
 conformance = ["dep:chio-kernel"]
 kernel-admission = ["dep:chio-kernel", "dep:async-trait", "dep:tokio"]
 native-mcp = ["kernel-admission", "dep:chio-mcp-adapter", "dep:chio-manifest"]
+real-linux-enforcement = ["native-mcp"]
 
 [dependencies]
 async-trait = { workspace = true, optional = true }
@@ -57,6 +58,7 @@ libc = "0.2"
 
 [dev-dependencies]
 async-trait = { workspace = true }
+chio-cage = { workspace = true }
 chio-control-plane = { workspace = true }
 chio-flow = { workspace = true }
 chio-manifest = { workspace = true }
@@ -64,6 +66,7 @@ chio-security-kernel = { workspace = true }
 chio-test-support = { workspace = true }
 rcgen = "0.13"
 tempfile = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 [lints]
 workspace = true
