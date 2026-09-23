@@ -6,6 +6,14 @@ cd "$(dirname "$0")/.."
 ./scripts/check-protocol-peer-negotiation.sh
 ./scripts/check-consumer-boundaries.sh
 ./scripts/check-release-inputs.sh
+python3 scripts/tests/check-release-source-gates.test.py
+python3 scripts/tests/check-release-draft-assets.test.py
+python3 scripts/tests/release-provenance.test.py
+python3 scripts/tests/check-release-binary-sbom.test.py
+python3 scripts/tests/release-sbom-rescan.test.py
+python3 scripts/tests/macos-release-portability.test.py
+python3 scripts/tests/msrv-cache-target.test.py
+python3 -m unittest discover -s integrations/required-agents/qualification -p 'test_*.py'
 ./scripts/check-workspace-layering.sh
 python3 scripts/check-review-slices.py
 bash scripts/tests/check-sidecar-docker-context.test.sh

@@ -31,6 +31,9 @@ mod request_identity;
 #[path = "runtime_tests/swarm_required.rs"]
 mod swarm_required;
 
+#[path = "runtime_tests/execution_evidence.rs"]
+mod execution_evidence;
+
 static METRICS_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 fn metrics_test_guard() -> std::sync::MutexGuard<'static, ()> {
@@ -982,6 +985,9 @@ fn normalize_dynamic_transport_fields(value: &mut Value) {
             if let Some(receipt_id) = map.get_mut("receiptId") {
                 *receipt_id = json!("$receipt");
             }
+            // Each transport run has a fresh signing identity. Dedicated
+            // execution-evidence tests verify these receipts and their bindings.
+            map.remove("chioEvidence");
             if let Some(owner_session_id) = map.get_mut("ownerSessionId") {
                 *owner_session_id = json!("$session");
             }

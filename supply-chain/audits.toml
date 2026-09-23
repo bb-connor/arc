@@ -557,7 +557,15 @@ notes = "cargo-vet drift closure. Reviewed for current workspace use and require
 who = "Codex (OpenAI), local delta review"
 criteria = "safe-to-deploy"
 delta = "0.8.0 -> 0.8.2"
+importable = false
 notes = "Reviewed the published 0.8.0 to 0.8.1 and 0.8.1 to 0.8.2 source diffs: nested reader depth and bounds, restoration of trailing-data rejection, SET OF duplicate and ordering behavior, borrowed integer conversions, manifests and tests. The four source files containing unsafe transparent-newtype conversions are byte-identical to 0.8.0; no new unsafe code, build script or ambient filesystem/network/process access was introduced. Ran the published 0.8.2 crate tests with all features, including nesting, trailing-data and SET OF regressions. This is a delta review for the locked PKCS8/SPKI dependency update, not a new full audit of the exempt 0.8.0 baseline."
+
+[[audits.der]]
+who = "Chio supply-chain reviewer (Codex)"
+criteria = "safe-to-deploy"
+delta = "0.8.0 -> 0.8.2"
+importable = false
+notes = "Reviewed complete checksum-verified RustCrypto source delta and selected Chio APIs. Pure DER parsing changes add no unsafe code or ambient IO; 0.8.2 restores nested full-consumption validation. Actual Iroh Ed25519/SPKI path passed 17 conformance tests (4 valid and 59 rejected inputs), plus 179 transport tests and 2 doctests. Known unused SetOfRef typed-decode/comparison error suppression remains, so this contextual judgment is not exportable: no use exists in Chio or reviewed Iroh/Ed25519/PKCS8/SPKI parents, and selected default CLI graphs omit der 0.8. Adding SetOfRef use requires renewed review. No vendor patch or security criterion relaxation. See docs/integrations/acceptance/der-dependency-qualification-20260910/README.md for source identities, complete review, discretion and limits."
 
 [[audits.der-parser]]
 who = "Chio supply-chain reviewer"

@@ -1,13 +1,29 @@
 # `@chio-protocol/sdk`
 
-Stable TypeScript SDK for Chio hosted MCP sessions, receipt queries, and
+TypeScript SDK for Chio hosted MCP sessions, receipt queries, and
 invariant verification.
+
+This checkout retains workspace version `0.1.0`. That version alone does not
+identify the current content-addressed receipt format and trusted-signer
+verification changes, or establish six-host acceptance. For integration
+qualification, install the explicitly supplied tarball after independently
+verifying its SHA-256 against the selected source artifact. A previously
+published package with the same version is not interchangeable:
+
+```bash
+npm install --save-exact ./chio-protocol-sdk-0.1.0.tgz
+```
+
+Use `verifyReceiptWithTrustedSigners` with keys selected by the operator.
+Trusting the key returned inside the receipt only establishes self-consistency.
+Callers must also bind the verified receipt to their expected caller, tool,
+parameters, operation identity, and any claimed output. A policy evaluation
+receipt is not proof that an effect was prevented or committed.
 
 ## Installation
 
-```bash
-npm install @chio-protocol/sdk
-```
+Use the selected tarball above for this source. Registry installation follows
+the separate release qualification and version-selection step.
 
 Requirements: Node.js `>=22`. The package ships as ESM and includes `.d.ts`
 types in the published artifact.

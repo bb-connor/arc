@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: a2de5a34e01a3345c9d1cfd8af54ab7b51bd57eed8cf608d3b84ede910af0a3e
+# Schema sha256: c31fc3d855f29edabccd629866ae3f328d7322f74f9c97ed7c5788c1adc8efbe
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -29,9 +29,9 @@ from pydantic_core import core_schema
 #: SHA-256 of the lexicographically sorted concatenation of every
 #: ``spec/schemas/chio-wire/v1/**/*.schema.json`` byte stream that was
 #: fed into datamodel-code-generator at build time.
-SCHEMA_SHA256 = "a2de5a34e01a3345c9d1cfd8af54ab7b51bd57eed8cf608d3b84ede910af0a3e"
+SCHEMA_SHA256 = "c31fc3d855f29edabccd629866ae3f328d7322f74f9c97ed7c5788c1adc8efbe"
 
-from .agent import Body as AgentBody, Body4, ChioAgentmessageHeartbeat, ChioAgentmessageListCapabilities, ChioAgentmessageToolCallRequest, ChioGovernedActiveResponseIntentBody, ChioGovernedTransactionIntent, MaxAmount, OrderedEffect
+from .agent import Body as AgentBody, Body4, Body5, BoundToolInvocationBinding, ChioAgentmessageHeartbeat, ChioAgentmessageListCapabilities, ChioAgentmessageToolCallRequest, ChioGovernedActiveResponseIntentBody, ChioGovernedTransactionIntent, MaxAmount, OrderedEffect
 from .anchor import Body as AnchorBody, CheckpointId, ChioAnchorBatchV1, Inclusion, Kind as AnchorKind, Witness, WitnessReceipt, WitnessState, WitnessState1, WitnessState2, WitnessState3
 from .capability import AggregateRootPublicKey, AggregateRootSignature, AggregateRootSigningAlgorithm, Algorithm as CapabilityAlgorithm, Attenuation, AttenuationProof, AttenuationWitness, Body as CapabilityBody, Caveat, ChioAggregateBudgetRootBinding, ChioAggregateInvocationBudget, ChioAggregateInvocationBudget1, ChioAggregateInvocationBudget2, ChioCapabilityGrant, ChioCapabilityNegotiationV1, ChioCapabilityRevocationEntry, ChioCapabilitytoken, ChioCumulativeApprovalRootBinding, ChioGovernedApprovalToken, ChioOpaqueSupplementalAuthorization, ChioScope, ChioThresholdApprovalProposal, ChioVerifiedApprovalSetBody, Constraint, CumulativeApprovalDelegableConstraint, CumulativeApprovalDirectConstraint, CumulativeRootMonetaryAmount, CumulativeRootPublicKey, CumulativeRootSignature, CumulativeRootSigningAlgorithm, Decision as CapabilityDecision, DelegationLink, GenericConstraint, GovernedApprovalPublicKey, GovernedApprovalSignature, GrantKind, GrantSubsetRelation, Kind as CapabilityKind, LegacyApprovalConstraint, MonetaryAmount as CapabilityMonetaryAmount, Operation as CapabilityOperation, PromptGrant, ResourceGrant, ScopeAttenuation, Subset, ThresholdProposalPublicKey, ThresholdProposalSignature, TokenDigest, ToolGrant, Value, Value1, Value2
 from .error import ChioToolcallerrorCapabilityDenied, ChioToolcallerrorCapabilityExpired, ChioToolcallerrorCapabilityRevoked, ChioToolcallerrorInternalError, ChioToolcallerrorPolicyDenied, ChioToolcallerrorToolServerError, Detail as ErrorDetail
@@ -84,8 +84,10 @@ __all__ = [
     "BbsReceiptSignature",
     "Bindings",
     "Body4",
+    "Body5",
     "BodyItem",
     "BoundTo",
+    "BoundToolInvocationBinding",
     "BoundaryClass",
     "BrokerBinding",
     "BrokerBinding1",

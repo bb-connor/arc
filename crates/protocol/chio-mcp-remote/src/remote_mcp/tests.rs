@@ -542,7 +542,7 @@ mod tests {
     }
 
     #[cfg(target_os = "linux")]
-    fn acquire_test_session_store(path: &FsPath) -> Arc<RemoteSessionStoreLifecycleLease> {
+    pub(super) fn acquire_test_session_store(path: &FsPath) -> Arc<RemoteSessionStoreLifecycleLease> {
         Arc::new(
             RemoteSessionStoreLifecycleLease::acquire(path)
                 .expect("acquire retained test session store"),
@@ -550,7 +550,7 @@ mod tests {
     }
 
     #[cfg(target_os = "linux")]
-    fn private_test_session_database(label: &str) -> (PathBuf, PathBuf) {
+    pub(super) fn private_test_session_database(label: &str) -> (PathBuf, PathBuf) {
         let directory = std::env::temp_dir().join(format!(
             "chio-remote-session-store-{label}-{}-{}",
             std::process::id(),

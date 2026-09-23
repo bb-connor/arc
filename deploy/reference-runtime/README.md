@@ -309,14 +309,13 @@ a local source build does not carry those release attestations.
 
 ## Not supervised here
 
-- `chio-secret-brokerd` and `chio-active-response-authorityd`. The broker
-  performs a production capability handshake with its admission authority
-  at startup, and the tree carries no production host for that authority;
-  the response authority's only client is not wired into any binary. Both
-  daemons also pin their own and their peer's process id inside a canonical
-  deployment config whose digest is baked into a read-only store, so their
-  launcher must fork both children, learn the ids, write the configs and
-  build the store before either continues. That launcher lands with the
-  authority host.
+- `chio-active-response-authorityd` requires the coordinated deployment
+  preparation described above. Its response client is not yet wired into a
+  production host binary. The launcher must start both children behind a
+  readiness barrier, bind their exact process IDs in the canonical deployment
+  configuration, and build the immutable store before either begins serving.
+  The packaged broker unit is separate: it connects to the process host's
+  production admission authority and preserves the configured durable state
+  across restarts.
 - The relay units under `docs/release/chio-pheromone-relay/systemd/`, which
   are unchanged.

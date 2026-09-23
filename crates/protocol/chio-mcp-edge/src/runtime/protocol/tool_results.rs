@@ -32,6 +32,16 @@ pub(in crate::runtime) fn kernel_response_to_tool_result(
         .as_deref()
         .or_else(|| terminal_state_reason(terminal_state));
 
+    // Preserve the exact value whose canonical bytes the kernel signed. MCP
+    // projection can wrap it, while denied and incomplete outputs stay hidden.
+    let (output_kind, evidence_output) = match output.as_ref() {
+        Some(ToolCallOutput::Value(value)) if !is_error && verdict == Verdict::Allow => {
+            ("value", value.clone())
+        }
+        Some(ToolCallOutput::Stream(_)) => ("stream", Value::Null),
+        _ => ("none", Value::Null),
+    };
+
     let result = if let Some(pending) =
         chio_cross_protocol::execution::pending_approval_result(verdict, output.as_ref())
     {
@@ -82,6 +92,17 @@ pub(in crate::runtime) fn kernel_response_to_tool_result(
             "receipt": receipt,
             "receiptId": receipt.id,
             "terminalState": terminal_state,
+        });
+        meta["chioEvidence"] = json!({
+            "schema": "chio.mcp.execution-evidence.v1",
+            "requestId": receipt.metadata.as_ref()
+                .and_then(|metadata| metadata.pointer("/receipt_context/request_id")),
+            "receipt": receipt,
+            "outputKind": output_kind,
+            "output": evidence_output,
+            // The signed decision, content hash and admission state remain
+            // authoritative; this terminal-state projection is diagnostic.
+            "terminalState": terminal_state_label(terminal_state),
         });
     }
     result

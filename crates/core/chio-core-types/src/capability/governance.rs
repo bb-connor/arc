@@ -10,6 +10,7 @@ use crate::crypto::{
     Signature, SigningAlgorithm, SigningBackend,
 };
 use crate::error::{Error, Result};
+use crate::hashing::Hash;
 use crate::schema_binding::ensure_schema_matches;
 use crate::session::SessionAnchorReference;
 use crate::signer_binding::{
@@ -1123,6 +1124,12 @@ fn validate_response_json_shape(
 pub enum GovernedTransactionIntentBody {
     #[default]
     ToolInvocation,
+    /// Tool invocation bound to one capability and SHA-256 of its RFC 8785 arguments.
+    /// Approval cannot transfer to a different capability or parameter payload.
+    BoundToolInvocation {
+        capability_id: String,
+        parameters_hash: Hash,
+    },
     ActiveResponsePlan(Box<GovernedResponsePlanIntentBody>),
 }
 
@@ -1196,7 +1203,8 @@ impl GovernedTransactionIntent {
     pub fn as_active_response_plan(&self) -> Option<&GovernedResponsePlanIntentBody> {
         match &self.body {
             GovernedTransactionIntentBody::ActiveResponsePlan(plan) => Some(plan.as_ref()),
-            GovernedTransactionIntentBody::ToolInvocation => None,
+            GovernedTransactionIntentBody::ToolInvocation
+            | GovernedTransactionIntentBody::BoundToolInvocation { .. } => None,
         }
     }
 
@@ -1212,7 +1220,8 @@ impl GovernedTransactionIntent {
     #[must_use]
     pub const fn governed_operation_expires_at(&self) -> Option<u64> {
         match &self.body {
-            GovernedTransactionIntentBody::ToolInvocation => None,
+            GovernedTransactionIntentBody::ToolInvocation
+            | GovernedTransactionIntentBody::BoundToolInvocation { .. } => None,
             GovernedTransactionIntentBody::ActiveResponsePlan(plan) => Some(plan.expires_at),
         }
     }

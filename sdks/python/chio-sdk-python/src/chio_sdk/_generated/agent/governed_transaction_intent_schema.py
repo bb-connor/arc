@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: a2de5a34e01a3345c9d1cfd8af54ab7b51bd57eed8cf608d3b84ede910af0a3e
+# Schema sha256: c31fc3d855f29edabccd629866ae3f328d7322f74f9c97ed7c5788c1adc8efbe
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, conint, constr
+from pydantic import BaseModel, ConfigDict, Field, conint, constr
 
 from . import active_response_governed_intent_schema
 
@@ -41,6 +41,25 @@ class Body4(BaseModel):
     value: active_response_governed_intent_schema.ChioGovernedActiveResponseIntentBody
 
 
+class BoundToolInvocationBinding(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    capability_id: constr(min_length=1)
+    parameters_hash: constr(pattern=r"^0x[0-9a-f]{64}$") = Field(
+        ...,
+        description="SHA-256 of RFC 8785 canonical tool arguments, serialized as the canonical chio-core-types Hash (32 bytes, lowercase hex with 0x prefix).",
+    )
+
+
+class Body5(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["bound_tool_invocation"]
+    value: BoundToolInvocationBinding
+
+
 class ChioGovernedTransactionIntent(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -56,4 +75,4 @@ class ChioGovernedTransactionIntent(BaseModel):
     call_chain: dict[str, Any] | None = None
     autonomy: dict[str, Any] | None = None
     context: Any | None = None
-    body: Body | Body4 | None = None
+    body: Body | Body4 | Body5 | None = None

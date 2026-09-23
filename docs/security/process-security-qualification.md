@@ -24,6 +24,38 @@ below retain their historical source boundaries.
 | Hosted delivery | #1160 publishes the continuation. Main prerequisite #1168 is at `2fb4a6c1c8`; definition-only #1167 retains `88b9b2a3cb`. Original hosted failures remain recorded. | New-head qualification, independent review, protected integration and the exact source/definition/image/verifier authority transition remain required. |
 | M9-M11 | Packaging and handoff work remains preserved. | No milestone-level M9-M10 acceptance or M11 operational promotion is established. |
 
+The native-host integration preserves #1156 at
+`7059c71ca86239e1ba5fe7b63c391db2b2ded3bc` as a merge parent. Session-scoped
+credentials now use the current authenticated resume records and retained
+Linux store lease. Restricted cancellation cannot subscribe to unrelated
+session events. Exact-argument approvals, durable pending-call fences,
+delivery acknowledgements, kernel-owned MCP evidence and verified receipt
+batch recovery remain composed with the existing admission authority.
+
+Owning checks pass on the reconciled implementation: 425 core cases, 120 MCP
+edge cases, 67 remote MCP cases, 16 kernel approval/projection cases, nine
+receipt-batch cases, 59 policy cases and two schema cases. The SDK and
+conformance suites pass 114 and 105 cases; the existing operator suite passes
+65 under the required `umask 022`. Strict all-target Clippy for the six affected
+Rust packages, formatting, source hygiene, schema inventory and all 225 formal
+mirrors pass. The original merge-fixture failures and two zero-test kernel
+selector attempts remain recorded; only the corrected 16-case execution counts
+as kernel evidence. Logs are under
+`output/process-security-20260915/m9-rust-closure-20260923/`.
+
+The resource-owner launcher now requires pinned signed manifest and native
+launch-policy inputs plus the private resume-HMAC keyring. Restart revalidates
+their recorded hashes and command bindings. It creates private owner files
+regardless of the invoking shell's file mask. Historical native-host captures
+remain historical: all six I01-I08 profiles, including Cursor's unresolved
+server-side restriction contract, still require current-source acceptance.
+
+The d621 M7 queue stopped after three caught and promoted campaigns before this
+integration changed its input closure. Its complete original inventory and raw
+outputs are retained in `m7-partial-d621-native-host-complete-20260923.tgz`,
+SHA-256 `3f774a756c67cf348e3598735de6770c2cbfd08a08b953c53a4055ee0321b614`.
+Those results do not replace the complete combined-source M7 campaign.
+
 The Rust packaging continuation implements
 [`cargo xtask release rust-preview`](rust-preview-packages.md). It packages the
 selected 50 Chio libraries plus reviewed AWS-LC source into an isolated offline

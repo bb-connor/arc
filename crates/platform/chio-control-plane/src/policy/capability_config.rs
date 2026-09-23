@@ -40,7 +40,6 @@ pub struct ToolGrantConfig {
     /// TTL in seconds for this grant.
     #[serde(default = "default_grant_ttl")]
     pub ttl: u64,
-
     /// Lifetime invocation ceiling enforced by the kernel's budget authority
     /// for this capability grant. Zero denies every invocation; omission leaves
     /// the grant unlimited. Accounting is keyed by capability ID and grant.
