@@ -170,8 +170,16 @@ impl StructuredClassificationResult {
         {
             return Err(StructuredClassificationError::IdentityMismatch);
         }
+        // All field findings bind this one payload. Decode it once instead of
+        // repeating a potentially 1 MiB JSON allocation for each of 256 findings.
+        let document = findings
+            .iter()
+            .any(|finding| matches!(finding.location, FindingLocation::FieldPath(_)))
+            .then(|| serde_json::from_slice::<serde_json::Value>(payload))
+            .transpose()
+            .map_err(|_| StructuredClassificationError::InvalidLocation)?;
         for finding in &findings {
-            validate_location(&finding.location, payload)?;
+            validate_location(&finding.location, payload.len(), document.as_ref())?;
         }
         Ok(Self {
             identity,
@@ -340,7 +348,8 @@ fn validate_identifier(value: &str) -> Result<(), StructuredClassificationError>
 
 fn validate_location(
     location: &FindingLocation,
-    payload: &[u8],
+    payload_len: usize,
+    document: Option<&serde_json::Value>,
 ) -> Result<(), StructuredClassificationError> {
     match location {
         FindingLocation::ByteRange { start, end } => {
@@ -348,19 +357,16 @@ fn validate_location(
                 .map_err(|_| StructuredClassificationError::InvalidLocation)?;
             let end = usize::try_from(*end)
                 .map_err(|_| StructuredClassificationError::InvalidLocation)?;
-            if start >= end || end > payload.len() {
+            if start >= end || end > payload_len {
                 return Err(StructuredClassificationError::InvalidLocation);
             }
             Ok(())
         }
-        FindingLocation::FieldPath(path) => {
-            let document: serde_json::Value = serde_json::from_slice(payload)
-                .map_err(|_| StructuredClassificationError::InvalidLocation)?;
-            document
-                .pointer(path)
-                .map(|_| ())
-                .ok_or(StructuredClassificationError::InvalidLocation)
-        }
+        FindingLocation::FieldPath(path) => document
+            .ok_or(StructuredClassificationError::InvalidLocation)?
+            .pointer(path)
+            .map(|_| ())
+            .ok_or(StructuredClassificationError::InvalidLocation),
     }
 }
 

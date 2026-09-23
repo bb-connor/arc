@@ -98,6 +98,9 @@ main() {
   run_tests "overlapping posture expiry in both orders" cargo test -p chio-control-plane --test active_defense_recovery overlapping_temporary_actions_expire_in_both_orders_preserving_remaining_contribution -- --exact
   run_tests "exact capability subtree lift" cargo test -p chio-control-plane --test active_defense_recovery exact_subtree_root_and_every_recorded_descendant_lift -- --exact
   run_tests "overlay store outage denies before dispatch" cargo test -p chio-security-kernel --test active_defense_containment overlay_store_outage_while_contribution_may_be_active_denies_before_dispatch -- --exact
+  run_tests "correlation outage preserves TTL rollback" cargo test --locked -p chio-control-plane --lib security::active_defense_host_tests::correlation_ingress_failure_does_not_strand_expired_overlays -- --exact
+  run_tests "planning outage preserves TTL rollback" cargo test --locked -p chio-control-plane --lib security::active_defense_host_tests::response_planning_failure_does_not_strand_expired_overlays -- --exact
+  run_tests "declassification outbox outage preserves TTL rollback" cargo test --locked -p chio-control-plane --lib security::active_defense_host_tests::declassification_outbox_failure_does_not_strand_expired_overlays -- --exact
   run_tests "planner outage preserves preventive guards" cargo test -p chio-security-kernel --test active_defense_containment planner_outage_with_no_active_overlay_leaves_preventive_guards_functional -- --exact
 
   # Exercise both the scheduler state machine and the production SQLite worker.

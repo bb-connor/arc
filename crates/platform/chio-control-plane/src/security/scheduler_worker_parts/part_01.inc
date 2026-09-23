@@ -1105,8 +1105,13 @@ impl ProductionResponseWorker {
     }
 
     fn tick_once_catching_crash(&self) -> Result<ResponseWorkerTick, ResponseWorkerTickError> {
-        catch_unwind(AssertUnwindSafe(|| self.tick_once()))
-            .unwrap_or_else(|_| Err(worker_task_crash_error()))
+        catch_unwind(AssertUnwindSafe(|| self.tick_once())).unwrap_or_else(|_| {
+            let error = worker_task_crash_error();
+            // Cleanup can fail too. Publish the terminal crash before trying
+            // to release leases so that a second fault cannot hide the first.
+            self.mark_failed(&error);
+            Err(error)
+        })
     }
 
     async fn tick_until_initial_ready(

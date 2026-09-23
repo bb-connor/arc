@@ -85,7 +85,7 @@ impl FixedClock {
         self.now_unix_ms.store(now_unix_ms, Ordering::Release);
     }
 
-    fn panic_on_next_read(&self) {
+    fn panic_on_next_worker_read(&self) {
         self.panic_once.store(true, Ordering::Release);
     }
 
@@ -110,9 +110,6 @@ impl FixedClock {
     }
 
     fn read_now_unix_ms(&self) -> PortResult<u64> {
-        if self.panic_once.swap(false, Ordering::AcqRel) {
-            panic!("controlled active-defense worker crash");
-        }
         let worker_read = std::thread::current()
             .name()
             .is_some_and(|name| name == "chio-response-worker");
@@ -131,6 +128,11 @@ impl FixedClock {
 
 impl SecurityClock for FixedClock {
     fn now_unix_ms(&self) -> PortResult<u64> {
+        // Crash the worker outside the shared SQLite transaction. A storage
+        // clock panic poisons the store and is a different failure boundary.
+        if self.panic_once.swap(false, Ordering::AcqRel) {
+            panic!("controlled active-defense worker crash");
+        }
         self.read_now_unix_ms()
     }
 }
@@ -1058,6 +1060,89 @@ async fn dropping_a_host_keeps_the_worker_live_until_a_ttl_overlay_is_lifted() {
     assert_eq!(worker.health().lifecycle, ResponseWorkerLifecycle::Stopped);
 }
 
+async fn ttl_rollback_survives_planning_store_failure(table: &str) {
+    let fixture = HostFixture::new();
+    let expires_at_unix_ms = fixture.install_ttl_containment_plan();
+    let mut host =
+        ProductionActiveDefenseHost::start(Arc::clone(&fixture.registry), fixture.config.clone())
+            .await
+            .unwrap_or_else(|error| panic!("start host: {error}"));
+    let connection = rusqlite::Connection::open(&fixture.security_path)
+        .unwrap_or_else(|error| panic!("open planning fault connection: {error}"));
+    // These are internal test-owned table names. Hide only a planning dependency;
+    // the durable scheduler, effects and receipt stores remain available.
+    connection
+        .execute_batch(&format!(
+            "ALTER TABLE {table} RENAME TO unavailable_planning_store"
+        ))
+        .unwrap_or_else(|error| panic!("inject planning store outage: {error}"));
+    let degraded = tokio::time::timeout(HOST_LIFECYCLE_TEST_TIMEOUT, async {
+        while host.worker_health().lifecycle != ResponseWorkerLifecycle::Degraded {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await;
+    let readiness_closed = host.ensure_ready().is_err();
+    fixture.clock.set(expires_at_unix_ms.saturating_add(1));
+    let lifted = tokio::time::timeout(HOST_LIFECYCLE_TEST_TIMEOUT, async {
+        while fixture.has_active_overlay_contributions() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await;
+    let outage_still_closed = host.ensure_ready().is_err();
+    // Restore the fault even when the regression fails so retained teardown
+    // can finish without leaving a live host or hiding the original failure.
+    connection
+        .execute_batch(&format!(
+            "ALTER TABLE unavailable_planning_store RENAME TO {table}"
+        ))
+        .unwrap_or_else(|error| panic!("restore planning store: {error}"));
+    host.shutdown()
+        .await
+        .unwrap_or_else(|error| panic!("shutdown recovered host: {error}"));
+    assert!(
+        degraded.is_ok(),
+        "planning outage did not degrade worker health"
+    );
+    assert!(readiness_closed && outage_still_closed);
+    assert!(
+        lifted.is_ok(),
+        "planning outage stranded the expired TTL overlay"
+    );
+    let record = fixture
+        .security_store
+        .load_plan(&ResponsePlanKey {
+            tenant_id: TenantId::new("tenant-host-lifecycle")
+                .unwrap_or_else(|error| panic!("tenant: {error}")),
+            action_id: ActionId::new("host-lifecycle-ttl-action")
+                .unwrap_or_else(|error| panic!("action: {error}")),
+        })
+        .unwrap_or_else(|error| panic!("load lifted response: {error}"))
+        .unwrap_or_else(|| panic!("lifted response missing"));
+    assert_eq!(
+        decode_response_record(&record)
+            .unwrap_or_else(|error| panic!("decode lifted response: {error}"))
+            .state,
+        ResponseState::Lifted
+    );
+}
+
+#[tokio::test]
+async fn correlation_ingress_failure_does_not_strand_expired_overlays() {
+    ttl_rollback_survives_planning_store_failure("security_correlation_ingress").await;
+}
+
+#[tokio::test]
+async fn response_planning_failure_does_not_strand_expired_overlays() {
+    ttl_rollback_survives_planning_store_failure("security_attested_finding_response_outbox").await;
+}
+
+#[tokio::test]
+async fn declassification_outbox_failure_does_not_strand_expired_overlays() {
+    ttl_rollback_survives_planning_store_failure("security_declassification_receipt_outbox").await;
+}
+
 #[tokio::test]
 async fn dropping_after_primary_worker_crash_recovers_and_lifts_a_ttl_overlay() {
     let fixture = HostFixture::new();
@@ -1078,7 +1163,7 @@ async fn dropping_after_primary_worker_crash_recovers_and_lifts_a_ttl_overlay() 
         .registry
         .snapshot()
         .unwrap_or_else(|| panic!("published services missing"));
-    fixture.clock.panic_on_next_read();
+    fixture.clock.panic_on_next_worker_read();
     tokio::time::timeout(HOST_LIFECYCLE_TEST_TIMEOUT, async {
         while primary.health().lifecycle != ResponseWorkerLifecycle::Failed {
             tokio::task::yield_now().await;

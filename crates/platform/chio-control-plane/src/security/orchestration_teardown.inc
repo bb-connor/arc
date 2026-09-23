@@ -503,6 +503,7 @@ impl ReservedProductionActiveDefenseStartup {
                 operation_quiescent: false,
                 worker_stopped: false,
                 unpublished: false,
+                stop_probe: None,
                 on_complete: None,
             },
             teardown_permit,
@@ -931,7 +932,7 @@ impl ProductionActiveDefenseHost {
             teardown.lifecycle.close_runtime_admission()?;
             teardown.admission_closed = true;
         }
-        if let Err(error) = detached_teardown_prepare_worker_stop(teardown) {
+        if let Err(error) = teardown.prepare_worker_stop().await {
             teardown.ensure_teardown_worker_running().await?;
             let health = teardown.active_worker.health();
             let in_flight_sequence = health
@@ -950,7 +951,7 @@ impl ProductionActiveDefenseHost {
                     in_flight_sequence.ok_or(ResponseWorkerTickError::WorkerStopped)?,
                 )
                 .await?;
-            detached_teardown_prepare_worker_stop(teardown)?;
+            teardown.prepare_worker_stop().await?;
         }
         teardown.quiesce_and_stop().await;
         teardown.worker_stopped = true;
@@ -994,6 +995,7 @@ impl ProductionActiveDefenseHost {
                     operation_quiescent: false,
                     worker_stopped: false,
                     unpublished: false,
+                    stop_probe: None,
                     on_complete: None,
                 }),
                 permit,
@@ -1037,6 +1039,7 @@ impl ProductionActiveDefenseHost {
                     operation_quiescent: false,
                     worker_stopped: false,
                     unpublished: false,
+                    stop_probe: None,
                     on_complete: None,
                 },
                 permit,
@@ -1072,10 +1075,39 @@ struct DetachedActiveDefenseTeardown {
     operation_quiescent: bool,
     worker_stopped: bool,
     unpublished: bool,
+    // Cancellation transfers this same in-flight storage operation with the
+    // retained teardown. It must not start a second drain or release custody.
+    stop_probe: Option<tokio::task::JoinHandle<Result<(), ProductionActiveDefenseHostError>>>,
     on_complete: Option<Box<dyn FnOnce() + Send + Sync + 'static>>,
 }
 
 impl DetachedActiveDefenseTeardown {
+    async fn prepare_worker_stop(&mut self) -> Result<(), ProductionActiveDefenseHostError> {
+        if self.stop_probe.is_none() {
+            let lifecycle = self.lifecycle.clone();
+            let store = Arc::clone(&self.security_store);
+            // The scheduler may hold SQLite's mutex during a slow operation.
+            // Never wait for that mutex on the async runtime's executor thread.
+            self.stop_probe = Some(tokio::task::spawn_blocking(move || {
+                lifecycle.drain_to_zero()?;
+                let inventory = store.active_defense_overlay_inventory()?;
+                if inventory.has_active_contributions() {
+                    return Err(ProductionActiveDefenseHostError::ActiveOverlayContributions {
+                        inventory,
+                    });
+                }
+                Ok(())
+            }));
+        }
+        let result = self
+            .stop_probe
+            .as_mut()
+            .ok_or(ProductionActiveDefenseHostError::TeardownOwnershipUnavailable)?
+            .await;
+        self.stop_probe = None;
+        result.map_err(|_| ProductionActiveDefenseHostError::TeardownStorageWorkerFailed)?
+    }
+
     async fn run(&mut self) {
         if !self.admission_closed {
             loop {
@@ -1138,7 +1170,7 @@ impl DetachedActiveDefenseTeardown {
     async fn quiesce_and_stop(&mut self) {
         'worker_phase: loop {
             loop {
-                match detached_teardown_prepare_worker_stop(self) {
+                match self.prepare_worker_stop().await {
                     Ok(()) => break,
                     Err(error) => {
                         if let Err(worker_error) = self.ensure_teardown_worker_running().await {
@@ -1184,16 +1216,7 @@ impl DetachedActiveDefenseTeardown {
                 }
             }
             loop {
-                if let Err(error) = self.lifecycle.drain_to_zero() {
-                    tracing::warn!(
-                        error = %error,
-                        audit_fault = "active_defense_detached_final_receipt_drain_retry",
-                        "detached active-defense final receipt drain failed and will retry"
-                    );
-                    tokio::time::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL).await;
-                    continue;
-                }
-                match ensure_detached_overlay_inventory_empty(self) {
+                match self.prepare_worker_stop().await {
                     Ok(()) => {}
                     Err(ProductionActiveDefenseHostError::ActiveOverlayContributions {
                         ..
@@ -1209,7 +1232,7 @@ impl DetachedActiveDefenseTeardown {
                         tracing::warn!(
                             error = %error,
                             audit_fault = "active_defense_detached_final_inventory_retry",
-                            "detached active-defense final inventory failed and will retry"
+                            "detached active-defense final receipt drain or inventory failed and will retry"
                         );
                         tokio::time::sleep(ACTIVE_DEFENSE_TEARDOWN_RETRY_INTERVAL).await;
                         continue;
@@ -1277,23 +1300,6 @@ impl DetachedActiveDefenseTeardown {
         self.worker_handle = Some(handle);
         Ok(())
     }
-}
-
-fn detached_teardown_prepare_worker_stop(
-    teardown: &DetachedActiveDefenseTeardown,
-) -> Result<(), ProductionActiveDefenseHostError> {
-    teardown.lifecycle.drain_to_zero()?;
-    ensure_detached_overlay_inventory_empty(teardown)
-}
-
-fn ensure_detached_overlay_inventory_empty(
-    teardown: &DetachedActiveDefenseTeardown,
-) -> Result<(), ProductionActiveDefenseHostError> {
-    let inventory = teardown.security_store.active_defense_overlay_inventory()?;
-    if inventory.has_active_contributions() {
-        return Err(ProductionActiveDefenseHostError::ActiveOverlayContributions { inventory });
-    }
-    Ok(())
 }
 
 fn spawn_detached_active_defense_teardown(

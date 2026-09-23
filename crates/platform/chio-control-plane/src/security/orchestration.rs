@@ -249,6 +249,8 @@ pub enum ProductionActiveDefenseHostError {
     TeardownSupervisorUnavailable(String),
     #[error("active-defense teardown ownership is unavailable")]
     TeardownOwnershipUnavailable,
+    #[error("active-defense teardown storage worker failed")]
+    TeardownStorageWorkerFailed,
     #[error("active-defense overlay inventory failed: {0}")]
     OverlayInventory(#[from] PortError),
     #[error("active-defense services retain active overlay contributions: {inventory:?}")]
@@ -696,13 +698,17 @@ impl ResponseWorkerPort for PlanningRecoveryResponseWorkerPort {
         tick_sequence: u64,
         shutdown_requested: bool,
     ) -> Result<ResponseWorkerTick, ResponseWorkerTickError> {
+        // Existing dispatches retain their original authority. Service their
+        // expiry, rollback and receipt recovery before admitting new response
+        // work, so a failed ingress or planner cannot strand an active overlay.
+        // Planning errors still reach the worker and keep host readiness closed.
+        let tick = self.inner.tick(tick_sequence, shutdown_requested)?;
         if self.planner.response_coordinator_is_ready() {
             self.correlation_ingress
                 .drain_once(self.recovery_limits.max_records_per_pass())?;
             self.planner
                 .resume_incomplete_pass(self.recovery_limits.max_records_per_pass())?;
         }
-        let tick = self.inner.tick(tick_sequence, shutdown_requested)?;
         Ok(tick)
     }
 

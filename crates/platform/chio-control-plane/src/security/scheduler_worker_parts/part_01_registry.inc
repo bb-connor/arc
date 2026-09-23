@@ -317,22 +317,13 @@ impl ResponseWorkerPort for SqliteResponseWorkerPort {
             self.release_safe_owned()?;
             return Err(ResponseWorkerTickError::WorkerStopped);
         }
-        let (declassification, compaction) = self.declassification_outbox.as_ref().map_or_else(
-            || {
-                Ok((
-                    DeclassificationReceiptDrainReport::default(),
-                    DeclassificationCompactionReport::default(),
-                ))
-            },
-            ProductionDeclassificationReceiptOutbox::maintain_one_batch,
-        )?;
         let claimed = self.claim(tick_sequence)?;
         let mut report = ResponseWorkerTick {
             tenant_id: self.config.tenant_id.clone(),
-            declassification_receipts_appended: declassification.appended,
-            declassification_receipts_acknowledged: declassification.acknowledged,
-            declassification_receipts_pending: declassification.remaining,
-            declassification_receipts_compacted: compaction.compacted,
+            declassification_receipts_appended: 0,
+            declassification_receipts_acknowledged: 0,
+            declassification_receipts_pending: 0,
+            declassification_receipts_compacted: 0,
             claimed: claimed.len(),
             completed_action_ids: Vec::new(),
             retry_action_ids: Vec::new(),
@@ -364,6 +355,16 @@ impl ResponseWorkerPort for SqliteResponseWorkerPort {
                     return Err(error);
                 }
             }
+        }
+        // A broken declassification outbox must close admission, but cannot
+        // prevent independent, already-authorized response rollback. Each
+        // response still commits its own required receipts through the executor.
+        if let Some(outbox) = &self.declassification_outbox {
+            let (declassification, compaction) = outbox.maintain_one_batch()?;
+            report.declassification_receipts_appended = declassification.appended;
+            report.declassification_receipts_acknowledged = declassification.acknowledged;
+            report.declassification_receipts_pending = declassification.remaining;
+            report.declassification_receipts_compacted = compaction.compacted;
         }
         Ok(report)
     }
