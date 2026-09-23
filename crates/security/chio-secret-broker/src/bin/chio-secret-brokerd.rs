@@ -11,6 +11,39 @@ use chio_secret_broker::daemon_runtime::{
 use chio_secret_broker::inherited_fd::adopt_inherited_key_file;
 use chio_secret_broker::{BrokerError, Result};
 
+#[cfg(unix)]
+static STOP_REQUESTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[cfg(unix)]
+extern "C" fn request_stop(_signal: libc::c_int) {
+    // AtomicBool is lock-free on the supported targets. The handler performs
+    // no allocation, locking, logging or storage access.
+    STOP_REQUESTED.store(true, std::sync::atomic::Ordering::Release);
+}
+
+#[cfg(unix)]
+#[allow(unsafe_code)]
+fn install_stop_handlers() -> Result<()> {
+    // SAFETY: sigaction is initialized before use; the handler has the C ABI
+    // and only sets a lock-free atomic. This binary owns its process handlers.
+    unsafe {
+        let mut action: libc::sigaction = std::mem::zeroed();
+        action.sa_sigaction = request_stop as *const () as usize;
+        action.sa_flags = libc::SA_RESTART;
+        if libc::sigemptyset(&mut action.sa_mask) != 0 {
+            return Err(BrokerError::Custody("stop signal mask failed".to_owned()));
+        }
+        for signal in [libc::SIGTERM, libc::SIGINT] {
+            if libc::sigaction(signal, &action, std::ptr::null_mut()) != 0 {
+                return Err(BrokerError::Custody(
+                    "stop signal handler failed".to_owned(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 struct Args {
     config_path: PathBuf,
     master_key_fd: u32,
@@ -79,6 +112,8 @@ fn run() -> Result<()> {
     #[cfg(target_os = "linux")]
     harden_broker_process_custody()?;
     let args = Args::parse()?;
+    #[cfg(unix)]
+    install_stop_handlers()?;
     let config = BrokerDaemonConfig::load(args.config_path)?;
     // SAFETY: process launch transfers both descriptor numbers exclusively to
     // brokerd, and no Rust value in this process owns either original.
@@ -90,7 +125,13 @@ fn run() -> Result<()> {
     let signing_key = unsafe { adopt_inherited_key_file(args.signing_key_fd, "signing key") }?;
     let master_key = secure_inherited_key_file(master_key, "master key")?;
     let signing_key = secure_inherited_key_file(signing_key, "signing key")?;
-    BrokerDaemonRuntime::build(config, master_key, signing_key)?.serve()
+    let runtime = BrokerDaemonRuntime::build(config, master_key, signing_key)?;
+    #[cfg(unix)]
+    {
+        runtime.serve_until_stopped(&STOP_REQUESTED)
+    }
+    #[cfg(not(unix))]
+    runtime.serve()
 }
 
 fn main() -> ExitCode {

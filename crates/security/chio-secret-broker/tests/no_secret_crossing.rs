@@ -114,10 +114,10 @@ mod linux_process {
     use std::io::{Seek, SeekFrom, Write};
     use std::os::fd::AsRawFd;
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
-    use std::process::{Command, Stdio};
+    use std::process::{Child, Command, Stdio};
     use std::sync::Arc;
     use std::thread;
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     use chio_core_types::capability::governance::{
         GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
@@ -184,12 +184,42 @@ mod linux_process {
 
     #[test]
     fn brokerd_process_governed_provisioning_keeps_seeded_secret_inside_broker() {
+        exercise_brokerd_process(false);
+    }
+
+    #[test]
+    fn brokerd_sigterm_drains_workers_and_restarts_with_its_durable_state() {
+        exercise_brokerd_process(true);
+    }
+
+    fn stop_gracefully(child: &mut Child) {
+        let pid = rustix::process::Pid::from_raw(i32::try_from(child.id()).test_expect("PID"))
+            .test_expect("positive child PID");
+        rustix::process::kill_process(pid, rustix::process::Signal::TERM).test_expect("SIGTERM");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(status) = child.try_wait().test_expect("poll stopped brokerd") {
+                assert!(
+                    status.success(),
+                    "brokerd must drain and exit successfully: {status}"
+                );
+                return;
+            }
+            if Instant::now() >= deadline {
+                child.kill().test_expect("stop wedged brokerd");
+                panic!("brokerd did not drain within five seconds");
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    fn exercise_brokerd_process(graceful_stop: bool) {
         let directory = crate::support::private_tempdir();
         let canary = b"brokerd-linux-process-canary-4f9071";
-        let master_seed = sealed_seed("broker-master", &[101; 32]);
+        let mut master_seed = sealed_seed("broker-master", &[101; 32]);
         let signing_seed = [102; 32];
         let signing_key = Keypair::from_seed(&signing_seed);
-        let signing_seed = sealed_seed("broker-signing", &signing_seed);
+        let mut signing_seed = sealed_seed("broker-signing", &signing_seed);
         let expected_owner_uid = master_seed.metadata().test_expect("master metadata").uid();
         let authority_signer = Keypair::from_seed(&[103; 32]);
         let capability_issuer = Keypair::from_seed(&[104; 32]);
@@ -198,16 +228,19 @@ mod linux_process {
         let authority_socket = directory.path().join("authority.sock");
         let broker_socket = directory.path().join("broker.sock");
         let audit_socket = directory.path().join("privileged-audit").join("audit.sock");
-        let authority_server = AuthorityRpcServer::bind(
-            &authority_socket,
-            signing_key.public_key(),
-            Arc::new(Ed25519Backend::new(authority_signer.clone())),
-            Arc::new(Authority),
-            30,
-        )
-        .test_expect("authority server");
+        let authority_server = Arc::new(
+            AuthorityRpcServer::bind(
+                &authority_socket,
+                signing_key.public_key(),
+                Arc::new(Ed25519Backend::new(authority_signer.clone())),
+                Arc::new(Authority),
+                30,
+            )
+            .test_expect("authority server"),
+        );
+        let initial_authority = Arc::clone(&authority_server);
         let authority_thread = thread::spawn(move || {
-            authority_server
+            initial_authority
                 .serve_one()
                 .test_expect("authority handshake")
         });
@@ -270,7 +303,8 @@ mod linux_process {
         .test_expect("write config");
         std::fs::set_permissions(&config_path, std::fs::Permissions::from_mode(0o600))
             .test_expect("config permissions");
-        let mut child = Command::new(env!("CARGO_BIN_EXE_chio-secret-brokerd"))
+        let mut command = Command::new(env!("CARGO_BIN_EXE_chio-secret-brokerd"));
+        command
             .arg("--config")
             .arg(&config_path)
             .arg("--master-key-fd")
@@ -282,9 +316,8 @@ mod linux_process {
                 String::from_utf8_lossy(canary).into_owned(),
             )
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .test_expect("spawn brokerd");
+            .stderr(Stdio::piped());
+        let mut child = command.spawn().test_expect("spawn brokerd");
         fcntl_setfd(&master_seed, FdFlags::CLOEXEC).test_expect("restore master cloexec");
         fcntl_setfd(&signing_seed, FdFlags::CLOEXEC).test_expect("restore signing cloexec");
         authority_thread.join().test_expect("authority thread");
@@ -369,7 +402,11 @@ mod linux_process {
             .windows(canary.len())
             .any(|window| window == canary));
 
-        child.kill().test_expect("terminate brokerd");
+        if graceful_stop {
+            stop_gracefully(&mut child);
+        } else {
+            child.kill().test_expect("terminate brokerd");
+        }
         let output = child.wait_with_output().test_expect("brokerd output");
         assert!(!output
             .stdout
@@ -379,6 +416,39 @@ mod linux_process {
             .stderr
             .windows(canary.len())
             .any(|window| window == canary));
+        if graceful_stop {
+            assert!(output.status.success());
+            assert!(!broker_socket.exists());
+            assert!(!audit_socket.exists());
+            master_seed
+                .seek(SeekFrom::Start(0))
+                .test_expect("reset master descriptor");
+            signing_seed
+                .seek(SeekFrom::Start(0))
+                .test_expect("reset signing descriptor");
+            let restart_authority = Arc::clone(&authority_server);
+            let handshake = thread::spawn(move || {
+                restart_authority
+                    .serve_one()
+                    .test_expect("restart authority handshake")
+            });
+            fcntl_setfd(&master_seed, FdFlags::empty()).test_expect("inherit restart master");
+            fcntl_setfd(&signing_seed, FdFlags::empty()).test_expect("inherit restart signing");
+            let mut restarted = command.spawn().test_expect("restart brokerd");
+            fcntl_setfd(&master_seed, FdFlags::CLOEXEC).test_expect("restore master cloexec");
+            fcntl_setfd(&signing_seed, FdFlags::CLOEXEC).test_expect("restore signing cloexec");
+            handshake.join().test_expect("restart handshake thread");
+            for _ in 0..200 {
+                if broker_socket.exists() && audit_socket.exists() {
+                    break;
+                }
+                assert!(restarted.try_wait().test_expect("restart status").is_none());
+                thread::sleep(Duration::from_millis(10));
+            }
+            assert!(broker_socket.exists() && audit_socket.exists());
+            stop_gracefully(&mut restarted);
+            assert!(!broker_socket.exists() && !audit_socket.exists());
+        }
         for entry in std::fs::read_dir(directory.path()).test_expect("database directory") {
             let entry = entry.test_expect("directory entry");
             if entry.file_type().test_expect("entry type").is_file() {

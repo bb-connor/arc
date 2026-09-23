@@ -58,6 +58,15 @@ conflicting-option refusal. Strict all-target CLI Clippy and source hygiene
 pass. Current release builds, full installation and the Rust registry package
 closure remain separate M9 work.
 
+The broker daemon now handles SIGTERM/SIGINT by stopping acceptance and joining
+its fixed workers before releasing socket custody. Failures racing that drain
+remain errors, and existing provider/IPC deadlines are unchanged. The real
+process inventory passes all three cases, including preserved hard-kill secret
+custody and a new SIGTERM/restart flow over the same durable stores; the worker
+panic propagation case and strict all-target broker Clippy also pass. These
+results and the initial test-only signal-constant compile correction are retained
+under `output/process-security-20260915/m9-broker-shutdown-20260923/`.
+
 The governed-host qualified full-index patch on `3dd65e1fba` is
 `47b5f18164ac39f4c48ec4debcaad14bd977724879d702462066c51a8a136f73`.
 Its real CLI case passes in 95.45 seconds, including witnessed rotation after

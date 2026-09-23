@@ -429,7 +429,7 @@ pub struct BrokerDaemonRuntime;
 #[cfg(unix)]
 fn run_daemon_serving_worker<F>(
     label: &'static str,
-    failure_sender: std::sync::mpsc::SyncSender<BrokerError>,
+    failure_sender: std::sync::mpsc::SyncSender<Result<()>>,
     worker: F,
 ) where
     F: FnOnce() -> Result<()>,
@@ -439,21 +439,18 @@ fn run_daemon_serving_worker<F>(
     // process at the panic site, which is already terminal and cannot deadlock
     // this in-process supervisor.
     #[cfg(panic = "unwind")]
-    let failure = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(worker)) {
-        Ok(Ok(())) => BrokerError::Invariant(format!(
-            "{label} serving worker terminated without a terminal error"
-        )),
-        Ok(Err(error)) => error,
-        Err(_) => BrokerError::Invariant(format!("{label} serving worker panicked")),
+    let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(worker)) {
+        Ok(result) => result,
+        Err(_) => Err(BrokerError::Invariant(format!(
+            "{label} serving worker panicked"
+        ))),
     };
     #[cfg(panic = "abort")]
-    let failure = match worker() {
-        Ok(()) => BrokerError::Invariant(format!(
-            "{label} serving worker terminated without a terminal error"
-        )),
-        Err(error) => error,
+    let result = {
+        let _ = label;
+        worker()
     };
-    let _send_result = failure_sender.send(failure);
+    let _send_result = failure_sender.send(result);
 }
 
 impl BrokerDaemonRuntime {
@@ -771,6 +768,13 @@ impl BrokerDaemonRuntime {
 
     #[cfg(unix)]
     pub fn serve(&self) -> Result<()> {
+        self.serve_until_stopped(&std::sync::atomic::AtomicBool::new(false))
+    }
+
+    /// Stop accepting work when requested, then join all workers before
+    /// releasing daemon custody. Existing I/O keeps its configured deadlines.
+    #[cfg(unix)]
+    pub fn serve_until_stopped(&self, shutdown: &std::sync::atomic::AtomicBool) -> Result<()> {
         use std::sync::atomic::{AtomicBool, Ordering};
         use std::sync::mpsc;
         use std::time::Duration;
@@ -783,8 +787,8 @@ impl BrokerDaemonRuntime {
         self.privileged_audit_endpoint.set_nonblocking(true)?;
         let stop = AtomicBool::new(false);
         let (failure_sender, failure_receiver) =
-            mpsc::sync_channel::<BrokerError>(NORMAL_IPC_WORKERS + 2);
-        std::thread::scope(|scope| {
+            mpsc::sync_channel::<Result<()>>(NORMAL_IPC_WORKERS + 2);
+        let outcome = std::thread::scope(|scope| {
             for _ in 0..NORMAL_IPC_WORKERS {
                 let normal_sender = failure_sender.clone();
                 let normal_stop = &stop;
@@ -833,12 +837,31 @@ impl BrokerDaemonRuntime {
                 });
             });
             drop(failure_sender);
-            let failure = failure_receiver.recv().unwrap_or_else(|_| {
-                BrokerError::Invariant("broker daemon serving thread terminated".to_string())
-            });
+            let outcome = loop {
+                if shutdown.load(Ordering::Acquire) {
+                    break Ok(());
+                }
+                match failure_receiver.recv_timeout(Duration::from_millis(20)) {
+                    Ok(Err(error)) => break Err(error),
+                    Ok(Ok(())) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        break Err(BrokerError::Invariant(
+                            "broker daemon serving thread terminated without a stop request"
+                                .to_owned(),
+                        ));
+                    }
+                    Err(mpsc::RecvTimeoutError::Timeout) => {}
+                }
+            };
             stop.store(true, Ordering::Release);
-            Err(failure)
-        })
+            outcome
+        });
+        outcome?;
+        // A failure that races the stop request must not become a clean exit.
+        // The scope has joined every producer, so this drains terminal results.
+        for completion in failure_receiver.try_iter() {
+            completion?;
+        }
+        Ok(())
     }
 
     #[cfg(not(unix))]
@@ -1288,7 +1311,7 @@ mod tests {
                 .test_expect("panicking serving worker must publish a failure");
             assert!(matches!(
                 failure,
-                BrokerError::Invariant(message)
+                Err(BrokerError::Invariant(message))
                     if message == format!("{label} serving worker panicked")
             ));
             drop(peer_sender);
