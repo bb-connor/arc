@@ -80,9 +80,34 @@ fn repair_is_idempotent_when_watermark_already_covers_boundary(
         })?;
     }
 
-    let store = SqliteReceiptStore::open_existing(&path)?;
-    let removed = store.retention_repair(archive_path)?;
+    let store = std::sync::Arc::new(SqliteReceiptStore::open_existing(&path)?);
+    let blocker = rusqlite::Connection::open(&path)?;
+    blocker.execute_batch("BEGIN IMMEDIATE")?;
+    let repairing = std::sync::Arc::clone(&store);
+    let repair_archive = archive_path.to_owned();
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    let worker = std::thread::spawn(move || {
+        let _ = sender.send(repairing.retention_repair(&repair_archive));
+    });
+    let waiting = receiver.recv_timeout(std::time::Duration::from_millis(100));
+    let inflight = store.receipt_commit_actor.writer_counters().inflight;
+    // Always release the real SQLite write lock before joining or asserting.
+    blocker.execute_batch("ROLLBACK")?;
+    let outcome = match waiting {
+        Ok(outcome) => Some(outcome),
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => receiver
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .ok(),
+        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => None,
+    };
+    worker.join().map_err(|_| "repair worker panicked")?;
+    assert_eq!(inflight, 1, "a blocked repair must remain in flight");
+    let removed = outcome.ok_or("repair did not respond")??;
     assert_eq!(removed, 2, "repair removes the orphaned claim-log rows");
+    let counters = store.receipt_commit_actor.writer_counters();
+    assert_eq!(counters.inflight, 0);
+    assert_eq!(counters.queue_depth, 0);
+    assert!(!store.receipt_commit_actor.writer_serving_closed());
 
     // The orphans are gone and the watermark still sits at the covered boundary.
     let live = store.reader_connection_for_test()?;

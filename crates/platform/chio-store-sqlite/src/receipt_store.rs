@@ -2133,10 +2133,8 @@ fn handle_non_append_command(
             archive_path,
             response,
         } => {
-            // Unconditional decrement pairs with the pre-send increment in
-            // `SqliteReceiptStore::retention_repair` (mirrors the Rotate arm's
-            // dequeue decrement above).
-            atomic_saturating_sub(&health.inflight, 1);
+            // Retain ownership through archive I/O and full head revalidation.
+            let inflight_guard = WriterInflightGuard::new(&health.inflight);
             // Runs regardless of `head_state` (like ReseedHead): the whole
             // point of this command is to repair a store whose head is
             // already Poisoned by the drift the repair removes, so gating it
@@ -2155,14 +2153,19 @@ fn handle_non_append_command(
                 // committed -- but it does update head_state/health so a
                 // subsequent health check or write surfaces the real cause
                 // instead of a stale poisoned message.
-                let reseed =
+                let reseed = if health.critical_write_poisoned.load(Ordering::SeqCst) {
+                    Err(ReceiptStoreError::Conflict(format!(
+                        "{}; repair the critical receipt projection and reopen the receipt store",
+                        critical_writer_error_message(health)
+                    )))
+                } else {
                     receipt_pool_connection(pool, sink_qualification).and_then(|connection| {
-                        if incremental_verification {
-                            seed_verified_head(&connection)
-                        } else {
-                            seed_head_snapshot(&connection)
-                        }
-                    });
+                        // Recovery must prove a clean head in both modes. The
+                        // cheap snapshot defers integrity checks to an append.
+                        support::audit_receipt_cost_projection(&connection)?;
+                        seed_verified_head(&connection)
+                    })
+                };
                 match reseed {
                     Ok(head) => {
                         health.store_head_snapshot(&head);
@@ -2177,16 +2180,19 @@ fn handle_non_append_command(
                         // returning the pre-repair append error. Fail-closed is
                         // unaffected: a real later batch failure re-sets it.
                         *pending_flush_error = None;
+                        health.set_head_poisoned(false);
                         *head_state = WriterHeadState::Verified(Box::new(head));
                     }
                     Err(error) => {
                         if let Ok(mut last_error) = health.last_error.lock() {
                             *last_error = Some(error.to_string());
                         }
+                        health.set_head_poisoned(true);
                         *head_state = WriterHeadState::Poisoned(error.to_string());
                     }
                 }
             }
+            drop(inflight_guard);
             let _ = response.send(outcome);
         }
         // Append/Flush are handled by the main loop; reaching here is
@@ -3744,14 +3750,9 @@ impl SqliteReceiptStore {
     pub fn retention_repair(&self, archive_path: &str) -> Result<u64, ReceiptStoreError> {
         let (response, result) = mpsc::sync_channel(1);
         let health = &self.receipt_commit_actor.health;
-        // In-flight writer, same accounting discipline as a rotation
-        // (`dispatch_rotate`): increment before handing the command to the
-        // actor so a concurrent `receipt_store_health` cannot observe a
-        // dequeued-but-uncounted repair. The `RetentionRepair` arm
-        // decrements unconditionally on dequeue; any send/recv failure here
-        // undoes the speculative increment so a rejected repair never leaks
-        // inflight.
-        health.inflight.fetch_add(1, Ordering::SeqCst);
+        // The actor retains this ownership until repair and revalidation end.
+        let previous_inflight = health.inflight.fetch_add(1, Ordering::SeqCst);
+        health.note_channel_send();
         if let Err(error) =
             self.receipt_commit_actor
                 .sender
@@ -3760,16 +3761,25 @@ impl SqliteReceiptStore {
                     response,
                 })
         {
+            health.note_channel_send_rejected();
             atomic_saturating_sub(&health.inflight, 1);
             return Err(match error {
-                mpsc::TrySendError::Full(_) => receipt_actor_saturated_error(),
-                mpsc::TrySendError::Disconnected(_) => receipt_actor_unavailable_error(),
+                mpsc::TrySendError::Full(_) => {
+                    health.saturated_total.fetch_add(1, Ordering::SeqCst);
+                    receipt_actor_saturated_error()
+                }
+                mpsc::TrySendError::Disconnected(_) => {
+                    health.note_writer_unavailable();
+                    receipt_actor_unavailable_error()
+                }
             });
         }
+        health.note_accept(previous_inflight);
         match result.recv() {
             Ok(outcome) => outcome,
             Err(_) => {
                 atomic_saturating_sub(&health.inflight, 1);
+                health.note_writer_unavailable();
                 Err(receipt_actor_unavailable_error())
             }
         }

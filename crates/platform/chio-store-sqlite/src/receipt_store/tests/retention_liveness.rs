@@ -6,6 +6,51 @@ use chio_kernel::ReceiptWriterLiveness;
 use crate::SqliteReceiptStore;
 
 #[test]
+fn retention_repair_revalidates_integrity_before_reopening_either_mode(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for incremental_verification in [false, true] {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("live.db");
+        let keypair = super::support::receipt_test_keypair();
+        {
+            let store = SqliteReceiptStore::open(&path)?;
+            let receipt = super::support::sample_receipt_with_keypair("repair-health", 1, &keypair);
+            store.append_chio_receipt_returning_seq(&receipt)?;
+            store.flush_receipt_writes()?;
+            store.create_next_receipt_checkpoint(1, &keypair)?;
+        }
+        let store = SqliteReceiptStore::open_existing_with_options(
+            &path,
+            crate::SqliteStoreOptions {
+                pool: crate::SqlitePoolConfig::default(),
+                incremental_verification,
+            },
+        )?;
+        store.flush_receipt_writes()?;
+        let connection = rusqlite::Connection::open(&path)?;
+        let original: String = connection.query_row(
+            "SELECT signature FROM kernel_checkpoints WHERE checkpoint_seq = 1",
+            [],
+            |row| row.get(0),
+        )?;
+        connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update")?;
+        connection.execute("UPDATE kernel_checkpoints SET signature = 'corrupt'", [])?;
+        // No orphaned rows need removing. Recovery must nevertheless verify
+        // the whole checkpoint chain before publishing a serving head.
+        assert_eq!(store.retention_repair("unused-archive.sqlite3")?, 0);
+        assert!(store.receipt_commit_actor.writer_serving_closed());
+        connection.execute("UPDATE kernel_checkpoints SET signature = ?1", [original])?;
+        assert_eq!(store.retention_repair("unused-archive.sqlite3")?, 0);
+        assert!(!store.receipt_commit_actor.writer_serving_closed());
+        let receipt = super::support::sample_receipt_with_keypair("after-repair", 2, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+        store.flush_receipt_writes()?;
+        assert!(store.receipt_store_health()?.healthy);
+    }
+    Ok(())
+}
+
+#[test]
 fn rotation_waiting_for_storage_remains_inflight_until_its_response(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
