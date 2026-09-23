@@ -61,6 +61,15 @@ are retained as `m9-auditable-e621-preparation-20260923.tgz`, SHA-256
 `b2d4278dafcc811627617d7ea4e727aa2ec085cf204e9549c7792911c108318b`.
 This is not a complete or current release build.
 
+Package assembly now owns a fresh Cargo output directory. The clean-source
+attempt reproduced a reused 86,196-byte archive containing a valid 86,179-byte
+gzip stream plus 17 stale bytes; assembly correctly refused it. The fresh-output
+repair passes complete assembly and strict xtask Clippy. The original failure
+and exact prefix comparison remain in the Rust-closure evidence directory.
+M7's behavioral controls and mutation builds now explicitly use `--locked`;
+their complete existing gate contract passes. Campaign capture must keep all
+logs and Cargo targets outside its frozen source tree.
+
 The September 23 M7 recovery continuation services previously authorized
 responses before new correlation/planning work and independent declassification
 outbox maintenance. Three real-store outage cases verify that admission remains

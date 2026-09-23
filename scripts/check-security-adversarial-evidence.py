@@ -5237,7 +5237,7 @@ def run_control(
         raise EvidenceError(
             f"{control['id']}: requires {required_os}, observed {platform.system().lower()}"
         )
-    command = ["cargo", "test", "--package", control["package"]]
+    command = ["cargo", "test", "--locked", "--package", control["package"]]
     if control["features"]:
         command.extend(["--features", ",".join(control["features"])])
     if control["target_kind"] == "lib":
@@ -5510,6 +5510,7 @@ def run_campaign(
         "--no-shuffle",
         "--in-place",
         "--jobserver-tasks=1",
+        "--cargo-arg=--locked",
         "--output",
         str(output_root),
     ]

@@ -4157,6 +4157,7 @@ checker.atomic_replace_many(
             "--no-config",
             "--in-place",
             "--jobserver-tasks=1",
+            "--cargo-arg=--locked",
             "--line-col=true",
             "--no-shuffle",
         ):
@@ -4220,7 +4221,12 @@ checker.atomic_replace_many(
         test_package_index = command.index("--test-package")
         if command[test_package_index + 1] != "fixture-control-package":
             raise AssertionError(f"wrong cross-package control: {command}")
-        if any(argument.startswith("--cargo-arg=") for argument in command):
+        if "--cargo-arg=--locked" not in command:
+            raise AssertionError("cross-package control omitted the dependency lock")
+        if any(
+            argument.startswith("--cargo-arg=") and argument != "--cargo-arg=--locked"
+            for argument in command
+        ):
             raise AssertionError(
                 "cross-package control leaked a target selector into the mutated package"
             )
