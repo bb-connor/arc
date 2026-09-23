@@ -213,6 +213,8 @@ jobs:
             -p chio-cage --bin chio-cage-init --features real-linux-enforcement
           cargo auditable build --release --locked --target x86_64-unknown-linux-musl \
             -p chio-secret-broker --bin chio-broker-mcp
+          cargo auditable build --release --locked --target x86_64-unknown-linux-musl \
+            -p chio-reference-tools --bins
 
       - name: Install syft
         if: runner.os != 'Windows'
@@ -314,11 +316,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for binary in chio-secret-brokerd chio-active-response-authorityd chio-keylog-witness chio-keylog-audit chio-cage-init chio-broker-mcp; do
+          for binary in chio-secret-brokerd chio-active-response-authorityd chio-keylog-witness chio-keylog-audit chio-cage-init chio-broker-mcp chio-tool-repo-reader chio-tool-artifact-writer chio-tool-digest; do
             target=x86_64-unknown-linux-gnu
-            if [[ "$binary" == chio-cage-init || "$binary" == chio-broker-mcp ]]; then
-              target=x86_64-unknown-linux-musl
-            fi
+            case "$binary" in
+              chio-cage-init|chio-broker-mcp|chio-tool-*) target=x86_64-unknown-linux-musl ;;
+            esac
             out_file="out/sbom/${binary}-${target}.cyclonedx.json"
             syft --config deploy/sbom/syft.yaml \
               -o "cyclonedx-json@1.6=${out_file}" "target/${target}/release/${binary}"

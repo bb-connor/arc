@@ -16,8 +16,14 @@ target_dir="$(realpath -e -- "$1")"
 stage_dir="$(realpath -e -- "$2")"
 native_target=x86_64-unknown-linux-gnu
 static_target=x86_64-unknown-linux-musl
-names=(chio chio-secret-brokerd chio-active-response-authorityd chio-keylog-witness chio-keylog-audit chio-cage-init chio-broker-mcp)
-targets=("$native_target" "$native_target" "$native_target" "$native_target" "$native_target" "$static_target" "$static_target")
+names=(
+  chio chio-secret-brokerd chio-active-response-authorityd chio-keylog-witness chio-keylog-audit
+  chio-cage-init chio-broker-mcp chio-tool-repo-reader chio-tool-artifact-writer chio-tool-digest
+)
+targets=(
+  "$native_target" "$native_target" "$native_target" "$native_target" "$native_target"
+  "$static_target" "$static_target" "$static_target" "$static_target" "$static_target"
+)
 
 # Validate every executable before adding any companion to the release. Cage
 # helpers must be static because their signed filesystem grants omit a loader.
@@ -70,6 +76,7 @@ cp -R -- "$root/deploy/reference-runtime" "$stage_dir/reference-runtime"
 install -m 0644 -- "$root/scripts/lib/provision-mcp-launch.sh" "$stage_dir/provision-mcp-launch.sh"
 install -m 0644 -- "$root/docs/security/broker-prepared-connections.md" "$stage_dir/reference-runtime/broker-prepared-connections.md"
 install -m 0644 -- "$root/docs/security/active-defense-rollout.md" "$stage_dir/reference-runtime/active-defense-rollout.md"
+install -m 0644 -- "$root/crates/tooling/chio-reference-tools/README.md" "$stage_dir/reference-runtime/reference-tools.md"
 source_sha="$(git -C "$root" rev-parse HEAD)"
 lock_sha256="$(sha256sum "$root/Cargo.lock" | cut -d ' ' -f 1)"
 jq -nS --arg source_sha "$source_sha" --arg lock_sha256 "$lock_sha256" --argjson binaries "$records" \

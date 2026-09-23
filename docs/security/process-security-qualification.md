@@ -44,9 +44,9 @@ mirrors pass. The original shutdown deadlock, captured thread stacks, crash-stat
 failure, compile-path mistake, and fixture correction are retained separately
 from the passing retries under `output/process-security-20260915/m7-recovery-20260923/`.
 
-The M9 continuation adds the six runtime companion binaries, their SBOMs and
+The M9 continuation adds the nine runtime companion binaries, their SBOMs and
 digests, and provisioning assets to the Linux x86 release archive. A remote
-staging-mechanism check validates all seven real x86 executables and static
+initial staging-mechanism check validates seven real x86 executables and static
 confinement helpers. Its inputs are explicitly labeled historical `a24204b42b`
 debug binaries, so it does not qualify a current release build. The supervisor
 also implements `--credential-fd ARGUMENT=CREDENTIAL` for the broker and response
@@ -57,6 +57,14 @@ including exact binary bytes, distinct descriptors, unsafe-file refusal and
 conflicting-option refusal. Strict all-target CLI Clippy and source hygiene
 pass. Current release builds, full installation and the Rust registry package
 closure remain separate M9 work.
+
+The archive also includes the three reference tools and their command reference,
+so its installation instructions require no checkout or tool compilation. All
+three tools build in release mode for x86_64 musl at `c1d7d13a86`; ELF checks
+confirm no interpreter, shared-library dependency or runtime search path, and
+the digest tool's actual protocol smoke passes. This is a source build, without
+release attestations. Logs and executable hashes are retained under
+`output/process-security-20260915/m9-reference-tools-20260923/`.
 
 The broker daemon now handles SIGTERM/SIGINT by stopping acceptance and joining
 its fixed workers before releasing socket custody. Failures racing that drain

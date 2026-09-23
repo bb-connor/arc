@@ -36,7 +36,7 @@ baseline is present, and the keylog example configs agree with the units.
 ## Install
 
 1. Install the binaries from the Linux x86_64 release archive, whose
-   `native-runtime.json` identifies all seven executables, their build targets
+   `native-runtime.json` identifies all ten executables, their build targets
    and SHA-256 digests. Verify the release archive's signature and checksum
    before extracting it. From the extracted directory, verify and install:
 
@@ -51,7 +51,7 @@ baseline is present, and the keylog example configs agree with the units.
    `provision-mcp-launch.sh` helper. When following the remaining steps outside
    a source checkout, replace `deploy/reference-runtime` with `reference-runtime`
    and `scripts/lib/provision-mcp-launch.sh` with `provision-mcp-launch.sh`.
-   The two confined executables use the static musl target. Brokered native
+   The five confined executables use the static musl target. Brokered native
    enforcement requires the signed profile and the supported Linux kernel;
    installing these files does not provision credentials or enable responses.
 
@@ -77,15 +77,6 @@ baseline is present, and the keylog example configs agree with the units.
    file must be private, singly linked and owned by the service user. Binary
    bytes, including trailing newlines, are transferred unchanged. Descriptor
    delivery supports supervised launch; it is incompatible with `--exec`.
-
-   To build the existing supervision profile from source instead:
-
-   ```bash
-   cargo build --release -p chio-cli -p chio-keyring
-   install -m 0755 target/release/chio /usr/local/bin/chio
-   install -m 0755 target/release/chio-keylog-witness /usr/local/bin/chio-keylog-witness
-   install -m 0755 target/release/chio-keylog-audit /usr/local/bin/chio-keylog-audit
-   ```
 
 2. Create the accounts and directories, then install the units.
 
@@ -142,18 +133,15 @@ baseline is present, and the keylog example configs agree with the units.
    `--authority-db`. Put it in `CHIO_CONTROL_AUTHORITY_PUBLIC_KEY` of the edge
    environment file; the edge refuses any other current authority key.
 
-5. Install the cage helper and the reference tools, then provision the
-   edge's launch material as root at the Enforced stage. Both the helper
-   and the tools are built static; the helper must be position-independent,
-   which the x86_64 toolchain produces with the flags below.
+5. Install the cage helper and the three reference tools from the same verified
+   archive, then provision the edge's launch material as root at the Enforced
+   stage. These executables are already built static; installation requires no
+   source checkout or compiler. The archive includes their command and grant
+   reference in `reference-runtime/reference-tools.md`.
 
    ```bash
-   RUSTFLAGS="-C target-feature=+crt-static -C relocation-model=pie" \
-     cargo build --release --target x86_64-unknown-linux-gnu \
-     -p chio-cage --bin chio-cage-init --features real-linux-enforcement \
-     -p chio-reference-tools
    install -d -m 0755 /usr/local/libexec/chio
-   install -m 0755 target/x86_64-unknown-linux-gnu/release/{chio-cage-init,chio-tool-repo-reader,chio-tool-artifact-writer,chio-tool-digest} \
+   install -m 0755 chio-cage-init chio-tool-repo-reader chio-tool-artifact-writer chio-tool-digest \
      /usr/local/libexec/chio/
    install -d -m 0750 -g chio-edge /srv/chio/repository
    chio security provision-reference-runtime \
@@ -247,6 +235,29 @@ baseline is present, and the keylog example configs agree with the units.
    mounts for that unit (`/run/credentials/<unit>/seed`), and its
    `socket_path` lives in the unit's runtime directory, which the manager
    removes on stop so a restart never meets a stale socket.
+
+## Building the package from source
+
+On a Linux x86_64 build host with the musl linker installed, build the same
+executables from a committed checkout and stage them into an empty directory:
+
+```bash
+rustup target add x86_64-unknown-linux-musl
+cargo build --locked --release --target x86_64-unknown-linux-gnu \
+  -p chio-cli -p chio-secret-broker -p chio-active-response-authority -p chio-keyring --bins
+cargo build --locked --release --target x86_64-unknown-linux-musl \
+  -p chio-cage --bin chio-cage-init --features real-linux-enforcement
+cargo build --locked --release --target x86_64-unknown-linux-musl \
+  -p chio-secret-broker --bin chio-broker-mcp
+cargo build --locked --release --target x86_64-unknown-linux-musl \
+  -p chio-reference-tools --bins
+mkdir -p native-runtime-stage
+bash scripts/stage-native-security-runtime.sh target native-runtime-stage
+```
+
+Follow the installation steps from that directory. The release workflow also
+embeds dependency inventories and generates SBOMs, signatures and provenance;
+a local source build does not carry those release attestations.
 
 ## Operations
 
