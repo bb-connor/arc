@@ -586,6 +586,14 @@ impl AuthorityRpcServer {
     }
 
     fn serve_stream(&self, mut stream: UnixStream) -> Result<()> {
+        // A partial frame must not retain the host's authority worker forever.
+        let timeout = Some(Duration::from_secs(30));
+        stream
+            .set_read_timeout(timeout)
+            .and_then(|()| stream.set_write_timeout(timeout))
+            .map_err(|error| {
+                BrokerError::Storage(format!("authority RPC deadline failed: {error}"))
+            })?;
         let request_bytes = read_bounded_frame(&mut stream)?;
         let request: SignedAuthorityRequest =
             serde_json::from_slice(&request_bytes).map_err(|error| {

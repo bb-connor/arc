@@ -16,6 +16,9 @@ mod diagnostics;
 #[path = "process_host/lifecycle.rs"]
 mod lifecycle;
 #[cfg(unix)]
+#[path = "process_host/native_broker.rs"]
+mod native_broker;
+#[cfg(unix)]
 #[path = "process_host/nonce_evidence.rs"]
 mod nonce_evidence;
 #[cfg(unix)]
@@ -45,6 +48,21 @@ mod swarm;
 
 #[derive(Subcommand)]
 pub(crate) enum ProcessCommands {
+    /// Sign one provider request with the host's retained process proof key.
+    PrepareBrokerCall {
+        #[arg(long)]
+        state: PathBuf,
+        #[arg(long)]
+        process: String,
+        #[arg(long)]
+        operation_key: String,
+        #[arg(long)]
+        capability: PathBuf,
+        #[arg(long)]
+        request: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// Observe finished workers, issued graphs, call outcomes and durable family usage (Linux).
     AttestOutcomes {
         #[arg(long)]
@@ -93,6 +111,9 @@ pub(crate) enum ProcessCommands {
         /// Original runtime/process/capability context, independently retained.
         #[arg(long)]
         context: PathBuf,
+        /// Independently retained, normalized host config for brokered calls.
+        #[arg(long)]
+        trusted_broker_host_config: Option<PathBuf>,
     },
     /// Attest completed fixed fan-out results and the retained aggregate usage (Linux).
     AttestRun {
@@ -261,12 +282,14 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
                 runtime_id,
                 request,
                 context,
+                trusted_broker_host_config,
             } => call_evidence::verify_file(
                 &artifact,
                 &trusted_kernel_pubkey,
                 &runtime_id,
                 &request,
                 &context,
+                trusted_broker_host_config.as_deref(),
             ),
             ProcessCommands::AttestRun { state, plan, out } => {
                 #[cfg(target_os = "linux")]
@@ -313,6 +336,21 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
                 swarm_plan.as_deref(),
             ),
             ProcessCommands::Serve { state, socket } => serving::serve(&state, &socket),
+            ProcessCommands::PrepareBrokerCall {
+                state,
+                process,
+                operation_key,
+                capability,
+                request,
+                out,
+            } => native_broker::prepare_call(
+                &state,
+                &process,
+                &operation_key,
+                &capability,
+                &request,
+                &out,
+            ),
             ProcessCommands::Run { state, plan } => {
                 #[cfg(target_os = "linux")]
                 {

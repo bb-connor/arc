@@ -5,15 +5,17 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use chio_kernel::{
-    KernelError, NestedFlowBridge, ToolDispatchContext, ToolInvocationContext, ToolInvocationCost,
-    ToolServerConnection,
+    BlockingToolServerConnection, KernelError, NestedFlowBridge, ToolDispatchContext,
+    ToolInvocationContext, ToolInvocationCost, ToolServerConnection,
 };
 use chio_manifest::{NativeSyscallProfile, VerifiedManifestRegistry};
-use chio_mcp_adapter::adapter::McpAdapterConfig;
+use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig};
 use chio_mcp_adapter::server::AdaptedMcpServer;
-use chio_mcp_adapter::transport::{NativeMcpLaunch, NativeMcpLaunchFactory};
+use chio_mcp_adapter::transport::{NativeMcpLaunch, NativeMcpLaunchFactory, StdioRequestTimeouts};
 
-use crate::kernel_admission::BrokerMcpToolConnection;
+use crate::kernel_admission::{
+    BrokerKernelConnection, BrokerMcpConnection, BrokerMcpToolConnection,
+};
 
 /// A single-use confined connection for one original kernel dispatch.
 ///
@@ -31,6 +33,7 @@ pub struct NativeBrokerMcpTool {
     tool_name: String,
     registry: Arc<VerifiedManifestRegistry>,
     factory: Arc<dyn NativeMcpLaunchFactory>,
+    timeouts: StdioRequestTimeouts,
     preparation_started: AtomicBool,
     prepared: Mutex<Option<PreparedDelivery>>,
 }
@@ -87,9 +90,90 @@ impl NativeBrokerMcpTool {
             tool_name,
             registry,
             factory,
+            timeouts: StdioRequestTimeouts::default(),
             preparation_started: AtomicBool::new(false),
             prepared: Mutex::new(None),
         })
+    }
+
+    pub fn with_request_timeouts(mut self, timeouts: StdioRequestTimeouts) -> Self {
+        self.timeouts = timeouts;
+        self
+    }
+
+    pub(crate) fn fresh(&self) -> Self {
+        Self {
+            command: self.command.clone(),
+            args: self.args.clone(),
+            config: self.config.clone(),
+            tool_name: self.tool_name.clone(),
+            registry: self.registry.clone(),
+            factory: self.factory.clone(),
+            timeouts: self.timeouts,
+            preparation_started: AtomicBool::new(false),
+            prepared: Mutex::new(None),
+        }
+    }
+}
+
+/// A process host's persistent route to invocation-owned confined children.
+/// Every readiness operation authenticates a fresh original broker dispatch;
+/// children and prepared descriptors are never shared, reconnected or retried.
+pub struct NativeBrokerMcpRouter {
+    authority: Arc<BrokerKernelConnection>,
+    template: NativeBrokerMcpTool,
+}
+
+impl NativeBrokerMcpRouter {
+    pub fn new(
+        authority: Arc<BrokerKernelConnection>,
+        template: NativeBrokerMcpTool,
+    ) -> Result<Self, KernelError> {
+        if template.preparation_started.load(Ordering::Acquire)
+            || template.server_id() != authority.server_id()
+            || template.tool_names() != authority.tool_names()
+        {
+            return Err(refused());
+        }
+        Ok(Self {
+            authority,
+            template,
+        })
+    }
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for NativeBrokerMcpRouter {
+    fn server_id(&self) -> &str {
+        self.template.server_id()
+    }
+    fn tool_names(&self) -> Vec<String> {
+        self.template.tool_names()
+    }
+
+    async fn invoke(
+        &self,
+        _: &str,
+        _: serde_json::Value,
+        _: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        Err(refused())
+    }
+
+    async fn prepare_delivery(&self, _: &ToolDispatchContext) -> Result<(), KernelError> {
+        Err(refused())
+    }
+
+    async fn prepare_invocation_connection(
+        &self,
+        context: &ToolDispatchContext,
+    ) -> Result<Option<Arc<dyn ToolServerConnection>>, KernelError> {
+        let connection = Arc::new(
+            BrokerMcpConnection::new(self.authority.clone(), Arc::new(self.template.fresh()))
+                .map_err(|_| refused())?,
+        );
+        connection.prepare_delivery(context).await?;
+        Ok(Some(connection))
     }
 }
 
@@ -114,36 +198,37 @@ impl BrokerMcpToolConnection for NativeBrokerMcpTool {
         let config = self.config.clone();
         let registry = self.registry.clone();
         let factory = self.factory.clone();
+        let timeouts = self.timeouts;
         let context = context.clone();
         let prepare = move || -> Result<PreparedDelivery, KernelError> {
             let witness = stream.try_clone().map_err(|_| refused())?;
             let args: Vec<_> = args.iter().map(String::as_str).collect();
             let launch = factory
                 .prepare_broker_launch(&command, &args, &config.server_id, registry.clone(), stream)
-                .map_err(|_| refused())?;
+                .map_err(|_| refused_at("launch policy"))?;
             // Matching peer credentials alone would also accept a fresh
             // connection to this daemon. Require the same open socket.
             launch
                 .verify_prepared_broker_stream(&witness)
-                .map_err(|_| refused())?;
-            let server = AdaptedMcpServer::from_command_with_manifest_registry(
+                .map_err(|_| refused_at("prepared socket identity"))?;
+            let adapter = McpAdapter::from_command_with_timeouts(
                 &command,
                 &args,
                 config,
-                registry.as_ref(),
                 NativeMcpLaunch::CageRequired(Box::new(launch)),
+                timeouts,
             )
             .map_err(|error| {
-                #[cfg(test)]
-                eprintln!("confined MCP adapter preparation failed: {error}");
-                let _ = error;
-                refused()
+                tracing::error!(error = %error, "confined broker MCP preparation failed");
+                refused_at("MCP handshake")
             })?;
+            let server = AdaptedMcpServer::new_with_manifest_registry(adapter, registry.as_ref())
+                .map_err(|_| refused_at("manifest discovery"))?;
             let prepared = PreparedDelivery { context, server };
             if prepared.server.native_enforcement_evidence().is_none()
                 || prepared.server.native_enforcement_receipt().is_none()
             {
-                return Err(refused());
+                return Err(refused_at("enforcement evidence"));
             }
             Ok(prepared)
         };
@@ -168,6 +253,18 @@ impl ToolServerConnection for NativeBrokerMcpTool {
 
     fn tool_names(&self) -> Vec<String> {
         vec![self.tool_name.clone()]
+    }
+
+    fn prepared_native_launch_receipt(
+        &self,
+    ) -> Option<chio_core_types::receipt::body::ChioReceipt> {
+        self.prepared
+            .lock()
+            .ok()?
+            .as_ref()?
+            .server
+            .native_enforcement_receipt()
+            .cloned()
     }
 
     async fn invoke(
@@ -229,4 +326,9 @@ impl ToolServerConnection for NativeBrokerMcpTool {
 
 fn refused() -> KernelError {
     KernelError::ToolServerError("confined broker MCP delivery refused".to_string())
+}
+
+fn refused_at(stage: &'static str) -> KernelError {
+    // Report only a fixed stage to the caller, never tool output or arguments.
+    KernelError::ToolServerError(format!("confined broker MCP delivery refused at {stage}"))
 }

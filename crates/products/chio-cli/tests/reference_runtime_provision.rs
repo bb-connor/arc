@@ -312,6 +312,35 @@ fn brokered_provisioning_rejects_legacy_stage_discovery_and_file_grants() {
 }
 
 #[test]
+fn brokered_provisioning_allows_a_future_socket_only_in_private_owned_storage() {
+    let fixture = Fixture::new();
+    let (_listener, binding_path, mut binding) = broker_fixture(&fixture);
+    let directory = fixture.root.path().join("future-broker");
+    std::fs::create_dir(&directory).expect("future broker directory");
+    std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700))
+        .expect("private broker directory");
+    binding["socket_path"] = json!(directory.join("broker.sock"));
+    std::fs::write(
+        &binding_path,
+        serde_json::to_vec(&binding).expect("binding"),
+    )
+    .expect("future binding");
+    let output = fixture.output("future");
+    let provisioned = broker_command(&fixture, &output, &binding_path)
+        .output()
+        .expect("provision future socket");
+    assert!(provisioned.status.success(), "{}", stderr(&provisioned));
+    assert!(!directory.join("broker.sock").exists());
+    std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o755))
+        .expect("public directory");
+    let denied = broker_command(&fixture, &fixture.output("public-future"), &binding_path)
+        .output()
+        .expect("reject public future socket");
+    assert!(!denied.status.success());
+    assert!(stderr(&denied).contains("private directory owned by the operator"));
+}
+
+#[test]
 fn brokered_provisioning_rejects_malformed_or_non_socket_bindings() {
     let fixture = Fixture::new();
     let (_listener, path, binding) = broker_fixture(&fixture);

@@ -21,6 +21,9 @@ mod host;
 mod keyring;
 #[path = "native_mcp.rs"]
 mod mcp;
+#[cfg(feature = "real-linux-enforcement")]
+#[path = "native_process_host.rs"]
+mod process_host;
 #[path = "native_response_tests.rs"]
 mod responses;
 
@@ -179,6 +182,11 @@ fn run_native_delivery_with_cutpoint(
             authority_signer: &authority_key,
             parent,
             cutpoint: cutpoint.clone(),
+            #[cfg(feature = "real-linux-enforcement")]
+            confined_router: confined
+                .as_ref()
+                .filter(|_| cutpoint.is_none())
+                .map(|confined| confined.tool.fresh()),
         },
         execution_request(port, credential.clone(), &issuer, &caller),
         connection.map(|connection| cutpoints::wrap_connection(connection, cutpoint.clone())),
@@ -339,6 +347,19 @@ fn run_native_delivery_with_cutpoint(
     #[cfg(feature = "real-linux-enforcement")]
     if let Some(confined) = confined.as_ref() {
         confined.verify_receipts(&canary)?;
+        if cutpoint.is_none() {
+            assert!(
+                outcome
+                    .as_ref()
+                    .map_err(|error| error.to_string())?
+                    .receipt
+                    .metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata["native_launch"]["receipt_id"].as_str())
+                    .is_some(),
+                "invocation-owned cage must be bound to the original kernel receipt"
+            );
+        }
     }
     #[cfg(feature = "real-linux-enforcement")]
     if let Some(keyring) = keyring.as_ref() {
@@ -512,6 +533,38 @@ fn run_native_delivery_with_cutpoint(
         usize::from(route == DeliveryRoute::ObservedMcp)
     );
     responses::reject_signed_capture_substitutions(&host, operation_id, &response, &broker_key)?;
+    let public =
+        host.reader
+            .completed_evidence(&host.participant, operation_id, &response, now_ms()?)?;
+    public.verify(
+        operation.binding(),
+        &host.execute,
+        &response,
+        &broker_key.public_key(),
+        now_ms()?,
+    )?;
+    let mut changed = public.clone();
+    changed.capture.authority_commit_index += 1;
+    assert!(changed
+        .verify(
+            operation.binding(),
+            &host.execute,
+            &response,
+            &broker_key.public_key(),
+            now_ms()?
+        )
+        .is_err());
+    let mut changed = public;
+    changed.registration.authority_metadata_digest = "00".repeat(32);
+    assert!(changed
+        .verify(
+            operation.binding(),
+            &host.execute,
+            &response,
+            &broker_key.public_key(),
+            now_ms()?
+        )
+        .is_err());
     let (after_verification, _) = store
         .load_unambiguous_retained_tool_request(
             &AdmissionIdentifier::try_new("request", &host.request.request_id)?,

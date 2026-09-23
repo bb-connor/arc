@@ -287,6 +287,7 @@ if [[ "${mode}" == "--release" ]]; then
   cargo build --locked --target x86_64-unknown-linux-musl \
     -p chio-secret-broker --bin chio-broker-mcp
   cargo build --locked -p chio-keyring --bins
+  cargo build --locked -p chio-cli --bin chio
   export CHIO_CAGE_TEST_HELPER="$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/debug/chio-cage-init"
   export CHIO_BROKER_MCP_TOOL="$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/debug/chio-broker-mcp"
   export CHIO_KEYLOG_WITNESS="$CARGO_TARGET_DIR/debug/chio-keylog-witness"
@@ -294,6 +295,7 @@ if [[ "${mode}" == "--release" ]]; then
   run_tests "confined native broker MCP, process death and terminal cage receipts" yes "$(cat <<'EOF'
 process_boundary_tests::native::confined::native_kernel_confined_broker_mcp_preserves_capture_and_terminal_receipts
 process_boundary_tests::native::cutpoints::confined_broker_process_cutpoints_preserve_provider_and_quota_observations
+process_boundary_tests::native::process_host::confined_broker_process_host_exports_original_call_and_replays_after_restart
 EOF
 )" \
     cargo test --locked -p chio-secret-broker --features real-linux-enforcement --lib \

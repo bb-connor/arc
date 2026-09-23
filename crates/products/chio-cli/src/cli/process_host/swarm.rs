@@ -35,6 +35,21 @@ const PROFILE: &str = "swarm-profile.json";
 const SOURCE: &str = "swarm-runtime.db";
 const SCHEMA: &str = "chio.process.swarm-profile.v1";
 
+pub(super) fn bootstrap_host(
+    directory: &PreparedPrivateDirectory,
+    record: &Record,
+    runtime: &ProcessRuntime,
+    issuer: &Keypair,
+) -> Result<(), CliError> {
+    let receipt =
+        requests::bootstrap(runtime, record, issuer, now_ms()?, "provision_process_host")?;
+    write_secret(
+        directory,
+        std::ffi::OsStr::new("process-bootstrap.json"),
+        &canonical_json_bytes(&receipt).map_err(error)?,
+    )
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Route {
@@ -155,7 +170,7 @@ pub(super) fn provision(
         return Err(error("root capability expired during initialization"));
     }
     let routes = routes(record)?;
-    let bootstrap = requests::bootstrap(runtime, record, issuer, now)?;
+    let bootstrap = requests::bootstrap(runtime, record, issuer, now, "provision_swarm")?;
     let mut bundles = Vec::new();
     for graph in &plan.graphs {
         let bundle = graph::build(

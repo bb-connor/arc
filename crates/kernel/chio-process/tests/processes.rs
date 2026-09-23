@@ -51,6 +51,77 @@ fn server(calls: &Arc<AtomicUsize>) -> Box<Server> {
 }
 
 #[tokio::test]
+async fn host_flow_identity_is_bound_to_the_original_process_operation() -> Result {
+    let directory = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(directory.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel.clone())?;
+    let profile = chio_process::ProcessSecurityProfile {
+        tenant_id: "tenant-a".into(),
+        isolation_epoch_id: "epoch-a".into(),
+        generation: 1,
+    };
+    let secured = runtime.clone().with_security_profile(profile.clone())?;
+    let capability = root(&secured, &kernel, 2)?;
+    let request = secured.tool_request("root", "bound-call", "tools", "read", json!({}))?;
+    let _response = secured.invoke("root", "bound-call", &request).await?;
+    assert!(matches!(
+        runtime.invoke("root", "bound-call", &request).await,
+        Err(ProcessError::Conflict)
+    ));
+    let changed = runtime.with_security_profile(chio_process::ProcessSecurityProfile {
+        tenant_id: "tenant-b".into(),
+        ..profile
+    })?;
+    assert!(matches!(
+        changed.invoke("root", "bound-call", &request).await,
+        Err(ProcessError::Conflict)
+    ));
+    assert_eq!(request.capability.id, capability.id);
+    Ok(())
+}
+
+#[test]
+fn host_retains_process_signer_and_selects_exact_supplemental_route() -> Result {
+    let directory = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(directory.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel.clone())?
+        .with_supplemental_authorization_route("tools".into(), "append".into())?;
+    let capability = root(&runtime, &kernel, 2)?;
+    runtime
+        .registry()
+        .provision_signers(&[("root".into(), &parent_key())])?;
+    let signed = runtime
+        .registry()
+        .with_process_signer("root", |parent, signer| {
+            assert_eq!(parent.id, capability.id);
+            signer.sign_canonical(&json!({"request": "original"}))
+        })??;
+    assert!(capability
+        .subject
+        .verify_canonical(&json!({"request": "original"}), &signed.0)?);
+    let original = json!({"b": 2, "a": 1});
+    let request = runtime.tool_request("root", "broker", "tools", "append", original.clone())?;
+    let extension = request
+        .supplemental_authorization
+        .ok_or("missing original authorization")?;
+    assert_eq!(
+        serde_json::to_value(extension)?["signed_extension"],
+        "{\"a\":1,\"b\":2}"
+    );
+    assert!(runtime
+        .tool_request("root", "ordinary", "tools", "read", original)?
+        .supplemental_authorization
+        .is_none());
+    assert!(runtime
+        .registry()
+        .with_process_signer("other", |_, _| ())
+        .is_err());
+    Ok(())
+}
+
+#[tokio::test]
 async fn invalid_process_lineage_produces_attributed_signed_denials_without_dispatch() -> Result {
     for refusal in [
         "expired",

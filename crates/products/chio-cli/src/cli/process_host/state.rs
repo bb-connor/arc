@@ -43,6 +43,8 @@ pub(super) struct Config {
     /// Require the original operation-owned nonce before every tool dispatch.
     #[serde(default, skip_serializing_if = "is_false")]
     pub execution_nonces: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_broker: Option<super::native_broker::Config>,
 }
 
 struct NoLegacyNonce;
@@ -102,7 +104,7 @@ pub(super) struct Route {
     pub tool_name: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Record {
     pub config: Config,
@@ -221,6 +223,9 @@ impl Config {
     }
 
     pub fn validate(&self) -> Result<(), CliError> {
+        if let Some(broker) = &self.native_broker {
+            broker.validate(self)?;
+        }
         if self.supervised_children && self.spawn_templates.is_empty() {
             return Err(error("supervised children require spawn templates"));
         }
@@ -474,6 +479,8 @@ pub(super) fn kernel(
 }
 
 pub(super) struct Host {
+    // Stop the authority worker before releasing the exclusive host lease.
+    _broker_service: Option<super::native_broker::AuthorityService>,
     pub lease: Lease,
     pub record: Record,
     pub runtime: ProcessRuntime,
@@ -493,6 +500,13 @@ impl Host {
         require_abi(&record.abi, "host state")?;
         record.config.validate()?;
         let policy = policy::load_policy(&record.config.policy)?;
+        if let Some(broker) = &record.config.native_broker {
+            let default = policy
+                .default_capabilities
+                .first()
+                .ok_or_else(|| error("host policy must define one default capability TTL group"))?;
+            broker.validate_grant_quota(&default.scope)?;
+        }
         if policy.identity.source_hash != record.source_policy_hash
             || policy.identity.runtime_hash != record.runtime_policy_hash
         {
@@ -525,9 +539,11 @@ impl Host {
         if connect {
             let (servers, manifests, observed_launches) = super::serving::connect(
                 &record.config,
-                &kernel,
+                &mut kernel,
                 lease.directory.path(),
                 swarm_required,
+                &authority,
+                false,
             )?;
             launch_receipts = observed_launches;
             if chio_core_types::crypto::canonical_json_bytes(&manifests).map_err(error)?
@@ -551,6 +567,23 @@ impl Host {
             &authority.kernel_keypair(),
         )?;
         let kernel = Arc::new(kernel);
+        let broker_service = if connect {
+            record
+                .config
+                .native_broker
+                .as_ref()
+                .map(|_| {
+                    super::native_broker::AuthorityService::start(
+                        &record.config,
+                        lease.directory.path(),
+                        &authority,
+                        kernel.clone(),
+                    )
+                })
+                .transpose()?
+        } else {
+            None
+        };
         let runtime =
             ProcessRuntime::open(lease.directory.path().join("process.db"), kernel.clone())
                 .map_err(error)?
@@ -558,12 +591,24 @@ impl Host {
                 .map_err(error)?
                 .with_launch_receipts(launch_receipts)
                 .map_err(error)?;
+        let runtime = match &record.config.native_broker {
+            Some(config) => runtime
+                .with_security_profile(config.security.clone())
+                .map_err(error)?
+                .with_supplemental_authorization_route(
+                    config.quota.server_id.clone(),
+                    config.quota.tool_name.clone(),
+                )
+                .map_err(error)?,
+            None => runtime,
+        };
         lease.directory.validate_path_identity()?;
         Ok(Self {
             lease,
             record,
             runtime,
             kernel,
+            _broker_service: broker_service,
             #[cfg(target_os = "linux")]
             receipts: _receipts,
             #[cfg(target_os = "linux")]

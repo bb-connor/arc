@@ -1,10 +1,13 @@
 # Execution image input qualification
 
-Updated September 22, 2026.
+Updated September 23, 2026.
 The images for the historical inputs below are built and locally validated.
-The current candidate retains the reviewed AWS-LC repair and adds the existing
-broker package to the control-plane test dependencies. Its lock digest is
-`b9d9447273164a977ec1c65ffcc07383ccf21779c94febb0ea55c336587c3c5a`.
+The current candidate retains the reviewed AWS-LC repair and composes the
+existing broker with the ordinary process host. Process signing keys now use
+the existing zeroize dependency, and native broker preparation uses the existing
+tracing dependency for operator diagnostics. No registry version changes.
+The lock digest is
+`c7d66a39f24a5cb54709061c22bbf350b68dc7d4e4e5abf36d8fc5173327eab4`.
 The Dockerfile and structural checker pin this exact digest. A fresh image
 build and validation remain required after this ratchet update and the native
 broker preparation gate update.

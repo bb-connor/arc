@@ -57,6 +57,8 @@ pub(super) struct NativeAuthority<'a> {
     pub authority_signer: &'a Keypair,
     pub parent: Option<CapabilityToken>,
     pub cutpoint: Option<Arc<cutpoints::Control>>,
+    #[cfg(feature = "real-linux-enforcement")]
+    pub confined_router: Option<crate::native_mcp::NativeBrokerMcpTool>,
 }
 
 pub(super) struct NativeHost {
@@ -86,6 +88,8 @@ impl NativeHost {
             authority_signer,
             parent,
             cutpoint,
+            #[cfg(feature = "real-linux-enforcement")]
+            confined_router,
         } = keys;
         let database = directory.join("kernel-authority.sqlite3");
         let runtime = DurableAdmissionRuntime::open(&database)?;
@@ -242,9 +246,21 @@ impl NativeHost {
             )?,
             participant.clone(),
         )?);
-        let connection: Box<dyn chio_kernel::ToolServerConnection> = match tool {
-            Some(tool) => Box::new(BrokerMcpConnection::new(connection, tool)?),
-            None => Box::new(BlockingToolServerAdapter::new(connection)?),
+        #[cfg(feature = "real-linux-enforcement")]
+        let routed = confined_router
+            .map(|template| {
+                crate::native_mcp::NativeBrokerMcpRouter::new(connection.clone(), template)
+                    .map(|router| Box::new(router) as Box<dyn chio_kernel::ToolServerConnection>)
+            })
+            .transpose()?;
+        #[cfg(not(feature = "real-linux-enforcement"))]
+        let routed: Option<Box<dyn chio_kernel::ToolServerConnection>> = None;
+        let connection: Box<dyn chio_kernel::ToolServerConnection> = match routed {
+            Some(router) => router,
+            None => match tool {
+                Some(tool) => Box::new(BrokerMcpConnection::new(connection, tool)?),
+                None => Box::new(BlockingToolServerAdapter::new(connection)?),
+            },
         };
         kernel.register_tool_server(connection);
         let kernel = Arc::new(kernel);

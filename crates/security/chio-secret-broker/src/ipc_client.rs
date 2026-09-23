@@ -576,7 +576,7 @@ fn decode_execute_outcome(
     }
 }
 
-fn validate_execute_response(
+pub(crate) fn validate_execute_response(
     request: &BrokerExecuteRequest,
     response: &BrokerExecuteResponse,
     trusted_receipt_signer: &PublicKey,

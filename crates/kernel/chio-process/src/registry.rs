@@ -86,6 +86,16 @@ impl ProcessRegistry {
         self.with_store(|store| store.provision_signers(keys))
     }
 
+    /// Use a persisted process key inside the trusted host. The callback is
+    /// never exposed through the worker protocol and grants no dispatch right.
+    pub fn with_process_signer<T>(
+        &self,
+        process: &str,
+        sign: impl FnOnce(&CapabilityToken, &Keypair) -> T,
+    ) -> Result<T, ProcessError> {
+        self.with_store(|store| store.with_process_signer(process, sign))
+    }
+
     /// Resolve an admitted call to exactly one live persisted process.
     pub fn caller(&self, context: &ToolInvocationContext) -> Result<ProcessSnapshot, ProcessError> {
         self.with_store(|store| store.caller(context))

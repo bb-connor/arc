@@ -2990,6 +2990,7 @@ dependencies = [
  "chio-federation-transport-iroh",
  "chio-finding",
  "chio-finding-verifier",
+ "chio-flow",
  "chio-guard-registry",
  "chio-guards",
  "chio-hosted-mcp",
@@ -3015,6 +3016,8 @@ dependencies = [
  "chio-runtime",
  "chio-runtime-core",
  "chio-runtime-harness",
+ "chio-secret-broker",
+ "chio-security-kernel",
  "chio-security-types",
  "chio-selective-disclosure",
  "chio-settle",
@@ -4680,6 +4683,7 @@ dependencies = [
  "chio-core-types",
  "chio-kernel",
  "chio-manifest",
+ "chio-security-types",
  "chio-store-sqlite",
  "hex",
  "rand 0.8.6",
@@ -4690,6 +4694,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]
@@ -4977,6 +4982,7 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
+ "tracing",
  "tracing-subscriber",
  "url",
  "webpki-roots 1.0.6",

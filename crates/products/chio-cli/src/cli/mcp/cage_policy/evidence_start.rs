@@ -32,7 +32,7 @@ pub(crate) fn verify_native_start_file(
         &receipt_key,
     )?;
     let (_, body) =
-        verify_policy_bound_enforcement(&policy_text, &receipt, server_id, &key)?;
+        verify_policy_bound_enforcement(&policy_text, &receipt, server_id, &key, false)?;
     let full = body
         .enforcement_record
         .fully_enforced

@@ -65,6 +65,12 @@ impl ToolServerConnection for BrokerMcpConnection {
         self.authority.tool_names()
     }
 
+    fn prepared_native_launch_receipt(
+        &self,
+    ) -> Option<chio_core_types::receipt::body::ChioReceipt> {
+        self.tool.prepared_native_launch_receipt()
+    }
+
     async fn invoke(
         &self,
         _: &str,

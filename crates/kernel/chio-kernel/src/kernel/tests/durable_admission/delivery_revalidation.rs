@@ -6,6 +6,187 @@ use std::task::{Context, Waker};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+#[derive(Clone, Copy)]
+enum OwnedOutcome {
+    Complete,
+    CancelPreparation,
+    CancelDispatch,
+    Revoke,
+    WrongServer,
+}
+
+struct OwnedFactory {
+    outcome: OwnedOutcome,
+    live: Arc<AtomicU64>,
+    calls: Arc<AtomicU64>,
+    revocations: Arc<crate::InMemoryRevocationStore>,
+    capability: String,
+}
+
+struct OwnedConnection {
+    outcome: OwnedOutcome,
+    live: Arc<AtomicU64>,
+    calls: Arc<AtomicU64>,
+}
+
+impl Drop for OwnedConnection {
+    fn drop(&mut self) {
+        self.live.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for OwnedFactory {
+    fn server_id(&self) -> &str {
+        "durable-server"
+    }
+    fn tool_names(&self) -> Vec<String> {
+        vec!["mutate".into()]
+    }
+    async fn invoke(
+        &self,
+        _: &str,
+        _: serde_json::Value,
+        _: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        Err(KernelError::ToolServerError(
+            "factory must never dispatch".into(),
+        ))
+    }
+    async fn prepare_invocation_connection(
+        &self,
+        _: &ToolDispatchContext,
+    ) -> Result<Option<Arc<dyn ToolServerConnection>>, KernelError> {
+        self.live.fetch_add(1, Ordering::SeqCst);
+        let child = Arc::new(OwnedConnection {
+            outcome: self.outcome,
+            live: self.live.clone(),
+            calls: self.calls.clone(),
+        });
+        match self.outcome {
+            OwnedOutcome::CancelPreparation => std::future::pending::<()>().await,
+            OwnedOutcome::Revoke => {
+                self.revocations
+                    .revoke(&self.capability)
+                    .map_err(|error| KernelError::Internal(error.to_string()))?;
+            }
+            _ => {}
+        }
+        Ok(Some(child))
+    }
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for OwnedConnection {
+    fn server_id(&self) -> &str {
+        if matches!(self.outcome, OwnedOutcome::WrongServer) {
+            "substituted"
+        } else {
+            "durable-server"
+        }
+    }
+    fn tool_names(&self) -> Vec<String> {
+        vec!["mutate".into()]
+    }
+    async fn invoke(
+        &self,
+        _: &str,
+        _: serde_json::Value,
+        _: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        if matches!(self.outcome, OwnedOutcome::CancelDispatch) {
+            std::future::pending::<()>().await;
+        }
+        Ok(serde_json::json!({"owned": true}))
+    }
+}
+
+#[test]
+fn invocation_owned_connections_close_on_completion_denial_and_cancellation() -> TestResult {
+    for nested in [false, true] {
+        for outcome in [
+            OwnedOutcome::Complete,
+            OwnedOutcome::CancelPreparation,
+            OwnedOutcome::CancelDispatch,
+            OwnedOutcome::Revoke,
+            OwnedOutcome::WrongServer,
+        ] {
+            let (mut kernel, request, store, calls) = durable_admission_fixture("owned-delivery");
+            let live = Arc::new(AtomicU64::new(0));
+            let revocations = Arc::new(crate::InMemoryRevocationStore::new());
+            kernel.set_revocation_store_handle(revocations.clone());
+            kernel.register_tool_server(Box::new(OwnedFactory {
+                outcome,
+                live: live.clone(),
+                calls: calls.clone(),
+                revocations,
+                capability: request.capability.id.clone(),
+            }));
+            let session = kernel.open_session("owned-parent".into(), Vec::new())?;
+            kernel.activate_session(&session)?;
+            let parent = make_operation_context(&session, "owned-parent-request", "owned-parent");
+            kernel.begin_session_request(&parent, OperationKind::ToolCall, true)?;
+            let mut client = NoopNestedFlowClient;
+            let mut evaluation: Pin<
+                Box<dyn Future<Output = Result<ToolCallResponse, KernelError>> + '_>,
+            > = if nested {
+                Box::pin(kernel.evaluate_tool_call_with_nested_flow_client_async(
+                    &parent,
+                    &request,
+                    &mut client,
+                    None,
+                ))
+            } else {
+                Box::pin(kernel.evaluate_tool_call(&request))
+            };
+            if matches!(
+                outcome,
+                OwnedOutcome::CancelPreparation | OwnedOutcome::CancelDispatch
+            ) {
+                assert!(evaluation
+                    .as_mut()
+                    .poll(&mut Context::from_waker(Waker::noop()))
+                    .is_pending());
+                assert_eq!(live.load(Ordering::SeqCst), 1);
+                drop(evaluation);
+                assert_eq!(
+                    store.operation().state(),
+                    if matches!(outcome, OwnedOutcome::CancelDispatch) {
+                        AdmissionOperationState::OutcomeUnknownAfterDispatch
+                    } else {
+                        AdmissionOperationState::CompensatedBeforeDispatch
+                    }
+                );
+            } else {
+                let response = block_on_async_tool_dispatch(evaluation)?;
+                assert_eq!(
+                    response.verdict,
+                    if matches!(outcome, OwnedOutcome::Complete) {
+                        Verdict::Allow
+                    } else {
+                        Verdict::Deny
+                    },
+                    "{response:?}"
+                );
+            }
+            assert_eq!(
+                live.load(Ordering::SeqCst),
+                0,
+                "invocation retained its connection after termination"
+            );
+            assert_eq!(
+                calls.load(Ordering::SeqCst),
+                u64::from(matches!(
+                    outcome,
+                    OwnedOutcome::Complete | OwnedOutcome::CancelDispatch
+                ))
+            );
+        }
+    }
+    Ok(())
+}
+
 enum PreparationMutation {
     None,
     Revoke(Arc<crate::InMemoryRevocationStore>, String),

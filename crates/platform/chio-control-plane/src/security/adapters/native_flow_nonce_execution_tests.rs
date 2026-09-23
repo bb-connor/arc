@@ -68,22 +68,10 @@ pub(in crate::security::adapters::tests::native_flow::support) fn issue(
         .ok_or("original nonce operation")?;
     // Resolve mutable state afresh through the authority, not the preflight's
     // historical acknowledgement. The dispatch writer checks it independently.
-    let context = fixture.context.as_v1();
-    let key = FlowStateKey {
-        tenant_id: context.tenant_id().clone(),
-        principal_id: context.principal_id().clone(),
-        session_id: context.session_id().clone(),
-        lineage_id: context.lineage_root_id().clone(),
-        isolation_epoch_id: context.isolation_epoch_id().clone(),
-    };
-    let observed = store.observe_native_security_flow(&fixture.binding, &key, &fence, now_ms()?)?;
-    fixture.context = SecurityInvocationContext::v1(
-        context.clone().with_flow_state_generation(
-            observed
-                .stored_context_generation()
-                .ok_or("preflight did not retain flow state")?,
-        ),
-    );
+    fixture.context = fixture
+        .kernel
+        .refresh_native_security_context(&fixture.context)?;
+    assert!(fixture.context.as_v1().flow_state_generation().is_some());
     Ok(operation.binding().operation_id().clone())
 }
 

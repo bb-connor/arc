@@ -22,6 +22,7 @@ pub use authority::BrokerKernelAdmissionAuthority;
 pub use connection::BrokerKernelConnection;
 #[cfg(unix)]
 pub use connection::{BrokerMcpConnection, BrokerMcpToolConnection};
+pub use delivery::{NativeBrokerCompletionEvidence, NativeBrokerQuotaObservation};
 
 pub(super) fn trusted_now_ms() -> Result<u64> {
     let elapsed = std::time::SystemTime::now()

@@ -116,7 +116,19 @@ pub(super) fn init(
     swarm_plan: Option<&Path>,
 ) -> Result<(), CliError> {
     let config = Config::load(config)?;
+    if config.native_broker.is_some() && aggregate_invocations.is_none() {
+        return Err(error(
+            "native broker hosts require an explicit aggregate invocation budget",
+        ));
+    }
     let policy = chio_control_plane::policy::load_policy(&config.policy)?;
+    if let Some(broker) = &config.native_broker {
+        let default = policy
+            .default_capabilities
+            .first()
+            .ok_or_else(|| error("host policy must define one default capability TTL group"))?;
+        broker.validate_grant_quota(&default.scope)?;
+    }
     if config.limits.max_depth > policy.kernel.delegation_depth_limit {
         return Err(error(
             "process tree depth exceeds the policy delegation limit",
@@ -129,14 +141,20 @@ pub(super) fn init(
     let identity = policy.identity.clone();
     let defaults = policy.default_capabilities.clone();
     let lease = Lease::acquire(state, true)?;
-    let (kernel, issuer, authority, _receipts) = kernel(
+    let (mut kernel, issuer, authority, _receipts) = kernel(
         lease.directory.path(),
         policy,
         true,
         config.execution_nonces,
     )?;
-    let (servers, manifests, _) =
-        super::serving::connect(&config, &kernel, lease.directory.path(), plan.is_some())?;
+    let (servers, manifests, _) = super::serving::connect(
+        &config,
+        &mut kernel,
+        lease.directory.path(),
+        plan.is_some(),
+        &authority,
+        true,
+    )?;
     let root_key = Keypair::generate();
     let root = match aggregate_invocations {
         Some(limit) => kernel.issue_aggregate_family_root(
@@ -188,7 +206,7 @@ pub(super) fn init(
             .spawn(&child.parent, &child.id, capability)
             .map_err(error)?;
     }
-    if !config.spawn_templates.is_empty() {
+    if !config.spawn_templates.is_empty() || config.native_broker.is_some() {
         let keys: Vec<_> = identities
             .iter()
             .map(|(id, (_, key))| (id.clone(), key))
@@ -212,6 +230,8 @@ pub(super) fn init(
             &authority,
             plan,
         )?;
+    } else {
+        super::swarm::bootstrap_host(&lease.directory, &record, &runtime, &issuer)?;
     }
     let encoded = canonical_json_bytes(&record).map_err(error)?;
     if encoded.len() as u64 > super::state::MAX_CONFIG_BYTES {

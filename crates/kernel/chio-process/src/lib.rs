@@ -12,6 +12,7 @@ mod integrity_tests;
 pub mod mailboxes;
 mod registry;
 mod routes;
+mod security;
 mod state_reader;
 mod store;
 mod types;
@@ -31,6 +32,7 @@ use serde_json::{json, Value};
 
 pub use registry::{ChildSubmission, ChildWork, ProcessRegistry, WorkerWait};
 pub use routes::{ProcessLaunchReceipt, ProcessRoute};
+pub use security::ProcessSecurityProfile;
 pub use state_reader::ProcessStateReader;
 use store::Store;
 pub use types::{
@@ -63,6 +65,8 @@ pub struct ProcessRuntime {
     namespace: String,
     routes: Arc<BTreeMap<String, ProcessRoute>>,
     launch_receipts: Arc<BTreeMap<String, ProcessLaunchReceipt>>,
+    security_profile: Option<ProcessSecurityProfile>,
+    supplemental_route: Option<(String, String)>,
 }
 
 impl ProcessRuntime {
@@ -78,7 +82,35 @@ impl ProcessRuntime {
             namespace,
             routes: Arc::new(BTreeMap::new()),
             launch_receipts: Arc::new(BTreeMap::new()),
+            security_profile: None,
+            supplemental_route: None,
         })
+    }
+
+    /// Install the host's persistent flow identity. Its digest is part of
+    /// every operation binding, so changing or removing it cannot recover an
+    /// already admitted call under another tenant or isolation generation.
+    pub fn with_security_profile(
+        mut self,
+        profile: ProcessSecurityProfile,
+    ) -> Result<Self, ProcessError> {
+        profile.validate()?;
+        self.security_profile = Some(profile);
+        Ok(self)
+    }
+
+    /// Present the exact signed argument envelope to the kernel's independently
+    /// installed supplemental verifier on this selected route. This conveys no
+    /// authority by itself; malformed or unsigned envelopes still fail there.
+    pub fn with_supplemental_authorization_route(
+        mut self,
+        server: String,
+        tool: String,
+    ) -> Result<Self, ProcessError> {
+        validate_id(&server)?;
+        validate_id(&tool)?;
+        self.supplemental_route = Some((server, tool));
+        Ok(self)
     }
 
     /// Install the trusted host's route for each registered tool server.
@@ -244,6 +276,17 @@ impl ProcessRuntime {
     ) -> Result<ToolCallRequest, ProcessError> {
         let process = self.process(process_id)?;
         let attempt = self.with_store(|store| store.call_attempt(process_id, operation_key))?;
+        let supplemental_authorization = if self
+            .supplemental_route
+            .as_ref()
+            .is_some_and(|(server, tool)| server == server_id && tool == tool_name)
+        {
+            Some(serde_json::from_value(json!({
+                "signed_extension": String::from_utf8(canonical_json_bytes(&arguments)?).map_err(|_| ProcessError::Invalid("supplemental authorization is not UTF-8"))?,
+            }))?)
+        } else {
+            None
+        };
         Ok(ToolCallRequest {
             request_id: self.request_id_for_attempt(process_id, operation_key, attempt)?,
             agent_id: process.capability.subject.to_hex(),
@@ -258,7 +301,7 @@ impl ProcessRuntime {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
-            supplemental_authorization: None,
+            supplemental_authorization,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -332,6 +375,10 @@ impl ProcessRuntime {
             Some(route) => digest(&("chio.process.host-route.v1", &recovery_binding, route))?,
             None => recovery_binding,
         };
+        let binding_hash = match &self.security_profile {
+            Some(profile) => digest(&("chio.process.security-context.v1", binding_hash, profile))?,
+            None => binding_hash,
+        };
         // Validate the persisted process identity and immutable request binding
         // before any kernel receipt attributes this attempt to the process.
         self.with_store(|store| store.admit(process_id, operation_key, request, &binding_hash))?;
@@ -339,6 +386,20 @@ impl ProcessRuntime {
         // root-first. A child can run even if its parent has never invoked a
         // tool, including after the kernel's in-memory registry is recreated.
         let lineage = self.with_store(|store| store.lineage(process_id))?;
+        let security_context = self
+            .security_profile
+            .as_ref()
+            .map(|profile| {
+                let root = lineage
+                    .first()
+                    .ok_or(ProcessError::Invalid("missing process lineage"))?;
+                profile.context(
+                    &self.namespace,
+                    request.capability.subject.to_hex(),
+                    &root.id,
+                )
+            })
+            .transpose()?;
         let mut ancestor_refusal = None;
         for capability in lineage.iter().take(lineage.len().saturating_sub(1)) {
             if let Err(error) = self.kernel.register_delegation_parent(capability) {
@@ -383,6 +444,17 @@ impl ProcessRuntime {
             let result = if let Some(reason) = &ancestor_refusal {
                 self.kernel
                     .sign_planned_deny_response(&current, reason, Some(attribution))
+            } else if let Some(context) = &security_context {
+                let context = self.kernel.refresh_native_security_context(context)?;
+                Box::pin(
+                    self.kernel
+                        .evaluate_tool_call_with_metadata_and_security_context(
+                            &current,
+                            Some(attribution),
+                            &context,
+                        ),
+                )
+                .await
             } else {
                 Box::pin(
                     self.kernel

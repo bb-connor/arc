@@ -165,6 +165,27 @@ pub trait ToolServerConnection: Send + Sync {
         Ok(())
     }
 
+    /// Prepare an invocation-owned connection for this original dispatch.
+    ///
+    /// The returned connection has already completed `prepare_delivery`. The
+    /// kernel retains it through revalidation and dispatch, and drops it on
+    /// cancellation or denial. A host can therefore register a long-lived
+    /// factory while a confined child and its descriptors belong to one call.
+    /// Preparation must obey the same no-effect contract as `prepare_delivery`.
+    async fn prepare_invocation_connection(
+        &self,
+        context: &ToolDispatchContext,
+    ) -> Result<Option<std::sync::Arc<dyn ToolServerConnection>>, KernelError> {
+        self.prepare_delivery(context).await?;
+        Ok(None)
+    }
+
+    /// The exact persisted enforcement receipt for the prepared invocation.
+    /// This is trusted transport evidence, never caller-provided metadata.
+    fn prepared_native_launch_receipt(&self) -> Option<chio_core::receipt::body::ChioReceipt> {
+        None
+    }
+
     /// Invoke with the dispatch identity. Remote transports forward the
     /// idempotency key and attempt so the server can deduplicate.
     async fn invoke_in_context(

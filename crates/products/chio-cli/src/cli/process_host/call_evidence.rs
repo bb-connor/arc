@@ -30,11 +30,15 @@ pub(super) use exporting::export;
 
 const SCHEMA: &str = "chio.process.call-observation.v2";
 const LEGACY_SCHEMA: &str = "chio.process.call-observation.v1";
+const BROKER_SCHEMA: &str = "chio.process.call-observation.v3";
 const LIMIT: u64 = 32 * 1024 * 1024;
 
 #[cfg(test)]
 #[path = "call_evidence/tests.rs"]
 mod tests;
+
+#[path = "call_evidence/broker.rs"]
+mod broker;
 
 #[path = "call_evidence/outcomes.rs"]
 mod outcomes;
@@ -57,6 +61,8 @@ struct Evidence {
     nonce: Option<super::nonce_evidence::Evidence>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     receipt_log: Option<super::receipt_evidence::Evidence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    broker: Option<broker::Evidence>,
 }
 
 /// Only public binding digests and the existing claim commitment preimages.
@@ -133,17 +139,43 @@ fn verify(
     key: &PublicKey,
     runtime: &str,
 ) -> Result<(), CliError> {
+    verify_with_broker_config(signed, evidence, key, runtime, None)
+}
+
+fn verify_with_broker_config(
+    signed: &ChioReceipt,
+    evidence: &Evidence,
+    key: &PublicKey,
+    runtime: &str,
+    broker_config: Option<&super::state::Config>,
+) -> Result<(), CliError> {
     receipt(signed, key)?;
     observation(signed, "attest_retained_call")?;
     require(
         !runtime.is_empty()
             && evidence.runtime_id == runtime
-            && matches!(evidence.schema.as_str(), SCHEMA | LEGACY_SCHEMA)
+            && matches!(
+                evidence.schema.as_str(),
+                SCHEMA | LEGACY_SCHEMA | BROKER_SCHEMA
+            )
             && signed.action.parameters == serde_json::to_value(evidence).map_err(error)?,
         "call schema, runtime pin or signed payload differs",
     )?;
     receipt(&evidence.bootstrap, key)?;
-    observation(&evidence.bootstrap, "provision_swarm")?;
+    let brokered = evidence.schema == BROKER_SCHEMA;
+    let ordinary = brokered && evidence.bootstrap.tool_name == "provision_process_host";
+    observation(
+        &evidence.bootstrap,
+        if ordinary {
+            "provision_process_host"
+        } else {
+            "provision_swarm"
+        },
+    )?;
+    require(
+        brokered == evidence.broker.is_some(),
+        "broker evidence differs from the observation schema",
+    )?;
     require(
         evidence.bootstrap.action.parameters["runtime_id"] == runtime
             && evidence.context["runtime_id"] == runtime
@@ -176,7 +208,7 @@ fn verify(
         call.timestamp >= evidence.bootstrap.timestamp && call.timestamp <= signed.timestamp,
         "call receipt is outside observation interval",
     )?;
-    if evidence.schema == SCHEMA {
+    if matches!(evidence.schema.as_str(), SCHEMA | BROKER_SCHEMA) {
         require(
             evidence.nonce.is_some()
                 == evidence
@@ -224,21 +256,38 @@ fn verify(
             "legacy call carries unsupported nonce or log claims",
         )?;
     }
-    verify_operation(
+    verify_operation_with_runtime(
         evidence.operation.as_ref(),
         &call,
         &cap,
         runtime,
         evidence.observed_at_unix_ms,
-    )
+        !ordinary,
+    )?;
+    if let Some(broker) = &evidence.broker {
+        broker::verify(broker, evidence, &call, &cap, broker_config.ok_or_else(|| error("broker call verification requires an independently selected host configuration"))?)?;
+    }
+    Ok(())
 }
 
+#[cfg(test)]
 fn verify_operation(
     operation: Option<&Operation>,
     call: &ChioReceipt,
     cap: &CapabilityToken,
     runtime: &str,
     observed_at: u64,
+) -> Result<(), CliError> {
+    verify_operation_with_runtime(operation, call, cap, runtime, observed_at, true)
+}
+
+fn verify_operation_with_runtime(
+    operation: Option<&Operation>,
+    call: &ChioReceipt,
+    cap: &CapabilityToken,
+    runtime: &str,
+    observed_at: u64,
+    runtime_required: bool,
 ) -> Result<(), CliError> {
     let metadata = call
         .metadata
@@ -350,6 +399,12 @@ fn verify_operation(
         operation.history.len() <= MAX_RUNTIME_PARTICIPANT_EPISODES,
         "continuation history exceeds its bound",
     )?;
+    if !runtime_required {
+        return require(
+            operation.history.is_empty() && owned.is_null(),
+            "ordinary broker call contains unselected runtime custody",
+        );
+    }
     let reference = if owned.is_null() {
         None
     } else {
@@ -420,6 +475,7 @@ pub(super) fn verify_file(
     runtime: &str,
     request: &Path,
     context: &Path,
+    broker_config: Option<&Path>,
 ) -> Result<(), CliError> {
     let key = crate::load_trusted_kernel_pubkey(key).map_err(error)?;
     let signed = crate::receipt_verify::verify_original_receipt(&text(path)?, &key)?;
@@ -431,7 +487,10 @@ pub(super) fn verify_file(
         evidence.request == expected_request && evidence.context == expected_context,
         "call differs from independently retained request or context",
     )?;
-    verify(&signed, &evidence, &key, runtime)?;
+    let broker_config = broker_config
+        .map(super::state::read_json::<super::state::Config>)
+        .transpose()?;
+    verify_with_broker_config(&signed, &evidence, &key, runtime, broker_config.as_ref())?;
     let call: ChioReceipt = serde_json::from_str(
         evidence.response["receipt_json"]
             .as_str()
@@ -459,10 +518,19 @@ pub(super) fn verify_file(
         "graph_completion",
         "scenario_matrix",
     ];
-    if evidence.schema == SCHEMA {
+    if matches!(evidence.schema.as_str(), SCHEMA | BROKER_SCHEMA) {
         checks.extend(["execution_nonces", "receipt_log_inclusion"]);
     } else {
         unchecked.extend(["execution_nonces", "receipt_log_inclusion"]);
+    }
+    if evidence.broker.is_some() {
+        checks.extend([
+            "broker_signature",
+            "broker_response_binding",
+            "original_composite_capture",
+            "confinement",
+        ]);
+        unchecked.retain(|check| *check != "confinement");
     }
     println!(
         "{}",

@@ -30,6 +30,7 @@ pub use registration::BrokerAdmissionParticipant;
 mod capture;
 pub use capture::{
     BrokerKernelAdmissionAuthority, BrokerKernelConnection, BrokerNativeCaptureReader,
+    NativeBrokerCompletionEvidence, NativeBrokerQuotaObservation,
 };
 #[cfg(unix)]
 pub use capture::{BrokerMcpConnection, BrokerMcpToolConnection};

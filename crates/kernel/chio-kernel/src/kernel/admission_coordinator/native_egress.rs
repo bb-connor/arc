@@ -31,8 +31,52 @@ pub type NativeSecurityEgressCheckpointHook = Arc<
         + Sync,
 >;
 
-#[cfg(feature = "admission-test-support")]
 impl ChioKernel {
+    /// Refresh only mutable flow observation through the selected, fenced
+    /// authority. Trusted hosts call this before each evaluation, including
+    /// the executable request following nonce preflight. Identity and isolation
+    /// stay unchanged; the admission writer still checks the generation itself.
+    pub fn refresh_native_security_context(
+        &self,
+        context: &SecurityInvocationContext,
+    ) -> Result<SecurityInvocationContext, KernelError> {
+        let Some(binding) = self.native_security_authority_binding()? else {
+            return Ok(context.clone());
+        };
+        let runtime = self.durable_runtime()?;
+        let _guard = runtime.lock_mutations()?;
+        let now = runtime.refresh_trusted_time(0);
+        let trusted = context.as_v1();
+        let key = FlowStateKey {
+            tenant_id: trusted.tenant_id().clone(),
+            principal_id: trusted.principal_id().clone(),
+            lineage_id: trusted.lineage_root_id().clone(),
+            session_id: trusted.session_id().clone(),
+            isolation_epoch_id: trusted.isolation_epoch_id().clone(),
+        };
+        let observed = store_call(|| {
+            runtime
+                .store
+                .observe_native_security_flow(&binding, &key, &runtime.fence, now)
+        })?;
+        let completed_at = runtime.refresh_trusted_time(now);
+        if observed.binding() != &binding
+            || observed.key() != &key
+            || observed.observed_at_unix_ms() < now
+            || observed.observed_at_unix_ms() > completed_at
+        {
+            return Err(invalid(
+                "native context observation differs from selected authority",
+            ));
+        }
+        let mut refreshed = trusted.clone();
+        // An absent context is valid only before its first input join. Unlike
+        // egress preparation, this read does not require a prior admission.
+        refreshed.flow_state_generation = observed.stored_context_generation();
+        Ok(SecurityInvocationContext::v1(refreshed))
+    }
+
+    #[cfg(feature = "admission-test-support")]
     pub fn install_native_egress_checkpoint_hook(
         &mut self,
         hook: NativeSecurityEgressCheckpointHook,

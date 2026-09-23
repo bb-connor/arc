@@ -826,6 +826,13 @@ impl ChioKernel {
             readiness_drop_guard.disarm();
             result
         };
+        let mut runtime_admission_metadata = runtime_admission_metadata;
+        let (readiness_result, prepared_delivery) =
+            PreparedToolDelivery::retain(readiness_result, &mut runtime_admission_metadata);
+        let server = prepared_delivery
+            .as_ref()
+            .and_then(|prepared| prepared.connection.as_ref())
+            .unwrap_or(server);
         let revalidation_now_unix_ms = current_unix_timestamp_ms();
         let final_dispatch_admission = match readiness_result {
             Ok(readiness_waited) => self.revalidate_immediately_before_dispatch(

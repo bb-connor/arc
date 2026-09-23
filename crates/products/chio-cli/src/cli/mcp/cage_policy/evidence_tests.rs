@@ -188,6 +188,7 @@ fn native_run_evidence_requires_external_policy_pin_and_same_observed_launch() -
             &receipt,
             "cage-policy-test",
             &signer.public_key(),
+            false,
         )
         .err()
         .ok_or("accepted mismatched observed launch")?;
@@ -371,6 +372,7 @@ fn native_policy_verification_rejects_legacy_and_mismatched_terminal_commitments
         &evidence.enforcement,
         "cage-policy-test",
         &signer.public_key(),
+        false,
     )
     .err()
     .ok_or("legacy receipt proved complete policy")?;

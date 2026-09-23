@@ -143,18 +143,9 @@ pub(crate) fn cmd_provision_reference_runtime(
                     CliError::cli_other_error(format!("invalid broker binding: {error}"))
                 })?;
             binding.validate()?;
-            require_exact_canonical_path(&binding.socket_path, "broker socket")?;
             #[cfg(unix)]
             {
-                use std::os::unix::fs::FileTypeExt;
-                if !std::fs::symlink_metadata(&binding.socket_path)?
-                    .file_type()
-                    .is_socket()
-                {
-                    return Err(CliError::cli_other_error(
-                        "broker binding path is not a Unix socket".to_string(),
-                    ));
-                }
+                validate_broker_endpoint(&binding.socket_path)?;
                 Ok(binding)
             }
             #[cfg(not(unix))]
@@ -203,7 +194,9 @@ pub(crate) fn cmd_provision_reference_runtime(
     };
     let profile = ProvisionProfile {
         max_artifact_bytes: args.max_artifact_bytes,
-        receipt_rollback_anchor_root: args.receipt_rollback_anchor_root.as_ref()
+        receipt_rollback_anchor_root: args
+            .receipt_rollback_anchor_root
+            .as_ref()
             .map(|path| require_exact_canonical_path(path, "receipt rollback anchor"))
             .transpose()?,
         report_schema: REPORT_SCHEMA,
@@ -236,6 +229,38 @@ pub(crate) fn cmd_provision_reference_runtime(
         &args.server_version,
     )?;
     provision(&inputs)
+}
+
+#[cfg(unix)]
+fn validate_broker_endpoint(path: &std::path::Path) -> Result<(), CliError> {
+    use std::os::unix::fs::{FileTypeExt, MetadataExt};
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_socket() => {
+            require_exact_canonical_path(path, "broker socket").map(|_| ())
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            // The broker authenticates the host authority before binding its
+            // socket. Provision their signed launch contract first, then start
+            // the host and broker. The live descriptor still checks SO_PEERCRED.
+            let parent = path
+                .parent()
+                .ok_or_else(|| CliError::cli_other_error("broker socket has no parent"))?;
+            require_exact_canonical_path(parent, "broker socket directory")?;
+            let metadata = std::fs::metadata(parent)?;
+            let owner = chio_cage::BrokerPeerIdentity::current_process()
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+            if !metadata.is_dir() || metadata.mode() & 0o077 != 0 || metadata.uid() != owner.uid {
+                return Err(CliError::cli_other_error(
+                    "future broker socket requires a private directory owned by the operator",
+                ));
+            }
+            Ok(())
+        }
+        Ok(_) => Err(CliError::cli_other_error(
+            "broker binding path is not a Unix socket",
+        )),
+        Err(error) => Err(error.into()),
+    }
 }
 
 /// Grants are exact canonical paths that exist, each named once.

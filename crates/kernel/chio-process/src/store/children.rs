@@ -7,6 +7,26 @@ use super::*;
 use crate::{ChildSubmission, ChildWork, WorkerWait};
 
 impl Store {
+    pub fn with_process_signer<T>(
+        &self,
+        id: &str,
+        sign: impl FnOnce(&CapabilityToken, &Keypair) -> T,
+    ) -> Result<T, ProcessError> {
+        self.require_running(id)?;
+        let process =
+            read_process(&self.connection, id)?.ok_or_else(|| ProcessError::NotFound(id.into()))?;
+        let seed = zeroize::Zeroizing::new(self.connection.query_row(
+            "SELECT seed_hex FROM process_delegation_keys WHERE process_id=?1",
+            [id],
+            |row| row.get::<_, String>(0),
+        )?);
+        let signer = Keypair::from_seed_hex(&seed)?;
+        if signer.public_key() != process.capability.subject {
+            return Err(ProcessError::Conflict);
+        }
+        Ok(sign(&process.capability, &signer))
+    }
+
     pub fn provision_signers(&mut self, keys: &[(String, &Keypair)]) -> Result<(), ProcessError> {
         let tx = self
             .connection

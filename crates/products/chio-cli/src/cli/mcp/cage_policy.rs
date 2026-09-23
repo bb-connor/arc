@@ -13,10 +13,14 @@ const MAX_CAGE_POLICY_BYTES: usize = 4 * 1024 * 1024;
 #[path = "cage_policy/evidence.rs"]
 mod evidence;
 #[cfg(target_os = "linux")]
-pub(crate) use evidence::{export_native_launch_evidence, export_native_launch_observations};
 pub(crate) use evidence::{
-    verify_native_launch_evidence, verify_native_launch_observation, verify_native_start_file,
-    NativeLaunchEvidence, NativeLaunchObservation,
+    export_broker_native_launch_evidence, export_native_launch_evidence,
+    export_native_launch_observations,
+};
+pub(crate) use evidence::{
+    verify_broker_native_launch_evidence, verify_native_launch_evidence,
+    verify_native_launch_observation, verify_native_start_file, NativeLaunchEvidence,
+    NativeLaunchObservation,
 };
 
 #[cfg(all(test, target_os = "linux"))]
@@ -32,6 +36,63 @@ pub(crate) struct SignedCagePolicyLaunchFactory {
 }
 
 impl SignedCagePolicyLaunchFactory {
+    /// Admit the signed broker route without opening an unprepared descriptor.
+    /// The invocation factory authenticates the actual descriptor at readiness.
+    pub(crate) fn broker_admission_policy(
+        &self,
+        server_id: &str,
+    ) -> Result<
+        (
+            Arc<chio_manifest::VerifiedManifestRegistry>,
+            PathBuf,
+            chio_cage::BrokerPeerIdentity,
+        ),
+        CliError,
+    > {
+        let policy = decode_cage_policy(
+            &self.path,
+            &self.signed_policy_bytes,
+            &self.trusted_policy_signer_key,
+        )?;
+        if policy
+            .enterprise_migration
+            .stage
+            .legacy_fallback_permitted()
+            || policy.signed_manifest.manifest.server_id != server_id
+            || policy
+                .signed_manifest
+                .manifest
+                .required_permissions
+                .as_ref()
+                .is_none_or(|permissions| {
+                    permissions.native_syscall_profile
+                        != chio_manifest::NativeSyscallProfile::BrokeredNativeV1
+                })
+        {
+            return Err(CliError::cli_other_error(
+                "process broker route requires an Enforced brokered-native policy",
+            ));
+        }
+        let broker = policy
+            .broker
+            .as_ref()
+            .ok_or_else(|| CliError::cli_other_error("missing signed broker binding"))?;
+        let socket = broker
+            .socket_path
+            .clone()
+            .filter(|_| broker.inherited_fd.is_none())
+            .ok_or_else(|| {
+                CliError::cli_other_error("process broker route requires a signed socket endpoint")
+            })?;
+        let registry = resolve_launch_manifest_registry(
+            &policy,
+            chio_manifest::RuntimeToolTopology::brokered(),
+            None,
+            "process broker",
+        )?;
+        Ok((registry, socket, broker.expected_peer_identity))
+    }
+
     pub(crate) fn new(path: PathBuf, trusted_policy_signer: String) -> Result<Self, CliError> {
         let signed_policy_bytes = read_cage_policy(&path)?;
         let trusted_policy_signer_key = chio_core::PublicKey::from_hex(&trusted_policy_signer)
@@ -88,6 +149,9 @@ impl chio_mcp_adapter::transport::NativeMcpLaunchFactory for SignedCagePolicyLau
             &contract,
             Some(admitted_manifest_registry),
             Some(std::fs::File::from(OwnedFd::from(stream))),
+        )
+        .inspect_err(
+            |error| tracing::error!(error = %error, "broker cage launch composition failed"),
         )
         .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))
     }

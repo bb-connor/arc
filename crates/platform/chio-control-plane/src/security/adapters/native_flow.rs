@@ -256,7 +256,14 @@ impl chio_kernel::SecurityPreDispatchHook for NativeFlowResolver {
         self.prepare_dispatch(authority.prepare_egress()?)
             .and_then(|prepared| prepared.capture_invocation(authority))
             .map(|_| ())
-            .map_err(|error| KernelError::GuardDenied(error.to_string()))
+            .map_err(|error| {
+                if let NativeFlowError::Policy(denial) = &error {
+                    // FlowDenial contains fixed reasons only. Keep payloads and
+                    // extension errors out of both operator and caller output.
+                    tracing::warn!(policy_denial = %denial, "native flow policy denied dispatch");
+                }
+                KernelError::GuardDenied(error.to_string())
+            })
     }
 
     fn native_authority_binding(

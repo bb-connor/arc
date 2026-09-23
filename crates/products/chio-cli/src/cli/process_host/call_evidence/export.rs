@@ -17,7 +17,7 @@ pub(crate) fn export(
     let context: Value = crate::process_response_verify::read_document(context)?;
     let response: Value = crate::process_response_verify::read_document(response)?;
     let host = Host::open(state, false)?;
-    if host.record.config.execution_nonces {
+    if host.record.config.execution_nonces || host.record.config.native_broker.is_some() {
         host.checkpoint_receipts()?;
     }
     let now = u64::try_from(
@@ -67,8 +67,12 @@ pub(super) fn observe(
         .as_str()
         .ok_or_else(|| error("missing process"))?;
     let cap = host.runtime.process(process).map_err(error)?.capability;
-    let bootstrap: ChioReceipt =
-        read_json(&host.lease.directory.path().join("swarm-bootstrap.json"))?;
+    let bootstrap_path = host.lease.directory.path().join("swarm-bootstrap.json");
+    let bootstrap: ChioReceipt = read_json(&if bootstrap_path.try_exists()? {
+        bootstrap_path
+    } else {
+        host.lease.directory.path().join("process-bootstrap.json")
+    })?;
     require(
         bootstrap.action.parameters["capabilities"][process]
             == serde_json::to_value(&cap).map_err(error)?,
@@ -152,8 +156,23 @@ pub(super) fn observe(
     } else {
         None
     };
+    let broker = if host.record.config.native_broker.is_some() {
+        Some(super::broker::export(
+            host,
+            &call,
+            &response,
+            operation
+                .as_ref()
+                .ok_or_else(|| error("broker response has no retained operation"))?,
+            now,
+        )?)
+    } else {
+        None
+    };
     let evidence = Evidence {
-        schema: if host.record.config.execution_nonces {
+        schema: if broker.is_some() {
+            BROKER_SCHEMA
+        } else if host.record.config.execution_nonces {
             SCHEMA
         } else {
             LEGACY_SCHEMA
@@ -167,11 +186,12 @@ pub(super) fn observe(
         response,
         operation,
         nonce,
-        receipt_log: if host.record.config.execution_nonces {
+        receipt_log: if host.record.config.execution_nonces || broker.is_some() {
             Some(super::super::receipt_evidence::export(host, &call, now)?)
         } else {
             None
         },
+        broker,
     };
     let parameters = serde_json::to_value(&evidence).map_err(error)?;
     let mut body = evidence.bootstrap.body();
@@ -181,6 +201,12 @@ pub(super) fn observe(
     body.action = ToolCallAction::from_parameters(parameters.clone()).map_err(error)?;
     body.content_hash = hash(&parameters)?;
     let signed = ChioReceipt::sign(body, &host.authority.kernel_keypair()).map_err(error)?;
-    verify(&signed, &evidence, &key, host.runtime.runtime_id())?;
+    verify_with_broker_config(
+        &signed,
+        &evidence,
+        &key,
+        host.runtime.runtime_id(),
+        Some(&host.record.config),
+    )?;
     Ok(signed)
 }

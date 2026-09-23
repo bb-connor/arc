@@ -17,6 +17,7 @@ pub(super) fn bootstrap(
     record: &Record,
     issuer: &Keypair,
     now: u64,
+    role: &str,
 ) -> Result<ChioReceipt, CliError> {
     let mut capabilities = BTreeMap::new();
     for id in
@@ -32,7 +33,7 @@ pub(super) fn bootstrap(
             timestamp: now / 1000,
             capability_id: capabilities["root"].id.clone(),
             tool_server: "chio-process-host".into(),
-            tool_name: "provision_swarm".into(),
+            tool_name: role.into(),
             action: ToolCallAction::from_parameters(parameters.clone()).map_err(error)?,
             decision: None,
             receipt_kind: ReceiptKind::TraceObservation,

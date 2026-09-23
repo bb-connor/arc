@@ -68,6 +68,7 @@ pub(crate) fn verify_native_launch_observation(
         &evidence.enforcement,
         server_id,
         trusted_policy_signer,
+        false,
     )?;
     Ok(NativeObservedWindow {
         started_at_unix_ms: enforcement.recorded_at_unix_ms,
@@ -107,6 +108,7 @@ fn verify_policy_bound_enforcement(
     receipt: &ChioReceipt,
     server_id: &str,
     trusted_policy_signer: &chio_core::PublicKey,
+    brokered: bool,
 ) -> Result<(McpCageLaunchPolicy, CageReceiptBody), CliError> {
     require(
         signed_policy.len() <= MAX_CAGE_POLICY_BYTES,
@@ -122,12 +124,41 @@ fn verify_policy_bound_enforcement(
             && policy.enterprise_migration.stage
                 == chio_security_types::EnterpriseMigrationStage::Enforced
             && policy.signed_manifest.manifest.server_id == server_id
-            && policy.broker.is_none(),
-        "expected the pinned server's Enforced local policy",
+            && policy.broker.is_some() == brokered,
+        "expected the pinned server's selected Enforced policy",
     )?;
+    if brokered {
+        require(
+            policy
+                .signed_manifest
+                .manifest
+                .required_permissions
+                .as_ref()
+                .is_some_and(|permissions| {
+                    permissions.native_syscall_profile
+                        == chio_manifest::NativeSyscallProfile::BrokeredNativeV1
+                        && permissions.read_paths.as_ref().is_none_or(Vec::is_empty)
+                        && permissions.write_paths.as_ref().is_none_or(Vec::is_empty)
+                        && permissions
+                            .environment_variables
+                            .as_ref()
+                            .is_none_or(Vec::is_empty)
+                })
+                && policy.broker.as_ref().is_some_and(|binding| {
+                    binding.socket_path.is_some()
+                        && binding.inherited_fd.is_none()
+                        && binding.expected_peer_identity.pid > 0
+                }),
+            "broker launch policy permits a different credential or descriptor boundary",
+        )?;
+    }
     let registry = resolve_launch_manifest_registry(
         &policy,
-        chio_manifest::RuntimeToolTopology::local(),
+        if brokered {
+            chio_manifest::RuntimeToolTopology::brokered()
+        } else {
+            chio_manifest::RuntimeToolTopology::local()
+        },
         None,
         "run evidence",
     )?;
@@ -175,11 +206,29 @@ pub(crate) fn verify_native_launch_evidence(
     server_id: &str,
     trusted_policy_signer: &chio_core::PublicKey,
 ) -> Result<NativeLaunchWindow, CliError> {
+    verify_launch(evidence, server_id, trusted_policy_signer, false)
+}
+
+pub(crate) fn verify_broker_native_launch_evidence(
+    evidence: &NativeLaunchEvidence,
+    server_id: &str,
+    trusted_policy_signer: &chio_core::PublicKey,
+) -> Result<NativeLaunchWindow, CliError> {
+    verify_launch(evidence, server_id, trusted_policy_signer, true)
+}
+
+fn verify_launch(
+    evidence: &NativeLaunchEvidence,
+    server_id: &str,
+    trusted_policy_signer: &chio_core::PublicKey,
+    brokered: bool,
+) -> Result<NativeLaunchWindow, CliError> {
     let (policy, enforcement) = verify_policy_bound_enforcement(
         &evidence.signed_policy,
         &evidence.enforcement,
         server_id,
         trusted_policy_signer,
+        brokered,
     )?;
     let key = chio_core::PublicKey::from_hex(&policy.receipt.trusted_signer_public_key)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
@@ -258,6 +307,54 @@ pub(crate) fn export_native_launch_observations(
     server_id: &str,
     trusted_policy_signer: &chio_core::PublicKey,
     receipt_ids: &BTreeSet<String>,
+) -> Result<BTreeMap<String, NativeLaunchObservation>, CliError> {
+    export_observations(
+        policy_path,
+        server_id,
+        trusted_policy_signer,
+        receipt_ids,
+        false,
+    )
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn export_broker_native_launch_evidence(
+    policy_path: &Path,
+    server_id: &str,
+    trusted_policy_signer: &chio_core::PublicKey,
+    receipt_ids: &BTreeSet<String>,
+) -> Result<BTreeMap<String, NativeLaunchEvidence>, CliError> {
+    export_observations(
+        policy_path,
+        server_id,
+        trusted_policy_signer,
+        receipt_ids,
+        true,
+    )?
+    .into_iter()
+    .map(|(id, evidence)| {
+        let terminal = evidence
+            .terminal
+            .ok_or_else(|| CliError::cli_other_error("broker launch has no terminal receipt"))?;
+        Ok((
+            id,
+            NativeLaunchEvidence {
+                signed_policy: evidence.signed_policy,
+                enforcement: evidence.enforcement,
+                terminal,
+            },
+        ))
+    })
+    .collect()
+}
+
+#[cfg(target_os = "linux")]
+fn export_observations(
+    policy_path: &Path,
+    server_id: &str,
+    trusted_policy_signer: &chio_core::PublicKey,
+    receipt_ids: &BTreeSet<String>,
+    brokered: bool,
 ) -> Result<BTreeMap<String, NativeLaunchObservation>, CliError> {
     use chio_kernel::receipt_query::ReceiptQuery;
     use chio_kernel::ReceiptStore;
@@ -349,7 +446,21 @@ pub(crate) fn export_native_launch_observations(
                 enforcement,
                 terminal: terminals.remove(&attempt),
             };
-            verify_native_launch_observation(&evidence, server_id, trusted_policy_signer)?;
+            if brokered {
+                verify_broker_native_launch_evidence(
+                    &NativeLaunchEvidence {
+                        signed_policy: evidence.signed_policy.clone(),
+                        enforcement: evidence.enforcement.clone(),
+                        terminal: evidence.terminal.clone().ok_or_else(|| {
+                            CliError::cli_other_error("broker launch has no terminal receipt")
+                        })?,
+                    },
+                    server_id,
+                    trusted_policy_signer,
+                )?;
+            } else {
+                verify_native_launch_observation(&evidence, server_id, trusted_policy_signer)?;
+            }
             Ok((id, evidence))
         })
         .collect()

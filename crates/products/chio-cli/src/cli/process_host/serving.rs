@@ -13,7 +13,7 @@ use chio_process::worker::{WorkerServer, WorkerService};
 use super::state::{error, Config, Host};
 use crate::CliError;
 
-type ConnectedServers = (
+pub(super) type ConnectedServers = (
     Vec<Box<dyn ToolServerConnection>>,
     Vec<ToolManifest>,
     BTreeMap<String, chio_process::ProcessLaunchReceipt>,
@@ -27,10 +27,15 @@ pub(super) fn worker_service(runtime: chio_process::ProcessRuntime) -> WorkerSer
 
 pub(super) fn connect(
     config: &Config,
-    kernel: &ChioKernel,
+    kernel: &mut ChioKernel,
     directory: &Path,
     require_enforced: bool,
+    authority: &chio_control_plane::DurableAdmissionRuntime,
+    initializing: bool,
 ) -> Result<ConnectedServers, CliError> {
+    if config.native_broker.is_some() {
+        return super::native_broker::connect(config, kernel, directory, authority, initializing);
+    }
     let mut servers: Vec<Box<dyn ToolServerConnection>> = Vec::new();
     let mut manifests = Vec::new();
     let mut launch_receipts = BTreeMap::new();
