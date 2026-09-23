@@ -35,7 +35,27 @@ baseline is present, and the keylog example configs agree with the units.
 
 ## Install
 
-1. Build and install the binaries.
+1. Install the binaries from the Linux x86_64 release archive, whose
+   `native-runtime.json` identifies all seven executables, their build targets
+   and SHA-256 digests. Verify the release archive's signature and checksum
+   before extracting it. From the extracted directory, verify and install:
+
+   ```bash
+   jq -r '.binaries[] | "\(.sha256)  \(.name)"' native-runtime.json | sha256sum -c -
+   install -m 0755 chio chio-keylog-witness chio-keylog-audit \
+     chio-secret-brokerd chio-active-response-authorityd \
+     chio-cage-init chio-broker-mcp /usr/local/bin/
+   ```
+
+   The archive includes this `reference-runtime` directory and the
+   `provision-mcp-launch.sh` helper. When following the remaining steps outside
+   a source checkout, replace `deploy/reference-runtime` with `reference-runtime`
+   and `scripts/lib/provision-mcp-launch.sh` with `provision-mcp-launch.sh`.
+   The two confined executables use the static musl target. Brokered native
+   enforcement requires the signed profile and the supported Linux kernel;
+   installing these files does not provision credentials or enable responses.
+
+   To build the existing supervision profile from source instead:
 
    ```bash
    cargo build --release -p chio-cli -p chio-keyring

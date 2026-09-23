@@ -199,6 +199,21 @@ jobs:
                 --target "'"${CHIO_TARGET}"'"
             '
 
+      - name: Build native security runtime companions
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          rustup target add x86_64-unknown-linux-musl
+          cargo auditable build --release --locked --target x86_64-unknown-linux-gnu \
+            -p chio-secret-broker -p chio-active-response-authority -p chio-keyring --bins
+          cargo auditable build --release --locked --target x86_64-unknown-linux-musl \
+            -p chio-cage --bin chio-cage-init --features real-linux-enforcement
+          cargo auditable build --release --locked --target x86_64-unknown-linux-musl \
+            -p chio-secret-broker --bin chio-broker-mcp
+
       - name: Install syft
         if: runner.os != 'Windows'
         # Pinned to v1.18.1 with checked-in SHA-256 digests per runner
@@ -294,6 +309,22 @@ jobs:
             exit 1
           }
 
+      - name: Emit native security runtime SBOMs
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for binary in chio-secret-brokerd chio-active-response-authorityd chio-keylog-witness chio-keylog-audit chio-cage-init chio-broker-mcp; do
+            target=x86_64-unknown-linux-gnu
+            if [[ "$binary" == chio-cage-init || "$binary" == chio-broker-mcp ]]; then
+              target=x86_64-unknown-linux-musl
+            fi
+            out_file="out/sbom/${binary}-${target}.cyclonedx.json"
+            syft --config deploy/sbom/syft.yaml \
+              -o "cyclonedx-json@1.6=${out_file}" "target/${target}/release/${binary}"
+            jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.6"' "$out_file" > /dev/null
+          done
+
       - name: Upload SBOM
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -341,6 +372,9 @@ jobs:
           mkdir -p "dist/${stage_dir}"
           cp "target/${CHIO_TARGET}/release/${BINARY_NAME}${CHIO_BIN_SUFFIX}" "dist/${stage_dir}/"
           cp README.md LICENSE "dist/${stage_dir}/" 2>/dev/null || true
+          if [[ "${CHIO_TARGET}" == x86_64-unknown-linux-gnu ]]; then
+            bash scripts/stage-native-security-runtime.sh target "dist/${stage_dir}"
+          fi
           (cd dist && tar czf "${stage_dir}.tar.gz" "${stage_dir}")
           (cd dist && shasum -a 256 "${stage_dir}.tar.gz" > "${stage_dir}.tar.gz.sha256")
 
