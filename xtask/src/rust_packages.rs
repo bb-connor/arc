@@ -4,7 +4,7 @@ mod index;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use serde_json::{json, Value};
@@ -75,11 +75,16 @@ fn assemble(root: &Path, out: &Path, allow_dirty: bool) -> Result<()> {
     let registry = out.join("registry");
     fs::create_dir(&registry)?;
     fs::create_dir(registry.join("index"))?;
-    let target = PathBuf::from(field(&metadata, "target_directory")?);
+    // Cargo 1.94.1 can leave a stale tail when it reuses a package file whose
+    // new compressed stream is shorter. Each assembly owns fresh output, so
+    // neither old bytes nor unrelated packages can enter this registry.
+    let target = out.join("cargo-packages");
     let mut package = Command::new("cargo");
     package
         .current_dir(root)
-        .args(["package", "--locked", "--no-verify", "--exclude-lockfile"]);
+        .args(["package", "--locked", "--no-verify", "--exclude-lockfile"])
+        .arg("--target-dir")
+        .arg(&target);
     if allow_dirty {
         package.arg("--allow-dirty");
     }
@@ -224,6 +229,7 @@ fn assemble(root: &Path, out: &Path, allow_dirty: bool) -> Result<()> {
     for name in ["LICENSE", "NOTICE"] {
         fs::copy(root.join(name), out.join(name))?;
     }
+    fs::remove_dir_all(target)?;
     println!(
         "Rust preview assembled at {} (consumer build remains required)",
         out.display()
