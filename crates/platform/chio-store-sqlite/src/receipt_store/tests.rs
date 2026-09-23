@@ -24,6 +24,8 @@ mod query;
 mod retained_commitments;
 #[path = "tests/retention.rs"]
 mod retention;
+#[path = "tests/retention_liveness.rs"]
+mod retention_liveness;
 #[path = "tests/scale_proof.rs"]
 mod scale_proof;
 #[path = "tests/scale_recovery.rs"]

@@ -1887,28 +1887,27 @@ fn handle_non_append_command(
             }
         }
         ReceiptCommitCommand::Rotate { config, response } => {
-            // Unconditional decrement pairs with the pre-send increment in
-            // `SqliteReceiptStore::dispatch_rotate` (mirrors the Write arm's
-            // dequeue decrement above). It runs before every early return
-            // below, so no dequeue path (poisoned head, pool-acquire error,
-            // the panic-guarded rotation, success, or error) can leak the
-            // in-flight rotation writer.
-            atomic_saturating_sub(&health.inflight, 1);
+            // Adopt the dispatcher's in-flight ownership until the response,
+            // including pool acquisition, integrity checks and archive fsync.
+            let inflight_guard = WriterInflightGuard::new(&health.inflight);
             // Fail-closed: rotation deletes evidence, so it must never run on a
             // store whose chain integrity is unverified. Refuse on a poisoned
             // head (mirrors the Write arm) and point at the repair path.
             if let WriterHeadState::Poisoned(message) = head_state {
+                drop(inflight_guard);
                 let _ = response.send(Err(poisoned_head_error(message)));
                 return None;
             }
             let mut connection = match receipt_pool_connection(pool, sink_qualification) {
                 Ok(connection) => connection,
                 Err(error) => {
+                    drop(inflight_guard);
                     let _ = response.send(Err(error));
                     return None;
                 }
             };
             if let Err(error) = verify_rollback(&connection, rollback_anchor, false) {
+                drop(inflight_guard);
                 let _ = response.send(Err(error));
                 return None;
             }
@@ -1930,6 +1929,7 @@ fn handle_non_append_command(
             let verified_latest_checkpoint = match verify_checkpoint_chain_integrity(&connection) {
                 Ok(latest) => latest,
                 Err(error) => {
+                    drop(inflight_guard);
                     let _ = response.send(Err(error));
                     return None;
                 }
@@ -1945,6 +1945,7 @@ fn handle_non_append_command(
             // source rows) and then delete the live claim log, destroying the
             // evidence repair needs to recover. Refuse fail-closed instead.
             if let Err(error) = validate_claim_receipt_log_entries(&connection) {
+                drop(inflight_guard);
                 let _ = response.send(Err(error));
                 return None;
             }
@@ -2001,6 +2002,7 @@ fn handle_non_append_command(
                     health.store_head_snapshot(head);
                 }
             }
+            drop(inflight_guard);
             let _ = response.send(outcome);
         }
         ReceiptCommitCommand::InstallSigner(signer) => {
@@ -2642,8 +2644,8 @@ fn receipt_store_healthy(
         )
 }
 
-/// Holds the writer `inflight` count for the DURATION of a writer-routed `Write`
-/// job. The pre-send increment in `WriterHandle::run_write_kind` is ADOPTED by
+/// Holds the writer `inflight` count through a writer-routed `Write` or `Rotate`
+/// job. The dispatcher's pre-send increment is adopted by
 /// this guard, so `receipt_store_health` reports `inflight > 0` while a slow or
 /// stuck writer-routed op (pool acquire, pre-check, closure, resync) is actually
 /// running. The `Write` arm releases it (`drop`) IMMEDIATELY BEFORE each

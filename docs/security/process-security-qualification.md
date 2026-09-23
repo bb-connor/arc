@@ -24,6 +24,26 @@ below retain their historical source boundaries.
 | Hosted delivery | #1160 publishes the continuation. Main prerequisite #1168 is at `2fb4a6c1c8`; definition-only #1167 retains `88b9b2a3cb`. Original hosted failures remain recorded. | New-head qualification, independent review, protected integration and the exact source/definition/image/verifier authority transition remain required. |
 | M9-M11 | Packaging and handoff work remains preserved. | No milestone-level M9-M10 acceptance or M11 operational promotion is established. |
 
+The September 23 M7 recovery continuation services previously authorized
+responses before new correlation/planning work and independent declassification
+outbox maintenance. Three real-store outage cases verify that admission remains
+closed while expired overlays are lifted. Shutdown moves blocking SQLite probes
+off the async executor and retains the same probe through cancellation. A caught
+worker panic publishes its terminal failure before cleanup, including when that
+cleanup also fails. All 22 host lifecycle cases and the focused panic/cleanup
+regression pass; the classifier's 11 existing cases also pass after removing
+repeated JSON decoding for field findings.
+
+The M8 continuation keeps rotation counted as in flight through archive I/O and
+accounts for its queue admission. A real SQLite write-lock regression verifies
+wedged health while rotation is blocked and healthy state after it completes.
+All 63 selected retention cases pass; the original #1045 property remains
+ignored and this fix is not claimed as its root cause. Strict all-target Clippy
+passes for control-plane, store and data guards. Source hygiene and 225 formal
+mirrors pass. The original shutdown deadlock, captured thread stacks, crash-state
+failure, compile-path mistake, and fixture correction are retained separately
+from the passing retries under `output/process-security-20260915/m7-recovery-20260923/`.
+
 The governed-host qualified full-index patch on `3dd65e1fba` is
 `47b5f18164ac39f4c48ec4debcaad14bd977724879d702462066c51a8a136f73`.
 Its real CLI case passes in 95.45 seconds, including witnessed rotation after
