@@ -367,13 +367,14 @@ __attribute__((noreturn, used)) void probe_start(long *initial_stack) {
     long result = invoke(SYS_OPENAT, AT_FDCWD, (long)path, O_RDONLY, 0);
     terminate(result == -13 ? 0 : 128);
 #elif PROBE_MODE == 28
-    if (initial_stack[0] != 3) {
+    if (initial_stack[0] != 3 && initial_stack[0] != 4) {
         terminate(129);
     }
     const char **arguments = (const char **)&initial_stack[1];
     long descriptor = arguments[1][0] - '0';
     long operation = arguments[2][0] - '0';
-    long result = invoke(SYS_FCNTL, descriptor, operation, 0, 0);
+    long flags = initial_stack[0] == 4 ? arguments[3][0] - '0' : 0;
+    long result = invoke(SYS_FCNTL, descriptor, operation, flags, 0);
     terminate(result == 0 ? 0 : 130);
 #else
 #error invalid probe mode

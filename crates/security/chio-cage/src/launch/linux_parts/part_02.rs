@@ -3,8 +3,11 @@ fn syscall_number(architecture: SandboxArchitecture, name: &str) -> Option<u32> 
         SandboxArchitecture::X86_64 => Some(match name {
             "read" => 0,
             "write" => 1,
+            "open" => 2,
             "close" => 3,
+            "stat" => 4,
             "fstat" => 5,
+            "lstat" => 6,
             "poll" => 7,
             "lseek" => 8,
             "mmap" => 9,
@@ -1408,5 +1411,9 @@ mod tests {
             Some(89)
         );
         assert!(syscall_number(SandboxArchitecture::Aarch64, "readlink").is_none());
+        for (name, number) in [("open", 2), ("stat", 4), ("lstat", 6)] {
+            assert_eq!(syscall_number(SandboxArchitecture::X86_64, name), Some(number));
+            assert!(syscall_number(SandboxArchitecture::Aarch64, name).is_none());
+        }
     }
 }

@@ -1118,7 +1118,7 @@ fn default_deny_blocks_ipv4_and_ipv6_connect_and_bind() {
 #[test]
 fn default_deny_blocks_unreviewed_syscall() {
     assert_probe_sigsys("CHIO_CAGE_TEST_FORBIDDEN_SYSCALL");
-    broker_status::check_broker_descriptor_status();
+    broker_status::check_descriptor_status();
 }
 
 #[test]

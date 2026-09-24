@@ -80,6 +80,7 @@ fn build_seccomp_plan(
         "exit",
         "exit_group",
         "faccessat2",
+        "fcntl",
         "fstat",
         "futex",
         "getpid",
@@ -135,7 +136,18 @@ fn build_seccomp_plan(
         // subsequent open remains independently confined by Landlock.
         // Rust/glibc path canonicalization uses readlink rather than readlinkat
         // on x86_64. Both inspect link metadata; file opens remain confined.
-        allowed.extend(["access", "arch_prctl", "poll", "readlink"]);
+        // musl also uses the legacy open/stat/lstat entrypoints. They have
+        // the same path authority as the allowed *at variants; Landlock
+        // continues to enforce every file open against the retained grants.
+        allowed.extend([
+            "access",
+            "arch_prctl",
+            "lstat",
+            "open",
+            "poll",
+            "readlink",
+            "stat",
+        ]);
     }
     match profile {
         NativeSyscallProfile::NativeMinimalV1 => {}
@@ -143,7 +155,6 @@ fn build_seccomp_plan(
         NativeSyscallProfile::BrokeredNativeV1 => {
             allowed.extend(STANDARD.iter().copied());
             allowed.extend(BROKERED.iter().copied());
-            allowed.insert("fcntl");
         }
     }
     for forbidden in [
@@ -173,6 +184,26 @@ fn build_seccomp_plan(
             },
         ],
     )]);
+    if profile != NativeSyscallProfile::BrokeredNativeV1 {
+        // Rust's musl file wrapper marks newly opened descriptors close-on-exec.
+        // Permit that one tightening operation, without duplication or clearing
+        // flags. The broker profile retains its separate F_GETFD-only contract.
+        argument_constraints.insert(
+            "fcntl".to_string(),
+            vec![
+                SyscallArgumentConstraint {
+                    argument_index: 1,
+                    comparison: SeccompArgumentComparison::Equal,
+                    value: 2, // Linux F_SETFD.
+                },
+                SyscallArgumentConstraint {
+                    argument_index: 2,
+                    comparison: SeccompArgumentComparison::Equal,
+                    value: 1, // Linux FD_CLOEXEC.
+                },
+            ],
+        );
+    }
     if profile == NativeSyscallProfile::BrokeredNativeV1 {
         for syscall in BROKERED {
             argument_constraints.insert(
