@@ -17,7 +17,19 @@ installing the boundary files. Historical images built with `COPY . .` retain
 the repository in an earlier image layer even after deleting it. Their
 final-filesystem checks do not qualify those images for publication. Validate
 the rebuilt image's saved layers as well as its installed boundary and cache.
-Source `93616b70146dbb76d397a1e72e9fd6ef359e41b5` plus the source-mount repair
+Source `4e5658c36ef785f876a241be1007c45545858807` produces locally validated image
+`sha256:b25400a6d53f1f49b62de0bd88ce92b933e87b334346a14e0bb8229c3e21b19e`.
+Its 14 installed boundary files, 225-package inventory, pinned tools and
+network-disabled locked dependency fetch pass. All 12 saved image layers contain
+no retained source contents. The evidence archive is
+`image-4e5658c36e-evidence-20260924.tgz`, SHA-256
+`72bd901897454b94e2392c618b707e43e9991460aae502824000ef3f2e225c96`.
+The installed native cage gate requires all 70 tests, including the 15 ELF
+parser cases. The preceding `b92a9c9a96` image and its original gzip-inspection
+failure are retained separately; that image predates the gate inventory fix.
+This image remains unpublished and unauthorized for trusted capture.
+
+Historical source `93616b70146dbb76d397a1e72e9fd6ef359e41b5` plus the source-mount repair
 produced local image
 `sha256:b242807702061932477601925d83cf1f8a740563f5700a487e027532bd82deb3`.
 All 12 saved layers contain no retained source contents. The 14 installed
@@ -27,8 +39,7 @@ suite also passes. Evidence is retained under
 `output/process-security-20260915/image-source-layer-93616b7014-20260924/`
 and `image-source-layer-93616b7014-evidence-20260924.tgz`.
 This is a local image identifier, not a published or authorized execution pin.
-It predates the current dependency edges and lock digest; the current image
-still requires its own build and validation.
+It predates the current dependency edges and lock digest.
 Registry publication, reviewed
 workflow-definition rotation and capture authorization remain outstanding.
 

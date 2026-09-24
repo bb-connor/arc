@@ -1,6 +1,64 @@
 # Combined process and M4 qualification
 
-## Current checkpoint (2026-09-23)
+## Current checkpoint (2026-09-24)
+
+Draft PR #1160 and the primary worktree contain the runtime fixes through
+`4e5658c36ef785f876a241be1007c45545858807`. Actual systemd installation exposed
+credential custody and packaged musl failures that component tests did not catch.
+The supervisor, witness seed loader and remote session keyring now accept
+systemd's exact root-owned, read-only memory filesystem and service ACL. Ordinary
+group-readable credentials remain invalid. Binary credentials cross into the
+daemon through service-owned sealed memory files and read-only descriptors.
+The reference units preserve unprivileged accounts and empty capabilities while
+allowing the required `openat2` operation.
+
+The cage now accepts a zero-initialized ELF TLS template with no file image.
+Native profiles allow musl's legacy file operations under existing Landlock
+grants and only the `fcntl` operation that sets close-on-exec. Descriptor
+duplication and flag clearing remain denied, including the broker's narrower
+descriptor contract. Native library, parser, real syscall and strict Clippy
+checks pass on the recorded patch. The installed debug CLI and auditable musl
+helper complete an allowed read, deny an ungranted tool and forbidden path,
+and verify receipts against the independently retained kernel key. A SIGKILL
+of both systemd service groups preserves the authority key, kernel key, ready
+session and original receipts; authenticated reads resume. Graceful shutdown
+continues to terminalize sessions. These are diagnostic installation results,
+not a completed release-package installation.
+
+An unchanged key-log service configuration previously failed its second start
+because it attempted exclusive database creation again. Witness and audit
+daemons now reopen and validate an existing store; explicitly permitted initial
+creation remains exclusive. All three existing process tests and strict
+all-target Clippy pass on aarch64, including retained witnessed pins and storage
+identities. The original x86 systemd failure is retained; the repaired x86
+package still needs its installed restart check.
+
+All nine original Apalache safety shards pass on `17df840f2e` with unchanged
+bounds and deadlines. The complete Lean gate also passes on that source. Those
+formal sources and owning workflows remain unchanged in the current candidate.
+Apalache evidence is archived as `m10-apalache-17df840f2e-20260924.tgz`, SHA-256
+`3a21829a2ae4f8191b09657dcb143e11f78bcaf894b38ae029b0fb3a6df58476`.
+These results do not imply the separate negative, temporal, fuzz or scheduled
+inventories have completed.
+
+The current dependency lock is
+`67904d2a3d2ec99cfef68cdde03b62a52098b82eca2f97a415638b824f32dec0`.
+It adds three existing workspace dependency edges without registry version
+changes. The generated Docker workspace and execution-image pins match it.
+The image built from `4e5658c36e` passes runtime/cache validation and inspection
+of all 12 saved layers; see the [image input record](execution-image-inputs-2026-09-20.md).
+It includes the native gate's required inventory of 70 tests, including all 15
+ELF parser cases. It is unpublished and does not authorize trusted capture.
+
+The native full-workspace run remains frozen on `93616b7`; it is not a current
+candidate pass. The auditable ten-executable package is rebuilding on
+`4574454ba6`, before the two daemon restart changes. Final package installation,
+all 35 current-source M7 campaigns, the unresolved #1045 retention cause, all
+six I01-I08 host profiles, remaining final qualification, independent review
+and protected integration remain open. The successful slow-storage runs do not
+remove #1045's quarantine. M11 activation remains separately authorized.
+
+## Previous checkpoint (2026-09-23)
 
 The continuation is on draft PR #1160. Both required parents remain ancestors. The primary
 checkout was fast-forwarded after its frozen workspace run terminated;
