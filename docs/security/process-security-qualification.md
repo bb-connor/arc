@@ -2,8 +2,9 @@
 
 ## Current checkpoint (2026-09-24)
 
-Draft PR #1160 and the primary worktree contain the runtime fixes through
-`4e5658c36ef785f876a241be1007c45545858807`. Actual systemd installation exposed
+Runtime installation is qualified on `9ca2ace6ec40f5bce40cb435b67e68b22334a59c`;
+archive assembly is qualified on `bb470b5f298ba3895dc56c9d46d2aa80567c5fd3`.
+Actual systemd installation exposed
 credential custody and packaged musl failures that component tests did not catch.
 The supervisor, witness seed loader and remote session keyring now accept
 systemd's exact root-owned, read-only memory filesystem and service ACL. Ordinary
@@ -22,24 +23,38 @@ helper complete an allowed read, deny an ungranted tool and forbidden path,
 and verify receipts against the independently retained kernel key. A SIGKILL
 of both systemd service groups preserves the authority key, kernel key, ready
 session and original receipts; authenticated reads resume. Graceful shutdown
-continues to terminalize sessions. These are diagnostic installation results,
-not a completed release-package installation.
+continues to terminalize sessions. The subsequent installed release package
+passes these same allow, deny, signature and crash-recovery checks. Original
+diagnostic failures remain separate from that successful package result.
 
 An unchanged key-log service configuration previously failed its second start
 because it attempted exclusive database creation again. Witness and audit
 daemons now reopen and validate an existing store; explicitly permitted initial
 creation remains exclusive. All three existing process tests and strict
 all-target Clippy pass on aarch64, including retained witnessed pins and storage
-identities. The original x86 systemd failure is retained; the repaired x86
-package still needs its installed restart check.
+identities. The installed x86 release witness now starts and restarts with the
+same configuration and byte-for-byte unchanged original database. The original
+systemd failure is retained. No signing keys or stores were replaced.
+
+All ten auditable release executables build and stage. The release workflow
+now includes every companion's CycloneDX inventory in the archive, using the
+exact binary names and targets from `native-runtime.json`. Its existing 13-case
+inventory suite passes. Executing the actual workflow staging block and
+extracting the resulting archive verifies all ten binary hashes, all ten
+inventories and each inventory's executable digest. The CLI's embedded inventory
+contains 760 Rust components and 584 dependency entries. The archive SHA-256 is
+`415f6ce4bb34ca71dced49542d5c55df74e48571cf1188921f0edc48ff390a29`.
+These local installation and inventory results do not supply release signatures,
+hosted provenance, registry publication or acceptance for every host integration.
 
 All nine original Apalache safety shards pass on `17df840f2e` with unchanged
 bounds and deadlines. The complete Lean gate also passes on that source. Those
 formal sources and owning workflows remain unchanged in the current candidate.
 Apalache evidence is archived as `m10-apalache-17df840f2e-20260924.tgz`, SHA-256
 `3a21829a2ae4f8191b09657dcb143e11f78bcaf894b38ae029b0fb3a6df58476`.
-These results do not imply the separate negative, temporal, fuzz or scheduled
-inventories have completed.
+All 16 registered negative model checks also pass on `9ca2ace6ec`, producing
+their expected counterexamples. Temporal, fuzz and other scheduled inventories
+remain separate from these safety and negative results.
 
 The current dependency lock is
 `67904d2a3d2ec99cfef68cdde03b62a52098b82eca2f97a415638b824f32dec0`.
@@ -51,12 +66,13 @@ It includes the native gate's required inventory of 70 tests, including all 15
 ELF parser cases. It is unpublished and does not authorize trusted capture.
 
 The native full-workspace run remains frozen on `93616b7`; it is not a current
-candidate pass. The auditable ten-executable package is rebuilding on
-`4574454ba6`, before the two daemon restart changes. Final package installation,
-all 35 current-source M7 campaigns, the unresolved #1045 retention cause, all
+candidate pass. All 35 final-source M7 campaigns, the unresolved #1045 retention cause, all
 six I01-I08 host profiles, remaining final qualification, independent review
 and protected integration remain open. The successful slow-storage runs do not
 remove #1045's quarantine. M11 activation remains separately authorized.
+M7 binds every repository input, including release files. Its final run must
+follow the archive repair and retain a frozen source; historical partial runs
+are preserved without implying completion.
 
 ## Previous checkpoint (2026-09-23)
 
