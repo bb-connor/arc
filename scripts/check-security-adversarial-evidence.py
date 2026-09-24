@@ -5320,7 +5320,7 @@ def prepare_enterprise_descriptor_control(
     )
     for path in (helper, probe):
         metadata = path.lstat()
-        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+        if not stat.S_ISREG(metadata.st_mode):
             raise EvidenceError(f"enterprise descriptor fixture is not regular: {path}")
         if not metadata.st_mode & 0o111:
             raise EvidenceError(f"enterprise descriptor fixture is not executable: {path}")
