@@ -27,6 +27,25 @@ Original failed runs and final results are retained under
 `output/process-security-20260915/m8-atomic-migration-54609bb56a-20260924/`.
 These fixes do not establish the cause of #1045 or remove its quarantine.
 
+The common candidate also preserves public Chio #23's `e6723d43e1` ancestry
+through integration `ab4f7a58fb`. Its dependency reconciliation retains
+Next.js 15.5.26, Metro 0.84.5, Rolldown 1.2.9, Rollup 4.63.4, the patched
+Elysia floor and production Ajv. The fuzz workspace selects the reviewed
+AWS-LC patch and current swarm authority, with the public CLI request-identity
+coverage triggers retained. Offline npm frozen-resolution checks, locked Cargo
+metadata, 225 formal mirrors and generated proof coverage pass. Public routing
+and publication remain unchanged; historical raw host artifacts still require
+an explicit public disposition before exporting their Git ancestry.
+
+The `54609bb56a` M7 queue caught and promoted nine campaigns before stopping
+for the storage and dependency integration. The original 35-case inventory,
+raw outcomes and interrupted tenth control are retained in
+`m7-partial-54609bb56a-20260924.tgz`, SHA-256
+`9a72271e2b08ecc01aa8e5d69deeb32e2b4b22f5e81d300f2193d7f2cd609da5`.
+Final campaigns follow the combined workspace gate. The storage changes also
+alter the selected Rust package closure, so the earlier `6e4135a73d` consumer
+pass below is historical and requires an updated package qualification.
+
 | Area | Current evidence | Remaining boundary |
 | --- | --- | --- |
 | Foundation | The locked x86 workspace run at `36ddfcf69e` stopped on three CLI sandbox tests. All three exact cases pass with the matching stock Ubuntu Bubblewrap profile and unchanged restrictions. The full retry is terminal, exit 101, on `auth_live`: Node 18.19.1 cannot import the TypeScript SDK. The temporary profile cleanup completed, with namespace restrictions restored to 1/1. | Complete workspace and workspace-Clippy passes remain open. Original failures and the cleanup record are retained in `chio-workspace-36dd-terminal-20260923.tgz`, SHA-256 `51098e8f1182b07fc84476cda9f54a4786b9d0de3dcb0b345b8299768ae0425e`, under `output/process-security-20260915/`. |

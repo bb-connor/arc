@@ -36,11 +36,14 @@
   "overrides": {
     "browserslist": "4.28.8",
     "fast-uri": "3.1.6",
+    "metro": "0.84.5",
+    "metro-config": "0.84.5",
+    "metro-transform-worker": "0.84.5",
     "miniflare": {
       "undici": "7.29.0"
     },
     "next": {
-      ".": "15.5.25",
+      ".": "15.5.26",
       "postcss": "8.5.26"
     },
     "postcss": "8.5.26",
@@ -51,7 +54,7 @@
     "vite": "7.3.6"
   },
   "devDependencies": {
-    "next": "15.5.25",
+    "next": "15.5.26",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   }
