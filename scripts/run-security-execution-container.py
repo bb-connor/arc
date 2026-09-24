@@ -1210,6 +1210,9 @@ def validate_created_container(
         "UsernsMode": "",
         "VolumesFrom": None,
     }
+    for dns_field in ("Dns", "DnsOptions", "DnsSearch"):
+        if dns_field in host and host[dns_field] is None:
+            host[dns_field] = []
     if any(host.get(key) != value for key, value in expected_host.items()):
         raise BoundaryError("Docker changed the created container host boundary")
     observed_ulimits = host.get("Ulimits")
