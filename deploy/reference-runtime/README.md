@@ -38,7 +38,9 @@ baseline is present, and the keylog example configs agree with the units.
 
 1. Install the binaries from the Linux x86_64 release archive, whose
    `native-runtime.json` identifies all ten executables, their build targets
-   and SHA-256 digests. Verify the release archive's signature and checksum
+   and SHA-256 digests. Each executable has a corresponding
+   `<name>-<target>.cyclonedx.json` dependency inventory in that archive.
+   Verify the release archive's signature and checksum
    before extracting it. From the extracted directory, verify and install:
 
    ```bash

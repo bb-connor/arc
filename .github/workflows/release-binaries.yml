@@ -463,6 +463,11 @@ jobs:
           cp README.md LICENSE "dist/${stage_dir}/" 2>/dev/null || true
           if [[ "${CHIO_TARGET}" == x86_64-unknown-linux-gnu ]]; then
             bash scripts/stage-native-security-runtime.sh target "dist/${stage_dir}"
+            runtime_sboms="$(jq -er '.binaries[] | "\(.name)-\(.target).cyclonedx.json"' \
+              "dist/${stage_dir}/native-runtime.json")"
+            while IFS= read -r sbom; do
+              cp -- "out/sbom/${sbom}" "dist/${stage_dir}/"
+            done <<< "${runtime_sboms}"
           fi
           (cd dist && tar czf "${stage_dir}.tar.gz" "${stage_dir}")
           (cd dist && shasum -a 256 "${stage_dir}.tar.gz" > "${stage_dir}.tar.gz.sha256")
