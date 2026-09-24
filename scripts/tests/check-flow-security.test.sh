@@ -90,7 +90,7 @@ expected_counts = {
     "frozen dispatch participant context": 31,
     "durable caller participant persistence": 3,
     "native compiled catalog identity": 2,
-    "native post-join policy": 133,
+    "native post-join policy": 136,
     "native declassification row semantics": 1,
     "native declassification issuer window": 1,
     "public nested credential custody": 5,
