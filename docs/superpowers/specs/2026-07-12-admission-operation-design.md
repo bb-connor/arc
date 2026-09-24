@@ -505,6 +505,61 @@ must be converted to cloned-handle tests or explicit read-only observer tests.
 Multi-process serving is outside the local SQLite profile and requires a remote
 linearizable store with leader epochs.
 
+### Shared-authority time ordering
+
+Independent kernels can reach a shared authority out of decision-timestamp
+order. Admission schema 17 therefore separates the kernel's decision time
+(`recorded_at_unix_ms`) from the authority clock sampled inside the transaction
+(`observed_at_unix_ms`). New commit preimages use
+`chio.admission-operation-commit-chain.v2` and authenticate both values. Decision
+time remains monotonic within an operation, but need not be monotonic across
+unrelated operations. Signed projections and participant artifacts retain their
+original canonical bytes.
+
+The durable clock floor and rollback anchors track authority observations, not
+the greatest caller timestamp. A backwards authority-clock step fails closed;
+the implementation does not silently clamp it. Caller timestamps still require
+positive I-JSON-safe milliseconds within the bounded system-clock skew. Live
+lease, nonce, and approval checks use the later of decision time and current
+authority time. Historical nonce verification for cumulative approval retains
+its proposal-time rule, with the live approval window checked separately.
+
+Schema upgrades preserve v1 commit hashes and existing rollback anchors: old
+rows retain a null observation, whose clock floor is their recorded timestamp.
+Once v2 history starts it cannot revert to v1. If a legacy floor is ahead of the
+authority clock, new work remains denied until that clock catches up. Upgrades
+hold the exclusive serving lock, preserve child foreign-key targets during the
+table rebuild, and verify the canonical schema, foreign keys and commit chain
+before committing. Operators must not downgrade a schema-17 database to an older
+binary.
+
+### Private caller dispatch context retention
+
+Admission schema 18 adds an immutable private caller-context row. Its bounded
+canonical frame binds the original request digest, immutable operation binding,
+CapturePending version, provider attempt, execution nonce and executable hold. A dedicated
+authority port retains that row and its operation digest attachment in the same
+transaction as actual invocation capture and the nonce/operation dispatch
+commitment. Capture preparation remains an earlier durable intent, before
+payment and the final security hook. This storage port does not produce an
+external execution permit. Reads, recovery scans and startup validate the
+physical participant; generic compare-and-swap cannot create it independently.
+
+Migration refuses ambiguous pre-18 caller histories, including unversioned
+stores, nonterminal callers and refunded or denied caller terminals. Under the
+legacy report-after-effect contract, a pre-dispatch compensation did not prove
+that an external effect never happened. Migration never backfills an execution
+authorization or invents capture history. Ordinary nonce histories retain their
+original commits. Do not downgrade a schema-18 authority to an older binary.
+
+The kernel now freezes one in-memory return-context component before ordinary
+and nested dispatch commitment. This is not a durable restart snapshot or a
+credential custody record. The complete typed admission snapshot and the authenticated external
+start/report handshake remain unimplemented. The context frame validates
+storage structure and binding, not the authority of its private payload. See
+the [caller dispatch commitment design](2026-09-07-caller-dispatch-commitment-design.md)
+for the remaining snapshot, executor, delivery and qualification requirements.
+
 ## Configuration and rollout
 
 ```rust

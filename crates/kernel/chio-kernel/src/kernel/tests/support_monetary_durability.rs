@@ -1243,6 +1243,7 @@ fn predispatch_unwind_requires_confirmed_payment_release_status(
             &capability,
             mutation.charge_result(),
             Some(&authorization),
+            None,
         )
         .is_err());
     let usage = store

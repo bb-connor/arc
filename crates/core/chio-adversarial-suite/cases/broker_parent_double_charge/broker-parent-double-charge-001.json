@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "broker-parent-double-charge-001",
+  "class": "broker_parent_double_charge",
+  "expected_verdict": "DENY",
+  "expected_reason": "broker_parent_double_charge_detected",
+  "threat_id": "resource_exhaustion_dos",
+  "pending": true,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "quota_identity_control",
+        "package": "chio-store-sqlite",
+        "test_source": "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs",
+        "target_kind": "lib",
+        "test_name": "budget_store::tests::composite_lifecycle::composite_authorize_capture_and_settlement_survive_response_loss_and_restart"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "broker_parent_double_charge",
+        "control_id": "quota_identity_control",
+        "package": "chio-store-sqlite",
+        "source": "crates/platform/chio-store-sqlite/src/budget_store/composite.rs",
+        "function": "SqliteBudgetStore::authorize_composite_hold_inner",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "!=",
+          "replacement": "==",
+          "occurrence": 2
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/broker_parent_double_charge/mutants.out/outcomes.json"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage.",
+    "Quota authorization, capture and compensation now belong to the original composite SQLite authority. This case exercises that owner and its existing restart and accounting assertions."
+  ]
+}

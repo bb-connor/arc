@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 8ba0a80532a71a901c67466299ea1bfe1de2852479f67791d2ff4b08be726a8c
+# Schema sha256: c31fc3d855f29edabccd629866ae3f328d7322f74f9c97ed7c5788c1adc8efbe
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,14 +14,16 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
+from chio_sdk._manifest_wire import SecurityWireModel as BaseModel
+
+from pydantic import ConfigDict, Field, RootModel, conint, constr
 
 
 class CumulativeRootMonetaryAmount(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    units: conint(ge=0)
+    units: conint(strict=True, ge=0)
     currency: constr(min_length=1)
 
 
@@ -61,7 +63,7 @@ class Body(BaseModel):
         extra="forbid",
     )
     schema_: Literal["chio.cumulative-approval-root.v1"] = Field(..., alias="schema")
-    signer_key_epoch: conint(ge=0)
+    signer_key_epoch: conint(strict=True, ge=0)
     root_capability_id: constr(min_length=1)
     root_capability_hash: constr(pattern=r"^[0-9a-f]{64}$")
     root_issuer: CumulativeRootPublicKey
@@ -69,9 +71,9 @@ class Body(BaseModel):
     root_scope_hash: constr(pattern=r"^[0-9a-f]{64}$")
     root_grant_hash: constr(pattern=r"^[0-9a-f]{64}$")
     approval_budget_id: constr(min_length=1)
-    approval_budget_epoch: conint(ge=0)
+    approval_budget_epoch: conint(strict=True, ge=0)
     threshold: CumulativeRootMonetaryAmount
-    root_expires_at: conint(ge=0)
+    root_expires_at: conint(strict=True, ge=0)
 
 
 class ChioCumulativeApprovalRootBinding(BaseModel):

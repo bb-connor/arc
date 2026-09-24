@@ -345,6 +345,15 @@ pub struct CapabilityFeatureContext<'a> {
     pub direct_root: Option<&'a CapabilityToken>,
 }
 
+/// Signed ancestor evidence in root-to-parent order. An empty slice retains
+/// the existing verifier behavior, including rejection of multi-hop narrowed
+/// chains that have no authenticated intermediate scopes.
+#[derive(Debug, Clone, Copy)]
+pub struct CapabilityEvidenceContext<'a> {
+    pub features: CapabilityFeatureContext<'a>,
+    pub ancestors: &'a [CapabilityToken],
+}
+
 /// Chain-binding entry point. Verify a capability token while also
 /// enforcing the chain-binding rule required for delegation soundness.
 ///
@@ -430,6 +439,36 @@ pub fn verify_capability_full_with_root(
     trust_root: &dyn TrustRootResolver,
     budgets: &mut dyn BudgetRegistry,
 ) -> Result<VerifiedCapability, CapabilityError> {
+    verify_capability_full_with_evidence(
+        token,
+        trusted_issuers,
+        clock,
+        crypto_floor,
+        CapabilityEvidenceContext {
+            features,
+            ancestors: &[],
+        },
+        trust_root,
+        budgets,
+    )
+}
+
+/// Full verification with signed scope evidence for recursive delegation.
+/// Ancestor evidence is untrusted input and is verified before budget admission.
+/// Missing evidence keeps the existing fail-closed chain-binding behavior.
+pub fn verify_capability_full_with_evidence(
+    token: &CapabilityToken,
+    trusted_issuers: &[PublicKey],
+    clock: &dyn Clock,
+    crypto_floor: CapabilityCryptoFloor,
+    evidence: CapabilityEvidenceContext<'_>,
+    trust_root: &dyn TrustRootResolver,
+    budgets: &mut dyn BudgetRegistry,
+) -> Result<VerifiedCapability, CapabilityError> {
+    let CapabilityEvidenceContext {
+        features,
+        ancestors,
+    } = evidence;
     let CapabilityFeatureContext { peer, direct_root } = features;
     validate_peer_capabilities(peer)?;
     let aggregate_budget_enabled = peer.supports(AGGREGATE_INVOCATION_BUDGET);
@@ -465,10 +504,25 @@ pub fn verify_capability_full_with_root(
         direct_root,
     )?;
     verify_delegation_chain_shape(token)?;
-    verify_chain_binding_with_negotiation(token, peer, trust_root)?;
+    if ancestors.is_empty() {
+        verify_chain_binding_with_negotiation(token, peer, trust_root)?;
+    } else {
+        lineage::verify_signed_lineage(
+            token,
+            ancestors,
+            trusted_issuers,
+            clock,
+            crypto_floor,
+            features,
+            trust_root,
+        )?;
+    }
     admit_delegated_budget(token, budgets)?;
     Ok(verified)
 }
+
+#[path = "capability_verify/lineage.rs"]
+mod lineage;
 
 fn validate_peer_capabilities(peer: &CapabilityNegotiation) -> Result<(), CapabilityError> {
     peer.validate().map_err(|error| {

@@ -6,6 +6,9 @@ use super::support::{
 };
 use super::*;
 
+#[path = "evidence_retention/dispatch.rs"]
+mod dispatch;
+
 pub(crate) fn receipt_query_sql(
     query: &ReceiptQuery,
     tenant_fragment: &str,
@@ -221,57 +224,6 @@ impl SqliteReceiptStore {
     /// checkpointed batch has fully aged, i.e. a no-op rotation).
     pub fn rotate_if_needed(&self, config: &RetentionConfig) -> Result<u64, ReceiptStoreError> {
         self.dispatch_rotate(Box::new(config.clone()), None)
-    }
-
-    fn dispatch_rotate(
-        &self,
-        config: Box<RetentionConfig>,
-        explicit_cutoff: Option<u64>,
-    ) -> Result<u64, ReceiptStoreError> {
-        if config.tenant_id.is_some() {
-            // Tenant-scoped archival is not expressible as a prefix watermark,
-            // so reject here before any partial work runs.
-            return Err(ReceiptStoreError::RetentionTenantScopeUnsupported);
-        }
-        let config = match explicit_cutoff {
-            Some(cutoff) => {
-                let mut config = config;
-                config.retention_days = 0;
-                config.explicit_cutoff_unix_secs = Some(cutoff);
-                config
-            }
-            None => config,
-        };
-        let (response, result) = std::sync::mpsc::sync_channel(1);
-        // A rotation is an in-flight writer just like an append or a Write job:
-        // increment BEFORE handing the command to the actor so a concurrent
-        // `receipt_store_health` cannot observe a dequeued-but-uncounted
-        // rotation, mirroring `ReceiptCommitActor::append` and
-        // `WriterHandle::run_write_kind`. The Rotate actor arm decrements
-        // unconditionally on dequeue; any send or recv failure here undoes the
-        // speculative increment so a rejected rotation never leaks inflight.
-        let health = &self.receipt_commit_actor.health;
-        health
-            .inflight
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        if let Err(error) = self
-            .receipt_commit_actor
-            .sender
-            .try_send(ReceiptCommitCommand::Rotate { config, response })
-        {
-            atomic_saturating_sub(&health.inflight, 1);
-            return Err(match error {
-                std::sync::mpsc::TrySendError::Full(_) => receipt_actor_saturated_error(),
-                std::sync::mpsc::TrySendError::Disconnected(_) => receipt_actor_unavailable_error(),
-            });
-        }
-        match result.recv() {
-            Ok(outcome) => outcome,
-            Err(_) => {
-                atomic_saturating_sub(&health.inflight, 1);
-                Err(receipt_actor_unavailable_error())
-            }
-        }
     }
 
     /// Internal implementation for `query_receipts` (called from `receipt_query` module).

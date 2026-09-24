@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/effect-transition-receipt-body-v1.schema.json",
+  "title": "Chio effect transition receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["header", "response", "effect", "generation", "scheduler_fencing_token", "outcome"],
+  "properties": {
+    "header": {
+      "allOf": [
+        { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/header" },
+        { "type": "object", "properties": { "prior_receipt_ids": { "type": "array", "maxItems": 1 } } }
+      ]
+    },
+    "response": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/response" },
+    "effect": { "$ref": "#/$defs/effect" },
+    "generation": { "$ref": "#/$defs/jsonSafePositiveInteger" },
+    "scheduler_lease_owner_id": {
+      "oneOf": [
+        { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" },
+        { "type": "null" }
+      ]
+    },
+    "scheduler_fencing_token": { "$ref": "#/$defs/jsonSafePositiveInteger" },
+    "outcome": { "$ref": "#/$defs/outcome" }
+  },
+  "$defs": {
+    "jsonSafePositiveInteger": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "kind": {
+      "enum": [
+        "escalate_alert",
+        "throttle_session",
+        "restrict_egress",
+        "suspend_session",
+        "suspend_capability_set",
+        "freeze_issuance"
+      ]
+    },
+    "target": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target_type", "tenant_id"],
+          "properties": { "target_type": { "const": "tenant" }, "tenant_id": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target_type", "session_id"],
+          "properties": { "target_type": { "const": "session" }, "session_id": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target_type", "lineage_id"],
+          "properties": { "target_type": { "const": "lineage" }, "lineage_id": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target_type", "affected_set_hash"],
+          "properties": { "target_type": { "const": "capability_set" }, "affected_set_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" } }
+        }
+      ]
+    },
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effect_id", "ordinal", "kind", "target", "contribution_hash", "observed_base_version_hash"],
+      "properties": {
+        "effect_id": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" },
+        "ordinal": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "kind": { "$ref": "#/$defs/kind" },
+        "target": { "$ref": "#/$defs/target" },
+        "contribution_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" },
+        "observed_base_version_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" }
+      }
+    },
+    "outcome": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "const": "requested" } } },
+        { "type": "object", "additionalProperties": false, "required": ["state", "resulting_version_hash"], "properties": { "state": { "const": "applied" }, "resulting_version_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" } } },
+        { "type": "object", "additionalProperties": false, "required": ["state", "error_code"], "properties": { "state": { "const": "apply_failed" }, "error_code": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" } } },
+        { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "const": "rollback_requested" } } },
+        { "type": "object", "additionalProperties": false, "required": ["state", "resulting_version_hash"], "properties": { "state": { "const": "restored" }, "resulting_version_hash": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/digest" } } },
+        { "type": "object", "additionalProperties": false, "required": ["state", "error_code"], "properties": { "state": { "const": "rollback_failed" }, "error_code": { "$ref": "response-state-transition-receipt-body-v1.schema.json#/$defs/identifier" } } }
+      ]
+    }
+  }
+}

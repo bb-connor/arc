@@ -3,55 +3,36 @@
 # Two complementary gates run in this workflow:
 #
 #   1. `scripts/check-threat-coverage.sh` (file-existence gate):
-#      fails the build if any threat ID lacks a populated test
-#      body (the codegen stub at
-#      crates/tooling/chio-conformance/tests/threats/<id>.rs still calls
-#      `unimplemented!()`) and is not explicitly marked
-#      `coverage_state: pending` (with a `deferred_to`),
-#      `coverage_state: partial`, or `coverage_state:
-#      weak_coverage` in the threat-model JSON.
+#      fails if a covered or partial threat ID lacks the required test
+#      body, if partial evidence is invalid, or if a pending row lacks a
+#      technical `deferred_to` closure condition.
 #
 #   2. `scripts/check-threat-coverage-mutants.sh` (per-row mutation-
-#      testing gate): for each
-#      `covered` row, asserts the existence of an evidence file at
+#      testing gate): for each `covered` or `partial` row, asserts the
+#      existence of a source-bound evidence file at
 #      `audits/evidence/threats/<id>.json` recording at least one
-#      caught mutant. Rows whose evidence is missing or zero-kills
-#      get a `WEAK: <id>` downgrade hint. Bootstrap placeholders
-#      (`needs_real_run: true`) are reported as informational and
-#      do not fail the build.
+#      caught mutant and zero survivors. Pending rows are accepted only by
+#      their explicit threat-model state and technical closure condition.
 #
-# Pending vectors auto-promoted by the fuzz-seed promoter live in
-# the corpus, not the threat list, and are excluded from this gate
-# by construction.
-#
-# Required status check name: threat-model-coverage / coverage-gate
+# Standalone check name: threat-model-coverage / coverage-gate. Pull requests
+# and pushes are enforced transitively through CI's required Security contract.
 
 name: threat-model-coverage
 
 on:
-  pull_request:
-    paths:
-      - "spec/security/chio-threat-model.v1.json"
-      - "spec/security/chio-threat-model.schema.json"
-      - "crates/tooling/chio-conformance/tests/threats/**"
-      - "crates/tooling/chio-spec-codegen/src/threat_model.rs"
-      - "scripts/check-threat-coverage.sh"
-      - "scripts/check-threat-coverage-mutants.sh"
-      - "scripts/tests/check-threat-coverage.test.sh"
-      - "scripts/tests/check-threat-coverage-mutants.test.sh"
-      - "audits/evidence/threats/**"
-      - ".github/workflows/threat-model-coverage.yml"
-  push:
-    branches:
-      - main
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_BUILD_JOBS: "1"
+
 concurrency:
-  group: threat-model-coverage-${{ github.ref }}
-  cancel-in-progress: true
+  group: threat-model-coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   coverage-gate:
@@ -74,6 +55,20 @@ jobs:
 
       - name: Run threat-model coverage gate (file-existence)
         run: bash scripts/check-threat-coverage.sh
+
+      - name: Install and authenticate cargo-mutants
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo install cargo-mutants --locked --version 25.3.1
+          cargo_mutants="$(command -v cargo-mutants)"
+          test -n "${cargo_mutants}"
+          test "$(realpath "${cargo_mutants}")" = "${cargo_mutants}"
+          test -f "${cargo_mutants}"
+          test ! -L "${cargo_mutants}"
+          test -x "${cargo_mutants}"
+          test "$(stat -c '%h' "${cargo_mutants}")" = "1"
+          test "$("${cargo_mutants}" mutants --version)" = "cargo-mutants 25.3.1"
 
       - name: Run threat-model mutants gate (per-row evidence)
         run: bash scripts/check-threat-coverage-mutants.sh

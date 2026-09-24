@@ -17,6 +17,7 @@ impl ChioKernel {
             server_id: &request.server_id,
             session_filesystem_roots: None,
             matched_grant_index: Some(matched_grant_index),
+            security_context: None,
         };
         for guard in self.guards.iter() {
             if !post_invocation_applied

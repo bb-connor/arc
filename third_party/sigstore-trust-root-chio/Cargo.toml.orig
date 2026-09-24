@@ -1,0 +1,47 @@
+[package]
+name = "sigstore-trust-root"
+description = "Sigstore trusted root management and parsing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+tuf = ["tough", "tokio", "futures", "directories", "url", "tracing"]
+
+[dependencies]
+# Internal dependencies
+sigstore-types = { workspace = true }
+sigstore-crypto = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Crypto & Certificates
+base64 = { workspace = true }
+x509-cert = { workspace = true }
+rustls-pki-types = { workspace = true }
+
+# Time handling
+chrono = { workspace = true }
+
+# Utilities
+hex = { workspace = true }
+
+# TUF feature dependencies (optional)
+tough = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
+directories = { workspace = true, optional = true }
+url = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
+
+[dev-dependencies]
+# For testing
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

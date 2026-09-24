@@ -655,6 +655,7 @@ jobs:
           ).splitlines()[0]
           boundary = json.loads(boundary_line)
           expected_trusted_files = {
+              "cargo-mutants",
               "check-cage-all-target-inventory.py",
               "check-cage-enforcement.sh",
               "check-cage-linux-enforcement.sh",

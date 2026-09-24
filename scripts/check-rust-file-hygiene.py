@@ -11,6 +11,7 @@ extend an expiry without shrinking the file defeats the gate.
 from __future__ import annotations
 
 import argparse
+import hashlib
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -40,6 +41,14 @@ STATEMACHINE_GENERATED_HEADER_SOURCE = (
 STATEMACHINE_GENERATED_HEADER_CONST_MARKER = (
     'const STATE_MACHINE_GENERATED_HEADER_PREFIX: &str = "\\\n'
 )
+# Immutable generated files from the checksum-verified regress 0.11.1 archive.
+# These retain upstream paths for module resolution. Any byte change requires
+# renewed provenance review; a generated header alone cannot excuse a file.
+VENDORED_GENERATED_SHA256 = {
+    "third_party/regress-chio/src/unicodetables.rs": "c3ec026fcfb6bc607f0002915c824d1792a368ecb5bf489abc0f94aea586d963",
+    "third_party/regress-chio/tests/unicode_property_escapes.rs": "84301dee923b2a7822d393bb30cf8a05f9290450cb5380adcee0ca78a03d92c5",
+}
+
 TEXT_HYGIENE_PREFIXES = ("crates/", "docs/", "sdks/", "scripts/", "spec/", "xtask/")
 TEXT_HYGIENE_SUFFIXES = (".rs", ".md")
 TEXT_HYGIENE_PATTERNS = ("*.rs", "*.md")
@@ -330,26 +339,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "durable admission projection surface with current-status denial binding; capped to current size until split",
         max_lines=2_154,
     ),
-    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs": allow(
-        "2026-12-31",
-        "durable terminal coordinator with status-release and recovery snapshots plus signed outcome and pool-claim binding; capped to current size until split",
-        max_lines=2_428,
-    ),
-    "crates/kernel/chio-kernel/src/kernel/construction.rs": allow(
-        "2026-10-31",
-        "kernel construction wiring with the finding-pool ledger, verifier authorities, and receipt-flush lock; capped to current size until split",
-        max_lines=2_034,
-    ),
-    "crates/kernel/chio-kernel/src/kernel/dispatch.rs": allow(
-        "2026-10-31",
-        "kernel dispatch surface with status snapshots and request-scoped pool claims; capped to current size until split",
-        max_lines=2_058,
-    ),
-    "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs": allow(
-        "2026-11-30",
-        "kernel async evaluation core with recovery status and pool dispatch continuity; capped to current size until split",
-        max_lines=2_172,
-    ),
     "crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs": allow(
         "2026-12-31",
         "durable kernel admission regression suite; capped to current size until split",
@@ -360,20 +349,10 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "execution nonce regression suite; capped to current size until split",
         max_lines=3_377,
     ),
-    "crates/kernel/chio-kernel/src/kernel/tests/session.rs": allow(
-        "2026-10-31",
-        "kernel session regression suite; capped to current size until split",
-        max_lines=2_083,
-    ),
     "crates/kernel/chio-kernel/src/kernel/validation.rs": allow(
         "2026-12-31",
         "kernel capability and admission validation surface; capped to current size until split",
         max_lines=2_821,
-    ),
-    "crates/platform/chio-control-plane/src/lib.rs": allow(
-        "2026-10-31",
-        "control-plane crate root; capped to current size until split",
-        max_lines=1_034,
     ),
     "crates/platform/chio-control-plane/src/trust_control/capital_and_liability/liability.rs": allow(
         "2026-11-30",
@@ -430,11 +409,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "cognition finding market authority store with atomic status and sales-blocked participation fences; capped to current size until split",
         max_lines=2_328,
     ),
-    "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs": allow(
-        "2026-11-30",
-        "cognition pool ledger with durable delivery claims; capped to current size until split",
-        max_lines=2_283,
-    ),
     "crates/platform/chio-store-sqlite/src/finding_challenge_store_tests.rs": allow(
         "2027-01-31",
         "cognition challenge authority store regression suite; capped to current size until split",
@@ -484,11 +458,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "2026-11-30",
         "serving-owner provisioning test suite with sequenced revocation stream coverage; capped to current size until split",
         max_lines=2_298,
-    ),
-    "crates/products/chio-api-protect/src/proxy/mediated.rs": allow(
-        "2027-01-31",
-        "mediated API protection proxy surface; capped to current size until split",
-        max_lines=3_551,
     ),
 }
 
@@ -614,7 +583,7 @@ def load_generated_header(root: Path, spec: GeneratedHeaderSpec) -> str | None:
 def classify(path: str) -> str:
     parts = path.split("/")
     name = parts[-1]
-    if "/_generated/" in f"/{path}/":
+    if path in VENDORED_GENERATED_SHA256 or "/_generated/" in f"/{path}/":
         return "generated"
     if path.startswith("examples/") or "/examples/" in f"/{path}/":
         return "example"
@@ -689,6 +658,12 @@ def validate_generated_headers(
                 )
 
     for path in generated_paths:
+        expected = VENDORED_GENERATED_SHA256.get(path)
+        if expected is not None:
+            covered_paths.add(path)
+            raw = (root / path).read_bytes()
+            if hashlib.sha256(raw).hexdigest() != expected:
+                failures.append(f"{path}: vendored generated source differs from reviewed archive")
         if path not in covered_paths:
             failures.append(
                 f"{path}: generated Rust path is not covered by a known generator header check"

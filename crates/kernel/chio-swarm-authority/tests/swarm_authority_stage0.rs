@@ -29,6 +29,9 @@ use proptest::prelude::*;
 
 const NOW_UNIX_MS: u64 = 1_800_000_001_000;
 
+#[path = "swarm_authority_stage0/live_admission.rs"]
+mod live_admission;
+
 #[test]
 fn swarm_authority_stage0_verifies_valid_bundle() -> Result<(), Box<dyn Error>> {
     let bundle = sample_swarm_bundle()?;

@@ -24,6 +24,12 @@ admin API.
   JWT, or token introspection), verifying EdDSA/RS256-512/PS256-512/ES256-384
   signatures plus DPoP proof-of-possession, mTLS thumbprint, and runtime
   attestation sender constraints.
+- Bound DPoP replay identity parts before canonicalizing the signed proof and
+  retain sender nonces through the inclusive signed validity horizon, including
+  tolerated future issue time. A local cache TTL cannot shorten that horizon.
+  The shared kernel cache enforces both count and retained-identity byte limits;
+  exhaustion denies rather than evicting a live sender proof. This remains
+  process-local replay protection, not durable DPoP custody.
 - Optionally run a self-issued OAuth 2.0 authorization server
   (`LocalAuthorizationServer`) with PKCE authorization-code and
   token-exchange grants, for deployments without an external identity
@@ -39,7 +45,8 @@ admin API.
   integrity-tagged restore path, so a restart can resume in-flight sessions
   without re-authenticating.
 - Serve `/admin/*` operator routes (health, authority rotation, receipts,
-  revocations, budgets, session trust/drain/shutdown, Prometheus metrics)
+  revocations, budgets, session trust/drain/shutdown, exact-call approval
+  records and decisions, Prometheus metrics)
   behind a constant-time bearer check.
 - Publish OAuth protected-resource and authorization-server discovery
   metadata carrying Chio's governed-authorization profile.
@@ -59,6 +66,14 @@ admin API.
   outside a full server, for negative-conformance testing.
 
 ## Testing
+
+Hosted operator approval uses `POST /admin/approvals`,
+`GET /admin/approvals/{id}`, and `POST /admin/approvals/{id}/decision`.
+It requires durable admission/session state and a distinct operator credential.
+These routes never dispatch a tool; approved artifacts enter the ordinary
+kernel `tools/call` path with a capability and canonical-argument binding.
+See the [operator procedure](../../../integrations/required-agents/qualification/APPROVALS.md)
+and real resource qualification runner for recovery and outcome semantics.
 
 `cargo test -p chio-mcp-remote`
 

@@ -1,266 +1,185 @@
-# chio-hermes
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px)" srcset="docs/assets/readme-hero-mobile.svg" />
+    <img src="docs/assets/readme-hero.svg" alt="Chio for Hermes" width="960" />
+  </picture>
+</p>
 
-Hermes Agent plugin for the [Chio](https://github.com/backbay-labs/chio)
-protocol. Routes Hermes file/shell/git tools through a capability-scoped
-Chio sidecar so every call is policy-checked, signed, and audited.
+<p align="center">
+  <a href="https://github.com/backbay-labs/chio"><img src="https://img.shields.io/badge/protocol-Chio-b08d5b?style=flat-square" alt="Chio protocol" /></a>
+  <img src="https://img.shields.io/badge/Python-3.11%2B-a97cf0?style=flat-square" alt="Python 3.11 or later" />
+  <a href="../../../LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-6f665b?style=flat-square" alt="Apache 2.0 license" /></a>
+</p>
 
-There are two ways to bring Chio into a Hermes session. Pick one; do
-not stack them.
+# Chio for Hermes
 
-- **Path A (zero-code, MCP-server style):** run
-  `chio mcp serve --preset code-agent -- <upstream-mcp-server-argv>` and
-  paste the resulting `mcp_servers.chio` block into
-  `~/.hermes/config.yaml`. No Python dependency.
-- **Path B (this package):** install Hermes, then `pip install
-  chio-hermes` into the same Python environment, enable `chio` under
-  `plugins.enabled`, and Chio's `CodeAgent` tool surface becomes part
-  of the Hermes tool registry.
+**Let Hermes work on your files. Keep authority with the kernel.**
 
-## Install
+A native [Hermes Agent](https://github.com/NousResearch/hermes-agent) integration
+for [Chio](https://www.chio.computer). The restricted launcher gives Hermes four scoped
+filesystem tools through a separate kernel and resource owner. The agent can
+read, write, edit and list the designated workspace while the operator retains
+credentials, policy and signed operation records.
 
-`hermes-agent` is not on PyPI. Install Hermes first via the upstream
-curl-installer, then `pip install chio-hermes` into the same Python:
+[How it works](#how-it-works) · [Build from source](#build-from-source) ·
+[Run a task](#run-a-task) · [Operator guide](docs/OPERATOR.md) ·
+[Evidence](#validation-and-evidence)
+
+> **Source candidate:** `chio-hermes` 0.1.2 has bounded local native-host
+> evidence on macOS with pinned Hermes 0.20.5. Full integration acceptance and
+> compatible public artifact delivery remain open. This package is not yet
+> available on PyPI; build from the source revision below.
+
+## What you can do
+
+| Workflow | Kernel tool |
+| --- | --- |
+| Read a file in the designated workspace | `read_text_file` |
+| Create or replace a permitted file | `write_file` |
+| Apply a scoped text edit | `edit_file` |
+| Inspect a permitted directory | `list_directory` |
+
+The supported mode runs one task in a fresh isolated host profile. Native
+shell, local filesystem access, browser tools, other MCP servers, delegation,
+scheduled jobs and background sessions are disabled or confined. It is a file
+work integration; running builds, tests or Git commands is outside this mode.
+
+## How it works
+
+```mermaid
+flowchart LR
+    H[Hermes Agent] -->|Four MCP tools| G[Private Chio gateway]
+    G -->|Scoped session| K[Chio kernel]
+    K -->|Authorized execution| F[Filesystem resource owner]
+    F -->|Result| K
+    K -->|Signed outcome| G
+    G -->|Verified tool result| H
+    H --> R[Private model relay]
+    R --> P[Model provider]
+```
+
+The parent launcher owns the gateway and model relay. Hermes receives temporary
+loopback tokens; the parent retains the kernel bearer, trusted signer pins,
+provider credentials and durable journal. The protected files live at the
+resource owner, outside the agent's local filesystem.
+
+A macOS Seatbelt profile confines the agent and its bootstrap descendants to
+explicit paths and the two private relay ports. A missing sandbox, incompatible
+host or malformed configuration prevents launch. The gateway verifies caller,
+request, signer and result bindings before it acknowledges delivery. Uncertain
+outcomes stay fenced for operator reconciliation.
+
+The [action inventory](ACTION_INVENTORY.md) describes each enforcement point.
+The legacy `pre_tool_call` plugin is a diagnostic compatibility surface; use
+`chio-hermes-restricted` for this boundary.
+
+## Build from source
+
+You need Git, Python 3.11 or later, and uv. The adapter and its Python dependency
+sources are included in one public Chio checkout:
 
 ```bash
-# 1. Install Hermes (one of the two)
-curl -LsSf https://hermes.nousresearch.com/install.sh | sh
-# or
-pip install --upgrade git+https://github.com/NousResearch/hermes-agent.git
-
-# 2. Install the Chio plugin
-pip install chio-hermes
-
-# 3. Enable the plugin in ~/.hermes/config.yaml
-#    plugins:
-#      enabled:
-#        - chio
+git init chio-hermes-source
+git -C chio-hermes-source fetch --no-tags --depth=1 \
+  https://github.com/backbay-labs/chio.git \
+  70071260afe514b06cac1c319487bd48e465d39e
+git -C chio-hermes-source checkout --detach FETCH_HEAD
+cd chio-hermes-source/sdks/python/chio-hermes
+uv sync --locked --extra dev
+uv run --locked chio-hermes-restricted --help
 ```
 
-`hermes setup` will then prompt for `CHIO_SIDECAR_URL` and
-`CHIO_CAPABILITY_ID` (the capability id is masked at the prompt).
+This installs the adapter into a project environment. It does not start Hermes,
+provision a kernel or alter your normal agent profile. A source build has its
+own artifact identity; it does not inherit qualification from a recorded wheel.
 
-## Path A: zero-code MCP wrapping
+Before running a task, follow the [operator guide](docs/OPERATOR.md#installation-and-launch)
+to install the pinned native host and compatible bridge, and prepare the kernel
+session. Hermes is installed separately from the adapter. Its upstream lockfile
+requires uv 0.12.11 in the recorded installation.
 
-Skip this package entirely. Wrap any upstream MCP server with the Chio
-edge:
+| Component | Selected local candidate |
+| --- | --- |
+| Native host | Hermes 0.20.5 at `175054c14b54404663d8614a178280cffe6062eb` |
+| Adapter | `chio-hermes` 0.1.2 |
+| Host gateway | `@chio/bridge` 0.3.0, selected archive |
+| Kernel | CLI 0.1.1-rc.1 at `bafa02b06de93553cecb6f60b340f3dd8fd9b401` |
+| Protected platform | macOS with `/usr/bin/sandbox-exec` |
 
-```yaml
-# ~/.hermes/config.yaml
-mcp_servers:
-  chio:
-    command:
-      - chio
-      - mcp
-      - serve
-      - --preset
-      - code-agent
-      - --server-id
-      - fs
-      - --
-      - npx
-      - -y
-      - "@modelcontextprotocol/server-filesystem"
-      - /workspace
+[Exact artifact identities](evidence/2026-09-10/static-kernel-native/README.md#frozen-inputs)
+include the separately installed recovery operator. Version numbers alone are
+insufficient to select a compatible installation.
+
+## Run a task
+
+After provisioning, create a query file such as:
+
+```text
+Write a short project note to /workspace/project-note.md, read it back,
+and report the contents returned by the tool.
 ```
 
-The `--server-id` MUST match an identifier the bundled `code-agent`
-preset grants capabilities to (`fs`, `shell`, or `git`). Using any
-other id (e.g. `filesystem`) fails closed because no grant matches.
-
-Chio gates each `tools/call` through the `code-agent` policy preset
-(byte-identical to the policy used by `chio-code-agent` and this
-plugin). See `docs/integrations/HERMES.md` for the full Path A
-walkthrough including shell and git server entries.
-
-## Path B quickstart
-
-After installing Hermes, this plugin, and minting a capability:
+The path must be permitted by the resource owner's policy. From the adapter
+source directory, launch with your explicit installation paths and prepared
+private gateway configuration:
 
 ```bash
-hermes chio issue \
-    --tool-server fs --tool-server shell --tool-server git \
-    --subject 0xabcdef... \
-    --ttl 3600
-
-export CHIO_SIDECAR_URL="http://127.0.0.1:9090"
-export CHIO_CAPABILITY_ID="cap-..."   # printed by `hermes chio issue`
-
-hermes chat -t chio,hermes-cli
+uv run --locked chio-hermes-restricted \
+  --host-python /opt/hermes/venv/bin/python \
+  --host-root /opt/hermes/pinned-source \
+  --node /opt/node/bin/node \
+  --gateway-script /opt/chio-bridge/dist/gateway-http.js \
+  --gateway-config /private/operator/hermes-gateway.json \
+  --state-dir /private/operator/runs/hermes-unique-run \
+  --query-file /private/operator/task.txt \
+  --model gpt-5.5 \
+  --model-auth codex-subscription \
+  --codex-auth-file /private/operator/codex-profile/auth.json
 ```
 
-The `chio` toolset is opt-in. Add `chio` to the `toolsets:` list in
-`~/.hermes/config.yaml`, or pass `-t chio,hermes-cli` per-invocation,
-or the 12 `chio_*` tools will not surface in the session even with
-`plugins.enabled: [chio]` set.
+Use a new state directory for each independent run. The explicit native Codex
+login cache stays with the parent; account access determines model availability.
+The operator guide also documents [API-key authentication](docs/OPERATOR.md#installation-and-launch)
+and [subscription renewal](docs/OPERATOR.md#chatgpt-subscription-model-transport).
 
-Inside the session, `chio_file_read`, `chio_shell_run`, `chio_git_*`
-and the rest of the 12 `chio_*` tools are available. `/chio status`
-shows the configured sidecar, masked capability id, and recent
-receipts.
+Retain `launch.json`, `terminal.json`, host output and the private gateway journal. Judge a file
+action by its verified outcome and an independent resource observation. An
+agent's final text or process exit is insufficient evidence of completion.
 
-> **Sidecar quickstart (chio v0.2+):** the plugin expects a Chio
-> sidecar at `CHIO_SIDECAR_URL` exposing `/v1/capabilities/*`. With
-> chio v0.2 you can run one in a single line:
->
-> ```bash
-> chio start --listen 127.0.0.1:9090 --print-config
-> ```
->
-> `chio start` is a friendly zero-config alias for `chio api protect`
-> with the SDK path aliases (`POST /v1/capabilities`,
-> `POST /v1/evaluate`, `POST /v1/capabilities/validate`,
-> `POST /v1/receipts/verify`) mounted. For chio < 0.2, the plugin
-> stays in degraded-but-safe mode: `chio_sidecar_unreachable` envelopes
-> surface for `status: allowed` paths, but every client-side guard
-> (path filters, env sanitization, `--no-verify` rejection, output
-> capping) still fires. See
-> [docs/integrations/HERMES.md](../../../docs/integrations/HERMES.md)
-> for the full deployment matrix.
+## Recovery and lifecycle
 
-## What the bundled default policy denies
+Cancellation or launcher loss terminates the isolated host and closes its tool
+route. An action may already have reached the resource before that happens.
+Preserve the original journal and authority, inspect the resource, and use the
+[recovery procedure](docs/OPERATOR.md#reconcile-a-retained-outcome). Never reset
+state or create a replacement session to replay an unknown outcome.
 
-The plugin reuses the `chio_code_agent` default policy unchanged:
+The [upgrade and removal guide](docs/OPERATOR.md#recovery-upgrade-and-removal)
+covers separate candidate environments, retained state, revocation and cleanup.
+Automatic task resume and background sessions are not exposed.
 
-- **Allows:** reading files under the cwd; writing under `src/`,
-  `tests/`, `docs/`; safe shell commands; read-only `git` subcommands
-  (`status`, `diff`, `log`); `git add` and `git commit`.
-- **Denies:** `.env` / `.env.*`, `.git/**`, `.ssh/**`,
-  `.aws/credentials`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`.
-- **Denies outright:** `rm -rf /`, `chmod 777`, `curl | sh`, `sudo`,
-  `git push --force`, `git reset --hard origin`, `mkfs.*`,
-  `dd if=... of=/dev/...`.
-- **Approval-required (held in the sidecar HITL queue):** `rm -rf
-  <subdir>`, `mv`, `cp -r`, `git reset --hard`, `git clean -fd`. The
-  `chio_shell_run` schema does NOT expose an `approved` field, so the
-  model cannot self-approve. As of v0.2 the plugin POSTs the held call
-  to the sidecar (`POST /approvals/submit`) and returns a
-  `chio_requires_approval` envelope carrying an `approval_id`. Resolve
-  it with `/chio approve <id>` (or `/chio deny <id>`) inside the
-  Hermes session, or `hermes chio approvals respond <id>
-  --approve|--deny [--reason TEXT]` from another shell. After the
-  approval lands, the LLM has to retry the original tool call;
-  auto-resume of held calls is v0.3 work.
+## Validation and evidence
 
-Custom policies load from `CHIO_POLICY_FILE` (path to YAML); if unset
-the bundled `DEFAULT_POLICY` is used.
-
-## Capability lifecycle
-
-The plugin ships a `hermes chio` CLI subcommand:
+Run the component checks from the adapter directory:
 
 ```bash
-hermes chio issue --tool-server fs --subject 0x... --ttl 3600
-hermes chio list
-hermes chio revoke <capability-id> --reason "rotated"
-hermes chio approvals list
-hermes chio approvals respond <approval-id> --approve --reason "ok-by-operator"
-hermes chio approvals respond <approval-id> --deny
+uv run --locked --extra dev pytest -q
+uv run --locked --extra dev ruff check src tests scripts
 ```
 
-`issue` calls `ChioClient.create_capability(...)` and writes the
-returned capability id into a per-profile JSON cache at
-`~/.hermes/profiles/<active>/chio-capabilities.json`. `list` reads
-that cache. `revoke` shells out to `chio trust revoke
---capability-id <id>` and marks the local cache entry revoked.
-`approvals list` and `approvals respond` drive the sidecar HITL
-channel via the operator-respond shortcut on
-`POST /approvals/{id}/operator-respond`.
+| Record | What it establishes |
+| --- | --- |
+| [Acceptance ledger](ACCEPTANCE.md) | Observed cases, source/artifact identities, failures and remaining gates |
+| [Native subscription coverage](evidence/2026-09-09/subscription-r15/COVERAGE.md) | Useful work, negative controls and identity/recovery checks through Hermes |
+| [Static-kernel native record](evidence/2026-09-10/static-kernel-native/README.md) | Pinned public host install, failure cutpoints and offline lifecycle observations |
+| [Action inventory](ACTION_INVENTORY.md) | Reachable tools, disabled paths and resource ownership |
 
-For an in-session view, use `/chio status`, `/chio receipts [N]`,
-`/chio policy`, `/chio approvals`, `/chio approve <id> [reason]`, or
-`/chio deny <id> [reason]`.
+Four legacy sidecar tests are opt-in and remain unresolved. Mock-client tests
+and deterministic provider fixtures are labeled separately from live-model,
+real-kernel observations. None of these results establishes another host's
+acceptance or a published release.
 
-## Receipts caveat
+---
 
-The plugin appends one canonical-JSON line per Chio receipt to
-`<hermes-home>/logs/chio-receipts.jsonl` (profile-aware). This file is
-a **user-side convenience for the Hermes session, not the canonical
-audit store.**
-
-The verifiable, tamper-evident copy lives in the sidecar's receipts
-database. To get long-term storage, run the sidecar with
-`--receipts-db <path>.sqlite`; replay it via `chio replay` (see
-`docs/replay-cli.md`). Operators who care about audit MUST configure
-`--receipts-db`.
-
-## Failure modes
-
-Each handler returns canonical JSON. Common shapes:
-
-| Case | `error` field |
-|------|---------------|
-| Allow | (none, `status: "allowed"`) |
-| Local policy deny | `denied` (with `guard`) |
-| Sidecar deny | `denied` (with `guard` from receipt) |
-| Sidecar unreachable | `chio_sidecar_unreachable` |
-| Capability expired | `chio_capability_expired` |
-| `CHIO_CAPABILITY_ID` unset | `chio_not_configured` |
-| Executor I/O error | `chio_executor_error` |
-| Other | `chio_error` |
-
-`pre_tool_call` denials surface to the model via Hermes's native block
-path; the plugin does not inject extra system messages.
-
-## Relation to `chio mcp serve --preset code-agent`
-
-`chio mcp serve --preset code-agent` is the same policy wrapping an
-arbitrary MCP server over stdio (Path A above). `chio-hermes` is the
-Python-embedded flavour that lives inside the Hermes process (Path B).
-The two paths use byte-identical policies, so they deny the same set
-of operations. Pick whichever fits your integration surface; do not
-stack both, or every tool call will be policy-checked twice.
-
-## Environment variables
-
-| Variable | Required | Default | Notes |
-|----------|----------|---------|-------|
-| `CHIO_SIDECAR_URL` | yes | `http://127.0.0.1:9090` | Sidecar HTTP endpoint. Not secret. |
-| `CHIO_CAPABILITY_ID` | yes | (none) | Capability id from `hermes chio issue`. Without this the handlers return `chio_not_configured`. Long-lived bearer secret; store in `~/.hermes/.env` with mode `0600`. |
-| `CHIO_POLICY_FILE` | no | (bundled `DEFAULT_POLICY`) | Path to a YAML policy. Not secret. |
-| `CHIO_WORKSPACE_ROOT` | no | current working directory | Constrains every `chio_file_*`, `chio_git_*`, and `chio_shell_run` operation to a single resolved root; paths that resolve outside are rejected with `PermissionError`. Not secret. |
-| `CHIO_SHELL_TIMEOUT` | no | `60` (seconds) | Per-subprocess wall-clock timeout for `chio_shell_run`, `chio_file_edit`, and `chio_git_*` (each invocation, not the cumulative budget). Not secret. |
-| `CHIO_SUBPROCESS_MAX_BYTES` | no | `1048576` (1 MiB) | Per-stream byte cap for `chio_shell_run` / `chio_git_*` subprocess output. Output past the cap is truncated and the result envelope carries `output_truncated: true`. Not secret. |
-| `CHIO_RECEIPT_BUFFER_MAX` | no | `1000` | In-memory recorded-receipt buffer cap (cap on the global FIFO deque exposed via `/chio receipts`, NOT a per-task limit). Not secret. |
-| `CHIO_CONTROL_URL` | required for `hermes chio revoke` (when `CHIO_REVOCATION_DB` is unset) | (none) | Forwarded as `--control-url` to `chio trust revoke`. Takes precedence over `CHIO_REVOCATION_DB`. Without this or `CHIO_REVOCATION_DB`, `revoke` exits with `chio_revocation_backend_unconfigured`. Not secret (URL only; auth is the capability bearer). |
-| `CHIO_REVOCATION_DB` | required for `hermes chio revoke` (when `CHIO_CONTROL_URL` is unset) | (none) | Filesystem path forwarded as `--revocation-db` to `chio trust revoke`. Used when `CHIO_CONTROL_URL` is not set. Not secret (path only). |
-
-## Configuration precedence
-
-For each setting (sidecar URL, capability id, policy file, etc.):
-
-1. `plugins.entries.chio.*` in `~/.hermes/config.yaml` (lowest).
-2. `~/.hermes/.env` env vars (override).
-3. In-process env vars at registration time (highest).
-
-This mirrors Hermes's own `~/.hermes/.env` over `config.yaml` model.
-
-## Caveats (upstream Hermes)
-
-Four Hermes 0.13.0 gaps affect entry-point plugins. None block
-functionality once worked around.
-
-- `hermes plugins list` does not enumerate entry-point plugins. Trust
-  `pip show chio-hermes` and the `[plugins] DEBUG Loading plugin
-  'chio'` log line under `HERMES_PLUGINS_DEBUG=1`.
-- `hermes plugins enable chio` rejects entry-point names. Edit
-  `~/.hermes/config.yaml` directly:
-
-  ```yaml
-  plugins:
-    enabled:
-      - chio
-  ```
-- `hermes setup` does not read entry-point `plugin.yaml`, so it never
-  prompts for `CHIO_SIDECAR_URL` / `CHIO_CAPABILITY_ID`. Export them
-  (or write to `~/.hermes/.env` mode `0600`) before `hermes`.
-- LLM-driven invocation (`hermes -z "..."`) is unproven (no provider
-  key on the dogfood box). Static surface is verified end to end.
-
-See `docs/integrations/HERMES.md` "Known issues" for the file:line
-references in upstream `hermes_cli`.
-
-## See also
-
-- `docs/integrations/HERMES.md` -- long-form integration walkthrough.
-- `chio-code-agent` -- the underlying tool wrappers.
-- `chio mcp serve --preset code-agent` -- Path A wrapping flavour.
+Part of [Chio](https://www.chio.computer) · [Protocol source](https://github.com/backbay-labs/chio) ·
+[Apache 2.0](../../../LICENSE)

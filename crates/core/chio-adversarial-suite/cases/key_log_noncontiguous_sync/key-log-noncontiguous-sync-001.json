@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "key-log-noncontiguous-sync-001",
+  "class": "key_log_noncontiguous_sync",
+  "expected_verdict": "DENY",
+  "expected_reason": "key_log_noncontiguous_sync_detected",
+  "threat_id": "native_channel_replay",
+  "pending": true,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "sync_contiguity_control",
+        "package": "chio-keyring",
+        "test_source": "crates/security/chio-keyring/src/sync.rs",
+        "target_kind": "lib",
+        "test_name": "sync::tests::synchronization_shape_rejects_mismatched_and_empty_ranges"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "key_log_noncontiguous_sync",
+        "control_id": "sync_contiguity_control",
+        "package": "chio-keyring",
+        "source": "crates/security/chio-keyring/src/sync.rs",
+        "function": "synchronization_shape_is_valid",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "true"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/key_log_noncontiguous_sync/mutants.out/outcomes.json"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+  ]
+}

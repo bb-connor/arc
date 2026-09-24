@@ -26,6 +26,9 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(test)]
+extern crate self as chio_store_sqlite;
+
 use std::path::{Path, PathBuf};
 
 pub mod admission_operation_store;
@@ -34,6 +37,7 @@ pub mod approval_store;
 pub mod authority;
 pub mod batch_approval_store;
 pub mod budget_store;
+pub mod caller_execution_ledger;
 pub mod capability_lineage;
 pub mod channel_lifecycle_store;
 pub mod channel_release_publisher_store;
@@ -41,6 +45,7 @@ pub mod clearing_lifecycle_store;
 pub mod dead_letters;
 pub mod economic_state_cache;
 pub mod encrypted_blob;
+pub mod enterprise_migration_state;
 pub mod evidence_export;
 pub mod execution_nonce_store;
 pub mod finding_challenge_store;
@@ -54,6 +59,8 @@ pub mod finding_recovery_store;
 pub mod finding_status_store;
 pub mod fiscal_store;
 pub mod frost_store;
+#[cfg(feature = "fuzz")]
+pub mod fuzz;
 mod governed_approval_replay_store;
 pub mod iou_store;
 #[cfg(feature = "lineage")]
@@ -66,6 +73,9 @@ mod replay_clock;
 pub mod revocation_store;
 mod rollback_generation;
 pub mod schema_version;
+pub mod sealed_decoy_registry;
+pub mod security_admission_operation_store;
+pub mod security_state;
 pub mod serving_owner;
 pub mod settle_attempts;
 pub mod tool_outcome_store;
@@ -338,7 +348,11 @@ pub fn sqlite_filesystem_path(text: &str) -> PathBuf {
 }
 
 pub use admission_operation_store::{
-    CreditExposureAccountSnapshot, DurableObligationV1, SqliteAdmissionOperationStore,
+    CreditExposureAccountSnapshot, DpopReplayMigrationRecordV1, DurableObligationV1,
+    GovernedApprovalReplayMigrationRecordV1, RuntimeReplayMigrationRecordV1,
+    SecurityParticipantEgressHistory, SecurityParticipantFlowJoinHistory,
+    SecurityParticipantMigrationPhase, SecurityParticipantMigrationRecord,
+    SecurityParticipantStateInitialization, SqliteAdmissionOperationStore,
 };
 pub use agent_web_replay_store::{
     SqliteAgentWebReplayReservationState, SqliteAgentWebReplayStore, SqliteAgentWebReplayStoreError,
@@ -363,8 +377,14 @@ pub use economic_state_cache::{
     EconomicStateStageRecord, EconomicStateStageStatus, SqliteEconomicStateCache,
 };
 pub use encrypted_blob::{
-    decrypt_blob, encrypt_blob, BlobHandle, BlobStoreError, DecryptError, EncryptError,
-    EncryptedBlob, SqliteEncryptedBlobStore, TenantId, TenantKey,
+    decrypt_blob, encrypt_blob, BlobHandle, BlobReference, BlobReferenceMutationOutcome,
+    BlobStoreError, DecryptError, EncryptError, EncryptedBlob, SqliteEncryptedBlobStore, TenantId,
+    TenantKey,
+};
+pub use enterprise_migration_state::{
+    enterprise_migration_transition_digest, sign_enterprise_migration_transition,
+    SqliteEnterpriseMigrationOpenPolicy, SqliteEnterpriseMigrationStateStore,
+    SqliteEnterpriseMigrationStateStoreError,
 };
 pub use execution_nonce_store::{SqliteExecutionNonceStore, SqliteExecutionNonceStoreError};
 pub use finding_challenge_store::{
@@ -445,6 +465,8 @@ pub use frost_store::{
     StagedFrostRotation, StoredFrostCeremonyCompletion,
 };
 pub use governed_approval_replay_store::{
+    GovernedApprovalReplaySourceBinding, GovernedApprovalReplaySourceSeal,
+    GovernedApprovalReplaySourceSnapshot, SqliteGovernedApprovalReplaySource,
     SqliteGovernedApprovalReplayStore, SqliteGovernedApprovalReplayStoreError,
 };
 pub use iou_store::{SqliteIouEnvelopeStore, IOU_ENVELOPE_MIGRATION};
@@ -454,9 +476,13 @@ pub use revocation_store::SqliteRevocationStore;
 pub use schema_version::{
     check_schema_version, stamp_schema_version, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID,
 };
+pub use sealed_decoy_registry::SqliteSealedDecoyRegistryStore;
+pub use security_admission_operation_store::SqliteAdmissionOperationStore as SqliteSecurityAdmissionOperationStore;
+pub use security_state::SqliteSecurityStateStore;
 pub use serving_owner::{
-    scope_fixed_authority_ids_for_current_thread, FixedAuthorityIdScope, SqliteAuthorityStore,
-    SqliteServingOwnerError,
+    scope_fixed_authority_ids_for_current_thread, FixedAuthorityIdScope, RelocationImport,
+    RelocationImportPhase, RelocationSeal, SqliteAuthorityStore, SqliteServingOwnerError,
+    RELOCATION_SEAL_FORMAT,
 };
 
 impl chio_kernel::QualifiedAdmissionProjectionStore
@@ -524,23 +550,7 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
             decision,
             operation,
         })
-        .map_err(|error| match error {
-            chio_kernel::admission_operation::AdmissionCaptureError::Unavailable(detail) => {
-                chio_kernel::AdmissionBudgetAuthorizationError::Unavailable(detail)
-            }
-            chio_kernel::admission_operation::AdmissionCaptureError::Fenced => {
-                chio_kernel::AdmissionBudgetAuthorizationError::Fenced
-            }
-            chio_kernel::admission_operation::AdmissionCaptureError::OutcomeUnknown(detail) => {
-                chio_kernel::AdmissionBudgetAuthorizationError::OutcomeUnknown(detail)
-            }
-            chio_kernel::admission_operation::AdmissionCaptureError::Invariant(detail) => {
-                chio_kernel::AdmissionBudgetAuthorizationError::Invariant(detail)
-            }
-            chio_kernel::admission_operation::AdmissionCaptureError::Operation(error) => {
-                chio_kernel::AdmissionBudgetAuthorizationError::Operation(error)
-            }
-        })
+        .map_err(authorization_error_from_capture)
     }
 
     fn capture_invocation_and_commit_dispatch(
@@ -558,6 +568,113 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
             self,
             operation,
             recovery_lease,
+            request,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map(|(decision, operation)| chio_kernel::AdmissionBudgetCapture {
+            decision,
+            operation,
+        })
+    }
+
+    fn capture_caller_invocation_and_commit_dispatch(
+        &self,
+        capture: chio_kernel::receipt_store::AdmissionCallerDispatchCapture<'_>,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetCapture,
+        chio_kernel::admission_operation::AdmissionCaptureError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::capture_caller_invocation_and_commit_dispatch(self, capture)
+    }
+
+    fn capture_native_invocation_and_commit_dispatch(
+        &self,
+        capture: chio_kernel::receipt_store::AdmissionNativeDispatchCapture<'_>,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetCapture,
+        chio_kernel::admission_operation::AdmissionCaptureError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch(self, capture)
+    }
+
+    fn capture_native_caller_invocation_and_commit_dispatch(
+        &self,
+        capture: chio_kernel::receipt_store::AdmissionNativeDispatchCapture<'_>,
+        context: &chio_kernel::admission_operation::AdmissionCallerDispatchContextV1,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetCapture,
+        chio_kernel::admission_operation::AdmissionCaptureError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::capture_native_caller_invocation_and_commit_dispatch(self, capture, context)
+    }
+
+    fn load_native_dispatch_capture(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<chio_kernel::AdmissionBudgetCapture>,
+        chio_kernel::admission_operation::AdmissionOperationStoreError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::load_native_dispatch_capture(
+            self,
+            operation_id,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn claim_and_authorize_budget_and_commit_admission(
+        &self,
+        claim: chio_kernel::admission_operation::RecoveryClaimRequest<'_>,
+        lease: &mut chio_kernel::admission_operation::ClaimedLease<'_>,
+        operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+        request: chio_kernel::budget_store::BudgetAuthorizeHoldRequest,
+        payment_journal: Option<chio_kernel::payment::PaymentJournalRecord>,
+        credit_exposure: Option<chio_kernel::CreditExposureReservationRequest>,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetAuthorization,
+        chio_kernel::AdmissionBudgetAuthorizationError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::claim_and_authorize_budget_and_commit_admission(
+            self,
+            claim,
+            lease,
+            operation,
+            request,
+            payment_journal,
+            credit_exposure,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map(|(decision, operation)| chio_kernel::AdmissionBudgetAuthorization {
+            decision,
+            operation,
+        })
+        .map_err(authorization_error_from_capture)
+    }
+
+    fn claim_and_capture_invocation_and_commit_dispatch(
+        &self,
+        claim: chio_kernel::admission_operation::RecoveryClaimRequest<'_>,
+        lease: &mut chio_kernel::admission_operation::ClaimedLease<'_>,
+        operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+        request: chio_kernel::budget_store::BudgetCaptureInvocationRequest,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetCapture,
+        chio_kernel::admission_operation::AdmissionCaptureError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::claim_and_capture_invocation_and_commit_dispatch(
+            self,
+            claim,
+            lease,
+            operation,
             request,
             active_fence,
             trusted_now_unix_ms,
@@ -591,6 +708,20 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
         limit: usize,
     ) -> Result<Vec<chio_core::receipt::body::ChioReceipt>, chio_kernel::ReceiptStoreError> {
         self.list_terminal_receipts_after(after_receipt_id, limit)
+    }
+}
+
+fn authorization_error_from_capture(
+    error: chio_kernel::admission_operation::AdmissionCaptureError,
+) -> chio_kernel::AdmissionBudgetAuthorizationError {
+    use chio_kernel::admission_operation::AdmissionCaptureError as Capture;
+    use chio_kernel::AdmissionBudgetAuthorizationError as Authorization;
+    match error {
+        Capture::Unavailable(detail) => Authorization::Unavailable(detail),
+        Capture::Fenced => Authorization::Fenced,
+        Capture::OutcomeUnknown(detail) => Authorization::OutcomeUnknown(detail),
+        Capture::Invariant(detail) => Authorization::Invariant(detail),
+        Capture::Operation(error) => Authorization::Operation(error),
     }
 }
 
@@ -688,6 +819,32 @@ pub use tool_outcome_store::SqliteToolOutcomeStore;
 
 #[cfg(test)]
 mod tests {
+    /// Snapshot every durable table so refusal tests cover claims, participants,
+    /// commit chains, and derived authority state together.
+    pub(crate) fn authority_snapshot(
+        connection: &rusqlite::Connection,
+    ) -> rusqlite::Result<Vec<(String, Vec<String>)>> {
+        let names = connection.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")?
+            .query_map([], |row| row.get::<_, String>(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
+        names
+            .into_iter()
+            .map(|name| {
+                let mut statement = connection
+                    .prepare(&format!("SELECT * FROM \"{}\"", name.replace('"', "\"\"")))?;
+                let columns = statement.column_count();
+                let mut rows = statement
+                    .query_map([], |row| {
+                        let values = (0..columns)
+                            .map(|index| row.get::<_, rusqlite::types::Value>(index))
+                            .collect::<rusqlite::Result<Vec<_>>>()?;
+                        Ok(format!("{values:?}"))
+                    })?
+                    .collect::<rusqlite::Result<Vec<_>>>()?;
+                rows.sort();
+                Ok((name, rows))
+            })
+            .collect()
+    }
     use super::{
         is_in_memory_sqlite_path, sqlite_parent_dir_to_create, sqlite_uri_has_nonlocal_authority,
     };

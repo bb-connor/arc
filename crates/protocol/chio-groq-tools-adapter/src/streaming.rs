@@ -30,11 +30,22 @@ impl GroqAdapter {
             "Groq",
             Some("[DONE]"),
             |call| {
-                self.invocation_from_function_call(&FunctionCallPart::new(
+                let invocation = self.invocation_from_function_call(&FunctionCallPart::new(
                     call.id.clone(),
                     call.name.clone(),
                     call.args.clone(),
-                ))
+                ))?;
+                if !invocation
+                    .bridge_security
+                    .as_ref()
+                    .is_some_and(chio_manifest::BridgeSecurityMetadata::has_registry_coordinates)
+                {
+                    return Err(ProviderError::Malformed(
+                        "Groq SSE tool-call evaluation requires a registry-admitted security sidecar"
+                            .to_string(),
+                    ));
+                }
+                Ok(invocation)
             },
             evaluate,
         )

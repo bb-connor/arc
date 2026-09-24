@@ -55,12 +55,34 @@ write_file "$vendored_comments/third_party/aws-lc-rs-chio/src/cipher.rs" \
 assert_rc "$(run_checker "$vendored_comments" "$work/vendor-code.out" "$work/vendor-code.err")" 1 \
   "vendored executable incomplete implementation still fails"
 
+vendored_other="$work/vendored-other"
+init_case "$vendored_other"
+write_file "$vendored_other/third_party/regress-chio/src/bytesearch.rs" \
+  "// TODO."
+write_file "$vendored_other/third_party/ignore-chio/src/walk.rs" \
+  "// Placeholder implementation to allow compiling on non-standard platforms"
+track_case "$vendored_other"
+assert_rc "$(run_checker "$vendored_other" "$work/vendor-other.out" "$work/vendor-other.err")" 0 \
+  "exact reviewed dependency comments are allowed"
+write_file "$vendored_other/third_party/regress-chio/src/bytesearch.rs" \
+  "// TODO." \
+  "// TODO: skip validation"
+assert_rc "$(run_checker "$vendored_other" "$work/vendor-new-comment.out" "$work/vendor-new-comment.err")" 1 \
+  "new dependency TODO remains rejected"
+write_file "$vendored_other/third_party/regress-chio/src/bytesearch.rs" \
+  "// TODO." \
+  'pub fn search() { todo!(); }'
+assert_rc "$(run_checker "$vendored_other" "$work/vendor-new-code.out" "$work/vendor-new-code.err")" 1 \
+  "new dependency executable TODO remains rejected"
+
 init_case "$non_production"
 write_file "$non_production/docs/example.md" "TODO: documented follow-up"
 write_file "$non_production/tests/replay.rs" "fn test_stub() {}"
 write_file "$non_production/examples/demo/src/main.rs" "fn main() { /* placeholder */ }"
 write_file "$non_production/scripts/example.sh" "# FIXME: script fixture"
 write_file "$non_production/crates/chio-demo/src/_generated/wire.rs" "// not_yet_implemented generated fixture"
+write_file "$non_production/fuzz/corpus/peers_lock_decode/shipped-lockfile.toml" \
+  "# Unpublished peer placeholder in parser input, not executable code"
 track_case "$non_production"
 assert_rc "$(run_checker "$non_production" "$work/non-production.out" "$work/non-production.err")" 0 \
   "non-production stub-surface hits pass"
@@ -72,10 +94,14 @@ write_file "$production_fail/crates/chio-demo/src/lib.rs" \
   "pub fn evaluate() {" \
   "    // TODO: replace placeholder implementation" \
   "}"
+write_file "$production_fail/fuzz/corpus_support/src/lib.rs" \
+  "pub fn parse() { todo!(); }"
 track_case "$production_fail"
 assert_rc "$(run_checker "$production_fail" "$work/production-fail.out" "$work/production-fail.err")" 1 \
   "unallowlisted production stub hit fails"
 grep -F "production stub-surface hit is not allowlisted" \
+  "$work/production-fail.err" >/dev/null
+grep -F "fuzz/corpus_support/src/lib.rs:1" \
   "$work/production-fail.err" >/dev/null
 
 lowercase_fail="$work/lowercase-fail"

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 8ba0a80532a71a901c67466299ea1bfe1de2852479f67791d2ff4b08be726a8c
+# Schema sha256: c31fc3d855f29edabccd629866ae3f328d7322f74f9c97ed7c5788c1adc8efbe
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,7 +14,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
+from chio_sdk._manifest_wire import SecurityWireModel as BaseModel
+
+from pydantic import ConfigDict, Field, RootModel, conint, constr
 
 
 class Algorithm(Enum):
@@ -59,10 +61,10 @@ class ChioThresholdApprovalProposal(BaseModel):
     subject: ThresholdProposalPublicKey
     authorizing_capability_digest: constr(pattern=r"^[0-9a-f]{64}$")
     policy_hash: constr(pattern=r"^[0-9a-f]{64}$")
-    threshold: conint(ge=1, le=32)
+    threshold: conint(strict=True, ge=1, le=32)
     eligible_set_digest: constr(pattern=r"^[0-9a-f]{64}$")
-    proposal_created_at: conint(ge=0)
-    proposal_deadline: conint(ge=1)
+    proposal_created_at: conint(strict=True, ge=0)
+    proposal_deadline: conint(strict=True, ge=1)
     policy_authority: ThresholdProposalPublicKey
     algorithm: Algorithm | None = None
     signature: ThresholdProposalSignature

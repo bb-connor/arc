@@ -3,7 +3,17 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+./scripts/check-protocol-peer-negotiation.sh
+./scripts/check-consumer-boundaries.sh
 ./scripts/check-release-inputs.sh
+python3 scripts/tests/check-release-source-gates.test.py
+python3 scripts/tests/check-release-draft-assets.test.py
+python3 scripts/tests/release-provenance.test.py
+python3 scripts/tests/check-release-binary-sbom.test.py
+python3 scripts/tests/release-sbom-rescan.test.py
+python3 scripts/tests/macos-release-portability.test.py
+python3 scripts/tests/msrv-cache-target.test.py
+python3 -m unittest discover -s integrations/required-agents/qualification -p 'test_*.py'
 ./scripts/check-workspace-layering.sh
 python3 scripts/check-review-slices.py
 bash scripts/tests/check-sidecar-docker-context.test.sh
@@ -11,6 +21,14 @@ bash scripts/tests/check-sidecar-image-workflow.test.sh
 python3 scripts/check-rust-public-surface.py
 bash scripts/tests/check-rust-public-surface.test.sh
 python3 scripts/check-architecture-docs.py
+./scripts/check-security-provenance.sh
+python3 scripts/check-enterprise-provenance.py
+python3 scripts/check-linux-enforcement-stack.py
+./scripts/check-security-dependencies.sh
+bash scripts/tests/check-security-provenance.test.sh
+bash scripts/tests/check-enterprise-provenance.test.sh
+bash scripts/tests/check-linux-enforcement-stack.test.sh
+bash scripts/tests/check-security-dependencies.test.sh
 ./scripts/check-formal-proofs.sh
 bash scripts/tests/lean-mutants.test.sh
 bash scripts/tests/spec-mutants.test.sh

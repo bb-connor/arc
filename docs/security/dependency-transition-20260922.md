@@ -26,11 +26,13 @@ the native and Rust updates without a new cargo-vet exemption. The upstream ciph
 file has an exact-size, expiring source-hygiene allowance; other file limits remain
 enforced.
 
-JavaScript workspace lockfiles retain the public package membership. Express
-and Fastify conformance fixtures now answer the existing receipt-verification endpoint with typed receipt
-roles, and include rejection cases. The verdict matrix checks all 72 canonical
-scenario identifiers. These transport fixtures do not establish cryptographic
-acceptance.
+JavaScript workspace lockfiles include the process SDKs and preserve the public
+Metro, Next.js, Rolldown and Rollup updates. The Elysia adapter requires the patched
+1.4.29 peer and development version. Node HTTP validates receipt schemas through
+its production Ajv dependency. Express and Fastify conformance fixtures use the
+shared signed receipt fixture and verify the exact issued receipt and pinned
+signer before returning an accepted verdict. The verdict matrix checks all 72
+canonical scenario identifiers.
 
 ## Qualification
 

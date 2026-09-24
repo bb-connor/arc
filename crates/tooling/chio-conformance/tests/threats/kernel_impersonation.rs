@@ -29,19 +29,23 @@
 //      whose `kernel_key` field differs from the on-the-wire claim.
 //
 // Production call sites:
-//   `crates/chio-kernel-core/src/receipts.rs`
+//   `crates/kernel/chio-kernel-core/src/receipts.rs`
 //     (`sign_receipt_relaying_trusted_body`).
-//   `crates/chio-core-types/src/receipt.rs:292`
+//   `crates/core/chio-core-types/src/receipt.rs:292`
 //     (`ChioReceipt::verify_signature`).
 //
 // Revert-to-prove-it-fails recipe: delete the kernel_key /
 // backend_key mismatch guard inside `sign_receipt_relaying_trusted_body`
-// in `crates/chio-kernel-core/src/receipts.rs` (so the body's
+// in `crates/kernel/chio-kernel-core/src/receipts.rs` (so the body's
 // `kernel_key` field is no longer compared to the signing backend's
 // public key before signing). The mint-side deny-arm assertion below
 // fails because the attacker can mint a forged receipt that claims
 // the legitimate kernel's `kernel_key` while signing with their own
 // key.
+//
+// Targeted mutation recipe: replace the `||` joining the algorithm and key
+// mismatch predicates with `&&`. The same-algorithm attacker key below then
+// bypasses the weakened guard, and the mint-side assertion MUST fail.
 
 use chio_core::crypto::{Ed25519Backend, Keypair};
 use chio_core::receipt::{body::ChioReceiptBody, decision::Decision, decision::ToolCallAction};

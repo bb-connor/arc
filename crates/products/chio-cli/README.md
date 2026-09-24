@@ -9,7 +9,7 @@ evaluation, signing, and verification live in the crates it wraps
 in `ARCHITECTURE.md`), not in this crate.
 
 Commands span five areas: running and hosting governed agent sessions (`run`,
-`check`, `mcp`, `api`, `start`); trust-plane administration and audit (`trust`,
+`check`, `mcp`, `api`, `start`, `process`); trust-plane administration and audit (`trust`,
 `receipt`, `evidence`, `reputation`, `did`, `passport`); offline verification
 and replay (`proof`, `commerce`, `certify`, `cert`, `attest`, `replay`,
 `workflow`); WASM guard authoring and the guard marketplace (`guard`, `bind`);
@@ -20,8 +20,13 @@ scaffolding.
 
 ## Responsibilities
 
+The experimental [process host](PROCESS_HOST.md) connects Python and JavaScript
+workers to existing MCP tool servers through durable kernel admission. It
+provisions a declared process tree, exports private connection descriptors and
+recovers the same process identities after host restart.
+
 - Parse the `chio` command line (`Cli`/`Commands` in `src/cli/types.rs`) and
-  dispatch each of 29 top-level commands to an implementation function
+  dispatch top-level commands to an implementation function
   (`src/cli/dispatch/mod.rs::run`).
 - Run a policy-governed agent subprocess over a framed stdio transport
   (`chio run`), and evaluate one-off tool calls without a subprocess
@@ -58,7 +63,7 @@ Full flag reference: `chio <command> [<subcommand>...] --help`.
 | `api` | `protect` | Protect an HTTP API behind an OpenAPI spec-backed sidecar. |
 | `mcp` | `wrap`, `serve`, `serve-http` | Wrap or host an MCP-compatible edge behind the kernel. |
 | `trust` | 26 groups: `serve`, `provider`, `federation-policy`, `revoke`, `facility`, `bond`, `loss`, `liability-provider`, `liability-market`, `underwriting-input`, `underwriting-decision`, `underwriting-appeal`, `capital-book`, `capital-instruction`, `capital-allocation`, `credit-scorecard`, `credit-backtest`, `provider-risk-package`, `appraisal`, `behavioral-feed`, `exposure-ledger`, `evidence-share`, `authorization-context`, `federated-issue`, `federated-delegation-policy-create`, `status` | Manage local and remote trust-plane state. |
-| `receipt` | `list`, `health`, `flush`, `audit`, `retention`, `checkpoint`, `explain` | Query, audit, and repair the receipt store. |
+| `receipt` | `verify`, `list`, `health`, `flush`, `audit`, `retention`, `checkpoint`, `explain` | Verify exported signatures; query, audit, and repair the receipt store. |
 | `evidence` | `export`, `verify`, `import`, `federation-policy` | Export and verify offline evidence packages. |
 | `certify` | `check`, `verify`, `registry` (11 more) | Certify conformance evidence and publish results. |
 | `did` | `resolve` | Resolve `did:chio` identifiers into DID Documents. |
@@ -88,7 +93,9 @@ A few command names collide in ways worth flagging:
 - `chio cert` (ACP session compliance certificates) is unrelated to
   `chio certify` (conformance certification artifacts).
 - `chio trust` and `chio receipt` are separate top-level commands, even though
-  `chio receipt`'s implementation lives under `src/cli/trust/receipt/`.
+  its store operations live under `src/cli/trust/receipt/`. Offline signature
+  verification lives in `src/cli/receipt_verify.rs` and requires a trusted
+  kernel key pin; it does not require a store or re-evaluate policy.
 - `chio runtime pheromone` (evaluate a policy, no state change) is distinct
   from the top-level `chio pheromone` command tree.
 - `chio proof collect --kind replay` (a Proof Room bundle kind) is unrelated

@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "id": "containment-rollback-001",
+  "class": "containment_rollback",
+  "expected_verdict": "DENY",
+  "expected_reason": "containment_rollback_detected",
+  "threat_id": "resource_exhaustion_dos",
+  "pending": true,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "blast_completeness_control",
+        "package": "chio-quarantine",
+        "test_source": "crates/security/chio-quarantine/src/blast.rs",
+        "target_kind": "lib",
+        "test_name": "blast::tests::corruption_truncation_lag_and_missing_completeness_are_never_exact"
+      },
+      {
+        "id": "plan_hash_control",
+        "package": "chio-quarantine",
+        "test_source": "crates/security/chio-quarantine/tests/state_machine.rs",
+        "target_kind": "test",
+        "target": "state_machine",
+        "test_name": "response_plan_hash_commits_to_exact_policy_and_finding_authority_bindings"
+      },
+      {
+        "id": "rollback_control",
+        "package": "chio-quarantine",
+        "test_source": "crates/security/chio-quarantine/tests/response_executor.rs",
+        "target_kind": "test",
+        "target": "response_executor",
+        "test_name": "executor_crash_stale_takeover_pending_rollback_never_calls_effect_port"
+      },
+      {
+        "id": "lift_truth_control",
+        "package": "chio-quarantine",
+        "test_source": "crates/security/chio-quarantine/tests/state_machine.rs",
+        "target_kind": "test",
+        "target": "state_machine",
+        "test_name": "lifted_is_unreachable_until_every_applied_reversible_effect_is_restored"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "truncation_ignored",
+        "control_id": "blast_completeness_control",
+        "package": "chio-quarantine",
+        "source": "crates/security/chio-quarantine/src/blast.rs",
+        "function": "resolve_snapshot",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "||",
+          "replacement": "&&",
+          "occurrence": 1
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/truncation_ignored/mutants.out/outcomes.json"
+        }
+      },
+      {
+        "id": "approval_plan_field_omission",
+        "control_id": "plan_hash_control",
+        "package": "chio-quarantine",
+        "source": "crates/security/chio-quarantine/src/state_machine.rs",
+        "function": "compute_plan_hash",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok([0; 32])"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/approval_plan_field_omission/mutants.out/outcomes.json"
+        }
+      },
+      {
+        "id": "root_only_lift",
+        "control_id": "rollback_control",
+        "package": "chio-quarantine",
+        "source": "crates/security/chio-quarantine/src/executor.rs",
+        "function": "ResponseExecutor<S, E, R, A>::drive_rollback",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "||",
+          "replacement": "&&",
+          "occurrence": 1
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/root_only_lift/mutants.out/outcomes.json"
+        }
+      },
+      {
+        "id": "false_lifted_status",
+        "control_id": "lift_truth_control",
+        "package": "chio-security-types",
+        "source": "crates/security/chio-security-types/src/response.rs",
+        "function": "ResponseSnapshot::all_applied_reversible_effects_restored",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "true"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/false_lifted_status/mutants.out/outcomes.json"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+  ]
+}

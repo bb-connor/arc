@@ -42,6 +42,22 @@ imported feeds and the workspace policy.
 
 ## Updating upstream feeds
 
+Locally maintained forks `enumflags2_derive`, `crmf`, `cmpv2`, `seccompiler` and
+`sigstore-verify` have explicit
+`audit-as-crates-io = false` ownership entries. Their modified sources are
+reviewed and tested in `third_party/enumflags2-derive-chio`,
+`third_party/crmf-chio`, `third_party/cmpv2-chio`, `third_party/seccompiler-chio` and
+`third_party/sigstore-verify-chio`, with provenance beside each fork. Applying a
+registry certificate to those different bytes would misstate its scope. Their
+registry dependencies remain subject to the normal deployment-audit policy.
+This ownership declaration is not an audit exemption or an independent review.
+
+The September 16 feed refresh adds Bytecode Alliance's exact target deltas for
+rustls 0.23.45 and rustls-webpki 0.103.15. The machine-generated update also
+imports Mozilla's simdutf8 0.1.5 audit and refreshes its existing encoding_rs
+wildcard record. All four record changes were reviewed; no import authority,
+exemption or required criterion changed.
+
 ```sh
 cargo vet --locked                                            # confirm baseline
 cargo vet import <name> <url>                                 # register + fetch

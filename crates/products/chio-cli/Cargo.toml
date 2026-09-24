@@ -23,9 +23,11 @@ async-trait = { workspace = true }
 chio-appraisal = { workspace = true }
 chio-arena = { workspace = true }
 chio-api-protect = { workspace = true }
+chio-active-response-authority = { workspace = true }
 chio-attest-buyer-core = { workspace = true }
 chio-federation-authority = { workspace = true }
 chio-attest-loopback = { workspace = true }
+chio-cage = { workspace = true }
 chio-runtime-core = { workspace = true }
 chio-runtime-harness = { workspace = true }
 chio-commerce-order = { workspace = true }
@@ -58,7 +60,9 @@ chio-lineage = { workspace = true }
 chio-listing = { workspace = true }
 chio-log-redact = { workspace = true }
 chio-metrics-spec = { workspace = true }
+chio-manifest = { workspace = true }
 chio-policy = { workspace = true }
+chio-process = { workspace = true, features = ["worker-server", "mailboxes"] }
 chio-proof-room = { workspace = true }
 chio-mcp-adapter = { workspace = true }
 chio-mcp-remote = { workspace = true }
@@ -74,13 +78,17 @@ chio-reputation = { workspace = true }
 chio-runtime = { workspace = true }
 chio-swarm-authority = { workspace = true }
 chio-selective-disclosure = { workspace = true, features = ["bbs"] }
+chio-security-types = { workspace = true }
+chio-security-kernel = { workspace = true }
+chio-flow = { workspace = true }
+chio-secret-broker = { workspace = true, features = ["native-mcp"] }
 chio-store-sqlite = { workspace = true }
 chio-tee-frame = { workspace = true }
 chio-tool-call-fabric = { workspace = true }
 chio-trace-validate = { workspace = true }
 chio-workflow = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
+serde_json = { workspace = true, features = ["raw_value"] }
 serde_yml = { workspace = true }
 thiserror = { workspace = true }
 clap = { version = "4", features = ["derive", "env"] }
@@ -112,9 +120,13 @@ tar = "0.4"
 zstd = "0.13"
 libc = "0.2"
 zeroize = { workspace = true }
+chio-keyring = { workspace = true }
 rand_core = { workspace = true }
 semver = "1"
 uuid = { workspace = true, features = ["v4"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { workspace = true }
 
 [dev-dependencies]
 chio-credit = { workspace = true }

@@ -194,6 +194,34 @@ fn evaluate_rejects_unsupported_authorization_extensions() {
 }
 
 #[test]
+fn evaluate_rejects_unnegotiated_approval_set_proposal_and_governed_intent() {
+    let envelope: serde_json::Value = serde_json::from_str(&evaluate_envelope("echo")).unwrap();
+    let positive: serde_json::Value =
+        serde_json::from_str(&evaluate_json_str(&envelope.to_string()).unwrap()).unwrap();
+    assert_eq!(positive["verdict"], "allow");
+    for field in [
+        "approval_tokens",
+        "threshold_approval_proposal",
+        "governed_intent",
+        "approval_token",
+        "supplemental_authorization",
+    ] {
+        let mut changed = envelope.clone();
+        changed["request"][field] = if field == "approval_tokens" {
+            json!([{"artifact":"one"}, {"artifact":"two"}])
+        } else {
+            json!({"artifact":field})
+        };
+        let error = evaluate_json_str(&changed.to_string()).unwrap_err();
+        assert!(
+            matches!(error, KernelFfiError::InvalidCapability(message)
+            if message.contains("cannot authenticate governed approvals")),
+            "{field}"
+        );
+    }
+}
+
+#[test]
 fn evaluate_allows_delegated_token_with_parent_budget_snapshot() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();

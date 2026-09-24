@@ -45,12 +45,12 @@ enum class ErrorCode {
 
 struct Error {
   ErrorCode code = ErrorCode::None;
-  std::string message;
-  std::string operation;
-  std::optional<int> http_status;
-  std::string response_body_snippet;
-  std::optional<int> ffi_status;
-  std::optional<int> ffi_error_code;
+  std::string message{};
+  std::string operation{};
+  std::optional<int> http_status = std::nullopt;
+  std::string response_body_snippet{};
+  std::optional<int> ffi_status = std::nullopt;
+  std::optional<int> ffi_error_code = std::nullopt;
   bool retryable = false;
 
   static Error none() { return {}; }

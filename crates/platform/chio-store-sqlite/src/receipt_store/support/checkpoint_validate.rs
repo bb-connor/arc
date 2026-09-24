@@ -1,5 +1,15 @@
 use super::*;
 
+#[cfg(test)]
+thread_local! {
+    static CHECKPOINT_CHAIN_READ_VERIFICATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn checkpoint_chain_read_verifications() -> usize {
+    CHECKPOINT_CHAIN_READ_VERIFICATIONS.with(std::cell::Cell::get)
+}
+
 const CHECKPOINT_TRANSPARENCY_GUARDS_SQL: &str = r#"
 CREATE TRIGGER IF NOT EXISTS kernel_checkpoints_reject_update
 BEFORE UPDATE ON kernel_checkpoints
@@ -460,6 +470,8 @@ pub(crate) fn verify_latest_checkpoint_integrity(
     if load_latest_persisted_checkpoint_row(connection)?.is_none() {
         return Ok(());
     }
+    #[cfg(test)]
+    CHECKPOINT_CHAIN_READ_VERIFICATIONS.with(|count| count.set(count.get() + 1));
     verify_checkpoint_chain_integrity(connection).map(|_| ())
 }
 
@@ -1047,12 +1059,7 @@ pub(crate) fn validate_checkpoint_against_claim_log(
     connection: &Connection,
     checkpoint: &KernelCheckpoint,
 ) -> Result<(), ReceiptStoreError> {
-    validate_checkpoint_claim_log_signer_range(connection, checkpoint)?;
-    let rows = load_claim_tree_canonical_bytes_range(
-        connection,
-        checkpoint.body.batch_start_seq,
-        checkpoint.body.batch_end_seq,
-    )?;
+    let rows = load_checkpoint_claim_tree_canonical_bytes_range(connection, checkpoint)?;
     let receipt_bytes = rows.into_iter().map(|(_, bytes)| bytes).collect::<Vec<_>>();
     if receipt_bytes.len() != checkpoint.body.tree_size {
         return Err(ReceiptStoreError::Conflict(format!(
@@ -1386,96 +1393,6 @@ fn store_kernel_checkpoint_tx(
         )));
     }
     insert_checkpoint_incremental_tx(tx, predecessor.as_ref(), checkpoint).map(|_| ())
-}
-
-fn validate_checkpoint_claim_log_signer_range(
-    connection: &Connection,
-    checkpoint: &KernelCheckpoint,
-) -> Result<(), ReceiptStoreError> {
-    super::ensure_claim_log_range_contiguous(
-        connection,
-        checkpoint.body.batch_start_seq,
-        checkpoint.body.batch_end_seq,
-        "checkpoint signer binding",
-    )?;
-    let mut range_signer_key: Option<String> = None;
-    let mut statement = connection.prepare(
-        r#"
-        SELECT entry_seq, receipt_kind, raw_json
-        FROM claim_receipt_log_entries
-        WHERE entry_seq >= ?1 AND entry_seq <= ?2
-        ORDER BY entry_seq ASC
-        "#,
-    )?;
-    let rows = statement.query_map(
-        params![
-            sqlite_i64(
-                checkpoint.body.batch_start_seq,
-                "checkpoint signer start_seq"
-            )?,
-            sqlite_i64(checkpoint.body.batch_end_seq, "checkpoint signer end_seq")?,
-        ],
-        |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-            ))
-        },
-    )?;
-    for row in rows {
-        let (entry_seq, receipt_kind, raw_json) = row?;
-        let entry_seq = sqlite_positive_u64(entry_seq, "checkpoint signer entry_seq")?;
-        let receipt_key = match receipt_kind.as_str() {
-            "tool_receipt" => decode_verified_chio_receipt(
-                &raw_json,
-                "checkpoint signer tool receipt",
-                Some(entry_seq),
-            )?
-            .kernel_key
-            .to_hex(),
-            "child_receipt" => decode_verified_child_receipt(
-                &raw_json,
-                "checkpoint signer child receipt",
-                Some(entry_seq),
-            )?
-            .kernel_key
-            .to_hex(),
-            other => {
-                return Err(ReceiptStoreError::Conflict(format!(
-                    "unsupported claim receipt kind `{other}` in checkpoint signer binding"
-                )));
-            }
-        };
-        match range_signer_key.as_deref() {
-            Some(expected_key) if expected_key != receipt_key => {
-                return Err(ReceiptStoreError::Conflict(format!(
-                    "checkpoint {} covers mixed receipt signer range: {receipt_kind} entry {entry_seq} uses kernel key {receipt_key}, expected {expected_key}",
-                    checkpoint.body.checkpoint_seq
-                )));
-            }
-            Some(_) => {}
-            None => range_signer_key = Some(receipt_key),
-        }
-    }
-    let checkpoint_key = checkpoint.body.kernel_key.to_hex();
-    match range_signer_key.as_deref() {
-        Some(receipt_key) if receipt_key == checkpoint_key => Ok(()),
-        Some(receipt_key) => Err(ReceiptStoreError::Conflict(format!(
-            "checkpoint {} kernel key {} does not match receipt signer key {} for claim receipt log range {}..={}",
-            checkpoint.body.checkpoint_seq,
-            checkpoint_key,
-            receipt_key,
-            checkpoint.body.batch_start_seq,
-            checkpoint.body.batch_end_seq
-        ))),
-        None => Err(ReceiptStoreError::Conflict(format!(
-            "checkpoint {} covers no receipt signer keys in claim receipt log range {}..={}",
-            checkpoint.body.checkpoint_seq,
-            checkpoint.body.batch_start_seq,
-            checkpoint.body.batch_end_seq
-        ))),
-    }
 }
 
 fn expected_checkpoint_projection_rows(

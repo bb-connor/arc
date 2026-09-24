@@ -33,6 +33,14 @@ receipt model without rewriting the server. MCP hosting itself lives in
 - `resources::AdaptedMcpResourceProvider`, `prompts::AdaptedMcpPromptProvider`.
 - `edge::*` - re-exported MCP edge contracts (`McpToolInfo`, `McpTransport`, ...).
 
+The transport API performs synchronous I/O. On a Tokio multithread runtime,
+`AdaptedMcpServer` marks delivery preparation and invocation as blocking work so
+other servers and worker connections can progress during an upstream wait.
+The call stays on its original stack, including any borrowed nested-flow bridge;
+it is not detached or given another cancellation owner. Direct synchronous and
+Tokio current-thread callers retain synchronous behavior. Transport request
+deadlines and kernel dispatch deadlines remain responsible for their own bounds.
+
 ## Feature flags
 
 | Flag | Effect |

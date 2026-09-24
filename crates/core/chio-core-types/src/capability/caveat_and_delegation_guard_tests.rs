@@ -1,11 +1,98 @@
 #[cfg(feature = "delegation")]
 use super::attenuation::delegate;
 use super::attenuation::{compute_attenuation_witness, scope_hash, AttenuationProof};
-use super::caveat::{Caveat, CaveatKind};
+use super::caveat::{
+    CapabilitySecurityBinding, Caveat, CaveatKind, CAPABILITY_SECURITY_BINDING_SCHEMA,
+};
 use super::scope::{ChioScope, Operation, ToolGrant};
 use super::token::{CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTokenBody};
 use crate::crypto::Keypair;
 use crate::error::Error;
+
+fn security_binding(issuer: &Keypair) -> CapabilitySecurityBinding {
+    CapabilitySecurityBinding {
+        schema: CAPABILITY_SECURITY_BINDING_SCHEMA.to_string(),
+        tenant_id: "tenant-1".to_string(),
+        lineage_id: "lineage-1".to_string(),
+        session_id: "session-1".to_string(),
+        principal_id: "agent-1".to_string(),
+        isolation_epoch_id: "epoch-1".to_string(),
+        context_generation: 7,
+        workload_id: "workload-1".to_string(),
+        server_id: "server-1".to_string(),
+        workload_signer_public_key: issuer.public_key().to_hex(),
+    }
+}
+
+fn direct_body(issuer: &Keypair, subject: &Keypair) -> CapabilityTokenBody {
+    CapabilityTokenBody {
+        id: "cap-security-bound".to_string(),
+        issuer: issuer.public_key(),
+        subject: subject.public_key(),
+        scope: make_scope(vec![make_grant("srv", "tool", vec![Operation::Invoke])]),
+        issued_at: 10,
+        expires_at: 20,
+        delegation_chain: vec![],
+        aggregate_invocation_budget: None,
+    }
+}
+
+#[test]
+fn security_binding_is_canonical_signed_and_strict() {
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let binding = security_binding(&issuer);
+    let token = CapabilityToken::sign_with_security_binding(
+        direct_body(&issuer, &subject),
+        binding.clone(),
+        &issuer,
+    )
+    .unwrap();
+
+    assert!(token.verify_signature().unwrap());
+    assert_eq!(token.security_binding().unwrap(), Some(binding));
+    assert_eq!(token.caveats.len(), 1);
+    assert_eq!(token.caveats[0].kind, CaveatKind::BindSecurityContext);
+
+    let mut noncanonical = token.clone();
+    noncanonical.caveats[0].predicate = format!(" {}", noncanonical.caveats[0].predicate);
+    assert!(noncanonical.validate_schema().is_err());
+
+    let mut detached = token.clone();
+    detached.caveats[0].sig = Some(token.signature.clone());
+    assert!(detached.validate_schema().is_err());
+
+    let mut unknown = serde_json::to_value(token.security_binding().unwrap().unwrap()).unwrap();
+    unknown
+        .as_object_mut()
+        .unwrap()
+        .insert("unexpected".to_string(), serde_json::json!(true));
+    let mut unknown_token = token;
+    unknown_token.caveats[0].predicate =
+        String::from_utf8(crate::canonical_json_bytes(&unknown).unwrap()).unwrap();
+    assert!(unknown_token.validate_schema().is_err());
+}
+
+#[test]
+fn security_binding_mutation_invalidates_capability_signature() {
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let token = CapabilityToken::sign_with_security_binding(
+        direct_body(&issuer, &subject),
+        security_binding(&issuer),
+        &issuer,
+    )
+    .unwrap();
+    let mut mutated = token.clone();
+    let mut binding = mutated.security_binding().unwrap().unwrap();
+    binding.context_generation += 1;
+    mutated.caveats = vec![Caveat::bind_security_context(&binding).unwrap()];
+    assert!(!mutated.verify_signature().unwrap());
+
+    let plain = CapabilityToken::sign(direct_body(&issuer, &subject), &issuer).unwrap();
+    assert!(plain.verify_signature().unwrap());
+    assert_eq!(plain.security_binding().unwrap(), None);
+}
 
 fn make_grant(server: &str, tool: &str, ops: Vec<Operation>) -> ToolGrant {
     ToolGrant {

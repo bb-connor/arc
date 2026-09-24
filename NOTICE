@@ -9,3 +9,25 @@ This product includes third-party software components, each of which is governed
 by its own license. The licenses for those components apply to their respective
 portions of the software and are available with their corresponding source or
 package distributions.
+
+nono 0.53.0
+Copyright Luke Hinds
+Upstream repository: https://github.com/always-further/nono
+Reviewed upstream commit: c4b25b827330640cb95f85809d88d977191b42e7
+Licensed under the Apache License, Version 2.0.
+
+Chio includes the upstream nono crate under `third_party/nono-upstream-chio`
+with a filesystem grant provenance repair, and the separate `nono-chio`
+integration adapter under `third_party/nono-chio`. Both components' source,
+license and exact patch inventories are distributed with this product.
+
+sigstore-verify 0.6.3
+Copyright 2025 prefix.dev GmbH
+Upstream repository: https://github.com/prefix-dev/sigstore-rust
+Reviewed upstream commit: 490f9231ff81b3269f4316a98b95059691d49593
+Licensed under the BSD 3-Clause License.
+
+Chio includes the upstream crate under `third_party/sigstore-verify-chio` with
+fail-closed identity, time, transparency-log, certificate, and content-binding
+patches. The source, license, provenance, and patch description are distributed
+with this product.

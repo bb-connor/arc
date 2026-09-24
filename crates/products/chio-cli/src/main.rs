@@ -14,6 +14,8 @@
 //   Wrap an MCP server subprocess with the Chio kernel and expose an
 //   MCP-compatible edge over stdio for stock MCP clients.
 
+mod active_defense_migration;
+mod active_response_authority;
 mod admin;
 mod archive;
 mod cert;
@@ -23,6 +25,7 @@ mod commands {
 }
 mod did;
 mod doctor;
+mod supervise;
 mod guard;
 mod guards;
 mod lineage;
@@ -42,7 +45,8 @@ pub use chio_control_plane::{
     authority_public_key_from_seed_file, build_kernel, certify, configure_budget_store,
     configure_capability_authority, configure_receipt_store, configure_revocation_store,
     durable_admission_sidecar_path, enterprise_federation, evidence_export, federation_policy,
-    issuance, issue_default_capabilities, load_or_create_authority_keypair,
+    issuance, issue_default_capabilities, load_existing_authority_keypair,
+    load_or_create_authority_keypair,
     open_durable_admission_runtime, passport_verifier, policy, reputation, require_control_token,
     rotate_authority_keypair, scim_lifecycle, trust_control, validate_distinct_database_paths,
     validate_durable_admission_participant_paths, CliError, DurableAdmissionRuntime,
@@ -78,8 +82,7 @@ use chio_core::session::{
 };
 use chio_kernel::transport::{ChioTransport, TransportError};
 use chio_kernel::{
-    ChioKernel, RevocationStore, SessionOperationResponse, ToolCallOutput,
-    ToolCallRequest as KernelToolCallRequest, ToolCallStream,
+    ChioKernel, RevocationStore, SessionOperationResponse, ToolCallOutput, ToolCallStream,
 };
 use chio_mcp_adapter::adapter::McpAdapterConfig;
 use chio_mcp_adapter::edge::{ChioMcpEdge, McpEdgeConfig};
@@ -91,7 +94,8 @@ use crate::policy::load_policy;
 mod types_cli;
 #[allow(unused_imports)]
 pub(crate) use types_cli::{
-    ApiCommands, ArenaCommands, CertCommands, CertifyCommands, CertifyRegistryCommands, CheckMode,
+    ApiCommands, ArenaCommands, AuthorityDeploymentCommands, AuthorityStoreCommands, CertCommands,
+    CertifyCommands, CertifyRegistryCommands, CheckMode,
     ChioAttestCommands, ChioBuyerCommands, ChioFederationCommands, ChioRuntimeQuoteCommands,
     ChioSupplyChainCommands, Cli, Commands, CommerceCommands, ConformanceCommands, DidCommands,
     EvidenceCommands, EvidenceFederationPolicyCommands, GuardBlocklistCommands, GuardCommands,
@@ -101,7 +105,7 @@ pub(crate) use types_cli::{
     ProofDoctorScenario,
     ProofExportRedactProfile, ProofFixtureCommands, ProofVerifyRequirement,
     ReceiptCheckpointCommands, ReceiptCommands, ReceiptRetentionCommands, ReplayArgs,
-    ReplaySubcommand, ReputationCommands,
+    ReplaySubcommand, ReputationCommands, SecurityCommands,
     SettleCommands, TrafficArgs, TrustAuthorizationContextCommands, TrustBehavioralFeedCommands,
     TrustCapitalAllocationCommands, TrustCapitalBookCommands, TrustCapitalInstructionCommands,
     TrustCommands, TrustCreditBacktestCommands, TrustCreditBondCommands,
@@ -133,9 +137,16 @@ use chio_types::{
 };
 #[path = "cli/doctor.rs"]
 mod doctor_cli;
+#[path = "cli/security_preflight.rs"]
+mod security_preflight_cli;
+pub(crate) use security_preflight_cli::{cmd_security_preflight, PreflightArgs, PreflightStores};
+#[path = "cli/security_supervise.rs"]
+mod security_supervise_cli;
+pub(crate) use security_supervise_cli::{cmd_security_supervise, SuperviseArgs};
 #[allow(unused_imports)]
 pub(crate) use doctor_cli::{
-    cmd_doctor, render_doctor_human, render_doctor_json, write_doctor_report, DoctorArgs,
+    cmd_doctor, render_doctor_human, render_doctor_json, render_titled_human, write_doctor_report,
+    DoctorArgs,
 };
 #[path = "cli/dispatch/mod.rs"]
 mod dispatch_cli;
@@ -174,6 +185,8 @@ fn main() {
 }
 #[path = "cli/runtime.rs"]
 mod runtime_cli;
+#[path = "cli/process_host.rs"]
+mod process_host;
 #[allow(unused_imports)]
 pub(crate) use runtime_cli::{
     cli_normalized_url_authority, cmd_api_protect, cmd_check, cmd_mcp_serve, cmd_mcp_serve_http,
@@ -255,7 +268,7 @@ pub(crate) use trust_commands_cli::{
 mod session_cli;
 #[allow(unused_imports)]
 pub(crate) use session_cli::{
-    control_request_id, handle_agent_message, make_error_receipt, normalize_agent_message,
+    control_request_id, handle_agent_message, normalize_agent_message,
     print_summary, select_capability_for_request, tool_response_messages, SessionStats,
 };
 #[cfg(test)]
@@ -280,6 +293,11 @@ pub(crate) use mcp_cli::{
 #[path = "cli/replay.rs"]
 mod replay_cli;
 pub(crate) use replay_cli::{cmd_replay, load_trusted_kernel_pubkey};
+
+#[path = "cli/receipt_verify.rs"]
+mod receipt_verify;
+#[path = "cli/process_response_verify.rs"]
+mod process_response_verify;
 #[path = "cli/arena.rs"]
 mod arena_cli;
 pub(crate) use arena_cli::{cmd_arena_evolve, cmd_arena_replay, cmd_arena_run};

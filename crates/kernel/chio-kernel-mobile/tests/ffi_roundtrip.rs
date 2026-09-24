@@ -349,6 +349,40 @@ fn evaluate_rejects_unsupported_authorization_extensions() {
 }
 
 #[test]
+fn evaluate_rejects_unnegotiated_approval_set_proposal_and_governed_intent() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let envelope = serde_json::json!({
+        "capability":make_capability(&subject, &issuer), "trusted_issuers":[issuer.public_key().to_hex()],
+        "request":{"request_id":"portable-positive", "tool_name":"echo", "server_id":"srv-a",
+            "agent_id":subject.public_key().to_hex(), "arguments":{}}, "now_secs":EVAL_TIME as i64
+    });
+    let positive: serde_json::Value =
+        serde_json::from_str(&evaluate(envelope.to_string()).unwrap()).unwrap();
+    assert_eq!(positive["verdict"], "allow");
+    for field in [
+        "approval_tokens",
+        "threshold_approval_proposal",
+        "governed_intent",
+        "approval_token",
+        "supplemental_authorization",
+    ] {
+        let mut changed = envelope.clone();
+        changed["request"][field] = if field == "approval_tokens" {
+            serde_json::json!([{"artifact":"one"}, {"artifact":"two"}])
+        } else {
+            serde_json::json!({"artifact":field})
+        };
+        let error = evaluate(changed.to_string()).unwrap_err();
+        assert!(
+            matches!(error, ChioMobileError::InvalidCapability { message }
+            if message.contains("cannot authenticate governed approvals")),
+            "{field}"
+        );
+    }
+}
+
+#[test]
 fn sign_receipt_roundtrip_and_verifies() {
     // WYSIWYS: the public signer recomputes content_hash over the
     // canonical content preimage. A matching content+hash pair signs and

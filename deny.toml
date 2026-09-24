@@ -323,6 +323,13 @@ name = "pem-rfc7468"
 name = "rustls-platform-verifier"
 
 [[bans.skip]]
+# last-checked = 2026-09-03. nono directly resolves regress 0.11.1, while
+# its typify 0.6.1 build dependency resolves regress 0.10.5 through
+# typify-impl. Chio's pinned generator and core-types tests also use 0.10.5.
+name = "regress"
+version = "=0.11.1"
+
+[[bans.skip]]
 name = "spin"
 
 [[bans.skip]]
@@ -339,6 +346,21 @@ name = "strum_macros"
 
 [[bans.skip]]
 name = "toml_edit"
+
+[[bans.skip]]
+# last-checked = 2026-09-03. Chio pins typify 0.4.3 for stable generated API
+# bytes, while nono's build dependency resolves typify 0.6.1. Matching
+# typify-impl and typify-macro versions make all three skips necessary.
+name = "typify"
+version = "=0.6.1"
+
+[[bans.skip]]
+name = "typify-impl"
+version = "=0.6.1"
+
+[[bans.skip]]
+name = "typify-macro"
+version = "=0.6.1"
 
 [[bans.skip]]
 name = "wasm-streams"

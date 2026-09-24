@@ -154,39 +154,17 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
     let sessions = Arc::new(RemoteSessionLedger::new(
         SessionLifecyclePolicy::from_env(),
         config.session_db_path.clone(),
+        factory.resume_hmac_keyring.clone(),
     )?);
     if let Some(path) = config.session_db_path.as_deref() {
-        let loaded_records = load_active_session_records(path)?;
-        for session_id in loaded_records.invalid_session_ids {
-            if let Err(delete_error) = delete_active_session_record(path, &session_id) {
-                warn!(
-                    session_id = %session_id,
-                    error = %delete_error,
-                    "failed to delete malformed persisted MCP session record"
-                );
-            }
-        }
-        for record in loaded_records.records {
-            match factory.restore_session(&record) {
-                Ok(session) => sessions.insert_active(session).await,
-                Err(error) => {
-                    warn!(
-                        session_id = %record.session_id,
-                        error = %error,
-                        "dropping persisted MCP session record that could not be restored"
-                    );
-                    if let Err(delete_error) =
-                        delete_active_session_record(path, &record.session_id)
-                    {
-                        warn!(
-                            session_id = %record.session_id,
-                            error = %delete_error,
-                            "failed to delete unrestorable MCP session record"
-                        );
-                    }
-                }
-            }
-        }
+        let keyring = factory.resume_hmac_keyring.as_deref().ok_or_else(|| {
+            CliError::cli_other_error(
+                "durable MCP session resume requires a dedicated HMAC keyring".to_string(),
+            )
+        })?;
+        restore_persisted_sessions(path, keyring, &sessions, |record| {
+            factory.restore_session(record)
+        }).await?;
     }
     sessions.cleanup_due_sessions().await;
 
@@ -218,6 +196,8 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
             rate_limit_mcp_request,
         ));
 
+    let shutdown_sessions = Arc::clone(&state.sessions);
+    let shutdown_factory = Arc::clone(&state.factory);
     let router = remote_mcp_admin::install_admin_routes(mcp_routes)
         .route(
             PROTECTED_RESOURCE_METADATA_ROOT_PATH,
@@ -276,21 +256,102 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
     )
     .with_graceful_shutdown(controller.signalled());
 
-    // Draining the in-flight requests is the primary durability guarantee here:
-    // the receipt commit actor acknowledges an append only after the batch
-    // reaches WAL, so every acknowledged receipt is already durable once the
-    // request that wrote it finishes. Each session kernel runs behind its own
-    // worker thread reachable only through its message channel, so there is no
-    // in-process handle to flush after the drain.
+    // Once in-flight requests have drained, terminalize every session before
+    // closing a shared hosted owner. Terminalization commits a replay fence,
+    // closes the owned transport so terminal security evidence is persisted,
+    // and only then finalizes the diagnostic tombstone.
     chio_http_serve::run_until_drained(
         server,
         controller.subscribe(),
         hygiene.drain_timeout,
-        async { Ok::<(), String>(()) },
+        async move {
+            let session_result = shutdown_sessions
+                .shutdown_all_active()
+                .await
+                .map_err(|error| error.to_string());
+            let shared_result = shutdown_factory
+                .shutdown_shared_upstream_owner()
+                .map_err(|error| error.to_string());
+            match (session_result, shared_result) {
+                (Ok(()), Ok(())) => Ok(()),
+                (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+                (Err(session_error), Err(shared_error)) => Err(format!(
+                    "session terminalization failed: {session_error}; shared upstream shutdown failed: {shared_error}"
+                )),
+            }
+        },
     )
     .await
     .map(|_outcome| ())
     .map_err(|error| CliError::cli_other_error(format!("remote MCP edge server failed: {error}")))
+}
+
+async fn restore_persisted_sessions(
+    path: &std::path::Path,
+    keyring: &RemoteSessionHmacKeyring,
+    sessions: &RemoteSessionLedger,
+    mut restore: impl FnMut(&RemoteSessionResumeRecord) -> Result<Option<Arc<RemoteSession>>, CliError>,
+) -> Result<(), CliError> {
+    let loaded_records = load_active_session_records(path, keyring)?;
+    for session_id in loaded_records.invalid_session_ids {
+        if let Err(delete_error) = delete_active_session_record(path, &session_id) {
+            warn!(session_id = %session_id, error = %delete_error,
+                "failed to delete malformed persisted MCP session record");
+        }
+    }
+    for record in loaded_records.records {
+        match restore(&record) {
+            Ok(Some(session)) => sessions.insert_active(session).await,
+            Ok(None) => {
+                warn!(session_id = %record.session_id,
+                    "retaining incompatible MCP session without activating it");
+            }
+            Err(error) => {
+                warn!(session_id = %record.session_id, error = %error,
+                    "preserving authenticated MCP session record after failed restoration");
+                // Authentication and decoding succeeded before restoration.
+                // An authority outage or unresolved admission is not proof
+                // that the session is invalid. Refuse startup and retain it
+                // for a later attempt, without serving a partial session set.
+                return Err(error);
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn fail_closed_session_after_persistence_error(
+    state: &RemoteAppState,
+    session: &Arc<RemoteSession>,
+    persistence_error: CliError,
+) -> Response {
+    warn!(
+        session_id = %session.session_id,
+        error = %persistence_error,
+        "terminalizing MCP session after durable resume-state persistence failure"
+    );
+    if let Err(terminalization_error) = state.sessions.mark_closed(session).await {
+        warn!(
+            session_id = %session.session_id,
+            error = %terminalization_error,
+            "failed to persist terminal MCP session state after resume-state persistence failure"
+        );
+        if !session.lifecycle_snapshot().state.is_terminal() {
+            session.mark_closed();
+            state.sessions.remove_active(&session.session_id).await;
+            if let Err(shutdown_error) = session.shutdown_upstream_transport() {
+                warn!(
+                    session_id = %session.session_id,
+                    error = %shutdown_error,
+                    "failed to close MCP upstream after resume-state persistence failure"
+                );
+            }
+        }
+    }
+    plain_http_error(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "failed to persist resumable MCP session safely",
+    )
 }
 
 async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> Response {
@@ -303,10 +364,9 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         .map(|metadata| metadata.resource.as_str())
         .unwrap_or(MCP_ENDPOINT_PATH)
         .to_string();
-    let request_auth_context = match authenticate_session_request(
+    let (request_auth_context, session_credential) = match remote_mcp_session_credentials::authenticate_request(
+        &state,
         request.headers(),
-        &state.auth_mode,
-        state.protected_resource_metadata.as_deref(),
         "POST",
         &expected_target,
     )
@@ -337,6 +397,12 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         }
     };
 
+    if let Some(credential) = session_credential.as_ref() {
+        if let Err(response) = credential.validate_message(&message) {
+            return response;
+        }
+    }
+    let response_method = message.get("method").and_then(Value::as_str).unwrap_or_default().to_owned();
     let is_initialize = is_initialize_request(&message);
     let is_request = message.get("id").is_some() && message.get("method").is_some();
     if is_initialize {
@@ -374,7 +440,10 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
                 if let Err(response) = validate_session_lifecycle(&session) {
                     return response;
                 }
-                session.touch();
+                if let Err(error) = session.touch() {
+                    return fail_closed_session_after_persistence_error(&state, &session, error)
+                        .await;
+                }
                 session
             }
             RemoteSessionEntry::Terminal(record) => {
@@ -388,6 +457,22 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         }
     };
     if !is_request {
+        if session_credential.is_some() {
+            // A cancellation must reach an active call without waiting for its
+            // response stream. It grants no access to unrelated session events.
+            if let Err(response) = remote_mcp_session_credentials::authenticate_request(
+                &state, &headers, "POST", &expected_target,
+            ).await {
+                return response;
+            }
+            if let Err(error) = session.send(message) {
+                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            }
+            return response_with_mode(
+                StatusCode::ACCEPTED.into_response(),
+                "post_notification_accepted",
+            );
+        }
         let mut event_rx = session.subscribe();
         let stream_lock = session.active_request_stream.clone().try_lock_owned().ok();
         if let Err(error) = session.send(message) {
@@ -430,6 +515,33 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     let request_id = message.get("id").cloned().unwrap_or(Value::Null);
     let mut event_rx = session.subscribe();
     let stream_lock = session.active_request_stream.clone().lock_owned().await;
+    // Authority may expire or be revoked while waiting behind another request.
+    if session_credential.is_some() {
+        if let Err(response) = remote_mcp_session_credentials::authenticate_request(
+            &state, &headers, "POST", &expected_target,
+        ).await {
+            return response;
+        }
+    }
+    if response_method == "chio/acknowledge" {
+        if let Some(credential) = session_credential.as_ref() {
+            return match remote_mcp_session_credentials::acknowledge_call(&state, credential, &message) {
+                Ok(response) => Json(response).into_response(),
+                Err(response) => response,
+            };
+        }
+    }
+    let credential_call = if response_method == "tools/call" {
+        if let Some(credential) = session_credential.as_ref() {
+            match remote_mcp_session_credentials::reserve_call(&state, credential, &message) {
+                Ok(remote_mcp_session_credentials::CallReservation::Pending(call)) => Some(call),
+                Ok(remote_mcp_session_credentials::CallReservation::Replay(response)) => {
+                    return Json(response).into_response();
+                }
+                Err(response) => return response,
+            }
+        } else { None }
+    } else { None };
     if let Err(error) = session.send(message) {
         drop(stream_lock);
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
@@ -448,23 +560,34 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         loop {
             match event_rx.recv().await {
                 Ok(event) => {
-                    if is_successful_initialize_response(&event.message, &request_id) {
-                        session_for_stream.set_protocol_version(
-                            event.message
-                                .get("result")
-                                .and_then(|result| result.get("protocolVersion"))
-                                .and_then(Value::as_str)
-                                .map(ToOwned::to_owned),
-                        );
+                    let mut outgoing = event.message.clone();
+                    if is_terminal_response_for_request(&event.message, &request_id) {
+                        if let Some(call) = credential_call.as_ref() {
+                            match remote_mcp_session_credentials::finish_call(&state, call, &event.message) {
+                                Ok(response) => outgoing = response,
+                                Err(_) => {
+                                    // The effect may already exist. Withhold success
+                                    // and leave the durable pending fence in place.
+                                    let failure = json!({"jsonrpc":"2.0","id":request_id,
+                                        "error":{"code":-32603,"message":"credential outcome persistence failed; effect is uncertain"}});
+                                    yield Ok(Event::default().data(failure.to_string()));
+                                    break;
+                                }
+                            }
+                        }
                     }
-
                     let should_emit = should_emit_post_stream_event(
                         &event,
                         Some(&request_id),
                         session_for_stream.has_active_notification_stream(),
                     );
-                    if should_emit {
-                        let data = serde_json::to_string(&event.message).unwrap_or_else(|_| "null".to_string());
+                    if should_emit && (session_credential.is_none()
+                        || is_terminal_response_for_request(&event.message, &request_id)) {
+                        let mut message = outgoing;
+                        if let Some(credential) = session_credential.as_ref() {
+                            credential.restrict_response(&response_method, &mut message);
+                        }
+                        let data = serde_json::to_string(&message).unwrap_or_else(|_| "null".to_string());
                         yield Ok(Event::default().id(event.event_id).data(data));
                     }
                     if is_terminal_response_for_request(&event.message, &request_id) {
@@ -499,6 +622,14 @@ async fn handle_initialize_post(
         );
     }
 
+    let initialize_params = message.get("params").cloned().unwrap_or_else(|| json!({}));
+    let authorization = match chio_mcp_adapter::edge::authorization::negotiate_authorization_capabilities(&initialize_params) {
+        Ok(profile) => profile,
+        Err(error) => return jsonrpc_http_error(StatusCode::BAD_REQUEST, -32602, &error.to_string()),
+    };
+    let mut peer_capabilities = parse_remote_session_peer_capabilities(&initialize_params);
+    peer_capabilities.authorization = Some(authorization);
+
     let session = match state.factory.spawn_session(auth_context) {
         Ok(session) => session,
         Err(error) => {
@@ -507,8 +638,6 @@ async fn handle_initialize_post(
     };
 
     let request_id = message.get("id").cloned().unwrap_or(Value::Null);
-    let initialize_params = message.get("params").cloned().unwrap_or_else(|| json!({}));
-    let peer_capabilities = parse_remote_session_peer_capabilities(&initialize_params);
     let mut event_rx = session.subscribe();
     if let Err(error) = session.send(message) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
@@ -521,7 +650,7 @@ async fn handle_initialize_post(
                 let is_terminal = is_terminal_response_for_request(&event.message, &request_id);
                 let is_success = is_successful_initialize_response(&event.message, &request_id);
                 if is_success {
-                    session.mark_ready(
+                    if let Err(error) = session.mark_ready(
                         event
                             .message
                             .get("result")
@@ -530,7 +659,12 @@ async fn handle_initialize_post(
                             .map(ToOwned::to_owned),
                         initialize_params.clone(),
                         peer_capabilities.clone(),
-                    );
+                    ) {
+                        return fail_closed_session_after_persistence_error(
+                            &state, &session, error,
+                        )
+                        .await;
+                    }
                 }
                 buffered_events.push(event);
 
@@ -667,16 +801,15 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
         .map(|metadata| metadata.resource.as_str())
         .unwrap_or(MCP_ENDPOINT_PATH)
         .to_string();
-    let request_auth_context = match authenticate_session_request(
+    let request_auth_context = match remote_mcp_session_credentials::authenticate_request(
+        &state,
         request.headers(),
-        &state.auth_mode,
-        state.protected_resource_metadata.as_deref(),
         "GET",
         &expected_target,
     )
     .await
     {
-        Ok(auth_context) => auth_context,
+        Ok((auth_context, _)) => auth_context,
         Err(response) => return response,
     };
     if let Err(response) = validate_get_accept_header(request.headers()) {
@@ -707,7 +840,10 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
                 if let Err(response) = validate_session_lifecycle(&session) {
                     return response;
                 }
-                session.touch();
+                if let Err(error) = session.touch() {
+                    return fail_closed_session_after_persistence_error(&state, &session, error)
+                        .await;
+                }
                 session
             }
             RemoteSessionEntry::Terminal(record) => {
@@ -908,16 +1044,15 @@ async fn handle_delete(State(state): State<RemoteAppState>, request: Request) ->
         .map(|metadata| metadata.resource.as_str())
         .unwrap_or(MCP_ENDPOINT_PATH)
         .to_string();
-    let request_auth_context = match authenticate_session_request(
+    let request_auth_context = match remote_mcp_session_credentials::authenticate_request(
+        &state,
         request.headers(),
-        &state.auth_mode,
-        state.protected_resource_metadata.as_deref(),
         "DELETE",
         &expected_target,
     )
     .await
     {
-        Ok(auth_context) => auth_context,
+        Ok((auth_context, _)) => auth_context,
         Err(response) => return response,
     };
 
@@ -1078,6 +1213,7 @@ fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
         .is_some_and(|value| value.get("url").is_some() || value.get("openUrl").is_some());
 
     PeerCapabilities {
+        authorization: None,
         supports_progress: declared_peer_capability(capabilities, "progress"),
         supports_cancellation: declared_peer_capability(capabilities, "cancellation"),
         supports_subscriptions: resources

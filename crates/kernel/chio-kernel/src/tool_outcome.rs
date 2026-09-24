@@ -10,9 +10,11 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::admission_operation::{
-    AdmissionAttachment, AdmissionDigest, AdmissionDispatchCommitBindingV1, AdmissionDispatchState,
-    AdmissionIdentifier, AdmissionOperationCommand, AdmissionOperationId, AdmissionOperationState,
-    AdmissionOperationV1, AdmissionProjectionContext, AdmissionRecoveryLease,
+    claim_qualified_lease, AdmissionAttachment, AdmissionDigest, AdmissionDispatchCommitBindingV1,
+    AdmissionDispatchState, AdmissionIdentifier, AdmissionOperationCommand, AdmissionOperationId,
+    AdmissionOperationState, AdmissionOperationStoreError, AdmissionOperationV1,
+    AdmissionProjectionContext, AdmissionRecoveryLease, ClaimedLease,
+    QualifiedAdmissionOperationStore, RecoveryClaimRequest,
 };
 use crate::dispatch_status::{
     DispatchStatusQuery, QualifiedDispatchStatusProvider, VerifiedProviderNotAccepted,
@@ -22,9 +24,65 @@ use crate::runtime::ToolCallRequest;
 pub const RAW_INVOCATION_OUTCOME_SCHEMA: &str = "chio.raw-invocation-outcome.v1";
 pub const RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA: &str =
     "chio.raw-invocation-outcome-with-request.v1";
+pub const RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA: &str =
+    "chio.raw-invocation-outcome-with-security-context.v1";
+pub const RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA: &str =
+    "chio.raw-invocation-outcome-with-federation-context.v1";
+pub const RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA: &str =
+    "chio.raw-invocation-outcome-with-security-release.v1";
+pub const RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA: &str =
+    "chio.raw-invocation-outcome-with-signing-identity.v1";
+pub const RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA: &str =
+    "chio.raw-invocation-outcome-with-caller-delivery.v1";
+
+mod caller_delivery;
+mod receipt_signing;
+pub use receipt_signing::FrozenReceiptSigningIdentityV1;
 pub const TOOL_OUTCOME_SCHEMA: &str = "chio.tool-outcome.v1";
 pub const POST_RETURN_EVALUATION_SCHEMA: &str = "chio.post-return-evaluation.v1";
 pub const POST_RETURN_EXACT_INPUTS_SCHEMA: &str = "chio.post-return-exact-inputs.v1";
+
+fn validate_security_context_request_binding(
+    request: &ToolCallRequest,
+    security_context: &crate::kernel::SecurityInvocationContext,
+) -> Result<(), ToolOutcomeError> {
+    let context = security_context.as_v1();
+    if context.context_generation() == 0
+        || context.principal_id().as_str() != request.agent_id.as_str()
+    {
+        return Err(ToolOutcomeError::Binding("raw.security_invocation_context"));
+    }
+    let capability_binding = request
+        .capability
+        .security_binding()
+        .map_err(|_| ToolOutcomeError::Binding("raw.security_invocation_context"))?;
+    let lineage_root = capability_binding.as_ref().map_or_else(
+        || {
+            request
+                .capability
+                .delegation_chain
+                .first()
+                .map_or(request.capability.id.as_str(), |link| {
+                    link.capability_id.as_str()
+                })
+        },
+        |binding| binding.lineage_id.as_str(),
+    );
+    if context.lineage_root_id().as_str() != lineage_root {
+        return Err(ToolOutcomeError::Binding("raw.security_invocation_context"));
+    }
+    if let Some(binding) = capability_binding {
+        if binding.tenant_id != context.tenant_id().as_str()
+            || binding.session_id != context.session_id().as_str()
+            || binding.principal_id != context.principal_id().as_str()
+            || binding.isolation_epoch_id != context.isolation_epoch_id().as_str()
+            || binding.context_generation != context.context_generation()
+        {
+            return Err(ToolOutcomeError::Binding("raw.security_invocation_context"));
+        }
+    }
+    Ok(())
+}
 pub const MONETARY_RELEASE_EVIDENCE_SCHEMA: &str = "chio.monetary-release-evidence.v1";
 
 pub const MAX_RAW_INVOCATION_OUTCOME_BYTES: usize = 257 * 1024 * 1024;
@@ -303,7 +361,7 @@ impl InvocationStreamLimitsV1 {
 }
 
 /// The only canonical representation of a returned invocation.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Clone, PartialEq, Serialize)]
 pub struct RawInvocationOutcomeV1 {
     schema: &'static str,
     operation_id: AdmissionOperationId,
@@ -323,9 +381,19 @@ pub struct RawInvocationOutcomeV1 {
     pre_invocation_guard_evidence: Vec<GuardEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     request_canonical_json: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    security_invocation_context: Option<crate::kernel::SecurityInvocationContext>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    federation_context_json: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    security_release_required: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    receipt_signing_identity: Option<FrozenReceiptSigningIdentityV1>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    caller_delivery_evidence: Option<Box<crate::caller_delivery::CallerDeliveryEvidenceV1>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PersistedRawInvocationOutcomeV1 {
     pub schema: String,
@@ -346,6 +414,46 @@ pub struct PersistedRawInvocationOutcomeV1 {
     pub pre_invocation_guard_evidence: Vec<GuardEvidence>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub request_canonical_json: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub security_invocation_context: Option<crate::kernel::SecurityInvocationContext>,
+    /// Private retained evidence, not public receipt metadata or verified authority.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub federation_context_json: Option<String>,
+    /// Frozen before dispatch. Absence in a legacy security-context outcome
+    /// is not evidence that its live lifecycle owner permitted final release.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub security_release_required: Option<bool>,
+    /// Public selection frozen before dispatch, not live signing authority.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_signing_identity: Option<FrozenReceiptSigningIdentityV1>,
+    /// Private signed evidence, authenticated again against original pins when
+    /// qualifying durable native caller release. This is not public metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caller_delivery_evidence: Option<Box<crate::caller_delivery::CallerDeliveryEvidenceV1>>,
+}
+
+// Raw returns can contain credentials, tool output and private treaty evidence.
+// Keep diagnostics useful for correlation without exposing the retained payload.
+impl std::fmt::Debug for RawInvocationOutcomeV1 {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RawInvocationOutcomeV1")
+            .field("schema", &self.schema)
+            .field("operation_id", &self.operation_id)
+            .field("request_id", &self.request_id)
+            .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for PersistedRawInvocationOutcomeV1 {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PersistedRawInvocationOutcomeV1")
+            .field("schema", &self.schema)
+            .field("operation_id", &self.operation_id)
+            .field("request_id", &self.request_id)
+            .finish_non_exhaustive()
+    }
 }
 
 impl RawInvocationOutcomeV1 {
@@ -382,6 +490,7 @@ impl RawInvocationOutcomeV1 {
             receipt_metadata_snapshot,
             pre_invocation_guard_evidence,
             None,
+            None,
         )
     }
 
@@ -401,11 +510,16 @@ impl RawInvocationOutcomeV1 {
         receipt_metadata_snapshot: Option<Value>,
         pre_invocation_guard_evidence: Vec<GuardEvidence>,
         request: &ToolCallRequest,
+        security_invocation_context: Option<crate::kernel::SecurityInvocationContext>,
     ) -> Result<Self, ToolOutcomeError> {
         let request_canonical_json = String::from_utf8(canonical(request)?)
             .map_err(|_| ToolOutcomeError::Invalid("raw.request_canonical_json"))?;
         Self::from_committed_dispatch_parts(
-            RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA,
+            if security_invocation_context.is_some() {
+                RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA
+            } else {
+                RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA
+            },
             operation,
             commit,
             tool_server,
@@ -420,6 +534,7 @@ impl RawInvocationOutcomeV1 {
             receipt_metadata_snapshot,
             pre_invocation_guard_evidence,
             Some(request_canonical_json),
+            security_invocation_context,
         )
     }
 
@@ -440,6 +555,7 @@ impl RawInvocationOutcomeV1 {
         receipt_metadata_snapshot: Option<Value>,
         pre_invocation_guard_evidence: Vec<GuardEvidence>,
         request_canonical_json: Option<String>,
+        security_invocation_context: Option<crate::kernel::SecurityInvocationContext>,
     ) -> Result<Self, ToolOutcomeError> {
         validate_committed_operation(operation, commit)?;
         validate_registered_provider_attempt(operation, &provider_attempt)?;
@@ -461,6 +577,11 @@ impl RawInvocationOutcomeV1 {
             receipt_metadata_snapshot,
             pre_invocation_guard_evidence,
             request_canonical_json,
+            security_invocation_context,
+            federation_context_json: None,
+            security_release_required: None,
+            receipt_signing_identity: None,
+            caller_delivery_evidence: None,
         };
         raw.canonical_blob()?;
         Ok(raw)
@@ -489,27 +610,77 @@ impl RawInvocationOutcomeV1 {
             receipt_metadata_snapshot: self.receipt_metadata_snapshot.clone(),
             pre_invocation_guard_evidence: self.pre_invocation_guard_evidence.clone(),
             request_canonical_json: self.request_canonical_json.clone(),
+            security_invocation_context: self.security_invocation_context.clone(),
+            federation_context_json: self.federation_context_json.clone(),
+            security_release_required: self.security_release_required,
+            receipt_signing_identity: self.receipt_signing_identity.clone(),
+            caller_delivery_evidence: self.caller_delivery_evidence.clone(),
         }
     }
 
     pub fn from_persisted(
         value: PersistedRawInvocationOutcomeV1,
     ) -> Result<Self, ToolOutcomeError> {
+        let caller_schema = value.schema == RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA;
+        if caller_schema != value.caller_delivery_evidence.is_some() {
+            return Err(ToolOutcomeError::Invalid("raw.caller_delivery_schema"));
+        }
         let schema = match (
-            value.schema.as_str(),
+            if caller_schema {
+                RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA
+            } else {
+                value.schema.as_str()
+            },
             value.request_canonical_json.is_some(),
+            value.security_invocation_context.is_some(),
+            value.federation_context_json.is_some(),
+            value.security_release_required.is_some(),
+            value.receipt_signing_identity.is_some(),
         ) {
-            (RAW_INVOCATION_OUTCOME_SCHEMA, false) => RAW_INVOCATION_OUTCOME_SCHEMA,
-            (RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA, true) => {
+            (RAW_INVOCATION_OUTCOME_SCHEMA, false, false, false, false, false) => {
+                RAW_INVOCATION_OUTCOME_SCHEMA
+            }
+            (RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA, true, false, false, false, false) => {
                 RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA
             }
+            (
+                RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA,
+                true,
+                true,
+                false,
+                false,
+                false,
+            ) => RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA,
+            (
+                RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA,
+                true,
+                _,
+                true,
+                false,
+                false,
+            ) => RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA,
+            (RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA, true, true, _, true, false) => {
+                RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA
+            }
+            (
+                RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA,
+                true,
+                security,
+                _,
+                release,
+                true,
+            ) if security == release => RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA,
             _ => return Err(ToolOutcomeError::Invalid("raw.schema")),
         };
         if value.request_canonical_json.as_deref() == Some("") {
             return Err(ToolOutcomeError::Invalid("raw.schema"));
         }
         let raw = Self {
-            schema,
+            schema: if caller_schema {
+                RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA
+            } else {
+                schema
+            },
             operation_id: value.operation_id,
             request_id: value.request_id,
             dispatch_operation_version: value.dispatch_operation_version,
@@ -526,6 +697,11 @@ impl RawInvocationOutcomeV1 {
             receipt_metadata_snapshot: value.receipt_metadata_snapshot,
             pre_invocation_guard_evidence: value.pre_invocation_guard_evidence,
             request_canonical_json: value.request_canonical_json,
+            security_invocation_context: value.security_invocation_context,
+            federation_context_json: value.federation_context_json,
+            security_release_required: value.security_release_required,
+            receipt_signing_identity: value.receipt_signing_identity,
+            caller_delivery_evidence: value.caller_delivery_evidence,
         };
         raw.canonical_blob()?;
         Ok(raw)
@@ -552,6 +728,24 @@ impl RawInvocationOutcomeV1 {
         &self,
         maximum: usize,
     ) -> Result<CanonicalInvocationBlobV1, ToolOutcomeError> {
+        match (&self.receipt_signing_identity, self.schema) {
+            (
+                Some(identity),
+                RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA
+                | RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA,
+            ) if self.request_canonical_json.is_some() => {
+                identity.validate()?;
+                self.requires_security_release()?;
+            }
+            (None, schema)
+                if !matches!(
+                    schema,
+                    RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA
+                        | RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA
+                ) => {}
+            _ => return Err(ToolOutcomeError::Invalid("raw.receipt_signing_schema")),
+        }
+        self.validate_caller_delivery_evidence()?;
         positive(
             "raw.dispatch_operation_version",
             self.dispatch_operation_version,
@@ -584,6 +778,24 @@ impl RawInvocationOutcomeV1 {
                 || request.tool_name != self.tool_name.as_str()
             {
                 return Err(ToolOutcomeError::Binding("raw.request"));
+            }
+            if let Some(security_context) = self.security_invocation_context.as_ref() {
+                validate_security_context_request_binding(&request, security_context)?;
+            }
+            if self.federation_context_json.is_some()
+                && request.federated_origin_kernel_id.is_none()
+            {
+                return Err(ToolOutcomeError::Binding("raw.federation_context"));
+            }
+        }
+        if let Some(context) = &self.federation_context_json {
+            if context.is_empty() || context.len() > MAX_EVIDENCE_ARTIFACT_BYTES {
+                return Err(ToolOutcomeError::Invalid("raw.federation_context"));
+            }
+            let value: Value = serde_json::from_str(context)
+                .map_err(|_| ToolOutcomeError::Invalid("raw.federation_context"))?;
+            if !value.is_object() || canonical(&value)? != context.as_bytes() {
+                return Err(ToolOutcomeError::Invalid("raw.federation_context"));
             }
         }
         CanonicalInvocationBlobV1::new(bounded("raw_invocation_outcome", self, maximum)?)
@@ -626,6 +838,64 @@ impl RawInvocationOutcomeV1 {
                     .map_err(|_| ToolOutcomeError::Invalid("raw.request_canonical_json"))
             })
             .transpose()
+    }
+
+    pub(crate) fn security_invocation_context(
+        &self,
+    ) -> Option<&crate::kernel::SecurityInvocationContext> {
+        self.security_invocation_context.as_ref()
+    }
+
+    pub(crate) fn with_federation_context_json(
+        mut self,
+        context: Option<String>,
+    ) -> Result<Self, ToolOutcomeError> {
+        if context.is_some() {
+            if self.request_canonical_json.is_none() {
+                return Err(ToolOutcomeError::Binding("raw.federation_context"));
+            }
+            if self.security_release_required.is_none() && self.receipt_signing_identity.is_none() {
+                self.schema = RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA;
+            }
+            self.federation_context_json = context;
+            self.canonical_blob()?;
+        }
+        Ok(self)
+    }
+
+    pub(crate) fn federation_context_json(&self) -> Option<&str> {
+        self.federation_context_json.as_deref()
+    }
+
+    pub(crate) fn with_security_release_requirement(
+        mut self,
+        required: bool,
+    ) -> Result<Self, ToolOutcomeError> {
+        if self.security_invocation_context.is_some() {
+            if self.receipt_signing_identity.is_none() {
+                self.schema = RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA;
+            }
+            self.security_release_required = Some(required);
+            self.canonical_blob()?;
+        } else if required {
+            return Err(ToolOutcomeError::Binding("raw.security_release_context"));
+        }
+        Ok(self)
+    }
+
+    /// Retained requirement data, not release authority. A legacy outcome with
+    /// security context has no qualified lifecycle disposition and must reject.
+    pub fn requires_security_release(&self) -> Result<bool, ToolOutcomeError> {
+        match (
+            self.security_invocation_context.is_some(),
+            self.security_release_required,
+        ) {
+            (false, None) => Ok(false),
+            (true, Some(required)) => Ok(required),
+            _ => Err(ToolOutcomeError::Binding(
+                "raw.security_release_requirement",
+            )),
+        }
     }
 }
 
@@ -1263,6 +1533,8 @@ impl ToolOutcomeTransitionV1 {
 
 mod post_return;
 pub use post_return::*;
+mod security_release;
+pub use security_release::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum ToolOutcomeInsertResultV1 {
@@ -1319,6 +1591,41 @@ pub enum ToolOutcomeStoreError {
 
 /// Storage boundary for insert-once return recording and atomic finalization.
 pub trait ToolOutcomeStore: Send + Sync {
+    /// Check the configured backend before a lifecycle-bearing dispatch is
+    /// committed. This readiness check is not release or execution authority.
+    fn require_security_release_checkpoint_support(&self) -> Result<(), ToolOutcomeStoreError> {
+        Err(ToolOutcomeStoreError::Unavailable(
+            "durable security release checkpoints are unsupported".into(),
+        ))
+    }
+
+    /// Persist an acknowledged live release in the exact finalizing operation's
+    /// fenced participant journal. Decoded record data cannot call this port.
+    /// The callback runs outside the kernel mutation sequencer. Implementations
+    /// must revalidate the original recovery lease, current serving owner and
+    /// exact outcome/evaluation in this write transaction, using a fresh trusted
+    /// clock. A successful callback cannot renew an expired or replaced lease.
+    fn record_security_release(
+        &self,
+        _release: &AcknowledgedSecurityReleaseV1,
+        _recovery_lease: &AdmissionRecoveryLease,
+    ) -> Result<SecurityReleaseRecordV1, ToolOutcomeStoreError> {
+        Err(ToolOutcomeStoreError::Unavailable(
+            "durable security release checkpoints are unsupported".into(),
+        ))
+    }
+
+    /// Return exact checkpoint data from the qualified outcome authority, not a
+    /// newly acquired lifecycle owner or permission for another dispatch.
+    fn lookup_security_release(
+        &self,
+        _operation_id: &AdmissionOperationId,
+    ) -> Result<Option<SecurityReleaseRecordV1>, ToolOutcomeStoreError> {
+        Err(ToolOutcomeStoreError::Unavailable(
+            "durable security release checkpoints are unsupported".into(),
+        ))
+    }
+
     fn record_tool_returned(
         &self,
         operation: &AdmissionOperationV1,
@@ -1377,10 +1684,131 @@ pub trait ToolOutcomeStore: Send + Sync {
         trusted_now_unix_ms: u64,
     ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError>;
 
+    /// Persist an already-computed suffix of pure results and the matching
+    /// terminal pair. Every step retains its ordinary successor validation
+    /// and journal entry. Stores may commit the sequence in one transaction;
+    /// this default retains each step before atomically finalizing the pair.
+    /// A failed default call can therefore leave a recoverable pure prefix.
+    /// External stateful steps must use their existing recording boundary.
+    #[allow(clippy::too_many_arguments)]
+    fn finalize_post_return_with_pure_results(
+        &self,
+        operation_id: &AdmissionOperationId,
+        expected_evaluation_version: u64,
+        pure_result_digests: &[AdmissionDigest],
+        recovery_lease: &AdmissionRecoveryLease,
+        terminal_evaluation: &PostReturnEvaluationRecordV1,
+        expected_outcome_version: u64,
+        terminal_outcome: &ToolOutcomeRecordV1,
+        resolved_output: Option<&CanonicalResolvedOutputBlobV1>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
+        let mut version = expected_evaluation_version;
+        if !pure_result_digests.is_empty() {
+            let mut current = self
+                .lookup_post_return_evaluation(operation_id)?
+                .ok_or(ToolOutcomeStoreError::NotFound)?;
+            if current.version() != version {
+                return Err(ToolOutcomeStoreError::CasConflict);
+            }
+            for digest in pure_result_digests {
+                let next = current
+                    .record_next_pure_result(digest.clone())
+                    .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?;
+                current = self.stage_post_return_evaluation(
+                    operation_id,
+                    version,
+                    recovery_lease,
+                    &next,
+                    active_fence,
+                    trusted_now_unix_ms,
+                )?;
+                version = current.version();
+            }
+        }
+        self.finalize_post_return(
+            operation_id,
+            version,
+            recovery_lease,
+            terminal_evaluation,
+            expected_outcome_version,
+            terminal_outcome,
+            resolved_output,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
     fn load_resolved_output_by_operation(
         &self,
         operation_id: &AdmissionOperationId,
     ) -> Result<Option<CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError>;
+
+    /// Claim recovery of `operation` and record its returned outcome in the
+    /// joint transaction that binds the outcome to the operation. A store
+    /// that fuses both writes makes them one durable write and rolls the
+    /// claim back with a refused or conflicting record; this default persists
+    /// and qualifies the claim through `admission` first.
+    #[allow(clippy::too_many_arguments)]
+    fn claim_and_record_tool_returned(
+        &self,
+        admission: &dyn QualifiedAdmissionOperationStore,
+        claim: RecoveryClaimRequest<'_>,
+        lease: &mut ClaimedLease<'_>,
+        operation: &AdmissionOperationV1,
+        blob: &CanonicalInvocationBlobV1,
+        record: &ToolOutcomeRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<ToolOutcomeInsertResultV1, ToolOutcomeStoreError> {
+        let lease = claim_qualified_lease(admission, claim, trusted_now_unix_ms, lease)
+            .map_err(claimed_outcome_error)?;
+        self.record_tool_returned(
+            operation,
+            &lease,
+            blob,
+            record,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    /// Claim recovery of the evaluated operation and begin its post-return
+    /// evaluation in one joint transaction, returning the lease the later
+    /// stages apply under; see [`Self::claim_and_record_tool_returned`].
+    fn claim_and_begin_post_return_evaluation(
+        &self,
+        admission: &dyn QualifiedAdmissionOperationStore,
+        claim: RecoveryClaimRequest<'_>,
+        lease: &mut ClaimedLease<'_>,
+        record: &PostReturnEvaluationRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(PostReturnEvaluationRecordV1, AdmissionRecoveryLease), ToolOutcomeStoreError> {
+        let lease = claim_qualified_lease(admission, claim, trusted_now_unix_ms, lease)
+            .map_err(claimed_outcome_error)?;
+        let evaluation =
+            self.begin_post_return_evaluation(&lease, record, active_fence, trusted_now_unix_ms)?;
+        Ok((evaluation, lease))
+    }
+}
+
+fn claimed_outcome_error(error: AdmissionOperationStoreError) -> ToolOutcomeStoreError {
+    match error {
+        AdmissionOperationStoreError::Unavailable(detail) => {
+            ToolOutcomeStoreError::Unavailable(detail)
+        }
+        AdmissionOperationStoreError::Fenced => ToolOutcomeStoreError::Fenced,
+        AdmissionOperationStoreError::NotFound => ToolOutcomeStoreError::NotFound,
+        AdmissionOperationStoreError::Invariant(detail) => ToolOutcomeStoreError::Invariant(detail),
+        AdmissionOperationStoreError::OutcomeUnknown(detail) => ToolOutcomeStoreError::Unavailable(
+            format!("recovery claim durable outcome is unknown: {detail}"),
+        ),
+        AdmissionOperationStoreError::Operation(error) => {
+            ToolOutcomeStoreError::Invariant(error.to_string())
+        }
+    }
 }
 
 /// Explicit trust boundary for stores that atomically bind a returned tool

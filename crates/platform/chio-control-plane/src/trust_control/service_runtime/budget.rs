@@ -4,6 +4,8 @@ use super::*;
 
 #[path = "budget/lifecycle.rs"]
 mod lifecycle;
+#[path = "budget/recovery.rs"]
+mod recovery;
 #[path = "budget/structured.rs"]
 mod structured;
 
@@ -24,8 +26,11 @@ pub fn build_remote_budget_store(
 pub(crate) fn build_shared_remote_budget_store(
     control_url: &str,
     control_token: &str,
+    recovery_fence: chio_kernel::admission_operation::StoreMutationFence,
 ) -> Result<Arc<RemoteBudgetStore>, CliError> {
-    remote_budget_store(control_url, control_token).map(Arc::new)
+    let mut store = remote_budget_store(control_url, control_token)?;
+    store.recovery_fence = Some(recovery_fence);
+    Ok(Arc::new(store))
 }
 
 fn remote_budget_store(
@@ -34,6 +39,7 @@ fn remote_budget_store(
 ) -> Result<RemoteBudgetStore, CliError> {
     Ok(RemoteBudgetStore {
         client: build_client(control_url, control_token)?,
+        recovery_fence: None,
         cached_usage: Mutex::new(HashMap::new()),
     })
 }
@@ -155,6 +161,13 @@ fn reject_unsupported_remote_hard_authority(
 }
 
 impl BudgetStore for RemoteBudgetStore {
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<Option<chio_kernel::budget_store::BudgetHoldSnapshot>, BudgetStoreError> {
+        self.load_retained_budget_hold(hold_id)
+    }
+
     fn budget_guarantee_level(&self) -> BudgetGuaranteeLevel {
         BudgetGuaranteeLevel::AdvisoryPosthoc
     }

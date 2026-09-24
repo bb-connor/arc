@@ -1,4 +1,6 @@
 use std::fs::{self, File, OpenOptions};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Barrier};
 
@@ -27,25 +29,6 @@ fn fixture() -> (TempDir, PathBuf, PathBuf) {
     let lock_root = temp.path().join("locks");
     create_lock_root(&lock_root);
     (temp, database, lock_root)
-}
-
-#[test]
-fn live_store_verifies_the_configured_database_identity() {
-    let (temp, database, lock_root) = fixture();
-    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
-    let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open serving");
-
-    authority
-        .verify_database_path(&database)
-        .expect("configured database matches the serving owner");
-
-    let foreign = temp.path().join("foreign.db");
-    File::create(&foreign).expect("create foreign database path");
-    assert!(matches!(
-        authority.verify_database_path(&foreign),
-        Err(SqliteServingOwnerError::Invalid(_))
-    ));
 }
 
 /// Tightens a fixture directory to owner-only access. Both `tempfile::tempdir` and
@@ -2292,7 +2275,7 @@ fn concurrent_provisioning_creates_one_owner_and_one_lock() {
 mod challenge_projection;
 #[path = "tests/provisioning.rs"]
 mod provisioning;
+#[path = "tests/relocation.rs"]
+mod relocation;
 #[path = "tests/scoped_identity.rs"]
 mod scoped_identity;
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;

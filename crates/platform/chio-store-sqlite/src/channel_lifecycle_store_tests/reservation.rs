@@ -912,10 +912,12 @@ fn finalize_after_expiry(
 #[test]
 fn anchored_reservation_finalizes_after_expiry_under_a_new_serving_owner() -> TestResult {
     let _runtime =
-        chio_kernel::scope_fixed_runtime_for_current_thread(2, std::iter::empty::<String>());
+        chio_kernel::scope_fixed_runtime_for_current_thread(1, std::iter::empty::<String>());
     let fixture = fixture()?;
     let flow = reservation_flow(&fixture.fence, "post-expiry-finalize")?;
     let operation = stage_and_anchor(&fixture, &flow)?;
+    let _later =
+        chio_kernel::scope_fixed_runtime_for_current_thread(2, std::iter::empty::<String>());
     let historical_fence = fixture.fence.clone();
     let Fixture {
         _temp,
@@ -978,7 +980,7 @@ fn anchored_reservation_finalizes_after_expiry_under_a_new_serving_owner() -> Te
 #[test]
 fn live_replay_rejects_a_store_qualified_same_fence_claim_for_another_operation() -> TestResult {
     let _runtime =
-        chio_kernel::scope_fixed_runtime_for_current_thread(2, std::iter::empty::<String>());
+        chio_kernel::scope_fixed_runtime_for_current_thread(1, std::iter::empty::<String>());
     let fixture = fixture()?;
     let flow = reservation_flow(&fixture.fence, "live-replay-authority")?;
     let live = finalize_after_expiry(&fixture, &flow)?;

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "broker-orphan-hold-001",
+  "class": "broker_orphan_hold",
+  "expected_verdict": "DENY",
+  "expected_reason": "broker_orphan_hold_detected",
+  "threat_id": "resource_exhaustion_dos",
+  "pending": true,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "compensated_release_outbox_control",
+        "package": "chio-store-sqlite",
+        "test_source": "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs",
+        "target_kind": "lib",
+        "test_name": "budget_store::tests::composite_lifecycle::composite_release_and_reverse_restore_durable_reservations"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "broker_orphan_hold",
+        "control_id": "compensated_release_outbox_control",
+        "package": "chio-store-sqlite",
+        "source": "crates/platform/chio-store-sqlite/src/budget_store/composite/transitions/terminal.rs",
+        "function": "SqliteBudgetStore::reverse_composite_hold",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "==",
+          "replacement": "!=",
+          "occurrence": 1
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/broker_orphan_hold/mutants.out/outcomes.json"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage.",
+    "Quota authorization, capture and compensation now belong to the original composite SQLite authority. This case exercises that owner and its existing restart and accounting assertions."
+  ]
+}

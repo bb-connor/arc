@@ -882,6 +882,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         }
     }
 
@@ -1157,6 +1158,7 @@ mod tests {
                     guard_evidence: &[],
                     payee_binding: None,
                     recovery: Some(&verified),
+                    security_context: None,
                 },
             )
             .expect_err("ordinary recovery must require a durable terminal projection");

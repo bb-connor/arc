@@ -75,6 +75,7 @@ fn sample_invocation() -> ToolInvocation {
             },
             received_at: SystemTime::UNIX_EPOCH + Duration::from_millis(1_745_452_800_000),
         },
+        bridge_security: None,
     }
 }
 
@@ -148,6 +149,7 @@ fn arb_tool_invocation() -> impl Strategy<Value = ToolInvocation> {
                 tool_name,
                 arguments,
                 provenance,
+                bridge_security: None,
             },
         )
 }
