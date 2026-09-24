@@ -141,11 +141,11 @@ cat >"$fake_bin/cargo" <<'EOF'
 set -euo pipefail
 args=" $* "
 if [[ "$args" == *" build "* ]] && [[ "$args" == *" --bin chio-cage-init "* ]]; then
-  [[ "$args" == *" --target x86_64-unknown-linux-gnu "* ]] || {
+  [[ "$args" == *" --target x86_64-unknown-linux-musl "* ]] || {
     echo "static helper requires an explicit target to isolate host procedural macros" >&2
     exit 1
   }
-  helper="${CARGO_TARGET_DIR:?}/x86_64-unknown-linux-gnu/debug/chio-cage-init"
+  helper="${CARGO_TARGET_DIR:?}/x86_64-unknown-linux-musl/debug/chio-cage-init"
   mkdir -p "$(dirname "$helper")"
   printf '#!/bin/true\n' >"$helper"
   chmod 700 "$helper"
@@ -292,6 +292,7 @@ if [[ "$args" == *" --all-targets "* ]] ||
       runtime_file_rebound_to_forbidden_descriptor_fails_closed
       script_target_is_rejected_before_launch
       target_argv_is_bounded_and_bound_into_the_plan_digest
+      zero_initialized_tls_does_not_bind_an_unused_file_offset
     )
     print_target "Running unittests src/lib.rs (/tmp/chio_cage-lib)" "${lib_tests[@]}"
     print_target "Running unittests src/bin/chio-cage-init.rs (/tmp/chio_cage_init-bin)"
@@ -380,7 +381,7 @@ if [[ "$status" -ne 0 ]]; then
   cat "$work/1-success.out" >&2
   exit "$status"
 fi
-grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=69 probes=26 mutations=10$' \
+grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=70 probes=26 mutations=10$' \
   "$work/1-success.out"
 
 python3 scripts/tests/check-cage-all-target-inventory.test.py
