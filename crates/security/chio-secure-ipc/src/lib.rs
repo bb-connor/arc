@@ -19,6 +19,8 @@ use std::os::unix::net::{UnixListener, UnixStream};
 
 use serde::{Deserialize, Serialize};
 
+pub mod credentials;
+
 pub const MAX_UNIX_SOCKET_PATH_BYTES: usize = 100;
 pub const MAX_INHERITED_DESCRIPTOR: u32 = 65_535;
 pub const DEFAULT_MAX_FRAME_BYTES: usize = 1_048_576;
@@ -416,7 +418,11 @@ impl InheritedSecretFile {
             })?;
             if !metadata.file_type().is_file()
                 || metadata.uid() != expected_uid
-                || metadata.nlink() != 1
+                || (metadata.nlink() != 1
+                    && !(metadata.nlink() == 0
+                        && credentials::is_sealed_credential(&self.file).map_err(|error| {
+                            SecureIpcError::Io(format!("{label} descriptor seals failed: {error}"))
+                        })?))
                 || metadata.permissions().mode() & 0o077 != 0
             {
                 return Err(SecureIpcError::Custody(format!(

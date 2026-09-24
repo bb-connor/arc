@@ -82,6 +82,7 @@ chio-security-types = { workspace = true }
 chio-security-kernel = { workspace = true }
 chio-flow = { workspace = true }
 chio-secret-broker = { workspace = true, features = ["native-mcp"] }
+chio-secure-ipc = { workspace = true }
 chio-store-sqlite = { workspace = true }
 chio-tee-frame = { workspace = true }
 chio-tool-call-fabric = { workspace = true }

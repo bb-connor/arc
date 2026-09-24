@@ -25,6 +25,7 @@ chio-kernel = { workspace = true }
 chio-mcp-adapter = { workspace = true }
 chio-manifest = { workspace = true }
 chio-metrics-spec = { workspace = true }
+chio-secure-ipc = { workspace = true }
 chio-store-sqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

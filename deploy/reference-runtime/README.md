@@ -75,9 +75,13 @@ baseline is present, and the keylog example configs agree with the units.
 
    Use the socket paths from the provisioned daemon configurations and declare
    these credential names with `LoadCredential=` in the operator's units. Each
-   file must be private, singly linked and owned by the service user. Binary
-   bytes, including trailing newlines, are transferred unchanged. Descriptor
-   delivery supports supervised launch; it is incompatible with `--exec`.
+   file must be private, singly linked and owned by the service user, or a
+   root-owned credential on systemd's read-only memory filesystem whose ACL
+   grants read access only to that service user. Group-readable ordinary files
+   remain invalid. On Linux the supervisor copies binary credentials into
+   service-owned, sealed memory files and transfers read-only descriptors.
+   Binary bytes, including trailing newlines, are transferred unchanged.
+   Descriptor delivery supports supervised launch; it is incompatible with `--exec`.
 
    The packaged `chio-secret-broker.service` supplies these bindings. Before
    enabling it, provision the canonical broker configuration and enterprise
@@ -113,6 +117,7 @@ baseline is present, and the keylog example configs agree with the units.
 2. Create the accounts and directories, then install the units.
 
    ```bash
+   install -d -m 0755 /etc/sysusers.d /etc/tmpfiles.d
    install -m 0644 deploy/reference-runtime/sysusers.d/chio.conf /etc/sysusers.d/chio.conf
    install -m 0644 deploy/reference-runtime/tmpfiles.d/chio.conf /etc/tmpfiles.d/chio.conf
    systemd-sysusers chio.conf
@@ -120,6 +125,13 @@ baseline is present, and the keylog example configs agree with the units.
    install -m 0644 deploy/reference-runtime/systemd/*.service /etc/systemd/system/
    systemctl daemon-reload
    ```
+
+   The units leave `RestrictSUIDSGID` disabled because its syscall filter also
+   blocks `openat2`, which the confinement boundary requires. They retain
+   dedicated unprivileged accounts, empty capability sets, `NoNewPrivileges`,
+   a read-only system filesystem and private writable state. Do not substitute
+   weaker path resolution or disable the enforcement preflight to work around
+   that filter.
 
 3. Create the credentials as root under `/etc/chio/credentials` (mode 0600).
    The manager reads them and exposes each one to its service alone. Every

@@ -157,7 +157,7 @@ pub fn load_credential(directory: &Path, name: &str) -> Result<String, Credentia
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC);
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK);
     }
     let mut file = options
         .open(&path)
@@ -170,8 +170,14 @@ pub fn load_credential(directory: &Path, name: &str) -> Result<String, Credentia
     }
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        if metadata.permissions().mode() & 0o077 != 0 {
+        use std::os::unix::fs::MetadataExt;
+        // SAFETY: geteuid only returns the calling process identity.
+        let uid = unsafe { libc::geteuid() };
+        if metadata.nlink() != 1
+            || (metadata.uid() != uid || metadata.mode() & 0o077 != 0)
+                && !chio_secure_ipc::credentials::is_systemd_credential(&file, uid)
+                    .map_err(|error| unreadable(error.to_string()))?
+        {
             return Err(CredentialError::Exposed(name.to_string()));
         }
     }
@@ -320,8 +326,11 @@ mod tests {
             Err(CredentialError::Exposed("exposed".to_string()))
         );
         write_credential(directory.path(), "target", b"token", 0o600);
-        std::os::unix::fs::symlink(directory.path().join("target"), directory.path().join("link"))
-            .unwrap_or_else(|error| panic!("{error}"));
+        std::os::unix::fs::symlink(
+            directory.path().join("target"),
+            directory.path().join("link"),
+        )
+        .unwrap_or_else(|error| panic!("{error}"));
         assert!(matches!(
             load_credential(directory.path(), "link"),
             Err(CredentialError::Unreadable { .. })
@@ -367,7 +376,8 @@ mod tests {
         );
         assert_eq!(load_bindings(None, &[], |_| false), Ok(Vec::new()));
         assert_eq!(
-            load_bindings(Some(directory.path()), &bindings, |variable| variable == "CHIO_ADMIN_TOKEN"),
+            load_bindings(Some(directory.path()), &bindings, |variable| variable
+                == "CHIO_ADMIN_TOKEN"),
             Err(CredentialError::Shadows("CHIO_ADMIN_TOKEN".to_string()))
         );
         let duplicated = [

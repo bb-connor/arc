@@ -53,7 +53,9 @@ ProtectProc=invisible
 RestrictAddressFamilies=AF_UNIX
 RestrictNamespaces=true
 RestrictRealtime=true
-RestrictSUIDSGID=true
+# Keep descriptor-bound openat2 resolution available. The service remains
+# unprivileged with NoNewPrivileges and an empty capability set.
+RestrictSUIDSGID=false
 LockPersonality=true
 MemoryDenyWriteExecute=true
 SystemCallArchitectures=native

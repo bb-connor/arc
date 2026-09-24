@@ -50,7 +50,8 @@ const HARDENING_BASELINE: [(&str, &str); 24] = [
     ("ProtectControlGroups", "true"),
     ("RestrictNamespaces", "true"),
     ("RestrictRealtime", "true"),
-    ("RestrictSUIDSGID", "true"),
+    // systemd's set-id filter blocks openat2, which the cage requires.
+    ("RestrictSUIDSGID", "false"),
     ("LockPersonality", "true"),
     ("SystemCallArchitectures", "native"),
     ("CapabilityBoundingSet", ""),

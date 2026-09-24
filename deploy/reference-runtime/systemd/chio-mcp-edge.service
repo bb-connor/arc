@@ -106,7 +106,9 @@ ProtectProc=invisible
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictNamespaces=true
 RestrictRealtime=true
-RestrictSUIDSGID=true
+# openat2 is required for descriptor-bound cage resolution. This systemd
+# filter blocks it; NoNewPrivileges and empty capabilities prevent elevation.
+RestrictSUIDSGID=false
 LockPersonality=true
 SystemCallArchitectures=native
 CapabilityBoundingSet=

@@ -92,11 +92,24 @@ pub fn load_key_log_policy(path: impl AsRef<Path>) -> Result<KeyLogPolicy> {
 
 pub fn load_witness_seed_backend(path: impl AsRef<Path>) -> Result<Ed25519Backend> {
     let path = path.as_ref();
-    let (mut bytes, metadata) = read_bounded_regular_file(path, 32)?;
+    let ordinary = read_bounded_regular_file(path, 32);
+    #[cfg(target_os = "linux")]
+    let (mut bytes, metadata, managed) = match ordinary {
+        Ok((bytes, metadata)) => (bytes, metadata, false),
+        Err(original) => match read_systemd_seed(path) {
+            Ok((bytes, metadata)) => (bytes, metadata, true),
+            Err(_) => return Err(original),
+        },
+    };
+    #[cfg(not(target_os = "linux"))]
+    let (mut bytes, metadata, managed) = {
+        let (bytes, metadata) = ordinary?;
+        (bytes, metadata, false)
+    };
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
-        if metadata.mode() & 0o077 != 0 || metadata.nlink() != 1 {
+        if !managed && (metadata.mode() & 0o077 != 0 || metadata.nlink() != 1) {
             return Err(KeyringError::StateInvariant(
                 "witness seed must have mode 0600 or stricter and one hard link",
             ));
@@ -114,6 +127,43 @@ pub fn load_witness_seed_backend(path: impl AsRef<Path>) -> Result<Ed25519Backen
     let keypair = Keypair::from_seed(&seed);
     seed.fill(0);
     Ok(Ed25519Backend::new(keypair))
+}
+
+#[cfg(target_os = "linux")]
+fn read_systemd_seed(path: &Path) -> Result<(Vec<u8>, Metadata)> {
+    use rustix::fs::{open, Mode, OFlags};
+    use std::io::Read;
+
+    if !path.is_absolute() {
+        return Err(KeyringError::StateInvariant(
+            "credential path must be absolute",
+        ));
+    }
+    let mut file = std::fs::File::from(
+        open(
+            path,
+            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::NONBLOCK,
+            Mode::empty(),
+        )
+        .map_err(std::io::Error::from)?,
+    );
+    if !chio_secure_ipc::credentials::is_systemd_credential(
+        &file,
+        rustix::process::geteuid().as_raw(),
+    )? {
+        return Err(KeyringError::StateInvariant(
+            "invalid systemd credential custody",
+        ));
+    }
+    let metadata = file.metadata()?;
+    if metadata.len() != 32 {
+        return Err(KeyringError::StateInvariant(
+            "witness seed must contain exactly 32 bytes",
+        ));
+    }
+    let mut bytes = Vec::with_capacity(32);
+    file.by_ref().take(33).read_to_end(&mut bytes)?;
+    Ok((bytes, metadata))
 }
 
 pub(crate) fn read_bounded_regular_file(

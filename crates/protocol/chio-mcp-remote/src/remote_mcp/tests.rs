@@ -704,6 +704,13 @@ mod tests {
             .expect("configured keyring");
         assert_eq!(loaded.current.key_id, "current");
         assert_eq!(loaded.previous.len(), 1);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o440))
+                .expect("set ordinary keyring group-readable");
+            assert!(load_resume_hmac_keyring(&config).is_err());
+        }
         std::fs::remove_file(path).expect("remove test keyring");
     }
 

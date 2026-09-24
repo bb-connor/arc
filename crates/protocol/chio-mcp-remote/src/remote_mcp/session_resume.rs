@@ -502,7 +502,7 @@ fn read_resume_hmac_keyring_file(path: &FsPath) -> Result<Zeroizing<Vec<u8>>, Cl
 
     let descriptor = rustix::fs::open(
         path,
-        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
+        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
         Mode::empty(),
     )
     .map_err(|error| {
@@ -530,13 +530,22 @@ fn read_resume_hmac_keyring_file(path: &FsPath) -> Result<Zeroizing<Vec<u8>>, Cl
             path.display()
         )));
     }
-    if metadata.permissions().mode() & 0o077 != 0 {
+    let effective_uid = rustix::process::geteuid().as_raw();
+    if metadata.permissions().mode() & 0o077 != 0
+        && !chio_secure_ipc::credentials::is_systemd_credential(&file, effective_uid).map_err(
+            |error| {
+                CliError::cli_other_error(format!(
+                    "inspect remote MCP resume HMAC credential custody {}: {error}",
+                    path.display()
+                ))
+            },
+        )?
+    {
         return Err(CliError::cli_other_error(format!(
             "remote MCP resume HMAC keyring {} must not be group- or world-accessible",
             path.display()
         )));
     }
-    let effective_uid = rustix::process::geteuid().as_raw();
     if !resume_hmac_keyring_owner_is_trusted(metadata.uid(), effective_uid) {
         return Err(CliError::cli_other_error(format!(
             "remote MCP resume HMAC keyring {} must be owned by effective UID {} or root",

@@ -80,14 +80,18 @@ mod unix {
                     .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK)
                     .open(directory.join(&binding.name))
                     .map_err(|error| unreadable(error.to_string()))?;
-                let metadata = file.metadata().map_err(|error| unreadable(error.to_string()))?;
+                let metadata = file
+                    .metadata()
+                    .map_err(|error| unreadable(error.to_string()))?;
                 if !metadata.is_file() {
                     return Err(CredentialError::NotARegularFile(binding.name.clone()));
                 }
                 // SAFETY: geteuid reads process identity and has no arguments.
-                if metadata.uid() != unsafe { libc::geteuid() }
-                    || metadata.nlink() != 1
-                    || metadata.mode() & 0o077 != 0
+                let uid = unsafe { libc::geteuid() };
+                if metadata.nlink() != 1
+                    || (metadata.uid() != uid || metadata.mode() & 0o077 != 0)
+                        && !chio_secure_ipc::credentials::is_systemd_credential(&file, uid)
+                            .map_err(|error| unreadable(error.to_string()))?
                 {
                     return Err(unreadable("descriptor credential must be private, singly linked and owned by the service user".to_owned()));
                 }
@@ -97,8 +101,13 @@ mod unix {
                 if metadata.len() > MAX_CREDENTIAL_BYTES {
                     return Err(CredentialError::TooLarge(binding.name.clone()));
                 }
+                #[cfg(target_os = "linux")]
+                let file = super::sealed_credential(file)
+                    .map_err(|error| unreadable(error.to_string()))?;
                 if !(3..=65_535).contains(&file.as_raw_fd()) {
-                    return Err(unreadable("descriptor is outside the inherited custody range".to_owned()));
+                    return Err(unreadable(
+                        "descriptor is outside the inherited custody range".to_owned(),
+                    ));
                 }
                 files.push((argument, file));
             }
@@ -110,7 +119,9 @@ mod unix {
                 let inline = format!("{argument}=");
                 if command.get_args().any(|value| {
                     value == argument.as_str()
-                        || value.to_str().is_some_and(|value| value.starts_with(&inline))
+                        || value
+                            .to_str()
+                            .is_some_and(|value| value.starts_with(&inline))
                 }) {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
@@ -142,3 +153,55 @@ mod unix {
 
 #[cfg(unix)]
 pub use unix::DescriptorCredentials;
+
+#[cfg(target_os = "linux")]
+fn sealed_credential(mut source: std::fs::File) -> std::io::Result<std::fs::File> {
+    use rustix::fs::{fchmod, fcntl_add_seals, memfd_create, MemfdFlags, Mode, SealFlags};
+    use std::io::{Read, Write};
+    use std::os::fd::AsRawFd;
+
+    let mut bytes = zeroize::Zeroizing::new(Vec::new());
+    (&mut source)
+        .take(super::credentials::MAX_CREDENTIAL_BYTES + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes.is_empty() || bytes.len() as u64 > super::credentials::MAX_CREDENTIAL_BYTES {
+        return Err(std::io::Error::other(
+            "binary credential changed length while being read",
+        ));
+    }
+    let mut sealed = std::fs::File::from(memfd_create(
+        c"chio-service-credential",
+        MemfdFlags::CLOEXEC | MemfdFlags::ALLOW_SEALING,
+    )?);
+    fchmod(&sealed, Mode::RUSR | Mode::WUSR)?;
+    sealed.write_all(&bytes)?;
+    fcntl_add_seals(
+        &sealed,
+        SealFlags::SEAL | SealFlags::SHRINK | SealFlags::GROW | SealFlags::WRITE,
+    )?;
+    // Reopening our owned descriptor gives the child a read-only handle at
+    // offset zero. The write-capable handle is dropped before launch.
+    std::fs::File::open(format!("/proc/self/fd/{}", sealed.as_raw_fd()))
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use std::io::{Read, Seek, Write};
+
+    #[test]
+    fn binary_delivery_is_sealed_read_only_and_preserves_every_byte() -> std::io::Result<()> {
+        let original = [0_u8, 255, 7, b'\n'];
+        let mut source = tempfile::tempfile()?;
+        source.write_all(&original)?;
+        source.rewind()?;
+        let mut delivered = super::sealed_credential(source)?;
+        assert!(chio_secure_ipc::credentials::is_sealed_credential(
+            &delivered
+        )?);
+        let mut bytes = Vec::new();
+        delivered.read_to_end(&mut bytes)?;
+        assert_eq!(bytes, original);
+        assert!(delivered.write_all(b"replace").is_err());
+        Ok(())
+    }
+}

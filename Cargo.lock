@@ -3018,6 +3018,7 @@ dependencies = [
  "chio-runtime-core",
  "chio-runtime-harness",
  "chio-secret-broker",
+ "chio-secure-ipc",
  "chio-security-kernel",
  "chio-security-types",
  "chio-selective-disclosure",
@@ -4237,6 +4238,7 @@ name = "chio-keyring"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-secure-ipc",
  "chio-test-support",
  "rusqlite",
  "rustix",
@@ -4428,6 +4430,7 @@ dependencies = [
  "chio-manifest",
  "chio-mcp-adapter",
  "chio-metrics-spec",
+ "chio-secure-ipc",
  "chio-security-types",
  "chio-store-sqlite",
  "hmac 0.12.1",
