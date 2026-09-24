@@ -10,6 +10,23 @@ Use the [completion execution plan](../superpowers/plans/2026-09-22-security-roa
 for the reconciled queue and original-requirement coverage. Older checkpoints
 below retain their historical source boundaries.
 
+Receipt-store bootstrap now commits schema migration, projection backfills,
+immutability guards and the schema stamp in one transaction. Failed or
+interrupted opens cannot publish an unguarded intermediate schema. Legacy
+lineage migration creates the statement index only after adding its column.
+The new public-open regression verifies unchanged schema, guards and receipt
+bytes after failure, followed by healthy migration after repair. The existing
+retention-repair fixture now injects only set drift using canonical guards;
+its original repair and integrity assertions remain unchanged.
+
+All 311 receipt-store cases pass with the same three existing ignores. Strict
+all-target store Clippy, Rust file hygiene, formatting and diff checks pass.
+The owning source is `54609bb56a` plus the three-file patch SHA-256
+`5353b1d27e2a6293e7aa5b56e453b2aa649c2e77aa3b5817f82e38ac39646832`.
+Original failed runs and final results are retained under
+`output/process-security-20260915/m8-atomic-migration-54609bb56a-20260924/`.
+These fixes do not establish the cause of #1045 or remove its quarantine.
+
 | Area | Current evidence | Remaining boundary |
 | --- | --- | --- |
 | Foundation | The locked x86 workspace run at `36ddfcf69e` stopped on three CLI sandbox tests. All three exact cases pass with the matching stock Ubuntu Bubblewrap profile and unchanged restrictions. The full retry is terminal, exit 101, on `auth_live`: Node 18.19.1 cannot import the TypeScript SDK. The temporary profile cleanup completed, with namespace restrictions restored to 1/1. | Complete workspace and workspace-Clippy passes remain open. Original failures and the cleanup record are retained in `chio-workspace-36dd-terminal-20260923.tgz`, SHA-256 `51098e8f1182b07fc84476cda9f54a4786b9d0de3dcb0b345b8299768ae0425e`, under `output/process-security-20260915/`. |
@@ -115,8 +132,12 @@ delayed-sync diagnostic passes all 256 head-property cases but encounters
 sequence and database files are retained under
 `m8-retention-ci-workload-a986606-20260923/`. The sequence passes on replay; a
 full retention retry traces failed storage syscalls after reclaiming completed
-build caches. The original hang and its cause remain unproven, and the
-quarantine remains in place.
+build caches. That retry completes all 256 generated cases and four persisted
+seeds in 3,906.96 seconds, with 25 ms delayed sync, unchanged assertions and no
+failed storage syscalls. Its log SHA-256 is
+`128ba65fd20e6117428980115737e093f54e92daaabf1abe199aaca4d759c444`.
+This run predates the atomic migration fix. The original hang and its cause
+remain unproven, and the quarantine remains in place.
 
 The Rust packaging continuation implements
 [`cargo xtask release rust-preview`](rust-preview-packages.md). It packages the

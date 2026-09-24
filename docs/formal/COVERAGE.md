@@ -1178,7 +1178,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `70770306bfa8227daeb802f057ef66b4c628a35877e309b8ed7b00a1591670df`
+- Input digest: `3ed67b1003b39c978f9d81631968897c3444bde8f7dd82dcb085e53b97a3320d`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1215,13 +1215,13 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/capability/cumulative_approval_tests.rs`: `140b6109e4250489585b4646831466971d5ae7e04f12534ab9c849e4e34acd78`
 - `crates/core/chio-core-types/src/capability/delegation_trust_root_tests.rs`: `d6cf7906084de0d3c5963c4c4d615f0c5c79b3198e585cda51f1d2a29db30b0e`
 - `crates/core/chio-core-types/src/capability/features.rs`: `5bd1ea634b9b4da3569bbb82dfbe7fd05c94436779e5fc31d6279b41c1e979da`
-- `crates/core/chio-core-types/src/capability/governance.rs`: `fe61be8fd8e7d2e8a5a336e9332aaeba707d3a3fb0944c923c7a4d1aec9b4c7e`
+- `crates/core/chio-core-types/src/capability/governance.rs`: `708abf95943df6a344d2ac3cb2859d749872fd27006450884cb64dccf7974576`
 - `crates/core/chio-core-types/src/capability/mod.rs`: `44624591e2b41953d0964dd009709f58a4bc6810cd647067a164d1bd69c80f0b`
 - `crates/core/chio-core-types/src/capability/runtime_attestation.rs`: `2a9a5a75c2a2f0ccd49b26f2d923d9be8ec6502e0427e3d2dc00e1da502b5b20`
 - `crates/core/chio-core-types/src/capability/scope.rs`: `de9cbc93c397f7b02e731164be24a67f8ad520cbad420711f996d7fc3d480bf8`
 - `crates/core/chio-core-types/src/capability/supplemental_authorization.rs`: `8a6cea2a6b9d299590c56262da4ee69414ac08e16305410ef740a19b6b99bebe`
 - `crates/core/chio-core-types/src/capability/tests.rs`: `77b16d206fceea44b41cbaca17d565ceb382eb1556c74847e90739efbaeb9d2f`
-- `crates/core/chio-core-types/src/capability/tests/governed_intents.rs`: `0faf4f60cad575506100b106eb701d0c02198c0b536d33e920ef4de03610be28`
+- `crates/core/chio-core-types/src/capability/tests/governed_intents.rs`: `4c7253fe3180813fdeefb65e5ac6bea3118adbec4acebe34e5e2b0ac7a71f71d`
 - `crates/core/chio-core-types/src/capability/threshold_approval.rs`: `109dfd87821a18b5fe204484fb72c1dc6c86e9b21c37c08681beb7f4bbb46551`
 - `crates/core/chio-core-types/src/capability/threshold_approval_tests.rs`: `446aa3fb1803fb2fbf2ecb31510b8ba71fbb1e795eb832d4f2950484e7039989`
 - `crates/core/chio-core-types/src/capability/token.rs`: `e21a3d2628277e6f3f0ea2d991e546c470f091a2c236e85a5c03a713d7537f30`

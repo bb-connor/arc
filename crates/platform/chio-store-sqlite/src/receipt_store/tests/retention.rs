@@ -1699,13 +1699,13 @@ fn bricked_store_repair_restores_append() -> Result<(), Box<dyn std::error::Erro
                      INSERT OR IGNORE INTO archive.claim_receipt_log_entries \
                        SELECT * FROM main.claim_receipt_log_entries WHERE entry_seq <= 2; \
                      DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
-                     DELETE FROM main.chio_tool_receipts WHERE seq <= 2; \
-                     CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
-                       BEFORE DELETE ON chio_tool_receipts \
-                       BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END;",
+                     DELETE FROM main.chio_tool_receipts WHERE seq <= 2;",
                 )?;
                 copy_checkpoint_prefix_to_attached_archive(connection, 2)?;
                 connection.execute_batch("DETACH DATABASE archive")?;
+                // Inject only set drift. Operator repair still requires the
+                // canonical immutability guards.
+                super::support::restore_transparency_projection_guards(connection)?;
                 Ok(())
             }
         })?;
