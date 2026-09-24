@@ -936,7 +936,7 @@ mod tests {
     }
 
     #[test]
-    fn periodic_tick_drains_one_bounded_batch_before_scheduler_claim() {
+    fn periodic_tick_claims_recovery_before_one_bounded_outbox_batch() {
         let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
         let store = Arc::new(
             SqliteSecurityStateStore::open(directory.path().join("bounded-outbox-tick.sqlite"))
@@ -1012,7 +1012,9 @@ mod tests {
         assert_eq!(report.declassification_receipts_pending, 7);
         assert_eq!(report.declassification_receipts_compacted, 1);
         assert_eq!(report.claimed, 0);
-        assert_eq!(scripted.events(), vec!["drain", "compact", "claim"]);
+        // Authorized recovery precedes outbox maintenance so an outbox outage
+        // cannot strand rollback. Maintenance still performs one bounded batch.
+        assert_eq!(scripted.events(), vec!["claim", "drain", "compact"]);
         assert_eq!(
             scripted.requested_batches(),
             vec![MAX_DECLASSIFICATION_EVIDENCE_BATCH]
