@@ -296,6 +296,14 @@ baseline is present, and the keylog example configs agree with the units.
    `socket_path` lives in the unit's runtime directory, which the manager
    removes on stop so a restart never meets a stale socket.
 
+   `provision: true` permits exclusive database creation on the first start.
+   Subsequent starts reopen and validate the original database, retaining its
+   witnessed history and pins. Set it to `false` after initial provisioning
+   when a missing database must fail startup. Existing corrupt or mismatched
+   stores are never replaced. Each audit config's `operator_database_path`
+   must name the already provisioned operator database for this key-log policy;
+   the audit service opens it read-only and does not create an operator store.
+
 ## Building the package from source
 
 On a Linux x86_64 build host with the musl linker installed, build the same

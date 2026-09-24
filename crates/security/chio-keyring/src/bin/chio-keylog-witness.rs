@@ -38,7 +38,9 @@ fn run() -> chio_keyring::Result<()> {
     let readiness_backend = backend.clone();
     let clock = Arc::new(SystemTrustedClock);
     let started_at = clock.now()?;
-    let witness = if config.provision {
+    // Provisioning is first-start permission. A supervisor restart must reopen
+    // the original store and validate its policy instead of recreating it.
+    let witness = if config.provision && !config.database_path.try_exists()? {
         SqliteKeyLogWitness::provision(
             &config.database_path,
             policy,

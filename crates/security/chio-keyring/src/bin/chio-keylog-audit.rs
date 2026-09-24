@@ -104,7 +104,9 @@ fn run() -> chio_keyring::Result<()> {
         policy.clone(),
     )?);
     let clock = Arc::new(SystemTrustedClock);
-    let verifier = if config.provision {
+    // Keep the original verifier and pin across supervisor restarts. Creation
+    // remains exclusive when an explicitly provisioned store does not exist.
+    let verifier = if config.provision && !config.database_path.try_exists()? {
         SqlitePinnedKeyLogVerifier::provision(&config.database_path, policy.clone(), clock.clone())?
     } else {
         SqlitePinnedKeyLogVerifier::open(&config.database_path, policy.clone(), clock.clone())?

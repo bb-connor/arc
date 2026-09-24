@@ -339,7 +339,7 @@ fn three_witness_processes_prove_distinct_durable_identity_and_restart_recovery(
     let before = proofs[1].clone();
     children.0[1].kill().test_unwrap();
     children.0[1].wait().test_unwrap();
-    children.0[1] = fixture.spawn_witness(1, false);
+    children.0[1] = fixture.spawn_witness(1, true);
     let after = wait_for_witness(&clients[1], "restart-witness-b");
     assert_ne!(before.body.process_id, after.body.process_id);
     assert_eq!(before.body.storage_identity, after.body.storage_identity);
@@ -608,14 +608,7 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
 
     children.0[3].kill().test_unwrap();
     children.0[3].wait().test_unwrap();
-    let mut restarted_config: AuditServiceConfig =
-        serde_json::from_slice(&std::fs::read(&audit_config_paths[0]).test_unwrap()).test_unwrap();
-    restarted_config.provision = false;
-    write_private_file(
-        &audit_config_paths[0],
-        serde_json::to_vec(&restarted_config).test_unwrap(),
-    )
-    .test_unwrap();
+    // Restart with the exact installed config, including first-start permission.
     children.0[3] = Command::new(env!("CARGO_BIN_EXE_chio-keylog-audit"))
         .arg("--config")
         .arg(&audit_config_paths[0])
