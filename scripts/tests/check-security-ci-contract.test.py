@@ -1018,12 +1018,30 @@ assert_boundary_file_rejected(
     "image Rust component closure changed",
 )
 assert_boundary_file_rejected(
+    "security image retains repository contents in an image layer",
+    Path("deploy/docker/Dockerfile.security-evidence-runner"),
+    replace_once(
+        "WORKDIR /opt/authorized-source\n",
+        "WORKDIR /opt/authorized-source\nCOPY . .\n",
+    ),
+    "image instruction graph changed",
+)
+assert_boundary_file_rejected(
+    "security image mounts writable source inputs",
+    Path("deploy/docker/Dockerfile.security-evidence-runner"),
+    replace_once(
+        "--mount=type=bind,target=/opt/authorized-source,readonly",
+        "--mount=type=bind,target=/opt/authorized-source,rw",
+    ),
+    "image authority graph changed",
+)
+assert_boundary_file_rejected(
     "security image omits installed seccomp authority",
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
         " && install -m 0444 deploy/docker/security-evidence-seccomp.json "
-        "/opt/chio-security/security-evidence-seccomp.json \\\n",
-        "",
+        "/opt/chio-security/security-evidence-seccomp.json\n",
+        " && true\n",
     ),
     "image authority graph changed",
 )

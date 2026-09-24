@@ -1980,8 +1980,8 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         "RUN",
         "RUN",
         "WORKDIR",
-        "COPY",
         "ENV",
+        "RUN",
         "RUN",
         "WORKDIR",
         "ENTRYPOINT",
@@ -2068,9 +2068,8 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
     )
     if shell_clauses(instructions[4][1]) != expected_mutants:
         raise ContractError("security execution image Cargo tool closure changed")
-    if instructions[5:8] != (
+    if instructions[5:7] != (
         ("WORKDIR", "/opt/authorized-source"),
-        ("COPY", ". ."),
         (
             "ENV",
             "CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 CARGO_TERM_COLOR=never",
@@ -2109,6 +2108,7 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         "/opt/chio-security/security-evidence-seccomp.json",
     )
     expected_authority = (
+        '--mount=type=bind,target=/opt/authorized-source,readonly '
         'test "$(rustc --version)" = "rustc 1.94.1 '
         '(e408947bf 2026-03-25)"',
         'test "$(cargo mutants --version | awk \'{print $2}\')" = "25.3.1"',
@@ -2126,10 +2126,11 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         "/opt/chio-security/cargo-cache/; fi",
         "chmod -R a+rX /opt/chio-security/cargo-cache",
         *authority_installs,
-        "rm -rf /opt/authorized-source",
     )
-    if shell_clauses(instructions[8][1]) != expected_authority:
+    if shell_clauses(instructions[7][1]) != expected_authority:
         raise ContractError("security execution image authority graph changed")
+    if instructions[8] != ("RUN", "rmdir /opt/authorized-source"):
+        raise ContractError("security execution image source cleanup changed")
     if instructions[9] != ("WORKDIR", "/private/candidate"):
         raise ContractError("security execution image runtime workdir changed")
     try:

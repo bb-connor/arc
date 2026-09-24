@@ -83,13 +83,14 @@ RUN curl --proto '=https' --tlsv1.2 --fail --location \
  && rm -rf /tmp/cargo-mutants-25.3.1 /tmp/cargo-mutants-25.3.1.crate
 
 WORKDIR /opt/authorized-source
-COPY . .
 
 ENV CARGO_INCREMENTAL=0 \
     CARGO_BUILD_JOBS=1 \
     CARGO_TERM_COLOR=never
 
-RUN test "$(rustc --version)" = "rustc 1.94.1 (e408947bf 2026-03-25)" \
+# Build inputs must never enter an image layer, including layers hidden by deletion.
+RUN --mount=type=bind,target=/opt/authorized-source,readonly \
+    test "$(rustc --version)" = "rustc 1.94.1 (e408947bf 2026-03-25)" \
  && test "$(cargo mutants --version | awk '{print $2}')" = "25.3.1" \
  && test "$(cargo clippy --version)" = "clippy 0.1.94 (e408947bfd 2026-03-25)" \
  && test "$(cargo fmt --version)" = "rustfmt 1.8.0-stable (e408947bfd 2026-03-25)" \
@@ -113,8 +114,9 @@ RUN test "$(rustc --version)" = "rustc 1.94.1 (e408947bf 2026-03-25)" \
  && install -D -m 0555 scripts/check-exact-cargo-test-inventory.py /opt/chio-security/gates/check-exact-cargo-test-inventory.py \
  && install -D -m 0555 scripts/check-cage-all-target-inventory.py /opt/chio-security/gates/check-cage-all-target-inventory.py \
  && install -D -m 0555 crates/security/chio-cage/scripts/check-linux-enforcement.sh /opt/chio-security/gates/check-cage-linux-enforcement.sh \
- && install -m 0444 deploy/docker/security-evidence-seccomp.json /opt/chio-security/security-evidence-seccomp.json \
- && rm -rf /opt/authorized-source
+ && install -m 0444 deploy/docker/security-evidence-seccomp.json /opt/chio-security/security-evidence-seccomp.json
+
+RUN rmdir /opt/authorized-source
 
 WORKDIR /private/candidate
 ENTRYPOINT ["/usr/bin/python3", "-I", "/opt/chio-security/entrypoint.py"]

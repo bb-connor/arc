@@ -1,6 +1,6 @@
 # Execution image input qualification
 
-Updated September 23, 2026.
+Updated September 24, 2026.
 The images for the historical inputs below are built and locally validated.
 The current candidate retains the reviewed AWS-LC repair and composes the
 existing broker with the ordinary process host. Process signing keys now use
@@ -10,9 +10,22 @@ adds the existing keyring crate to the CLI's direct dependencies. No registry
 version changes.
 The lock digest is
 `e3f42ccac4fd0397f507cc3767a25eda3436fd4f43296359d740e39de7cd8d76`.
-The Dockerfile and structural checker pin this exact digest. A fresh image
-build and validation remain required after this ratchet update and the native
-broker preparation gate update.
+The Dockerfile and structural checker pin this exact digest.
+The build now mounts its source read-only while fetching dependencies and
+installing the boundary files. Historical images built with `COPY . .` retain
+the repository in an earlier image layer even after deleting it. Their
+final-filesystem checks do not qualify those images for publication. Validate
+the rebuilt image's saved layers as well as its installed boundary and cache.
+Source `93616b70146dbb76d397a1e72e9fd6ef359e41b5` plus the source-mount repair
+produced local image
+`sha256:b242807702061932477601925d83cf1f8a740563f5700a487e027532bd82deb3`.
+All 12 saved layers contain no retained source contents. The 14 installed
+boundary files, 225-package inventory, pinned tools and network-disabled locked
+dependency fetch pass the existing validator. The complete structural mutation
+suite also passes. Evidence is retained under
+`output/process-security-20260915/image-source-layer-93616b7014-20260924/`
+and `image-source-layer-93616b7014-evidence-20260924.tgz`.
+This is a local image identifier, not a published or authorized execution pin.
 Registry publication, reviewed
 workflow-definition rotation and capture authorization remain outstanding.
 
