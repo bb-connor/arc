@@ -149,7 +149,7 @@ def static_contract_tests() -> None:
     for marker in (
         "bash=5.2.37-r0",
         "security-evidence-apk.lock",
-        "86fad0ccb2b3f1cf2402c12ddade71d14b21e9995b3d113795259b899c0a57c0",
+        "354d439672c5c992ca20d54a276e30aea1dc431ae719357899885c7282169acd",
         "637f50a513c887136bfd8c5b8ad946ee8c185f75041a1d9a091db998455efeda",
         "a1492d1c91d82b8d2101220accedffb1c2af7c97ea0793915c4a97d5c3d7424b",
         "47040c9cded7996c38b9976af0a9c46c4902ec5eb59369fffec758410dba8028",

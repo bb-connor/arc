@@ -60,7 +60,7 @@ EXPECTED_SECURITY_IMAGE_FROM = (
     "667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67"
 )
 EXPECTED_APK_LOCK_SHA256 = (
-    "86fad0ccb2b3f1cf2402c12ddade71d14b21e9995b3d113795259b899c0a57c0"
+    "354d439672c5c992ca20d54a276e30aea1dc431ae719357899885c7282169acd"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
     "67904d2a3d2ec99cfef68cdde03b62a52098b82eca2f97a415638b824f32dec0"
@@ -119,15 +119,16 @@ printf '%s  %s\n' '{EXPECTED_TEMPORAL_GATE_SHA256}' "${{temporal_runner}}" | /us
 /bin/bash -p "${{temporal_runner}}"
 """.strip()
 EXPECTED_DIRECT_APK_PACKAGES = (
+    "/tmp/ca-certificates-20260611-r0.apk",
     "bash=5.2.37-r0",
     "build-base=0.5-r3",
-    "ca-certificates=20260611-r0",
     "cmake=3.31.7-r1",
     "coreutils=9.7-r1",
     "curl=8.14.1-r3",
     "git=2.49.1-r0",
     "jq=1.8.2-r0",
     "linux-headers=6.14.2-r0",
+    "libexpat=2.8.5-r0",
     "openssl-dev=3.5.8-r0",
     "pkgconf=2.4.3-r0",
     "protobuf=29.4-r0",
@@ -1995,11 +1996,17 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         raise ContractError("security execution image APK inventory copy changed")
 
     expected_apk = (
+        "wget -q -O /tmp/ca-certificates-20260611-r0.apk "
+        "https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/"
+        "ca-certificates-20260611-r0.apk",
+        "echo 'a8ad8f04dfba1a2897388c4b420b698bf1ecd870be10f0127134a567d5e59896 "
+        "/tmp/ca-certificates-20260611-r0.apk' | sha256sum -c -",
         "apk add --no-cache " + " ".join(EXPECTED_DIRECT_APK_PACKAGES),
         "apk info -v | LC_ALL=C sort > /tmp/security-evidence-apk.actual",
         "cmp /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual",
         f"echo '{apk_digest} /tmp/security-evidence-apk.lock' | sha256sum -c -",
-        "rm /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual",
+        "rm /tmp/ca-certificates-20260611-r0.apk "
+        "/tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual",
     )
     if shell_clauses(instructions[2][1]) != expected_apk:
         raise ContractError("security execution image APK closure changed")
