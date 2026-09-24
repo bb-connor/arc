@@ -1178,7 +1178,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `e0b095e22474fe14f034ec020e7b172c0d0a96039ebc37f76dd0e2eedd5e6bb3`
+- Input digest: `12a3916598771ab62949893bc064cc3e6dc0a333b4b31b0a36297fb3c7b9cc05`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1411,13 +1411,13 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/theorem-inventory.json`: `91cab8491707abd7a25114b1f4cfffefb9b40e5b1ef474054d298cad46310f59`
 - `formal/tla/DelegationDepthBound.tla`: `69c28ca6b16ef3b2174235347d8bb2aab40fce4cbb79123e4512f363b9717be9`
 - `formal/tla/DistributedRevocation.tla`: `59110faa37eeeaac45b9b206594ae5ef39f94404323a377967012431489b8aa7`
-- `formal/tla/DistributedRevocationTemporal.tla`: `604bdcd34f505b11c6aa9819cc73193f4e455b4d77227d22d6e79e07b48cc2e1`
+- `formal/tla/DistributedRevocationTemporal.tla`: `cf1228fc40ac7929443e04f6a0112e6c980cd6a5e4b14ca76e56b616be52ca25`
 - `formal/tla/DistributedRevocationTemporalRefinement.tla`: `c5e1219daa9949723f99d2f6945a5ae8319f6daa0e1cfc21f334bce26afeb0d9`
 - `formal/tla/DistributedRevocationTemporalWitness.tla`: `dc137710d74f8e7280061d31f129437cc3b2947857de45da7f688158f376128e`
 - `formal/tla/InformationFlowLattice.tla`: `81ebe8a5ba2c84d34dabb63cb31c955b1351f5f2f941f21ca07c2092557a987b`
 - `formal/tla/MCDelegationDepthBound.cfg`: `147ac36dc8b9a6804e64ff78cae40f09ec8cdf225347de4e0adb059f2074f099`
 - `formal/tla/MCRevocationPropagation.cfg`: `c71faf1f2d8f5646890b5a7cc2e4264f4aae9518d953fc3393b78a7335a74355`
-- `formal/tla/RevocationPropagation.tla`: `cc002ea9e1ee4868e5bcc55fd0a5472f99a26cb9ecf317da34855e0cc68c70e3`
+- `formal/tla/RevocationPropagation.tla`: `1fec98b59ddcc66380c2c56071886507cdfc4198ff7397928f5fb12d65f81e4b`
 - `formal/tla/trace/TraceCheckRevocationPropagation.tla`: `60b0a3b0a287605cbd9735c755a5af94a94f84398800d8767400967bf05a1749`
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `e0fab0a4fa1c419568942078c2512563fb99c8c093f38cfd9d479f174107453f`
