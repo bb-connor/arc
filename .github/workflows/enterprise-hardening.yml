@@ -343,7 +343,7 @@ jobs:
         run: ./scripts/check-keyring-transparency.sh
 
       - name: Secret broker boundary behavior
-        run: ./scripts/check-secret-broker-boundary.sh
+        run: ./scripts/check-secret-broker-boundary.sh --portable
 
       - name: Schema registry and generated bindings
         run: |
