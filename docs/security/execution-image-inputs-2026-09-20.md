@@ -6,10 +6,11 @@ The current candidate retains the reviewed AWS-LC repair and composes the
 existing broker with the ordinary process host. Process signing keys now use
 the existing zeroize dependency, and native broker preparation uses the existing
 tracing dependency for operator diagnostics. Governed process-host issuance
-adds the existing keyring crate to the CLI's direct dependencies. No registry
-version changes.
+adds the existing keyring crate to the CLI's direct dependencies. Systemd
+credential custody adds the existing secure-IPC crate to the CLI, keyring and
+remote MCP edge. No registry version changes.
 The lock digest is
-`e3f42ccac4fd0397f507cc3767a25eda3436fd4f43296359d740e39de7cd8d76`.
+`67904d2a3d2ec99cfef68cdde03b62a52098b82eca2f97a415638b824f32dec0`.
 The Dockerfile and structural checker pin this exact digest.
 The build now mounts its source read-only while fetching dependencies and
 installing the boundary files. Historical images built with `COPY . .` retain
@@ -26,6 +27,8 @@ suite also passes. Evidence is retained under
 `output/process-security-20260915/image-source-layer-93616b7014-20260924/`
 and `image-source-layer-93616b7014-evidence-20260924.tgz`.
 This is a local image identifier, not a published or authorized execution pin.
+It predates the current dependency edges and lock digest; the current image
+still requires its own build and validation.
 Registry publication, reviewed
 workflow-definition rotation and capture authorization remain outstanding.
 
