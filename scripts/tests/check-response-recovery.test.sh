@@ -73,6 +73,11 @@ required_mappings=(
   'cargo test -p chio-quarantine --test response_executor receipt_truth_rollback_failure_never_reports_lifted -- --exact'
   'cargo test -p chio-core-types --test security_receipts partial_apply_cannot_validate_as_active_completion -- --exact'
   'cargo test -p chio-core-types --test security_receipts partial_rollback_cannot_validate_as_lifted_completion -- --exact'
+  'cargo test --locked -p chio-active-response-authority --lib runtime::tests::daemon_stop_discards_queued_requests_and_joins_inflight_workers -- --exact'
+  'cargo test --locked -p chio-active-response-authority --lib runtime::tests::daemon_worker_panic_stops_the_listener_and_joins_workers -- --exact'
+  'cargo test --locked -p chio-control-plane --lib security::active_defense_host_tests::correlation_ingress_failure_does_not_strand_expired_overlays -- --exact'
+  'cargo test --locked -p chio-control-plane --lib security::active_defense_host_tests::declassification_outbox_failure_does_not_strand_expired_overlays -- --exact'
+  'cargo test --locked -p chio-control-plane --lib security::active_defense_host_tests::response_planning_failure_does_not_strand_expired_overlays -- --exact'
 )
 
 for required in "${required_mappings[@]}"; do
