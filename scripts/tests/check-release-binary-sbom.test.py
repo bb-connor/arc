@@ -187,8 +187,9 @@ class BinaryInventoryGate(unittest.TestCase):
         self.assertIn(f"SYFT_VERSION={GATE.SYFT_VERSION}", workflow)
         self.assertIn(f'$syftVersion = "{GATE.SYFT_VERSION}"', workflow)
         index = workflow.index("      - name: Validate executable dependency inventory")
-        end = workflow.index("      - name: Upload SBOM", index)
+        end = workflow.index("\n      - ", index)
         block = workflow[index:end]
+        self.assertLess(end, workflow.index("      - name: Upload SBOM", index))
         self.assertNotIn("        if:", block)
         self.assertIn("python scripts/check-release-binary-sbom.py", block)
         self.assertIn('--expected-version "${GITHUB_REF_NAME#v}"', block)

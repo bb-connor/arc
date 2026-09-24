@@ -82,7 +82,7 @@ class MsrvCacheTarget(unittest.TestCase):
             self.assertNotIn(unsupported, JOB)
 
     def test_all_existing_msrv_commands_and_limits_remain_required(self):
-        self.assertIn('timeout-minutes: 240', JOB)
+        self.assertIn('timeout-minutes: 360', JOB)
         lane = JOB.split('      - name: MSRV workspace lane\n', 1)[1]
         self.assertIn('CARGO_BUILD_JOBS: "1"', lane)
         self.assertIn('RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"', lane)
