@@ -1,0 +1,119 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.602026969,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--locked",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.652446702,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--locked",
+            "--lib",
+            "launch::platform::tests::helper_identity_control_rejects_same_bytes_different_identity",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-cage",
+          "file": "crates/security/chio-cage/src/launch/linux.rs",
+          "function": {
+            "function_name": "helper_identity_and_binding_match",
+            "return_type": "-> bool",
+            "span": {
+              "start": {
+                "line": 4,
+                "column": 1
+              },
+              "end": {
+                "line": 11,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 10,
+              "column": 5
+            },
+            "end": {
+              "line": 10,
+              "column": 89
+            }
+          },
+          "replacement": "true",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-cage__src__launch__linux.rs_line_10_col_5.log",
+      "diff_path": "diff/crates__security__chio-cage__src__launch__linux.rs_line_10_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 3.057241653,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--locked",
+            "--lib"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.602209311,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--locked",
+            "--lib",
+            "launch::platform::tests::helper_identity_control_rejects_same_bytes_different_identity",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

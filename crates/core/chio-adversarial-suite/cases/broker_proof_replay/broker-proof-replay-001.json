@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "broker_proof_replay_detected",
   "threat_id": "native_channel_replay",
-  "pending": true,
+  "pending": false,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -32,7 +32,9 @@
           "replacement": "=="
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/broker_proof_replay/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/broker_proof_replay/mutants.out/outcomes.json",
+          "sha256": "d68dd839e360a90fe16a36adb1165c278ce5359b05d06f8c35a41871f565818d",
+          "inputs_sha256": "b3f1b0ef3e525958efc09cd5b0e216657c16f0a689a9597c1564ab7c1d761793"
         }
       }
     ]

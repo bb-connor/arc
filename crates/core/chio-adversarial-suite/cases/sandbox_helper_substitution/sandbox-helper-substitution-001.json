@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "sandbox_helper_substitution_detected",
   "threat_id": "kernel_impersonation",
-  "pending": true,
+  "pending": false,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -31,7 +31,9 @@
           "replacement": "true"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/sandbox_helper_substitution/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/sandbox_helper_substitution/mutants.out/outcomes.json",
+          "sha256": "d33d6a86dd3ec862f72ffe42fe98a18f9945e8db280cfa4a4aea5209d8f6c2b2",
+          "inputs_sha256": "c140add1221ccd5fde5afbf63b3007bfd050b8ccb22ab395f479a81f60c45af4"
         }
       }
     ]

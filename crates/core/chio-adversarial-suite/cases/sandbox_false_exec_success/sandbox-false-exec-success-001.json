@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "sandbox_false_exec_success_detected",
   "threat_id": "tool_server_escape",
-  "pending": true,
+  "pending": false,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -31,7 +31,9 @@
           "replacement": "Ok(())"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/sandbox_false_exec_success/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/sandbox_false_exec_success/mutants.out/outcomes.json",
+          "sha256": "f036235a021c881508e82e1cfaebfb793116b012eb8e551cffb33beb7841feeb",
+          "inputs_sha256": "bb0bb2b7c5d13e1894e9fc149f1f76b93325e0f716ced0e2202bd2c2cb8ea1a4"
         }
       }
     ]

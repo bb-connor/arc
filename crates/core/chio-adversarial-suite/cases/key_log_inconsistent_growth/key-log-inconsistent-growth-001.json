@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "key_log_inconsistent_growth_detected",
   "threat_id": "kernel_impersonation",
-  "pending": true,
+  "pending": false,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -31,7 +31,9 @@
           "replacement": "Ok(())"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/key_log_inconsistent_growth/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/key_log_inconsistent_growth/mutants.out/outcomes.json",
+          "sha256": "2acf5af49ea8cec889e9bd2b0af764a73a896f5cfca50057e2e2cde2227dd12a",
+          "inputs_sha256": "e993d0247f16813015180360e16d2cec38adb91c747f63258e9e89047a0faf43"
         }
       }
     ]

@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "broker_destination_rebinding_detected",
   "threat_id": "ssrf_via_http_substrate",
-  "pending": true,
+  "pending": false,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -32,7 +32,9 @@
           "replacement": ""
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/broker_destination_rebinding/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/broker_destination_rebinding/mutants.out/outcomes.json",
+          "sha256": "002210cb7f50bbf6d33281ee84ffbb5057ca35c9f1196255357d65b131f5d1bb",
+          "inputs_sha256": "1841257564a87e9571947f72d2af7ded3dd7e0ca8652f30e66f94bd6bff038c5"
         }
       }
     ]

@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "old_key_backdating_detected",
   "threat_id": "kernel_impersonation",
-  "pending": true,
+  "pending": false,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -33,7 +33,9 @@
           "occurrence": 1
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/old_key_backdating/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/old_key_backdating/mutants.out/outcomes.json",
+          "sha256": "684152cdd170ced3c320bd759eb7998241dd677751c0b61f3aaef0ecbde3e884",
+          "inputs_sha256": "b6c37b2229e2dc21a088b69184370c2a361c343350d60895aa6a2a8111a5b091"
         }
       }
     ]

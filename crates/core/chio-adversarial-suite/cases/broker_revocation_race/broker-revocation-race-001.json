@@ -5,7 +5,7 @@
   "expected_verdict": "DENY",
   "expected_reason": "broker_revocation_race_detected",
   "threat_id": "capability_token_theft",
-  "pending": true,
+  "pending": false,
   "artifact": {
     "schema": "chio.adversarial-mutation-evidence.v1",
     "controls": [
@@ -30,7 +30,9 @@
           "replacement": "Ok(())"
         },
         "outcomes": {
-          "path": "audits/evidence/mutants/security/broker_revocation_race/mutants.out/outcomes.json"
+          "path": "audits/evidence/mutants/security/broker_revocation_race/mutants.out/outcomes.json",
+          "sha256": "077e923a3c8616b3747a9c4ad44d893bf311717a7c4e0b4cff2fb37b593856d8",
+          "inputs_sha256": "41ee951cb00f6b691b4bfec3a3e6b29c4e76dacd692f0396cd0fcfbcdefedb5c"
         }
       }
     ]
