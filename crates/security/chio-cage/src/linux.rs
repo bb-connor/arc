@@ -599,6 +599,7 @@ fn validate_program_headers(
     const PT_LOAD: u32 = 1;
     const PT_DYNAMIC: u32 = 2;
     const PT_INTERP: u32 = 3;
+    const PT_TLS: u32 = 7;
     const PF_X: u32 = 1;
 
     let table_size = u64::from(entry_size)
@@ -635,11 +636,16 @@ fn validate_program_headers(
             .ok_or_else(|| CageError::InvalidExecutable(path.to_path_buf()))?;
         let alignment = read_elf_u64(entry, 48)
             .ok_or_else(|| CageError::InvalidExecutable(path.to_path_buf()))?;
+        // A zero-initialized TLS template has no file-backed image. Linkers
+        // may leave its unused file offset incongruent with its virtual
+        // address; the template alignment still has to be a power of two.
+        // ELF gABI 7.7: https://gabi.xinuos.com/elf/07-pheader.html#thread-local-storage
+        let empty_tls = segment_type == PT_TLS && file_size == 0;
         if file_size > memory_size
             || file_size > 0 && checked_elf_range(content, segment_offset, file_size).is_none()
             || alignment > 1
                 && (!alignment.is_power_of_two()
-                    || virtual_address % alignment != segment_offset % alignment)
+                    || !empty_tls && virtual_address % alignment != segment_offset % alignment)
         {
             return Err(CageError::InvalidExecutable(path.to_path_buf()));
         }

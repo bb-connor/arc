@@ -141,6 +141,48 @@ fn write_header_only_executable(path: &Path) {
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700)).test_unwrap();
 }
 
+#[test]
+fn zero_initialized_tls_does_not_bind_an_unused_file_offset() {
+    let tree = TestTree::new();
+    let mut image = std::fs::read(&tree.helper).test_unwrap();
+    image.resize(176, 0);
+    image[56..58].copy_from_slice(&2_u16.to_le_bytes());
+    image[120..124].copy_from_slice(&7_u32.to_le_bytes()); // PT_TLS
+    image[124..128].copy_from_slice(&4_u32.to_le_bytes()); // PF_R
+
+    // The release musl helper has a zero-byte TLS initialization image with
+    // differing file/virtual alignment. Only its in-memory template exists.
+    image[128..136].copy_from_slice(&4_u64.to_le_bytes());
+    image[136..144].copy_from_slice(&0x1000_u64.to_le_bytes());
+    image[160..168].copy_from_slice(&48_u64.to_le_bytes());
+    image[168..176].copy_from_slice(&8_u64.to_le_bytes());
+    std::fs::write(&tree.helper, &image).test_unwrap();
+    assert!(retain_runtime_resources(&tree.runtime_paths()).is_ok());
+
+    image[152..160].copy_from_slice(&1_u64.to_le_bytes());
+    std::fs::write(&tree.helper, &image).test_unwrap();
+    assert!(matches!(
+        retain_runtime_resources(&tree.runtime_paths()),
+        Err(CageError::InvalidExecutable(_))
+    ));
+
+    image[152..160].copy_from_slice(&0_u64.to_le_bytes());
+    image[120..124].copy_from_slice(&1_u32.to_le_bytes()); // PT_LOAD
+    std::fs::write(&tree.helper, &image).test_unwrap();
+    assert!(matches!(
+        retain_runtime_resources(&tree.runtime_paths()),
+        Err(CageError::InvalidExecutable(_))
+    ));
+
+    image[120..124].copy_from_slice(&7_u32.to_le_bytes());
+    image[168..176].copy_from_slice(&3_u64.to_le_bytes());
+    std::fs::write(&tree.helper, &image).test_unwrap();
+    assert!(matches!(
+        retain_runtime_resources(&tree.runtime_paths()),
+        Err(CageError::InvalidExecutable(_))
+    ));
+}
+
 fn write_dynamically_linked_executable(path: &Path) {
     let machine = match std::env::consts::ARCH {
         "x86_64" => 62_u16,
