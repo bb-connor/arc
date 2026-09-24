@@ -5635,18 +5635,26 @@ def run_campaign(
             command.append("--cargo-arg=--lib")
         else:
             command.append(f"--cargo-arg=--test={control['target']}")
+    mutation_environment = environment
+    if campaign["id"] == "sandbox_fd_leak":
+        # The descriptor closer runs in cage-init. An externally prebuilt
+        # helper would stay unchanged while cargo-mutants edits its source.
+        # Build the static PIE helper and integration test from each mutant.
+        command.append("--cargo-arg=--target=x86_64-unknown-linux-musl")
+        mutation_environment = dict(environment)
+        mutation_environment.pop("CHIO_CAGE_TEST_HELPER", None)
     command.extend(["--", control["test_name"], "--", "--exact"])
     try:
         with cargo_mutants_subprocess_options(
             root,
             command,
-            environment,
+            mutation_environment,
             verified_cargo_mutants_identity,
         ) as (execution_options, _campaign_identity):
             run_checked(
                 command,
                 root,
-                environment,
+                mutation_environment,
                 execution_options=execution_options,
             )
         outcomes_path = output_path / "outcomes.json"
