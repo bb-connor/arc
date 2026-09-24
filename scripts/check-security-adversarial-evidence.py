@@ -5248,6 +5248,85 @@ def run_json_checked(
         ) from error
 
 
+def prepare_enterprise_descriptor_control(
+    root: Path, environment: dict[str, str]
+) -> None:
+    """Build the descriptor probe inside the current isolated broker state."""
+
+    artifact_root = Path("/target/artifacts")
+    probe = artifact_root / "probe-12"
+    helper = (
+        artifact_root
+        / "static-pie-target/x86_64-unknown-linux-musl/debug/chio-cage-init"
+    )
+    expected = {
+        "CHIO_CAGE_TEST_FD_LEAK": os.fspath(probe),
+        "CHIO_CAGE_TEST_HELPER": os.fspath(helper),
+    }
+    if all(environment.get(key) == value for key, value in expected.items()):
+        return
+    if any(key in environment for key in expected):
+        raise EvidenceError("enterprise descriptor control has unexpected cage fixtures")
+
+    helper_environment = dict(environment)
+    helper_environment["CARGO_TARGET_DIR"] = os.fspath(
+        artifact_root / "static-pie-target"
+    )
+    run_checked(
+        [
+            "cargo",
+            "build",
+            "--offline",
+            "--locked",
+            "--target",
+            "x86_64-unknown-linux-musl",
+            "--package",
+            "chio-cage",
+            "--bin",
+            "chio-cage-init",
+            "--features",
+            "real-linux-enforcement",
+        ],
+        root,
+        helper_environment,
+    )
+    header = run_checked(["readelf", "-hW", os.fspath(helper)], root, environment)
+    program = run_checked(["readelf", "-lW", os.fspath(helper)], root, environment)
+    dynamic = run_checked(["readelf", "-dW", os.fspath(helper)], root, environment)
+    if (
+        re.search(r"^\s*Type:\s+DYN\b", header, re.MULTILINE) is None
+        or re.search(r"\bINTERP\b", program) is not None
+        or re.search(r"\((?:NEEDED|RPATH|RUNPATH)\)", dynamic) is not None
+    ):
+        raise EvidenceError("enterprise descriptor helper is not static PIE")
+    run_checked(
+        [
+            "cc",
+            "-nostdlib",
+            "-static",
+            "-fno-stack-protector",
+            "-fno-pie",
+            "-no-pie",
+            "-Wl,--build-id=none",
+            "-DPROBE_MODE=12",
+            os.fspath(
+                root / "crates/security/chio-cage/tests/fixtures/cage_probe.c"
+            ),
+            "-o",
+            os.fspath(probe),
+        ],
+        root,
+        environment,
+    )
+    for path in (helper, probe):
+        metadata = path.lstat()
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise EvidenceError(f"enterprise descriptor fixture is not regular: {path}")
+        if not metadata.st_mode & 0o111:
+            raise EvidenceError(f"enterprise descriptor fixture is not executable: {path}")
+    environment.update(expected)
+
+
 def run_control(
     root: Path, control: dict[str, Any], environment: dict[str, str]
 ) -> None:
@@ -5256,6 +5335,11 @@ def run_control(
         raise EvidenceError(
             f"{control['id']}: requires {required_os}, observed {platform.system().lower()}"
         )
+    if (
+        enterprise_security_runner(environment)
+        and control["id"] == "descriptor_closure_control"
+    ):
+        prepare_enterprise_descriptor_control(root, environment)
     command = ["cargo", "test", "--locked", "--package", control["package"]]
     if control["features"]:
         command.extend(["--features", ",".join(control["features"])])
