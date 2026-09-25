@@ -144,6 +144,57 @@ def signed_response(call):
     return json.loads(response(call)["receipt_json"], object_pairs_hook=unique_object)
 
 
+def verify_authority_probes(case):
+    """Bind each signed denial to the planned isolation probe it represents."""
+    run = case["outcomes"]["action"]["parameters"]
+    workers = run["runner"]["plan"]["workers"]
+    require(
+        len(workers) == 2 and {item["process"] for item in workers} == {"alice", "bob"},
+        "authority probe worker inventory differs",
+    )
+    inputs = {item["process"]: item["input"] for item in workers}
+    fields = (
+        "process", "operation_key", "server_id", "tool_name", "arguments",
+        "governed_intent", "request_id", "capability_sha256",
+    )
+    request_fields = ("operation_key", "server_id", "tool_name", "arguments")
+    for worker, peer in (("alice", "bob"), ("bob", "alice")):
+        own_input, peer_input = inputs[worker], inputs[peer]
+        require(
+            own_input["process"] == worker
+            and own_input["expected_verdict"] == "allow"
+            and own_input["check_replay"] is True
+            and own_input["crash_after_checkpoint"] is (worker == "alice"),
+            "authority worker plan omits replay or deliberate recovery",
+        )
+        own = {field: own_input[field] for field in fields}
+        other = {field: peer_input[field] for field in fields}
+        require(
+            own["arguments"] != other["arguments"]
+            and own["governed_intent"] != other["governed_intent"]
+            and own["capability_sha256"] != other["capability_sha256"]
+            and own["request_id"] != other["request_id"],
+            "authority peer challenge is not distinct",
+        )
+        probes = (
+            dict(own, operation_key="scope-widening", tool_name="write_file"),
+            dict(other, process=worker, operation_key="peer-authority"),
+            dict(own, operation_key="changed-intent", arguments=other["arguments"]),
+            dict(own, operation_key="reused-continuation"),
+        )
+        require(
+            own_input["probes"] == list(probes[:3]),
+            "authority probe plan differs from isolation challenges",
+        )
+        for index, probe in enumerate(probes):
+            request = {field: probe[field] for field in request_fields}
+            request["known_outcome_only"] = False
+            require(
+                case["denials"][f"{worker}-{index}"]["request"] == request,
+                "authority denial differs from its planned isolation probe",
+            )
+
+
 def verify_observations(name, case, verified, identity):
     """Join pinned external observations to independently verified runtime facts."""
     run = case["outcomes"]["action"]["parameters"]
@@ -542,6 +593,7 @@ def verify_bundle(chio, artifact, trusted_pins):
                     },
                     "authority denial inventory differs",
                 )
+                verify_authority_probes(case)
                 caps = case["outcomes"]["action"]["parameters"]["bootstrap"]["action"][
                     "parameters"
                 ]["capabilities"]
@@ -772,6 +824,10 @@ def verify_negative_cases(chio, artifact, trusted_pins):
                 value = value[part]
             value[path[-1]] = replacement
             reject(name, changed, copy.deepcopy(original_pins))
+        changed = copy.deepcopy(original)
+        denials = changed["scenarios"]["authority"]["denials"]
+        denials["alice-0"], denials["alice-1"] = denials["alice-1"], denials["alice-0"]
+        reject("authority-denial-order", changed, copy.deepcopy(original_pins))
         changed = copy.deepcopy(original)
         changed["scenarios"]["budget"]["observation"]["overlap_observed"] = False
         reject("capture-digest", changed, copy.deepcopy(original_pins), repin=False)
