@@ -21,6 +21,7 @@ on:
       - scripts/run-exact-cargo-test-inventory.sh
       - Cargo.toml
       - Cargo.lock
+      - third_party/aws-lc-rs-chio/**
   push:
     branches:
       - 'project/**'
@@ -40,6 +41,7 @@ on:
       - scripts/run-exact-cargo-test-inventory.sh
       - Cargo.toml
       - Cargo.lock
+      - third_party/aws-lc-rs-chio/**
   workflow_dispatch:
 
 concurrency:

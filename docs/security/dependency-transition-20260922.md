@@ -19,11 +19,16 @@ in the public repository so external builds use the same reviewed source.
 | Next.js peer and example requirement | >=15.5.24 <16 | GHSA-2xp9-vwfh-vxw4 and GHSA-p293-qw3h-jr36 repairs |
 
 [CHIO-PATCH.md](../../third_party/aws-lc-rs-chio/CHIO-PATCH.md)
-identifies the registry archive, local semantic changes and vector whitespace
-normalization. Root and generated Docker manifests retain the same source patch;
-affected Docker builders copy the vendor directory. Existing audit records cover
-the native and Rust updates without a new cargo-vet exemption. The upstream cipher
-file has an exact-size, expiring source-hygiene allowance; other file limits remain
+identifies the registry archive, the tracked source patch, the restored fixture
+hashes and the vector normalization. Root and generated Docker manifests retain
+the same source patch; affected Docker builders copy the vendor directory.
+The native sys crates have exact-source audits. Cargo Vet's earlier success
+missed this local Rust fork because it treated a path dependency as first-party.
+The corrected policy now requires an audit of the published 1.18.1 base and
+fails closed until that audit is completed. Cargo Vet cannot authenticate the
+fork delta, which requires separate review against the tracked patch. No new
+exemption or unsupported certification was added. The upstream cipher file has
+an exact-size, expiring source-hygiene allowance; other file limits remain
 enforced.
 
 JavaScript workspace lockfiles include the process SDKs and preserve the public
@@ -37,8 +42,10 @@ canonical scenario identifiers.
 ## Qualification
 
 The retained DES regression exercises key parity validation against the patched
-source. Qualification also covers cargo-vet, cargo-deny, Docker source inputs,
-frozen JavaScript resolution and the TypeScript build and conformance commands.
+source. Earlier cargo-deny, Docker source-input, frozen JavaScript-resolution,
+TypeScript build and conformance checks have source-bound records.
+The corrected `cargo vet check --locked` reports `aws-lc-rs:1.18.1` missing
+`safe-to-deploy`; that is an open security gate, not a passing check.
 Passing results must identify the public source revision that was checked.
 
 Review the vendor provenance, dependency/audit closure, container inputs, SDK

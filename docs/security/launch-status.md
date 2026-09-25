@@ -44,7 +44,7 @@ acceptance is complete. This is not merge or release approval.
 | M7 | Deception, response recovery, flow and temporal gates pass at `6170900d7f`; adversarial inventory missing | Port all recovered security cases and qualify final composed paths | Active-defense ledger and original plan |
 | M8 | Historical retention and million-receipt recovery pass; checkpoint race repaired | Qualify the final checkpoint implementation and resolve the original liveness failure | Retention #1045 and final-source million-receipt gate remain required |
 | M9 | Entry packages unpublished and external consumer unqualified | Package dependency closure and clean install after M4-M8 | Three intended entrypoints remain `publish = false` |
-| M10 | Not release qualified; locked local cargo-vet and published-head MSRV now pass | Complete final local/hosted inventories, review, trusted authority transition and publication gates | [Current qualification and owning blockers](process-security-qualification.md#current-checkpoint-2026-09-22) |
+| M10 | Not release qualified; the corrected Cargo Vet policy exposes an unaudited local AWS-LC fork | Complete the source audit, final inventories, review, trusted authority transition and publication gates | [Current qualification and owning blockers](process-security-qualification.md#current-checkpoint-2026-09-22) |
 | M11 | Not started | Authorized observed pilot and signed promotion stages | [Numeric operator contract](active-defense-rollout.md) |
 
 ## M3 local acceptance closeout

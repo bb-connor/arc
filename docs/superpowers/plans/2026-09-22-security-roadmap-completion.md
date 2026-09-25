@@ -47,7 +47,7 @@ Research refreshed Git refs, GitHub PR/check/review/ruleset APIs, the current im
 | Local disposition ledger | 109 unique records: 81 reproduced-and-repaired, 20 fixed-with-evidence, eight technically-inapplicable-with-reason |
 | Lock SHA-256 | `8e7154ee265ed4521d92130aeb145070c8da1026d02b2939761af758f447ade1` |
 
-The six unpublished commits contain the musl ioctl fix, AWS-LC DES validation repair and audit records, image-lock ratchet, two process-test synchronizations and Python-interpreter resolution. Preserve them. The old 26-missing-audits queue is superseded: current `cargo vet check --locked` reports success with 585 fully audited, seven partially audited and 731 exempted packages under the existing policy. This is not a claim that every dependency has a full audit.
+The six unpublished commits contain the musl ioctl fix, AWS-LC DES validation repair and audit records, image-lock ratchet, two process-test synchronizations and Python-interpreter resolution. Preserve them. The September 22 `cargo vet check --locked` success reported 585 fully audited, seven partially audited and 731 exempted packages under the then-existing policy. Review later found that the path-patched `aws-lc-rs` fork was treated as first-party. The corrected policy fails on 1.18.1 until its source audit is completed; the earlier green result did not cover this fork.
 
 ### Retained evidence newer than the status prose
 
