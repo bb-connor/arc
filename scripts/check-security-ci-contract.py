@@ -4834,6 +4834,7 @@ EXPECTED_NONCE_FIPS_PATHS = [
     "scripts/run-exact-cargo-test-inventory.sh",
     "Cargo.toml",
     "Cargo.lock",
+    "third_party/aws-lc-rs-chio/**",
 ]
 
 
