@@ -2,6 +2,7 @@ mod child;
 mod container;
 mod journal;
 mod plan;
+mod portable;
 mod socket;
 mod supervision;
 
@@ -14,7 +15,7 @@ use tokio::sync::oneshot;
 use tokio::task::JoinSet;
 use tokio::time::Instant;
 
-use super::state::{error, read_json, Host};
+use super::state::{error, Host};
 use crate::CliError;
 use child::Usage;
 use journal::{Completion, Journal};
@@ -24,9 +25,9 @@ pub(super) fn cleanup_socket_for_export(db: &rusqlite::Connection) -> Result<(),
     socket::cleanup_for_export(db)
 }
 
-pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
-    let plan: Plan = read_json(plan)?;
+pub(super) fn run(state: &Path, plan: &Path, json: bool) -> Result<(), CliError> {
     let host = Host::open(state, true)?;
+    let plan = portable::load(&host, plan)?;
     plan.validate(&host)?;
     let mut journal = Journal::open(&host, &plan)?;
     if let Some(service) = &host.lifecycle {
@@ -79,7 +80,7 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
             report["handled_failures"] = serde_json::json!(completion.handled_failures);
             report["unhandled_failures"] = serde_json::json!(completion.unhandled_failures);
         }
-        println!("{report}");
+        super::output::run(json, state, &report);
         cleaned?;
         socket_cleaned?;
         result?;

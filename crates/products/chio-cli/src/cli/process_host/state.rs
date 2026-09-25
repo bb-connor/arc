@@ -60,6 +60,9 @@ pub(super) struct Server {
     pub id: String,
     /// An absolute executable followed by its literal arguments. No shell.
     pub command: Vec<String>,
+    /// Portable authoring only; resolved into the signed launch policy at init.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<PathBuf>,
     /// Operator-selected MCP request deadline, including service setup and cleanup.
     #[serde(default = "default_request_timeout_seconds")]
     pub request_timeout_seconds: u64,
@@ -181,9 +184,18 @@ pub(super) fn write_secret(
 }
 
 impl Config {
-    pub fn load(path: &Path) -> Result<Self, CliError> {
+    pub fn load_for_init(path: &Path, local_tools: bool) -> Result<Self, CliError> {
         let source = std::fs::canonicalize(path)?;
         let mut config: Self = read_json(&source)?;
+        let portable = config.schema == "chio.process.host.v2";
+        if portable != local_tools {
+            return Err(error("portable local tools require host.v2 and explicit --local-tools; signed operator configurations use host.v1 without that flag"));
+        }
+        if local_tools && config.servers.is_empty() {
+            return Err(error(
+                "--local-tools requires at least one configured server",
+            ));
+        }
         if config.policy.is_relative() {
             config.policy = source
                 .parent()
@@ -195,23 +207,96 @@ impl Config {
             .parent()
             .ok_or_else(|| error("configuration has no parent"))?;
         for server in &mut config.servers {
-            let policy = server.launch_policy.as_mut().ok_or_else(|| {
-                error("native MCP servers require launch_policy and launch_policy_signer")
-            })?;
-            if policy.is_relative() {
-                *policy = parent.join(&*policy);
+            if portable {
+                if server.launch_policy.is_some() || server.launch_policy_signer.is_some() {
+                    return Err(error(
+                        "--local-tools cannot override an existing signed launch policy",
+                    ));
+                }
+                let cwd = server
+                    .cwd
+                    .as_ref()
+                    .ok_or_else(|| error("portable tool server requires cwd"))?;
+                let cwd = super::paths::directory(parent, cwd)?;
+                let name = server
+                    .command
+                    .first_mut()
+                    .ok_or_else(|| error("tool command is empty"))?;
+                // The signed native launch contract requires a canonical target.
+                // Worker plans separately preserve virtual-environment invocation.
+                let selected = super::paths::executable(&cwd, name)?;
+                let canonical = selected.canonicalize()?;
+                if selected != canonical
+                    && selected
+                        .parent()
+                        .and_then(Path::parent)
+                        .is_some_and(|root| root.join("pyvenv.cfg").is_file())
+                {
+                    return Err(error("signed local tool launch requires a regular virtual-environment interpreter; create that tool environment with copied executables instead of symlinks"));
+                }
+                *name = canonical
+                    .to_str()
+                    .ok_or_else(|| error("tool executable path must be UTF-8"))?
+                    .to_owned();
+                server.cwd = Some(cwd);
+            } else {
+                if server.cwd.is_some() {
+                    return Err(error("server cwd requires host.v2"));
+                }
+                let policy = server.launch_policy.as_mut().ok_or_else(|| {
+                    error("native MCP servers require launch_policy and launch_policy_signer")
+                })?;
+                if policy.is_relative() {
+                    *policy = parent.join(&*policy);
+                }
+                *policy = std::fs::canonicalize(&*policy)?;
             }
-            *policy = std::fs::canonicalize(&*policy)?;
         }
         config.validate()?;
         Ok(config)
+    }
+
+    pub fn provision_local_tools(&mut self, lease: &Lease) -> Result<(), CliError> {
+        if self.schema != "chio.process.host.v2" {
+            return Ok(());
+        }
+        for server in &mut self.servers {
+            lease.directory.validate_path_identity()?;
+            let directory = lease.directory.path().join(format!("tool-{}", server.id));
+            let cwd = server
+                .cwd
+                .as_deref()
+                .ok_or_else(|| error("missing local tool cwd"))?;
+            crate::mcp_cli::provision_process_local_tools(
+                &directory,
+                &server.command,
+                cwd,
+                &server.id,
+            )
+            .map_err(|cause| {
+                error(format!(
+                    "local tool {} initialization failed; partial state retained at {}: {cause}",
+                    server.id,
+                    lease.directory.path().display()
+                ))
+            })?;
+            server.launch_policy = Some(directory.join("cage-launch-policy.json"));
+            server.launch_policy_signer = Some(
+                std::fs::read_to_string(directory.join("cage-policy-signer"))?
+                    .trim()
+                    .to_owned(),
+            );
+            server.cwd = None;
+        }
+        self.schema = SCHEMA.to_owned();
+        self.validate()
     }
 
     pub fn validate(&self) -> Result<(), CliError> {
         if self.supervised_children && self.spawn_templates.is_empty() {
             return Err(error("supervised children require spawn templates"));
         }
-        if self.schema != SCHEMA
+        if ![SCHEMA, "chio.process.host.v2"].contains(&self.schema.as_str())
             || (self.servers.is_empty()
                 && self.mailboxes.is_empty()
                 && self.spawn_templates.is_empty())
@@ -248,20 +333,34 @@ impl Config {
             identifier(&server.id)?;
             StdioRequestTimeouts::with_request_timeout_seconds(server.request_timeout_seconds)
                 .map_err(error)?;
-            if !server
-                .launch_policy
-                .as_ref()
-                .is_some_and(|path| path.is_absolute())
-            {
-                return Err(error(
-                    "native MCP servers require an absolute launch_policy",
-                ));
+            if self.schema == "chio.process.host.v2" {
+                if server.launch_policy.is_some()
+                    || server.launch_policy_signer.is_some()
+                    || !server.cwd.as_ref().is_some_and(|path| path.is_absolute())
+                {
+                    return Err(error(
+                        "portable local tools require cwd and no existing launch policy",
+                    ));
+                }
+            } else {
+                if server.cwd.is_some() {
+                    return Err(error("retained host has an unresolved tool cwd"));
+                }
+                if !server
+                    .launch_policy
+                    .as_ref()
+                    .is_some_and(|path| path.is_absolute())
+                {
+                    return Err(error(
+                        "native MCP servers require an absolute launch_policy",
+                    ));
+                }
+                let signer = server
+                    .launch_policy_signer
+                    .as_deref()
+                    .ok_or_else(|| error("native MCP servers require launch_policy_signer"))?;
+                chio_core_types::crypto::PublicKey::from_hex(signer).map_err(error)?;
             }
-            let signer = server
-                .launch_policy_signer
-                .as_deref()
-                .ok_or_else(|| error("native MCP servers require launch_policy_signer"))?;
-            chio_core_types::crypto::PublicKey::from_hex(signer).map_err(error)?;
             if !servers.insert(server.id.as_str())
                 || server.command.is_empty()
                 || server.command.len() > 128

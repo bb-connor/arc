@@ -13,6 +13,8 @@ from chio_mini_swe.repository_store import Workspace, atomic_bytes, configuratio
 
 CONFIG = "chio.mini-swe.session-config.v1"
 SCOPED_CONFIG = "chio.mini-swe.session-config.v2"
+PROFILE_CONFIG = "chio.mini-swe.session-config.v3"
+RUNTIME_PROFILE = "chio.mini-swe.runtime-profile.v1"
 INITIALIZED = "chio.mini-swe.session-initialized.v1"
 PREPARED = "chio.mini-swe.session-prepared.v1"
 AUTHORIZATION = "chio.mini-swe.session-authorization.v1"
@@ -126,6 +128,25 @@ def _environment(config):
     }
 
 
+def load_configuration(path):
+    """Resolve a supplied runtime profile once, before capturing session identity."""
+    config = session_security.read_document(path)
+    if not isinstance(config, dict) or config.get("schema") != PROFILE_CONFIG:
+        return config
+    images = {"worker_image", "execution_image", "helper_image"}
+    _fields(config, (CONFIG_FIELDS - images) | {"source_paths", "runtime_profile"})
+    profile_path = _path(path.parent, config["runtime_profile"])
+    profile = session_security.read_document(profile_path, maximum=65536)
+    _fields(profile, images | {"schema"})
+    if profile["schema"] != RUNTIME_PROFILE:
+        raise ValueError("Unsupported coding runtime profile")
+    # Profiles contain exact installed image IDs, never tags or implicit pulls.
+    resolved = {key: value for key, value in config.items() if key != "runtime_profile"}
+    resolved.update({key: profile[key] for key in images})
+    resolved["schema"] = SCOPED_CONFIG
+    return resolved
+
+
 def initialize(config_path, task_path, state):
     from chio_mini_swe.gateway import tool as model_tool
     from chio_mini_swe.repository import tool as repository_tool
@@ -134,12 +155,12 @@ def initialize(config_path, task_path, state):
     from chio_mini_swe.worker import validate_bootstrap
 
     path = Path(config_path).resolve(strict=True)
-    config = session_security.read_document(path)
+    config = load_configuration(path)
     _configuration_fields(config)
     provider_path = _path(path.parent, config["provider_config"])
     provider = validate(session_security.read_document(provider_path, maximum=65536))
     _configuration(config, provider)
-    binary = _path(path.parent, config["chio"])
+    binary = operator.resolve_executable(path.parent, config["chio"])
     operator.protected_executable(binary)
     binary_hash = operator.digest_file(binary)
     if not operator.supports_state_reader(binary):

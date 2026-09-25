@@ -41,12 +41,30 @@ def file_hash(path, *, maximum=1024 * 1024, private=False):
     return hashlib.sha256((read_private if private else read_file)(path, maximum)).hexdigest()
 
 
-def _protected(path):
+def _protected(path, *, package_record=False):
     metadata = path.lstat()
+    if package_record:
+        # uv's lock and installer RECORD inventories are bookkeeping, not
+        # importable code. They may be writable even when the installation's
+        # code and every containing directory are protected. Never read them
+        # to derive launch authority or installed source identity.
+        if (not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1
+                or metadata.st_mode & 0o111 or metadata.st_uid != os.getuid()):
+            raise ValueError("Invalid Python package-manager record")
+        return
     if metadata.st_uid not in {0, os.getuid()} or metadata.st_mode & 0o022:
         raise ValueError("The installed Python environment is writable by other users")
     if not (stat.S_ISDIR(metadata.st_mode) or stat.S_ISREG(metadata.st_mode)):
         raise ValueError("The installed Python environment contains a special file")
+
+
+def _package_record(prefix, path):
+    parts = path.relative_to(prefix).parts
+    return parts == (".lock",) or (
+        len(parts) == 5 and parts[0] == "lib" and parts[1].startswith("python")
+        and parts[2] == "site-packages" and parts[3].endswith(".dist-info")
+        and parts[4] == "RECORD"
+    )
 
 
 def environment_identity():
@@ -73,6 +91,9 @@ def environment_identity():
             if count > 100000:
                 raise ValueError("The installed Python environment exceeds its entry bound")
             path = Path(directory) / name
+            if _package_record(prefix, path):
+                _protected(path, package_record=True)
+                continue
             if path.is_symlink():
                 target = path.resolve(strict=True)
                 protected_parent(target.parent)

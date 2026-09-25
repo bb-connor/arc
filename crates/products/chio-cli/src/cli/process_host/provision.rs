@@ -109,8 +109,13 @@ pub(super) fn child_capability(
     .map_err(error)
 }
 
-pub(super) fn init(config: &Path, state: &Path) -> Result<(), CliError> {
-    let config = Config::load(config)?;
+pub(super) fn init(
+    config: &Path,
+    state: &Path,
+    local_tools: bool,
+    json: bool,
+) -> Result<(), CliError> {
+    let mut config = Config::load_for_init(config, local_tools)?;
     let policy = chio_control_plane::policy::load_policy(&config.policy)?;
     if config.limits.max_depth > policy.kernel.delegation_depth_limit {
         return Err(error(
@@ -120,6 +125,7 @@ pub(super) fn init(config: &Path, state: &Path) -> Result<(), CliError> {
     let identity = policy.identity.clone();
     let defaults = policy.default_capabilities.clone();
     let lease = Lease::acquire(state, true)?;
+    config.provision_local_tools(&lease)?;
     let (kernel, issuer) = kernel(lease.directory.path(), policy)?;
     let (servers, manifests) = super::serving::connect(&config, &kernel, lease.directory.path())?;
     let root_key = Keypair::generate();
@@ -187,15 +193,18 @@ pub(super) fn init(config: &Path, state: &Path) -> Result<(), CliError> {
     }
     write_secret(
         &lease.directory,
+        std::ffi::OsStr::new("kernel.pub"),
+        format!("{}\n", issuer.public_key().to_hex()).as_bytes(),
+    )?;
+    // host.json is the final readiness record. Partial initialization never runs.
+    write_secret(
+        &lease.directory,
         std::ffi::OsStr::new("host.json"),
         &encoded,
     )?;
     lease.directory.validate_path_identity()?;
     drop(servers);
-    println!(
-        "{}",
-        json!({"initialized": true, "processes": identities.len(), "kernel_key": issuer.public_key().to_hex()})
-    );
+    super::output::initialized(json, state, identities.len(), &issuer.public_key().to_hex());
     Ok(())
 }
 

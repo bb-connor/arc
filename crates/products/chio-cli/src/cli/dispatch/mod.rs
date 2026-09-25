@@ -23,7 +23,6 @@ mod settle_arena;
 mod trust_cmd;
 mod workflow;
 
-use api_mcp::{dispatch_api, dispatch_mcp};
 #[allow(unused_imports)]
 pub(crate) use self::attest::{
     cmd_chio_attest_runtime_quote_verify, cmd_chio_attest_supply_chain_verify, decode_fixed_hex,
@@ -33,33 +32,32 @@ pub(crate) use self::attest::{
 #[cfg(feature = "tee-quotes")]
 #[allow(unused_imports)]
 pub(crate) use self::attest::{
-    collateral_required_str, collateral_required_u32, decode_hex_required,
-    decode_hex_vec_required, parse_quote_tcb_status, unix_seconds_to_system_time,
-    RuntimeQuoteCollateralDocument,
+    collateral_required_str, collateral_required_u32, decode_hex_required, decode_hex_vec_required,
+    parse_quote_tcb_status, unix_seconds_to_system_time, RuntimeQuoteCollateralDocument,
 };
-use certify_cert::{dispatch_cert, dispatch_certify};
-use did_passport::{dispatch_did, dispatch_passport};
 #[allow(unused_imports)]
 pub(crate) use self::federation::{
-    dispatch_chio_authority_command, dispatch_chio_federation_command,
-    dispatch_chio_treaty_command,
+    dispatch_chio_authority_command, dispatch_chio_federation_command, dispatch_chio_treaty_command,
 };
-use finding_cmd::dispatch_finding;
 #[allow(unused_imports)]
 pub(crate) use self::lineage_cmd::{dispatch_lineage, emit_lineage_report};
 #[allow(unused_imports)]
 pub(crate) use self::market_cmd::{
     cmd_market_info, cmd_market_install, cmd_market_list, parse_market_tier,
 };
-pub(crate) use output::write_cli_error;
-use policy_analysis::dispatch_policy;
 #[allow(unused_imports)]
 pub(crate) use self::pheromone::dispatch_chio_pheromone_command;
+#[allow(unused_imports)]
+pub(crate) use self::runtime::dispatch_chio_runtime_command;
+use api_mcp::{dispatch_api, dispatch_mcp};
+use certify_cert::{dispatch_cert, dispatch_certify};
+use did_passport::{dispatch_did, dispatch_passport};
+use finding_cmd::dispatch_finding;
+pub(crate) use output::write_cli_error;
+use policy_analysis::dispatch_policy;
 use proof::{dispatch_commerce, dispatch_proof};
 use receipt_evidence::{dispatch_evidence, dispatch_receipt};
 use reputation_guard::{dispatch_conformance, dispatch_guard, dispatch_reputation};
-#[allow(unused_imports)]
-pub(crate) use self::runtime::dispatch_chio_runtime_command;
 use settle_arena::{dispatch_arena, dispatch_settle};
 use trust_cmd::dispatch_trust;
 use workflow::dispatch_workflow;
@@ -107,11 +105,7 @@ fn format_redacted_event_line(event: &chio_log_redact::RedactedEvent) -> String 
 /// Format a redacted tracing event into one stderr line and write it.
 fn write_redacted_event_to_stderr(event: chio_log_redact::RedactedEvent) {
     use std::io::Write;
-    let _ = writeln!(
-        std::io::stderr(),
-        "{}",
-        format_redacted_event_line(&event)
-    );
+    let _ = writeln!(std::io::stderr(), "{}", format_redacted_event_line(&event));
 }
 
 #[cfg(test)]
@@ -197,24 +191,28 @@ pub(crate) fn run() {
     let control_url = cli.control_url.clone();
     let control_token = cli.control_token.clone();
     let control_authority_public_key = cli.control_authority_public_key.clone();
-    let control_authority_trusted_public_keys =
-        cli.control_authority_trusted_public_keys.clone();
+    let control_authority_trusted_public_keys = cli.control_authority_trusted_public_keys.clone();
     let json_output = cli.json_output();
+    let process_json_output = cli.process_json_output();
 
     init_redacted_tracing();
 
     let command = cli.command;
     let result = match command {
         Commands::Process { command } => {
-            if receipt_db.is_some() || revocation_db.is_some() || authority_seed_file.is_some()
-                || authority_db.is_some() || budget_db.is_some() || session_db.is_some()
+            if receipt_db.is_some()
+                || revocation_db.is_some()
+                || authority_seed_file.is_some()
+                || authority_db.is_some()
+                || budget_db.is_some()
+                || session_db.is_some()
                 || control_url.is_some()
             {
                 Err(CliError::cli_other_error("process host stores are bound to --state; global store and control URL overrides are unsupported".to_owned()))
             } else {
-                crate::process_host::dispatch(command)
+                crate::process_host::dispatch(command, process_json_output)
             }
-        },
+        }
         Commands::Run { policy, command } => cmd_run(
             &policy,
             &command,
@@ -277,17 +275,49 @@ pub(crate) fn run() {
             control_authority_public_key,
             control_authority_trusted_public_keys,
         ),
-        Commands::Trust { command } => dispatch_trust(command, json_output, receipt_db, revocation_db, authority_seed_file, authority_db, budget_db, session_db, control_url, control_token),
-        Commands::Receipt { command } => dispatch_receipt(command, json_output, receipt_db, control_url, control_token),
-        Commands::Evidence { command } => dispatch_evidence(command, json_output, receipt_db, control_url, control_token),
-        Commands::Certify { command } => dispatch_certify(command, json_output, control_url, control_token),
+        Commands::Trust { command } => dispatch_trust(
+            command,
+            json_output,
+            receipt_db,
+            revocation_db,
+            authority_seed_file,
+            authority_db,
+            budget_db,
+            session_db,
+            control_url,
+            control_token,
+        ),
+        Commands::Receipt { command } => {
+            dispatch_receipt(command, json_output, receipt_db, control_url, control_token)
+        }
+        Commands::Evidence { command } => {
+            dispatch_evidence(command, json_output, receipt_db, control_url, control_token)
+        }
+        Commands::Certify { command } => {
+            dispatch_certify(command, json_output, control_url, control_token)
+        }
         Commands::Did { command } => dispatch_did(command, json_output),
-        Commands::Passport { command } => dispatch_passport(command, json_output, receipt_db, budget_db, control_url, control_token),
+        Commands::Passport { command } => dispatch_passport(
+            command,
+            json_output,
+            receipt_db,
+            budget_db,
+            control_url,
+            control_token,
+        ),
         Commands::Proof { command } => dispatch_proof(command, json_output),
         Commands::Commerce { command } => dispatch_commerce(command, json_output),
         Commands::Workflow { command } => dispatch_workflow(command, json_output),
         Commands::Cert { command } => dispatch_cert(command, json_output, authority_seed_file),
-        Commands::Reputation { command } => dispatch_reputation(command, json_output, receipt_db, budget_db, authority_seed_file, control_url, control_token),
+        Commands::Reputation { command } => dispatch_reputation(
+            command,
+            json_output,
+            receipt_db,
+            budget_db,
+            authority_seed_file,
+            control_url,
+            control_token,
+        ),
         Commands::Guard { command } => {
             dispatch_guard(command, json_output, control_url, control_token)
         }
@@ -306,9 +336,7 @@ pub(crate) fn run() {
                     output,
                     manifest,
                 } => crate::active_response_authority::cmd_authority_store_build(
-                    &input,
-                    &output,
-                    &manifest,
+                    &input, &output, &manifest,
                 ),
             },
             #[cfg(not(unix))]

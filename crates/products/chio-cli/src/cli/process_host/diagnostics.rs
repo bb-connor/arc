@@ -160,13 +160,14 @@ fn read_private(
     Ok(bytes)
 }
 
-pub(super) fn status(path: &Path) -> Result<(), CliError> {
+pub(super) fn status(path: &Path, json: bool) -> Result<(), CliError> {
     let observer = Observer::open(path)?;
     let snapshot = observer.run_status()?;
     observer.directory.validate_path_identity()?;
-    println!(
-        "{}",
-        serde_json::json!({
+    super::output::status(
+        json,
+        path,
+        &serde_json::json!({
             "schema": "chio.process.status.v1",
             "abi": {
                 "serving": chio_process::PROCESS_ABI,
@@ -175,7 +176,7 @@ pub(super) fn status(path: &Path) -> Result<(), CliError> {
             },
             "host_lock_held": observer.host_lock_held,
             "run": snapshot,
-        })
+        }),
     );
     Ok(())
 }
