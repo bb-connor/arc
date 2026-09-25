@@ -40,9 +40,8 @@
 
 ---
 
-```sh
-curl -fsSL https://www.chio.computer/install.sh | sh
-```
+[Build the CLI from source](docs/install/README.md), or try the
+[Linux process preview](docs/install/PROCESS_PREVIEW.md) with Python and Node workers.
 
 ## What is Chio
 
@@ -258,10 +257,15 @@ Bond Claude Code to a policy in one line, then verify everything it did.
 ### 1. Install
 
 ```sh
-curl -fsSL https://www.chio.computer/install.sh | sh
+git clone https://github.com/backbay-labs/chio.git
+cd chio
+cargo build --locked --release -p chio-cli --bin chio
+export PATH="$PWD/target/release:$PATH"
+chio --version
 ```
 
-<sub>Or from source: <code>git clone https://github.com/backbay-labs/chio.git && cd chio && cargo build --release -p chio-cli</code></sub>
+See the [install guide](docs/install/README.md) for prerequisites and the
+[process preview](docs/install/PROCESS_PREVIEW.md) for the newer worker stack.
 
 ### 2. Put Claude or Hermes under policy
 

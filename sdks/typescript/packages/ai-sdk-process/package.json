@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bb-connor/arc.git",
+    "url": "git+https://github.com/backbay-labs/chio.git",
     "directory": "sdks/typescript/packages/ai-sdk-process"
   },
   "main": "./dist/index.js",

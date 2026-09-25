@@ -16,7 +16,7 @@ workers with read-only RPC inputs, separate namespaces, bounded scratch and
 resource/output ceilings on a local Linux Docker engine. It does not change the
 client's worker protocol or require an additional Python dependency.
 
-The [packaged starter](https://github.com/bb-connor/arc/tree/main/examples/process-starter)
+The [packaged starter](https://github.com/backbay-labs/chio/tree/main/examples/process-starter)
 includes a native Linux host and runs Python and Node workers from installed
 packages outside the checkout. Registry publication is a separate release step.
 
