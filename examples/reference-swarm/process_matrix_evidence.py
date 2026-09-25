@@ -189,10 +189,54 @@ def verify_authority_probes(case):
         for index, probe in enumerate(probes):
             request = {field: probe[field] for field in request_fields}
             request["known_outcome_only"] = False
+            denied = case["denials"][f"{worker}-{index}"]
             require(
-                case["denials"][f"{worker}-{index}"]["request"] == request,
+                denied["request"] == request,
                 "authority denial differs from its planned isolation probe",
             )
+            signed = json.loads(
+                denied["response"]["receipt_json"], object_pairs_hook=unique_object
+            )
+            metadata = signed["metadata"]
+            intent = probe["governed_intent"]
+            # The reference intent contains ASCII keys and values, so compact
+            # sorted JSON has the same bytes as its RFC 8785 binding.
+            canonical_intent = json.dumps(
+                intent, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                allow_nan=False,
+            )
+            require(canonical_intent.isascii(), "non-ASCII reference intent")
+            governed = metadata["governed_transaction"]
+            require(
+                metadata["chio_process"]["operation_key"] == probe["operation_key"]
+                and metadata["chio_process"]["process_id"] == worker
+                and governed["intent_id"] == intent["id"]
+                and governed["intent_hash"]
+                == hashlib.sha256(canonical_intent.encode()).hexdigest()
+                and governed["server_id"] == intent["server_id"]
+                and governed["tool_name"] == intent["tool_name"],
+                "authority denial has a different signed intent",
+            )
+            if index == 0:
+                require(
+                    metadata.get("chio_runtime") is None
+                    and signed["decision"]["reason"]
+                    == f"requested tool {probe['tool_name']} on server "
+                    f"{probe['server_id']} is not in capability scope",
+                    "scope widening was denied for a different reason",
+                )
+            else:
+                expected_failure = (
+                    "chio_swarm_authority_rejected"
+                    if index == 1 else "request_binding_mismatch"
+                )
+                require(
+                    metadata["chio_runtime"]["accepted"] is False
+                    and metadata["chio_runtime"]["failure_code"] == expected_failure
+                    and metadata["chio_runtime"]["admission_id"]
+                    == intent["context"]["chioAdmission"]["admissionId"],
+                    "authority probe was denied by a different admission path",
+                )
 
 
 def verify_observations(name, case, verified, identity):
@@ -828,6 +872,20 @@ def verify_negative_cases(chio, artifact, trusted_pins):
         denials = changed["scenarios"]["authority"]["denials"]
         denials["alice-0"], denials["alice-1"] = denials["alice-1"], denials["alice-0"]
         reject("authority-denial-order", changed, copy.deepcopy(original_pins))
+        # Isolate the semantic check after receipt authentication. A full
+        # bundle mutation would fail on the signature before reaching it.
+        changed = copy.deepcopy(original)
+        authority = changed["scenarios"]["authority"]
+        denial = authority["denials"]["alice-1"]["response"]
+        receipt = json.loads(denial["receipt_json"], object_pairs_hook=unique_object)
+        receipt["metadata"]["chio_runtime"]["failure_code"] = "request_binding_mismatch"
+        denial["receipt_json"] = json.dumps(receipt)
+        try:
+            verify_authority_probes(authority)
+        except ValueError as error:
+            results.append({"case": "authority-denial-path", "rejected": True, "reason": str(error)})
+        else:
+            raise ValueError("matrix verifier accepted authority-denial-path")
         changed = copy.deepcopy(original)
         changed["scenarios"]["budget"]["observation"]["overlap_observed"] = False
         reject("capture-digest", changed, copy.deepcopy(original_pins), repin=False)
