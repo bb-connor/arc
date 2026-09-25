@@ -21,7 +21,9 @@ mod linkage;
 #[path = "provision/reference_runtime.rs"]
 mod reference_runtime;
 
-pub(crate) use reference_runtime::{cmd_provision_reference_runtime, ProvisionReferenceRuntimeArgs};
+pub(crate) use reference_runtime::{
+    cmd_provision_reference_runtime, ProvisionReferenceRuntimeArgs,
+};
 
 /// Where the reviewed tool surface of a provisioned demo comes from.
 #[derive(Clone, Copy)]
@@ -337,13 +339,46 @@ pub(crate) fn cmd_provision_native_mcp_demo(
     provision(&inputs)
 }
 
+pub(crate) fn provision_process_local_tools(
+    output: &Path,
+    command: &[String],
+    cwd: &Path,
+    id: &str,
+) -> Result<(), CliError> {
+    let target = command
+        .first()
+        .ok_or_else(|| CliError::cli_other_error("missing local tool command".to_owned()))?;
+    let inputs = resolve_inputs(
+        ProvisionProfile::native_mcp_demo(),
+        output,
+        None,
+        ToolSurfaceSource::Discovered,
+        Path::new(target),
+        &command[1..],
+        Some(cwd),
+        unsafe { libc::geteuid() },
+        unsafe { libc::getegid() },
+        &[],
+        id,
+        id,
+        "1",
+    )?;
+    provision_report(&inputs)?;
+    Ok(())
+}
+
 /// Provision or revalidate: an existing output is verified byte for byte
 /// against what the inputs would produce, a missing one is created.
 fn provision(inputs: &ProvisionInputs) -> Result<(), CliError> {
+    let report = provision_report(inputs)?;
+    write_report_to_stdout(&report)
+}
+
+fn provision_report(inputs: &ProvisionInputs) -> Result<ProvisionReport, CliError> {
     match std::fs::symlink_metadata(&inputs.output_directory) {
         Ok(_) => {
             let report = validate_existing_provision(inputs)?;
-            return write_report_to_stdout(&report);
+            return Ok(report);
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => {
@@ -405,20 +440,19 @@ fn resolve_inputs(
         CliError::cli_other_error(format!("invalid native MCP execution identity: {error}"))
     })?;
     let chio_executable = std::env::current_exe().map_err(|error| {
-        CliError::cli_io_error(format!("failed to resolve the current Chio executable: {error}"))
+        CliError::cli_io_error(format!(
+            "failed to resolve the current Chio executable: {error}"
+        ))
     })?;
     let chio_executable_path = require_exact_canonical_path(
-        &chio_executable
-            .canonicalize()
-            .map_err(|error| {
-                CliError::cli_io_error(format!(
-                    "failed to canonicalize the current Chio executable: {error}"
-                ))
-            })?,
+        &chio_executable.canonicalize().map_err(|error| {
+            CliError::cli_io_error(format!(
+                "failed to canonicalize the current Chio executable: {error}"
+            ))
+        })?,
         "current Chio executable",
     )?;
-    let chio_executable_digest =
-        hash_executable(&chio_executable_path, "current Chio executable")?;
+    let chio_executable_digest = hash_executable(&chio_executable_path, "current Chio executable")?;
     let (cage_init_path, cage_init_binding_digest) = match &profile.cage_init {
         CageInitSource::ChioExecutable => {
             (chio_executable_path.clone(), chio_executable_digest.clone())
@@ -474,8 +508,8 @@ fn resolve_inputs(
             validate_reviewed_tools(tools, "the native MCP target's tools/list")?
         }
     };
-    let reviewed_tools_bytes =
-        chio_core::canonical_json_bytes(&ReviewedTools { tools: &tools }).map_err(|error| {
+    let reviewed_tools_bytes = chio_core::canonical_json_bytes(&ReviewedTools { tools: &tools })
+        .map_err(|error| {
             CliError::cli_other_error(format!(
                 "failed to encode the reviewed native MCP tool surface: {error}"
             ))
@@ -524,10 +558,14 @@ fn require_target_linkage_declared(
     target: &Path,
     runtime_files: &BTreeSet<PathBuf>,
 ) -> Result<(), CliError> {
-    let image = read_bounded_regular_file(target, MAX_EXECUTABLE_BYTES, false, "target executable")?;
+    let image =
+        read_bounded_regular_file(target, MAX_EXECUTABLE_BYTES, false, "target executable")?;
     match linkage::inspect_executable_linkage(&image) {
         Ok(linkage::ExecutableLinkage::Static { .. }) => Ok(()),
-        Ok(linkage::ExecutableLinkage::Dynamic { interpreter, needed }) => {
+        Ok(linkage::ExecutableLinkage::Dynamic {
+            interpreter,
+            needed,
+        }) => {
             let declared_interpreter = interpreter
                 .as_ref()
                 .is_none_or(|interpreter| runtime_files.contains(interpreter));
@@ -545,7 +583,7 @@ fn require_target_linkage_declared(
     }
 }
 
-fn provision_new(inputs: &ProvisionInputs) -> Result<(), CliError> {
+fn provision_new(inputs: &ProvisionInputs) -> Result<ProvisionReport, CliError> {
     let parent = inputs.output_directory.parent().ok_or_else(|| {
         CliError::cli_other_error("native MCP demo output has no parent directory".to_string())
     })?;
@@ -556,10 +594,7 @@ fn provision_new(inputs: &ProvisionInputs) -> Result<(), CliError> {
             CliError::cli_other_error("native MCP demo output has no directory name".to_string())
         })?
         .to_string_lossy();
-    let staging_path = parent.join(format!(
-        ".{leaf}.chio-provision-{}",
-        uuid::Uuid::new_v4()
-    ));
+    let staging_path = parent.join(format!(".{leaf}.chio-provision-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir(&staging_path).map_err(|error| {
         CliError::cli_io_error(format!(
             "failed to create native MCP demo staging directory {}: {error}",
@@ -681,7 +716,11 @@ fn provision_new(inputs: &ProvisionInputs) -> Result<(), CliError> {
         let promotion_bytes = chio_core::canonical_json_bytes(&promotion).map_err(|error| {
             CliError::cli_other_error(format!("failed to encode migration promotion: {error}"))
         })?;
-        write_private_file(&staging_path.join(file_name), &promotion_bytes, "migration promotion")?;
+        write_private_file(
+            &staging_path.join(file_name),
+            &promotion_bytes,
+            "migration promotion",
+        )?;
         migration_state = match store.compare_and_promote(&promotion).map_err(|error| {
             CliError::cli_other_error(format!(
                 "failed to promote the migration ledger to {stage:?}: {error}"
@@ -737,7 +776,7 @@ fn provision_new(inputs: &ProvisionInputs) -> Result<(), CliError> {
     sync_directory(parent)?;
 
     match validate_existing_provision(inputs) {
-        Ok(validated) => write_report_to_stdout(&validated),
+        Ok(validated) => Ok(validated),
         Err(error) => {
             let _ = std::fs::remove_dir_all(&inputs.output_directory);
             Err(error)
@@ -745,9 +784,7 @@ fn provision_new(inputs: &ProvisionInputs) -> Result<(), CliError> {
     }
 }
 
-fn validate_existing_provision(
-    inputs: &ProvisionInputs,
-) -> Result<ProvisionReport, CliError> {
+fn validate_existing_provision(inputs: &ProvisionInputs) -> Result<ProvisionReport, CliError> {
     validate_private_directory(&inputs.output_directory)?;
     validate_exact_artifact_set(&inputs.output_directory, &inputs.profile)?;
     let report_bytes = read_bounded_regular_file(
@@ -756,9 +793,9 @@ fn validate_existing_provision(
         true,
         "provision report",
     )?;
-    let report: ProvisionReport = serde_json::from_slice(&report_bytes).map_err(
-        |error| CliError::cli_other_error(format!("invalid demo provision report: {error}")),
-    )?;
+    let report: ProvisionReport = serde_json::from_slice(&report_bytes).map_err(|error| {
+        CliError::cli_other_error(format!("invalid demo provision report: {error}"))
+    })?;
     require_canonical_json(&report, &report_bytes, "demo provision report")?;
     let now = current_unix_ms()?;
     if report.created_at_unix_ms == 0 || report.created_at_unix_ms > now {
@@ -774,7 +811,9 @@ fn validate_existing_provision(
         "reviewed tools",
     )?;
     if reviewed_tools_bytes != inputs.reviewed_tools_bytes {
-        return Err(tampered("reviewed tools do not match the requested fixture"));
+        return Err(tampered(
+            "reviewed tools do not match the requested fixture",
+        ));
     }
 
     let signers = load_existing_signers(&inputs.output_directory)?;
@@ -785,13 +824,12 @@ fn validate_existing_provision(
         true,
         "target command",
     )?;
-    let expected_target_command = chio_core::canonical_json_bytes(&inputs.target_argv).map_err(
-        |error| {
+    let expected_target_command =
+        chio_core::canonical_json_bytes(&inputs.target_argv).map_err(|error| {
             CliError::cli_other_error(format!(
                 "failed to encode expected target command argv: {error}"
             ))
-        },
-    )?;
+        })?;
     if target_command != expected_target_command {
         return Err(tampered(
             "target command argv does not match the requested executable and arguments",
@@ -810,7 +848,9 @@ fn validate_existing_provision(
         "signed manifest",
     )?;
     if signed_manifest_bytes != expected_manifest_bytes {
-        return Err(tampered("signed manifest does not match the reviewed tool surface"));
+        return Err(tampered(
+            "signed manifest does not match the reviewed tool surface",
+        ));
     }
 
     let deployment_id = deployment_id(&inputs.profile, &inputs.server_id)?;
@@ -893,30 +933,33 @@ fn validate_existing_provision(
         &launch_contract,
     )
     .map_err(|error| {
-        CliError::cli_other_error(format!("failed to encode expected migration posture: {error}"))
+        CliError::cli_other_error(format!(
+            "failed to encode expected migration posture: {error}"
+        ))
     })?;
-    let expected_transition_body =
-        chio_security_types::EnterpriseMigrationTransitionBody::genesis(
-            migration_key.clone(),
-            posture_digest,
-            digest32(&signed_manifest_bytes),
-            canonical_digest32(&launch_contract, "demo launch contract")?,
-            launch_contract.runtime_digest,
-            report.created_at_unix_ms,
-            signers.migration.public_key().to_hex(),
-        )
-        .map_err(|error| {
-            CliError::cli_other_error(format!("failed to rebuild demo migration genesis: {error}"))
-        })?;
+    let expected_transition_body = chio_security_types::EnterpriseMigrationTransitionBody::genesis(
+        migration_key.clone(),
+        posture_digest,
+        digest32(&signed_manifest_bytes),
+        canonical_digest32(&launch_contract, "demo launch contract")?,
+        launch_contract.runtime_digest,
+        report.created_at_unix_ms,
+        signers.migration.public_key().to_hex(),
+    )
+    .map_err(|error| {
+        CliError::cli_other_error(format!("failed to rebuild demo migration genesis: {error}"))
+    })?;
     let expected_transition = chio_store_sqlite::sign_enterprise_migration_transition(
         expected_transition_body,
         &signers.migration,
     )
     .map_err(|error| {
-        CliError::cli_other_error(format!("failed to rebuild signed migration genesis: {error}"))
+        CliError::cli_other_error(format!(
+            "failed to rebuild signed migration genesis: {error}"
+        ))
     })?;
-    let expected_transition_bytes = chio_core::canonical_json_bytes(&expected_transition)
-        .map_err(|error| {
+    let expected_transition_bytes =
+        chio_core::canonical_json_bytes(&expected_transition).map_err(|error| {
             CliError::cli_other_error(format!(
                 "failed to encode expected migration genesis: {error}"
             ))
@@ -929,7 +972,8 @@ fn validate_existing_provision(
 
     let mut prior_state = state_after(&transition, transition_digest);
     let mut transition_digests = vec![transition_digest];
-    for ((stage, _), (promotion, promotion_bytes)) in promotions.iter().zip(&promotion_transitions) {
+    for ((stage, _), (promotion, promotion_bytes)) in promotions.iter().zip(&promotion_transitions)
+    {
         let expected = build_promotion(
             &signers,
             &prior_state,
@@ -941,7 +985,9 @@ fn validate_existing_provision(
             report.created_at_unix_ms,
         )?;
         let expected_bytes = chio_core::canonical_json_bytes(&expected).map_err(|error| {
-            CliError::cli_other_error(format!("failed to encode expected migration promotion: {error}"))
+            CliError::cli_other_error(format!(
+                "failed to encode expected migration promotion: {error}"
+            ))
         })?;
         if *promotion_bytes != expected_bytes {
             return Err(tampered(&format!(
@@ -960,7 +1006,9 @@ fn validate_existing_provision(
         "cage policy",
     )?;
     if cage_policy_bytes != expected_policy_bytes {
-        return Err(tampered("cage policy does not match the exact launch contract"));
+        return Err(tampered(
+            "cage policy does not match the exact launch contract",
+        ));
     }
     let target_args = inputs
         .target_argv
@@ -999,7 +1047,9 @@ fn validate_existing_provision(
         &transition_digests,
     );
     if report != expected_report {
-        return Err(tampered("provision report does not match the verified artifacts"));
+        return Err(tampered(
+            "provision report does not match the verified artifacts",
+        ));
     }
     validate_exact_artifact_set(&inputs.output_directory, &inputs.profile)?;
     Ok(report)
@@ -1014,7 +1064,9 @@ fn load_migration_state(
         .map_err(|error| {
             CliError::cli_other_error(format!("failed to load the migration ledger: {error}"))
         })?
-        .ok_or_else(|| CliError::cli_other_error("migration ledger head was not retained".to_string()))
+        .ok_or_else(|| {
+            CliError::cli_other_error("migration ledger head was not retained".to_string())
+        })
 }
 
 /// The ledger state a registered transition leaves behind.
@@ -1067,7 +1119,9 @@ fn build_promotion(
         launch_contract,
     )
     .map_err(|error| {
-        CliError::cli_other_error(format!("failed to encode the {stage:?} migration posture: {error}"))
+        CliError::cli_other_error(format!(
+            "failed to encode the {stage:?} migration posture: {error}"
+        ))
     })?;
     let body = chio_security_types::EnterpriseMigrationTransitionBody::promotion(
         prior,
@@ -1079,7 +1133,9 @@ fn build_promotion(
         signers.migration.public_key().to_hex(),
     )
     .map_err(|error| {
-        CliError::cli_other_error(format!("failed to build the {stage:?} migration promotion: {error}"))
+        CliError::cli_other_error(format!(
+            "failed to build the {stage:?} migration promotion: {error}"
+        ))
     })?;
     if body.to_stage != stage {
         return Err(CliError::cli_other_error(format!(
@@ -1087,9 +1143,13 @@ fn build_promotion(
             body.to_stage
         )));
     }
-    chio_store_sqlite::sign_enterprise_migration_transition(body, &signers.migration).map_err(|error| {
-        CliError::cli_other_error(format!("failed to sign the {stage:?} migration promotion: {error}"))
-    })
+    chio_store_sqlite::sign_enterprise_migration_transition(body, &signers.migration).map_err(
+        |error| {
+            CliError::cli_other_error(format!(
+                "failed to sign the {stage:?} migration promotion: {error}"
+            ))
+        },
+    )
 }
 
 fn build_signed_manifest(
@@ -1102,8 +1162,8 @@ fn build_signed_manifest(
         server_version: inputs.server_version.clone(),
         public_key: signer.public_key().to_hex(),
     };
-    let mut manifest = chio_mcp_adapter::generate_manifest(&config, inputs.tools.clone())
-        .map_err(|error| {
+    let mut manifest =
+        chio_mcp_adapter::generate_manifest(&config, inputs.tools.clone()).map_err(|error| {
             CliError::cli_other_error(format!(
                 "reviewed native MCP tools cannot form a strict manifest: {error}"
             ))
@@ -1158,7 +1218,9 @@ fn build_policy_factory(
             .join(MIGRATION_DATABASE_FILE),
         deployment_id,
         migration_signer_public_key: signers.migration.public_key(),
-        receipt_database_path: inputs.runtime_security_directory.join(RECEIPT_DATABASE_FILE),
+        receipt_database_path: inputs
+            .runtime_security_directory
+            .join(RECEIPT_DATABASE_FILE),
         receipt_signer_seed_path: inputs.runtime_security_directory.join(RECEIPT_SEED_FILE),
         receipt_signer_public_key: signers.receipt.public_key(),
     })
@@ -1281,9 +1343,8 @@ fn load_existing_signers(directory: &Path) -> Result<ProvisionSigners, CliError>
 
 fn load_signer(directory: &Path, file_name: &str) -> Result<chio_core::Keypair, CliError> {
     validate_private_regular_file(&directory.join(file_name), 256, file_name)?;
-    chio_control_plane::load_existing_authority_keypair(&directory.join(file_name)).map_err(
-        |error| tampered(&format!("private signer {file_name} is invalid: {error}")),
-    )
+    chio_control_plane::load_existing_authority_keypair(&directory.join(file_name))
+        .map_err(|error| tampered(&format!("private signer {file_name} is invalid: {error}")))
 }
 
 fn write_public_keys(directory: &Path, signers: &ProvisionSigners) -> Result<(), CliError> {
@@ -1306,10 +1367,7 @@ fn write_public_keys(directory: &Path, signers: &ProvisionSigners) -> Result<(),
     Ok(())
 }
 
-fn validate_public_key_files(
-    directory: &Path,
-    signers: &ProvisionSigners,
-) -> Result<(), CliError> {
+fn validate_public_key_files(directory: &Path, signers: &ProvisionSigners) -> Result<(), CliError> {
     for (file_name, expected) in [
         (MANIFEST_PUBLIC_KEY_FILE, signers.manifest.public_key()),
         (CAGE_POLICY_PUBLIC_KEY_FILE, signers.policy.public_key()),
@@ -1320,12 +1378,7 @@ fn validate_public_key_files(
             signers.control_authority.public_key(),
         ),
     ] {
-        let bytes = read_bounded_regular_file(
-            &directory.join(file_name),
-            128,
-            true,
-            file_name,
-        )?;
+        let bytes = read_bounded_regular_file(&directory.join(file_name), 128, true, file_name)?;
         if bytes != expected.to_hex().as_bytes() {
             return Err(tampered(&format!(
                 "public key file {file_name} does not match its private signer"
@@ -1401,9 +1454,8 @@ fn canonical_digest32<T: Serialize>(
     value: &T,
     label: &str,
 ) -> Result<chio_security_types::ports::Digest32, CliError> {
-    let bytes = chio_core::canonical_json_bytes(value).map_err(|error| {
-        CliError::cli_other_error(format!("failed to encode {label}: {error}"))
-    })?;
+    let bytes = chio_core::canonical_json_bytes(value)
+        .map_err(|error| CliError::cli_other_error(format!("failed to encode {label}: {error}")))?;
     Ok(digest32(&bytes))
 }
 
@@ -1459,10 +1511,7 @@ fn require_exact_absolute_output_path(path: &Path) -> Result<PathBuf, CliError> 
     Ok(canonical_output)
 }
 
-fn require_exact_absolute_logical_directory(
-    path: &Path,
-    label: &str,
-) -> Result<PathBuf, CliError> {
+fn require_exact_absolute_logical_directory(path: &Path, label: &str) -> Result<PathBuf, CliError> {
     use std::path::Component;
 
     if !path.is_absolute() || path.file_name().is_none() {
@@ -1527,7 +1576,10 @@ fn require_exact_canonical_path(path: &Path, label: &str) -> Result<PathBuf, Cli
         )));
     }
     let canonical = path.canonicalize().map_err(|error| {
-        CliError::cli_io_error(format!("failed to canonicalize {label} {}: {error}", path.display()))
+        CliError::cli_io_error(format!(
+            "failed to canonicalize {label} {}: {error}",
+            path.display()
+        ))
     })?;
     if canonical != path {
         return Err(CliError::cli_other_error(format!(
@@ -1540,7 +1592,10 @@ fn require_exact_canonical_path(path: &Path, label: &str) -> Result<PathBuf, Cli
 fn require_exact_canonical_directory(path: &Path, label: &str) -> Result<PathBuf, CliError> {
     let canonical = require_exact_canonical_path(path, label)?;
     let metadata = std::fs::symlink_metadata(&canonical).map_err(|error| {
-        CliError::cli_io_error(format!("failed to inspect {label} {}: {error}", canonical.display()))
+        CliError::cli_io_error(format!(
+            "failed to inspect {label} {}: {error}",
+            canonical.display()
+        ))
     })?;
     if metadata.file_type().is_symlink() || !metadata.is_dir() {
         return Err(CliError::cli_other_error(format!(
@@ -1558,7 +1613,10 @@ fn path_utf8<'a>(path: &'a Path, label: &str) -> Result<&'a str, CliError> {
 fn hash_executable(path: &Path, label: &str) -> Result<String, CliError> {
     let mut file = open_regular_file(path, false, label)?;
     let metadata = file.metadata().map_err(|error| {
-        CliError::cli_io_error(format!("failed to inspect {label} {}: {error}", path.display()))
+        CliError::cli_io_error(format!(
+            "failed to inspect {label} {}: {error}",
+            path.display()
+        ))
     })?;
     if metadata.len() == 0 || metadata.len() > MAX_EXECUTABLE_BYTES {
         return Err(CliError::cli_other_error(format!(
@@ -1579,7 +1637,10 @@ fn hash_executable(path: &Path, label: &str) -> Result<String, CliError> {
     let mut buffer = [0_u8; 64 * 1024];
     loop {
         let read = file.read(&mut buffer).map_err(|error| {
-            CliError::cli_io_error(format!("failed to read {label} {}: {error}", path.display()))
+            CliError::cli_io_error(format!(
+                "failed to read {label} {}: {error}",
+                path.display()
+            ))
         })?;
         if read == 0 {
             break;
@@ -1608,7 +1669,10 @@ fn read_bounded_regular_file(
 ) -> Result<Vec<u8>, CliError> {
     let file = open_regular_file(path, require_private, label)?;
     let metadata = file.metadata().map_err(|error| {
-        CliError::cli_io_error(format!("failed to inspect {label} {}: {error}", path.display()))
+        CliError::cli_io_error(format!(
+            "failed to inspect {label} {}: {error}",
+            path.display()
+        ))
     })?;
     if metadata.len() == 0 || metadata.len() > max_bytes {
         return Err(CliError::cli_other_error(format!(
@@ -1622,7 +1686,10 @@ fn read_bounded_regular_file(
     file.take(max_bytes.saturating_add(1))
         .read_to_end(&mut bytes)
         .map_err(|error| {
-            CliError::cli_io_error(format!("failed to read {label} {}: {error}", path.display()))
+            CliError::cli_io_error(format!(
+                "failed to read {label} {}: {error}",
+                path.display()
+            ))
         })?;
     if bytes.len() as u64 != metadata.len() || bytes.len() as u64 > max_bytes {
         return Err(CliError::cli_other_error(format!(
@@ -1641,10 +1708,16 @@ fn open_regular_file(path: &Path, require_private: bool, label: &str) -> Result<
         options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
     }
     let file = options.open(path).map_err(|error| {
-        CliError::cli_io_error(format!("failed to open {label} {}: {error}", path.display()))
+        CliError::cli_io_error(format!(
+            "failed to open {label} {}: {error}",
+            path.display()
+        ))
     })?;
     let metadata = file.metadata().map_err(|error| {
-        CliError::cli_io_error(format!("failed to inspect {label} {}: {error}", path.display()))
+        CliError::cli_io_error(format!(
+            "failed to inspect {label} {}: {error}",
+            path.display()
+        ))
     })?;
     if !metadata.is_file() {
         return Err(CliError::cli_other_error(format!(
@@ -1663,11 +1736,7 @@ fn open_regular_file(path: &Path, require_private: bool, label: &str) -> Result<
     Ok(file)
 }
 
-fn validate_private_regular_file(
-    path: &Path,
-    max_bytes: u64,
-    label: &str,
-) -> Result<(), CliError> {
+fn validate_private_regular_file(path: &Path, max_bytes: u64, label: &str) -> Result<(), CliError> {
     let file = open_regular_file(path, true, label)?;
     let length = file
         .metadata()
@@ -1697,16 +1766,27 @@ fn write_private_file(path: &Path, bytes: &[u8], label: &str) -> Result<(), CliE
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt as _;
-        options.mode(0o600).custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
+        options
+            .mode(0o600)
+            .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
     }
     let mut file = options.open(path).map_err(|error| {
-        CliError::cli_io_error(format!("failed to create {label} {}: {error}", path.display()))
+        CliError::cli_io_error(format!(
+            "failed to create {label} {}: {error}",
+            path.display()
+        ))
     })?;
     file.write_all(bytes).map_err(|error| {
-        CliError::cli_io_error(format!("failed to write {label} {}: {error}", path.display()))
+        CliError::cli_io_error(format!(
+            "failed to write {label} {}: {error}",
+            path.display()
+        ))
     })?;
     file.sync_all().map_err(|error| {
-        CliError::cli_io_error(format!("failed to sync {label} {}: {error}", path.display()))
+        CliError::cli_io_error(format!(
+            "failed to sync {label} {}: {error}",
+            path.display()
+        ))
     })?;
     set_private_file_permissions(path)
 }
@@ -1782,32 +1862,35 @@ fn validate_private_directory(path: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn validate_exact_artifact_set(directory: &Path, profile: &ProvisionProfile) -> Result<(), CliError> {
+fn validate_exact_artifact_set(
+    directory: &Path,
+    profile: &ProvisionProfile,
+) -> Result<(), CliError> {
     let expected = profile
         .promotions()
         .into_iter()
         .map(|(_, file_name)| file_name)
         .chain([
-        REVIEWED_TOOLS_FILE,
-        SIGNED_MANIFEST_FILE,
-        MANIFEST_SEED_FILE,
-        MANIFEST_PUBLIC_KEY_FILE,
-        CAGE_POLICY_FILE,
-        CAGE_POLICY_SEED_FILE,
-        CAGE_POLICY_PUBLIC_KEY_FILE,
-        MIGRATION_SEED_FILE,
-        MIGRATION_PUBLIC_KEY_FILE,
-        MIGRATION_GENESIS_FILE,
-        MIGRATION_DATABASE_FILE,
-        RECEIPT_SEED_FILE,
-        RECEIPT_PUBLIC_KEY_FILE,
-        CONTROL_AUTHORITY_SEED_FILE,
-        CONTROL_AUTHORITY_PUBLIC_KEY_FILE,
-        TARGET_COMMAND_FILE,
-        REPORT_FILE,
-    ])
-    .map(std::ffi::OsString::from)
-    .collect::<BTreeSet<_>>();
+            REVIEWED_TOOLS_FILE,
+            SIGNED_MANIFEST_FILE,
+            MANIFEST_SEED_FILE,
+            MANIFEST_PUBLIC_KEY_FILE,
+            CAGE_POLICY_FILE,
+            CAGE_POLICY_SEED_FILE,
+            CAGE_POLICY_PUBLIC_KEY_FILE,
+            MIGRATION_SEED_FILE,
+            MIGRATION_PUBLIC_KEY_FILE,
+            MIGRATION_GENESIS_FILE,
+            MIGRATION_DATABASE_FILE,
+            RECEIPT_SEED_FILE,
+            RECEIPT_PUBLIC_KEY_FILE,
+            CONTROL_AUTHORITY_SEED_FILE,
+            CONTROL_AUTHORITY_PUBLIC_KEY_FILE,
+            TARGET_COMMAND_FILE,
+            REPORT_FILE,
+        ])
+        .map(std::ffi::OsString::from)
+        .collect::<BTreeSet<_>>();
     let allowed = expected
         .iter()
         .cloned()
@@ -1829,11 +1912,15 @@ fn validate_exact_artifact_set(directory: &Path, profile: &ProvisionProfile) -> 
         })?;
         let name = entry.file_name();
         if !allowed.contains(&name) || !actual.insert(name) {
-            return Err(tampered("demo output contains duplicate or unexpected artifacts"));
+            return Err(tampered(
+                "demo output contains duplicate or unexpected artifacts",
+            ));
         }
     }
     if !expected.is_subset(&actual) {
-        return Err(tampered("demo output is partial or contains unexpected artifacts"));
+        return Err(tampered(
+            "demo output is partial or contains unexpected artifacts",
+        ));
     }
     Ok(())
 }
@@ -1857,7 +1944,10 @@ fn sync_directory(path: &Path) -> Result<(), CliError> {
     File::open(path)
         .and_then(|directory| directory.sync_all())
         .map_err(|error| {
-            CliError::cli_io_error(format!("failed to sync directory {}: {error}", path.display()))
+            CliError::cli_io_error(format!(
+                "failed to sync directory {}: {error}",
+                path.display()
+            ))
         })
 }
 
@@ -1871,7 +1961,9 @@ fn write_report_to_stdout(report: &ProvisionReport) -> Result<(), CliError> {
         CliError::cli_io_error(format!("failed to write demo provision report: {error}"))
     })?;
     lock.write_all(b"\n").map_err(|error| {
-        CliError::cli_io_error(format!("failed to terminate demo provision report: {error}"))
+        CliError::cli_io_error(format!(
+            "failed to terminate demo provision report: {error}"
+        ))
     })
 }
 

@@ -117,8 +117,8 @@ pub(crate) struct Cli {
     json: bool,
 
     /// Output format for command results and terminal error reporting.
-    #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
-    format: OutputFormat,
+    #[arg(long, value_enum)]
+    format: Option<OutputFormat>,
 
     /// Optional SQLite database path for durable receipt persistence.
     #[arg(long, global = true)]
@@ -178,8 +178,18 @@ pub(crate) struct Cli {
 }
 
 impl Cli {
+    pub(crate) fn process_json_output(&self) -> bool {
+        use std::io::IsTerminal;
+        self.json
+            || match self.format {
+                Some(OutputFormat::Json) => true,
+                Some(OutputFormat::Human) => false,
+                None => !std::io::stdout().is_terminal(),
+            }
+    }
+
     pub(crate) fn json_output(&self) -> bool {
-        self.json || matches!(self.format, OutputFormat::Json)
+        self.json || matches!(self.format, Some(OutputFormat::Json))
     }
 }
 
@@ -366,7 +376,14 @@ mod cli_env_tests {
         // The advertised nested spelling is the single supported one: the flat
         // `retention-repair` form must not linger and diverge from the guidance.
         assert!(
-            parse_cli(["chio", "receipt", "retention-repair", "--archive", "a.sqlite3"]).is_err(),
+            parse_cli([
+                "chio",
+                "receipt",
+                "retention-repair",
+                "--archive",
+                "a.sqlite3"
+            ])
+            .is_err(),
             "the flat `retention-repair` spelling must not be accepted"
         );
     }

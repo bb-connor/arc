@@ -14,6 +14,54 @@ from test_provider import config as provider_config
 from test_repository import commit
 
 
+def profile_configuration(root, config):
+    value = dict(config, schema=session.PROFILE_CONFIG, source_paths=["file"],
+                 runtime_profile="runtime.json", chio="chio")
+    profile = {"schema": session.RUNTIME_PROFILE}
+    for field in ("worker_image", "execution_image", "helper_image"):
+        profile[field] = value.pop(field)
+    (root / "runtime.json").write_text(json.dumps(profile))
+    (root / "config.json").write_text(json.dumps(value))
+    return value, profile
+
+
+def test_runtime_profile_is_resolved_at_source_and_captured_once(setup, monkeypatch):
+    root, config, _, _ = setup
+    profile_configuration(root, config)
+    monkeypatch.setenv("PATH", str(root) + os.pathsep + os.environ["PATH"])
+    elsewhere = root / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    state = initialize(setup)
+    captured = json.loads((state / "configuration.json").read_text())
+    assert captured["schema"] == session.SCOPED_CONFIG
+    assert captured["worker_image"] == config["worker_image"]
+    assert captured["chio"] == str(root / "chio")
+    assert "runtime_profile" not in captured
+    (root / "runtime.json").unlink()
+    assert session.inspect(state)["source_paths"] == ["file"]
+
+
+@pytest.mark.parametrize("mutation", ["tag", "extra-field", "missing-image", "schema"])
+def test_invalid_runtime_profile_fails_before_creating_state(setup, mutation):
+    root, config, _, calls = setup
+    value, profile = profile_configuration(root, config)
+    value["chio"] = config["chio"]
+    if mutation == "tag":
+        profile["worker_image"] = "python:latest"
+    elif mutation == "extra-field":
+        profile["authority"] = "implicit"
+    elif mutation == "missing-image":
+        del profile["helper_image"]
+    else:
+        profile["schema"] = "unsupported"
+    (root / "runtime.json").write_text(json.dumps(profile))
+    (root / "config.json").write_text(json.dumps(value))
+    with pytest.raises(ValueError):
+        initialize(setup)
+    assert not (root / "session").exists() and not calls
+
+
 @pytest.fixture
 def setup(tmp_path, monkeypatch):
     prior = os.umask(0o077)

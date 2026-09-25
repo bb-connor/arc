@@ -8,6 +8,7 @@ import argparse
 import json
 import os
 import subprocess
+import shutil
 from pathlib import Path
 
 from chio_process import ProcessClient, WorkerError
@@ -69,7 +70,10 @@ def invoke_recorded(chio, connection, public_key, request, output):
         if not isinstance(value, str) or not value:
             raise ValueError(f"host connection must supply {field} before dispatch")
         context[field] = value
-    chio = Path(chio).resolve(strict=True)
+    selected = shutil.which(str(chio)) if "/" not in str(chio) else str(chio)
+    if selected is None:
+        raise ValueError(f"Chio executable {str(chio)!r} was not found on PATH")
+    chio = Path(selected).resolve(strict=True)
     output = Path(output)
     output.mkdir(mode=0o700)
     _sync_directory(output.parent)

@@ -6,7 +6,7 @@ directory and install it into an application with
 `npm install /path/to/chio-protocol-process-0.1.0.tgz`.
 Registry publication is a separate release step.
 
-The [packaged starter](https://github.com/bb-connor/arc/tree/main/examples/process-starter)
+The [packaged starter](https://github.com/backbay-labs/chio/tree/main/examples/process-starter)
 includes a native Linux host and runs Python and Node workers from installed
 packages outside the checkout.
 

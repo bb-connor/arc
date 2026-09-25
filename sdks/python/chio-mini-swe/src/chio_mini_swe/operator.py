@@ -7,6 +7,7 @@ import json
 import os
 import re
 import stat
+import shutil
 import subprocess
 import tempfile
 import uuid
@@ -104,6 +105,17 @@ def command(binary, *arguments, diagnostic=None):
     return json.loads(result.stdout)
 
 
+def resolve_executable(base, value):
+    if not isinstance(value, str) or not value or "\0" in value:
+        raise ValueError("Executable must be a nonempty string")
+    if "/" not in value:
+        selected = shutil.which(value)
+        if selected is None:
+            raise ValueError(f"Chio executable {value!r} was not found on PATH")
+        return Path(selected).resolve(strict=True)
+    return (base / value).resolve(strict=True)
+
+
 def prepare(profile_path, task_path, state):
     profile_path = Path(profile_path).resolve(strict=True)
     profile = read_json(profile_path, 1024 * 1024)
@@ -127,7 +139,10 @@ def prepare(profile_path, task_path, state):
     for key in ("chio", "host_config", "provider_config"):
         if not isinstance(profile[key], str):
             raise ValueError("Profile paths must be strings")
-        paths[key] = (profile_path.parent / profile[key]).resolve(strict=True)
+        paths[key] = (
+            resolve_executable(profile_path.parent, profile[key]) if key == "chio"
+            else (profile_path.parent / profile[key]).resolve(strict=True)
+        )
     protected_executable(paths["chio"])
     binary_hash = digest_file(paths["chio"])
     if not supports_state_reader(paths["chio"]):
@@ -342,13 +357,14 @@ def result(state, output):
 
 
 def main():
-    from chio_mini_swe import session
+    from chio_mini_swe import session, runtime_profile
 
     parser = argparse.ArgumentParser(
         description="Run a coding task on an operator-provisioned Chio host"
     )
     commands = parser.add_subparsers(dest="command", required=True)
     session.add_parser(commands)
+    runtime_profile.add_parser(commands)
     setup = commands.add_parser("prepare")
     setup.add_argument("--profile", required=True)
     setup.add_argument("--task-file", required=True)
@@ -376,7 +392,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix="chio-operator-") as private:
         os.environ["MSWEA_GLOBAL_CONFIG_DIR"] = private
         os.environ["MSWEA_SILENT_STARTUP"] = "1"
-        if args.command == "session":
+        if args.command == "runtime-profile":
+            value = runtime_profile.create(args.worker_image, args.execution_image, args.helper_image, args.out)
+        elif args.command == "session":
             value = session.dispatch(args)
         elif args.command == "prepare":
             value = prepare(args.profile, args.task_file, args.state)

@@ -13,6 +13,12 @@ mod diagnostics;
 #[path = "process_host/lifecycle.rs"]
 mod lifecycle;
 #[cfg(unix)]
+#[path = "process_host/output.rs"]
+mod output;
+#[cfg(unix)]
+#[path = "process_host/paths.rs"]
+mod paths;
+#[cfg(unix)]
 #[path = "process_host/provision.rs"]
 mod provision;
 #[cfg(unix)]
@@ -60,6 +66,9 @@ pub(crate) enum ProcessCommands {
         config: PathBuf,
         #[arg(long)]
         state: PathBuf,
+        /// Discover and authorize the configured local tools. Starts their commands; provides no OS confinement.
+        #[arg(long)]
+        local_tools: bool,
     },
     /// Serve authenticated workers until SIGINT or SIGTERM, then drain calls.
     Serve {
@@ -114,7 +123,7 @@ pub(crate) enum ProcessCommands {
     },
 }
 
-pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
+pub(crate) fn dispatch(command: ProcessCommands, json: bool) -> Result<(), CliError> {
     #[cfg(unix)]
     {
         match command {
@@ -123,18 +132,22 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
                 process,
                 blob,
             } => diagnostics::application_state(&state, &process, blob.as_deref()),
-            ProcessCommands::Status { state } => diagnostics::status(&state),
+            ProcessCommands::Status { state } => diagnostics::status(&state, json),
             ProcessCommands::Logs {
                 state,
                 process,
                 attempt,
             } => diagnostics::logs(&state, &process, attempt),
-            ProcessCommands::Init { config, state } => provision::init(&config, &state),
+            ProcessCommands::Init {
+                config,
+                state,
+                local_tools,
+            } => provision::init(&config, &state, local_tools, json),
             ProcessCommands::Serve { state, socket } => serving::serve(&state, &socket),
             ProcessCommands::Run { state, plan } => {
                 #[cfg(target_os = "linux")]
                 {
-                    runner::run(&state, &plan)
+                    runner::run(&state, &plan, json)
                 }
                 #[cfg(not(target_os = "linux"))]
                 {
@@ -168,7 +181,7 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
     }
     #[cfg(not(unix))]
     {
-        let _ = command;
+        let _ = (command, json);
         Err(CliError::cli_other_error(
             "the process host requires Unix sockets".to_owned(),
         ))

@@ -6,7 +6,7 @@
   "publishConfig": { "access": "public" },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bb-connor/arc.git",
+    "url": "git+https://github.com/backbay-labs/chio.git",
     "directory": "sdks/typescript/packages/process"
   },
   "type": "module",
