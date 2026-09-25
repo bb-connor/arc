@@ -40,6 +40,7 @@ WORKDIR /build
 
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
+COPY third_party ./third_party
 # `wit/` is consumed by chio-wasm-guards via
 # `wasmtime::component::bindgen!(path = "../../wit/chio-guard.wit")`,
 # which resolves at compile time. chio-cli enables the component backend,
