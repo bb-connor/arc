@@ -909,7 +909,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "publish-security-contract",
-    ): "4f1569329509253a78b699249bc0b91f25a2f7b5820ef6634eeb4730017d9da6",
+    ): "36c623035b6ea06ee45a06f29ba8232d059994fd990bba5f7a10a315df6f447d",
     (
         "security contract revocation",
         "bind-revocation",
@@ -917,7 +917,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "security contract revocation",
         "revoke-security-contract",
-    ): "844cb2102b2cec4c746f523313a7be97432ed4bfcecbbfe58141f6e15e395ef5",
+    ): "3dc04fec4dd1260b2e4706201ab0686bf8332273f188d55f65315733a038aec7",
     (
         "enterprise-hardening",
         "committed-linux-evidence",
@@ -6957,6 +6957,7 @@ def validate(root: Path) -> None:
             'test "$(jq -r \'.owner.login\' <<< "${app}")" = "${GITHUB_REPOSITORY_OWNER}"',
             'test "$(jq -cS \'.permissions\' <<< "${app}")" = \'{"checks":"write","metadata":"read","statuses":"write"}\'',
             'token_request=\'{"permissions":{"checks":"write"}}\'',
+            '"https://api.github.com/app/installations/${SECURITY_APP_INSTALLATION_ID}"',
             '"https://api.github.com/app/installations/${SECURITY_APP_INSTALLATION_ID}/access_tokens"',
             r'[[ "${installation_token}" =~ ^ghs_[A-Za-z0-9_.-]{16,4096}$ ]]',
             'token_permissions="$(jq -cS \'.permissions\' <<< "${token_response}")"',
@@ -7665,6 +7666,7 @@ def validate(root: Path) -> None:
             'test "$(jq -r \'.object.sha\' <<< "${merge_ref}")" = "${MERGE_COMMIT_SHA}"',
             "trap 'unset SECURITY_APP_PRIVATE_KEY_PEM installation_token",
             'test "$(jq -r \'.slug\' <<< "${app}")" = "chio-security-authority"',
+            '"https://api.github.com/app/installations/${SECURITY_APP_INSTALLATION_ID}"',
             'test "$(jq -cS \'.permissions\' <<< "${app}")" = \'{"checks":"write","metadata":"read","statuses":"write"}\'',
             'token_request=\'{"permissions":{"checks":"write"}}\'',
             '\'{"checks":"write"}\'|\'{"checks":"write","metadata":"read"}\') ;;',

@@ -488,6 +488,77 @@ def run_extraction_fixture(
             raise AssertionError(f"{label}: unsafe extraction was accepted")
 
 
+def assert_app_token_bootstrap(workflow_name: str, job_id: str, step_name: str) -> None:
+    workflow = CHECKER.load_workflow(ROOT / ".github/workflows" / workflow_name)
+    body = CHECKER.named_step(CHECKER.job(workflow, job_id), step_name)["run"]
+    start = body.index('app="$(')
+    end_marker = 'test "$(jq -r \'.repositories[0].full_name\' <<< "${repositories}")" = "${GITHUB_REPOSITORY}"'
+    end = body.index(end_marker, start) + len(end_marker)
+    # Exercise the workflow's Bash against GitHub's App/JWT endpoints. The
+    # installation token is issued five seconds after JWT construction.
+    fixture = r'''
+set -euo pipefail
+shopt -s inherit_errexit
+SECURITY_APP_ID=42
+SECURITY_APP_INSTALLATION_ID=7
+GITHUB_REPOSITORY_OWNER=bb-connor
+GITHUB_REPOSITORY=bb-connor/arc
+jwt=fixture-jwt
+now_epoch=1995
+private_key=unused-fixture-key
+date() {
+  if test "$*" = '+%s'; then printf '2000\n'; else command date "$@"; fi
+}
+curl() {
+  local url="${@: -1}" authorization=''
+  while test "$#" -gt 0; do
+    if test "$1" = '-H' && [[ "${2-}" == 'Authorization: Bearer '* ]]; then
+      authorization="$2"
+    fi
+    shift
+  done
+  if test "$url" = 'https://api.github.com/installation/repositories?per_page=100'; then
+    test "$authorization" = 'Authorization: Bearer ghs_fixture_security_authority_token' || return 22
+    printf '%s\n' '{"total_count":1,"repositories":[{"full_name":"bb-connor/arc"}]}'
+    return
+  fi
+  test "$authorization" = 'Authorization: Bearer fixture-jwt' || return 22
+  case "$url" in
+    https://api.github.com/app)
+      printf '%s\n' '{"id":42,"slug":"chio-security-authority","owner":{"login":"bb-connor"},"permissions":{"checks":"write","metadata":"read","statuses":"write"}}' ;;
+    https://api.github.com/app/installations/7)
+      printf '%s\n' '{"id":7,"app_id":42,"app_slug":"chio-security-authority","account":{"login":"bb-connor"},"repository_selection":"selected","permissions":{"checks":"write","metadata":"read","statuses":"write"}}' ;;
+    https://api.github.com/app/installations/7/access_tokens)
+      printf '%s\n' '{"token":"ghs_fixture_security_authority_token","permissions":{"checks":"write","metadata":"read"},"expires_at":"1970-01-01T01:33:20Z"}' ;;
+    *) printf 'unexpected GitHub endpoint: %s\n' "$url" >&2; return 22 ;;
+  esac
+}
+'''
+    with tempfile.TemporaryDirectory() as directory:
+        result = subprocess.run(
+            ["bash", "-c", fixture + body[start:end]],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    if result.returncode != 0:
+        raise AssertionError(
+            f"{workflow_name}: App token bootstrap failed ({result.returncode}): "
+            f"{result.stderr}"
+        )
+
+
+assert_app_token_bootstrap(
+    "enterprise-evidence-finalizer.yml",
+    "publish-security-contract",
+    "Reconcile exact five-context merge authority",
+)
+assert_app_token_bootstrap(
+    "security-contract-revocation.yml",
+    "revoke-security-contract",
+    "Revoke exact Actions mirrors and dedicated App namespace",
+)
 assert_nonzero_bootstrap_accepted()
 
 # Full control-plane lanes must retain the same fixture isolation as the flow
