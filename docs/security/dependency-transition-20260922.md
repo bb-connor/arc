@@ -16,6 +16,7 @@ workflow definitions. Neither change authorizes a new source or publisher.
 | js-yaml | 4.3.2 | GHSA-2883-xcg3-v3hh repair |
 | vitest and @vitest/mocker | 4.1.11 | GHSA-82fw-gwwq-j7x9 repair |
 | sharp | 0.35.4 | GHSA-rgj7-g3m4-5g8c repair |
+| Elysia dev and peer floor | 1.4.29 | GHSA-9643-4qgh-g8mx form-data complexity repair |
 | Next.js peer and example requirement | >=15.5.24 <16 | GHSA-2xp9-vwfh-vxw4 and GHSA-p293-qw3h-jr36 repairs |
 
 The AWS-LC source is extracted from the security integration rather than
@@ -45,8 +46,10 @@ acceptance.
 Earlier local checks passed for cargo-deny, 385 AWS-LC library cases, three DES
 regressions, Docker manifest/context checks, frozen Bun resolution, the complete
 publishable TypeScript build and test commands, and 75 private conformance cases.
-The first hosted run exposed the inherited JavaScript advisories and the missing
-vendor source classification. Those failures are retained in PR #1168's history.
+The first hosted run exposed inherited JavaScript advisories and missing vendor
+source classification. A later current-head CVE run exposed Elysia 1.4.28 in
+the adapter's separate nested lock; its package, nested lock and workspace lock
+now select 1.4.29. Those failures remain in PR #1168's history.
 The corrected `cargo vet check --locked` reports `aws-lc-rs:1.18.1` missing
 `safe-to-deploy`; that is an open security gate, not a passing check.
 
