@@ -4179,24 +4179,22 @@ mod state_machine {
         Ok(ids)
     }
 
-    proptest! {
-        // 24 cases, health folded at rotation boundaries: each health call
-        // re-verifies the whole chain over a synchronous=FULL file-backed
-        // store, so a per-op fold at 48 cases is hours of fsync-bound work on
-        // a loaded runner (the lane wedges to the 6h job ceiling). Rotation is
-        // the transition this invariant guards; per-append head divergence is
-        // covered by head_property's full-audit equality.
-        #![proptest_config(ProptestConfig::with_cases(24))]
-        // Quarantined from the hot CI lanes: on GitHub runners this test
-        // enters and never completes (2.5h+ before the job timeout), wedging
-        // Build-lint-test and MSRV, while finishing in ~34s locally. The
-        // suspected livelock is the background checkpoint signer racing
-        // archival rotation under runner-grade fsync latency; issue #1045
-        // tracks reproducing it and restoring the lane. Run explicitly with
-        // `cargo test -p chio-store-sqlite --lib -- --ignored retention`.
-        #[test]
-        #[ignore = "wedges CI runners; see issue #1045"]
-        fn prop_retention_preserves_append_invariant(ops in prop::collection::vec(op_strategy(), 1..40)) {
+    // The proptest! macro applies PROPTEST_CASES after its local config. CI's
+    // 256-case setting therefore overrides the former 24-case budget and
+    // multiplies synchronous=FULL writes and full-chain health folds. A direct
+    // runner keeps this expensive rotation invariant at 24 cases without
+    // changing the CI budget for other properties. Issue #1045 retains the
+    // runner-grade liveness question until the hosted lane completes.
+    #[test]
+    fn prop_retention_preserves_append_invariant() -> Result<(), Box<dyn std::error::Error>> {
+        let mut config = ProptestConfig::with_cases(24);
+        config.source_file = Some(file!());
+        config.test_name = Some(concat!(
+            module_path!(),
+            "::prop_retention_preserves_append_invariant"
+        ));
+        let mut runner = proptest::test_runner::TestRunner::new(config);
+        runner.run(&prop::collection::vec(op_strategy(), 1..40), |ops| {
             let path = unique_db_path("prop-retention");
             let archive = unique_db_path("prop-archive");
             let keypair = super::super::support::receipt_test_keypair();
@@ -4299,7 +4297,9 @@ mod state_machine {
 
             let _ = std::fs::remove_file(&path);
             let _ = std::fs::remove_file(&archive);
-        }
+            Ok(())
+        })?;
+        Ok(())
     }
 
     fn map_err(error: ReceiptStoreError) -> TestCaseError {
