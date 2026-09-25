@@ -10,6 +10,7 @@ on:
       - "Cargo.toml"
       - "crates/**/Cargo.toml"
       - "supply-chain/**"
+      - "third_party/aws-lc-rs-chio/**"
       - ".github/workflows/cargo-vet.yml"
   pull_request:
     paths:
@@ -17,6 +18,7 @@ on:
       - "Cargo.toml"
       - "crates/**/Cargo.toml"
       - "supply-chain/**"
+      - "third_party/aws-lc-rs-chio/**"
       - ".github/workflows/cargo-vet.yml"
 
 permissions:

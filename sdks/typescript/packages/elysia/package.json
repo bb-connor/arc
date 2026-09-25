@@ -31,14 +31,14 @@
     "@chio-protocol/node-http": "0.1.0"
   },
   "peerDependencies": {
-    "elysia": ">=1.0.0"
+    "elysia": ">=1.4.29"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "elysia": "^1.3.2",
+    "elysia": "1.4.29",
     "esbuild": "^0.28.1",
     "typescript": "~5.7.0",
-    "vitest": "^3.0.0"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "vite": {

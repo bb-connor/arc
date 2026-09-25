@@ -11,6 +11,7 @@ on:
       - crates/platform/chio-store-sqlite/**
       - Cargo.toml
       - Cargo.lock
+      - third_party/aws-lc-rs-chio/**
       - examples/tee-sidecar/**
   push:
     branches:
@@ -25,6 +26,7 @@ on:
       - crates/platform/chio-store-sqlite/**
       - Cargo.toml
       - Cargo.lock
+      - third_party/aws-lc-rs-chio/**
       - examples/tee-sidecar/**
   workflow_dispatch:
 
