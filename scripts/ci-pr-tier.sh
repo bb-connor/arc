@@ -3,8 +3,10 @@
 # Invoked by `make ci`. For the heavier local gate (formal proof report), use
 # `make ci-workspace` which runs scripts/ci-workspace.sh.
 set -euo pipefail
+umask 022
 
 cd "$(dirname "$0")/.."
+export CHIO_CHECKOUT_ROOT="$PWD"
 
 # Mirror .github/workflows/ci.yml workflow env and per-step cargo settings so
 # `make ci` matches the PR-tier "Build, lint, test" job coverage and warning

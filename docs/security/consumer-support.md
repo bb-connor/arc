@@ -42,11 +42,11 @@ no request-controlled identity or silent ephemeral replacement is permitted.
 
 ## Direct Rust construction and factory sites
 
-Paths are relative to the repository. The physical-source audit found the 29
+Paths are relative to the repository. The physical-source audit found the 31
 sites below. This includes constructor wrappers, not just direct `new` calls.
 Included test fragments are retained visibly rather than misclassified as
-production. The same physical-source gate now pins 86 dispatch/caller references
-(D001-D086) as well as these 29 construction references. This is an exact source
+production. The same physical-source gate now pins 91 dispatch/caller sites
+(D001-D091) as well as these 31 construction sites. This is an exact source
 inventory, not Rust macro expansion or a semantic proof of all network effects.
 
 | ID | Exact path and symbol | Role / selected profile | Acceptance owner and current state |
@@ -80,6 +80,8 @@ inventory, not Rust macro expansion or a semantic proof of all network effects.
 | C27 | `crates/protocol/chio-acp-edge/src/fuzz.rs::make_kernel` | Fuzz harness | Adversarial parser/edge input; not production authority |
 | C28 | `crates/platform/chio-control-plane/src/security/adapters/native_flow_test_support.rs::open_kernel` | Included test fixture | Included by native-flow tests under `cfg(test)`; M3 native host acceptance fixture |
 | C29 | `crates/platform/chio-control-plane/src/security/event_consumer_parts/part_06.inc::build_real_adapter_runtime` | Included test fixture | Event-consumer test composition; not a separate public factory |
+| C30 | `crates/products/chio-cli/src/cli/process_host/state.rs::kernel` | Durable process host factory | Process host, crash/recovery, nonce-custody and run/call-evidence gates; native deployment also requires its configured cage/broker authorities |
+| C31 | `examples/rust-runtime-consumer/src/main.rs::open` | Offline Rust embedding example | The standalone consumer in [Rust preview packages](rust-preview-packages.md) runs allowed and denied calls, verifies receipts and checks one effect after process restart. Fixed demonstration identity, ephemeral transparency/revocation stores; no production deployment claim |
 
 Remote construction is gated by the public factory's
 `RemoteSessionFactory::new`, before C04/C05. Its new
@@ -196,12 +198,13 @@ remain explicitly versioned; it cannot be reported as current-v2 verification.
   tests and is not proof that every consumer has been inventoried.
 
 The physical constructor portion now runs in the existing adapter source gate.
-It pins all 29 exact path/symbol/reference-count entries, including function
+It pins all 31 exact path/symbol/reference-count entries, including function
 pointer references. Constructor aliases and macro-hidden references require
 explicit checker support instead of silently escaping coverage. This is not a
-Rust type-system proof. The D inventory below extends this to 86 physical
-dispatch references. Unit calibration adds/removes constructors and dispatch
-references in isolated source trees and removes each required mediation call.
+Rust type-system proof. The D inventory below extends this to 91 physical
+dispatch sites with exact reference counts. Unit calibration adds/removes
+constructors and dispatch references in isolated source trees and removes each
+required mediation call.
 
 The first real run of the stricter peer gate failed because
 `tests::cross_protocol_kernel_request_preserves_complete_authorization_context`
@@ -380,3 +383,6 @@ separate requirements; this table alone does not qualify a deployment.
 | D080-D082 | `crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs` | Caller reservation, including host security context and strict nonce preflight | P01/P07, exact M3 dependency gate |
 | D083-D084 | `crates/kernel/chio-kernel/src/provider_verdict.rs` | Provider verdict APIs retain verified registry and optional host security context | P06, provider lowering and missing/forged-sidecar cases |
 | D085-D086 | `crates/products/chio-api-protect/src/proxy/mediated.rs` | Mediated reservation endpoint, never execution permission | P07, API-protect caller and M3 dependency gates |
+| D087, D089 | `crates/kernel/chio-process/src/lib.rs::ProcessRuntime::invoke_with_recovery` | Original operation/request and ancestor capability binding; optional trusted security context is refreshed before kernel evaluation | C30, `host_flow_identity_is_bound_to_the_original_process_operation`, nonce and crash/recovery gates |
+| D088 | `crates/platform/chio-control-plane/src/security/adapters/native_flow_process_restart.rs::caller_lookup_waits_for_original_coordinator` | Included reconciliation fixture | P01/P07, native process restart and exact M3 dependency gate |
+| D090-D091 | `examples/rust-runtime-consumer/src/main.rs::{initial,recover}` | Two initial kernel calls (allow/deny) and original-outcome recovery | C31, offline Rust package consumer with independently counted effect |

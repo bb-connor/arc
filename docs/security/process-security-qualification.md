@@ -1,6 +1,68 @@
 # Combined process and M4 qualification
 
-## Current checkpoint (2026-09-24)
+## Current checkpoint (2026-09-25)
+
+This checkpoint starts from draft PR #1160 at
+`e3f8bb33edeeccd58ac1f5d31e32ddb14b3c3227` and records the launcher and
+mediation inventory corrections below. Steps 1-4 remain open at
+the audit, trusted-capture and integration boundaries. The table distinguishes
+implemented behavior from those acceptance requirements.
+
+| Work packet | Implemented and verified | Remaining acceptance |
+| --- | --- | --- |
+| 1. Foundation | The complete local workspace invocation reached terminal exit 101 with five failed targets. Reusing its compiled binaries under the required `umask 022` passes all five: 210 API protection tests, 657 CLI unit tests, and the three MCP startup/call-evidence/run-evidence integration tests. Strict workspace/all-target Clippy also passes. The MCP failure reproduces under `umask 002`: its temporary ancestor is group writable and the production validator correctly rejects it. Both local CI launchers now fix the umask and bind `CHIO_CHECKOUT_ROOT` to their checkout. | Final hosted foundation checks; a genuine `aws-lc-rs 1.18.1` audit. The original full-workspace exit remains a failure, separate from the focused passes. |
+| 2. M5 evidence joins | Original nonce custody and receipt-log inclusion are exported and verified by Rust. Completed, denied, interrupted and captured-unknown call tests pass. The matrix verifier binds signed authority denials to their intent, operation and rejection path. The retained seven-scenario v3 artifact passes independent verification with 17 rejected substitutions. | Full M5 acceptance still requires the foundation and trusted capture from packets 1 and 3. Retrospective artifact verification is not a fresh final-source capture. |
+| 3. Trusted authority | PR #1167 contains the complete five-file workflow definition set. PR #1168 contains its dependency prerequisite, including replacement of yanked `der 0.8.0`. Their trees compose without conflicts. The execution image and native package have bounded, unpublished validation records. | Reviewed definitions on main, immutable caller/definition rotation, separately authorized source, published registry manifest digest, the publisher App private-key secret, the App-bound ruleset check, and signed committed capture evidence. |
+| 4. Integration | PR #1160 retains both required histories and the implemented M5 joins. | Independent review, final-source capture/observer results, all required terminal checks, and authorized protected integration. |
+
+The failed workspace invocation began on `d67b0688f9`; the intervening change
+through `e3f8bb33ed` changes no Rust or Cargo input. The focused passes reuse
+those test executables and preserve the original assertions and deadlines.
+The shell default of `002` is not the qualification environment specified by
+the execution plan. Production directory checks remain unchanged.
+
+Strict locked workspace/all-target Clippy exits 0 with `-D warnings` in
+13m 48s. Locked Cargo Deny passes advisories, bans, licenses and sources.
+Formatting, shell syntax, diff hygiene, all 225 formal-source mirrors and
+generated proof coverage (59 rows, 170 artifacts) pass. Cargo Vet is a
+separate audit requirement and remains failed.
+
+The exact-head [hosted consumer gate](https://github.com/bb-connor/arc/actions/runs/36155263566/job/108145762865)
+passed its behavioral cases and then rejected four unclassified mediation
+sites. The source review confirms that the process host refreshes its trusted
+security context before kernel evaluation, and the offline Rust example wires
+durable admission before its initial/recovery calls. The inventory now records
+C31 and D089-D091 with exact reference counts; existing C30/D087-D088 are also
+documented in the [consumer profile map](consumer-support.md). The unchanged
+checker reproduces the original failure before the inventory edit and passes
+afterward. No mediation exception or source exclusion was added.
+
+The same source's MSRV job ended with GitHub's "hosted runner lost
+communication with the server" annotation. Its retained log stops during the
+SQLite nonce lifecycle suite without a failed assertion. This is an incomplete
+MSRV result and requires a terminal hosted retry; it does not justify changing
+test deadlines or assertions.
+
+Later roadmap evidence is also newer than the previous checkpoint below:
+
+- M7's original 35 campaigns completed on frozen `626df9b853`: all controls
+  passed, all mutants were caught, and the unscoped complete gate passed.
+  Commit `b7cb138785` retains the derived outcomes. This source-bound local
+  result does not establish trusted capture or qualify later repository inputs.
+- M8's unchanged million-entry append and recovery campaigns both passed on
+  `626df9b853`. Issue #1045 remains open; scale results do not prove the cause
+  of the earlier hosted liveness failure.
+- M9's ten-binary auditable package at `b7cb138785` passed native installation,
+  allowed/denied calls, receipt verification, service SIGKILL/restart and
+  witness restart. Archive SHA-256:
+  `f8e0dd9e3058cff6fcf3082f842900f8ab79ed216dcc21090af8c2e126786514`.
+  The package remains unpublished.
+- Formal safety shards, the 49 PR-tier Kani proofs, distributed temporal
+  checks and all 30 original fuzz campaigns have retained passes. The legacy
+  temporal command still times out at its original bound. M10 and the
+  separately authorized M11 pilot are not complete.
+
+## Previous checkpoint (2026-09-24)
 
 Runtime installation is qualified on `9ca2ace6ec40f5bce40cb435b67e68b22334a59c`;
 archive assembly is qualified on `bb470b5f298ba3895dc56c9d46d2aa80567c5fd3`.

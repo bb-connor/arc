@@ -868,3 +868,31 @@ path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_pro
 symbol = "caller_lookup_waits_for_original_coordinator"
 target = ".reconcile_caller_execution_blocking"
 references = 1
+
+[[constructor_sites]]
+id = "C31"
+path = "examples/rust-runtime-consumer/src/main.rs"
+symbol = "open"
+target = "ChioKernel::new"
+references = 1
+
+[[dispatch_sites]]
+id = "D089"
+path = "crates/kernel/chio-process/src/lib.rs"
+symbol = "ProcessRuntime::invoke_with_recovery"
+target = ".evaluate_tool_call_with_metadata_and_security_context"
+references = 1
+
+[[dispatch_sites]]
+id = "D090"
+path = "examples/rust-runtime-consumer/src/main.rs"
+symbol = "initial"
+target = ".evaluate_tool_call_blocking"
+references = 2
+
+[[dispatch_sites]]
+id = "D091"
+path = "examples/rust-runtime-consumer/src/main.rs"
+symbol = "recover"
+target = ".evaluate_tool_call_blocking"
+references = 1

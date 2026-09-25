@@ -115,7 +115,7 @@ Packet 3 preparation and package-closure inspection can progress while frozen te
 
 **Consumes:** Current six-commit continuation and retained exact-source evidence. **Produces:** A complete local foundation record, with all retained failures and source boundaries.
 
-- [ ] Use the existing validated `CHIO_CHECKOUT_ROOT` contract for external target directories. The recorded failure is `read internet draft: No such file or directory`, not a missing tracked standard. The same exact test passes with the explicit root. Fix the launcher configuration first; change resolver code only if a further defect reproduces.
+- [x] Use the existing validated `CHIO_CHECKOUT_ROOT` contract for external target directories. The recorded failure is `read internet draft: No such file or directory`, not a missing tracked standard. The same exact test passes with the explicit root. Both local CI launchers now bind the checkout root and required `umask 022`; production fixture resolution and directory validation remain unchanged.
 - [ ] Run the complete owning conformance target under the configured environment, then finish the full workspace run. Preserve the existing rejection tests for invalid roots and external-target discovery.
 
 ```bash
@@ -147,9 +147,16 @@ git diff --check
 **Consumes:** Original worker responses, committed authority state and signed checkpoints. **Produces:** A versioned complete artifact whose verifier establishes nonce and log membership in addition to existing task, policy, accounting and confinement joins.
 
 - [ ] Add failing artifact regressions for a valid nonce copied from another request, altered attempt identity, missing required nonce, duplicated nonce, missing receipt inclusion, wrong checkpoint root, altered leaf/index and a proof from another runtime.
-- [ ] Export original nonce evidence and receipt-log proof material from the owning durable authorities. The worker already transports `execution_nonce_json`; carrying bytes alone is not verification. Do not mint replacement nonces during export.
-- [ ] Extend the existing artifact version and Rust verification paths to authenticate those joins, then extend the Python matrix verifier and its intrinsic-signature/substitution tests. Legacy artifacts remain readable only with their explicit incomplete claims.
-- [ ] Add a positive completed case and a captured-unknown case. Historical verification must not turn a nonce into renewed execution permission or fabricate a terminal receipt for an interrupted operation.
+- [x] Export original nonce evidence and receipt-log proof material from the owning durable authorities. The worker already transports `execution_nonce_json`; carrying bytes alone is not verification. Do not mint replacement nonces during export.
+- [x] Extend the existing artifact version and Rust verification paths to authenticate those joins, then extend the Python matrix verifier and its intrinsic-signature/substitution tests. Legacy artifacts remain readable only with their explicit incomplete claims.
+- [x] Add a positive completed case and a captured-unknown case. Historical verification must not turn a nonce into renewed execution permission or fabricate a terminal receipt for an interrupted operation.
+
+September 25 checkpoint: both owning Rust artifact integration tests and the
+CLI's completed/denied/interrupted/unknown custody cases pass on unchanged Rust
+inputs through `e3f8bb33ed`. The retained v3 matrix rejects 17 substitutions,
+including the signed authority denial-path repair. See the
+[current qualification record](../../security/process-security-qualification.md).
+Packet 4's full acceptance remains open.
 
 ```bash
 cargo test --locked -p chio-cli --test process_run_evidence
@@ -158,7 +165,7 @@ cargo test --locked -p chio-cli --test process_response_verify
 cargo clippy --locked -p chio-cli --all-targets -- -D warnings
 ```
 
-- [ ] Commit this behavior as `feat(security): bind swarm evidence to nonce custody and receipt checkpoints` after the positive and mutation cases pass. Keep foundation and trusted-runner claims independently checked; never close M5 by changing a literal boolean.
+- [x] Commit this behavior as `feat(security): bind swarm evidence to nonce custody and receipt checkpoints` after the positive and mutation cases pass. Implemented in `0b8a7273ac`, followed by pre-dispatch refusal custody and matrix denial-path repairs. Keep foundation and trusted-runner claims independently checked; never close M5 by changing a literal boolean.
 
 **Exit:** Independent verification detects each nonce/log substitution and authenticates the original complete run. Full M5 acceptance awaits Packet 4.
 
