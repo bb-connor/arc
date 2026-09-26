@@ -34,6 +34,9 @@ use chio_store_sqlite::{
 };
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
+#[path = "support/authorization_composite.rs"]
+mod authorization_composite;
+
 /// Rows each store carries before its first measured iteration.
 const POPULATED_ROWS: usize = 20_000;
 
@@ -489,6 +492,7 @@ criterion_group!(
     benches,
     bench_budget_charge_release,
     bench_admission_operation_record_and_read,
-    bench_security_state_denial_read
+    bench_security_state_denial_read,
+    authorization_composite::bench_authorization_composite
 );
 criterion_main!(benches);
