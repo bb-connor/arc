@@ -150,9 +150,9 @@ fn validate_submission_digest(
     digest: &str,
     label: &str,
 ) -> Result<(), ActiveResponseSubmissionProofError> {
-    let parsed = Hash::from_hex(digest).map_err(|_| {
+    let parsed = Hash::from_hex(digest).map_err(|error| {
         ActiveResponseSubmissionProofError::Invalid(format!(
-            "submission {label} hash is not a 32-byte hexadecimal digest"
+            "submission {label} hash is not a 32-byte hexadecimal digest: {error}"
         ))
     })?;
     if parsed.to_hex() != digest || parsed.as_bytes().iter().all(|byte| *byte == 0) {
@@ -692,8 +692,11 @@ fn validate_active_response_submission(
 }
 
 fn active_policy_digest(policy_hash: &str) -> Result<Digest32, KernelError> {
-    let hash = Hash::from_hex(policy_hash)
-        .map_err(|_| denied("active kernel policy hash is not a 32-byte hexadecimal digest"))?;
+    let hash = Hash::from_hex(policy_hash).map_err(|error| {
+        denied(&format!(
+            "active kernel policy hash is not a 32-byte hexadecimal digest: {error}"
+        ))
+    })?;
     if hash.to_hex() != policy_hash {
         return Err(denied(
             "active kernel policy hash is not canonical lowercase hexadecimal",

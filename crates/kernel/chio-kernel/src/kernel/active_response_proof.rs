@@ -36,8 +36,10 @@ pub(super) fn active_response_execution_dispatch_binding(
         dispatch_id: request.dispatch_id().clone(),
         action_id: request.response_plan().action_id.clone(),
         plan_hash: request.response_plan().plan_hash,
-        executor_authority_id: RecordId::new(request.executor_authority_id()).map_err(|_| {
-            active_response_internal("active-response executor authority ID is invalid")
+        executor_authority_id: RecordId::new(request.executor_authority_id()).map_err(|error| {
+            active_response_internal(format!(
+                "active-response executor authority ID is invalid: {error}"
+            ))
         })?,
         executor_authority_generation: request.executor_authority_generation(),
         authorization_capability_hash: active_response_digest_from_hex(
@@ -145,7 +147,11 @@ fn active_response_initial_applying_body_hash(
     applying.mutations = chio_security_types::ResponseMutationLog::new(
         snapshot.mutations.as_slice()[..=index].to_vec(),
     )
-    .map_err(|_| active_response_internal("active-response applying prefix is too large"))?;
+    .map_err(|error| {
+        active_response_internal(format!(
+            "active-response applying prefix is too large: {error}"
+        ))
+    })?;
     let canonical = canonical_json_bytes(&applying).map_err(|error| {
         active_response_internal(format!(
             "active-response applying prefix canonicalization failed: {error}"
@@ -155,8 +161,8 @@ fn active_response_initial_applying_body_hash(
 }
 
 fn active_response_digest_from_hex(value: &str, label: &str) -> Result<Digest32, KernelError> {
-    let digest = Hash::from_hex(value).map_err(|_| {
-        active_response_internal(format!("active-response {label} hash is invalid"))
+    let digest = Hash::from_hex(value).map_err(|error| {
+        active_response_internal(format!("active-response {label} hash is invalid: {error}"))
     })?;
     if digest.to_hex() != value || digest.as_bytes().iter().all(|byte| *byte == 0) {
         return Err(active_response_internal(format!(
