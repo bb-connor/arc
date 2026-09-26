@@ -8,7 +8,10 @@ use alloc::vec::Vec;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 
-use crate::ResponseExecutionBinding;
+use crate::response_dispatch::DispatchRejection;
+use crate::response_execution::{
+    ResponseExecutionBinding, ResponseExecutionBindingError, ResponseExecutionMode,
+};
 
 pub const RESPONSE_STATE_SCHEMA_VERSION: u8 = 1;
 pub const MAX_RESPONSE_EFFECTS: usize = 64;
@@ -265,20 +268,32 @@ pub struct ResponsePlanAuthorizationBody {
 }
 
 impl ResponsePlan {
-    pub fn require_execution_mode(
-        &self,
-        mode: crate::ResponseExecutionMode,
-    ) -> Result<ResponseExecutionBinding, ResponseShapeError> {
+    /// The rule that admits a plan to fresh live execution: the plan carries a
+    /// binding, the binding is readable, and its mode is live.
+    pub fn require_live_execution(&self) -> Result<ResponseExecutionBinding, DispatchRejection> {
         let binding = self
             .execution
-            .ok_or(ResponseShapeError::InvalidExecutionBinding)?;
-        binding
-            .validate()
-            .map_err(|_| ResponseShapeError::InvalidExecutionBinding)?;
-        if binding.mode != mode {
-            return Err(ResponseShapeError::InvalidExecutionBinding);
+            .ok_or(DispatchRejection::LegacyPlanFreshDispatch)?;
+        binding.validate()?;
+        if binding.mode != ResponseExecutionMode::Live {
+            return Err(DispatchRejection::ExecutionMode {
+                observed: binding.mode,
+            });
         }
         Ok(binding)
+    }
+
+    /// The rule for work that is already committed or in flight: a plan bound
+    /// to simulation never continues as live work. A plan with no binding is
+    /// historical and is tolerated here only; fresh admission refuses it.
+    pub fn require_live_or_legacy_execution(&self) -> Result<(), DispatchRejection> {
+        match self.execution {
+            None => Ok(()),
+            Some(binding) if binding.mode == ResponseExecutionMode::Live => Ok(()),
+            Some(binding) => Err(DispatchRejection::ExecutionMode {
+                observed: binding.mode,
+            }),
+        }
     }
 
     #[must_use]
@@ -315,11 +330,10 @@ impl ResponsePlan {
     }
 
     pub fn validate_shape(&self) -> Result<(), ResponseShapeError> {
-        if self
-            .execution
-            .is_some_and(|binding| binding.validate().is_err())
-        {
-            return Err(ResponseShapeError::InvalidExecutionBinding);
+        if let Some(binding) = self.execution {
+            binding
+                .validate()
+                .map_err(ResponseShapeError::InvalidExecutionBinding)?;
         }
         if self.effects.is_empty() {
             return Err(ResponseShapeError::EmptyEffects);
@@ -1457,7 +1471,7 @@ fn applied_reversible_effect_count(snapshot: &ResponseSnapshot) -> Option<usize>
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ResponseShapeError {
-    InvalidExecutionBinding,
+    InvalidExecutionBinding(ResponseExecutionBindingError),
     InvalidAffectedSetHash,
     CapabilityExpiresBeforePlan,
     CrossTenantTarget,
@@ -1480,7 +1494,9 @@ pub enum ResponseShapeError {
 impl fmt::Display for ResponseShapeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
-            Self::InvalidExecutionBinding => "response execution binding is invalid",
+            Self::InvalidExecutionBinding(error) => {
+                return write!(formatter, "response execution binding is invalid: {error}");
+            }
             Self::InvalidAffectedSetHash => "response plan affected-set hash is zero",
             Self::CapabilityExpiresBeforePlan => "operator capability expires before the plan",
             Self::CrossTenantTarget => "response target crosses the plan tenant",
@@ -1505,7 +1521,30 @@ impl fmt::Display for ResponseShapeError {
     }
 }
 
-impl core::error::Error for ResponseShapeError {}
+impl core::error::Error for ResponseShapeError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            Self::InvalidExecutionBinding(error) => Some(error),
+            Self::InvalidAffectedSetHash
+            | Self::CapabilityExpiresBeforePlan
+            | Self::CrossTenantTarget
+            | Self::DuplicateEffectId
+            | Self::EmptyEffects
+            | Self::InvalidEffectOrdinal
+            | Self::InvalidEffectTarget
+            | Self::InvalidFindingHash
+            | Self::InvalidContributionHash
+            | Self::InvalidObservedBaseVersionHash
+            | Self::InvalidOperatorCapabilityHash
+            | Self::InvalidPlanHash
+            | Self::InvalidPolicyHash
+            | Self::InvalidReasonHash
+            | Self::InvalidTargetAffectedSetHash
+            | Self::InvalidTimeRange
+            | Self::MissingIssuanceFence => None,
+        }
+    }
+}
 
 fn digest_is_zero(digest: &Digest32) -> bool {
     digest.as_bytes().iter().all(|byte| *byte == 0)

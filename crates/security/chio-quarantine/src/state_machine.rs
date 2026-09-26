@@ -103,8 +103,7 @@ impl<S: ResponseStore + ?Sized> ResponseStateMachine<S> {
 
     pub fn create(&self, plan: ResponsePlan) -> Result<ResponsePlanRecord, StateMachineError> {
         validate_plan(&plan)?;
-        plan.require_execution_mode(chio_security_types::ResponseExecutionMode::Live)
-            .map_err(|_| StateMachineError::InvalidPlan)?;
+        plan.require_live_execution()?;
         let request_id = request_id(&plan)?;
         let mutations = ResponseMutationLog::new(vec![ResponseMutationRecord::Requested(
             ResponseRequestedRecord {
@@ -787,10 +786,7 @@ fn validate_transition_request(
     }
     if actual_target == ResponseState::Applying {
         if snapshot.state != ResponseState::Applying {
-            snapshot
-                .plan
-                .require_execution_mode(chio_security_types::ResponseExecutionMode::Live)
-                .map_err(|_| StateMachineError::InvalidTransition)?;
+            snapshot.plan.require_live_execution()?;
         }
         let lease = request
             .applying_lease_expires_at_unix_ms

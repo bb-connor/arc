@@ -7,13 +7,15 @@ use chio_quarantine::{
 };
 use chio_security_types::ports::{
     ActionId, BoundedVec, CanonicalBody, CreateOutcome, Digest32, ErrorCode, LeaseOwnerId,
-    RecordId, ResponseDispatchApproval, ResponseDispatchAuthorizationBody, ResponseDispatchLease,
+    RecordId, ResponseDispatchApproval, ResponseDispatchAuthorizationBody,
+    ResponseDispatchCommitMode, ResponseDispatchCommitRequest, ResponseDispatchLease,
     ResponsePlanRecord, ResponseStore, SessionId, TenantId,
 };
 use chio_security_types::{
-    OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind,
-    ResponseEffectProgress, ResponseEffectSpec, ResponseMutationRecord, ResponsePlanInput,
-    ResponseSnapshot, ResponseState, ResponseTarget, ResponseTransitionCause,
+    DispatchRejection, OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind,
+    ResponseEffectProgress, ResponseEffectSpec, ResponseExecutionBinding, ResponseExecutionMode,
+    ResponseMutationRecord, ResponsePlan, ResponsePlanInput, ResponseSnapshot, ResponseState,
+    ResponseTarget, ResponseTransitionCause,
 };
 use response_support::TestResponseStore;
 use std::sync::Arc;
@@ -46,7 +48,7 @@ fn response_record(snapshot: &ResponseSnapshot) -> ResponsePlanRecord {
     }
 }
 
-fn plan(approval_requirement: ResponseApprovalRequirement) -> chio_security_types::ResponsePlan {
+fn plan(approval_requirement: ResponseApprovalRequirement) -> ResponsePlan {
     let canonical_contribution = CanonicalBody::new(b"{\"posture_rank\":2}".to_vec())
         .unwrap_or_else(|error| panic!("invalid contribution body: {error}"));
     let contribution_hash =
@@ -94,7 +96,7 @@ fn plan(approval_requirement: ResponseApprovalRequirement) -> chio_security_type
 }
 
 fn preparation(
-    plan: chio_security_types::ResponsePlan,
+    plan: ResponsePlan,
     approval: ResponseDispatchApproval,
 ) -> ResponseDispatchPreparationRequest {
     ResponseDispatchPreparationRequest {
@@ -112,9 +114,57 @@ fn preparation(
                 .unwrap_or_else(|error| panic!("invalid lease owner: {error}")),
             lease_expires_at_unix_ms: 42_000,
         },
-        commit_mode: chio_security_types::ports::ResponseDispatchCommitMode::Fresh,
+        commit_mode: ResponseDispatchCommitMode::Fresh,
     }
 }
+
+fn governed_plan() -> ResponsePlan {
+    plan(ResponseApprovalRequirement::Governed {
+        policy_id: record_id("response-policy"),
+    })
+}
+
+fn governed_approval(admission_operation_version: u64) -> ResponseDispatchApproval {
+    ResponseDispatchApproval::Governed {
+        admission_operation_id: record_id("admission-operation"),
+        admission_operation_version,
+        approval_set_hash: digest(40),
+    }
+}
+
+/// Re-sign a plan whose execution binding was edited after it was built, so
+/// only the binding rule can refuse it.
+fn plan_with_execution(
+    approval_requirement: ResponseApprovalRequirement,
+    execution: Option<ResponseExecutionBinding>,
+) -> ResponsePlan {
+    let mut response_plan = plan(approval_requirement);
+    response_plan.execution = execution;
+    let body = serde_json::to_value(response_plan.authorization_body())
+        .unwrap_or_else(|error| panic!("authorization body: {error}"));
+    let hash =
+        chio_core_types::capability::governance::GovernedResponsePlanIntentBody::compute_plan_body_digest(
+            &body,
+        )
+        .unwrap_or_else(|error| panic!("authorization hash: {error}"));
+    response_plan.plan_hash = Digest32::new(*hash.as_bytes());
+    response_plan
+}
+
+fn dispatch_rejection(
+    result: Result<ResponseDispatchCommitRequest, StateMachineError>,
+) -> DispatchRejection {
+    match result {
+        Err(StateMachineError::InvalidDispatch(rejection)) => rejection,
+        Err(other) => panic!("dispatch refused by another rule: {other}"),
+        Ok(_) => panic!("dispatch was accepted"),
+    }
+}
+
+const RESUME_MODES: [ResponseDispatchCommitMode; 2] = [
+    ResponseDispatchCommitMode::GovernedCommittedResume,
+    ResponseDispatchCommitMode::GovernedCommittedExpiredResume,
+];
 
 #[test]
 fn automatic_dispatch_prepares_one_atomic_applying_transition() {
@@ -206,35 +256,151 @@ fn automatic_dispatch_prepares_one_atomic_applying_transition() {
 
 #[test]
 fn fresh_live_dispatch_rejects_simulation_and_legacy_authority() {
-    use chio_security_types::{ResponseExecutionBinding, ResponseExecutionMode};
-    for execution in [
-        None,
-        Some(ResponseExecutionBinding::new(ResponseExecutionMode::DryRun)),
+    let simulated = DispatchRejection::ExecutionMode {
+        observed: ResponseExecutionMode::DryRun,
+    };
+    for (execution, expected) in [
+        (None, DispatchRejection::LegacyPlanFreshDispatch),
+        (
+            Some(ResponseExecutionBinding::new(ResponseExecutionMode::DryRun)),
+            simulated,
+        ),
     ] {
-        let mut response_plan = plan(ResponseApprovalRequirement::Automatic);
-        response_plan.execution = execution;
-        let body = serde_json::to_value(response_plan.authorization_body())
-            .unwrap_or_else(|error| panic!("authorization body: {error}"));
-        let hash = chio_core_types::capability::governance::GovernedResponsePlanIntentBody::compute_plan_body_digest(&body)
-            .unwrap_or_else(|error| panic!("authorization hash: {error}"));
-        response_plan.plan_hash = Digest32::new(*hash.as_bytes());
-        assert!(
-            matches!(
-                prepare_response_dispatch(preparation(
-                    response_plan.clone(),
-                    ResponseDispatchApproval::Automatic,
-                )),
-                Err(StateMachineError::InvalidDispatch)
-            ),
-            "fresh dispatch accepted {execution:?}"
+        let response_plan = plan_with_execution(ResponseApprovalRequirement::Automatic, execution);
+        assert_eq!(
+            dispatch_rejection(prepare_response_dispatch(preparation(
+                response_plan.clone(),
+                ResponseDispatchApproval::Automatic,
+            ))),
+            expected,
+            "fresh dispatch of {execution:?}"
         );
         let state = ResponseStateMachine::new(Arc::new(TestResponseStore::default()));
         assert!(
             matches!(
                 state.create(response_plan),
-                Err(StateMachineError::InvalidPlan)
+                Err(StateMachineError::InvalidDispatch(rejection)) if rejection == expected
             ),
-            "live state accepted {execution:?}"
+            "live state creation of {execution:?}"
+        );
+    }
+}
+
+#[test]
+fn committed_resume_refuses_simulation_and_unbound_plans_by_name() {
+    for commit_mode in RESUME_MODES {
+        let mut simulated = preparation(
+            plan_with_execution(
+                ResponseApprovalRequirement::Governed {
+                    policy_id: record_id("response-policy"),
+                },
+                Some(ResponseExecutionBinding::new(ResponseExecutionMode::DryRun)),
+            ),
+            governed_approval(2),
+        );
+        simulated.commit_mode = commit_mode;
+        assert_eq!(
+            dispatch_rejection(prepare_response_dispatch(simulated)),
+            DispatchRejection::ExecutionMode {
+                observed: ResponseExecutionMode::DryRun,
+            },
+            "{commit_mode:?}"
+        );
+
+        let mut legacy = preparation(
+            plan_with_execution(
+                ResponseApprovalRequirement::Governed {
+                    policy_id: record_id("response-policy"),
+                },
+                None,
+            ),
+            governed_approval(2),
+        );
+        legacy.commit_mode = commit_mode;
+        assert_eq!(
+            dispatch_rejection(prepare_response_dispatch(legacy)),
+            DispatchRejection::LegacyPlanFreshDispatch,
+            "{commit_mode:?}"
+        );
+    }
+}
+
+#[test]
+fn dispatch_preparation_names_the_rule_that_refused_it() {
+    let automatic = || {
+        preparation(
+            plan(ResponseApprovalRequirement::Automatic),
+            ResponseDispatchApproval::Automatic,
+        )
+    };
+
+    let mut zero_generation = automatic();
+    zero_generation.executor_authority_generation = 0;
+    assert_eq!(
+        dispatch_rejection(prepare_response_dispatch(zero_generation)),
+        DispatchRejection::ZeroExecutorGeneration
+    );
+
+    let mut authorized_before_creation = automatic();
+    authorized_before_creation.authorized_at_unix_ms = 39_999;
+    assert_eq!(
+        dispatch_rejection(prepare_response_dispatch(authorized_before_creation)),
+        DispatchRejection::AuthorizationOutsideWindow {
+            authorized_at_unix_ms: 39_999,
+            created_at_unix_ms: 40_000,
+            expires_at_unix_ms: 50_000,
+        }
+    );
+
+    let mut authorized_at_expiry = automatic();
+    authorized_at_expiry.authorized_at_unix_ms = 50_000;
+    assert_eq!(
+        dispatch_rejection(prepare_response_dispatch(authorized_at_expiry)),
+        DispatchRejection::AuthorizationOutsideWindow {
+            authorized_at_unix_ms: 50_000,
+            created_at_unix_ms: 40_000,
+            expires_at_unix_ms: 50_000,
+        }
+    );
+
+    let mut lease_at_authorization = automatic();
+    lease_at_authorization
+        .initial_lease
+        .lease_expires_at_unix_ms = 41_000;
+    assert_eq!(
+        dispatch_rejection(prepare_response_dispatch(lease_at_authorization)),
+        DispatchRejection::LeaseOutsideWindow {
+            lease_expires_at_unix_ms: 41_000,
+            authorized_at_unix_ms: 41_000,
+            plan_expires_at_unix_ms: 50_000,
+        }
+    );
+
+    let mut lease_past_plan = automatic();
+    lease_past_plan.initial_lease.lease_expires_at_unix_ms = 50_001;
+    assert_eq!(
+        dispatch_rejection(prepare_response_dispatch(lease_past_plan)),
+        DispatchRejection::LeaseOutsideWindow {
+            lease_expires_at_unix_ms: 50_001,
+            authorized_at_unix_ms: 41_000,
+            plan_expires_at_unix_ms: 50_000,
+        }
+    );
+
+    assert_eq!(
+        dispatch_rejection(prepare_response_dispatch(preparation(
+            governed_plan(),
+            governed_approval(0),
+        ))),
+        DispatchRejection::ZeroAdmissionOperationVersion
+    );
+
+    for commit_mode in RESUME_MODES {
+        let mut automatic_resume = automatic();
+        automatic_resume.commit_mode = commit_mode;
+        assert_eq!(
+            dispatch_rejection(prepare_response_dispatch(automatic_resume)),
+            DispatchRejection::ResumeRequiresGovernedApproval { commit_mode }
         );
     }
 }
@@ -509,17 +675,8 @@ fn committed_dispatch_deadline_preserves_requested_ambiguity_and_applied_rollbac
 
 #[test]
 fn governed_dispatch_preserves_approval_history_before_applying() {
-    let prepared = prepare_response_dispatch(preparation(
-        plan(ResponseApprovalRequirement::Governed {
-            policy_id: record_id("response-policy"),
-        }),
-        ResponseDispatchApproval::Governed {
-            admission_operation_id: record_id("admission-operation"),
-            admission_operation_version: 2,
-            approval_set_hash: digest(40),
-        },
-    ))
-    .unwrap_or_else(|error| panic!("governed dispatch preparation failed: {error}"));
+    let prepared = prepare_response_dispatch(preparation(governed_plan(), governed_approval(2)))
+        .unwrap_or_else(|error| panic!("governed dispatch preparation failed: {error}"));
 
     let snapshot = decode_response_record(&prepared.response_plan)
         .unwrap_or_else(|error| panic!("prepared response record is invalid: {error}"));
@@ -549,13 +706,23 @@ fn dispatch_preparation_rejects_authorization_or_approval_mismatch() {
         ResponseDispatchApproval::Automatic,
     );
     wrong_capability.authorization_capability_hash = digest(99);
-    assert!(prepare_response_dispatch(wrong_capability).is_err());
-
-    let wrong_mode = preparation(
-        plan(ResponseApprovalRequirement::Governed {
-            policy_id: record_id("response-policy"),
-        }),
-        ResponseDispatchApproval::Automatic,
+    assert_eq!(
+        dispatch_rejection(prepare_response_dispatch(wrong_capability)),
+        DispatchRejection::CapabilityDigestMismatch
     );
-    assert!(prepare_response_dispatch(wrong_mode).is_err());
+
+    assert_eq!(
+        dispatch_rejection(prepare_response_dispatch(preparation(
+            governed_plan(),
+            ResponseDispatchApproval::Automatic,
+        ))),
+        DispatchRejection::ApprovalRequirementMismatch
+    );
+    assert_eq!(
+        dispatch_rejection(prepare_response_dispatch(preparation(
+            plan(ResponseApprovalRequirement::Automatic),
+            governed_approval(2),
+        ))),
+        DispatchRejection::ApprovalRequirementMismatch
+    );
 }

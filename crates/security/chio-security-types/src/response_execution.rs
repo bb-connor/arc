@@ -1,6 +1,6 @@
 //! Signed separation between simulated response plans and live execution.
 
-use crate::ports::{PortError, PortResult};
+use core::fmt;
 use serde::{Deserialize, Serialize};
 
 pub const RESPONSE_EXECUTION_BINDING_SCHEMA_VERSION: u8 = 1;
@@ -10,6 +10,16 @@ pub const RESPONSE_EXECUTION_BINDING_SCHEMA_VERSION: u8 = 1;
 pub enum ResponseExecutionMode {
     DryRun,
     Live,
+}
+
+impl ResponseExecutionMode {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::DryRun => "dry_run",
+            Self::Live => "live",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -28,10 +38,34 @@ impl ResponseExecutionBinding {
         }
     }
 
-    pub fn validate(&self) -> PortResult<()> {
+    pub fn validate(&self) -> Result<(), ResponseExecutionBindingError> {
         if self.schema_version != RESPONSE_EXECUTION_BINDING_SCHEMA_VERSION {
-            return Err(PortError::invalid_data());
+            return Err(ResponseExecutionBindingError::UnsupportedSchemaVersion {
+                expected: RESPONSE_EXECUTION_BINDING_SCHEMA_VERSION,
+                observed: self.schema_version,
+            });
         }
         Ok(())
     }
 }
+
+/// Why an execution binding was refused. The payload is the pair of versions
+/// the rule compared, which is what a receipt needs and nothing the binding's
+/// author supplied beyond that number.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ResponseExecutionBindingError {
+    UnsupportedSchemaVersion { expected: u8, observed: u8 },
+}
+
+impl fmt::Display for ResponseExecutionBindingError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnsupportedSchemaVersion { expected, observed } => write!(
+                formatter,
+                "response execution binding schema version {observed} is not the supported version {expected}"
+            ),
+        }
+    }
+}
+
+impl core::error::Error for ResponseExecutionBindingError {}
