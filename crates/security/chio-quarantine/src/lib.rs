@@ -25,7 +25,8 @@ pub use scheduler::{
     SchedulerTickRequest, SchedulerWorkOutcome,
 };
 pub use state_machine::{
-    build_response_plan, decode_response_record, prepare_response_dispatch, EffectMutation,
-    EffectMutationRequest, EffectReceiptContext, ResponseDispatchPreparationRequest,
-    ResponseStateMachine, ResponseTransitionRequest, StateMachineError,
+    build_response_plan, decode_response_record, prepare_response_dispatch, CanonicalFailure,
+    EffectMutation, EffectMutationRequest, EffectReceiptContext, FreezeBindingField, PlanDefect,
+    RecordDefect, ResponseDispatchPreparationRequest, ResponseStateMachine,
+    ResponseTransitionRequest, StateMachineError,
 };
