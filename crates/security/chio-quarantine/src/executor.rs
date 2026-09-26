@@ -3,6 +3,10 @@ use crate::executor_proof::{
     durable_execution_proof_snapshot,
     validate_dispatch_authorization as validate_dispatch_authorization_proof,
 };
+mod error;
+
+pub use error::ExecutorError;
+
 use crate::native_receipts::{
     latest_response_receipt, receipt_append_request, response_receipt_for_mutation,
 };
@@ -27,7 +31,6 @@ use chio_security_types::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use thiserror::Error;
 
 const EFFECT_JOURNAL_SCHEMA_VERSION: u8 = 2;
 const EFFECT_COMMAND_ID_DOMAIN: &[u8] = b"chio.response-effect-command.v1\0";
@@ -182,7 +185,9 @@ impl<
         let mut current = current.clone();
         loop {
             let snapshot = decode_response_record(&current)?;
-            if snapshot.plan.execution.is_some_and(|binding| binding.mode != chio_security_types::ResponseExecutionMode::Live) {
+            if snapshot.plan.execution.is_some_and(|binding| {
+                binding.mode != chio_security_types::ResponseExecutionMode::Live
+            }) {
                 return Err(StateMachineError::InvalidDispatch.into());
             }
             self.validate_work(&snapshot, work, now_unix_ms)?;
@@ -1679,42 +1684,4 @@ fn hex_bytes(bytes: &[u8]) -> String {
         output.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     output
-}
-
-#[derive(Debug, Error)]
-pub enum ExecutorError {
-    #[error("response execution requires a completed approval")]
-    ApprovalRequired,
-    #[error("response execution retry attempt overflowed")]
-    AttemptOverflow,
-    #[error("response execution alert failed: {0}")]
-    Alert(PortError),
-    #[error("response execution canonicalization failed")]
-    Canonical,
-    #[error("response effect outcome is unknown")]
-    EffectOutcomeUnknown,
-    #[error("response effect mutation returned without an authoritative result: {0}")]
-    EffectMutation(PortError),
-    #[error("response effect result query failed: {0}")]
-    EffectQuery(PortError),
-    #[error("response effect result is invalid")]
-    InvalidEffectResult,
-    #[error("response effect generation overflowed")]
-    GenerationOverflow,
-    #[error("response effect journal is invalid")]
-    InvalidEffectJournal,
-    #[error("active response execution evidence is invalid or incomplete")]
-    InvalidActiveEvidence,
-    #[error("response execution receipt failed: {0}")]
-    Receipt(PortError),
-    #[error("response execution receipt lineage does not match durable state")]
-    ReceiptLineageMismatch,
-    #[error("response execution lease is stale")]
-    StaleLease,
-    #[error("response execution store failed: {0}")]
-    Store(PortError),
-    #[error("response state machine failed: {0}")]
-    StateMachine(#[from] StateMachineError),
-    #[error("scheduled work does not match the response plan")]
-    WorkMismatch,
 }

@@ -52,7 +52,9 @@ fn plan(approval_requirement: ResponseApprovalRequirement) -> chio_security_type
     let contribution_hash =
         Digest32::new(*chio_core_types::sha256(canonical_contribution.as_bytes()).as_bytes());
     build_response_plan(ResponsePlanInput {
-        execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
+        execution: chio_security_types::ResponseExecutionBinding::new(
+            chio_security_types::ResponseExecutionMode::Live,
+        ),
         action_id: ActionId::new("action-dispatch")
             .unwrap_or_else(|error| panic!("invalid action id: {error}")),
         trigger_finding_id: record_id("finding-dispatch"),
@@ -216,12 +218,24 @@ fn fresh_live_dispatch_rejects_simulation_and_legacy_authority() {
         let hash = chio_core_types::capability::governance::GovernedResponsePlanIntentBody::compute_plan_body_digest(&body)
             .unwrap_or_else(|error| panic!("authorization hash: {error}"));
         response_plan.plan_hash = Digest32::new(*hash.as_bytes());
-        assert!(prepare_response_dispatch(preparation(
-            response_plan.clone(),
-            ResponseDispatchApproval::Automatic,
-        )).is_err(), "fresh dispatch accepted {execution:?}");
+        assert!(
+            matches!(
+                prepare_response_dispatch(preparation(
+                    response_plan.clone(),
+                    ResponseDispatchApproval::Automatic,
+                )),
+                Err(StateMachineError::InvalidDispatch)
+            ),
+            "fresh dispatch accepted {execution:?}"
+        );
         let state = ResponseStateMachine::new(Arc::new(TestResponseStore::default()));
-        assert!(state.create(response_plan).is_err(), "live state accepted {execution:?}");
+        assert!(
+            matches!(
+                state.create(response_plan),
+                Err(StateMachineError::InvalidPlan)
+            ),
+            "live state accepted {execution:?}"
+        );
     }
 }
 

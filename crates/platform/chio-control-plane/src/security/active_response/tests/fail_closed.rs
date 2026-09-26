@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn expired_request_and_approval_mode_mismatch_fail_before_commit() {
     let harness = Harness::new();
@@ -40,8 +42,7 @@ fn expired_request_and_approval_mode_mismatch_fail_before_commit() {
 fn malformed_hash_record_and_authority_mismatch_fail_closed() {
     let harness = Harness::new();
     let mut zero_dispatch = harness.automatic_request();
-    zero_dispatch.dispatch_id =
-        record_id(&format!("active_response_dispatch_{}", "0".repeat(64)));
+    zero_dispatch.dispatch_id = record_id(&format!("active_response_dispatch_{}", "0".repeat(64)));
     assert!(matches!(
         require_error(harness.executor.execute_source(&zero_dispatch)),
         ActiveResponseExecutorError::RejectedBeforeCommit(_)

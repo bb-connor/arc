@@ -53,190 +53,17 @@ use super::{
     ActiveResponseExecutorAuthorityIdentity, ActiveResponseExecutorError,
 };
 
+mod admission_request;
+
+pub use admission_request::{
+    ActiveResponseAdmissionRequest, AutomaticActiveResponsePermit,
+    GovernedActiveResponseReservation, PreparedActiveResponseAdmission,
+};
+
 const ACTIVE_RESPONSE_APPROVAL_TOOL_NAME: &str = "governed_response_plan";
 const ACTIVE_RESPONSE_COORDINATOR_LEASE_EPOCH: u64 = 1;
 const AFFECTED_SET_HASH_DOMAIN: &[u8] = b"chio.response-affected-set.v1\0";
 const EFFECT_ID_DOMAIN: &[u8] = b"chio.response-effect.v1\0";
-
-/// Complete immutable envelope presented to the active-response admission seam.
-#[derive(Clone, Debug)]
-pub struct ActiveResponseAdmissionRequest {
-    response_plan: ResponsePlan,
-    authorization: ActiveResponseAuthorizationRequest,
-    admission_artifact_ref: AdmissionArtifactRef,
-    artifact_authority_attestation: ActiveResponseArtifactAuthorityAttestation,
-    threshold_proposal: Option<ThresholdApprovalProposal>,
-    approval_tokens: Vec<GovernedApprovalToken>,
-}
-
-impl ActiveResponseAdmissionRequest {
-    pub fn new(
-        response_plan: ResponsePlan,
-        authorization: ActiveResponseAuthorizationRequest,
-        admission_artifact_ref: AdmissionArtifactRef,
-        artifact_authority_attestation: ActiveResponseArtifactAuthorityAttestation,
-        threshold_proposal: Option<ThresholdApprovalProposal>,
-        approval_tokens: Vec<GovernedApprovalToken>,
-    ) -> Result<Self, KernelError> {
-        if response_plan.authorization_body() != *authorization.plan_body() {
-            return Err(active_response_denied(
-                "full response plan does not reproduce the compact authorization body",
-            ));
-        }
-        Ok(Self {
-            response_plan,
-            authorization,
-            admission_artifact_ref,
-            artifact_authority_attestation,
-            threshold_proposal,
-            approval_tokens,
-        })
-    }
-
-    #[must_use]
-    pub const fn response_plan(&self) -> &ResponsePlan {
-        &self.response_plan
-    }
-
-    #[must_use]
-    pub const fn authorization(&self) -> &ActiveResponseAuthorizationRequest {
-        &self.authorization
-    }
-
-    #[must_use]
-    pub const fn admission_artifact_ref(&self) -> &AdmissionArtifactRef {
-        &self.admission_artifact_ref
-    }
-
-    #[must_use]
-    pub const fn artifact_authority_attestation(
-        &self,
-    ) -> &ActiveResponseArtifactAuthorityAttestation {
-        &self.artifact_authority_attestation
-    }
-
-    #[must_use]
-    pub const fn threshold_proposal(&self) -> Option<&ThresholdApprovalProposal> {
-        self.threshold_proposal.as_ref()
-    }
-
-    pub(super) const fn threshold_proposal_option(&self) -> &Option<ThresholdApprovalProposal> {
-        &self.threshold_proposal
-    }
-
-    #[must_use]
-    pub fn approval_tokens(&self) -> &[GovernedApprovalToken] {
-        &self.approval_tokens
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AutomaticActiveResponsePermit {
-    pub(super) dispatch_id: RecordId,
-    pub(super) request_id: String,
-    pub(super) plan_body_hash: String,
-    pub(super) authorization_capability_hash: String,
-    pub(super) governed_intent_hash: String,
-    pub(super) policy_decision_hash: String,
-    pub(super) executor_authority_id: String,
-    pub(super) executor_authority_generation: u64,
-    pub(super) authorized_at_unix_ms: u64,
-    pub(super) expires_at_unix_ms: u64,
-}
-
-impl AutomaticActiveResponsePermit {
-    #[must_use]
-    pub const fn dispatch_id(&self) -> &RecordId {
-        &self.dispatch_id
-    }
-
-    #[must_use]
-    pub fn request_id(&self) -> &str {
-        &self.request_id
-    }
-
-    #[must_use]
-    pub fn plan_body_hash(&self) -> &str {
-        &self.plan_body_hash
-    }
-
-    #[must_use]
-    pub fn authorization_capability_hash(&self) -> &str {
-        &self.authorization_capability_hash
-    }
-
-    #[must_use]
-    pub fn governed_intent_hash(&self) -> &str {
-        &self.governed_intent_hash
-    }
-
-    #[must_use]
-    pub fn policy_decision_hash(&self) -> &str {
-        &self.policy_decision_hash
-    }
-
-    #[must_use]
-    pub fn executor_authority_id(&self) -> &str {
-        &self.executor_authority_id
-    }
-
-    #[must_use]
-    pub const fn executor_authority_generation(&self) -> u64 {
-        self.executor_authority_generation
-    }
-
-    #[must_use]
-    pub const fn expires_at_unix_ms(&self) -> u64 {
-        self.expires_at_unix_ms
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct GovernedActiveResponseReservation {
-    pub(super) operation: Box<AdmissionOperation>,
-    pub(super) approval_set: Box<ApprovalSetReservationInput>,
-    pub(super) policy_decision_hash: String,
-    pub(super) authorization_capability_hash: String,
-    pub(super) governed_intent_hash: String,
-    pub(super) executor_authority_id: String,
-    pub(super) executor_authority_generation: u64,
-    pub(super) authorized_at_unix_ms: u64,
-    pub(super) dispatch_operation_version: u64,
-    pub(super) dispatch_id: RecordId,
-}
-
-impl GovernedActiveResponseReservation {
-    #[must_use]
-    pub const fn dispatch_id(&self) -> &RecordId {
-        &self.dispatch_id
-    }
-
-    #[must_use]
-    pub fn operation_id(&self) -> &str {
-        self.operation.operation_id()
-    }
-
-    #[must_use]
-    pub fn approval_set_hash(&self) -> &str {
-        self.approval_set.approval_set_hash()
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum PreparedActiveResponseAdmission {
-    Automatic(AutomaticActiveResponsePermit),
-    Governed(GovernedActiveResponseReservation),
-}
-
-impl PreparedActiveResponseAdmission {
-    #[must_use]
-    pub const fn dispatch_id(&self) -> &RecordId {
-        match self {
-            Self::Automatic(permit) => permit.dispatch_id(),
-            Self::Governed(reservation) => reservation.dispatch_id(),
-        }
-    }
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ActiveResponseDispatchPermit {
@@ -266,7 +93,9 @@ impl ChioKernel {
         &self,
         request: &ActiveResponseAdmissionRequest,
     ) -> Result<PreparedActiveResponseAdmission, KernelError> {
-        request.response_plan().require_execution_mode(chio_security_types::ResponseExecutionMode::Live)
+        request
+            .response_plan()
+            .require_execution_mode(chio_security_types::ResponseExecutionMode::Live)
             .map_err(|error| active_response_denied(error.to_string()))?;
         let verified_admission =
             self.verify_active_response_admission_at(request, current_unix_timestamp_ms())?;
@@ -278,7 +107,9 @@ impl ChioKernel {
         request: &ActiveResponseAdmissionRequest,
         verified_admission: VerifiedActiveResponseAdmission,
     ) -> Result<PreparedActiveResponseAdmission, KernelError> {
-        request.response_plan().require_execution_mode(chio_security_types::ResponseExecutionMode::Live)
+        request
+            .response_plan()
+            .require_execution_mode(chio_security_types::ResponseExecutionMode::Live)
             .map_err(|error| active_response_denied(error.to_string()))?;
         match verified_admission {
             VerifiedActiveResponseAdmission::Automatic(permit) => {
@@ -878,17 +709,21 @@ impl ChioKernel {
                 break;
             }
         }
-        let immutable_window_expired = now_unix_ms >= request.response_plan.expires_at_unix_ms
-            || now_unix_ms >= request.response_plan.operator_capability.expires_at_unix_ms
+        let immutable_window_expired = now_unix_ms >= request.response_plan().expires_at_unix_ms
             || now_unix_ms
                 >= request
-                    .authorization
+                    .response_plan()
+                    .operator_capability
+                    .expires_at_unix_ms
+            || now_unix_ms
+                >= request
+                    .authorization()
                     .submission_proof()
                     .body
                     .expires_at_unix_ms
             || now_unix_ms
                 >= request
-                    .artifact_authority_attestation
+                    .artifact_authority_attestation()
                     .body
                     .expires_at_unix_ms
             || proposal_window_expired
@@ -1002,8 +837,14 @@ impl ChioKernel {
             ));
         }
         validate_executable_response_plan(request)?;
-        if request.response_plan().execution.is_some_and(|binding| binding.mode != chio_security_types::ResponseExecutionMode::Live) {
-            return Err(active_response_denied("simulation plans cannot authorize live response execution"));
+        if request
+            .response_plan()
+            .execution
+            .is_some_and(|binding| binding.mode != chio_security_types::ResponseExecutionMode::Live)
+        {
+            return Err(active_response_denied(
+                "simulation plans cannot authorize live response execution",
+            ));
         }
         let bindings = self.verify_active_response_authorization_at(
             request.authorization(),

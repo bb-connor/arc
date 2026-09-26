@@ -1,3 +1,7 @@
+mod error;
+
+pub use error::ResponseWorkerTickError;
+
 include!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/src/security/scheduler_worker_parts/part_01.inc"

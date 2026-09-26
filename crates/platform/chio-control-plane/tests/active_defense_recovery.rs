@@ -309,7 +309,9 @@ fn normal_to_quarantined_to_rollback_partial_remains_denied() {
     let base = session_overlay_version_hash(store.as_ref(), &target)
         .unwrap_or_else(|error| panic!("base overlay version: {error}"));
     let plan = build_response_plan(ResponsePlanInput {
-        execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
+        execution: chio_security_types::ResponseExecutionBinding::new(
+            chio_security_types::ResponseExecutionMode::Live,
+        ),
         action_id: action_id.clone(),
         trigger_finding_id: record("rollback-partial-finding"),
         trigger_finding_hash: digest(b"rollback-partial-finding"),

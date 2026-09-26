@@ -1,3 +1,5 @@
+#[path = "state_machine/plan_authorization.rs"]
+mod plan_authorization;
 mod response_support;
 
 use chio_quarantine::{
@@ -105,7 +107,9 @@ fn plan_input(effect_count: u8) -> ResponsePlanInput {
         .map(|index| effect(ResponseEffectKind::ThrottleSession, index))
         .collect();
     ResponsePlanInput {
-        execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
+        execution: chio_security_types::ResponseExecutionBinding::new(
+            chio_security_types::ResponseExecutionMode::Live,
+        ),
         action_id: ActionId::new("action-response")
             .unwrap_or_else(|failure| panic!("invalid action id: {failure}")),
         trigger_finding_id: record("finding-response"),
@@ -998,63 +1002,6 @@ fn receipt_backed_effect_generation_and_fencing_token_cannot_regress() {
         ),
         Err(StateMachineError::InvalidEffectLifecycle)
     ));
-}
-
-#[test]
-fn response_plan_authorization_body_excludes_its_own_hash() {
-    let plan = build_response_plan(plan_input(2))
-        .unwrap_or_else(|failure| panic!("valid response plan rejected: {failure}"));
-    let body = plan.authorization_body();
-    let mut encoded = serde_json::to_value(&body)
-        .unwrap_or_else(|failure| panic!("authorization body encoding failed: {failure}"));
-
-    assert_eq!(body.action_id, plan.action_id);
-    assert!(encoded.get("plan_hash").is_none());
-    let keys = encoded
-        .as_object()
-        .unwrap_or_else(|| panic!("authorization body is not an object"))
-        .keys()
-        .map(String::as_str)
-        .collect::<std::collections::BTreeSet<_>>();
-    let expected = [
-        "action_id",
-        "affected_ids",
-        "affected_set_hash",
-        "approval_requirement",
-        "created_at_unix_ms",
-        "effects",
-        "expires_at_unix_ms",
-        "operator_capability",
-        "policy_hash",
-        "policy_version",
-        "reason_hash",
-        "submitter",
-        "tenant_id",
-        "trigger_finding_hash",
-        "trigger_finding_id",
-        "trigger_finding_receipt_id",
-        "ttl_ms",
-    ]
-    .into_iter()
-    .collect();
-    assert_eq!(keys, expected);
-    let canonical = serde_json::to_string(&body)
-        .unwrap_or_else(|failure| panic!("authorization body encoding failed: {failure}"));
-    assert!(!canonical.contains("canonical_contribution"));
-    assert!(!canonical.contains("posture_rank"));
-
-    encoded["plan_hash"] = serde_json::json!(plan.plan_hash);
-    assert!(serde_json::from_value::<ResponsePlanAuthorizationBody>(encoded).is_err());
-}
-
-#[test]
-fn response_plan_rejects_authorization_body_above_governance_ceiling() {
-    let mut input = plan_input(1);
-    input.affected_ids = (0..300)
-        .map(|index| record(&format!("affected-{index:04}-{}", "a".repeat(220))))
-        .collect();
-
-    assert!(build_response_plan(input).is_err());
 }
 
 #[test]
