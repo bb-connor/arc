@@ -182,6 +182,8 @@ jobs:
           bash scripts/tests/check-lint-parity.test.sh
           python3 scripts/check-wire-schemas.py
           bash scripts/tests/check-wire-schemas.test.sh
+          python3 scripts/check-dependency-budget.py
+          bash scripts/tests/check-dependency-budget.test.sh
 
       - name: Formal traceability gate
         run: bash scripts/check-mapping.sh
