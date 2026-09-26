@@ -1170,8 +1170,11 @@ fn validate_committed_dispatch(
 
     let response_record = committed.committed_response_record();
     let snapshot: ResponseSnapshot =
-        serde_json::from_slice(response_record.canonical_body.as_bytes())
-            .map_err(|_| committed_recovery_denied("committed response record is not decodable"))?;
+        serde_json::from_slice(response_record.canonical_body.as_bytes()).map_err(|error| {
+            committed_recovery_denied(format!(
+                "committed response record is not decodable: {error}"
+            ))
+        })?;
     let canonical_response = canonical_json_bytes(&snapshot).map_err(|error| {
         committed_recovery_internal(format!(
             "committed response canonicalization failed: {error}"
@@ -1392,8 +1395,9 @@ fn digest_hex(digest: &Digest32) -> String {
 }
 
 fn digest_from_hex(value: &str, label: &str) -> Result<Digest32, KernelError> {
-    let digest = Hash::from_hex(value)
-        .map_err(|_| never_committed_internal(format!("prepared {label} hash is invalid")))?;
+    let digest = Hash::from_hex(value).map_err(|error| {
+        never_committed_internal(format!("prepared {label} hash is invalid: {error}"))
+    })?;
     if digest.to_hex() != value || digest.as_bytes().iter().all(|byte| *byte == 0) {
         return Err(never_committed_internal(format!(
             "prepared {label} hash is zero or not canonical lowercase hexadecimal"

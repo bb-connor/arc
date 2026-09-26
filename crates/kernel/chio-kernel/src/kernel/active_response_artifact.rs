@@ -378,9 +378,9 @@ impl ChioKernel {
 }
 
 fn digest_from_hex(value: &str, label: &str) -> Result<Digest32, KernelError> {
-    let parsed = Hash::from_hex(value).map_err(|_| {
+    let parsed = Hash::from_hex(value).map_err(|error| {
         denied(&format!(
-            "active-response {label} hash is not a 32-byte hexadecimal digest"
+            "active-response {label} hash is not a 32-byte hexadecimal digest: {error}"
         ))
     })?;
     if parsed.to_hex() != value || parsed.as_bytes().iter().all(|byte| *byte == 0) {
