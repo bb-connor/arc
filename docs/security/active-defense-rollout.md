@@ -118,10 +118,17 @@ The active-response protocol in `chio-control-plane`, the
 `chio-active-response-authorityd` runtime, and the
 `chio-secret-brokerd.runtime-config.v5` broker daemon are boundaries that must
 be qualified independently. A combined deployment uses the closed
-`chio.active-defense.deployment-config.v1` schema and validates its digest with
+`chio.active-defense.deployment-config.v2` schema and validates its digest with
 `chio security authority-deployment validate` before it may enter this
 section's promotion sequence. There is no implicit same-process or legacy
 composition.
+
+Configuration v2 requires `responseAuthority.responseExecutionMode` to be
+`dry_run` or `live`; the runtime subset uses
+`chio.active-response-authority.runtime-config.v2`. Both schema versions and
+the execution mode participate in the deployment digest. A v1 deployment must
+be regenerated with an explicit mode and new digests before restart. Missing
+or unknown modes and mode changes under a retained digest are rejected.
 
 - Run the response authority as a dedicated Unix process. Its socket path, PID, UID, and GID are pinned exactly. The socket directory and socket must be owned by the pinned UID and must not be group- or world-writable.
 - The authority daemon accepts only the complete canonical combined deployment as its `--config` input and validates the normalized deployment digest before extracting its runtime projection. A standalone response-authority subset cannot start the daemon. It then owns a `chio-secure-ipc` listener, retains an exclusive lifecycle lock, refuses an unknown preexisting node, binds the exact path, sets mode `0600`, authenticates kernel peer credentials before parsing bytes, rechecks the retained socket inode, and unlinks only that inode during shutdown. The protocol server remains independent of socket lifecycle ownership.

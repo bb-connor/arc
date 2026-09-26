@@ -110,7 +110,7 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:14` `SCIM_LIFECYCLE_RECORD_SCHEMA` = `chio.scim-lifecycle-record.v1`
 - `crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs:11` `DECLASSIFIED_SCHEMA` = `chio.native-flow-dispatch-policy.v2`
 - `crates/platform/chio-control-plane/src/security/event_consumer_parts/part_01.inc:79` `SECURITY_EVENT_RECEIPT_PROJECTION_VERSION` = `chio.security-event-receipt-projection.v1`
-- `crates/platform/chio-control-plane/src/security/event_consumer_parts/part_03.inc:19` `ATTESTED_FINDING_ADMISSION_ARTIFACT_BUNDLE_SCHEMA` = `chio.attested-finding-admission-artifacts.v1`
+- `crates/platform/chio-control-plane/src/security/event_consumer_parts/part_03.inc:20` `ATTESTED_FINDING_ADMISSION_ARTIFACT_BUNDLE_SCHEMA` = `chio.attested-finding-admission-artifacts.v1`
 - `crates/platform/chio-control-plane/src/security/migration_evidence.rs:11` `ENTERPRISE_MIGRATION_CANARY_EVIDENCE_SCHEMA` = `chio.enterprise-migration-canary-evidence.v1`
 - `crates/platform/chio-control-plane/src/security/migration_evidence.rs:13` `ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_SCHEMA` = `chio.enterprise-migration-cutover-attestation.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:146` `DEFECT_DOMAIN` = `chio.finding.defect.v1`
@@ -165,8 +165,8 @@ since been pinned is removed by the next `--update`.
 
 ## crates/security/chio-active-response-authority (4)
 
-- `crates/security/chio-active-response-authority/src/config.rs:16` `AUTHORITY_RUNTIME_CONFIG_SCHEMA` = `chio.active-response-authority.runtime-config.v1`
-- `crates/security/chio-active-response-authority/src/config.rs:18` `ACTIVE_DEFENSE_DEPLOYMENT_CONFIG_SCHEMA` = `chio.active-defense.deployment-config.v1`
+- `crates/security/chio-active-response-authority/src/config.rs:17` `AUTHORITY_RUNTIME_CONFIG_SCHEMA` = `chio.active-response-authority.runtime-config.v2`
+- `crates/security/chio-active-response-authority/src/config.rs:19` `ACTIVE_DEFENSE_DEPLOYMENT_CONFIG_SCHEMA` = `chio.active-defense.deployment-config.v2`
 - `crates/security/chio-active-response-authority/src/store.rs:31` `AUTHORITY_STORE_BUNDLE_SCHEMA` = `chio.active-response-authority.bundle.v1`
 - `crates/security/chio-active-response-authority/src/store.rs:32` `AUTHORITY_STORE_MANIFEST_SCHEMA` = `chio.active-response-authority.store-manifest.v1`
 

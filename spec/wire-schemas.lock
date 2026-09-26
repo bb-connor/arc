@@ -60,9 +60,9 @@ files = ["crates/products/chio-cli/src/active_defense_migration.rs"]
 first_seen = "6a12a69155"
 
 [[schema]]
-value = "chio.active-defense.deployment-config.v1"
+value = "chio.active-defense.deployment-config.v2"
 files = ["crates/security/chio-active-response-authority/src/config.rs"]
-first_seen = "ff2ea2a8d2"
+first_seen = "0b59590555"
 
 [[schema]]
 value = "chio.active-defense.shadow-migration-input.v1"
@@ -85,9 +85,9 @@ files = ["crates/security/chio-active-response-authority/src/store.rs"]
 first_seen = "ff2ea2a8d2"
 
 [[schema]]
-value = "chio.active-response-authority.runtime-config.v1"
+value = "chio.active-response-authority.runtime-config.v2"
 files = ["crates/security/chio-active-response-authority/src/config.rs"]
-first_seen = "ff2ea2a8d2"
+first_seen = "0b59590555"
 
 [[schema]]
 value = "chio.active-response-authority.store-manifest.v1"

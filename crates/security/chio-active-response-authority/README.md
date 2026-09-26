@@ -7,7 +7,7 @@ new immutable SQLite snapshot, and restart the daemon with the new deployment
 and store digests.
 
 At startup the daemon loads the complete canonical
-`chio.active-defense.deployment-config.v1`, validates its normalized digest and
+`chio.active-defense.deployment-config.v2`, validates its normalized digest and
 broker/authority role separation, validates the complete SQLite image,
 recomputes its logical digest, and decodes all records into an immutable
 in-memory snapshot. A standalone response-authority runtime subset is not a

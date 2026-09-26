@@ -8,17 +8,18 @@ use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use chio_core::PublicKey;
 use chio_secure_ipc::{PeerIdentity, MAX_UNIX_SOCKET_PATH_BYTES};
 use chio_security_types::ports::Digest32;
+use chio_security_types::ResponseExecutionMode;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{AuthorityError, Result};
 
 pub const AUTHORITY_RUNTIME_CONFIG_SCHEMA: &str =
-    "chio.active-response-authority.runtime-config.v1";
+    "chio.active-response-authority.runtime-config.v2";
 pub const ACTIVE_DEFENSE_DEPLOYMENT_CONFIG_SCHEMA: &str =
-    "chio.active-defense.deployment-config.v1";
+    "chio.active-defense.deployment-config.v2";
 const ACTIVE_DEFENSE_DEPLOYMENT_DIGEST_DOMAIN: &[u8] =
-    b"chio.active-defense.deployment-config.digest.v1\0";
+    b"chio.active-defense.deployment-config.digest.v2\0";
 const MAX_DEPLOYMENT_CONFIG_BYTES: u64 = 1_048_576;
 const ACTIVE_RESPONSE_AUTHORITY_PROTOCOL: &str = "chio.active-response-policy-authority.v2";
 
@@ -27,6 +28,7 @@ const ACTIVE_RESPONSE_AUTHORITY_PROTOCOL: &str = "chio.active-response-policy-au
 pub struct AuthorityRuntimeConfig {
     pub schema: String,
     pub protocol: String,
+    pub response_execution_mode: ResponseExecutionMode,
     pub socket_path: PathBuf,
     pub store_path: PathBuf,
     pub trusted_service_uid: u32,

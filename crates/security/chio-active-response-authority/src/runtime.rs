@@ -568,6 +568,7 @@ mod tests {
             response_authority: AuthorityRuntimeConfig {
                 schema: AUTHORITY_RUNTIME_CONFIG_SCHEMA.to_string(),
                 protocol: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+                response_execution_mode: chio_security_types::ResponseExecutionMode::Live,
                 socket_path: socket_path.clone(),
                 store_path: store_path.clone(),
                 trusted_service_uid: service_identity.user_id,

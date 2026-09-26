@@ -28,6 +28,7 @@ fn deployment() -> ActiveDefenseDeploymentConfig {
         response_authority: AuthorityRuntimeConfig {
             schema: AUTHORITY_RUNTIME_CONFIG_SCHEMA.to_string(),
             protocol: ACTIVE_RESPONSE_AUTHORITY_PROTOCOL.to_string(),
+            response_execution_mode: ResponseExecutionMode::Live,
             socket_path: PathBuf::from("/run/chio/response-authority.sock"),
             store_path: PathBuf::from("/var/lib/chio/response-authority.db"),
             trusted_service_uid: authority_process.user_id,
@@ -152,8 +153,38 @@ fn deployment_digest_can_be_planned_before_digest_fields_are_populated() {
 fn deployment_digest_has_an_exact_golden_vector() {
     assert_eq!(
         hex::encode(deployment().deployment_digest.as_bytes()),
-        "6d6ec839be20fd9377b4d8c3412e6543c653faba73735ebf883f800c8605bf70"
+        "ad599694a598a196ebc7cedbb2a1d82b093a5c95fa356c96323e90f7718736bb"
     );
+}
+
+#[test]
+fn deployment_rejects_mode_substitution_under_the_original_digest() {
+    let mut configured = deployment();
+    configured.validate().test_expect("valid live deployment");
+    configured.response_authority.response_execution_mode = ResponseExecutionMode::DryRun;
+    let error = configured.validate().test_expect_err("mode substitution");
+    assert!(matches!(error, AuthorityError::InvalidConfig(message)
+        if message == "deployment digest does not match the normalized configuration"));
+}
+
+#[test]
+fn deployment_rejects_unknown_modes_and_legacy_schema_versions() {
+    let mut encoded = serde_json::to_value(deployment()).test_expect("deployment value");
+    encoded["responseAuthority"]["responseExecutionMode"] = serde_json::json!("automatic");
+    let error = serde_json::from_value::<ActiveDefenseDeploymentConfig>(encoded)
+        .test_expect_err("unknown execution mode");
+    assert!(error.to_string().contains("unknown variant `automatic`"));
+
+    let mut legacy_runtime = deployment();
+    legacy_runtime.response_authority.schema =
+        "chio.active-response-authority.runtime-config.v1".to_string();
+    assert!(matches!(legacy_runtime.compute_deployment_digest(),
+        Err(AuthorityError::InvalidConfig(message)) if message.starts_with("runtime schema,")));
+
+    let mut legacy_deployment = deployment();
+    legacy_deployment.schema = "chio.active-defense.deployment-config.v1".to_string();
+    assert!(matches!(legacy_deployment.compute_deployment_digest(),
+        Err(AuthorityError::InvalidConfig(message)) if message.starts_with("deployment digest,")));
 }
 
 #[test]
