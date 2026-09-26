@@ -12,6 +12,12 @@ use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion
 const RECEIPTS_PER_BATCH: usize = 64;
 const APPENDER_THREADS: usize = 8;
 
+/// Receipts already in the table before the populated group's first measured
+/// batch. Append cost is dominated by `fsync` and by the unique-index insert,
+/// and only the second of those grows with history, so the two groups bracket
+/// the append path rather than duplicating it.
+const POPULATED_RECEIPTS: u64 = 20_000;
+
 fn unique_db_path() -> std::path::PathBuf {
     let nonce = match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(duration) => duration.as_nanos(),
@@ -60,6 +66,15 @@ fn receipt_for_index(index: u64) -> ChioReceipt {
 }
 
 fn bench_store_receipt_write_throughput(c: &mut Criterion) {
+    measure_append_throughput(c, "store_receipt_write_throughput", 0);
+    measure_append_throughput(
+        c,
+        "store_receipt_write_throughput_populated",
+        POPULATED_RECEIPTS,
+    );
+}
+
+fn measure_append_throughput(c: &mut Criterion, name: &str, populate: u64) {
     let path = unique_db_path();
     let store = match SqliteReceiptStore::open(&path) {
         Ok(store) => store,
@@ -67,7 +82,19 @@ fn bench_store_receipt_write_throughput(c: &mut Criterion) {
     };
     let receipt_index = AtomicU64::new(1);
 
-    c.bench_function("store_receipt_write_throughput", |b| {
+    for _ in 0..populate {
+        let index = receipt_index.fetch_add(1, Ordering::Relaxed);
+        if let Err(error) = store.append_chio_receipt_returning_seq(&receipt_for_index(index)) {
+            fail_bench(&format!("populate receipt: {error}"));
+        }
+    }
+    if populate > 0 {
+        if let Err(error) = store.flush_receipt_writes() {
+            fail_bench(&format!("flush populated receipts: {error}"));
+        }
+    }
+
+    c.bench_function(name, |b| {
         b.iter_batched(
             || {
                 let first_index =
