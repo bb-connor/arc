@@ -11,10 +11,13 @@ use serde::{Deserialize, Serialize};
 const LEGACY_SCHEMA: &str = "chio.kernel-caller-return-context.v1";
 const SIGNING_SCHEMA: &str = "chio.kernel-caller-return-context.v2";
 const PARTICIPANT_SCHEMA: &str = "chio.kernel-caller-return-context.v3";
-const SCHEMA: &str = "chio.kernel-caller-return-context.v4";
+const CUSTODY_SCHEMA: &str = "chio.kernel-caller-return-context.v4";
+const SCHEMA: &str = "chio.kernel-caller-return-context.v6";
 
 #[path = "caller/custody.rs"]
 mod custody;
+#[path = "caller/deadline.rs"]
+mod deadline;
 #[path = "caller/report.rs"]
 mod report;
 pub(super) use custody::CallerParticipantCustody;
@@ -50,6 +53,8 @@ struct CallerReturnWire {
     participant_custody: Option<CallerParticipantCustody>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     native_custody: Option<NativeCallerReleaseCustodyV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    start_valid_until_unix_ms: Option<u64>,
 }
 
 impl ChioKernel {
@@ -181,6 +186,7 @@ impl ChioKernel {
                 "legacy caller context cannot acquire start authority",
             ));
         }
+        let expires_at_unix_ms = expires_at_unix_ms.min(wire.start_deadline()?);
         let body = CallerDispatchAuthorizationBodyV1 {
             schema: CALLER_DISPATCH_AUTHORIZATION_SCHEMA.into(),
             kernel_public_key: wire.kernel_public_key,
@@ -188,12 +194,7 @@ impl ChioKernel {
             invocation,
             committed,
             not_before_unix_ms: wire.frozen_at_unix_ms,
-            expires_at_unix_ms: wire
-                .native_custody
-                .as_ref()
-                .map_or(expires_at_unix_ms, |custody| {
-                    expires_at_unix_ms.min(custody.valid_until_unix_ms())
-                }),
+            expires_at_unix_ms,
         };
         SignedCallerDispatchAuthorizationV1::sign(body, &self.config.keypair)
             .map(Some)
@@ -233,6 +234,11 @@ impl ChioKernel {
             ));
         }
         let wire = CallerReturnWire {
+            start_valid_until_unix_ms: if native_custody.is_none() {
+                Some(self.freeze_caller_start_deadline(admission, context, now)?)
+            } else {
+                None
+            },
             schema: if native_custody.is_some() {
                 NATIVE_CALLER_CONTEXT_SCHEMA
             } else {
@@ -362,13 +368,19 @@ impl ChioKernel {
             wire.participants.as_ref(),
             wire.participant_custody.as_ref(),
         ) {
-            (SCHEMA | NATIVE_CALLER_CONTEXT_SCHEMA, Some(identity), Some(_), Some(_))
+            (
+                SCHEMA | CUSTODY_SCHEMA | NATIVE_CALLER_CONTEXT_SCHEMA,
+                Some(identity),
+                Some(_),
+                Some(_),
+            )
             | (PARTICIPANT_SCHEMA, Some(identity), Some(_), None)
             | (SIGNING_SCHEMA, Some(identity), None, None) => identity.validate().is_ok(),
             (LEGACY_SCHEMA, None, None, None) => true,
             _ => false,
         };
         if !schema_valid
+            || !wire.valid_deadline_shape()
             || (wire.schema == NATIVE_CALLER_CONTEXT_SCHEMA) != wire.native_custody.is_some()
             || wire.kernel_public_key != self.config.keypair.public_key()
             || wire.frozen_at_unix_ms == 0

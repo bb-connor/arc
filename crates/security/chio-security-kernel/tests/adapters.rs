@@ -409,6 +409,9 @@ impl PostInvocationHook for BlockingPostInvocationHook {
 struct CompilePreResolver;
 
 impl FlowPreInvocationResolver for CompilePreResolver {
+    fn persist_observed_input(&self, _: &FlowJoinRequest) -> Result<(), FlowDenial> {
+        Err(FlowDenial::StateChanged)
+    }
     fn resolve(
         &self,
         _input: &FlowPreInvocationInput<'_>,
@@ -424,6 +427,9 @@ impl FlowPreInvocationResolver for CompilePreResolver {
 struct PersistFailingPreResolver;
 
 impl FlowPreInvocationResolver for PersistFailingPreResolver {
+    fn persist_observed_input(&self, _: &FlowJoinRequest) -> Result<(), FlowDenial> {
+        Err(FlowDenial::DeclassificationStoreFailure)
+    }
     fn resolve(
         &self,
         _input: &FlowPreInvocationInput<'_>,
@@ -438,9 +444,14 @@ impl FlowPreInvocationResolver for PersistFailingPreResolver {
 
 struct DeclassifyingPreResolver {
     persist_calls: Arc<AtomicUsize>,
+    observed_inputs: Arc<AtomicUsize>,
 }
 
 impl FlowPreInvocationResolver for DeclassifyingPreResolver {
+    fn persist_observed_input(&self, _: &FlowJoinRequest) -> Result<(), FlowDenial> {
+        self.observed_inputs.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
     fn resolve(
         &self,
         _input: &FlowPreInvocationInput<'_>,
@@ -921,8 +932,10 @@ fn trait_conformance_compiles_against_kernel_hooks() {
 #[test]
 fn generic_pre_invocation_adapter_fails_closed_without_declassification_store() {
     let persist_calls = Arc::new(AtomicUsize::new(0));
+    let observed_inputs = Arc::new(AtomicUsize::new(0));
     let engine = EngineFlowPreInvocationPort::new(Arc::new(DeclassifyingPreResolver {
         persist_calls: Arc::clone(&persist_calls),
+        observed_inputs: Arc::clone(&observed_inputs),
     }));
     let request = request();
     let security = security_context(&request);
@@ -936,6 +949,7 @@ fn generic_pre_invocation_adapter_fails_closed_without_declassification_store() 
         Err(FlowDenial::DeclassificationStoreFailure)
     );
     assert_eq!(persist_calls.load(Ordering::SeqCst), 0);
+    assert_eq!(observed_inputs.load(Ordering::SeqCst), 1);
 }
 
 #[test]

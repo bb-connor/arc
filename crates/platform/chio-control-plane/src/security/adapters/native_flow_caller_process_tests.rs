@@ -374,6 +374,11 @@ fn verify_restart(root: &Path, witness: &Witness, cut: Cut) -> TestResult {
                     assert!(
                         matches!(&completed.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &report.report.output)
                     );
+                    kernel.emergency_stop("block replay after output release checkpoint")?;
+                    assert!(kernel
+                        .reconcile_authenticated_caller_execution_blocking(&authorization, &report,)
+                        .is_err());
+                    kernel.emergency_resume()?;
                     let duplicate = kernel.reconcile_authenticated_caller_execution_blocking(
                         &authorization,
                         &report,

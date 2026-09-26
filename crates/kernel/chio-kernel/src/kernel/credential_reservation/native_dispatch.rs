@@ -173,56 +173,9 @@ impl DispatchCredentialReservation<'_> {
         )?;
         // Carry the already verified artifacts' exclusive horizon across the
         // capture callback. Never refresh or extend them after commitment.
-        let mut valid_until = request
-            .capability
-            .expires_at
-            .checked_mul(1000)
-            .ok_or_else(|| invalid("native capability deadline overflow"))?;
-        if let Some(approval) = approval_credential {
-            valid_until = valid_until.min(
-                approval
-                    .expires_at_unix_secs
-                    .checked_mul(1000)
-                    .ok_or_else(|| invalid("native approval deadline overflow"))?,
-            );
-        }
-        if let Some(dpop) = prepared.dpop_credential() {
-            let until = dpop
-                .valid_through_unix_secs()
-                .map_err(|error| invalid(&error.to_string()))?
-                .checked_add(1)
-                .and_then(|seconds| seconds.checked_mul(1000))
-                .ok_or_else(|| invalid("native DPoP deadline overflow"))?;
-            valid_until = valid_until.min(until);
-        }
+        let mut valid_until = prepared.valid_until_unix_ms()?;
         if let Some((_, validity)) = &runtime {
             valid_until = valid_until.min(validity.valid_until_unix_ms());
-        }
-        if let Some(nonce) = execution_nonce {
-            valid_until = valid_until.min(
-                u64::try_from(nonce.signed_nonce().expires_at())
-                    .ok()
-                    .and_then(|seconds| seconds.checked_mul(1000))
-                    .ok_or_else(|| invalid("native execution nonce deadline overflow"))?,
-            );
-        }
-        if let Some(grant) = &request.declassification_grant {
-            // Issuer trust and flow policy are checked by the live native
-            // resolver. The physical capture additionally requires its exact
-            // operation-owned use and matching policy, never this signature alone.
-            if !grant
-                .verify_signature()
-                .map_err(|error| invalid(&error.to_string()))?
-            {
-                return Err(invalid("native declassification signature is invalid"));
-            }
-            valid_until = valid_until.min(
-                grant
-                    .body()
-                    .expires_at_unix_seconds()
-                    .checked_mul(1000)
-                    .ok_or_else(|| invalid("native declassification deadline overflow"))?,
-            );
         }
         Ok(VerifiedNativeDispatchCredentials {
             reservation: self,

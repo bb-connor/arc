@@ -15,6 +15,46 @@ fn copy_store(source: &Path, destination: &Path) -> (PathBuf, PathBuf) {
 }
 
 #[test]
+fn restoring_pre_export_database_cannot_undo_retirement() {
+    use std::io::Write;
+    let (_temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    drop(SqliteAuthorityStore::open_serving(&database, &lock_root).expect("serve"));
+    let before = fs::read(&database).expect("snapshot before export");
+    SqliteAuthorityStore::export_for_relocation(&database, &lock_root).expect("export");
+    // Preserve the inode and all external custody artifacts, restoring only
+    // the database bytes as an in-place backup rollback would do.
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(&database)
+        .expect("open inode");
+    file.write_all(&before).expect("restore snapshot");
+    file.sync_all().expect("sync snapshot");
+    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+    assert!(SqliteAuthorityStore::export_for_relocation(&database, &lock_root).is_err());
+}
+
+#[test]
+fn relocation_preserves_other_authorities_in_a_shared_lock_root() {
+    let (temp, database, lock_root) = fixture();
+    let unrelated = temp.path().join("unrelated.db");
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision source");
+    SqliteAuthorityStore::provision(&unrelated, &lock_root).expect("provision unrelated");
+    let marker = path_identity_marker(&unrelated, &lock_root);
+    let marker_bytes = fs::read(&marker).expect("original marker");
+    SqliteAuthorityStore::export_for_relocation(&database, &lock_root).expect("export");
+    let moved = temp.path().join("moved.db");
+    fs::copy(&database, &moved).expect("copy exported database");
+    SqliteAuthorityStore::import_relocated(&moved, &lock_root).expect("import in shared root");
+    assert_eq!(fs::read(&marker).expect("retained marker"), marker_bytes);
+    drop(
+        SqliteAuthorityStore::open_serving(&unrelated, &lock_root).expect("unrelated still serves"),
+    );
+    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+}
+
+#[test]
 fn exported_store_refuses_serving_until_a_copy_is_imported_elsewhere() {
     let (temp, database, lock_root) = fixture();
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
@@ -256,7 +296,7 @@ fn verified_import_retries_after_lock_artifact_io_refusal() {
         "failure must follow successful file verification"
     );
     assert!(
-        matches!(refused, Err(SqliteServingOwnerError::Invalid(ref reason)) if reason.contains("previous lock artifact is not a regular file")),
+        matches!(refused, Err(SqliteServingOwnerError::Invalid(ref reason)) if reason.contains("local path identity continuity marker security check failed") && reason.contains("not a regular file")),
         "{refused:?}"
     );
     // Authorized work may have partially replaced the old locks. Remove only

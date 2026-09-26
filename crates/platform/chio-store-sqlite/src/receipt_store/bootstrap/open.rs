@@ -592,7 +592,6 @@ impl SqliteReceiptStore {
             CREATE TABLE IF NOT EXISTS chio_security_evidence_index (
                 evidence_id TEXT NOT NULL PRIMARY KEY,
                 receipt_id TEXT NOT NULL UNIQUE
-                    REFERENCES chio_tool_receipts(receipt_id) ON DELETE RESTRICT
             );
 
             CREATE TRIGGER IF NOT EXISTS chio_security_evidence_index_reject_update
@@ -1503,6 +1502,7 @@ impl SqliteReceiptStore {
         schema_migration.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
         schema_migration.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
         ensure_tool_receipt_attribution_columns(&schema_migration)?;
+        super::support::migrate_indexed_security_evidence_schema(&schema_migration)?;
         super::support::ensure_receipt_lineage_statement_columns(&schema_migration)?;
         super::support::drop_transparency_projection_guards(&schema_migration)?;
         super::support::ensure_receipt_retention_watermark_table(&schema_migration)?;

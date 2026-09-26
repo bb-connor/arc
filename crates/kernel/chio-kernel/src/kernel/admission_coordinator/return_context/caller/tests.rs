@@ -188,6 +188,10 @@ fn caller_return_codec_keeps_legacy_identity_absence_explicit() -> TestResult {
     payload
         .as_object_mut()
         .ok_or("caller object")?
+        .remove("start_valid_until_unix_ms");
+    payload
+        .as_object_mut()
+        .ok_or("caller object")?
         .remove("participant_custody");
     payload
         .as_object_mut()

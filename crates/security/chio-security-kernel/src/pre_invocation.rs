@@ -18,6 +18,13 @@ pub trait FlowPreInvocationResolver: Send + Sync {
         input: &FlowPreInvocationInput<'_>,
     ) -> Result<ResolvedFlowRequest, FlowDenial>;
 
+    /// Retain classified input before a policy decision can reject the call.
+    /// Implementations must fail closed if the observation cannot be stored.
+    fn persist_observed_input(
+        &self,
+        observation: &chio_security_types::ports::FlowJoinRequest,
+    ) -> Result<(), FlowDenial>;
+
     fn persist(&self, admission: &FlowAdmission) -> Result<(), FlowDenial>;
 }
 
@@ -45,6 +52,8 @@ impl EngineFlowPreInvocationPort {
 impl FlowPreInvocationPort for EngineFlowPreInvocationPort {
     fn evaluate(&self, input: &FlowPreInvocationInput<'_>) -> Result<(), FlowDenial> {
         let resolved = self.resolver.resolve(input)?;
+        self.resolver
+            .persist_observed_input(&resolved.observed_input_taint())?;
         let admission = evaluate_pre_invocation(resolved)?;
         self.resolver.persist(&admission)
     }

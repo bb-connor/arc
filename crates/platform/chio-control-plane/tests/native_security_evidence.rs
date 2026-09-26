@@ -270,6 +270,38 @@ fn native_sink_signs_appends_idempotently_and_verifies_the_exact_stored_receipt(
     assert!(connection
         .execute("DELETE FROM chio_security_evidence_index", [])
         .is_err());
+    store
+        .enable_background_checkpoints(chio_store_sqlite::BackgroundCheckpointSigner {
+            keypair: Arc::new(Keypair::from_seed(&[77_u8; 32])),
+            max_batch: 1,
+        })
+        .unwrap_or_else(|error| panic!("enable evidence checkpoints: {error}"));
+    store
+        .flush_receipt_writes()
+        .unwrap_or_else(|error| panic!("flush checkpoint: {error}"));
+    let archive_path = tempdir.path().join("archive.sqlite");
+    assert_eq!(
+        store
+            .archive_receipts_before(signed.timestamp + 1, &archive_path.to_string_lossy())
+            .unwrap_or_else(|error| panic!("archive indexed evidence: {error}")),
+        1
+    );
+    assert_eq!(
+        connection
+            .query_row("SELECT COUNT(*) FROM chio_tool_receipts", [], |row| row
+                .get::<_, i64>(0))
+            .unwrap_or_else(|error| panic!("live receipt count: {error}")),
+        0
+    );
+    let replay = store
+        .append_indexed_security_evidence(&request.evidence_id, &signed)
+        .unwrap_or_else(|error| panic!("retry archived evidence: {error}"));
+    assert_eq!(
+        chio_core::canonical_json_bytes(&replay)
+            .unwrap_or_else(|error| panic!("canonical replay: {error}")),
+        chio_core::canonical_json_bytes(&signed)
+            .unwrap_or_else(|error| panic!("canonical original: {error}"))
+    );
     let reopened = SqliteReceiptStore::open(&database_path)
         .unwrap_or_else(|error| panic!("reopen receipt store: {error}"));
     let reopened_receipt = reopened
@@ -277,6 +309,17 @@ fn native_sink_signs_appends_idempotently_and_verifies_the_exact_stored_receipt(
         .unwrap_or_else(|error| panic!("load reopened indexed evidence: {error}"))
         .unwrap_or_else(|| panic!("reopened indexed evidence missing"));
     assert_eq!(reopened_receipt.id, signed.id);
+    let archive =
+        Connection::open(&archive_path).unwrap_or_else(|error| panic!("archive: {error}"));
+    archive
+        .execute("DELETE FROM chio_tool_receipts", [])
+        .unwrap_or_else(|error| panic!("damage archive: {error}"));
+    assert!(reopened
+        .load_indexed_security_evidence(&request.evidence_id)
+        .is_err());
+    assert!(reopened
+        .append_indexed_security_evidence(&request.evidence_id, &signed)
+        .is_err());
 }
 
 #[test]

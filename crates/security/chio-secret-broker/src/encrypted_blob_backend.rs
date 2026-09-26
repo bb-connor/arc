@@ -1,6 +1,7 @@
 use chio_core_types::Keypair;
 use chio_store_sqlite::{
-    BlobReference, BlobReferenceMutationOutcome, SqliteEncryptedBlobStore, TenantId, TenantKey,
+    BlobHandle, BlobReference, BlobReferenceMutationOutcome, SqliteEncryptedBlobStore, TenantId,
+    TenantKey,
 };
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
@@ -8,6 +9,7 @@ use std::fs::File;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
+use std::sync::RwLock;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use zeroize::Zeroizing;
 
@@ -161,6 +163,9 @@ pub struct EncryptedBlobSecretBackend {
     tenant_id: TenantId,
     tenant_key: TenantKey,
     durable_file: Option<DurableBrokerDatabaseFile>,
+    // Shared by the daemon's mutation and dispatch workers. A successful
+    // dispatch commit linearizes before or after each credential mutation.
+    credential_mutations: RwLock<()>,
 }
 
 impl EncryptedBlobSecretBackend {
@@ -188,6 +193,7 @@ impl EncryptedBlobSecretBackend {
             tenant_id: TenantId::new(tenant_scope),
             tenant_key,
             durable_file: Some(durable_file),
+            credential_mutations: RwLock::new(()),
         })
     }
 
@@ -202,6 +208,7 @@ impl EncryptedBlobSecretBackend {
             tenant_id: TenantId::new(tenant_scope),
             tenant_key: TenantKey::from_bytes(key),
             durable_file: None,
+            credential_mutations: RwLock::new(()),
         })
     }
 
@@ -212,6 +219,10 @@ impl EncryptedBlobSecretBackend {
 
     #[cfg(test)]
     pub(crate) fn provision(&self, credential: &CredentialRef, secret: &[u8]) -> Result<()> {
+        let _mutation = self
+            .credential_mutations
+            .write()
+            .map_err(credential_lock_error)?;
         credential.validate()?;
         if secret.is_empty() || secret.len() > 65_536 {
             return Err(BrokerError::InvalidRequest(
@@ -232,6 +243,10 @@ impl EncryptedBlobSecretBackend {
         operation_id: &str,
         mutation_digest: &str,
     ) -> Result<BlobReferenceMutationOutcome> {
+        let _mutation = self
+            .credential_mutations
+            .write()
+            .map_err(credential_lock_error)?;
         credential.validate()?;
         if secret.is_empty() || secret.len() > 65_536 {
             return Err(BrokerError::InvalidRequest(
@@ -253,6 +268,10 @@ impl EncryptedBlobSecretBackend {
 
     #[cfg(test)]
     pub(crate) fn disable(&self, credential: &CredentialRef) -> Result<()> {
+        let _mutation = self
+            .credential_mutations
+            .write()
+            .map_err(credential_lock_error)?;
         credential.validate()?;
         self.store
             .disable_blob_reference(&self.reference(credential)?)
@@ -265,6 +284,10 @@ impl EncryptedBlobSecretBackend {
         operation_id: &str,
         mutation_digest: &str,
     ) -> Result<BlobReferenceMutationOutcome> {
+        let _mutation = self
+            .credential_mutations
+            .write()
+            .map_err(credential_lock_error)?;
         credential.validate()?;
         self.store
             .disable_blob_reference_once(
@@ -277,6 +300,10 @@ impl EncryptedBlobSecretBackend {
 
     #[cfg(test)]
     pub(crate) fn delete(&self, credential: &CredentialRef) -> Result<()> {
+        let _mutation = self
+            .credential_mutations
+            .write()
+            .map_err(credential_lock_error)?;
         credential.validate()?;
         self.store
             .delete_blob_reference(&self.reference(credential)?)
@@ -289,10 +316,61 @@ impl EncryptedBlobSecretBackend {
         operation_id: &str,
         mutation_digest: &str,
     ) -> Result<BlobReferenceMutationOutcome> {
+        let _mutation = self
+            .credential_mutations
+            .write()
+            .map_err(credential_lock_error)?;
         credential.validate()?;
         self.store
             .delete_blob_reference_once(&self.reference(credential)?, operation_id, mutation_digest)
             .map_err(blob_storage)
+    }
+
+    /// Revalidate the exact encrypted version and commit dispatch while
+    /// credential mutation is excluded. The guard never spans network I/O.
+    pub(crate) fn authorize_dispatch<T>(
+        &self,
+        credential: &CredentialRef,
+        prepared_version: &BlobHandle,
+        commit: impl FnOnce() -> Result<T>,
+    ) -> Result<T> {
+        let _dispatch = self
+            .credential_mutations
+            .read()
+            .map_err(credential_lock_error)?;
+        let current = self
+            .store
+            .resolve_blob_reference(&self.reference(credential)?)
+            .map_err(|_| missing_credential(credential))?;
+        if &current != prepared_version {
+            return Err(missing_credential(credential));
+        }
+        commit()
+    }
+
+    pub(crate) fn materialize_for_dispatch(
+        &self,
+        credential: &CredentialRef,
+    ) -> Result<(SecretMaterial, BlobHandle)> {
+        let _dispatch = self
+            .credential_mutations
+            .read()
+            .map_err(credential_lock_error)?;
+        let reference = self.reference(credential)?;
+        let handle = self
+            .store
+            .resolve_blob_reference(&reference)
+            .map_err(|_| missing_credential(credential))?;
+        let plaintext = self
+            .store
+            .read_encrypted_blob(&handle, &self.tenant_key)
+            .map_err(|_| {
+                BrokerError::Storage(format!(
+                    "credential reference {} failed authentication",
+                    credential.credential_id
+                ))
+            })?;
+        Ok((SecretMaterial::new(plaintext), handle))
     }
 
     fn reference(&self, credential: &CredentialRef) -> Result<BlobReference> {
@@ -320,23 +398,13 @@ impl EncryptedBlobSecretBackend {
 
 impl SecretBackend for EncryptedBlobSecretBackend {
     fn materialize(&self, credential: &CredentialRef) -> Result<SecretMaterial> {
-        credential.validate()?;
-        let reference = self.reference(credential)?;
-        let handle = self
-            .store
-            .resolve_blob_reference(&reference)
-            .map_err(|_| missing_credential(credential))?;
-        let plaintext = self
-            .store
-            .read_encrypted_blob(&handle, &self.tenant_key)
-            .map_err(|_| {
-                BrokerError::Storage(format!(
-                    "credential reference {} failed authentication",
-                    credential.credential_id
-                ))
-            })?;
-        Ok(SecretMaterial::new(plaintext))
+        self.materialize_for_dispatch(credential)
+            .map(|(material, _)| material)
     }
+}
+
+fn credential_lock_error<T>(_: std::sync::PoisonError<T>) -> BrokerError {
+    BrokerError::AuthorityUnavailable("credential mutation fence is poisoned".to_string())
 }
 
 fn missing_credential(credential: &CredentialRef) -> BrokerError {

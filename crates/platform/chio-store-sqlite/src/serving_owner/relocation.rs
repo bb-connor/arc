@@ -344,6 +344,9 @@ impl SqliteAuthorityStore {
                 "sqlite relocation export commit outcome is unknown: {error}"
             ))
         })?;
+        // Retirement is protected outside SQLite before an export can be
+        // acknowledged. Restoring an older database cannot erase this fence.
+        rollback_anchor.sync_after_commit(&connection)?;
         finish_export(&connection, &database_path, &expected_database)?;
         Ok(seal)
     }
@@ -487,7 +490,13 @@ impl SqliteAuthorityStore {
         // Lock artifacts belong to the previous location; nothing serves an
         // exported store, so they are replaced rather than reused.
         let lock_path = lock_root.join(format!("{}.lock", record.store_uuid));
-        remove_previous_lock_artifacts(&lock_root, &lock_path)?;
+        let _previous_lock = remove_previous_lock_artifacts(
+            &lock_root,
+            &lock_path,
+            &database_path,
+            Path::new(&record.database_path),
+            &record.store_uuid,
+        )?;
         let lock_file = create_lock_file(&lock_path)?;
         let lock_metadata = lock_file.metadata()?;
         validate_lock_metadata(&lock_root, &lock_metadata)?;
@@ -501,7 +510,6 @@ impl SqliteAuthorityStore {
             read_u64(metadata_device(&lock_metadata)?, "lock_device")?,
             read_u64(metadata_inode(&lock_metadata)?, "lock_inode")?,
         )?;
-        rollback_anchor.seed_new(&connection)?;
 
         let database_metadata = fs::metadata(&database_path)?;
         validate_database_metadata(&database_metadata)?;
@@ -544,6 +552,9 @@ impl SqliteAuthorityStore {
             ));
         }
         verify_authority_store_invariants(&transaction)?;
+        // Seed the new location with the imported state. Seeding the exported
+        // source state would carry its permanent retirement fence here.
+        rollback_anchor.seed_new(&transaction)?;
         transaction.commit().map_err(|error| {
             SqliteServingOwnerError::OutcomeUnknown(format!(
                 "sqlite relocation import commit outcome is unknown: {error}"
@@ -561,24 +572,34 @@ impl SqliteAuthorityStore {
 fn remove_previous_lock_artifacts(
     lock_root: &Path,
     lock_path: &Path,
-) -> Result<(), SqliteServingOwnerError> {
-    for entry in fs::read_dir(lock_root)? {
-        let entry = entry?;
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        let stale_marker = name.starts_with(".chio-path-") && name.ends_with(".identity");
-        if entry.path() == lock_path || stale_marker {
-            let metadata = fs::symlink_metadata(entry.path())?;
-            if !metadata.file_type().is_file() {
-                return Err(SqliteServingOwnerError::Invalid(
-                    "previous lock artifact is not a regular file".to_string(),
-                ));
-            }
-            fs::remove_file(entry.path())?;
+    database_path: &Path,
+    previous_database_path: &Path,
+    store_uuid: &str,
+) -> Result<Option<File>, SqliteServingOwnerError> {
+    let previous_lock = match fs::symlink_metadata(lock_path) {
+        Ok(_) => {
+            let file = open_lock_file(lock_path)?;
+            validate_lock_metadata(lock_root, &file.metadata()?)?;
+            acquire_serving_lock(&file, database_path)?;
+            Some(file)
         }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error.into()),
+    };
+    path_identity::remove_for_relocation(
+        lock_root,
+        previous_database_path,
+        store_uuid,
+        previous_database_path != database_path,
+    )?;
+    if previous_database_path != database_path {
+        path_identity::remove_for_relocation(lock_root, database_path, store_uuid, false)?;
+    }
+    if previous_lock.is_some() {
+        fs::remove_file(lock_path)?;
     }
     File::open(lock_root)?.sync_all()?;
-    Ok(())
+    Ok(previous_lock)
 }
 
 /// SQLite reports a busy checkpoint as a result row, not an execution error.

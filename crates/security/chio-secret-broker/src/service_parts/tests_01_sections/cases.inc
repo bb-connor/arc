@@ -1,4 +1,52 @@
     #[test]
+    fn expired_authority_after_capture_never_reaches_network_dispatch() {
+        let fixture = fixture(1, false, false);
+        let (request, trusted) = execution(&fixture, 189, 1);
+        register_prepared_execution(&fixture, &request, &trusted, 20);
+        let expired = request.capability.body.expires_at_unix_seconds + 1;
+        assert!(fixture
+            .service
+            .execute_inner(&request, &trusted, 21, &|| Ok(expired))
+            .is_err());
+        assert_eq!(fixture.authority.captured_count(), 1);
+        assert!(fixture
+            .observed_authorizations
+            .lock()
+            .test_expect("transport observations")
+            .is_empty());
+    }
+
+    #[test]
+    fn credential_mutation_fences_an_already_prepared_dispatch() {
+        for delete in [false, true] {
+            let fixture = fixture(1, false, false);
+            let (request, trusted) = execution(&fixture, 188, 1);
+            register_prepared_execution(&fixture, &request, &trusted, 20);
+            let credential = &request.capability.body.credential;
+            if delete {
+                fixture
+                    .backend
+                    .delete(credential)
+                    .test_expect("delete prepared credential");
+            } else {
+                fixture
+                    .backend
+                    .disable(credential)
+                    .test_expect("disable prepared credential");
+            }
+            assert!(fixture
+                .service
+                .execute_inner(&request, &trusted, 21, &|| Ok(21))
+                .is_err());
+            assert!(fixture
+                .observed_authorizations
+                .lock()
+                .test_expect("transport observations")
+                .is_empty());
+        }
+    }
+
+    #[test]
     fn migration_custody_denial_precedes_credential_materialization() {
         let fixture = fixture(1, false, false);
         let (request, trusted) = execution(&fixture, 90, 1);

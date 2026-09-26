@@ -805,6 +805,13 @@ impl PersistentFlowResolver {
 }
 
 impl FlowPreInvocationResolver for PersistentFlowResolver {
+    fn persist_observed_input(&self, observation: &FlowJoinRequest) -> Result<(), FlowDenial> {
+        self.state
+            .join(observation)
+            .map(|_| ())
+            .map_err(|_| FlowDenial::StateChanged)
+    }
+
     fn resolve(
         &self,
         input: &FlowPreInvocationInput<'_>,
@@ -826,24 +833,15 @@ impl FlowPreInvocationPort for PersistentFlowResolver {
             .as_ref()
             .map(|_| FlowDenialReceiptContext::from_resolved(&resolved))
             .transpose()?;
-        let prepared = match prepare_pre_invocation(resolved) {
-            Ok(prepared) => prepared,
-            Err(denial) => {
-                if let Some(context) = receipt_context.as_ref() {
-                    self.attest_flow_denial(context, denial)?;
-                }
-                return Err(denial);
-            }
-        };
-        match self.persist_admission(prepared.admission()) {
-            Ok(_) => Ok(()),
-            Err(denial) => {
-                if let Some(context) = receipt_context.as_ref() {
-                    self.attest_flow_denial(context, denial)?;
-                }
-                Err(denial)
+        let decision = self
+            .persist_observed_input(&resolved.observed_input_taint())
+            .and_then(|()| prepare_pre_invocation(resolved).map(|_| ()));
+        if let Err(denial) = decision {
+            if let Some(context) = receipt_context.as_ref() {
+                self.attest_flow_denial(context, denial)?;
             }
         }
+        decision
     }
 }
 

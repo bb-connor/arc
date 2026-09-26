@@ -52,13 +52,10 @@ jobs:
             --artifacts artifacts --repository "${GITHUB_REPOSITORY}" --tag "${GITHUB_REF_NAME}" \
             --source-sha "${GITHUB_SHA}" --run-id "${GITHUB_RUN_ID}" --run-attempt "${GITHUB_RUN_ATTEMPT}" \
             --report subjects.json --github-output "${GITHUB_OUTPUT}"
-          tag_core="${GITHUB_REF_NAME%%+*}"
-          if [[ "${tag_core}" == *-* ]]; then
-            draft_state="$(gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq .isDraft)"
-            if [[ "${draft_state}" != "true" ]]; then
-              echo "::error::candidate provenance requires an existing draft; never reopen a published release" >&2
-              exit 1
-            fi
+          draft_state="$(gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq .isDraft)"
+          if [[ "${draft_state}" != "true" ]]; then
+            echo "::error::provenance requires an existing draft; never reopen a published release" >&2
+            exit 1
           fi
       - name: Retain provenance subject binding
         if: always()
@@ -134,13 +131,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag_core="${GITHUB_REF_NAME%%+*}"
-          if [[ "${tag_core}" == *-* ]]; then
-            draft_state="$(gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq .isDraft)"
-            if [[ "${draft_state}" != "true" ]]; then
-              echo "::error::refusing to attach candidate provenance after publication" >&2
-              exit 1
-            fi
+          draft_state="$(gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq .isDraft)"
+          if [[ "${draft_state}" != "true" ]]; then
+            echo "::error::refusing to attach provenance after publication" >&2
+            exit 1
           fi
           # No --clobber: an existing immutable provenance asset must not be replaced.
           gh release upload "${GITHUB_REF_NAME}" "provenance/chio-${GITHUB_SHA}.intoto.jsonl" \

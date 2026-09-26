@@ -799,6 +799,7 @@ mod tests {
     #[test]
     fn production_flow_denial_path_emits_closed_native_receipt_from_resolved_runtime_facts() {
         let receipts = Arc::new(RecordingSecurityReceipts::default());
+        let state = Arc::new(FakeFlowStore::new(flow_snapshot(7)));
         let config = FlowResolverConfig::new(
             restricted_label(),
             CategoryLabelMap::new(
@@ -819,7 +820,7 @@ mod tests {
         );
         let resolver = PersistentFlowResolver::new(
             flow_registry(),
-            Arc::new(FakeFlowStore::new(flow_snapshot(7))),
+            state.clone(),
             Arc::new(CountingEmptyClassifier::new()),
             Arc::new(FixedClock(150_000)),
             config,
@@ -855,6 +856,11 @@ mod tests {
         assert_eq!(body.header.tenant_id.as_str(), "tenant-a");
         assert_eq!(body.request_hash.as_bytes().len(), 32);
         assert_eq!(body.denial_code.as_str(), "flow.policy_flow_violation");
+        let retained = state.load(&flow_key()).unwrap_or_else(|error| panic!("taint: {error}"))
+            .unwrap_or_else(|| panic!("missing taint"));
+        assert_eq!(retained.principal_label, restricted_label());
+        assert_eq!(retained.session_label, restricted_label());
+        assert_eq!(retained.lineage_label, restricted_label());
     }
 
     #[test]

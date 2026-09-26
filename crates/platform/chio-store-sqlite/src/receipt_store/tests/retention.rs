@@ -189,6 +189,21 @@ fn retained_lookup_queries_the_archive_connection_that_was_authenticated(
         &store,
         &archived_receipt.id,
         || {
+            let writer = rusqlite::Connection::open(&archive)?;
+            writer.busy_timeout(std::time::Duration::ZERO)?;
+            let error = writer
+                .execute("DELETE FROM chio_tool_receipts", [])
+                .err()
+                .ok_or_else(|| {
+                    ReceiptStoreError::Conflict(
+                        "authenticated snapshot allowed archive replacement in place".into(),
+                    )
+                })?;
+            assert_eq!(
+                error.sqlite_error_code(),
+                Some(rusqlite::ErrorCode::DatabaseBusy)
+            );
+            drop(writer);
             std::fs::rename(&archive, &displaced)?;
             std::fs::rename(&replacement, &archive)?;
             Ok(())

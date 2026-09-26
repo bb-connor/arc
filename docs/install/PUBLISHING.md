@@ -251,14 +251,18 @@ release is the correct response.
 ## Candidate archive staging and promotion
 
 SemVer prereleases such as `v0.1.1-rc.1` produce a GitHub draft prerelease.
-Stable tags retain the stable-release path. The source CI/security/qualification
+Stable tags also stage as drafts. The source CI/security/qualification
 checks, auditable build, SBOM validation and cosign signing still run before
 release assets are attached. A hyphen in build metadata alone, such as
 `v1.2.3+build-42`, does not select prerelease mode.
 
 The SLSA jobs run inside the original tagged release invocation, verify the
-provenance before attaching it, and require candidates to remain drafts. They
-refuse to reopen an already published candidate. Archive uploads do not
+provenance before attaching it, and require every release to remain a draft. They
+refuse to reopen an already published release. Stable publication waits for
+provenance verification and checksum-index staging, then rechecks the source
+gates and verifies the exact hosted asset bytes and identities before making
+the release public. Candidates additionally retain the operator acceptance
+and merged checksum review requirements below. Archive uploads do not
 overwrite an existing asset. Never rebuild a tag to replace bytes that have already
 been qualified. A changed binary needs a new candidate and fresh acceptance.
 

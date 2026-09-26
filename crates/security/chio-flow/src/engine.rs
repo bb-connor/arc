@@ -68,6 +68,38 @@ pub struct FlowAdmission {
     pub declassification: Option<ConsumedDeclassification>,
 }
 
+impl ResolvedFlowRequest {
+    /// Taint from input already observed by the principal. Persist this even
+    /// when destination policy or declassification subsequently denies egress.
+    /// This transition grants no egress or declassification authority.
+    #[must_use]
+    pub fn observed_input_taint(&self) -> FlowJoinRequest {
+        // An unrepresentable join cannot erase knowledge already observed.
+        // Admission still rejects the original overflow independently.
+        self.input_taint_transition(self.source_label().unwrap_or(InformationLabel::Top))
+    }
+
+    fn source_label(&self) -> Result<InformationLabel, FlowDenial> {
+        join_labels([
+            &self.payload_label,
+            &self.operator_input_floor,
+            &self.state.principal_label,
+            &self.state.lineage_label,
+            &self.state.session_label,
+        ])
+    }
+
+    fn input_taint_transition(&self, label: InformationLabel) -> FlowJoinRequest {
+        FlowJoinRequest {
+            key: self.state.key.clone(),
+            principal_join: label.clone(),
+            lineage_join: label.clone(),
+            session_join: label,
+            transition_id: self.transition_id.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct PreparedFlowAdmission {
     admission: FlowAdmission,
@@ -239,20 +271,8 @@ pub fn prepare_pre_invocation(
         .manifest
         .validate()
         .map_err(|_| FlowDenial::InvalidManifest)?;
-    let source_label = join_labels([
-        &request.payload_label,
-        &request.operator_input_floor,
-        &request.state.principal_label,
-        &request.state.lineage_label,
-        &request.state.session_label,
-    ])?;
-    let taint_transition = FlowJoinRequest {
-        key: request.state.key.clone(),
-        principal_join: source_label.clone(),
-        lineage_join: source_label.clone(),
-        session_join: source_label.clone(),
-        transition_id: request.transition_id,
-    };
+    let source_label = request.source_label()?;
+    let taint_transition = request.input_taint_transition(source_label.clone());
     let effective_egress = request.runtime_egress || request.manifest.egress;
     #[cfg(any(feature = "std", test))]
     let declassification = request.declassification;
@@ -753,6 +773,27 @@ mod tests {
         let mut digest = [0_u8; 32];
         digest.copy_from_slice(&bytes);
         Digest32::new(digest)
+    }
+
+    #[test]
+    fn input_join_overflow_retains_top_taint_and_denies_admission() {
+        let mut request = request();
+        let owners = (0_u8..64)
+            .map(|value| {
+                let owner = principal(&alloc::format!("overflow-owner-{value}"));
+                (owner.clone(), BTreeSet::from([owner]))
+            })
+            .collect();
+        request.state.principal_label = InformationLabel::try_known(owners, BTreeSet::new())
+            .unwrap_or_else(|error| panic!("principal label: {error}"));
+        let observed = request.observed_input_taint();
+        assert_eq!(observed.principal_join, InformationLabel::Top);
+        assert_eq!(observed.lineage_join, InformationLabel::Top);
+        assert_eq!(observed.session_join, InformationLabel::Top);
+        assert!(matches!(
+            prepare_pre_invocation(request),
+            Err(FlowDenial::StateOverflow)
+        ));
     }
 
     #[test]

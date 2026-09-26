@@ -612,8 +612,9 @@ fn archive_connection_backs_prefix(
     if covered.is_empty() {
         return Ok(false);
     }
-    let Ok(archive_tx) = archive.transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)
-    else {
+    // A retained lookup may already own the read transaction that must also
+    // cover its later payload read. A savepoint preserves that outer snapshot.
+    let Ok(archive_tx) = archive.savepoint() else {
         return Ok(false);
     };
     for live_row in covered {

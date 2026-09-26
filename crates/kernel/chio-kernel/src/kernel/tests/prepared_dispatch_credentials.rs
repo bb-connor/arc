@@ -11,6 +11,35 @@ mod fixture;
 use fixture::Fixture;
 
 #[test]
+fn dispatch_deadline_cannot_outlive_a_shorter_signed_approval() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let mut body = fixture
+        .request
+        .approval_token
+        .as_ref()
+        .ok_or("approval")?
+        .body();
+    body.expires_at = current_unix_timestamp() + 10;
+    let expires = body.expires_at;
+    fixture.request.approval_token = Some(GovernedApprovalToken::sign(
+        body,
+        &fixture.kernel.config.keypair,
+    )?);
+    let prepared = fixture.kernel.prepare_dispatch_credentials(
+        &fixture.request,
+        &fixture.request.capability,
+        false,
+        current_unix_timestamp(),
+        false,
+    )?;
+    assert_eq!(prepared.valid_until_unix_ms()?, expires * 1000);
+    fixture.assert_no_writes()?;
+    // Legacy proof verification cannot manufacture a durable proof horizon.
+    assert!(fixture.prepare()?.valid_until_unix_ms().is_err());
+    Ok(())
+}
+
+#[test]
 fn oversized_dpop_identity_denies_before_other_credential_probes_or_mutations() -> TestResult {
     let mut fixture = Fixture::new()?;
     fixture

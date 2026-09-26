@@ -70,6 +70,27 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
 
 #[cfg(target_os = "linux")]
 #[tokio::test]
+async fn admission_authority_authenticates_before_reading_the_body(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use tower::ServiceExt;
+    let request = axum::http::Request::builder()
+        .method("POST")
+        .uri(INTERNAL_ADMISSION_AUTHORITY_PATH)
+        .header("content-type", "application/json")
+        .body(axum::body::Body::from_stream(
+            futures_util::stream::pending::<Result<axum::body::Bytes, std::convert::Infallible>>(),
+        ))?;
+    let response = tokio::time::timeout(
+        Duration::from_secs(1),
+        super::build_router(metrics_state("service-secret")).oneshot(request),
+    )
+    .await??;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
 async fn retained_hold_route_requires_service_auth_and_the_current_owner(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use super::super::admission_authority::handle_admission_authority;
@@ -95,16 +116,11 @@ async fn retained_hold_route_requires_service_auth_and_the_current_owner(
     )?;
     let unauthorized = handle_admission_authority(
         State(state.clone()),
-        HeaderMap::new(),
-        Json(request.clone()),
+        axum::http::Request::builder()
+            .body(axum::body::Body::from("invalid JSON must not be parsed"))?,
     )
     .await;
     assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        AUTHORIZATION,
-        HeaderValue::from_static("Bearer service-secret"),
-    );
     for current in [false, true] {
         let mut request = request.clone();
         if !current {
@@ -114,8 +130,14 @@ async fn retained_hold_route_requires_service_auth_and_the_current_owner(
                 .ok_or("missing fence")?
                 .owner_epoch += 1;
         }
-        let response =
-            handle_admission_authority(State(state.clone()), headers.clone(), Json(request)).await;
+        let response = handle_admission_authority(
+            State(state.clone()),
+            axum::http::Request::builder()
+                .header(AUTHORIZATION, "Bearer service-secret")
+                .header("content-type", "application/json")
+                .body(axum::body::Body::from(serde_json::to_vec(&request)?))?,
+        )
+        .await;
         let body = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
         let response: AdmissionAuthorityResponse = serde_json::from_slice(&body)?;
         if current {

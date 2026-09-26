@@ -799,8 +799,18 @@ jobs:
       # Required for npm provenance attestations via GitHub OIDC.
       id-token: write
       contents: read
+      actions: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Require exact-source main qualification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_DIR: ${{ matrix.package }}
+        run: python3 scripts/check-release-source-gates.py --sdk npm --package "$PACKAGE_DIR"
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:

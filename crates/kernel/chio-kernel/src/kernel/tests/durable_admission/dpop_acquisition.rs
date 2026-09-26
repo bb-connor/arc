@@ -57,6 +57,32 @@ fn dpop_configuration_and_reservation_cannot_bypass_durable_custody() {
 }
 
 #[test]
+fn dispatch_deadline_keeps_the_original_dpop_window() {
+    let (kernel, request, _, _) = fixture(Mode::Normal);
+    let proof = request.dpop_proof.as_ref().expect("original proof");
+    let deadline = (proof.body.issued_at + 60 + 1) * 1000;
+    let prepared = kernel
+        .prepare_dispatch_credentials(
+            &request,
+            &request.capability,
+            true,
+            current_unix_timestamp(),
+            false,
+        )
+        .expect("verified original credentials");
+    assert_eq!(prepared.valid_until_unix_ms().expect("deadline"), deadline);
+    let _clock = crate::scope_fixed_runtime_for_current_thread(proof.body.issued_at + 5, []);
+    assert_eq!(
+        prepared
+            .refresh()
+            .expect("still valid")
+            .valid_until_unix_ms()
+            .expect("deadline"),
+        deadline
+    );
+}
+
+#[test]
 fn lost_claim_and_history_acknowledgements_require_fresh_recovery() {
     let (kernel, request, store, calls) = fixture(Mode::LostAckAndHistoryPanic);
     let mut admission = begin(&kernel, &request);

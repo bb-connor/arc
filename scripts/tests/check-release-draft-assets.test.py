@@ -63,6 +63,30 @@ class DraftAssets(unittest.TestCase):
         with self.assertRaises(ValueError):
             GATE.require_stage(REPO, TAG, self.read)
 
+    def test_stable_stage_never_reopens_a_public_release(self):
+        self.release.update(tag_name="v1.2.3+build-42", prerelease=False)
+        GATE.require_stage(REPO, self.release["tag_name"], self.read)
+        self.release["draft"] = False
+        with self.assertRaises(ValueError):
+            GATE.require_stage(REPO, self.release["tag_name"], self.read)
+
+    def test_stable_snapshot_preserves_exact_assets_through_publication(self):
+        tag = "v1.2.3"
+        self.release.update(tag_name=tag, prerelease=False)
+        for path in self.directory.iterdir():
+            path.unlink()
+        self.assets = []
+        for index, name in enumerate(sorted(GATE.required_names(tag, SOURCE)), 1):
+            body = (name + " stable fixture\n").encode()
+            (self.directory / name).write_bytes(body)
+            self.assets.append({"id": index, "name": name, "size": len(body), "state": "uploaded",
+                                "digest": "sha256:" + hashlib.sha256(body).hexdigest()})
+        before = GATE.snapshot(REPO, tag, SOURCE, self.directory, read=self.read)
+        self.release["draft"] = False
+        self.assertEqual(before, GATE.snapshot(REPO, tag, SOURCE, self.directory, read=self.read, published=True))
+        with self.assertRaises(ValueError):
+            GATE.snapshot(REPO, tag, SOURCE, self.directory, read=self.read)
+
     def test_missing_provenance_signature_sbom_or_native_material_refuses(self):
         for suffix in ("intoto.jsonl", ".sig", "cyclonedx.json", "native-openssl-scan.json"):
             with self.subTest(suffix=suffix):
@@ -186,6 +210,10 @@ class DraftAssets(unittest.TestCase):
                                env={**os.environ, "version": version, "GITHUB_OUTPUT": str(output)})
                 self.assertEqual(output.read_text(), f"prerelease={expected}\n")
         self.assertIn("overwrite_files: false", source)
+        self.assertIn("needs: [release, provenance, checksum-index]", source)
+        self.assertIn("name: Stage release pending provenance", source)
+        self.assertIn("draft: true", source.split("name: Stage release pending provenance", 1)[1].split("provenance:", 1)[0])
+        self.assertIn("cmp before-publication.json publication.json", source)
         self.assertIn("check-release-draft-assets.py stage", source)
         self.assertIn("name: Candidate checksum review remains pending with the operator", source)
         self.assertIn("name: Open checksum index PR\n        if: steps.checksum_release.outputs.prerelease != 'true'", source)

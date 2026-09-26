@@ -155,14 +155,14 @@ class ReleaseCheckout(unittest.TestCase):
     def git(self, *args):
         return subprocess.check_output(["git", *args], cwd=self.root, text=True)
 
-    def run_main(self):
+    def run_main(self, sdk=None, package=None):
         output = io.StringIO()
         with patch.object(GATE, "__file__", str(self.root / "scripts/gate.py")), \
                 patch.dict(os.environ, self.env, clear=True), \
                 patch.object(GATE, "require_gates", return_value=[{"fixture": True}]) as remote, \
                 contextlib.redirect_stdout(output):
             try:
-                GATE.main()
+                GATE.main(sdk, package)
             except (ValueError, subprocess.CalledProcessError):
                 remote.assert_not_called()
                 raise
@@ -171,6 +171,29 @@ class ReleaseCheckout(unittest.TestCase):
 
     def test_matching_tag_and_clean_exact_checkout_succeeds(self):
         self.assertEqual(self.run_main()["version"], "0.1.1-rc.1")
+
+    def test_sdk_tags_require_the_selected_package_and_same_source_gates(self):
+        for sdk, prefix, package, manifest, contents in [
+            ("npm", "ts", "sdks/typescript/packages/process", "package.json", '{"version":"0.1.1-rc.1"}'),
+            ("pypi", "py", "sdks/python/chio-process", "pyproject.toml", '[project]\nversion = "0.1.1-rc.1"\n'),
+        ]:
+            with self.subTest(sdk=sdk):
+                path = self.root / package
+                path.mkdir(parents=True)
+                (path / manifest).write_text(contents)
+                self.git("add", ".")
+                self.git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                         "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "SDK package")
+                self.head = self.git("rev-parse", "HEAD").strip()
+                self.env["GITHUB_SHA"] = self.head
+                for tag in [f"{prefix}/v0.1.1-rc.1", f"{prefix}/{path.name}-v0.1.1-rc.1"]:
+                    self.env["GITHUB_REF_NAME"] = tag
+                    self.assertEqual(self.run_main(sdk, package)["source"], self.head)
+                self.env["GITHUB_REF_NAME"] = f"{prefix}/other-v0.1.1-rc.1"
+                with self.assertRaises(ValueError):
+                    self.run_main(sdk, package)
+                with self.assertRaises(ValueError):
+                    self.run_main(sdk, "crates/products/chio-cli")
 
     def test_wrong_tag_ref_or_source_refuses_before_network(self):
         for key, value in [("GITHUB_REF_NAME", "v0.1.0"),

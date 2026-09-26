@@ -465,7 +465,16 @@ fn resolve_inputs(
         .chain(target_args.iter().cloned())
         .collect::<Vec<_>>();
 
-    let tools = match tool_surface {
+    let mut inputs = ProvisionInputs {
+        profile, output_directory, runtime_security_directory,
+        reviewed_tools_source: tool_surface.label(),
+        tools: Vec::new(), reviewed_tools_bytes: Vec::new(),
+        target_path, target_argv, target_binding_digest, working_directory, execution_identity,
+        chio_executable_path, chio_executable_digest, cage_init_path, cage_init_binding_digest,
+        server_id: server_id.to_string(), server_name: server_name.to_string(),
+        server_version: server_version.to_string(),
+    };
+    inputs.tools = match tool_surface {
         ToolSurfaceSource::Fixture(tools_fixture) => {
             let tools_fixture = require_exact_canonical_path(tools_fixture, "tools fixture")?;
             let fixture_bytes = read_bounded_regular_file(
@@ -477,39 +486,18 @@ fn resolve_inputs(
             decode_tools_fixture(&fixture_bytes, &tools_fixture)?
         }
         ToolSurfaceSource::Discovered => {
-            let target_args = target_argv.get(1..).unwrap_or_default();
-            let tools =
-                discovery::discover_tool_surface(&target_path, target_args, &working_directory)?;
+            let tools = discovery::discover_tool_surface(&inputs)?;
             validate_reviewed_tools(tools, "the native MCP target's tools/list")?
         }
     };
-    let reviewed_tools_bytes =
-        chio_core::canonical_json_bytes(&ReviewedTools { tools: &tools }).map_err(|error| {
+    inputs.reviewed_tools_bytes =
+        chio_core::canonical_json_bytes(&ReviewedTools { tools: &inputs.tools }).map_err(|error| {
             CliError::cli_other_error(format!(
                 "failed to encode the reviewed native MCP tool surface: {error}"
             ))
         })?;
 
-    Ok(ProvisionInputs {
-        profile,
-        output_directory,
-        runtime_security_directory,
-        reviewed_tools_source: tool_surface.label(),
-        tools,
-        reviewed_tools_bytes,
-        target_path,
-        target_argv,
-        target_binding_digest,
-        working_directory,
-        execution_identity,
-        chio_executable_path,
-        chio_executable_digest,
-        cage_init_path,
-        cage_init_binding_digest,
-        server_id: server_id.to_string(),
-        server_name: server_name.to_string(),
-        server_version: server_version.to_string(),
-    })
+    Ok(inputs)
 }
 
 /// The cage helper must be a static position-independent executable, the

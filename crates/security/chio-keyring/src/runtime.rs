@@ -283,14 +283,60 @@ impl WitnessedRotationRuntime {
                     self.operator.as_ref(),
                     activation_guard.as_ref(),
                 )?;
-                activation_guard.require_activation()?;
             }
         }
+        self.confirm_activated_rotation(&pending.event_id, &pending.checkpoint, services)
+    }
+
+    /// Finish witness synchronization, independent audit confirmation and
+    /// receipt forwarding after activation committed but completion failed.
+    /// This path never rotates again or treats the local head as audit proof.
+    pub fn resume_activated_rotation(
+        &self,
+        services: &IndependentKeyLogServices,
+    ) -> Result<WitnessedRotationOutcome> {
+        let stored = self.store.load_checkpoints()?.into_iter().last().ok_or(
+            KeyringError::StateInvariant("activated checkpoint is absent"),
+        )?;
+        let event = self
+            .store
+            .load_events()?
+            .into_iter()
+            .last()
+            .ok_or(KeyringError::StateInvariant("activated event is absent"))?;
+        if stored.stage != CheckpointStage::Activated
+            || stored.checkpoint.body.checkpoint_sequence != event.body.sequence
+        {
+            return Err(KeyringError::StateInvariant(
+                "key log has no activated tail to confirm",
+            ));
+        }
+        self.confirm_activated_rotation(&event.body.event_id, &stored.checkpoint, services)
+    }
+
+    fn confirm_activated_rotation(
+        &self,
+        event_id: &EventId,
+        checkpoint: &SignedKeyLogCheckpoint,
+        services: &IndependentKeyLogServices,
+    ) -> Result<WitnessedRotationOutcome> {
+        if let WitnessedRotationMode::Enterprise {
+            activation_guard, ..
+        } = &self.mode
+        {
+            activation_guard.require_activation()?;
+        }
+        let checkpoint_hash = checkpoint.checkpoint_hash()?;
+        if self.store.verified_checkpoint_stage(&checkpoint_hash)? != CheckpointStage::Activated {
+            return Err(KeyringError::StateInvariant(
+                "rotation is not durably activated",
+            ));
+        }
         for witness in services.witnesses() {
-            match self.synchronize_witness_to_candidate(witness, &pending.checkpoint) {
+            match self.synchronize_witness_to_candidate(witness, checkpoint) {
                 Ok(signature) => {
                     self.store
-                        .store_witness_signature(&pending.checkpoint_hash, &signature)?;
+                        .store_witness_signature(&checkpoint_hash, &signature)?;
                 }
                 Err(KeyringError::Io(_)) => {}
                 Err(error) => return Err(error),
@@ -302,14 +348,21 @@ impl WitnessedRotationRuntime {
             .ok_or(KeyringError::StateInvariant("operator key log has no head"))?;
         self.wait_for_independent_auditors(services, &activated_pin)?;
         let signing_epoch = self.router.signing_epoch()?;
-        if activated_pin.signing_epoch != signing_epoch {
+        if activated_pin.signing_epoch != signing_epoch
+            || activated_pin.checkpoint_hash != checkpoint_hash
+        {
             return Err(KeyringError::StateInvariant(
                 "independent auditors did not observe the activated signing epoch",
             ));
         }
-        self.persist_enterprise_receipt(&pending.event_id, KeyEnterpriseReceiptStage::Active)?;
+        self.persist_enterprise_receipt(event_id, KeyEnterpriseReceiptStage::Active)?;
+        if self.store.head_pin()?.as_ref() != Some(&activated_pin) {
+            return Err(KeyringError::StateInvariant(
+                "key log changed during rotation confirmation",
+            ));
+        }
         Ok(WitnessedRotationOutcome {
-            checkpoint_hash: pending.checkpoint_hash,
+            checkpoint_hash,
             signing_epoch,
             audit_pin: activated_pin,
         })

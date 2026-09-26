@@ -460,8 +460,18 @@ jobs:
       # Required for PyPI Trusted Publishing via OIDC.
       id-token: write
       contents: read
+      actions: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Require exact-source main qualification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_DIR: ${{ matrix.package }}
+        run: python3 scripts/check-release-source-gates.py --sdk pypi --package "$PACKAGE_DIR"
 
       - name: Read package name
         id: meta

@@ -38,6 +38,8 @@ static long invoke5(long number, long first, long second, long third, long fourt
 #define SYS_PPOLL 271
 #define SYS_SCHED_GETAFFINITY 204
 #define SYS_READLINK 89
+#define SYS_PRLIMIT64 302
+#define SYS_TGKILL 234
 __asm__(
     ".global _start\n"
     ".type _start,@function\n"
@@ -89,6 +91,8 @@ static long invoke5(long number, long first, long second, long third, long fourt
 #define SYS_PPOLL 73
 #define SYS_SCHED_GETAFFINITY 123
 #define SYS_READLINKAT 78
+#define SYS_PRLIMIT64 261
+#define SYS_TGKILL 131
 __asm__(
     ".global _start\n"
     ".type _start,%function\n"
@@ -376,6 +380,33 @@ __attribute__((noreturn, used)) void probe_start(long *initial_stack) {
     long flags = initial_stack[0] == 4 ? arguments[3][0] - '0' : 0;
     long result = invoke(SYS_FCNTL, descriptor, operation, flags, 0);
     terminate(result == 0 ? 0 : 130);
+#elif PROBE_MODE == 29
+    unsigned long limits[2];
+    long result = invoke(SYS_PRLIMIT64, 0, 7, 0, (long)limits);
+    terminate(result == 0 ? 0 : 131);
+#elif PROBE_MODE == 30 || PROBE_MODE == 31
+    if (initial_stack[0] != 2) {
+        terminate(132);
+    }
+    const char **arguments = (const char **)&initial_stack[1];
+    long peer = 0;
+    for (const char *digit = arguments[1]; *digit; ++digit) {
+        if (*digit < '0' || *digit > '9' || peer > 100000000) {
+            terminate(133);
+        }
+        peer = peer * 10 + *digit - '0';
+    }
+    if (peer <= 0) {
+        terminate(134);
+    }
+#if PROBE_MODE == 30
+    unsigned long limits[2];
+    invoke(SYS_PRLIMIT64, peer, 7, 0, (long)limits);
+#else
+    // Signal zero checks permission without delivering a signal.
+    invoke(SYS_TGKILL, peer, peer, 0, 0);
+#endif
+    terminate(135);
 #else
 #error invalid probe mode
 #endif

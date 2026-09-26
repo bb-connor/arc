@@ -18,17 +18,26 @@ fn trusted_retention_archive(
     store: &SqliteReceiptStore,
 ) -> Result<Option<Connection>, ReceiptStoreError> {
     let connection = store.connection()?;
-    let recorded = retention_watermark(&connection)?.unwrap_or(0);
+    trusted_retention_archive_for_connection(&connection)
+}
+
+fn trusted_retention_archive_for_connection(
+    connection: &Connection,
+) -> Result<Option<Connection>, ReceiptStoreError> {
+    let recorded = retention_watermark(connection)?.unwrap_or(0);
     if recorded == 0 {
         return Ok(None);
     }
-    let archive_path = latest_watermark_archive_path(&connection)?.ok_or_else(|| {
+    let archive_path = latest_watermark_archive_path(connection)?.ok_or_else(|| {
         ReceiptStoreError::ReadBoundary(
             "retention watermark does not name an authenticated archive".to_owned(),
         )
     })?;
     let mut archive = open_retention_archive(&archive_path)?;
-    if !retention_archive_connection_is_trusted(&connection, &mut archive, recorded)? {
+    // Keep validation and subsequent point reads in one snapshot, including
+    // when another connection can modify the same archive inode.
+    archive.execute_batch("BEGIN DEFERRED TRANSACTION")?;
+    if !retention_archive_connection_is_trusted(connection, &mut archive, recorded)? {
         return Err(ReceiptStoreError::ReadBoundary(
             "configured retention archive does not authenticate the recorded prefix".to_owned(),
         ));
@@ -1102,6 +1111,43 @@ impl IndexedSecurityEvidenceStore for SqliteReceiptStore {
     }
 }
 
+fn load_retained_indexed_security_evidence(
+    connection: &Connection,
+    evidence_id: &OpaqueReceiptRef,
+) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+    let receipt_id: Option<String> = connection
+        .query_row(
+            "SELECT receipt_id FROM chio_security_evidence_index WHERE evidence_id = ?1",
+            params![evidence_id.as_str()],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(receipt_id) = receipt_id else {
+        return Ok(None);
+    };
+    let receipt =
+        match load_chio_receipt_row(connection, &receipt_id, "indexed live security receipt")? {
+            Some(receipt) => receipt,
+            None => {
+                let archive =
+                    trusted_retention_archive_for_connection(connection)?.ok_or_else(|| {
+                        ReceiptStoreError::ReadBoundary(
+                            "indexed security receipt is missing without an archive".to_string(),
+                        )
+                    })?;
+                load_chio_receipt_row(&archive, &receipt_id, "indexed archived security receipt")?
+                    .ok_or_else(|| {
+                    ReceiptStoreError::ReadBoundary(
+                        "indexed security receipt is absent from its authenticated archive"
+                            .to_string(),
+                    )
+                })?
+            }
+        };
+    validate_indexed_security_receipt(evidence_id, &receipt)?;
+    Ok(Some(receipt))
+}
+
 impl SqliteReceiptStore {
     pub fn append_indexed_security_evidence(
         &self,
@@ -1111,29 +1157,12 @@ impl SqliteReceiptStore {
         ensure_chio_receipt_verified(receipt)?;
         validate_indexed_security_receipt(evidence_id, receipt)?;
         let raw_json = serde_json::to_string(receipt)?;
+        let logical_evidence_id = evidence_id.clone();
         let evidence_id = evidence_id.as_str().to_string();
         let receipt = receipt.clone();
         self.writer_handle().run_write_receipt(move |connection| {
             ensure_checkpoint_transparency_guards(connection)?;
-            if let Some(existing_raw_json) = connection
-                .query_row(
-                    r#"
-                    SELECT receipt.raw_json
-                    FROM chio_security_evidence_index AS evidence
-                    JOIN chio_tool_receipts AS receipt
-                      ON receipt.receipt_id = evidence.receipt_id
-                    WHERE evidence.evidence_id = ?1
-                    "#,
-                    params![evidence_id.as_str()],
-                    |row| row.get::<_, String>(0),
-                )
-                .optional()?
-            {
-                let existing = decode_verified_chio_receipt(
-                    &existing_raw_json,
-                    "indexed active-defense receipt",
-                    None,
-                )?;
+            if let Some(existing) = load_retained_indexed_security_evidence(connection, &logical_evidence_id)? {
                 if !same_unsigned_receipt_and_bbs_binding(&existing, &receipt)? {
                     return Err(ReceiptStoreError::Conflict(format!(
                         "active-defense evidence `{evidence_id}` is already mapped to a different receipt"
@@ -1201,29 +1230,7 @@ impl SqliteReceiptStore {
         let connection = self.connection()?;
         ensure_checkpoint_transparency_guards(&connection)?;
         verify_latest_checkpoint_integrity(&connection)?;
-        connection
-            .query_row(
-                r#"
-                SELECT receipt.seq, receipt.raw_json
-                FROM chio_security_evidence_index AS evidence
-                JOIN chio_tool_receipts AS receipt
-                  ON receipt.receipt_id = evidence.receipt_id
-                WHERE evidence.evidence_id = ?1
-                "#,
-                params![evidence_id.as_str()],
-                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-            )
-            .optional()?
-            .map(|(seq, raw_json)| {
-                let receipt = decode_verified_chio_receipt(
-                    &raw_json,
-                    "indexed active-defense receipt",
-                    Some(seq.max(0) as u64),
-                )?;
-                validate_indexed_security_receipt(evidence_id, &receipt)?;
-                Ok(receipt)
-            })
-            .transpose()
+        load_retained_indexed_security_evidence(&connection, evidence_id)
     }
 
     pub fn ensure_indexed_security_evidence_ready(&self) -> Result<(), ReceiptStoreError> {

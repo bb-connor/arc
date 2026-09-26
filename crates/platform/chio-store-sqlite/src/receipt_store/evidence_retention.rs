@@ -1049,6 +1049,9 @@ pub(super) fn create_archive_schema(
             evidence_sha256 TEXT, recorded_at INTEGER NOT NULL,
             reconciliation_state TEXT NOT NULL, note TEXT, updated_at INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS archive.chio_security_evidence_index (
+            evidence_id TEXT NOT NULL PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE
+        );
         CREATE TABLE IF NOT EXISTS archive.chio_authorization_receipt_consumptions (
             authorization_receipt_id TEXT PRIMARY KEY, consumer_receipt_id TEXT NOT NULL,
             request_id TEXT NOT NULL, session_id TEXT NOT NULL, tool_call_id TEXT NOT NULL,
@@ -1253,6 +1256,10 @@ pub(super) fn copy_archived_prefix(
             SELECT * FROM main.chio_authorization_receipt_consumptions WHERE authorization_receipt_id IN (
                 SELECT receipt_id FROM main.claim_receipt_log_entries
                 WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
+        INSERT OR IGNORE INTO archive.chio_security_evidence_index
+            SELECT * FROM main.chio_security_evidence_index WHERE receipt_id IN (
+                SELECT receipt_id FROM main.claim_receipt_log_entries
+                WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
         INSERT OR IGNORE INTO archive.receipt_lineage_statements
             (receipt_id, statement_id, request_id, session_id, session_anchor_id,
              chain_id, parent_request_id, parent_receipt_id, evidence_class,
@@ -1306,7 +1313,16 @@ fn verify_co_archival_complete(
     connection: &rusqlite::Connection,
     w: i64,
 ) -> Result<(), ReceiptStoreError> {
-    let checks: [(&'static str, String, String); 9] = [
+    let checks: [(&'static str, String, String); 10] = [
+        (
+            "chio_security_evidence_index",
+            format!("SELECT COUNT(*) FROM main.chio_security_evidence_index WHERE receipt_id IN \
+                (SELECT receipt_id FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt')"),
+            format!("SELECT COUNT(*) FROM main.chio_security_evidence_index m WHERE m.receipt_id IN \
+                (SELECT receipt_id FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt') \
+                AND EXISTS (SELECT 1 FROM archive.chio_security_evidence_index a \
+                WHERE a.evidence_id = m.evidence_id AND a.receipt_id = m.receipt_id)"),
+        ),
         (
             // Present AND every column identical: `archive_sql` counts only live
             // prefix rows whose archive row matches on the `seq` primary key and

@@ -151,6 +151,13 @@ impl ChioKernel {
         request: &ToolCallRequest,
     ) -> Result<(), KernelError> {
         if returned.caller_report_digest().is_some() {
+            // A persisted checkpoint authenticates the original output. It
+            // does not exempt a later delivery from the current stop state.
+            if self.is_emergency_stopped() {
+                return Err(KernelError::GuardDenied(
+                    EMERGENCY_STOP_DENY_REASON.to_string(),
+                ));
+            }
             self.check_revocation(&request.capability)?;
             #[cfg(feature = "delegation")]
             super::super::delegation::consult_revocation_view(

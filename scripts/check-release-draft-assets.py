@@ -46,8 +46,14 @@ def find_release(repository: str, tag: str, read=api):
 
 def require_stage(repository: str, tag: str, read=api) -> None:
     release = find_release(repository, tag, read)
-    if release and (release.get("draft") is not True or release.get("prerelease") is not True):
-        raise ValueError("existing candidate is not a draft prerelease; never reopen a published release")
+    if release and (release.get("draft") is not True or release.get("prerelease") is not is_prerelease(tag)):
+        raise ValueError("existing release is not the expected draft; never reopen a published release")
+
+
+def is_prerelease(tag: str) -> bool:
+    if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?", tag):
+        raise ValueError("expected a release version tag")
+    return "-" in tag.split("+", 1)[0]
 
 
 def required_names(tag: str, source: str) -> set[str]:
@@ -66,13 +72,12 @@ def required_names(tag: str, source: str) -> set[str]:
 
 
 def snapshot(repository: str, tag: str, source: str, directory: Path, *, published=False, read=api) -> dict:
-    if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+-[0-9A-Za-z.-]+(?:\+[0-9A-Za-z.-]+)?", tag):
-        raise ValueError("expected a candidate version tag")
+    prerelease = is_prerelease(tag)
     if not re.fullmatch(r"[0-9a-f]{40}", source):
         raise ValueError("invalid source commit")
     release = find_release(repository, tag, read)
-    if not release or release.get("draft") is not (not published) or release.get("prerelease") is not True:
-        raise ValueError("release does not have the required candidate publication state")
+    if not release or release.get("draft") is not (not published) or release.get("prerelease") is not prerelease:
+        raise ValueError("release does not have the required publication state")
     ref = read(f"repos/{repository}/git/ref/tags/{quote(tag, safe='')}")["object"]
     for _ in range(8):
         if ref.get("type") != "tag":

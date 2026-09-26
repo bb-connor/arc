@@ -188,13 +188,13 @@ if [[ "$args" == *" --all-targets "* ]] ||
         printf 'test %s ... ok\n' "${tests[$index]}"
       done
       printf 'test %s ... ignored\n' "${tests[9]}"
-      printf 'test result: ok. 9 passed; 0 failed; 1 ignored; 0 measured; 26 filtered out\n'
+      printf 'test result: ok. 9 passed; 0 failed; 1 ignored; 0 measured; 27 filtered out\n'
       exit 0
     fi
     for test_name in "${tests[@]}"; do
       printf 'test %s ... ok\n' "$test_name"
     done
-    printf 'test result: ok. %d passed; 0 failed; 0 ignored; 0 measured; 26 filtered out\n' "${#tests[@]}"
+    printf 'test result: ok. %d passed; 0 failed; 0 ignored; 0 measured; 27 filtered out\n' "${#tests[@]}"
     exit 0
   fi
 
@@ -210,6 +210,7 @@ if [[ "$args" == *" --all-targets "* ]] ||
     independent_seccomp_filter_kills_forbidden_socket
     landlock_denies_ungranted_path_after_fd_based_target_exec
     seccomp_kills_forbidden_process_creation
+    seccomp_confines_resource_limits_and_signals_to_the_cage
     landlock_denies_file_creation_without_a_grant
     retained_target_survives_path_replacement
     retained_helper_survives_path_replacement_without_reopening
@@ -228,7 +229,7 @@ if [[ "$args" == *" --all-targets "* ]] ||
   )
   case "$mode" in
     zero_probes) probes=() ;;
-    removed_probe) probes=("${probes[@]:0:25}") ;;
+    removed_probe) probes=("${probes[@]:0:26}") ;;
     extra_probe) probes+=(unratcheted_real_linux_probe) ;;
   esac
 
@@ -263,6 +264,7 @@ if [[ "$args" == *" --all-targets "* ]] ||
       rejects_root_zero_unsorted_duplicate_and_primary_groups
       required_enforcement_comparison_is_exact
       seccomp_control_rejects_forbidden_socket_before_default_deny
+      seccomp_rejects_peer_process_authority_in_every_profile
       signature_is_verified_before_permissions_are_read
       swapped_extra_and_missing_stdio_roles_fail_plan_validation
       swapped_live_stdio_descriptors_fail_identity_verification
@@ -381,7 +383,7 @@ if [[ "$status" -ne 0 ]]; then
   cat "$work/1-success.out" >&2
   exit "$status"
 fi
-grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=70 probes=26 mutations=10$' \
+grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=72 probes=27 mutations=10$' \
   "$work/1-success.out"
 
 python3 scripts/tests/check-cage-all-target-inventory.test.py

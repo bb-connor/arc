@@ -608,8 +608,11 @@ jobs:
           retention-days: 7
 
   release:
-    name: Publish GitHub Release
+    name: Stage GitHub Release
     needs: build
+    outputs:
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      tag: ${{ steps.version.outputs.tag }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -832,25 +835,24 @@ jobs:
           } > release/NOTES.md
           cat release/NOTES.md
 
-      - name: Refuse to reopen a published candidate
-        if: steps.version.outputs.prerelease == 'true'
+      - name: Refuse to reopen a published release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: python3 scripts/check-release-draft-assets.py stage --repository "${GITHUB_REPOSITORY}" --tag "${RELEASE_TAG}"
 
-      - name: Stage candidate or publish stable release
+      - name: Stage release pending provenance
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: chio ${{ steps.version.outputs.tag }}
           body_path: release/NOTES.md
-          # Candidates stay unpublished until their exact hosted bytes pass host
-          # acceptance and SLSA verification. Promotion does not rebuild assets.
-          draft: ${{ steps.version.outputs.prerelease == 'true' }}
+          # Every release stays private until its provenance verifies.
+          # Candidates additionally require the operator's host acceptance.
+          draft: true
           prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
-          make_latest: ${{ steps.version.outputs.prerelease == 'true' && 'false' || 'true' }}
+          make_latest: false
           overwrite_files: false
           fail_on_unmatched_files: true
           # `*.sig` and `*.pem` are the cosign sign-blob siblings; without them
@@ -1050,13 +1052,12 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: Attach candidate checksum review materials to the draft
-        if: steps.checksum_release.outputs.prerelease == 'true'
+      - name: Attach checksum review materials to the draft
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           tag_name: ${{ steps.checksum_release.outputs.tag }}
           draft: true
-          prerelease: true
+          prerelease: ${{ steps.checksum_release.outputs.prerelease == 'true' }}
           make_latest: false
           overwrite_files: false
           fail_on_unmatched_files: true
@@ -1091,6 +1092,57 @@ jobs:
 
             Security review requested (release trust-boundary).
           commit-message: "chore(release): publish ${{ steps.checksum_release.outputs.tag }} checksum index"
+
+  publish-stable:
+    name: Publish verified stable release
+    needs: [release, provenance, checksum-index]
+    if: needs.release.outputs.prerelease == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Checkout original release source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.sha }}
+      - name: Install supported cryptographic verifier
+        uses: sigstore/cosign-installer@1aa8e0f2454b781fbf0fbf306a4c9533a0c57409
+        with:
+          cosign-release: v2.4.1
+      - name: Revalidate source gates and exact hosted provenance before publication
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          python3 scripts/check-release-source-gates.py
+          mkdir hosted
+          gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --dir hosted
+          python3 scripts/check-release-draft-assets.py record \
+            --repository "${GITHUB_REPOSITORY}" --tag "${RELEASE_TAG}" --source-sha "${GITHUB_SHA}" \
+            --directory hosted --manifest before-publication.json
+          mapfile -t archives < <(find hosted -type f \( -name '*.tar.gz' -o -name '*.zip' \) | sort)
+          python3 scripts/verify-release-provenance.py verify \
+            --bundle "hosted/chio-${GITHUB_SHA}.intoto.jsonl" --evidence verification-evidence \
+            --repository "${GITHUB_REPOSITORY}" --tag "${RELEASE_TAG}" --source-sha "${GITHUB_SHA}" \
+            --run-id "${GITHUB_RUN_ID}" --run-attempt "${GITHUB_RUN_ATTEMPT}" "${archives[@]}"
+          python3 scripts/check-release-draft-assets.py record \
+            --repository "${GITHUB_REPOSITORY}" --tag "${RELEASE_TAG}" --source-sha "${GITHUB_SHA}" \
+            --directory hosted --manifest publication.json
+          cmp before-publication.json publication.json
+          gh release edit "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --draft=false --prerelease=false --latest
+      - name: Retain stable publication evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: stable-publication-${{ github.run_attempt }}
+          path: |
+            before-publication.json
+            publication.json
+            verification-evidence/
+          if-no-files-found: error
 
   mutants-gate-flip:
     # Auto-flip the cargo-mutants gate from advisory to blocking on the first

@@ -612,9 +612,9 @@ impl BrokerService {
         }
 
         self.require_migrations_enforced(request)?;
-        let credential = self
+        let (credential, credential_version) = self
             .backend
-            .materialize(&request.capability.body.credential)?;
+            .materialize_for_dispatch(&request.capability.body.credential)?;
         let dispatch = self.https.prepare(
             self.provider.as_ref(),
             &request.request,
@@ -651,6 +651,7 @@ impl BrokerService {
                 prepared_at_unix_seconds: now_unix_seconds,
                 dispatch,
                 credential,
+                credential_version,
                 revocation_set,
             },
         );

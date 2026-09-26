@@ -94,6 +94,50 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
     pub(crate) fn dpop_credential(&self) -> Option<&DpopReplayCredentialV1> {
         self.dpop_credential.as_ref()
     }
+
+    /// Exclusive deadline of the original, verified artifacts. This is a
+    /// restriction on dispatch, not a replacement for live reservation custody.
+    pub(crate) fn valid_until_unix_ms(&self) -> Result<u64, KernelError> {
+        let invalid = |reason: &str| KernelError::DurableAdmission(reason.to_owned());
+        let millis = |seconds: u64| {
+            seconds
+                .checked_mul(1000)
+                .ok_or_else(|| invalid("credential deadline overflow"))
+        };
+        let mut deadline = millis(self.input.cap.expires_at)?;
+        if let Some(approval) = self.approval_credential()? {
+            deadline = deadline.min(millis(approval.expires_at_unix_secs)?);
+        }
+        if let Some(dpop) = self.dpop_credential() {
+            let exclusive = dpop
+                .valid_through_unix_secs()
+                .map_err(|error| invalid(&error.to_string()))?
+                .checked_add(1)
+                .ok_or_else(|| invalid("DPoP deadline overflow"))?;
+            deadline = deadline.min(millis(exclusive)?);
+        } else if self.input.dpop_required {
+            return Err(invalid(
+                "dispatch deadline requires operation-owned DPoP custody",
+            ));
+        }
+        if let Some(nonce) = &self.input.request.execution_nonce {
+            let seconds = u64::try_from(nonce.expires_at())
+                .map_err(|_| invalid("execution nonce deadline is invalid"))?;
+            deadline = deadline.min(millis(seconds)?);
+        }
+        if let Some(grant) = &self.input.request.declassification_grant {
+            // Issuer trust, policy and consumption remain the live flow
+            // resolver's responsibility. A signature alone grants no release.
+            if !grant
+                .verify_signature()
+                .map_err(|error| invalid(&error.to_string()))?
+            {
+                return Err(invalid("declassification signature is invalid"));
+            }
+            deadline = deadline.min(millis(grant.body().expires_at_unix_seconds())?);
+        }
+        Ok(deadline)
+    }
 }
 
 impl ChioKernel {

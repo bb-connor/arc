@@ -126,7 +126,6 @@ fn build_seccomp_plan(
         "readv",
         "restart_syscall",
         "setitimer",
-        "tgkill",
     ];
     const BROKERED: &[&str] = &["recvfrom", "recvmsg", "sendmsg", "sendto"];
 
@@ -184,6 +183,16 @@ fn build_seccomp_plan(
             },
         ],
     )]);
+    // PID zero selects the calling process. A same-UID peer must never be
+    // able to change the kernel's limits through this otherwise useful call.
+    argument_constraints.insert(
+        "prlimit64".to_string(),
+        vec![SyscallArgumentConstraint {
+            argument_index: 0,
+            comparison: SeccompArgumentComparison::Equal,
+            value: 0,
+        }],
+    );
     if profile != NativeSyscallProfile::BrokeredNativeV1 {
         // Rust's musl file wrapper marks newly opened descriptors close-on-exec.
         // Permit that one tightening operation, without duplication or clearing
@@ -503,7 +512,10 @@ mod tests {
         }
         #[cfg(not(target_arch = "x86_64"))]
         assert!(matches!(
-            admit(registry.authorize_cage_manifest("cage-test").test_unwrap(), &ceilings()),
+            admit(
+                registry.authorize_cage_manifest("cage-test").test_unwrap(),
+                &ceilings()
+            ),
             Err(CageError::UnsupportedArchitecture(_))
         ));
     }

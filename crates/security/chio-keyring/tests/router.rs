@@ -205,7 +205,7 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
     let ready = ready_log(&path);
     let router = KeyringSigningRouter::open(Arc::clone(&ready.store), Box::new(ready.old.clone()))
         .test_unwrap();
-    let mut staged = router
+    let staged = router
         .stage_pending(
             ready.rotation.body.event_id.clone(),
             Box::new(ready.new.clone()),
@@ -217,6 +217,16 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
             Box::new(ready.new.clone()),
         )
         .is_err());
+
+    // A failed request drops its volatile lease; durable pending state remains
+    // resumable without restarting the authority or admitting two owners.
+    drop(staged);
+    let mut staged = router
+        .stage_pending(
+            ready.rotation.body.event_id.clone(),
+            Box::new(ready.new.clone()),
+        )
+        .test_unwrap();
 
     let first = router
         .sign_canonical(0, &serde_json::json!({"artifact": 1}))

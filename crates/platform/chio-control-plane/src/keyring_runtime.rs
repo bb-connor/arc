@@ -451,10 +451,11 @@ impl KeyringRuntimeComposition {
                 ));
             }
             self.require_key_log_verification()?;
+            let outcome = self.current_rotation_outcome()?;
             write_authority_seed_file_bound(active_seed_path, &recovered, Some(&active_identity))?;
             self.require_key_log_verification()?;
             remove_authority_seed_handoff(&pending_path, &handoff, &pending_identity)?;
-            return Ok((recovered.public_key(), self.current_rotation_outcome()?));
+            return Ok((recovered.public_key(), outcome));
         }
         let (next_keypair, pending_identity, target_epoch) = match pending {
             Some((handoff, keypair, identity)) => {
@@ -467,11 +468,9 @@ impl KeyringRuntimeComposition {
                     )? {
                         QuiescentAuthoritySeedHandoff::Completed => {
                             self.require_key_log_verification()?;
+                            let outcome = self.current_rotation_outcome()?;
                             remove_authority_seed_handoff(&pending_path, &handoff, &identity)?;
-                            return Ok((
-                                active_keypair.public_key(),
-                                self.current_rotation_outcome()?,
-                            ));
+                            return Ok((active_keypair.public_key(), outcome));
                         }
                         QuiescentAuthoritySeedHandoff::Resumable { target_epoch } => {
                             (keypair, identity, target_epoch)
@@ -551,16 +550,9 @@ impl KeyringRuntimeComposition {
 
     fn current_rotation_outcome(&self) -> Result<chio_keyring::WitnessedRotationOutcome, CliError> {
         self.require_key_log_verification()?;
-        let audit_pin = self
-            .store
-            .head_pin()
-            .map_err(|error| CliError::cli_other_error(error.to_string()))?
-            .ok_or_else(|| CliError::cli_other_error("key log has no active head".to_string()))?;
-        Ok(chio_keyring::WitnessedRotationOutcome {
-            checkpoint_hash: audit_pin.checkpoint_hash,
-            signing_epoch: audit_pin.signing_epoch,
-            audit_pin,
-        })
+        self.rotation_runtime
+            .resume_activated_rotation(&self.independent_services)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))
     }
 }
 
@@ -1191,6 +1183,7 @@ pub fn load_keyring_runtime_from_authority_seed(
                         return Err(active_error);
                     }
                     composition.require_key_log_verification()?;
+                    composition.current_rotation_outcome()?;
                     write_authority_seed_file_bound(
                         active_seed_path,
                         &recovered,
@@ -1376,6 +1369,7 @@ fn cleanup_completed_authority_seed_handoff(
                 ));
             }
             composition.require_key_log_verification()?;
+            composition.current_rotation_outcome()?;
             remove_authority_seed_handoff(&pending_path, &handoff, &identity)
         }
         QuiescentAuthoritySeedHandoff::Resumable { .. } => Ok(()),

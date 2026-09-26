@@ -351,12 +351,48 @@ impl BrokerService {
             );
             return Err(execution_failure_after_capture_release(error, released));
         }
-        if let Err(error) = self.attempts.commit_captured_attempt_dispatch(
-            &ids.attempt_id,
-            &dispatch_claim_id,
-            &capture_evidence,
-            now_unix_seconds,
-        ) {
+        let mut commit_started = false;
+        let dispatch_commit = (|| {
+            // Capture can block on remote authority. Its historical witness
+            // cannot authorize dispatch after expiry or parent revocation.
+            let authority_now = terminal_clock()?.max(now_unix_seconds);
+            let current = self.validate_request_authorities(
+                request,
+                &trusted.revocation_authority_domain,
+                authority_now,
+                false,
+            )?;
+            if current.revocation_set != retained.revocation_set {
+                return Err(BrokerError::AuthorizationDenied(
+                    "credential ancestry changed after capture".to_string(),
+                ));
+            }
+            self.backend.authorize_dispatch(
+                &request.capability.body.credential,
+                &retained.credential_version,
+                || {
+                    let dispatch_now = terminal_clock()?.max(authority_now);
+                    self.validate_request_core(request, dispatch_now)?;
+                    self.require_migrations_enforced(request)?;
+                    commit_started = true;
+                    self.attempts.commit_captured_attempt_dispatch(
+                        &ids.attempt_id,
+                        &dispatch_claim_id,
+                        &capture_evidence,
+                        dispatch_now,
+                    )
+                },
+            )
+        })();
+        if let Err(error) = dispatch_commit {
+            if !commit_started {
+                let released = self.attempts.release_captured_attempt_claim(
+                    &ids.attempt_id,
+                    &dispatch_claim_id,
+                    now_unix_seconds,
+                );
+                return Err(execution_failure_after_capture_release(error, released));
+            }
             let _ = self.attempts.transition(
                 &ids.attempt_id,
                 AttemptState::Captured,

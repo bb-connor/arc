@@ -41,6 +41,8 @@ pub(crate) struct AnchorRecord {
     trusted_time_high_water_unix_ms: u64,
     global_commit_head: u64,
     global_commit_chain_digest: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    retired_export_id: Option<String>,
 }
 
 struct DatabaseState {
@@ -49,6 +51,7 @@ struct DatabaseState {
     serving_lease_id: Option<String>,
     commit: AdmissionCommitHead,
     global_commit: GlobalCommitHead,
+    retired_export_id: Option<String>,
 }
 
 struct LoadedAnchor {
@@ -389,18 +392,23 @@ impl DatabaseState {
             u64::try_from(owner_epoch).map_err(|_| invalid("serving owner epoch is negative"))?;
         validate_store_uuid(&store_uuid)?;
         validate_serving_lease(owner_epoch, serving_lease_id.as_deref())?;
+        let retired_export_id = match super::relocation::relocation_state(connection)? {
+            super::relocation::RelocationState::Exported(seal) => Some(seal.export_id),
+            _ => None,
+        };
         Ok(Self {
             store_uuid,
             owner_epoch,
             serving_lease_id,
             commit,
             global_commit,
+            retired_export_id,
         })
     }
 
     fn record(&self, generation: u64) -> AnchorRecord {
         AnchorRecord {
-            format: "chio.sqlite-authority-rollback-anchor-global.v1".to_string(),
+            format: "chio.sqlite-authority-rollback-anchor-global.v2".to_string(),
             generation,
             store_uuid: self.store_uuid.clone(),
             owner_epoch: self.owner_epoch,
@@ -410,6 +418,7 @@ impl DatabaseState {
             trusted_time_high_water_unix_ms: self.commit.trusted_time_high_water_unix_ms,
             global_commit_head: self.global_commit.head_sequence,
             global_commit_chain_digest: self.global_commit.chain_digest.clone(),
+            retired_export_id: self.retired_export_id.clone(),
         }
     }
 }
@@ -422,11 +431,21 @@ impl AnchorRecord {
     }
 
     fn validate(&self) -> Result<(), SqliteServingOwnerError> {
-        if self.format != "chio.sqlite-authority-rollback-anchor-global.v1" || self.generation == 0
+        if !matches!(
+            self.format.as_str(),
+            "chio.sqlite-authority-rollback-anchor-global.v1"
+                | "chio.sqlite-authority-rollback-anchor-global.v2"
+        ) || self.generation == 0
         {
             return Err(invalid("serving rollback anchor version is invalid"));
         }
         validate_store_uuid(&self.store_uuid)?;
+        if let Some(export_id) = &self.retired_export_id {
+            if self.format != "chio.sqlite-authority-rollback-anchor-global.v2" {
+                return Err(invalid("retirement requires rollback anchor version 2"));
+            }
+            super::validate_uuid_v7(export_id, "anchored relocation export ID")?;
+        }
         validate_serving_lease(self.owner_epoch, self.serving_lease_id.as_deref())?;
         if !is_digest(&self.admission_commit_chain_digest)
             || (self.admission_commit_head == 0
@@ -468,6 +487,8 @@ fn prove_extension(
 ) -> Result<(), SqliteServingOwnerError> {
     anchor.validate()?;
     if database.store_uuid != anchor.store_uuid
+        || (anchor.retired_export_id.is_some()
+            && database.retired_export_id != anchor.retired_export_id)
         || database.owner_epoch < anchor.owner_epoch
         || (database.owner_epoch == anchor.owner_epoch
             && database.serving_lease_id != anchor.serving_lease_id)
@@ -487,7 +508,8 @@ fn prove_extension(
 }
 
 fn database_strictly_extends(anchor: &AnchorRecord, database: &DatabaseState) -> bool {
-    database.owner_epoch > anchor.owner_epoch
+    (anchor.retired_export_id.is_none() && database.retired_export_id.is_some())
+        || database.owner_epoch > anchor.owner_epoch
         || database.commit.head_sequence > anchor.admission_commit_head
         || database.commit.trusted_time_high_water_unix_ms > anchor.trusted_time_high_water_unix_ms
         || database.global_commit.head_sequence > anchor.global_commit_head
@@ -495,6 +517,8 @@ fn database_strictly_extends(anchor: &AnchorRecord, database: &DatabaseState) ->
 
 fn record_extends(current: &AnchorRecord, prior: &AnchorRecord) -> bool {
     current.store_uuid == prior.store_uuid
+        && (prior.retired_export_id.is_none()
+            || current.retired_export_id == prior.retired_export_id)
         && current.owner_epoch >= prior.owner_epoch
         && (current.owner_epoch != prior.owner_epoch
             || current.serving_lease_id == prior.serving_lease_id)

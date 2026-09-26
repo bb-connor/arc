@@ -3,7 +3,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::sync::Arc;
 
 use sha2::{Digest, Sha256};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::audit::{
     compare_audit_wire_requests, BrokerAuditComparisonSalt, BrokerAuditReferenceRequest,
@@ -93,9 +93,7 @@ pub(crate) struct RawHttpsResponse {
 
 impl Drop for RawHttpsResponse {
     fn drop(&mut self) {
-        for header in &mut self.headers {
-            header.value.zeroize();
-        }
+        zeroize_headers(&mut self.headers);
         for chunk in &mut self.decoded_body_chunks {
             chunk.zeroize();
         }
@@ -382,7 +380,7 @@ impl GenericHttpsExecutor {
             };
             if contains_secret(&body, credential.as_bytes()) {
                 body.zeroize();
-                zeroize_header_values(&mut headers);
+                zeroize_headers(&mut headers);
                 return Err(BrokerError::ResponseRejected(
                     "response body contains credential material".to_string(),
                 ));
@@ -554,16 +552,18 @@ fn sanitize_response_headers(
     credential: &SecretMaterial,
 ) -> Result<Vec<HeaderField>> {
     if headers.len() > MAX_HEADER_COUNT {
-        zeroize_header_values(&mut headers);
+        zeroize_headers(&mut headers);
         return Err(BrokerError::ResponseRejected(
             "upstream response has too many headers".to_string(),
         ));
     }
-    if headers
-        .iter()
-        .any(|header| contains_secret(&header.value, credential.as_bytes()))
-    {
-        zeroize_header_values(&mut headers);
+    if headers.iter().any(|header| {
+        let normalized_name = Zeroizing::new(header.name.to_ascii_lowercase());
+        contains_secret(&header.value, credential.as_bytes())
+            || contains_secret(header.name.as_bytes(), credential.as_bytes())
+            || contains_secret(normalized_name.as_bytes(), credential.as_bytes())
+    }) {
+        zeroize_headers(&mut headers);
         return Err(BrokerError::ResponseRejected(
             "response header contains credential material".to_string(),
         ));
@@ -572,6 +572,7 @@ fn sanitize_response_headers(
     let mut invalid_header = false;
     for original in &mut headers {
         let normalized = HeaderField::normalized(&original.name, &original.value);
+        original.name.zeroize();
         original.value.zeroize();
         let mut header = match normalized {
             Ok(header) => header,
@@ -590,8 +591,8 @@ fn sanitize_response_headers(
         sanitized.push(header);
     }
     if invalid_header {
-        zeroize_header_values(&mut headers);
-        zeroize_header_values(&mut sanitized);
+        zeroize_headers(&mut headers);
+        zeroize_headers(&mut sanitized);
         return Err(BrokerError::ResponseRejected(
             "upstream response header is invalid".to_string(),
         ));
@@ -599,8 +600,9 @@ fn sanitize_response_headers(
     Ok(sanitized)
 }
 
-fn zeroize_header_values(headers: &mut [HeaderField]) {
+fn zeroize_headers(headers: &mut [HeaderField]) {
     for header in headers {
+        header.name.zeroize();
         header.value.zeroize();
     }
 }
@@ -1093,6 +1095,25 @@ mod tests {
             &credential,
         )
         .is_err());
+    }
+
+    #[test]
+    fn response_header_names_cannot_echo_credentials() {
+        for (secret, name) in [
+            ("canary-secret", "x-canary-secret"),
+            ("Canary-Secret", "x-Canary-Secret"),
+            ("canary-secret", "X-CANARY-SECRET"),
+        ] {
+            let credential = SecretMaterial::new(secret.as_bytes().to_vec());
+            assert!(sanitize_response_headers(
+                vec![HeaderField {
+                    name: name.to_string(),
+                    value: b"innocent".to_vec(),
+                }],
+                &credential
+            )
+            .is_err());
+        }
     }
 
     #[test]

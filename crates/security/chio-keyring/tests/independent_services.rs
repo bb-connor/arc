@@ -38,13 +38,24 @@ fn backend(seed: u8) -> Ed25519Backend {
 
 struct Children(Vec<Child>);
 
-struct AcceptingEnterpriseReceiptSink;
+struct RecoverableEnterpriseReceiptSink {
+    fail_active: AtomicBool,
+    active_attempts: AtomicUsize,
+}
 
-impl chio_keyring::KeyEnterpriseReceiptSink for AcceptingEnterpriseReceiptSink {
+impl chio_keyring::KeyEnterpriseReceiptSink for RecoverableEnterpriseReceiptSink {
     fn persist(
         &self,
-        _receipt: &chio_keyring::SignedKeyEnterpriseReceipt,
+        receipt: &chio_keyring::SignedKeyEnterpriseReceipt,
     ) -> chio_keyring::Result<()> {
+        if receipt.body.stage == chio_keyring::KeyEnterpriseReceiptStage::Active {
+            self.active_attempts.fetch_add(1, Ordering::SeqCst);
+            if self.fail_active.load(Ordering::SeqCst) {
+                return Err(chio_keyring::KeyringError::StateInvariant(
+                    "test receipt forwarding unavailable",
+                ));
+            }
+        }
         Ok(())
     }
 }
@@ -746,11 +757,15 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
         allowed: AtomicBool::new(false),
         calls: AtomicUsize::new(0),
     });
+    let receipt_sink = Arc::new(RecoverableEnterpriseReceiptSink {
+        fail_active: AtomicBool::new(true),
+        active_attempts: AtomicUsize::new(0),
+    });
     let runtime = WitnessedRotationRuntime::new_enterprise(
         Arc::clone(&store),
         Arc::clone(&router),
         Arc::new(fixture.operator.clone()),
-        Arc::new(AcceptingEnterpriseReceiptSink),
+        receipt_sink.clone(),
         activation_guard.clone(),
     )
     .test_unwrap();
@@ -771,10 +786,38 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
         fixture.active.public_key()
     );
     activation_guard.allowed.store(true, Ordering::SeqCst);
-    let outcome = runtime
+    assert!(runtime
         .collect_witnesses_and_activate(&mut pending, &services)
-        .test_unwrap();
+        .is_err());
     assert_eq!(activation_guard.calls.load(Ordering::SeqCst), 3);
+    assert_eq!(
+        store.head_pin().test_unwrap().test_unwrap().signing_epoch,
+        1
+    );
+    assert_eq!(receipt_sink.active_attempts.load(Ordering::SeqCst), 1);
+
+    // Activation has committed. Recovery must still contact the independent
+    // auditor quorum before forwarding a receipt or reporting completion.
+    receipt_sink.fail_active.store(false, Ordering::SeqCst);
+    children.0[3].kill().test_unwrap();
+    children.0[3].wait().test_unwrap();
+    assert!(runtime.resume_activated_rotation(&services).is_err());
+    assert_eq!(receipt_sink.active_attempts.load(Ordering::SeqCst), 1);
+    children.0[3] = Command::new(env!("CARGO_BIN_EXE_chio-keylog-audit"))
+        .arg("--config")
+        .arg(&audit_config_paths[0])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .test_unwrap();
+    let started = Instant::now();
+    while audit_clients[0].readiness("activated-recovery").is_err() {
+        assert!(started.elapsed() < WAIT_LIMIT, "auditor did not restart");
+        thread::sleep(Duration::from_millis(20));
+    }
+    let outcome = runtime.resume_activated_rotation(&services).test_unwrap();
+    assert_eq!(receipt_sink.active_attempts.load(Ordering::SeqCst), 2);
     assert_eq!(outcome.signing_epoch, 1);
     assert_eq!(outcome.audit_pin.signing_epoch, 1);
     assert_eq!(

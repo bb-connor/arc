@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Require completed, exact-source main checks before publishing a binary release."""
+"""Require completed, exact-source main checks before publishing a release."""
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -89,18 +90,41 @@ def require_gates(repository: str, head: str, read=github) -> list[dict]:
     return evidence
 
 
-def main() -> None:
+def release_version(root: Path, tag: str, sdk: str | None, package: str | None) -> str:
+    if sdk is None:
+        manifest = tomllib.loads((root / "crates/products/chio-cli/Cargo.toml").read_text())
+        version = manifest["package"]["version"]
+        if isinstance(version, dict) and version == {"workspace": True}:
+            version = tomllib.loads((root / "Cargo.toml").read_text())["workspace"]["package"]["version"]
+        expected = {f"v{version}"}
+    else:
+        if sdk not in {"npm", "pypi"} or not package:
+            raise ValueError("SDK source qualification requires its package")
+        path = (root / package).resolve(strict=True)
+        allowed = [root / "sdks" / ("typescript" if sdk == "npm" else "python")]
+        if sdk == "pypi":
+            allowed.append(root / "sdks/lambda")
+        if not any(path.is_relative_to(base.resolve()) for base in allowed):
+            raise ValueError("SDK package lies outside its source tree")
+        if sdk == "npm":
+            version = json.loads((path / "package.json").read_text())["version"]
+            prefix = "ts"
+        else:
+            version = tomllib.loads((path / "pyproject.toml").read_text())["project"]["version"]
+            prefix = "py"
+        expected = {f"{prefix}/v{version}", f"{prefix}/{path.name}-v{version}"}
+    if not isinstance(version, str) or tag not in expected:
+        raise ValueError("release tag does not match the selected package version")
+    return version
+
+
+def main(sdk: str | None = None, package: str | None = None) -> None:
     root = Path(__file__).resolve().parents[1]
     head = os.environ["GITHUB_SHA"]
     tag = os.environ["GITHUB_REF_NAME"]
     if os.environ.get("GITHUB_REF_TYPE") != "tag":
-        raise ValueError("binary publication requires a tag event")
-    manifest = tomllib.loads((root / "crates/products/chio-cli/Cargo.toml").read_text())
-    version = manifest["package"]["version"]
-    if isinstance(version, dict) and version == {"workspace": True}:
-        version = tomllib.loads((root / "Cargo.toml").read_text())["workspace"]["package"]["version"]
-    if tag != f"v{version}":
-        raise ValueError("release tag does not match the compiled CLI package version")
+        raise ValueError("publication requires a tag event")
+    version = release_version(root, tag, sdk, package)
     actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     if actual != head:
         raise ValueError("checkout does not match the release source")
@@ -111,7 +135,11 @@ def main() -> None:
 
 if __name__ == "__main__":
     try:
-        main()
+        parser = argparse.ArgumentParser(description=__doc__)
+        parser.add_argument("--sdk", choices=("npm", "pypi"))
+        parser.add_argument("--package")
+        arguments = parser.parse_args()
+        main(arguments.sdk, arguments.package)
     except (KeyError, ValueError, TypeError, OSError, subprocess.SubprocessError) as error:
         # Do not echo gh stderr or environment values into release logs.
         print(f"release source gate refused: {type(error).__name__}", file=sys.stderr)

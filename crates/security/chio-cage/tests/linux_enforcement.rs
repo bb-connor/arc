@@ -192,17 +192,29 @@ fn compiled_with_runtime_files(
 }
 
 fn compiled_with_argv(target: &Path, argv: Vec<String>) -> chio_cage::CompiledCage {
+    compiled_with_profile_argv(target, NativeSyscallProfile::NativeMinimalV1, argv)
+}
+
+fn compiled_with_profile_argv(
+    target: &Path,
+    profile: NativeSyscallProfile,
+    argv: Vec<String>,
+) -> chio_cage::CompiledCage {
     let workdir = std::env::temp_dir();
     let keypair = Keypair::from_seed(&[74; 32]);
-    let signed = signed_manifest(&keypair, None, None);
+    let mut manifest = signed_manifest(&keypair, None, None).manifest;
+    manifest
+        .required_permissions
+        .as_mut()
+        .test_unwrap()
+        .native_syscall_profile = profile;
+    let signed = sign_manifest(&manifest, &keypair).test_unwrap();
     let ceilings = OperatorCeilings::new(
         BTreeSet::new(),
         BTreeSet::new(),
         BTreeSet::new(),
         BTreeSet::new(),
-        [NativeSyscallProfile::NativeMinimalV1]
-            .into_iter()
-            .collect(),
+        [profile].into_iter().collect(),
     )
     .with_forbidden_paths(BTreeSet::new());
     let admitted = admit(&signed, &keypair.public_key(), &ceilings).test_unwrap();
@@ -715,6 +727,39 @@ fn seccomp_kills_forbidden_process_creation() {
         record.exit.as_ref().and_then(|exit| exit.signal),
         Some(libc::SIGSYS)
     );
+}
+
+#[test]
+fn seccomp_confines_resource_limits_and_signals_to_the_cage() {
+    for profile in [
+        NativeSyscallProfile::NativeMinimalV1,
+        NativeSyscallProfile::NativeStandardV1,
+    ] {
+        for (name, peer) in [
+            ("CHIO_CAGE_TEST_PRLIMIT_SELF", false),
+            ("CHIO_CAGE_TEST_PRLIMIT_PEER", true),
+            ("CHIO_CAGE_TEST_TGKILL_PEER", true),
+        ] {
+            let target = required_path(name);
+            let mut argv = vec![target.display().to_string()];
+            if peer {
+                argv.push(std::process::id().to_string());
+            }
+            let record = launch(
+                compiled_with_profile_argv(&target, profile, argv),
+                CageLaunchOptions::default(),
+            )
+            .test_unwrap()
+            .wait()
+            .test_unwrap();
+            let exit = record.exit.test_unwrap();
+            if peer {
+                assert_eq!(exit.signal, Some(libc::SIGSYS), "{profile:?}: {name}");
+            } else {
+                assert_eq!(exit.exit_code, Some(0), "{profile:?}: {name}");
+            }
+        }
+    }
 }
 
 #[test]

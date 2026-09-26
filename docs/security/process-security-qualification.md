@@ -1,6 +1,16 @@
 # Combined process and M4 qualification
 
-## Current checkpoint (2026-09-25)
+## Review remediation (2026-09-25)
+
+The review of `24b995af66dbd3661f74ccea0a5192ddcfd763b3` produced corrections
+to discovery confinement, cage process authority, credential and keyring
+lifecycles, relocation, receipt retention, caller deadlines, flow taint and
+release ordering. The [remediation report](../reviews/2026-09-25-security-roadmap-remediation.md)
+records the fixes, compatibility changes, focused qualification and remaining
+gates. The foundation results below retain their original source identities;
+they do not qualify the later Rust changes.
+
+## Foundation checkpoint (2026-09-25)
 
 This checkpoint starts from draft PR #1160 at
 `e3f8bb33edeeccd58ac1f5d31e32ddb14b3c3227` and records the launcher and
@@ -12,7 +22,7 @@ implemented behavior from those acceptance requirements.
 | --- | --- | --- |
 | 1. Foundation | The complete local workspace invocation reached terminal exit 101 with five failed targets. Reusing its compiled binaries under the required `umask 022` passes all five: 210 API protection tests, 657 CLI unit tests, and the three MCP startup/call-evidence/run-evidence integration tests. Strict workspace/all-target Clippy also passes. The MCP failure reproduces under `umask 002`: its temporary ancestor is group writable and the production validator correctly rejects it. Both local CI launchers now fix the umask and bind `CHIO_CHECKOUT_ROOT` to their checkout. | Final hosted foundation checks; a genuine `aws-lc-rs 1.18.1` audit. The original full-workspace exit remains a failure, separate from the focused passes. |
 | 2. M5 evidence joins | Original nonce custody and receipt-log inclusion are exported and verified by Rust. Completed, denied, interrupted and captured-unknown call tests pass. The matrix verifier binds signed authority denials to their intent, operation and rejection path. The retained seven-scenario v3 artifact passes independent verification with 17 rejected substitutions. | Full M5 acceptance still requires the foundation and trusted capture from packets 1 and 3. Retrospective artifact verification is not a fresh final-source capture. |
-| 3. Trusted authority | PR #1167 contains the complete five-file workflow definition set. PR #1168 contains its dependency prerequisite, including replacement of yanked `der 0.8.0`. Their trees compose without conflicts. The execution image and native package have bounded, unpublished validation records. | Reviewed definitions on main, immutable caller/definition rotation, separately authorized source, published registry manifest digest, the publisher App private-key secret, the App-bound ruleset check, and signed committed capture evidence. |
+| 3. Trusted authority | PR #1167 contains the complete five-file workflow definition set. PR #1168 contains its dependency prerequisite, including replacement of yanked `der 0.8.0`. Their trees compose without conflicts. The execution image and native package have bounded, unpublished validation records. The protected `security-check-publisher/CHIO_SECURITY_APP_PRIVATE_KEY_PEM` secret is configured (metadata verified September 26 UTC; updated September 25 at 22:55:48 UTC). | Reviewed definitions on main, immutable caller/definition rotation, separately authorized source, published registry manifest digest, the App-bound ruleset check, and signed committed capture evidence. |
 | 4. Integration | PR #1160 retains both required histories and the implemented M5 joins. | Independent review, final-source capture/observer results, all required terminal checks, and authorized protected integration. |
 
 The failed workspace invocation began on `d67b0688f9`; the intervening change

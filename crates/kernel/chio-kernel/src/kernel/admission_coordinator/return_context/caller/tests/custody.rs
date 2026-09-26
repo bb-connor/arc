@@ -183,6 +183,10 @@ fn caller_return_v3_remains_readable_but_cannot_acquire_custody_on_reissue() -> 
     let mut payload: serde_json::Value =
         serde_json::from_slice(fixture.frame.kernel_context_json())?;
     payload["schema"] = serde_json::json!(PARTICIPANT_SCHEMA);
+    payload
+        .as_object_mut()
+        .ok_or("caller object")?
+        .remove("start_valid_until_unix_ms");
     assert!(
         fixture
             .kernel

@@ -1,4 +1,4 @@
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 
 use chio_core_types::{
     canonical_json_bytes, sha256, Hash, PublicKey, Signature, SigningAlgorithm, SigningBackend,
@@ -106,6 +106,23 @@ struct PendingLease {
 pub struct StagedPendingBackend {
     lease: PendingLease,
     backend: Option<Box<dyn SigningBackend>>,
+    owner: Weak<RwLock<RouterState>>,
+}
+
+impl Drop for StagedPendingBackend {
+    fn drop(&mut self) {
+        let Some(owner) = self.owner.upgrade() else {
+            return;
+        };
+        // A poisoned router remains unavailable. Only this handle's lease may
+        // be released; successful activation has already consumed it.
+        let Ok(mut state) = owner.write() else {
+            return;
+        };
+        if state.pending_lease.as_ref() == Some(&self.lease) {
+            state.pending_lease = None;
+        }
+    }
 }
 
 struct RouterState {
@@ -117,7 +134,7 @@ struct RouterState {
 
 pub struct KeyringSigningRouter {
     store: Arc<SqliteKeyLogStore>,
-    state: RwLock<RouterState>,
+    state: Arc<RwLock<RouterState>>,
     artifact_time_signer: Option<ArtifactTimeSigner>,
 }
 
@@ -201,12 +218,12 @@ impl KeyringSigningRouter {
         }
         Ok(Self {
             store,
-            state: RwLock::new(RouterState {
+            state: Arc::new(RwLock::new(RouterState {
                 active_key_id,
                 signing_epoch: durable.signing_epoch(),
                 active: active_backend,
                 pending_lease: None,
-            }),
+            })),
             artifact_time_signer,
         })
     }
@@ -257,6 +274,7 @@ impl KeyringSigningRouter {
         Ok(StagedPendingBackend {
             lease,
             backend: Some(backend),
+            owner: Arc::downgrade(&self.state),
         })
     }
 

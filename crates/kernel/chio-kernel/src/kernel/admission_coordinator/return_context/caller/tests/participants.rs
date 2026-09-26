@@ -148,6 +148,10 @@ fn frozen_participants_preserve_legacy_absence_without_upgrading_custody() -> Te
             .ok_or("caller object")?
             .remove("participant_custody");
         payload["schema"] = serde_json::json!(schema);
+        payload
+            .as_object_mut()
+            .ok_or("caller object")?
+            .remove("start_valid_until_unix_ms");
         if schema == LEGACY_SCHEMA {
             payload
                 .as_object_mut()

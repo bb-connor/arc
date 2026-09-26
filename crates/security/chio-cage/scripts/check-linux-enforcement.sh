@@ -60,7 +60,7 @@ else
 fi
 crate="$root/crates/security/chio-cage"
 
-for mode in $(seq 1 28); do
+for mode in $(seq 1 31); do
   if [[ "$mode" == 10 ]]; then
     continue
   fi
@@ -116,6 +116,9 @@ if [[ "${#dynamic_runtime_paths[@]}" -lt 2 ]]; then
 fi
 
 export CHIO_CAGE_TEST_SUCCESS="$probe_dir/probe-1"
+export CHIO_CAGE_TEST_PRLIMIT_SELF="$probe_dir/probe-29"
+export CHIO_CAGE_TEST_PRLIMIT_PEER="$probe_dir/probe-30"
+export CHIO_CAGE_TEST_TGKILL_PEER="$probe_dir/probe-31"
 export CHIO_CAGE_TEST_SOCKET="$probe_dir/probe-2"
 export CHIO_CAGE_TEST_LANDLOCK="$probe_dir/probe-3"
 export CHIO_CAGE_TEST_WAIT="$probe_dir/probe-4"
@@ -224,8 +227,8 @@ python3 -I "$inventory_checker" \
   --root "$root" \
   --run-output "$all_targets_output"
 all_targets_passed="$(passed_total "$all_targets_output")"
-if [[ "$all_targets_passed" -ne 70 ]]; then
-  echo "real-Linux all-target cage lane did not execute exactly 70 tests" >&2
+if [[ "$all_targets_passed" -ne 72 ]]; then
+  echo "real-Linux all-target cage lane did not execute exactly 72 tests" >&2
   exit 1
 fi
 
@@ -255,6 +258,7 @@ expected_probes=(
   independent_seccomp_filter_kills_forbidden_socket
   landlock_denies_ungranted_path_after_fd_based_target_exec
   seccomp_kills_forbidden_process_creation
+  seccomp_confines_resource_limits_and_signals_to_the_cage
   landlock_denies_file_creation_without_a_grant
   retained_target_survives_path_replacement
   retained_helper_survives_path_replacement_without_reopening

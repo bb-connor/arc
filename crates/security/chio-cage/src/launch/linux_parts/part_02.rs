@@ -459,10 +459,7 @@ fn socket_pair() -> Result<(OwnedFd, OwnedFd), CageLaunchError> {
     Ok((first, second))
 }
 
-fn receive_helper_pidfd(
-    socket: RawFd,
-    deadline: Instant,
-) -> Result<OwnedFd, CageLaunchError> {
+fn receive_helper_pidfd(socket: RawFd, deadline: Instant) -> Result<OwnedFd, CageLaunchError> {
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
@@ -489,9 +486,8 @@ fn receive_helper_pidfd(
                     "pidfd_receive_poll",
                 ));
             }
-            let (pidfd, extras) = receive_descriptors(socket).map_err(|fault| {
-                CageLaunchError::bootstrap_failed(fault.code, "pidfd_receive")
-            })?;
+            let (pidfd, extras) = receive_descriptors(socket)
+                .map_err(|fault| CageLaunchError::bootstrap_failed(fault.code, "pidfd_receive"))?;
             if !extras.is_empty() {
                 return Err(CageLaunchError::bootstrap_failed(
                     CageEnforcementFailureCode::DescriptorCountMismatch,
@@ -517,16 +513,13 @@ fn receive_helper_pidfd(
 }
 
 fn validate_helper_pidfd(pidfd: &OwnedFd, process_id: u32) -> Result<(), CageLaunchError> {
-    let fdinfo = std::fs::read_to_string(format!(
-        "/proc/self/fdinfo/{}",
-        pidfd.as_raw_fd()
-    ))
-    .map_err(|_| {
-        CageLaunchError::bootstrap_failed(
-            CageEnforcementFailureCode::HelperIdentityMismatch,
-            "pidfd_identity",
-        )
-    })?;
+    let fdinfo = std::fs::read_to_string(format!("/proc/self/fdinfo/{}", pidfd.as_raw_fd()))
+        .map_err(|_| {
+            CageLaunchError::bootstrap_failed(
+                CageEnforcementFailureCode::HelperIdentityMismatch,
+                "pidfd_identity",
+            )
+        })?;
     let observed_pid = fdinfo.lines().find_map(|line| {
         line.strip_prefix("Pid:")
             .and_then(|value| value.trim().parse::<i64>().ok())
@@ -1387,6 +1380,39 @@ mod tests {
     }
 
     #[test]
+    fn seccomp_rejects_peer_process_authority_in_every_profile() {
+        use chio_manifest::NativeSyscallProfile;
+        use chio_test_support::plain::TestResultOk;
+        for profile in [
+            NativeSyscallProfile::NativeMinimalV1,
+            NativeSyscallProfile::NativeStandardV1,
+            NativeSyscallProfile::BrokeredNativeV1,
+        ] {
+            let plan =
+                crate::build_seccomp_plan(SandboxArchitecture::X86_64, profile).test_unwrap();
+            assert!(seccomp_profile_is_fail_closed(&plan));
+            #[cfg(target_arch = "x86_64")]
+            compile_seccomp_filter(&plan).test_expect("self-only profile compiles");
+
+            let mut unconfined_limits = plan.clone();
+            unconfined_limits.argument_constraints.remove("prlimit64");
+            assert!(!seccomp_profile_is_fail_closed(&unconfined_limits));
+            for signal in ["kill", "tkill", "tgkill", "pidfd_send_signal"] {
+                let mut peer_signals = plan.clone();
+                peer_signals.allowed_syscalls.push(signal.to_string());
+                assert!(!seccomp_profile_is_fail_closed(&peer_signals));
+            }
+            let mut peer_limits = plan;
+            peer_limits
+                .argument_constraints
+                .get_mut("prlimit64")
+                .test_unwrap()[0]
+                .value = 1;
+            assert!(!seccomp_profile_is_fail_closed(&peer_limits));
+        }
+    }
+
+    #[test]
     fn architecture_syscall_tables_cover_reviewed_profiles() {
         for architecture in [SandboxArchitecture::X86_64, SandboxArchitecture::Aarch64] {
             for syscall in [
@@ -1412,7 +1438,10 @@ mod tests {
         );
         assert!(syscall_number(SandboxArchitecture::Aarch64, "readlink").is_none());
         for (name, number) in [("open", 2), ("stat", 4), ("lstat", 6)] {
-            assert_eq!(syscall_number(SandboxArchitecture::X86_64, name), Some(number));
+            assert_eq!(
+                syscall_number(SandboxArchitecture::X86_64, name),
+                Some(number)
+            );
             assert!(syscall_number(SandboxArchitecture::Aarch64, name).is_none());
         }
     }
