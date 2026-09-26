@@ -172,6 +172,8 @@ jobs:
           bash ./scripts/check-liability-roster-enforcement.sh
           bash ./scripts/tests/check-liability-roster-enforcement.test.sh
           bash ./scripts/check-no-eip3009-broadcast.sh
+          bash ./scripts/check-release-overflow.sh
+          bash ./scripts/tests/check-release-overflow.test.sh
 
       - name: Formal traceability gate
         run: bash scripts/check-mapping.sh

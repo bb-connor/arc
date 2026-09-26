@@ -177,6 +177,7 @@ members = [
     "crates/tooling/chio-reference-tools",
     "crates/tooling/chio-conformance/verdict_matrix/drivers/lambda",
     "crates/tooling/chio-release-evidence",
+    "crates/tooling/chio-profile-probe",
     "crates/sdk/chio-eval-receipt",
     "crates/tooling/chio-spec-codegen",
     "crates/tooling/chio-spec-validate",
@@ -314,16 +315,28 @@ rust_registry_public_crates = []
 unwrap_used = "deny"
 expect_used = "deny"
 
+# `overflow-checks` stays on in every profile that ships, for the same reason
+# `unwrap_used` is denied above: in a fail-closed security kernel a panic is an
+# availability fault, while a silent wrap is an authority grant. A `u64`
+# underflow in an exposure, budget or quota calculation does not produce a small
+# error, it produces the largest representable value, which a remaining-budget
+# comparison reads as unlimited authority. Leaving it at Cargo's release default
+# of `false` would also make the test suite structurally unable to find a
+# wrapping bug, because the wrap would only happen in a profile no test runs
+# under. `scripts/check-release-overflow.sh` is the check that does run under
+# it.
 [profile.release]
 codegen-units = 1
 lto = "fat"
 strip = "symbols"
 panic = "unwind"
+overflow-checks = true
 
 [profile.docker-release]
 inherits = "release"
 codegen-units = 16
 lto = "thin"
+overflow-checks = true
 
 # Dev/test debuginfo is disabled to keep `target/` from exploding. With ~130+
 # workspace members, the default `debug = 2` made a full `cargo test --workspace`
