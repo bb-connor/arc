@@ -23,6 +23,7 @@ fn response_plan_authorization_body_excludes_its_own_hash() {
         "approval_requirement",
         "created_at_unix_ms",
         "effects",
+        "execution",
         "expires_at_unix_ms",
         "operator_capability",
         "policy_hash",
