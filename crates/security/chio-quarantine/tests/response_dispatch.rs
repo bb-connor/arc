@@ -139,7 +139,10 @@ fn plan_with_execution(
     execution: Option<ResponseExecutionBinding>,
 ) -> ResponsePlan {
     let mut response_plan = plan(approval_requirement);
-    response_plan.execution = execution;
+    response_plan.execution = match execution {
+        None => chio_security_types::PlanProvenance::Legacy,
+        Some(binding) => chio_security_types::PlanProvenance::Bound(binding),
+    };
     let body = serde_json::to_value(response_plan.authorization_body())
         .unwrap_or_else(|error| panic!("authorization body: {error}"));
     let hash =

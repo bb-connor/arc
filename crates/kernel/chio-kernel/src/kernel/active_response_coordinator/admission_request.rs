@@ -1,6 +1,8 @@
 //! The immutable admission request envelope and the permits verification
 //! issues for it.
 
+use chio_security_types::FreshLiveAdmission;
+
 use super::{
     active_response_denied, ActiveResponseArtifactAuthorityAttestation,
     ActiveResponseAuthorizationRequest, AdmissionArtifactRef, AdmissionOperation,
@@ -11,7 +13,7 @@ use super::{
 /// Complete immutable envelope presented to the active-response admission seam.
 #[derive(Clone, Debug)]
 pub struct ActiveResponseAdmissionRequest {
-    response_plan: ResponsePlan,
+    response_plan: FreshLiveAdmission,
     authorization: ActiveResponseAuthorizationRequest,
     admission_artifact_ref: AdmissionArtifactRef,
     artifact_authority_attestation: ActiveResponseArtifactAuthorityAttestation,
@@ -21,14 +23,14 @@ pub struct ActiveResponseAdmissionRequest {
 
 impl ActiveResponseAdmissionRequest {
     pub fn new(
-        response_plan: ResponsePlan,
+        response_plan: FreshLiveAdmission,
         authorization: ActiveResponseAuthorizationRequest,
         admission_artifact_ref: AdmissionArtifactRef,
         artifact_authority_attestation: ActiveResponseArtifactAuthorityAttestation,
         threshold_proposal: Option<ThresholdApprovalProposal>,
         approval_tokens: Vec<GovernedApprovalToken>,
     ) -> Result<Self, KernelError> {
-        if response_plan.authorization_body() != *authorization.plan_body() {
+        if response_plan.plan().authorization_body() != *authorization.plan_body() {
             return Err(active_response_denied(
                 "full response plan does not reproduce the compact authorization body",
             ));
@@ -45,7 +47,7 @@ impl ActiveResponseAdmissionRequest {
 
     #[must_use]
     pub const fn response_plan(&self) -> &ResponsePlan {
-        &self.response_plan
+        self.response_plan.plan()
     }
 
     #[must_use]

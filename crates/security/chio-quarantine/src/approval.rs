@@ -687,7 +687,7 @@ mod tests {
 
     fn governed_plan() -> ResponsePlan {
         ResponsePlan {
-            execution: None,
+            execution: chio_security_types::PlanProvenance::Legacy,
             action_id: required!(ActionId::new("action-1")),
             trigger_finding_id: required!(RecordId::new("finding-1")),
             trigger_finding_hash: digest(1),

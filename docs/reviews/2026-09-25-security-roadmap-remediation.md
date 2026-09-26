@@ -43,6 +43,31 @@ not be substituted after migration. Rollback anchors read the previous global
 v1 format and write v2, which retains permanent export retirement. Restoring
 only an old database cannot remove that retirement.
 
+Legacy response plans are represented as `PlanProvenance::Legacy`; bound plans
+carry a validated execution binding. New kernel admission requires
+`FreshLiveAdmission`, which accepts only a bound live plan. The signed
+`authorization_body()` includes execution provenance, so stripping the binding
+changes the authorization hash. Legacy recovery remains enabled independently.
+
+Retiring that recovery requires a reconciled inventory across all authority
+stores, not a dispatch-table count or an elapsed retention horizon:
+
+- Governed admission operations and approval reservations already committed
+  before an executor dispatch row was written.
+- Executor dispatches, current response snapshots, and their effect or rollback
+  work, including automatic dispatches with no admission operation.
+- Retained prepared-dispatch bindings and admitted finding artifacts awaiting
+  commitment, cancellation, or an authenticated never-committed result.
+- Compensation journals, terminal receipt outboxes, fences, and cleanup work
+  owed by any of those records.
+
+Every inventoried obligation must be terminal with authenticated evidence or
+explicitly migrated with its original binding and recovery ownership. The
+crash-after-admission/before-dispatch case must complete owed recovery after
+migration and restart before retirement is accepted. This inventory has not yet
+been produced for an operator deployment, and no recovery-retirement switch is
+enabled by this change.
+
 Private non-native caller context v6 adds a frozen exclusive start deadline.
 Older contexts remain decodable for inspection and existing recovery checks;
 they cannot acquire new start authority by inferring missing credential

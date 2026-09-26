@@ -135,16 +135,60 @@ fn response_execution_binding_is_preserved_in_authorization() {
 }
 
 #[test]
+fn legacy_and_bound_provenance_preserve_the_signed_wire_shape() {
+    let fixture = valid_response_plan();
+    let mut encoded =
+        serde_json::to_value(&fixture).unwrap_or_else(|error| panic!("encode fixture: {error}"));
+    encoded
+        .as_object_mut()
+        .unwrap_or_else(|| panic!("plan is not an object"))
+        .remove("execution");
+    let absent: ResponsePlan = serde_json::from_value(encoded.clone())
+        .unwrap_or_else(|error| panic!("decode legacy: {error}"));
+    assert_eq!(
+        serde_json::to_value(&absent).unwrap_or_else(|error| panic!("encode legacy: {error}")),
+        encoded
+    );
+    encoded["execution"] = serde_json::Value::Null;
+    let null: ResponsePlan = serde_json::from_value(encoded)
+        .unwrap_or_else(|error| panic!("decode legacy null: {error}"));
+    assert_eq!(absent, null);
+    assert_eq!(absent.authorization_body(), null.authorization_body());
+    assert_eq!(
+        serde_json::to_value(absent.authorization_body())
+            .unwrap_or_else(|error| panic!("encode legacy body: {error}"))
+            .get("execution"),
+        None
+    );
+    for mode in ["live", "dry_run"] {
+        let mut bound =
+            serde_json::to_value(&absent).unwrap_or_else(|error| panic!("encode legacy: {error}"));
+        bound["execution"] = serde_json::json!({"schema_version": 1, "mode": mode});
+        let plan: ResponsePlan = serde_json::from_value(bound.clone())
+            .unwrap_or_else(|error| panic!("decode bound plan: {error}"));
+        assert_eq!(
+            serde_json::to_value(&plan).unwrap_or_else(|error| panic!("encode bound: {error}")),
+            bound
+        );
+        let body = serde_json::to_value(plan.authorization_body())
+            .unwrap_or_else(|error| panic!("encode bound body: {error}"));
+        assert_eq!(body["execution"], bound["execution"]);
+    }
+}
+
+#[test]
 fn live_execution_rules_name_the_binding_that_refused() {
     let mut plan = valid_response_plan();
-    plan.execution = None;
+    plan.execution = chio_security_types::PlanProvenance::Legacy;
     assert_eq!(
         plan.require_live_execution(),
         Err(DispatchRejection::LegacyPlanFreshDispatch)
     );
     assert_eq!(plan.require_live_or_legacy_execution(), Ok(()));
 
-    plan.execution = Some(ResponseExecutionBinding::new(ResponseExecutionMode::DryRun));
+    plan.execution = chio_security_types::PlanProvenance::Bound(ResponseExecutionBinding::new(
+        ResponseExecutionMode::DryRun,
+    ));
     let simulated = DispatchRejection::ExecutionMode {
         observed: ResponseExecutionMode::DryRun,
     };
@@ -152,7 +196,7 @@ fn live_execution_rules_name_the_binding_that_refused() {
     assert_eq!(plan.require_live_or_legacy_execution(), Err(simulated));
 
     let live = ResponseExecutionBinding::new(ResponseExecutionMode::Live);
-    plan.execution = Some(live);
+    plan.execution = chio_security_types::PlanProvenance::Bound(live);
     assert_eq!(plan.require_live_execution(), Ok(live));
     assert_eq!(plan.require_live_or_legacy_execution(), Ok(()));
 }
@@ -581,4 +625,31 @@ fn response_plan_rejects_zero_cryptographic_commitments() {
         zero_target.validate_shape(),
         Err(ResponseShapeError::InvalidTargetAffectedSetHash)
     );
+}
+
+#[test]
+fn fresh_live_admission_refuses_legacy_and_simulated_plans() {
+    use chio_security_types::{FreshLiveAdmission, PlanProvenance};
+    for (provenance, expected) in [
+        (
+            PlanProvenance::Legacy,
+            DispatchRejection::LegacyPlanFreshDispatch,
+        ),
+        (
+            PlanProvenance::Bound(ResponseExecutionBinding::new(ResponseExecutionMode::DryRun)),
+            DispatchRejection::ExecutionMode {
+                observed: ResponseExecutionMode::DryRun,
+            },
+        ),
+    ] {
+        let mut plan = valid_response_plan();
+        plan.execution = provenance;
+        assert_eq!(FreshLiveAdmission::new(plan).err(), Some(expected));
+    }
+    let mut plan = valid_response_plan();
+    plan.execution =
+        PlanProvenance::Bound(ResponseExecutionBinding::new(ResponseExecutionMode::Live));
+    let fresh = FreshLiveAdmission::new(plan.clone())
+        .unwrap_or_else(|error| panic!("live plan refused: {error}"));
+    assert_eq!(fresh.plan(), &plan);
 }

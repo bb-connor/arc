@@ -622,7 +622,7 @@ pub fn build_response_plan(input: ResponsePlanInput) -> Result<ResponsePlan, Sta
     }
     let effects = PlannedResponseEffects::new(effects).map_err(PlanDefect::EffectBound)?;
     let mut plan = ResponsePlan {
-        execution: Some(input.execution),
+        execution: chio_security_types::PlanProvenance::Bound(input.execution),
         action_id: input.action_id,
         trigger_finding_id: input.trigger_finding_id,
         trigger_finding_hash: input.trigger_finding_hash,

@@ -15,8 +15,8 @@ pub mod response_execution;
 
 pub use response_dispatch::DispatchRejection;
 pub use response_execution::{
-    ResponseExecutionBinding, ResponseExecutionBindingError, ResponseExecutionMode,
-    RESPONSE_EXECUTION_BINDING_SCHEMA_VERSION,
+    FreshLiveAdmission, PlanProvenance, ResponseExecutionBinding, ResponseExecutionBindingError,
+    ResponseExecutionMode, RESPONSE_EXECUTION_BINDING_SCHEMA_VERSION,
 };
 
 pub use deception::{

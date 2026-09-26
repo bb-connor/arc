@@ -99,3 +99,67 @@ impl fmt::Display for ResponseExecutionBindingError {
 }
 
 impl core::error::Error for ResponseExecutionBindingError {}
+
+/// Whether a retained plan predates execution-mode binding or commits to a mode.
+///
+/// Legacy is a recovery compatibility state, never fresh admission authority.
+/// Its wire form remains an absent (or decoded null) execution field. Bound
+/// provenance uses the original binding object without an additional enum tag.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PlanProvenance {
+    #[default]
+    Legacy,
+    Bound(ResponseExecutionBinding),
+}
+
+impl PlanProvenance {
+    #[must_use]
+    pub const fn is_legacy(&self) -> bool {
+        matches!(self, Self::Legacy)
+    }
+}
+
+impl Serialize for PlanProvenance {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Legacy => serializer.serialize_none(),
+            Self::Bound(binding) => binding.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for PlanProvenance {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        match Option::<ResponseExecutionBinding>::deserialize(deserializer)? {
+            None => Ok(Self::Legacy),
+            Some(binding) => Ok(Self::Bound(binding)),
+        }
+    }
+}
+
+/// An immutable plan whose signed provenance permits fresh live admission.
+/// This is not an approval or capability; the kernel still verifies all other
+/// authority inputs. It cannot be deserialized or constructed with a struct literal.
+///
+/// ```compile_fail
+/// use chio_security_types::{FreshLiveAdmission, ResponsePlan};
+/// fn bypass(plan: ResponsePlan) -> FreshLiveAdmission {
+///     FreshLiveAdmission { plan }
+/// }
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FreshLiveAdmission {
+    plan: crate::ResponsePlan,
+}
+
+impl FreshLiveAdmission {
+    pub fn new(plan: crate::ResponsePlan) -> Result<Self, crate::DispatchRejection> {
+        plan.require_live_execution()?;
+        Ok(Self { plan })
+    }
+
+    #[must_use]
+    pub const fn plan(&self) -> &crate::ResponsePlan {
+        &self.plan
+    }
+}

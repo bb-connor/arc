@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::response_dispatch::DispatchRejection;
 use crate::response_execution::{
-    ResponseExecutionBinding, ResponseExecutionBindingError, ResponseExecutionMode,
+    PlanProvenance, ResponseExecutionBinding, ResponseExecutionBindingError, ResponseExecutionMode,
 };
 
 pub const RESPONSE_STATE_SCHEMA_VERSION: u8 = 1;
@@ -200,8 +200,8 @@ pub struct ResponsePlanInput {
 #[serde(deny_unknown_fields)]
 pub struct ResponsePlan {
     /// Absent only in historical plans, which cannot authorize a fresh dispatch.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub execution: Option<ResponseExecutionBinding>,
+    #[serde(default, skip_serializing_if = "PlanProvenance::is_legacy")]
+    pub execution: PlanProvenance,
     pub action_id: ActionId,
     pub trigger_finding_id: RecordId,
     pub trigger_finding_hash: Digest32,
@@ -243,11 +243,13 @@ pub struct ResponsePlanAuthorizationEffect {
 /// The resulting body deliberately excludes `plan_hash` so the hash cannot
 /// become part of its own preimage. Every executable contribution remains
 /// bound by its validated canonical hash and derived effect identifier.
+/// `execution` is part of this signed commitment: stripping a dry-run binding
+/// to claim legacy provenance changes the body hash and invalidates authority.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResponsePlanAuthorizationBody {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub execution: Option<ResponseExecutionBinding>,
+    #[serde(default, skip_serializing_if = "PlanProvenance::is_legacy")]
+    pub execution: PlanProvenance,
     pub action_id: ActionId,
     pub trigger_finding_id: RecordId,
     pub trigger_finding_hash: Digest32,
@@ -271,9 +273,10 @@ impl ResponsePlan {
     /// The rule that admits a plan to fresh live execution: the plan carries a
     /// binding, the binding is readable, and its mode is live.
     pub fn require_live_execution(&self) -> Result<ResponseExecutionBinding, DispatchRejection> {
-        let binding = self
-            .execution
-            .ok_or(DispatchRejection::LegacyPlanFreshDispatch)?;
+        let binding = match self.execution {
+            PlanProvenance::Legacy => return Err(DispatchRejection::LegacyPlanFreshDispatch),
+            PlanProvenance::Bound(binding) => binding,
+        };
         if binding.mode() != ResponseExecutionMode::Live {
             return Err(DispatchRejection::ExecutionMode {
                 observed: binding.mode(),
@@ -287,9 +290,11 @@ impl ResponsePlan {
     /// historical and is tolerated here only; fresh admission refuses it.
     pub fn require_live_or_legacy_execution(&self) -> Result<(), DispatchRejection> {
         match self.execution {
-            None => Ok(()),
-            Some(binding) if binding.mode() == ResponseExecutionMode::Live => Ok(()),
-            Some(binding) => Err(DispatchRejection::ExecutionMode {
+            PlanProvenance::Legacy => Ok(()),
+            PlanProvenance::Bound(binding) if binding.mode() == ResponseExecutionMode::Live => {
+                Ok(())
+            }
+            PlanProvenance::Bound(binding) => Err(DispatchRejection::ExecutionMode {
                 observed: binding.mode(),
             }),
         }

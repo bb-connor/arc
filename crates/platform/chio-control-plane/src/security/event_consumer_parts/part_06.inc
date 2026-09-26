@@ -804,7 +804,8 @@
             )
             .unwrap_or_else(|error| panic!("sign real adapter attestation: {error}"));
         let native_request = chio_kernel::ActiveResponseAdmissionRequest::new(
-            response_plan.clone(),
+            chio_security_types::FreshLiveAdmission::new(response_plan.clone())
+                .unwrap_or_else(|error| panic!("real adapter fresh admission: {error}")),
             authorization,
             artifact_ref.clone(),
             authority_attestation.clone(),
