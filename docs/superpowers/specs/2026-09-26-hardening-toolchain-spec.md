@@ -126,13 +126,16 @@ construction, FFI-adjacent buffer handling, the decimal formatter in
 their proptest generators.
 
 **Classification task.** For each of the 22 crates, record: runs under Miri
-entirely; runs with named syscall tests ignored; excluded with a reason (only the
-OS-boundary modules of the cage should qualify). Commit the classification as the
-lane's crate list with a one-line reason per exclusion.
+entirely; runs with named tests ignored for one of the two reasons (a call into
+C, or a syscall Miri cannot execute), the reason named per test; or excluded
+because every test hits one of the two. Commit the classification as the lane's
+crate list with the reason per entry.
 
 **Acceptance.** The lane is green on the committed list; a deliberately
 introduced out-of-bounds read in a scratch test under one listed crate fails the
-lane; the exclusion list names a syscall for every excluded test.
+lane; every ignored or excluded test names one of the two reasons; every listed
+crate that contains `unsafe` names a test that executes an unsafe block under
+Miri, because a green list whose unsafe paths were all skipped proves nothing.
 
 ### H3. `#![forbid(unsafe_code)]` on every crate that has none
 
@@ -230,14 +233,16 @@ thing the standard's rule 2.5 forbids for closed wire and state-machine types.
   `test-group` with `max-threads = 1` scoped to those binaries, so isolation is
   per group rather than a global environment variable
 
-Process-per-test isolation is the point: any test that passes under `cargo test`
-and fails under nextest was depending on state left by a sibling test in the same
-process. Each such failure is a real finding about the test, occasionally about the
-code.
+Process-per-test isolation is the point. A test that passes under `cargo test`
+and fails under nextest is a lead, not yet a finding: it may depend on state a
+sibling left in the process, on environment or stdio the harness inherited
+differently, or on the harness's own timing, and each case is dispositioned
+individually before anything is called a defect.
 
-**Acceptance.** The workspace test step runs under nextest; every test that
-failed only under isolation has a recorded disposition; the flake census lane
-publishes its list.
+**Acceptance.** One additive lane runs the security crates under nextest
+alongside the existing `cargo test` lanes, replacing none of them; every test
+that failed only under isolation has a recorded disposition; replacing the
+`cargo test` lanes is a separately qualified change.
 
 ### H6. A Verus lane
 
@@ -283,10 +288,12 @@ tolerates because clones zeroize on drop. One, `FrostAuthenticatedDkgPackage` in
 for round 2 the field is the recipient's secret signing share, hex-encoded, signed
 by the transport key and not encrypted. No in-tree transport serializes it yet, so
 there is no live exposure; the type permits one. H7's first task is therefore not
-`secrecy` but sealing: encrypt round-2 package bytes to the recipient's transport
-key inside `authenticated_package`, or split the type so the plaintext round-2 form
-never implements `Serialize`, with a test asserting the share bytes are absent from
-the serialized output.
+`secrecy` but the type split that removes `Serialize` and `Deserialize` from the
+plaintext round-2 form, asserted at compile time, with the sealed envelope as the
+only serializable round-2 shape; sealing itself follows the
+[design note](2026-09-26-frost-round2-envelope-design.md) (X25519 sealing keys
+separate from the Ed25519 transport keys, one canonical metadata string,
+encrypt-then-sign, context check at opening, stateful acceptance).
 
 **Acceptance.** No secret-bearing struct derives `Debug` or `Serialize` on the
 secret field; `expose_secret()` call sites are the complete inventory of where
@@ -362,7 +369,10 @@ deduplication touches owned files and lands with Packet 7 or the owning lane.
 
 **Acceptance.** Every hand-written schema constant appears in the snapshot; the
 generated tests fail on a deliberate bump without a snapshot edit; the duplicate
-count is 0 or each remaining duplicate has a reason in the registry.
+count is 0 or each remaining duplicate has a reason in the registry. This
+acceptance covers identifiers only. The shape fixtures and old-reader tests that
+establish compatibility are accepted per schema by the owning lane and are not
+claimed by this item.
 
 ### H11. A dependency budget for privileged helpers
 
@@ -436,21 +446,29 @@ finds anything the example suite does not before extending it.
 
 ## Sequencing
 
-| Item | Depends on | Wave | Owner lane |
+The dispatch plan's Wave 2 table is the authoritative owner and dependency map;
+this table restates it for the hardening items and must not disagree with it.
+Lane K owns gates, configuration and measurement and writes no production
+source; every source remediation belongs to the crate's owning lane (G for the
+kernel, security types and keyring; S for the stores; J for the receipt store
+and boundary tests), from the list K measures. The follow-up review's F5 found
+the previous version of this table still assigning K source edits.
+
+| Item | Depends on | Wave | Owner |
 | --- | --- | --- | --- |
 | H0 lint-parity gate | nothing | 2, first | K |
-| delete the unreferenced `admission_cleanup/recovery_and_compensation.inc` (1,228 lines, found by Lane A) | a build confirming nothing needs it | 2 | K |
-| H10 schema snapshot and generated pins | nothing (additive) | 2, second | K |
-| H1 unsafe lints | the H1 measurement; the cage is owned by no Wave 1 lane; H0 for the mirror | 2 | K |
-| H3 `forbid` on 26 crates | nothing; disjoint from all lanes | 2 | K |
-| H5 nextest | nothing | 2, first, so later lanes' tests run isolated | K |
-| H2 Miri lane | H1 (comments) helpful, not required | 2 | K |
-| H6 FV-E5 runbook on Kani, then Verus lane | FV-E5 runbook completion | 2 (runbook), 3 (lane) | K |
-| H11 helper dependency budget | measuring `chio-cage-init` on the musl target; touches the cage crate, which no Wave 1 lane owns | 2 | K |
+| delete the unreferenced `admission_cleanup/recovery_and_compensation.inc` (1,228 lines, found by Lane A) | a build confirming nothing needs it | 2 | G |
+| H10 schema snapshot and generated pins | nothing (additive) | 2, second | K for the lock, the gate and the unpinned-constant report; shape fixtures and old-reader tests per schema: the schema's owning lane |
+| H1 unsafe lints | H0 for the mirror; K's measured list of blocks without a SAFETY comment | 2 | K measures and gates; comments and lint attributes: G, S, J for their crates |
+| H3 `forbid` on the crates with no `unsafe` | K's measured list | 2 | G, S, J for their crates; other crates with Packet 7 |
+| H5 nextest | nothing | 2, first | K: configuration and one additive lane; replacing `cargo test` lanes is a separately qualified change |
+| H2 Miri lane | the measured crate list | 2 | K: workflow, list and exclusion reasons; `cfg_attr(miri, ignore)` annotations: crate owners |
+| H6 FV-E5 runbook on Kani, then Verus lane | FV-E5 runbook completion | 2 (runbook), 3 (lane) | K for the runbook; the lane is a Wave 3 decision |
+| H11 helper dependency budget | measuring `chio-cage-init` on the musl target | 2 | K for the gate; any split of the helper crate: a Wave 3 lane |
 | H9 sanitizer audit | nothing | 2 | K |
-| H4 TCB deny set | B, C, D merged (touches their files) | 2, last in K | K |
-| H7 `secrecy` | inventory first; touches broker and keyring | 2 or 3 | K or D follow-on |
-| H8 semver and public API | the publishable set decision | 3 | K |
+| H4 TCB deny set | B, C, D merged; K's measured list | 2, after the owning lanes start | G, S, J for their crates, from K's list; K gates parity |
+| H7 FROST round-2 sealing | the [design note](2026-09-26-frost-round2-envelope-design.md) | 3 | a dedicated lane; the type split (step 1) may land earlier |
+| H8 semver and public API | the publishable set decision | 3 | K (gates only) |
 | DST scheduler | 4A clock port | 3 | new lane |
 | Hegel SDK pilot | nothing | 3 | new lane |
 

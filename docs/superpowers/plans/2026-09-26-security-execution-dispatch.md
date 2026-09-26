@@ -106,9 +106,11 @@ rule, `StateMachineError::InvalidDispatch(DispatchRejection)`, replacement of th
 112 `map_err(|_| ...)` discards in the quarantine crate and the kernel response
 coordinator (26 in `state_machine.rs` first), and registration of the five ad-hoc
 `chio-security-types` port codes. Then 1A to 1F together, while the binding has
-five call sites: private fields with `try_from`, `FreshLiveAdmission` and `CommittedResumeAuthority`
+five call sites: private fields with `try_from`, `FreshLiveAdmission` plus the two recovery authorities
+(`CommittedDispatchAuthority` with an automatic-or-governed approval, and
+`CommittedAdmissionAuthority` for a governed commitment before its dispatch row)
 replacing the five `require_execution_mode` sites and the inverse rule at
-`state_machine.rs:686-687` (two types, per the external review's R1),
+`state_machine.rs:686-687` (R1, then the follow-up review's F2),
 `PlanProvenance` with the obligation-inventory retirement (R2), the response
 domain constants imported from `chio-security-types`, and the strict
 canonicalization boundary enumeration. Then the parent packet's remaining tasks,
@@ -146,8 +148,8 @@ is the authoritative map; nothing in the parent plan is without an owner.
 | Lane | Owns (exclusively, for the wave) | Work, in order | Starts after |
 | --- | --- | --- | --- |
 | **M** parent Packet 4 | `fuzz/`, `formal/proof-manifest.toml`, `formal/rust-verification/`, `formal/apalache/`, the trace-validation surface | the `response_authority_protocol` and `response_lifecycle` fuzz harnesses with seeded corpora and recorded campaigns; production-linked Kani checks for the helpers 1A to 1C introduced; the response lifecycle model and trace validation; resolution of the temporal timeout in its owning lane | D merges |
-| **S** store owner | all of `chio-store-sqlite/src/` except `receipt_store/`; `chio-kernel/src/budget_store/` | Packet 8 `ExposureUnits`, then 9.3 `prepare_cached` on the paths C measured, then 9.4 connection strategy (which supersedes B's fencing where a store moves to the pool), then 10.3 classification, then 3A's store portion, then the H1/H3/H4 remediation for these crates | B, C merge |
-| **J** receipt-store owner and boundaries | `chio-store-sqlite/src/receipt_store/`, `chio-keyring/tests/`, `chio-secret-broker/src/process_boundary_tests/`, the process-cutpoint harness | Packet 3 retention liveness with #1045, then 10.4 chain-link bind and `CHECK`, then Packet 2 boundary proofs and 2A/2B (native cases on the CI runner); the cutpoint harness reruns against 9.4 before 9.4 is accepted | C merges; 2A/2B need the runner |
+| **S** store owner | all of `chio-store-sqlite/src/` except `receipt_store/`; `chio-kernel/src/budget_store/` | Packet 8 `ExposureUnits`, then 9.3 `prepare_cached` on the paths C measured, then 10.3 classification, then 3A's store portion, then the H1/H3/H4 remediation for these crates. 9.4 (connection strategy) is not in this candidate: it runs against the separately qualified successor, except a store whose 10.1 fence cannot be made safe, which is a fix here and is reported before it starts | B, C merge |
+| **J** receipt-store owner and boundaries | `chio-store-sqlite/src/receipt_store/`, `chio-keyring/tests/`, `chio-secret-broker/src/process_boundary_tests/`, the process-cutpoint harness | Packet 3 retention liveness with #1045, then 10.4 chain-link bind and `CHECK`, then Packet 2 boundary proofs and 2A/2B (native cases on the CI runner); the cutpoint harness reruns against any store S moves to the pool before that move is accepted | C merges; 2A/2B need the runner |
 | **G** kernel and security-types owner | `chio-security-types/src/`, `chio-kernel/src/` outside `budget_store/`, `chio-keyring/src/`, `chio-guards/src/external/cache.rs` | 4A clock port (one port, three traits migrated, gate on new `SystemTime::now`), then 10.2 `UntrustedJsonText` on 1F's enumeration, then 4B assertion conversion and H1/H3/H4 remediation for these crates | D merges |
 | **K** gates and configuration only | `scripts/`, `.github/workflows/`, `.config/`, `Cargo.toml` lint and profile tables, `formal/experiments/` | H0 parity gate (both lint tables), H10 snapshot and generated pins, H5 nextest configuration with per-group overrides, H9 sanitizer audit, H11 package dependency budget gate, H2 Miri lane configuration and crate list, FV-E5 runbook for H6; K writes no production source and hands the measured remediation lists to S, J and G | A merged (done) |
 

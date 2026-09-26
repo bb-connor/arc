@@ -101,7 +101,8 @@ value has private fields, no `Default`, no `From<Unverified>`, no `Deserialize`,
 exactly one constructor, which *is* the check. Accessors are read-only. The
 compiler then rejects the operation without the check.
 
-**Sketch: the five mode-check sites become two constructors, not one.** The first
+**Sketch: the five mode-check sites become three types, none of them constructible
+from a caller's assertion.** The first
 version of this sketch had a single `LiveAuthorizedPlan::authorize(plan,
 commit_mode)`. The external review's finding R1 showed why that is wrong: a caller
 supplying a resume mode obtained a token for a legacy plan with no durable proof,
@@ -139,41 +140,86 @@ impl FreshLiveAdmission {
     }
 }
 
-/// Authority to resume a committed dispatch. Constructible only inside the
-/// durable recovery verification, which binds the exact operation, plan hash,
-/// tenant, dispatch and executor generation it verified against the store.
-/// Resume paths accept this type; fresh admission cannot, by type. A caller
-/// cannot obtain one by choosing a commit mode.
+/// Approval evidence recovered with a committed dispatch, as durable readback
+/// found it. Automatic execution has no admission operation; governed execution
+/// binds the operation and approval set that authorized it.
 #[derive(Debug)]
-pub struct CommittedResumeAuthority {
-    operation_id: AdmissionOperationId,
-    plan_hash: Digest32,
-    tenant_id: TenantId,
-    dispatch_id: DispatchId,
-    executor_generation: NonZeroU64,
-    commit_mode: CommittedResumeMode,
+pub enum CommittedApproval {
+    Automatic,
+    Governed(ActiveResponseDispatchPermit),
 }
 
-impl CommittedResumeAuthority {
-    /// Module-private: only the recovery verification, in this module, calls it.
-    fn from_verified(verified: &VerifiedCommittedRecovery) -> Self {
+/// Authority to resume one exact dispatch the installed executor durably
+/// committed. Constructible only inside the recovery module, from the record
+/// it verified against the store: tenant, dispatch, plan body hash, executor
+/// identity and generation, commit mode, and the approval as recovered.
+#[derive(Debug)]
+pub struct CommittedDispatchAuthority {
+    tenant_id: TenantId,
+    dispatch_id: DispatchId,
+    plan_body_hash: Digest32,
+    executor_generation: NonZeroU64,
+    commit_mode: CommittedResumeMode,
+    approval: CommittedApproval,
+}
+
+impl CommittedDispatchAuthority {
+    /// Module-private: only the durable dispatch verification calls it.
+    fn from_verified(verified: &VerifiedCommittedDispatch) -> Self {
+        /* copy the bound identities out of the verified record */
+    }
+}
+
+/// Authority to resume a governed admission commitment that is durable but has
+/// no dispatch row: the crash landed after the admission commit and before the
+/// executor's commit. It authorizes no execution. It authorizes re-entering
+/// the ordinary live admission path with the committed operation bound, so a
+/// second admission cannot be minted for the same commitment.
+#[derive(Debug)]
+pub struct CommittedAdmissionAuthority {
+    tenant_id: TenantId,
+    operation_id: AdmissionOperationId,
+    operation_version: u64,
+    plan_body_hash: Digest32,
+    governed_intent_hash: Digest32,
+    approval_set_hash: Digest32,
+}
+
+impl CommittedAdmissionAuthority {
+    /// Module-private: only the governed commitment verification calls it.
+    fn from_verified(verified: &VerifiedCommittedAdmission) -> Self {
         /* copy the bound identities out of the verified record */
     }
 }
 ```
 
 `prepare_response_dispatch` for fresh dispatch and both kernel admission entry
-points take `FreshLiveAdmission`; the resume paths take `CommittedResumeAuthority`.
-`CommittedResumeAuthority` is declared beside `VerifiedCommittedRecovery` in the
-kernel's recovery module (`active_response_committed_recovery.rs`), because a
-module-private constructor is the only visibility that cannot be reached from
-another module; `pub(in path)` cannot cross the crate boundary from
-`chio-security-types`, where `FreshLiveAdmission` lives with the plan type. The
-inverse rule at `state_machine.rs:686-687` disappears because each type carries its
-own rule. A live path that forgets the check does not compile, and a caller
-cannot reach the resume rule by naming a mode. The negative tests include a legacy
-plan plus a caller-selected resume mode with no durable commitment, which must be
-rejected with its own variant.
+points take `FreshLiveAdmission`. The two recovery entry points map onto the two
+recovery authorities: `recover_committed_active_response`
+(`active_response_committed_recovery.rs:320`) verifies an exact executor-committed
+dispatch and yields `CommittedDispatchAuthority`, whose approval is `Automatic`
+where `validate_committed_governed_operation` (`:828`) finds no admission
+operation and `Governed(permit)` where it does; `reconstruct_pre_dispatch_active_response_admission`
+(`:164`) and `resume_dispatch_committed_active_response` verify a governed
+commitment with no executor commit and yield `CommittedAdmissionAuthority`, which
+re-enters the live admission path with the operation bound. Fresh admission
+accepts neither recovery type, by signature. Both recovery authorities are
+declared in the kernel's recovery module beside the verified records they are
+built from, with module-private constructors: `pub(in path)` cannot cross the
+crate boundary from `chio-security-types`, where `FreshLiveAdmission` lives with
+the plan type. The inverse rule at `state_machine.rs:686-687` disappears because
+each type carries its own rule. A live path that forgets the check does not
+compile, and a caller cannot reach a resume rule by naming a mode.
+
+The first correction of this sketch had one `CommittedResumeAuthority` with a
+mandatory `operation_id: AdmissionOperationId`. The follow-up review's finding F2
+showed that a universal resume token with a mandatory governed operation either
+strands automatic recovery, which has no admission operation, or invites an
+untyped exception; the approval enum and the second authority are that
+correction. The negative tests include: a legacy plan plus a caller-selected
+resume mode with no durable commitment, rejected with its own variant; an
+automatic committed dispatch resuming with no admission operation; a governed
+commitment with no dispatch row that cannot be executed as a dispatch.
 
 **Sketch: retrofitting a hollow `Verified*` type.** For a type that must cross the
 wire, the wire form is by definition unverified, so it gets a different name:

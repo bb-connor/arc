@@ -244,16 +244,24 @@ Addresses Q3. Land before the dry-run evaluator is wired, while the surface is s
 call sites (`state_machine.rs:118`, `:684`, `:1000`;
 `active_response_coordinator.rs:269`, `:281`).
 
-- [ ] Introduce `FreshLiveAdmission`, whose only constructor requires provenance
-      bound to the live mode, and `CommittedResumeAuthority`, constructible only
-      inside the durable recovery verification and binding the exact operation,
-      plan hash, tenant, dispatch and executor generation it verified. A single
-      token parameterized by a caller-supplied commit mode is rejected by the
-      external review's finding R1: it let a caller obtain authority for a legacy
-      plan by naming a resume mode.
+- [ ] Introduce three types. `FreshLiveAdmission`, whose only constructor
+      requires provenance bound to the live mode. `CommittedDispatchAuthority`,
+      constructible only inside the durable recovery verification for an exact
+      executor-committed dispatch, binding tenant, dispatch, plan body hash,
+      executor generation and commit mode, and carrying the recovered approval as
+      an enum (`Automatic`, or `Governed` with the dispatch permit). And
+      `CommittedAdmissionAuthority`, constructible only from a verified governed
+      admission commitment that has no dispatch row yet, which re-enters live
+      admission with the operation bound rather than authorizing execution. A
+      single token parameterized by a caller-supplied commit mode was rejected by
+      the external review's R1; a single resume token with a mandatory governed
+      operation identifier was rejected by the follow-up review's F2, because
+      automatic execution has no admission operation.
 - [ ] Fresh dispatch and both kernel admission entry points accept
-      `FreshLiveAdmission` only; resume paths accept `CommittedResumeAuthority`
-      only. Fresh admission must not accept the resume type, as a compile error.
+      `FreshLiveAdmission` only; the committed-dispatch resume path accepts
+      `CommittedDispatchAuthority` only; the pre-dispatch governed resume accepts
+      `CommittedAdmissionAuthority` only. Fresh admission must not accept either
+      recovery type, as a compile error.
       Remove the duplicated inverse condition at `state_machine.rs:686-687`; each
       type carries its own rule exactly once.
 - [ ] Confirm by construction that no live path accepts a bare `ResponsePlan`.
@@ -262,7 +270,10 @@ call sites (`state_machine.rs:118`, `:684`, `:1000`;
 - [ ] Negative tests, each asserting its `DispatchRejection` variant: a `DryRun`
       plan at every fresh entry point; a legacy plan at every fresh entry point; a
       legacy plan plus a caller-selected resume mode with no durable commitment;
-      and a simulated plan that cannot populate recoverable live dispatch work.
+      an automatic committed dispatch that resumes with no admission operation;
+      a governed commitment with no dispatch row that cannot be executed as a
+      dispatch; and a simulated plan that cannot populate recoverable live
+      dispatch work.
 - [ ] Record in the module docs that signature coverage of `execution` via
       `authorization_body()` is what blocks strip-to-legacy laundering, so a future
       change to the signed body does not silently remove that property.
@@ -636,7 +647,17 @@ before-and-after number (standard rule 13.9).
 - [ ] Do not convert all 420 sites on faith. Convert the paths 9.1 shows on the
       authorization critical path and record the delta.
 
-#### 9.4 Connection strategy (P4)
+#### 9.4 Connection strategy (P4) - NOT IN THIS CANDIDATE
+
+Moved to the separately qualified successor candidate (Wave 3, with Packet 7),
+per the follow-up review's F5: the review response promised to defer broad
+connection migrations, and a migration of 18 stores before the freeze would
+have contradicted that. The one exception is a store whose phase-aware fence
+(10.1) cannot be made safe from its existing anchor code; moving that store to
+the pooled shape is then a fix inside this candidate, reported before it starts
+so the cutpoint harness rerun can be scheduled. The items below describe the
+successor's work.
+
 
 - [ ] Replace `Arc<Mutex<Connection>>` with a WAL-mode read pool plus a single
       writer in the 18 stores that carry it (pass 7 census), not only the four

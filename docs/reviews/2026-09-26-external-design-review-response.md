@@ -19,7 +19,7 @@ design could not see past it.
 
 | Finding | Severity | Accepted | What was wrong | Correction landed in |
 | --- | --- | --- | --- | --- |
-| R1 `LiveAuthorizedPlan` lets the caller choose the recovery exception | P1 | yes | one token, constructed from a caller-supplied `commit_mode`, served both fresh admission and resume; a legacy plan plus a caller-selected resume mode obtained authority with no durable proof | design mechanism A now specifies two types; addendum 1B rewritten; Lane D redirected before reaching 1B |
+| R1 `LiveAuthorizedPlan` lets the caller choose the recovery exception | P1 | yes | one token, constructed from a caller-supplied `commit_mode`, served both fresh admission and resume; a legacy plan plus a caller-selected resume mode obtained authority with no durable proof | design mechanism A now specifies three types (fresh admission; committed dispatch with automatic or governed approval; committed admission before a dispatch row, the last two added by the follow-up review's F2); addendum 1B rewritten; Lane D redirected before reaching 1B |
 | R2 legacy retirement can strand irreversible commitments | P1 | yes | "zero dispatch rows or lease horizon" ignores the crash after admission commitment and before a dispatch row exists, which the kernel explicitly recovers (`active_response_committed_recovery.rs:365`, `:509`) | addendum 1C rewritten: stop new legacy admissions separately; retire reconciliation only after an obligations inventory is terminal; Lane D redirected |
 | R3 blanket SQLite poison recovery premise is false | P1 | yes | `Transaction::drop` discards the rollback result; the probe shows `into_inner()` returning a connection still inside a transaction with the uncommitted row readable; every one of the 18 stores pairs commits with external anchors or filesystem state (`fiscal_store.rs:338` commits before its anchor sync) | standard 14.1 rewritten; addendum 10.1 rewritten as phase-aware recovery with fencing; Lane B held and redirected mid-conversion |
 | R4 tenant isolation confuses content addressing with authorization | P1 | yes | a domain hash is computable from its inputs and identifiers appear in receipts and logs; "unguessable derivation" is not an authorization boundary | standard 14.6 and 14.7 rewritten; addendum 10.3 rewritten; every isolation test gives tenant B tenant A's exact valid identifier and requires denial |
@@ -68,7 +68,8 @@ A correction never substitutes for the requirement it amends.
 | Parent Packet 5, delivery blockers | operator authority, tracked separately | ongoing |
 | Parent Packet 6, freeze, qualify, independent review | orchestrator plus independent reviewer | after the last source-changing lane |
 | Packet 0 gates | Lane A | merged (0.1, 0.3, 0.4, 0.5); 0.2 held for B |
-| Packet 8 `ExposureUnits`; 9.3 `prepare_cached`; 9.4 connection strategy | Lane S (single store owner) | Wave 2, in that order |
+| Packet 8 `ExposureUnits`; 9.3 `prepare_cached` | Lane S (single store owner) | Wave 2, in that order |
+| 9.4 connection strategy | successor candidate (Wave 3, with Packet 7); a store whose 10.1 fence cannot be made safe is the one in-candidate exception | deferred per the follow-up review's F5 |
 | Packet 9.1, 9.2 (revised) | Lane C | in progress |
 | Packet 10.1 (revised, phase-aware) | Lane B | in progress, redirected |
 | Packet 10.2 `UntrustedJsonText` | Lane G | Wave 2 after 1F |

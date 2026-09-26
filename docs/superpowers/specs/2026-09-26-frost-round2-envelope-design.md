@@ -163,37 +163,71 @@ signature, and there is no second serialization to keep in step.
 Binding therefore holds as follows. A package sealed for participant B cannot
 be opened by A: A lacks B's sealing private key. A package for B cannot be
 re-labelled as being for C: `recipient_participant_id` and
-`recipient_sealing_key_id` are in the associated data and the signature. A
-package from ceremony X cannot be replayed into ceremony Y, epoch, or roster:
-`ceremony_id`, `key_epoch` and `participant_set_digest` are bound the same way.
+`recipient_sealing_key_id` are in the associated data and the signature. Binding alone does not stop an unmodified envelope from ceremony X being
+presented to a participant running ceremony Y with the same keys: its metadata
+authenticates, because nothing in it changed. What stops that is the opening
+boundary comparing `ceremony_id`, `key_epoch`, `participant_set_digest`, round
+and recipient against the validated context of the ceremony the recipient is
+actually running, as `validate_package` (`frost_ceremony.rs:784`) already does
+for the current type. Authentication proves the metadata is the sender's; the
+comparison proves it is this ceremony's. The follow-up review's F1 is the reason
+this paragraph says so explicitly.
 The plaintext `package_digest` of the current type is dropped from the sealed
 form; a digest of the share is not needed for binding once the ciphertext is
 signed, and it would otherwise be a stable identifier for a secret.
 
-### Replay within a ceremony
+### Replay: stateful acceptance, not transcript uniqueness
 
 Binding does not stop the same valid sealed package being delivered twice, or a
 sender delivering two different valid packages to one recipient in one round.
-The transcript verifier already rejects a round-1 package whose sender is not
-in the roster; it must also reject, for round 2, a second package for the same
-`(ceremony_id, key_epoch, sender_participant_id, recipient_participant_id)`.
-Whether it does today is a fact to read from
-`verify_frost_ceremony_transcript`, not to assume; the lane records which and
-adds the check if it is missing. The first accepted package wins and a second
-one is a ceremony failure, not a silent replacement, because a participant who
-can substitute a share after the fact can choose the recipient's long-term key.
+Today's `validate_round2_transcript` (`frost_ceremony.rs:723`) allocates a fresh
+set per invocation, so it detects duplicate sender and recipient pairs inside one
+supplied transcript and nothing across calls or restarts; ceremony identifiers
+are deterministic from the configuration (`:490`), so a retried configuration
+reuses them. The follow-up review's F4 asked which of the two properties is
+meant. It is stateful acceptance, owned by the ceremony store:
+
+- **Owner.** `chio-store-sqlite/src/frost_store/ceremony.rs`, which already
+  persists the ceremony's encrypted secrets and its round transitions. An
+  accepted round-2 package is a row keyed by `(ceremony_id, key_epoch, round,
+  sender_participant_id, recipient_participant_id)` carrying the digest of the
+  sealed envelope's canonical bytes and the time of acceptance.
+- **Atomic acceptance.** Opening and acceptance are one operation: the store
+  inserts the acceptance row and persists the opened share (encrypted, as it
+  persists the other ceremony secrets) in the same transaction, or neither.
+  A second delivery with an equal envelope digest is idempotent: accepted,
+  nothing written. A second delivery with a different digest is a ceremony
+  failure recorded durably against that ceremony, because a participant who can
+  substitute a share after the fact can choose the recipient's long-term key.
+- **Restart.** The rows are durable, so the same rule holds after a process
+  restart and across separate `open` calls; the in-memory transcript check stays
+  as the cheap first line and is not the mechanism.
+- **Retry policy.** A ceremony that failed is abandoned durably and terminally
+  under its identifier; the store refuses further packages for it. A retry is a
+  new ceremony, which means a new `key_epoch` (or whatever configuration field
+  feeds `ceremony_id`); reusing a failed ceremony's configuration is refused at
+  `begin_ceremony`, not silently accepted as a continuation.
+- **Tests.** Replay across two `open` calls; replay across a store close and
+  reopen; a differing second package failing the ceremony durably; a retry with
+  the same configuration refused; a retry with a new epoch accepted.
 
 ### Opening
 
-`open` runs in this order and stops at the first failure with a distinct error
-variant for each step: schema and suite recognized; sender in roster and
+`open` takes the sealed value and the recipient's validated ceremony context
+(the same `ValidatedCeremony` the current code builds from its configuration),
+and runs in this order, stopping at the first failure with a distinct error
+variant for each step: schema and suite recognized; the envelope's
+`ceremony_id`, `key_epoch`, `participant_set_digest` and round equal the
+context's, `recipient_participant_id` is the local participant and
+`recipient_sealing_key_id` matches the local sealing key (the context check,
+before any cryptography, so a foreign ceremony's envelope is refused without
+being attributed or decrypted); sender in the context's roster and
 `transport_key_id` matches the roster; signature verifies over the canonical
-metadata plus ciphertext; `recipient_participant_id` is the local participant
-and `recipient_sealing_key_id` matches the local sealing key; X25519 with the
-local sealing private key, HKDF, AEAD open with the canonical metadata as
-associated data; plaintext decodes as a `round2::Package`. The plaintext is
-`Zeroizing` from the AEAD output onward. Error variants name the step and never
-carry key or plaintext material.
+metadata plus ciphertext; X25519 with the local sealing private key, HKDF, AEAD
+open with the canonical metadata as associated data; plaintext decodes as a
+`round2::Package`; the acceptance row is written with the share, as above. The
+plaintext is `Zeroizing` from the AEAD output onward. Error variants name the
+step and never carry key or plaintext material.
 
 ## Tests the lane must land
 
@@ -202,18 +236,27 @@ three-of-five roster; the recorded test vectors (roster, ephemeral key, share,
 sealed bytes) pin the suite so an implementation change that alters the bytes
 is a deliberate schema bump.
 
-Negative, each asserting its variant: wrong recipient sealing key; metadata
+Negative, each asserting its variant: an unmodified valid envelope presented to
+a participant running a different ceremony, a different epoch, and a different
+roster, each in turn, refused by the context check before decryption (this is a
+different test from mutating authenticated bytes, and both are required); wrong
+recipient sealing key; metadata
 field altered after sealing (each field in turn, driven by a loop over the
 canonical fields so a new field is covered automatically); recipient
 re-labelled with a fresh signature from the real sender; ciphertext truncated
 or extended by one byte; signature from a sender not in the roster; sender's
-`transport_key_id` not matching the roster; replay of an accepted package;
-second distinct package from the same sender for the same recipient and round;
+`transport_key_id` not matching the roster; replay of an accepted package within one process and across a store reopen;
+second distinct package from the same sender for the same recipient and round,
+failing the ceremony durably; a retry with the same configuration refused;
 schema or suite string unknown.
 
-Leakage: serializing a round-2 transition, and every enclosing type that can
-contain one, yields bytes with no share, no ephemeral private key, and no
-derived key; `Debug` of every type in the module prints no such material.
+Leakage: `FrostRound2Transition` and the plaintext round-2 package carry secret
+state and implement neither `Serialize` nor `Deserialize`, asserted at compile
+time (`static_assertions::assert_not_impl_any!`), so the test does not serialize
+them and no serialization is added to make such a test possible. What is
+serialized and inspected is the public sealed envelope: its bytes contain no
+share, no ephemeral private key and no derived key. `Debug` of every type in the
+module prints no such material.
 
 Zeroization: the ephemeral private key, the shared secret, the derived key and
 the opened plaintext are `Zeroizing`; a test using a drop-observing wrapper

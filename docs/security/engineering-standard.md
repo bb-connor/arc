@@ -124,9 +124,10 @@ retrofits them.
 
 **2.3 Use typestate when it removes a whole class of omission.** When a security
 check must precede an operation, make the check produce a token the operation
-requires. Fresh dispatch should accept `FreshLiveAdmission`, and resume should accept
-`CommittedResumeAuthority` constructed only by the durable recovery verification,
-not `ResponsePlan` plus a remembered call to `require_execution_mode` (finding Q3).
+requires. Fresh dispatch should accept `FreshLiveAdmission`, and resume should accept a
+recovery authority constructed only by the durable recovery verification (one
+for an exact executor-committed dispatch, automatic or governed; one for a
+governed commitment with no dispatch row), not `ResponsePlan` plus a remembered call to `require_execution_mode` (finding Q3).
 Five hand-placed call sites is five chances to forget and no compiler help on the
 sixth. The token must also not be obtainable by the caller asserting its own
 provenance: one type parameterized by a caller-supplied commit mode fails this
