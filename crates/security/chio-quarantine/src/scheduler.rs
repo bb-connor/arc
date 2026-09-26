@@ -1,5 +1,5 @@
 use crate::executor::{ExecutorError, ResponseExecutor};
-use crate::state_machine::decode_response_record;
+use crate::state_machine::{decode_response_record, CanonicalFailure, StateMachineError};
 use chio_core_types::{canonical_json_bytes, sha256};
 use chio_security_types::ports::{
     ActionId, AlertDeliveryStatus, EffectId, EffectPort, ErrorCode, LeaseOwnerId,
@@ -228,7 +228,7 @@ impl<
             );
         };
         let current_snapshot =
-            decode_response_record(&current).map_err(|_| SchedulerError::InvalidExecutionRecord)?;
+            decode_response_record(&current).map_err(SchedulerError::InvalidExecutionRecord)?;
         let installed_lineage_fences = installed_lineage_fence_effect_ids(&current_snapshot);
         if !installed_lineage_fences.is_empty() {
             match self.maintain_lineage_fences(
@@ -251,7 +251,7 @@ impl<
         match self.executor.execute_scheduled(&current, work, now_unix_ms) {
             Ok(record) => {
                 let snapshot = decode_response_record(&record)
-                    .map_err(|_| SchedulerError::InvalidExecutionRecord)?;
+                    .map_err(SchedulerError::InvalidExecutionRecord)?;
                 if record.tenant_id != current.tenant_id
                     || record.action_id != current.action_id
                     || record.generation < current.generation
@@ -259,10 +259,10 @@ impl<
                     || snapshot.plan.action_id != work.action_id
                     || snapshot.plan.plan_hash != current_snapshot.plan.plan_hash
                 {
-                    return Err(SchedulerError::InvalidExecutionRecord);
+                    return Err(SchedulerError::ExecutionRecordMismatch);
                 }
                 if self.store.load_plan(&key)?.as_ref() != Some(&record) {
-                    return Err(SchedulerError::InvalidExecutionRecord);
+                    return Err(SchedulerError::ExecutionRecordNotDurable);
                 }
                 match snapshot.state {
                     ResponseState::Active
@@ -313,9 +313,9 @@ impl<
                 tenant_id: work.tenant_id.clone(),
                 action_id: work.action_id.clone(),
             })?
-            .ok_or(SchedulerError::InvalidExecutionRecord)?;
+            .ok_or(SchedulerError::MissingExecutionRecord)?;
         let snapshot =
-            decode_response_record(&current).map_err(|_| SchedulerError::InvalidExecutionRecord)?;
+            decode_response_record(&current).map_err(SchedulerError::InvalidExecutionRecord)?;
         if snapshot.state.is_terminal() {
             return Err(SchedulerError::WorkNotActive);
         }
@@ -609,10 +609,12 @@ fn scheduler_health_id(
     commitment: &SchedulerHealthEventCommitment<'_>,
     prefix: &str,
 ) -> Result<RecordId, SchedulerError> {
-    let canonical = canonical_json_bytes(commitment).map_err(|_| SchedulerError::Canonical)?;
+    let canonical = canonical_json_bytes(commitment).map_err(CanonicalFailure::Encoding)?;
     let digest = scheduler_health_hash(SCHEDULER_HEALTH_EVENT_ID_DOMAIN, &canonical);
-    RecordId::new(format!("{prefix}{}", hex_bytes(digest.as_bytes())))
-        .map_err(|_| SchedulerError::Canonical)
+    Ok(
+        RecordId::new(format!("{prefix}{}", hex_bytes(digest.as_bytes())))
+            .map_err(CanonicalFailure::Identifier)?,
+    )
 }
 
 fn scheduler_health_page_request(
@@ -655,7 +657,7 @@ fn scheduler_health_page_request(
             idempotency_key,
             occurred_at_unix_ms: retry.first_failure_at_unix_ms,
             alert_type: RecordId::new("response_scheduler_unavailable")
-                .map_err(|_| SchedulerError::Canonical)?,
+                .map_err(CanonicalFailure::Identifier)?,
             finding_id_hash: event_hash,
             action_id_hash: Some(action_hash),
             evidence_hash: scheduler_health_hash(
@@ -697,20 +699,20 @@ fn scheduler_transition_id<T: Serialize>(
         fencing_token: work.fencing_token,
         body,
     })
-    .map_err(|_| SchedulerError::Canonical)?;
+    .map_err(CanonicalFailure::Encoding)?;
     let mut input = Vec::with_capacity(SCHEDULER_TRANSITION_ID_DOMAIN.len() + canonical.len());
     input.extend_from_slice(SCHEDULER_TRANSITION_ID_DOMAIN);
     input.extend_from_slice(&canonical);
     let digest = sha256(&input);
-    RecordId::new(format!(
+    Ok(RecordId::new(format!(
         "response_scheduler_{}",
         hex_bytes(digest.as_bytes())
     ))
-    .map_err(|_| SchedulerError::Canonical)
+    .map_err(CanonicalFailure::Identifier)?)
 }
 
 fn error_code(value: &str) -> Result<ErrorCode, SchedulerError> {
-    ErrorCode::new(value).map_err(|_| SchedulerError::Canonical)
+    Ok(ErrorCode::new(value).map_err(CanonicalFailure::Identifier)?)
 }
 
 fn executor_error_code(error: &ExecutorError) -> Result<ErrorCode, SchedulerError> {
@@ -722,12 +724,20 @@ fn executor_error_code(error: &ExecutorError) -> Result<ErrorCode, SchedulerErro
         | ExecutorError::Store(error) => Ok(error.code().clone()),
         ExecutorError::ApprovalRequired => error_code("response.approval_required"),
         ExecutorError::AttemptOverflow => error_code("response.attempt_overflow"),
-        ExecutorError::Canonical => error_code("response.executor_canonical"),
+        ExecutorError::Canonical(_) => error_code("response.executor_canonical"),
         ExecutorError::EffectOutcomeUnknown => error_code("response.effect_outcome_unknown"),
         ExecutorError::GenerationOverflow => error_code("response.generation_overflow"),
+        ExecutorError::GenerationWidth(_) => error_code("response.generation_width"),
         ExecutorError::InvalidEffectResult => error_code("response.effect_result_invalid"),
         ExecutorError::InvalidEffectJournal => error_code("response.effect_journal_invalid"),
+        ExecutorError::EffectJournalDecode(_) => error_code("response.effect_journal_decode"),
+        ExecutorError::EffectJournalEncoding(_) => error_code("response.effect_journal_encoding"),
         ExecutorError::InvalidActiveEvidence => error_code("response.active_evidence_invalid"),
+        ExecutorError::ActiveEvidenceMutationBound(_) => {
+            error_code("response.active_evidence_mutation_bound")
+        }
+        ExecutorError::ActiveEvidenceEncoding(_) => error_code("response.active_evidence_encoding"),
+        ExecutorError::ActiveEvidenceBinding(_) => error_code("response.active_evidence_binding"),
         ExecutorError::ReceiptLineageMismatch => error_code("response.receipt_lineage_mismatch"),
         ExecutorError::StaleLease => error_code("response.scheduler_lease_stale"),
         ExecutorError::StateMachine(_) => error_code("response.state_machine_error"),
@@ -747,16 +757,22 @@ fn hex_bytes(bytes: &[u8]) -> String {
 
 #[derive(Debug, Error)]
 pub enum SchedulerError {
-    #[error("response scheduler canonicalization failed")]
-    Canonical,
+    #[error("response scheduler canonicalization failed: {0}")]
+    Canonical(#[from] CanonicalFailure),
     #[error("response scheduler clock moved backwards")]
     ClockRollback,
     #[error("response scheduler clock state is unavailable")]
     ClockStateUnavailable,
     #[error("response scheduler returned an invalid claim")]
     InvalidClaim,
-    #[error("response scheduler execution record is invalid")]
-    InvalidExecutionRecord,
+    #[error("response scheduler execution record does not decode")]
+    InvalidExecutionRecord(#[source] StateMachineError),
+    #[error("response scheduler execution record is missing")]
+    MissingExecutionRecord,
+    #[error("executed record does not continue the scheduled response")]
+    ExecutionRecordMismatch,
+    #[error("executed record is not the durable record")]
+    ExecutionRecordNotDurable,
     #[error("response scheduler retry state is invalid")]
     InvalidRetryState,
     #[error("response scheduler policy is invalid")]

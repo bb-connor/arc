@@ -152,7 +152,7 @@ impl TemporalRule {
             return Err(RuleError::InvalidPartialBound);
         }
         let stage_count =
-            u64::try_from(document.stages.len()).map_err(|_| RuleError::StateEstimateOverflow)?;
+            u64::try_from(document.stages.len()).map_err(RuleError::StageCountWidth)?;
         let state_estimate = u64::from(document.max_groups)
             .checked_mul(u64::from(document.max_partial_matches_per_group))
             .and_then(|value| value.checked_mul(stage_count))
@@ -196,7 +196,7 @@ impl TemporalRule {
             });
         }
 
-        let canonical = canonical_json_bytes(&document).map_err(|_| RuleError::Canonicalize)?;
+        let canonical = canonical_json_bytes(&document).map_err(RuleError::Canonicalize)?;
         let mut hash_input = Vec::with_capacity(RULE_HASH_DOMAIN.len() + canonical.len());
         hash_input.extend_from_slice(RULE_HASH_DOMAIN);
         hash_input.extend_from_slice(&canonical);
@@ -210,7 +210,7 @@ impl TemporalRule {
     }
 
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, RuleError> {
-        canonical_json_bytes(&self.document).map_err(|_| RuleError::Canonicalize)
+        canonical_json_bytes(&self.document).map_err(RuleError::Canonicalize)
     }
 
     #[must_use]
@@ -261,8 +261,8 @@ impl TemporalRule {
 
 #[derive(Debug, Error)]
 pub enum RuleError {
-    #[error("rule canonicalization failed")]
-    Canonicalize,
+    #[error("rule canonicalization failed: {0}")]
+    Canonicalize(#[source] chio_core_types::Error),
     #[error("rule contains duplicate stage names")]
     DuplicateStage,
     #[error("rule has no stages")]
@@ -289,6 +289,8 @@ pub enum RuleError {
     StateEstimateExceeded,
     #[error("rule state estimate overflowed")]
     StateEstimateOverflow,
+    #[error("rule stage count does not fit the estimate width")]
+    StageCountWidth(#[source] core::num::TryFromIntError),
     #[error("rule exceeds the stage limit")]
     TooManyStages,
 }

@@ -9,10 +9,12 @@ use chio_security_types::ports::{
 use chio_security_types::{ResponseApprovalRequirement, ResponsePlan};
 use thiserror::Error;
 
+use crate::state_machine::CanonicalFailure;
+
 const OPAQUE_APPROVAL_ADMISSION_ARTIFACT_DIGEST_DOMAIN: &[u8] =
     b"chio.security.opaque-approval-admission-artifact.v1\0";
 
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[derive(Debug, Error)]
 pub enum ApprovalCoordinatorError {
     #[error("automatic response plans cannot traverse governed approval")]
     AutomaticPlan,
@@ -20,16 +22,33 @@ pub enum ApprovalCoordinatorError {
     InvalidPlan,
     #[error("governed approval request does not match the response plan")]
     InvalidRequest,
-    #[error("opaque admission artifact is malformed or rebound")]
-    InvalidAdmissionArtifact,
+    #[error("opaque admission artifact is malformed or rebound: {0}")]
+    InvalidAdmissionArtifact(#[from] AdmissionArtifactDefect),
     #[error("governed approval reservation is malformed or rebound")]
     InvalidReservation,
     #[error("response approval is not live")]
     Expired,
     #[error("trusted approval authority failed closed: {0}")]
     Authority(PortError),
-    #[error("canonical approval descriptor construction failed")]
-    Canonical,
+    #[error("canonical approval descriptor construction failed: {0}")]
+    Canonical(#[from] CanonicalFailure),
+}
+
+/// The rule an opaque admission artifact failed. One variant per rule.
+#[derive(Debug, Error)]
+pub enum AdmissionArtifactDefect {
+    #[error("artifact schema version is not the supported version")]
+    UnsupportedSchemaVersion,
+    #[error("artifact digest is zero")]
+    ZeroArtifactDigest,
+    #[error("artifact canonical digest is zero")]
+    ZeroCanonicalDigest,
+    #[error("artifact body could not be canonically encoded")]
+    Encoding(#[source] chio_core_types::Error),
+    #[error("artifact canonical body is not the canonical encoding of its body")]
+    BodyNotCanonical,
+    #[error("artifact canonical digest does not match its body")]
+    DigestMismatch,
 }
 
 /// Build the only portable representation of native active-response admission
@@ -45,17 +64,16 @@ pub fn opaque_admission_artifact(
     artifact_digest: Digest32,
 ) -> Result<OpaqueApprovalAdmissionArtifact, ApprovalCoordinatorError> {
     if artifact_digest.is_zero() {
-        return Err(ApprovalCoordinatorError::InvalidAdmissionArtifact);
+        return Err(AdmissionArtifactDefect::ZeroArtifactDigest.into());
     }
     let body = OpaqueApprovalAdmissionArtifactBody {
         schema_version: OPAQUE_APPROVAL_ADMISSION_ARTIFACT_SCHEMA_VERSION,
         artifact_ref,
         artifact_digest,
     };
-    let canonical = canonical_json_bytes(&body).map_err(|_| ApprovalCoordinatorError::Canonical)?;
+    let canonical = canonical_json_bytes(&body).map_err(CanonicalFailure::Encoding)?;
     let canonical_digest = domain_digest(&canonical);
-    let canonical_body =
-        CanonicalBody::new(canonical).map_err(|_| ApprovalCoordinatorError::Canonical)?;
+    let canonical_body = CanonicalBody::new(canonical).map_err(CanonicalFailure::Body)?;
     Ok(OpaqueApprovalAdmissionArtifact {
         body,
         canonical_body,
@@ -223,18 +241,22 @@ fn validate_plan_request(
 fn validate_admission_artifact(
     artifact: &OpaqueApprovalAdmissionArtifact,
 ) -> Result<(), ApprovalCoordinatorError> {
-    if artifact.body.schema_version != OPAQUE_APPROVAL_ADMISSION_ARTIFACT_SCHEMA_VERSION
-        || artifact.body.artifact_digest.is_zero()
-        || artifact.canonical_digest.is_zero()
-    {
-        return Err(ApprovalCoordinatorError::InvalidAdmissionArtifact);
+    if artifact.body.schema_version != OPAQUE_APPROVAL_ADMISSION_ARTIFACT_SCHEMA_VERSION {
+        return Err(AdmissionArtifactDefect::UnsupportedSchemaVersion.into());
     }
-    let canonical = canonical_json_bytes(&artifact.body)
-        .map_err(|_| ApprovalCoordinatorError::InvalidAdmissionArtifact)?;
-    if artifact.canonical_body.as_bytes() != canonical.as_slice()
-        || artifact.canonical_digest != domain_digest(&canonical)
-    {
-        return Err(ApprovalCoordinatorError::InvalidAdmissionArtifact);
+    if artifact.body.artifact_digest.is_zero() {
+        return Err(AdmissionArtifactDefect::ZeroArtifactDigest.into());
+    }
+    if artifact.canonical_digest.is_zero() {
+        return Err(AdmissionArtifactDefect::ZeroCanonicalDigest.into());
+    }
+    let canonical =
+        canonical_json_bytes(&artifact.body).map_err(AdmissionArtifactDefect::Encoding)?;
+    if artifact.canonical_body.as_bytes() != canonical.as_slice() {
+        return Err(AdmissionArtifactDefect::BodyNotCanonical.into());
+    }
+    if artifact.canonical_digest != domain_digest(&canonical) {
+        return Err(AdmissionArtifactDefect::DigestMismatch.into());
     }
     Ok(())
 }
@@ -490,10 +512,12 @@ mod tests {
         let mut request = governed_request(&plan);
         request.admission_artifact.canonical_body = required!(CanonicalBody::new(vec![1, 2, 3]));
         let coordinator = ResponseApprovalCoordinator::new(FakeVerifier::valid());
-        assert_eq!(
+        assert!(matches!(
             coordinator.prepare(&plan, &request, LIVE_NOW),
-            Err(ApprovalCoordinatorError::InvalidAdmissionArtifact)
-        );
+            Err(ApprovalCoordinatorError::InvalidAdmissionArtifact(
+                AdmissionArtifactDefect::BodyNotCanonical
+            ))
+        ));
         assert_eq!(coordinator.verifier().counts().reserve, 0);
     }
 
@@ -521,10 +545,10 @@ mod tests {
             coordinator
                 .verifier()
                 .set_reserve(ReserveBehavior::Error(kind));
-            assert_eq!(
+            assert!(matches!(
                 coordinator.prepare(&plan, &request, LIVE_NOW),
-                Err(ApprovalCoordinatorError::Authority(port_error(kind)))
-            );
+                Err(ApprovalCoordinatorError::Authority(error)) if error == port_error(kind)
+            ));
             assert_eq!(coordinator.verifier().counts().reserve, 1);
         }
     }
@@ -542,10 +566,10 @@ mod tests {
             let request = governed_request(&plan);
             let coordinator = ResponseApprovalCoordinator::new(FakeVerifier::valid());
             coordinator.verifier().set_reserve(behavior);
-            assert_eq!(
+            assert!(matches!(
                 coordinator.prepare(&plan, &request, LIVE_NOW),
                 Err(ApprovalCoordinatorError::InvalidReservation)
-            );
+            ));
         }
     }
 
@@ -570,19 +594,19 @@ mod tests {
         coordinator
             .verifier()
             .set_reconstruct(ReconstructBehavior::WrongBinding);
-        assert_eq!(
+        assert!(matches!(
             coordinator.reconstruct(&plan, &request, &retained, LIVE_NOW),
             Err(ApprovalCoordinatorError::InvalidReservation)
-        );
+        ));
         coordinator
             .verifier()
             .set_reconstruct(ReconstructBehavior::Error(PortErrorKind::Unavailable));
-        assert_eq!(
+        assert!(matches!(
             coordinator.reconstruct(&plan, &request, &retained, LIVE_NOW),
-            Err(ApprovalCoordinatorError::Authority(port_error(
+            Err(ApprovalCoordinatorError::Authority(error)) if error == port_error(
                 PortErrorKind::Unavailable
-            )))
-        );
+            )
+        ));
         assert_eq!(coordinator.verifier().counts().reconstruct, 4);
     }
 
@@ -608,26 +632,26 @@ mod tests {
         coordinator
             .verifier()
             .set_commit_error(Some(PortErrorKind::Conflict));
-        assert_eq!(
+        assert!(matches!(
             coordinator.commit(&plan, &retained, LIVE_NOW),
-            Err(ApprovalCoordinatorError::Authority(port_error(
+            Err(ApprovalCoordinatorError::Authority(error)) if error == port_error(
                 PortErrorKind::Conflict
-            )))
-        );
+            )
+        ));
         coordinator
             .verifier()
             .set_cancel_error(Some(PortErrorKind::IntegrityFailure));
-        assert_eq!(
+        assert!(matches!(
             coordinator.cancel(&plan, &retained),
-            Err(ApprovalCoordinatorError::Authority(port_error(
+            Err(ApprovalCoordinatorError::Authority(error)) if error == port_error(
                 PortErrorKind::IntegrityFailure
-            )))
-        );
+            )
+        ));
 
-        assert_eq!(
+        assert!(matches!(
             coordinator.commit(&plan, &retained, EXPIRES_AT),
             Err(ApprovalCoordinatorError::Expired)
-        );
+        ));
         coordinator.verifier().set_cancel_error(None);
         required!(coordinator.cancel(&plan, &retained));
         assert_eq!(coordinator.verifier().counts().commit, 2);
@@ -642,22 +666,22 @@ mod tests {
         plan.approval_requirement = ResponseApprovalRequirement::Automatic;
         let coordinator = ResponseApprovalCoordinator::new(FakeVerifier::valid());
 
-        assert_eq!(
+        assert!(matches!(
             coordinator.prepare(&plan, &request, LIVE_NOW),
             Err(ApprovalCoordinatorError::AutomaticPlan)
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             coordinator.reconstruct(&plan, &request, &retained, LIVE_NOW),
             Err(ApprovalCoordinatorError::AutomaticPlan)
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             coordinator.commit(&plan, &retained, LIVE_NOW),
             Err(ApprovalCoordinatorError::AutomaticPlan)
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             coordinator.cancel(&plan, &retained),
             Err(ApprovalCoordinatorError::AutomaticPlan)
-        );
+        ));
         assert_eq!(coordinator.verifier().counts(), InvocationCounts::default());
     }
 

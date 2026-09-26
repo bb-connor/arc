@@ -43,7 +43,7 @@ pub(super) fn durable_execution_proof_snapshot(
         snapshot.operator_page_required = false;
         snapshot.mutations =
             ResponseMutationLog::new(current.mutations.as_slice()[..=activation_index].to_vec())
-                .map_err(|_| ExecutorError::InvalidActiveEvidence)?;
+                .map_err(ExecutorError::ActiveEvidenceMutationBound)?;
         let record = encode_response_record(&snapshot)?;
         return Ok((snapshot, record, DurableActiveResponseOutcome::Activated));
     }
@@ -71,8 +71,8 @@ pub(super) fn validate_dispatch_authorization(
     current: &ResponseSnapshot,
     authorization: &ResponseDispatchAuthorization,
 ) -> Result<(), ExecutorError> {
-    let canonical = canonical_json_bytes(&authorization.body)
-        .map_err(|_| ExecutorError::InvalidActiveEvidence)?;
+    let canonical =
+        canonical_json_bytes(&authorization.body).map_err(ExecutorError::ActiveEvidenceEncoding)?;
     let canonical_hash = Digest32::new(*sha256(&canonical).as_bytes());
     if canonical.as_slice() != authorization.canonical_body.as_bytes()
         || canonical_hash != authorization.body_hash
@@ -92,7 +92,7 @@ pub(super) fn validate_dispatch_authorization(
         .ok_or(ExecutorError::InvalidActiveEvidence)?;
     durable_binding
         .validate_for_plan(&current.plan)
-        .map_err(|_| ExecutorError::InvalidActiveEvidence)?;
+        .map_err(ExecutorError::ActiveEvidenceBinding)?;
     let expected_binding = ResponseExecutionDispatchBinding {
         schema_version: authorization.body.schema_version,
         tenant_id: authorization.body.key.tenant_id.clone(),
@@ -109,7 +109,7 @@ pub(super) fn validate_dispatch_authorization(
     };
     expected_binding
         .validate_for_plan(&current.plan)
-        .map_err(|_| ExecutorError::InvalidActiveEvidence)?;
+        .map_err(ExecutorError::ActiveEvidenceBinding)?;
     if durable_binding != expected_binding {
         return Err(ExecutorError::InvalidActiveEvidence);
     }
@@ -164,7 +164,7 @@ fn applying_response_record(
     snapshot.operator_page_required = false;
     snapshot.mutations =
         ResponseMutationLog::new(current.mutations.as_slice()[..=applying_index].to_vec())
-            .map_err(|_| ExecutorError::InvalidActiveEvidence)?;
+            .map_err(ExecutorError::ActiveEvidenceMutationBound)?;
     crate::state_machine::encode_normalized_dispatch_response_record(&snapshot)
         .map_err(ExecutorError::StateMachine)
 }

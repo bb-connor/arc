@@ -1177,7 +1177,7 @@ fn scheduler_fencing_substituted_terminal_record_never_releases_claimed_action()
     .unwrap_or_else(|error| panic!("scheduler: {error}"));
     assert!(matches!(
         scheduler.tick(&tick(1_000, "substitution")),
-        Err(SchedulerError::InvalidExecutionRecord)
+        Err(SchedulerError::ExecutionRecordMismatch)
     ));
     assert!(store.work().is_some());
     assert!(store.retry().is_none());
