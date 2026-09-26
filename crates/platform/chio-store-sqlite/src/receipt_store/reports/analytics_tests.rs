@@ -938,4 +938,35 @@ fn every_supported_analytics_filter_reaches_the_receipts_through_an_index() {
     );
 }
 
-use super::*;
+#[test]
+fn analytics_report_refuses_more_receipts_than_the_scan_ceiling() {
+    let fixture = populate("chio-analytics-ceiling", json_domain_receipts());
+    let ceiling = 8_i64;
+
+    let refusal = fixture
+        .store
+        .receipt_analytics_within(&admin_query(), ceiling)
+        .test_unwrap_err();
+    match refusal {
+        ReceiptStoreError::ReadBoundary(message) => assert!(
+            message.contains("covers more than 8 receipts"),
+            "unexpected refusal: {message}"
+        ),
+        other => panic!("expected a read-boundary refusal, got {other:?}"),
+    }
+
+    let (since, until) = NARROW_WINDOW;
+    let bounded = fixture
+        .store
+        .receipt_analytics_within(
+            &ReceiptAnalyticsQuery {
+                since: Some(since),
+                until: Some(until),
+                ..admin_query()
+            },
+            ceiling,
+        )
+        .test_expect("a bounded report is accepted");
+    assert!(bounded.summary.total_receipts > 0);
+    assert!(bounded.summary.total_receipts <= ceiling as u64);
+}
