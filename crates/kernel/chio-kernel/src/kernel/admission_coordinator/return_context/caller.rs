@@ -217,15 +217,17 @@ impl ChioKernel {
     pub(super) fn frame_caller_return_context(
         &self,
         admission: &DurableToolAdmission,
+        request: &ToolCallRequest,
         context: &DurableToolReturnContext,
         now: u64,
     ) -> Result<Option<AdmissionCallerDispatchContextV1>, KernelError> {
-        self.frame_caller_return_context_with_native(admission, context, now, None)
+        self.frame_caller_return_context_with_native(admission, request, context, now, None)
     }
 
     pub(in crate::kernel::admission_coordinator) fn frame_caller_return_context_with_native(
         &self,
         admission: &DurableToolAdmission,
+        request: &ToolCallRequest,
         context: &DurableToolReturnContext,
         now: u64,
         native_custody: Option<NativeCallerReleaseCustodyV1>,
@@ -248,7 +250,7 @@ impl ChioKernel {
         }
         let wire = CallerReturnWire {
             start_valid_until_unix_ms: if native_custody.is_none() {
-                Some(self.freeze_caller_start_deadline(admission, context, now)?)
+                Some(self.freeze_caller_start_deadline(admission, request, context, now)?)
             } else {
                 None
             },

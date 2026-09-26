@@ -66,7 +66,7 @@ fn authenticated_caller_start_retains_physical_dpop_and_reports_after_proof_expi
         )? {
         CallerStartResponse::Authorized(authorization) => *authorization,
         CallerStartResponse::Denied(response) => {
-            return Err(format!("{:?}", response.reason).into())
+            return Err(format!("valid caller start was denied: {:?}", response.reason).into())
         }
     };
     let (committed, history) = route.history(&request)?;

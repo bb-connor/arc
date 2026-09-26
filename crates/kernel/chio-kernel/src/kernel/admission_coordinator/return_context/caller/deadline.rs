@@ -7,6 +7,7 @@ impl ChioKernel {
     pub(super) fn freeze_caller_start_deadline(
         &self,
         admission: &DurableToolAdmission,
+        request: &ToolCallRequest,
         context: &DurableToolReturnContext,
         now: u64,
     ) -> Result<u64, KernelError> {
@@ -16,13 +17,12 @@ impl ChioKernel {
         let original = admission
             .original_retained_request()
             .ok_or_else(|| invalid("caller deadline lost its original request"))?;
-        let mut request = original.request_for_revalidation().clone();
-        request.execution_nonce = admission
-            .issued_execution_nonce()
-            .map(|reservation| reservation.signed_nonce().clone());
+        // Retained request material deliberately omits credentials. Freeze the
+        // deadline from the live presentation, then bind it to the original
+        // operation without retaining the proof in the return snapshot.
         let prepared = self
             .prepare_dispatch_credentials(
-                &request,
+                request,
                 &request.capability,
                 original.matching_grants_require_dpop(),
                 now / 1000,
@@ -33,7 +33,7 @@ impl ChioKernel {
         let mut deadline = prepared.valid_until_unix_ms()?;
         if let Some((_, validity)) = self.verify_owned_runtime_for_native_capture(
             admission,
-            &request,
+            request,
             context.matched_grant_index,
             context.admitted_metadata.as_ref(),
         )? {

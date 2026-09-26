@@ -138,6 +138,7 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
             .map_err(durable_store_error)?;
             self.kernel.frame_caller_return_context_with_native(
                 self.admission,
+                self.request,
                 context,
                 now,
                 Some(custody),

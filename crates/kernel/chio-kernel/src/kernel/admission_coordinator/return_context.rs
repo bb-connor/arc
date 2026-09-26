@@ -148,7 +148,7 @@ impl ChioKernel {
             .freeze_durable_tool_return_context(admission, input)
             .map_err(DurableDispatchCommitError::RejectedBeforeCommit)?;
         let caller_context = self
-            .frame_caller_return_context(admission, &context, now)
+            .frame_caller_return_context(admission, request, &context, now)
             .map_err(DurableDispatchCommitError::RejectedBeforeCommit)?;
         if caller_context.is_some() && budget_mutation.durable_hold_result().is_none() {
             return Err(DurableDispatchCommitError::RejectedBeforeCommit(

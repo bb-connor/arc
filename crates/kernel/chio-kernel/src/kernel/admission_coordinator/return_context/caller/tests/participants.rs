@@ -169,14 +169,18 @@ fn frozen_participants_preserve_legacy_absence_without_upgrading_custody() -> Te
             schema == SIGNING_SCHEMA
         );
         assert!(
-            fixture
-                .kernel
-                .frame_caller_return_context(
-                    &fixture.admission,
-                    &legacy,
-                    current_unix_timestamp_ms(),
-                )
-                .is_err(),
+            matches!(
+                fixture
+                    .kernel
+                    .frame_caller_return_context(
+                        &fixture.admission,
+                        &fixture.request,
+                        &legacy,
+                        current_unix_timestamp_ms(),
+                    ),
+                Err(KernelError::DurableAdmission(reason))
+                    if reason == "caller return component lost its admission binding"
+            ),
             "legacy context cannot be reissued as a complete v3 context"
         );
         let mut smuggled = payload.clone();

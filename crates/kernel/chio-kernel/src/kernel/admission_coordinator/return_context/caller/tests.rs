@@ -3,6 +3,7 @@ use super::*;
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 struct Fixture {
+    request: ToolCallRequest,
     kernel: ChioKernel,
     admission: DurableToolAdmission,
     frame: AdmissionCallerDispatchContextV1,

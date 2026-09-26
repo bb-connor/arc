@@ -210,10 +210,18 @@ fn caller_return_v3_remains_readable_but_cannot_acquire_custody_on_reissue() -> 
     assert!(legacy.participants.is_some());
     assert!(legacy.caller_participant_custody.is_none());
     assert!(
-        fixture
-            .kernel
-            .frame_caller_return_context(&fixture.admission, &legacy, current_unix_timestamp_ms(),)
-            .is_err(),
+        matches!(
+            fixture
+                .kernel
+                .frame_caller_return_context(
+                    &fixture.admission,
+                    &fixture.request,
+                    &legacy,
+                    current_unix_timestamp_ms(),
+                ),
+            Err(KernelError::DurableAdmission(reason))
+                if reason == "caller return component lost its admission binding"
+        ),
         "historical framing cannot infer missing custody"
     );
     payload["schema"] = serde_json::json!(SCHEMA);
