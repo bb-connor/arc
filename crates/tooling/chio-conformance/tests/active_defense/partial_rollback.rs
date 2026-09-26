@@ -1,3 +1,5 @@
+use super::*;
+
 struct SelectiveRemoveFailingContainmentOverlayStore {
     inner: Arc<SqliteSecurityStateStore>,
     failed_target: TenantScopedId,
@@ -148,7 +150,9 @@ fn partial_rollback_truth() {
     let restored_contribution_hash = digest(restored_contribution.as_bytes());
     let created_at_unix_ms = current_unix_ms();
     let plan = build_response_plan(ResponsePlanInput {
-        execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
+        execution: chio_security_types::ResponseExecutionBinding::new(
+            chio_security_types::ResponseExecutionMode::Live,
+        ),
         action_id: action("partial-rollback-action"),
         trigger_finding_id: record("partial-rollback-finding"),
         trigger_finding_hash: digest(b"partial-rollback-finding"),

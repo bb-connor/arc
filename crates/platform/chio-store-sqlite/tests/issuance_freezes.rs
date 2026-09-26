@@ -248,7 +248,9 @@ fn scheduler_plan(
     effect: ResponseEffectSpec,
 ) -> ResponsePlan {
     build_response_plan(ResponsePlanInput {
-        execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
+        execution: chio_security_types::ResponseExecutionBinding::new(
+            chio_security_types::ResponseExecutionMode::Live,
+        ),
         action_id,
         trigger_finding_id: record("issuance-freeze-horizon-finding"),
         trigger_finding_hash: digest(b"issuance-freeze-horizon-finding"),
