@@ -202,13 +202,31 @@ class ReadinessTests(unittest.TestCase):
         command = [str(executable), '10']
         process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
-            time.sleep(0.05)
-            MODULE.check_process(process.pid, command, executable, time.monotonic() + 2)
+            MODULE.await_process_identity(
+                lambda: MODULE.check_process(process.pid, command, executable, time.monotonic() + 2))
             with self.assertRaises(ValueError):
                 MODULE.check_process(process.pid, command + ['wrong'], executable, time.monotonic() + 2)
         finally:
             process.terminate()
             process.wait(timeout=2)
+
+    def test_bounded_identity_retry_settles_on_a_later_reading_and_stops_at_the_deadline(self):
+        attempts = []
+
+        def probe(settles_on):
+            attempts.append(1)
+            if len(attempts) < settles_on:
+                raise ValueError('recorded PID is not the selected kernel and retained session owner')
+            return len(attempts)
+
+        self.assertEqual(MODULE.await_process_identity(lambda: probe(3), interval_seconds=0), 3)
+        self.assertEqual(len(attempts), 3)
+        attempts.clear()
+        readings = iter([0.0, 0.5, 1.5])
+        with self.assertRaisesRegex(ValueError, 'recorded PID'):
+            MODULE.await_process_identity(lambda: probe(99), interval_seconds=0,
+                                          clock=lambda: next(readings))
+        self.assertEqual(len(attempts), 2)
 
 
 if __name__ == '__main__':

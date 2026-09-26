@@ -75,6 +75,22 @@ def check_process(pid, command, kernel, deadline):
     remaining_time(deadline)
 
 
+def await_process_identity(probe, *, timeout_seconds=1.0, interval_seconds=0.02,
+                           clock=time.monotonic):
+    """Poll a process identity probe until it agrees, or re-raise its last refusal."""
+    # A probe that reads /proc between fork and the completion of execve observes
+    # the parent executable, so one early disagreement is a race and not a verdict.
+    # A PID that is genuinely not the owner disagrees for the whole bound.
+    limit = clock() + timeout_seconds
+    while True:
+        try:
+            return probe()
+        except ValueError:
+            if clock() >= limit:
+                raise
+        time.sleep(interval_seconds)
+
+
 def wait_for_owner(state, timeout_seconds):
     if not 0 < timeout_seconds <= 300:
         raise ValueError('readiness timeout must be positive and at most 300 seconds')
