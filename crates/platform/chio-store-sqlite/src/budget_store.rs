@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::scope::MonetaryAmount;
@@ -28,6 +29,8 @@ use chio_kernel::payment::{
 use chio_kernel::tool_outcome::{MonetaryReleaseEvidenceKindV1, MonetaryReleaseEvidenceV1};
 use chio_kernel::{BudgetStore, BudgetStoreError, BudgetUsageRecord, CanonicalRevocationSet};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+
+use crate::store_connection::StoreConnection;
 
 mod authorization;
 mod composite;
@@ -63,6 +66,10 @@ pub use snapshot::{
 pub(crate) use store::BUDGET_STORE_SUPPORTED_SCHEMA_VERSION;
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod connection_recovery;
+
+#[cfg(test)]
 #[path = "budget_store/tests.rs"]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests;
@@ -75,6 +82,6 @@ use schema::*;
 
 #[derive(Clone)]
 pub struct SqliteBudgetStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Option<Arc<crate::serving_owner::SqliteServingOwner>>,
 }

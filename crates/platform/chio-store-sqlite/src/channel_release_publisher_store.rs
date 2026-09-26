@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::economic_continuity::{
@@ -24,6 +24,7 @@ use rusqlite::{
 use serde::{Deserialize, Serialize};
 
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
+use crate::store_connection::StoreConnection;
 
 mod persistence;
 mod qualification;
@@ -449,13 +450,13 @@ impl ChannelReleasePublisherCandidate {
 
 #[derive(Clone)]
 pub struct SqliteChannelReleasePublisherStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
 impl SqliteChannelReleasePublisherStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -809,11 +810,9 @@ impl SqliteChannelReleasePublisherStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, ChannelReleasePublisherError> {
-        self.connection.lock().map_err(|_| {
-            ChannelReleasePublisherError::Unavailable(
-                "sqlite channel release publisher lock poisoned".to_owned(),
-            )
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| ChannelReleasePublisherError::Unavailable(fenced.to_string()))
     }
 }
 

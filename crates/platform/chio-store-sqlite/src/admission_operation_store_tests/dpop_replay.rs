@@ -1,6 +1,8 @@
 use super::*;
 
 use std::sync::{Arc, Mutex};
+
+use crate::store_connection::StoreConnection;
 use std::time::Duration;
 
 use chio_kernel::dpop::replay_source::{
@@ -43,7 +45,7 @@ struct SourceState {
 struct Source {
     raw: Arc<DpopNonceStore>,
     instance: AdmissionIdentifier,
-    destination: Arc<Mutex<Connection>>,
+    destination: Arc<StoreConnection>,
     state: Mutex<SourceState>,
 }
 

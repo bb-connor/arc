@@ -26,7 +26,7 @@ use chio_finding::{
     FindingStatusVerdict,
 };
 
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_finding::FindingStatusProofInput;
@@ -44,6 +44,7 @@ use crate::finding_challenge_store::{
     begin_finalizing_under_sanction_tx, FindingFinalizingAuthorizationInput, FindingLiabilityState,
 };
 use crate::serving_owner::SqliteServingOwner;
+use crate::store_connection::StoreConnection;
 
 const FINDING_STATUS_SCHEMA_KEY: &str = "finding_status";
 pub(crate) const FINDING_STATUS_SUPPORTED_SCHEMA_VERSION: i32 = 5;
@@ -341,13 +342,13 @@ pub enum FindingStatusDecision {
 
 #[derive(Clone)]
 pub struct SqliteFindingStatusStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
 impl SqliteFindingStatusStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -362,11 +363,9 @@ impl SqliteFindingStatusStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, FindingStatusStoreError> {
-        self.connection.lock().map_err(|_| {
-            FindingStatusStoreError::Unavailable(
-                "sqlite finding status store lock poisoned".to_owned(),
-            )
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| FindingStatusStoreError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(

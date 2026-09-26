@@ -583,3 +583,7 @@ fn secure_temp_directory(path: &std::path::Path) -> std::io::Result<()> {
     let _ = path;
     Ok(())
 }
+
+#[path = "channel_lifecycle_store_tests/connection_recovery.rs"]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod connection_recovery;

@@ -58,7 +58,7 @@
 //! are not part of it, so a retry issued from a later clock replays rather
 //! than stranding the durable row it is retrying.
 
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_finding::validate_evm_payout_destination;
@@ -66,9 +66,9 @@ use chio_kernel::admission_operation::AdmissionOperationStoreError;
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use thiserror::Error;
 
-use crate::admission_operation_store::verify_active_owner;
 use crate::finding_status_store::{status_for_purchase_tx, FindingStatusDecision};
 use crate::serving_owner::SqliteServingOwner;
+use crate::{admission_operation_store::verify_active_owner, store_connection::StoreConnection};
 
 #[path = "finding_purchase_public_request.rs"]
 mod public_request;
@@ -372,13 +372,13 @@ pub struct FindingPayoutDestinationAdmission {
 
 #[derive(Clone)]
 pub struct SqliteFindingPurchaseStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
 impl SqliteFindingPurchaseStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -394,11 +394,9 @@ impl SqliteFindingPurchaseStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, FindingPurchaseStoreError> {
-        self.connection.lock().map_err(|_| {
-            FindingPurchaseStoreError::Unavailable(
-                "sqlite finding purchase lock poisoned".to_owned(),
-            )
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| FindingPurchaseStoreError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(
@@ -3379,6 +3377,8 @@ fn sqlite_error(error: rusqlite::Error) -> FindingPurchaseStoreError {
     }
 }
 
+#[cfg(test)]
+mod connection_recovery;
 #[cfg(test)]
 #[path = "finding_purchase_store_tests.rs"]
 #[allow(clippy::expect_used, clippy::unwrap_used)]

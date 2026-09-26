@@ -251,3 +251,6 @@ fn receipt_lineage_is_idempotent_and_substitution_resistant() {
         .expect("lineage");
     assert_eq!(stored.original_delivery_receipt_id, "receipt-original");
 }
+
+#[path = "finding_recovery_store_tests/connection_recovery.rs"]
+mod connection_recovery;

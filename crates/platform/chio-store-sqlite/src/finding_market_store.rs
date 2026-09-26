@@ -21,10 +21,10 @@
 //! single consumption, fee idempotency, and the atomic activation prepare
 //! and finalization transactions).
 
-use crate::admission_operation_store::verify_active_owner;
 use crate::finding_purchase_store::sales_blocked_tx;
 use crate::finding_status_store::{status_for_purchase_tx, FindingStatusDecision};
 use crate::serving_owner::SqliteServingOwner;
+use crate::{admission_operation_store::verify_active_owner, store_connection::StoreConnection};
 use chio_core::capability::scope::MonetaryAmount;
 use chio_core::sha256_hex;
 use chio_finding::{
@@ -33,7 +33,7 @@ use chio_finding::{
 };
 use chio_kernel::admission_operation::AdmissionOperationStoreError;
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 use thiserror::Error;
 
 #[path = "finding_market_participation.rs"]
@@ -302,7 +302,7 @@ const fn fee_event_parts(event: &FindingFeeEvent) -> (&'static str, u64) {
 
 #[derive(Clone)]
 pub struct SqliteFindingMarketStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     /// Read-only WAL companion for discovery reads that tolerate trailing
     /// the writer by one in-flight transaction. Admission and money paths
     /// stay on the serving-owner connection.
@@ -312,7 +312,7 @@ pub struct SqliteFindingMarketStore {
 
 impl SqliteFindingMarketStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         read_companions: Arc<crate::read_companion::ReadCompanionPool>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
@@ -324,9 +324,9 @@ impl SqliteFindingMarketStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, FindingMarketStoreError> {
-        self.connection.lock().map_err(|_| {
-            FindingMarketStoreError::Unavailable("sqlite finding market lock poisoned".to_owned())
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| FindingMarketStoreError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(

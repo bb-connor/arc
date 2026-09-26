@@ -850,3 +850,6 @@ fn signed_terminal_projection_is_bound_to_the_durable_kernel_claimant() {
         Some(second)
     );
 }
+
+#[path = "admission_operation_store_tests/connection_recovery.rs"]
+mod connection_recovery;

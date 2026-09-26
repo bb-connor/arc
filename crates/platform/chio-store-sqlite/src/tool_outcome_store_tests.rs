@@ -917,3 +917,6 @@ fn secure_temp_directory(path: &std::path::Path) {
     #[cfg(not(unix))]
     let _ = path;
 }
+
+#[path = "tool_outcome_store_tests/connection_recovery.rs"]
+mod connection_recovery;

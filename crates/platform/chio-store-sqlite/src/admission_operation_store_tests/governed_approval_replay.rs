@@ -2,6 +2,8 @@ use super::*;
 
 use std::sync::{Arc, Mutex};
 
+use crate::store_connection::StoreConnection;
+
 use crate::{SqliteGovernedApprovalReplaySource, SqliteGovernedApprovalReplayStore};
 use chio_kernel::admission_operation::governed_approval_replay::{
     GovernedApprovalReplaySourceBinding, GovernedApprovalReplaySourcePort,
@@ -44,7 +46,7 @@ struct SourceState {
 struct Source {
     raw: SqliteGovernedApprovalReplaySource,
     path: PathBuf,
-    destination: Arc<Mutex<Connection>>,
+    destination: Arc<StoreConnection>,
     state: Mutex<SourceState>,
 }
 

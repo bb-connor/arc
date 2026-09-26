@@ -1884,3 +1884,6 @@ fn same_key_authorization_state_update_is_rejected() {
         updated.operator_authorization_sha256
     );
 }
+
+#[path = "finding_status_store_tests/connection_recovery.rs"]
+mod connection_recovery;

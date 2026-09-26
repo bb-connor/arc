@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::StoreMutationFence;
@@ -18,6 +18,7 @@ use crate::revocation_store::{
     initialize_revocation_schema, verify_admission_authority_invariants,
     REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
 };
+use crate::store_connection::StoreConnection;
 use crate::{SqliteBudgetStore, SqliteRevocationStore};
 
 mod finding_market_snapshot_versions;
@@ -286,7 +287,7 @@ impl SqliteServingOwner {
 }
 
 pub struct SqliteAuthorityStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     read_companions: Arc<crate::read_companion::ReadCompanionPool>,
     owner: Arc<SqliteServingOwner>,
 }
@@ -807,8 +808,22 @@ impl SqliteAuthorityStore {
             record.database_device,
             record.database_inode,
         )?;
+        // Every commit on this connection is followed by a rollback-anchor sync,
+        // so a recovered connection serves only once the anchor equals the
+        // database head. A panic between a commit and its sync leaves the
+        // database one commit ahead, which fences the connection until
+        // `open_serving` reconciles the anchor forward.
+        let anchor_owner = owner.clone();
         Ok(Self {
-            connection: Arc::new(Mutex::new(connection)),
+            connection: Arc::new(StoreConnection::anchored(
+                "authority",
+                connection,
+                move |connection| {
+                    anchor_owner
+                        .verify_authority_anchor(connection)
+                        .map_err(Into::into)
+                },
+            )),
             read_companions: Arc::new(read_companions),
             owner,
         })
@@ -833,11 +848,10 @@ impl SqliteAuthorityStore {
         expected_path: impl AsRef<Path>,
     ) -> Result<(), SqliteServingOwnerError> {
         let expected_path = fs::canonicalize(expected_path.as_ref())?;
-        let connection = self.connection.lock().map_err(|_| {
-            SqliteServingOwnerError::Invalid(
-                "sqlite authority connection mutex is poisoned".to_string(),
-            )
-        })?;
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|fenced| SqliteServingOwnerError::Invalid(fenced.to_string()))?;
         self.owner.verify_authority_anchor(&connection)?;
         let record = load_provisioning_record(&connection)?.ok_or_else(|| {
             SqliteServingOwnerError::PartialProvision(expected_path.display().to_string())
@@ -1674,6 +1688,17 @@ fn verify_authority_store_invariants(
 #[path = "serving_owner/tests.rs"]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests;
+
+#[cfg(all(test, unix))]
+#[path = "serving_owner/connection_recovery.rs"]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod connection_recovery;
+#[cfg(all(test, unix))]
+pub(crate) use connection_recovery::{
+    authority_panics_after_anchor, authority_panics_after_commit_before_anchor,
+    authority_panics_before_commit, authority_panics_with_rollback_denied, ProvisionedAuthority,
+    PROBE_CAPABILITY,
+};
 
 #[cfg(all(test, windows))]
 mod windows_platform_tests {

@@ -2,6 +2,8 @@ use super::*;
 
 use std::sync::{Arc, Mutex};
 
+use crate::store_connection::StoreConnection;
+
 use chio_kernel::admission_operation::{RuntimeReplaySourcePort, RuntimeReplaySourceSnapshotV1};
 
 #[path = "runtime_replay/activation.rs"]
@@ -30,7 +32,7 @@ struct SourceState {
 /// A trusted-source test double. This deliberately does not claim to test the
 /// runtime SQLite barrier; its purpose is the qualified destination protocol.
 struct Source {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     state: Mutex<SourceState>,
 }
 

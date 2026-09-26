@@ -1231,3 +1231,6 @@ fn secure_temp_directory(path: &std::path::Path) {
     #[cfg(not(unix))]
     let _ = path;
 }
+
+#[path = "economic_state_cache_tests/connection_recovery.rs"]
+mod connection_recovery;

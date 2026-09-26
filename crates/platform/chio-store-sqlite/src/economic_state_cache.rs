@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::economic_continuity::{
@@ -27,6 +27,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
+use crate::store_connection::StoreConnection;
 
 mod persistence;
 pub(crate) use persistence::verify_cache_sql_invariants;
@@ -918,13 +919,13 @@ fn stage_batch_in_transaction(
 
 #[derive(Clone)]
 pub struct SqliteEconomicStateCache {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
 impl SqliteEconomicStateCache {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -936,7 +937,7 @@ impl SqliteEconomicStateCache {
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, EconomicStateCacheError> {
         self.connection
             .lock()
-            .map_err(|_| invariant("economic state cache lock is poisoned"))
+            .map_err(|fenced| EconomicStateCacheError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(

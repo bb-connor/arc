@@ -1,7 +1,7 @@
 //! Durable issuance, shared quota, and receipt lineage for no-charge finding
 //! recovery.
 
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_kernel::admission_operation::AdmissionOperationStoreError;
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
@@ -9,6 +9,7 @@ use thiserror::Error;
 
 use crate::admission_operation_store::verify_active_owner;
 use crate::serving_owner::SqliteServingOwner;
+use crate::store_connection::StoreConnection;
 
 const SCHEMA_KEY: &str = "finding_recovery";
 const SUPPORTED_SCHEMA_VERSION: i32 = 1;
@@ -86,13 +87,13 @@ pub struct FindingRecoveryReceiptLineageRecord {
 
 #[derive(Clone)]
 pub struct SqliteFindingRecoveryStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
 impl SqliteFindingRecoveryStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -102,9 +103,9 @@ impl SqliteFindingRecoveryStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, FindingRecoveryStoreError> {
-        self.connection.lock().map_err(|_| {
-            FindingRecoveryStoreError::Unavailable("sqlite finding recovery lock poisoned".into())
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| FindingRecoveryStoreError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(

@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::economic_continuity::{
@@ -26,6 +26,7 @@ use rusqlite::{
 use serde::Serialize;
 
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
+use crate::store_connection::StoreConnection;
 use crate::{
     EconomicOperationStageContext, EconomicStateCacheError, EconomicStateStageDescriptor,
     EconomicStateStageRecord, EconomicStateStageStatus,
@@ -192,7 +193,7 @@ impl ChannelReservationStageRecordV1 {
 
 #[derive(Clone)]
 pub struct SqliteChannelLifecycleStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
@@ -240,7 +241,7 @@ struct StoredPreparedPlan {
 
 impl SqliteChannelLifecycleStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -920,11 +921,9 @@ impl SqliteChannelLifecycleStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, ChannelLifecycleStoreError> {
-        self.connection.lock().map_err(|_| {
-            ChannelLifecycleStoreError::Unavailable(
-                "sqlite channel lifecycle lock poisoned".to_owned(),
-            )
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| ChannelLifecycleStoreError::Unavailable(fenced.to_string()))
     }
 }
 

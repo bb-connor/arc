@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::{sha256_hex, Keypair, StoreMutationFence};
@@ -156,13 +156,13 @@ struct PreparedFiscalRotationMutation {
 
 #[derive(Clone)]
 pub struct SqliteFiscalStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<crate::store_connection::StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
 impl SqliteFiscalStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<crate::store_connection::StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -174,7 +174,7 @@ impl SqliteFiscalStore {
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, FiscalStoreError> {
         self.connection
             .lock()
-            .map_err(|_| invariant("fiscal store lock is poisoned"))
+            .map_err(|fenced| FiscalStoreError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(

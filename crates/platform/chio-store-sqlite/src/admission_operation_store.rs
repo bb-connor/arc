@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
@@ -40,6 +40,7 @@ use rusqlite::{params, Connection, OptionalExtension, Row, Transaction, Transact
 use serde::{Deserialize, Serialize};
 
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
+use crate::store_connection::StoreConnection;
 
 mod budget_custody;
 mod caller_budget;
@@ -253,7 +254,7 @@ const RUNTIME_PARTICIPANT_SCHEMA: &str =
 
 #[derive(Clone)]
 pub struct SqliteAdmissionOperationStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
@@ -307,7 +308,7 @@ impl DurableObligationV1 {
 
 impl SqliteAdmissionOperationStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -317,11 +318,9 @@ impl SqliteAdmissionOperationStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, AdmissionOperationStoreError> {
-        self.connection.lock().map_err(|_| {
-            AdmissionOperationStoreError::Invariant(
-                "sqlite admission operation lock poisoned".to_string(),
-            )
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| AdmissionOperationStoreError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(

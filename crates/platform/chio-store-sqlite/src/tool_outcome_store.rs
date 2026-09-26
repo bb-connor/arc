@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::sha256_hex;
@@ -22,6 +22,7 @@ use crate::admission_operation_store::{
     resolve_recovery_authority, verify_active_owner, verify_trusted_time, RecoveryAuthority,
 };
 use crate::serving_owner::SqliteServingOwner;
+use crate::store_connection::StoreConnection;
 
 const TOOL_OUTCOME_SCHEMA_KEY: &str = "tool_outcome";
 pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 3;
@@ -60,13 +61,13 @@ enum StoredInvocationBlob {
 
 #[derive(Clone)]
 pub struct SqliteToolOutcomeStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
 impl SqliteToolOutcomeStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -76,9 +77,9 @@ impl SqliteToolOutcomeStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, ToolOutcomeStoreError> {
-        self.connection.lock().map_err(|_| {
-            ToolOutcomeStoreError::Unavailable("sqlite tool outcome lock poisoned".to_owned())
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| ToolOutcomeStoreError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(
