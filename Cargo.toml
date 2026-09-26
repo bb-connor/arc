@@ -296,10 +296,14 @@ rust_registry_public_crates = []
 # Downstream consumers can extract the manifest with `cargo audit -f <binary>`
 # to scan for known vulnerabilities without needing the source tree.
 
-# Canonical workspace lint policy. Every member crate inherits this block via
-# `[lints]\nworkspace = true` in its own manifest rather than hand-copying the
-# denies, so the policy lives in exactly one place. When tightening the policy
-# (for example adding `panic = "deny"`), edit it here only.
+# Canonical workspace lint policy. A member crate takes it with
+# `[lints]\nworkspace = true`. Cargo refuses to combine that line with any
+# local lint entry, so the crates that register `unexpected_cfgs` check-cfg
+# names (kani / loom / dhat / creusot) cannot inherit; they carry local
+# `[lints.rust]` and `[lints.clippy]` tables that mirror every entry here.
+# `scripts/check-lint-parity.py` fails when a mirror falls behind, so when
+# tightening the policy (for example adding `panic = "deny"`), edit it here
+# and in each mirror the gate names.
 #
 # `unwrap_used` / `expect_used` are denied because this is a fail-closed
 # security kernel: an unhandled `Option`/`Result` panic in a guard or receipt
@@ -307,9 +311,9 @@ rust_registry_public_crates = []
 # narrow, reviewed exception annotate the specific call site with
 # `#[allow(clippy::unwrap_used)]` instead of opting the whole crate out.
 #
-# No `[workspace.lints.rust]` floor is defined: the only per-crate rust-lint
-# usage today is bespoke `unexpected_cfgs` check-cfg registration (kani / loom /
-# dhat) that cannot be hoisted, so those stay as local `[lints.rust]` tables.
+# No `[workspace.lints.rust]` floor is defined yet. Adding one is a policy
+# change like any other: the mirrors must carry it, and the parity gate
+# compares the Rust table as well as the Clippy table.
 [workspace.lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"

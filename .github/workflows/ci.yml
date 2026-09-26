@@ -178,6 +178,14 @@ jobs:
           bash scripts/tests/check-domain-separation.test.sh
           python3 scripts/check-negative-assertions.py
           bash scripts/tests/check-negative-assertions.test.sh
+          python3 scripts/check-lint-parity.py
+          bash scripts/tests/check-lint-parity.test.sh
+          python3 scripts/check-wire-schemas.py
+          bash scripts/tests/check-wire-schemas.test.sh
+          python3 scripts/check-dependency-budget.py
+          bash scripts/tests/check-dependency-budget.test.sh
+          bash scripts/run-miri-crates.sh --list
+          bash scripts/tests/run-miri-crates.test.sh
 
       - name: Formal traceability gate
         run: bash scripts/check-mapping.sh
@@ -421,6 +429,59 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0 --cfg tokio_unstable"
         run: cargo test -p chio-kernel --features tokio-console-smoke --test tokio_console_smoke
+
+  nextest-security:
+    name: nextest (security crates, one process per test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    # Additive: the workspace lanes still run every test under `cargo test`.
+    # This lane runs the security crates under cargo-nextest, so each test
+    # gets its own process, a per-test deadline and leak detection
+    # (.config/nextest.toml). A test that passes under `cargo test` and fails
+    # here is a lead, not yet a finding: it may depend on state a sibling left
+    # in the shared process, on environment or stdio the harness inherited
+    # differently, or on the harness's own timing, and each case is
+    # dispositioned individually before anything is called a defect. Doctests
+    # are not nextest's to run and stay with the `cargo test` lanes.
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install --profile minimal
+          rustup show active-toolchain
+
+      - name: Install protobuf compiler
+        uses: ./.github/actions/apt-install
+        with:
+          packages: protobuf-compiler
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+
+      - name: Install cargo-nextest
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-nextest-tool-target
+        run: |
+          cargo install cargo-nextest --locked --version 0.9.146
+          cargo nextest --version
+
+      - name: Security crates under nextest
+        env:
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+        run: |
+          cargo nextest run --profile ci --locked \
+            -p chio-cage -p chio-security-types -p chio-flow -p chio-decoy \
+            -p chio-quarantine -p chio-keyring -p chio-security-kernel \
+            -p chio-active-response-authority -p chio-secure-ipc -p chio-secret-broker
+
+      - name: Upload the JUnit report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: nextest-security-junit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/nextest/ci/junit.xml
+          if-no-files-found: error
+          retention-days: 30
 
   kani-public-pr:
     name: kani-public-pr (all lane=pr harnesses)
