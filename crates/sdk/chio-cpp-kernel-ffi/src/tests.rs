@@ -495,6 +495,20 @@ fn take_result_string(result: &ChioKernelFfiResult) -> String {
 }
 
 #[test]
+fn returned_buffer_can_be_read_modified_and_freed() {
+    let mut value = String::with_capacity(64);
+    value.push_str("data");
+    let buffer = ChioKernelFfiBuffer::from_string(value);
+    assert_eq!(buffer.len, 4);
+    // SAFETY: this buffer owns four initialized bytes and has not been freed.
+    let bytes = unsafe { std::slice::from_raw_parts_mut(buffer.ptr, buffer.len) };
+    assert_eq!(bytes, b"data");
+    bytes[0] = b'D';
+    assert_eq!(bytes, b"Data");
+    chio_kernel_buffer_free(buffer);
+}
+
+#[test]
 fn ffi_sign_receipt_recompute_accepts_matching_content() {
     // WYSIWYS: drive the PUBLIC C ABI signer end-to-end. A matching
     // content+hash pair signs and verifies.

@@ -42,8 +42,8 @@ its `unsafe` is in a comment).
 | `chio-secure-ipc` | 7, 5 | 4 passed, 2 skipped | runs with named syscall and C-call tests ignored |
 | `chio-cage` | 101, 16 | 15 passed, 5 skipped, 399 s | runs with named syscall tests ignored; the OS-boundary custody tests are the exclusions, as expected |
 | `chio-keyring` | 6, 6 | 5 passed, 2 skipped | runs with named syscall tests ignored |
-| `chio-cpp-kernel-ffi` | 3, 3 | **Undefined Behavior** in the first buffer-reading test | listed; red until fixed (finding below) |
-| `chio-bindings-ffi` | 4, 4 | **Undefined Behavior** in the first buffer-reading test | listed; red until fixed (finding below) |
+| `chio-cpp-kernel-ffi` | 4, 4 | 24 passed, 0 skipped after the ownership fix | listed; the buffer regression reproduced the original failure before the fix |
+| `chio-bindings-ffi` | 5, 5 | 20 passed, 0 skipped after the ownership fix | listed; the buffer regression reproduced the original failure before the fix |
 | `chio-active-response-authority` | 3, 2 | 12 passed with 6 tests set aside: 5 `chmod` C calls and 1 assertion Miri's emulated file metadata cannot satisfy | ineligible: the two reachable sites are reached only by the ignored process-boundary helper test, the third is in the daemon binary; under Miri none of its unsafe code runs |
 | `chio-sqlite-file-identity` | 5, 5 | 0 passed once its 4 C-calling tests are set aside; 1 already `#[ignore]` | excluded: calls into C (every test opens SQLite) |
 | `chio-secret-broker` | 17, 7 | 4 passed before the first stop (`socket`, a C call); 180 unit tests | unclassified: the remainder was not run within the time available |
@@ -80,8 +80,8 @@ Each row is one `#[cfg_attr(miri, ignore = "<reason>")]`; the entry in
 
 ## Findings
 
-Miri stops both FFI crates at the same defect, in code that every buffer-
-returning test reaches:
+The initial Miri run stopped both FFI crates at the same defect, in code that
+every buffer-returning test reaches (locations below are from that run):
 
 - `crates/sdk/chio-cpp-kernel-ffi/src/lib.rs:82` takes `boxed.as_mut_ptr()`
   on a `Box<[u8]>`, then `:84` moves the box into `std::mem::forget`. Under
@@ -94,10 +94,13 @@ returning test reaches:
   constructor (`from_bytes`); the report lands at `src/lib.rs:438`
   (`result_to_string`).
 
-The sound shape is `Box::into_raw(boxed)`, taking the length first. Until the
-SDK owner lands that, the Miri lane is red on these two crates by design:
-skipping the tests would hide the finding the lane exists to make, and a UB
-report is not one of the two reasons a skip may carry.
+The constructors now transfer ownership with `Box::into_raw(boxed)`, taking the
+length first; deallocation reconstructs the same boxed slice. Focused tests
+read, modify and free buffers made from strings with spare capacity. Both tests
+reproduced the original provenance failure before the fix. Afterward,
+`cargo +nightly-2026-02-07 miri test --locked -p chio-cpp-kernel-ffi -p chio-bindings-ffi`
+passed all 44 tests on aarch64 Linux without skips. This is local Miri evidence;
+the listed crates remain required in the hosted lane.
 
 ## Reach records for the listed crates
 
@@ -130,13 +133,12 @@ sites are reached only by the four `pidfd_spawnp` tests that Miri cannot run,
 so under Miri the cage's executed unsafe code is the directory, exact-write
 and `openat2` paths.
 
-`chio-cpp-kernel-ffi` (3 of 3): `src/lib.rs:305` `read_c_str`,
-`src/lib.rs:778` `chio_kernel_buffer_free`, `src/tests.rs:493`
-`take_result_string`.
+`chio-cpp-kernel-ffi` (4 of 4): `read_c_str`, `chio_kernel_buffer_free`,
+`take_result_string` and the read/write/free regression
+`returned_buffer_can_be_read_modified_and_freed`.
 
-`chio-bindings-ffi` (4 of 4): `src/lib.rs:97` `chio_buffer_free`,
-`src/lib.rs:183` `read_c_str`, `src/lib.rs:205` `read_bytes`,
-`src/lib.rs:438` `result_to_string`.
+`chio-bindings-ffi` (5 of 5): `chio_buffer_free`, `read_c_str`, `read_bytes`,
+`result_to_string` and `returned_buffer_can_be_read_modified_and_freed`.
 
 ## Red on mutation
 

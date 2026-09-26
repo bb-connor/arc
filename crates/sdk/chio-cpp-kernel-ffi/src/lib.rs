@@ -78,10 +78,9 @@ impl ChioKernelFfiBuffer {
         if bytes.is_empty() {
             return Self::empty();
         }
-        let mut boxed = bytes.into_boxed_slice();
-        let ptr = boxed.as_mut_ptr();
+        let boxed = bytes.into_boxed_slice();
         let len = boxed.len();
-        std::mem::forget(boxed);
+        let ptr = Box::into_raw(boxed).cast::<u8>();
         Self { ptr, len }
     }
 }
@@ -773,10 +772,12 @@ pub extern "C" fn chio_kernel_buffer_free(buffer: ChioKernelFfiBuffer) {
     if buffer.ptr.is_null() || buffer.len == 0 {
         return;
     }
-    // SAFETY: all non-empty buffers returned by this crate come from
-    // `Vec::into_boxed_slice` with exactly this pointer and length.
+    // SAFETY: callers return a live buffer from this crate exactly once. Its
+    // pointer and length reconstruct the slice transferred by `Box::into_raw`.
     unsafe {
-        drop(Vec::from_raw_parts(buffer.ptr, buffer.len, buffer.len));
+        drop(Box::from_raw(ptr::slice_from_raw_parts_mut(
+            buffer.ptr, buffer.len,
+        )));
     }
 }
 

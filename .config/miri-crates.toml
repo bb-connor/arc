@@ -65,21 +65,19 @@ reason = "syscall: openat with O_DIRECTORY (flag 0x4000) is not supported by Mir
 test = "storage_identity_tests::trusted_parent_policy_requires_private_child_below_system_temp_directory"
 reason = "syscall: openat with O_DIRECTORY (flag 0x4000) is not supported by Miri"
 
-# Both FFI crates fail under Miri today with the same Stacked Borrows
-# violation: the buffer constructor takes a raw pointer with `as_mut_ptr()` on
-# a `Box<[u8]>` and then moves the box into `mem::forget`, which retags it
-# uniquely and invalidates the pointer the buffer keeps. That is a finding,
-# not an exclusion; the crates stay listed and the lane is red on them until
-# the constructors use `Box::into_raw`.
+# FFI buffers transfer Box ownership into the exported pointer and reconstruct
+# the same allocation when freed. The read/write/free regressions reproduced
+# the earlier borrowed-pointer defect under Miri; both full suites now pass
+# without skips (nightly-2026-02-07, 2026-09-26).
 [[crate]]
 name = "chio-cpp-kernel-ffi"
-unsafe_sites = 3
-reached = 3
+unsafe_sites = 4
+reached = 4
 
 [[crate]]
 name = "chio-bindings-ffi"
-unsafe_sites = 4
-reached = 4
+unsafe_sites = 5
+reached = 5
 
 [[excluded]]
 name = "chio-sqlite-file-identity"
