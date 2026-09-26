@@ -30,7 +30,7 @@ Eight findings across four passes have the same shape:
 | R2 | `StateMachineError::Shape(#[from] ResponseShapeError)` | remember to use `?` instead of `map_err(\|_\| InvalidDispatch)` |
 | R4 | `pub const RESPONSE_AFFECTED_SET_DOMAIN` | remember to import it rather than redeclare the bytes |
 | S2 | `canonical_json_bytes_from_str` (strict) | remember which entry point untrusted text requires |
-| S3 | unguessable identifiers | remember which tables rely on that instead of a tenant predicate |
+| S3 | tenant classification | remember which principal enforces each table's boundary, and that possession of an identifier is authority only under a stated bearer contract |
 
 Hunting instances has diminishing returns. The design below makes each row a
 compile error or a gate failure instead of a review comment.
@@ -101,54 +101,79 @@ value has private fields, no `Default`, no `From<Unverified>`, no `Deserialize`,
 exactly one constructor, which *is* the check. Accessors are read-only. The
 compiler then rejects the operation without the check.
 
-**Sketch: the five mode-check sites become one constructor.**
+**Sketch: the five mode-check sites become two constructors, not one.** The first
+version of this sketch had a single `LiveAuthorizedPlan::authorize(plan,
+commit_mode)`. The external review's finding R1 showed why that is wrong: a caller
+supplying a resume mode obtained a token for a legacy plan with no durable proof,
+and private fields do not repair a public constructor that accepts the caller's
+assertion of recovery provenance. The existing code keeps fresh admission and
+committed recovery apart (`active_response_committed_recovery.rs:408` verifies the
+durable operation, exact binding, committed approval and executor identity), and
+the types must too.
 
 ```rust
-/// A response plan whose execution mode has been checked for a specific
-/// commit mode. The kernel admission and quarantine dispatch entry points
-/// accept this type and nothing else.
+/// A plan admitted fresh. The only path to a value is this constructor, which
+/// requires provenance bound to the live mode; fresh kernel admission and fresh
+/// dispatch accept this type and nothing else.
 #[derive(Debug)]
-pub struct LiveAuthorizedPlan {
+pub struct FreshLiveAdmission {
     plan: ResponsePlan,
-    commit_mode: ResponseDispatchCommitMode,
 }
 
-impl LiveAuthorizedPlan {
-    pub fn authorize(
-        plan: ResponsePlan,
-        commit_mode: ResponseDispatchCommitMode,
-    ) -> Result<Self, DispatchRejection> {
-        match (&plan.provenance, commit_mode) {
-            (PlanProvenance::Bound(binding), _) if binding.mode() == ResponseExecutionMode::Live => {}
-            (PlanProvenance::Bound(binding), _) => {
-                return Err(DispatchRejection::ExecutionMode { observed: binding.mode() });
+impl FreshLiveAdmission {
+    pub fn admit(plan: ResponsePlan) -> Result<Self, DispatchRejection> {
+        match &plan.provenance {
+            PlanProvenance::Bound(binding) if binding.mode() == ResponseExecutionMode::Live => {
+                Ok(Self { plan })
             }
-            (PlanProvenance::Legacy, ResponseDispatchCommitMode::Fresh) => {
-                return Err(DispatchRejection::LegacyPlanFreshDispatch);
+            PlanProvenance::Bound(binding) => {
+                Err(DispatchRejection::ExecutionMode { observed: binding.mode() })
             }
-            (PlanProvenance::Legacy, _resume) => {
-                // Historical recovery only; retirement condition per correction 1C.
-            }
+            PlanProvenance::Legacy => Err(DispatchRejection::LegacyPlanFreshDispatch),
         }
-        Ok(Self { plan, commit_mode })
     }
 
     #[must_use]
     pub fn plan(&self) -> &ResponsePlan {
         &self.plan
     }
+}
 
-    #[must_use]
-    pub fn commit_mode(&self) -> ResponseDispatchCommitMode {
-        self.commit_mode
+/// Authority to resume a committed dispatch. Constructible only inside the
+/// durable recovery verification, which binds the exact operation, plan hash,
+/// tenant, dispatch and executor generation it verified against the store.
+/// Resume paths accept this type; fresh admission cannot, by type. A caller
+/// cannot obtain one by choosing a commit mode.
+#[derive(Debug)]
+pub struct CommittedResumeAuthority {
+    operation_id: AdmissionOperationId,
+    plan_hash: Digest32,
+    tenant_id: TenantId,
+    dispatch_id: DispatchId,
+    executor_generation: NonZeroU64,
+    commit_mode: CommittedResumeMode,
+}
+
+impl CommittedResumeAuthority {
+    /// Module-private: only the recovery verification, in this module, calls it.
+    fn from_verified(verified: &VerifiedCommittedRecovery) -> Self {
+        /* copy the bound identities out of the verified record */
     }
 }
 ```
 
-`prepare_response_dispatch` and both kernel admission entry points change their
-parameter from `ResponsePlan` to `LiveAuthorizedPlan`. The inverse rule at
-`state_machine.rs:687` disappears because the rule exists once. A sixth live path
-that forgets the check does not compile.
+`prepare_response_dispatch` for fresh dispatch and both kernel admission entry
+points take `FreshLiveAdmission`; the resume paths take `CommittedResumeAuthority`.
+`CommittedResumeAuthority` is declared beside `VerifiedCommittedRecovery` in the
+kernel's recovery module (`active_response_committed_recovery.rs`), because a
+module-private constructor is the only visibility that cannot be reached from
+another module; `pub(in path)` cannot cross the crate boundary from
+`chio-security-types`, where `FreshLiveAdmission` lives with the plan type. The
+inverse rule at `state_machine.rs:686-687` disappears because each type carries its
+own rule. A live path that forgets the check does not compile, and a caller
+cannot reach the resume rule by naming a mode. The negative tests include a legacy
+plan plus a caller-selected resume mode with no durable commitment, which must be
+rejected with its own variant.
 
 **Sketch: retrofitting a hollow `Verified*` type.** For a type that must cross the
 wire, the wire form is by definition unverified, so it gets a different name:

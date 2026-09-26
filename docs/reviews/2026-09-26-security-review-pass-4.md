@@ -207,6 +207,14 @@ class. Where an identifier is supposed to be unguessable, make its derivation a
 typed constructor rather than a `String`, as finding P6 already recommends for
 digests.
 
+*Corrected by the external review of the same day (finding R4):* "accessed by an
+unguessable identifier" is not an authorization class. A content hash is computable
+from its inputs and identifiers appear in receipts and logs. The classification is
+by enforcing principal (tenant predicate, named administrative principal, or an
+explicit bearer-capability contract), and every isolation test hands tenant B tenant
+A's exact valid identifier. Standard rules 14.6 and 14.7 and addendum item 10.3
+carry the corrected text.
+
 **Confidence:** high on the counts and the absence of a policy. The severity is
 genuinely unresolved and should be resolved by the classification, not by
 argument.

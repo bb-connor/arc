@@ -191,8 +191,14 @@ site.
 constructor performs `require_execution_mode(Live)`, and change
 `prepare_response_dispatch` and the kernel admission entry points to accept it
 instead of `ResponsePlan`. The check then cannot be omitted, because the value
-cannot be produced without it, and the rule exists once. Collapse the inverse
-branch into the same constructor, parameterized by commit mode.
+cannot be produced without it, and the rule exists once.
+
+*Corrected by the external review of the same day (finding R1):* the inverse branch
+must **not** collapse into the same constructor parameterized by commit mode, because
+a caller could then obtain authority for a legacy plan by naming a resume mode with
+no durable proof. Fresh admission and committed recovery are two types with two
+constructors, the second reachable only from the durable recovery verification. The
+design document's mechanism A and addendum item 1B carry the corrected text.
 
 This is the plan's own standard ("Share security decisions across live, recovery
 and simulation paths. Avoid duplicate policy implementations") applied to the

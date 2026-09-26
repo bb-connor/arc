@@ -41,7 +41,7 @@ unrepresentable-defects design is a TCB-wide migration, and the store crate, wit
 **Confidence:** high on the ratio, which no test-module noise could invert;
 upper-bound on the absolute discard count.
 
-## U2. Medium: the sandbox init helper links an HTTP client
+## U2. Medium: the sandbox init helper's package carries the platform's dependency graph
 
 `chio-cage` ships the confinement helper binary `chio-cage-init`, the static-PIE
 program that applies seccomp and Landlock and then `exec`s the confined tool. Its
@@ -60,9 +60,13 @@ Why it matters beyond taste. The helper is the most privileged program in the
 system's runtime: it runs before confinement exists, often as root during
 provisioning (boundary finding P1 #1), and every crate in its graph is in its
 trust base. The ledger's static-PIE and ELF checks prove the artifact has no
-dynamic dependencies; they say nothing about what was compiled into it. A
-sandbox helper with an HTTP client in its binary is the kind of thing an
-auditor screenshots.
+dynamic dependencies; they say nothing about what was compiled into it. The external review corrected this finding's claim: `cargo tree` measures the
+package graph, not what the linker kept in the `chio-cage-init` artifact, and
+Cargo does not promise the two match. What is established is that the helper's
+package depends on the platform; whether an HTTP client is in the binary is the
+lane's first measurement, on the musl target with the release features and
+lockfile. A sandbox helper whose package needs `reqwest` is still the kind of
+thing an auditor asks about.
 
 **Fix (hardening spec H11).** Split the helper into its own crate depending only
 on the plan and envelope types, `seccompiler-chio` and `nono-chio`, with a
@@ -144,12 +148,13 @@ route, a relay through the coordinator) inherits a plaintext signing share
 silently, because the type permits it. This is the design document's mechanism B
 in the wrong direction: the struct makes the unsafe state representable.
 
-**Fix.** Encrypt round-2 `package_bytes` to the recipient's transport key inside
-`authenticated_package` when `round == Round2`, so `package_hex` carries
-ciphertext for round 2 and plaintext only for round 1; the `transport_key_id`
-field already identifies the key, and HPKE or X25519 with an AEAD bound to the
-same associated data the store uses is the natural choice. Better still, split the
-types: `FrostRound1Package` (public, `Serialize`) and `SealedFrostRound2Package`
+**Fix.** The immediate boundary, which needs no new cryptography, is to stop the
+plaintext round-2 form from implementing `Serialize` at all. Sealing is a design
+note before it is code: the existing transport key is a *signature* key, so
+"encrypt to it" is not an envelope (the external review's correction); the note
+must choose an encryption suite and keys distinct from the signature key, bind the
+recipient, authenticate the metadata, and specify decryption and replay tests.
+The type split is the durable shape either way: `FrostRound1Package` (public, `Serialize`) and `SealedFrostRound2Package`
 (ciphertext, `Serialize`), with the plaintext round-2 form never implementing
 `Serialize` at all. Add a test that serializes a round-2 package and asserts the
 signing-share bytes do not appear in the output. Hardening item H7 now carries this
@@ -170,13 +175,17 @@ production code; none of the seven `select!` arms awaits a commit, insert,
 execute or append in the same block (the only lexical hits were in test files).
 Store I/O runs through ten `spawn_blocking` sites, which is the right shape.
 
-The structural reason this is safe is worth writing down so a refactor does not
-lose it: `rusqlite::Transaction` rolls back on drop, so a future cancelled before
-`commit()` leaves no partial durable state. The exposure that remains is the one
-the system already models explicitly: an external effect between commit and
-acknowledgement, which is the "unknown outcome" state and is resolved only by
-exact durable readback. Cancellation safety here is a property of RAII plus the
-existing recovery design, not of care at each site.
+The first version of this paragraph concluded too much from the structure, and the
+external review corrected it. Two facts remain true: `rusqlite::Transaction` rolls
+back on drop, so a future cancelled before `commit()` inside an async task leaves
+no partial durable state; and the effect-between-commit-and-acknowledgement case is
+the unknown-outcome state the design already models. But store I/O here runs
+through `spawn_blocking`, and cancelling a future that awaits a `spawn_blocking`
+handle does not stop the blocking work: the operation can commit after the caller
+has already been cancelled and lost its acknowledgement. Whether the existing
+reconciliation binds that case is what has to be established, per store, and it is
+not established by this sweep. Cancellation safety here is a property of the
+recovery design if and only if that binding holds, not of RAII alone.
 
 ## U6 addendum: the `timeout()` sites, classified
 

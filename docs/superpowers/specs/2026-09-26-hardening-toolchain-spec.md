@@ -45,9 +45,12 @@ table (H1, H4) silently misses those 19 crates unless each manifest is edited
 too, and nothing today would notice. The manifest's own comment ("every member
 crate inherits this block") is already untrue.
 
-**Target.** A gate that parses every opt-out manifest and asserts its
-`[lints.clippy]` is a superset of the workspace table, with a self-test that
-fails when a workspace lint is added and not mirrored. Run it first in Lane K, so
+**Target.** A gate that parses every opt-out manifest and asserts that both its
+`[lints.rust]` and `[lints.clippy]` tables carry every workspace lint at the same
+level with the same explicit exceptions (H1 adds `unsafe_op_in_unsafe_fn` to the
+*Rust* table, which a Clippy-only comparison would miss, per the external review's
+R8), with a self-test that fails when a workspace lint is added to either table and
+not mirrored. Run it first in Lane K, so
 H1 and H4 land on a base where reaching all crates is checked rather than
 assumed.
 
@@ -109,14 +112,15 @@ more with one file each.
 **Target.** A nightly `miri.yml` lane running `cargo +nightly miri test -p <crate>`
 on every crate in a committed list, with `MIRIFLAGS` and a nightly date pinned in
 the workflow so the lane is reproducible; the workspace's stable 1.94.1 pin is
-untouched. Two limits bound the scope honestly. Miri cannot execute `seccomp`,
-Landlock, `fork`, `memfd` or raw socket syscalls; tests that reach them are
-marked `#[cfg_attr(miri, ignore)]` with the syscall named in a comment. Miri also
-cannot call into C: anything that opens SQLite (`rusqlite`, so the whole store
-crate) or signs and verifies through `aws-lc-rs` is out of reach unless a
-pure-Rust backend feature exists for the test build. Classify each crate's
-tests accordingly before promising coverage, and run unit tests only; Miri is
-10 to 100 times slower than native execution. Everything else runs: pointer casts, slice
+untouched. Two limits bound the scope honestly, and they are the only two exclusion reasons.
+Miri cannot execute `seccomp`, Landlock, `fork`, `memfd` or raw socket syscalls;
+Miri cannot call into C, so anything that opens SQLite (`rusqlite`, the whole store
+crate) or signs through `aws-lc-rs` is out of reach unless a pure-Rust backend
+feature exists for the test build. Every excluded test names which of the two
+applies in its `#[cfg_attr(miri, ignore)]` reason. A crate on the list must show
+that its `unsafe` code actually executes under Miri (a canary test per `unsafe`
+module, or coverage), because a green list of crates whose unsafe paths were all
+ignored proves nothing. Unit tests only; Miri is 10 to 100 times slower. Everything else runs: pointer casts, slice
 construction, FFI-adjacent buffer handling, the decimal formatter in
 `write_current_pid`, transmute-free but layout-sensitive code, the parsers under
 their proptest generators.
@@ -154,8 +158,14 @@ list; the gate has a self-test.
 `clippy::dbg_macro` 0, `clippy::print_stdout` 0, `clippy::as_conversions` 0,
 `missing_docs` 1, `unreachable_pub` 0.
 
-**Target.** A `[lints]` table in each of the 22 crates, inheriting the workspace
-table and adding:
+**Target.** Cargo rejects `workspace = true` combined with local entries in one
+`[lints]` table (`cannot override workspace.lints in lints`, reproduced by the
+external review's probe), so each of the 22 crates either carries a complete local
+mirror of the workspace tables plus the additions below, kept in parity by H0's
+gate, or applies the additions as crate-root `#![deny(...)]` attributes. Each
+category is mutation-tested: a violating fixture in the crate fails the build. The
+remediation of existing sites is performed by the lane that owns each crate, not by
+the gates lane. The additions:
 
 | Lint | Why, for this TCB |
 | --- | --- |
@@ -197,11 +207,17 @@ thing the standard's rule 2.5 forbids for closed wire and state-machine types.
 **Target.** `cargo-nextest` pinned by version, installed by the CI setup step, with
 `.config/nextest.toml` committed:
 
-- `slow-timeout = { period = "60s", terminate-after = 3 }` so a hung test is
-  killed and named instead of hanging the lane
-- `leak-timeout = "500ms"` so a test that leaves a child process or thread behind
-  is reported (this is the "background waiter killed" class recorded in the
-  ledger)
+- `slow-timeout` with **per-group overrides that preserve every existing inner
+  deadline**: a native recovery harness already allows its child 300 s before
+  restart verification (`native_flow_caller_process_tests.rs:174`), so a global
+  180 s cutoff would kill a correct test and misreport it as isolation-dependent
+  (the external review's R7). The default applies only to tests with no declared
+  deadline
+- `leak-timeout` for what it actually detects: a child process still holding the
+  test's inherited stdout or stderr. It does not see threads, nor a child whose
+  streams were redirected to a file, which the native harness does; keep the
+  existing child-lifecycle assertions for those. Set the leak outcome to fail
+  explicitly, since nextest treats leaks as passing by default
 - `retries = 0` in the required lanes. Retries hide flakes. A separate,
   non-required "flake census" lane runs with `retries = 2` and `--no-fail-fast`
   and publishes which tests needed a retry, so flakes are measured, never
@@ -275,7 +291,12 @@ the serialized output.
 **Acceptance.** No secret-bearing struct derives `Debug` or `Serialize` on the
 secret field; `expose_secret()` call sites are the complete inventory of where
 secrets are read; a gate fails on a new `Zeroizing<` field in a `Debug`-deriving
-struct in the security crates.
+struct in the security crates. For the FROST round-2 package specifically: the
+immediate boundary is removing `Serialize` from the plaintext round-2 form;
+sealing is a separate design note (encryption key suite distinct from the
+signature key, recipient binding, authenticated metadata, decryption and replay
+tests), because encrypting to the existing transport *signature* key is not an
+envelope, per the external review.
 
 ### H8. `cargo-semver-checks` and `cargo-public-api` for the publishable crates
 
@@ -325,11 +346,14 @@ bump from v4 to v6 was caught only because two round-trip tests happened to pin
 the literal. A bump to `chio.broker-execute.v1` would be caught by nothing.
 "Never break userspace" has no enforcement for 280 of 588 wire formats.
 
-**Target.** A committed snapshot, `spec/wire-schemas.lock` (value, declaring
-files, first-seen commit), and a generated test per crate asserting every schema
-constant equals its snapshot entry. A bump then requires editing the snapshot in
-the same commit, which is the deliberate acknowledgement a wire change deserves,
-and the diff shows exactly which format moved. For the 55 duplicates: one
+**Target, narrowed per the external review's R10.** A committed snapshot,
+`spec/wire-schemas.lock` (value, declaring files, first-seen commit), and a
+generated test per crate asserting every schema constant equals its snapshot entry.
+This makes an identifier change an *acknowledged* change and nothing more: renaming
+a field while keeping the identifier passes it, and bumping identifier and snapshot
+together says nothing about historical readers. Compatibility is a separate
+mechanism: each schema entry is associated with a canonical-byte shape fixture and
+an old-reader test, so a shape change fails independently of the identifier. For the 55 duplicates: one
 declaration per value in a `WireSchema` registry, the same shape as the `Domain`
 enum in the unrepresentable-defects design, imported everywhere else. The
 snapshot and generated tests are additive and belong early in Lane K; the
@@ -341,18 +365,22 @@ count is 0 or each remaining duplicate has a reason in the registry.
 
 ### H11. A dependency budget for privileged helpers
 
-**Census.** `chio-cage`, which ships the confinement helper binary
-`chio-cage-init`, has a normal-dependency graph of **344 unique crates**,
+**Census.** `chio-cage`, the package that ships the confinement helper binary
+`chio-cage-init`, has a normal-dependency **package graph** of **344 unique
+crates**,
 unchanged with default features off, including `tokio`, `hyper`, `hyper-util`,
 `reqwest`, `tower-http`, `rustls-webpki`, `aws-lc-rs`, `regex`, `fancy-regex`,
 `serde_json` and `tracing`. The cause is the crate's dependency on `chio-core` and
 `chio-manifest`. `chio-secret-broker` is at 640, `chio-keyring` at 94,
 `chio-security-types` at 10.
 
-The helper is the most privileged program at runtime: it runs before confinement
-exists, as root during provisioning, and everything compiled into it is in its
-trust base. The existing static-PIE and ELF checks prove the artifact has no
-dynamic dependencies; they do not bound what was linked in.
+A package graph is not binary linkage: `cargo tree` reports what a package depends
+on, not what the linker kept in a particular target's artifact, and Cargo does not
+promise equivalence. So the first version's "an HTTP client compiled into the
+helper" is withdrawn until measured; what is established is that the helper's
+*package* carries the platform's graph. The helper is still the most privileged
+program at runtime, and the existing static-PIE and ELF checks prove only the
+absence of dynamic dependencies.
 
 **Target.** Move the helper into its own crate depending only on the plan and
 envelope types, `seccompiler-chio` and `nono-chio`. Measure its graph on the musl
@@ -360,8 +388,10 @@ target, set a committed ceiling from that measurement, and gate it: a script run
 `cargo tree -p chio-cage-init --edges normal --target x86_64-unknown-linux-musl`,
 fails above the ceiling, and fails on any crate from a deny-list (`tokio`,
 `hyper`, `reqwest`, `rustls`, `regex`, `serde_json` unless the plan format needs
-it). Apply the same gate, with its own ceiling, to `chio-secret-brokerd`, whose
-640 is the next question.
+it). Apply the same gate, with its own ceiling, to the `chio-secret-broker` package
+(`chio-secret-brokerd` is a binary target inside it, not a package name), whose
+640 is the next question. Artifact provenance, what the release binary actually
+contains, is measured separately from the package budget.
 
 **Acceptance.** The helper's graph is under its ceiling with no deny-listed
 crate; the gate has a self-test that fails when a deny-listed crate is added;

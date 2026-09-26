@@ -124,10 +124,13 @@ retrofits them.
 
 **2.3 Use typestate when it removes a whole class of omission.** When a security
 check must precede an operation, make the check produce a token the operation
-requires. `prepare_response_dispatch` should accept `LiveAuthorizedPlan`, not
-`ResponsePlan` plus a remembered call to `require_execution_mode` (finding Q3).
+requires. Fresh dispatch should accept `FreshLiveAdmission`, and resume should accept
+`CommittedResumeAuthority` constructed only by the durable recovery verification,
+not `ResponsePlan` plus a remembered call to `require_execution_mode` (finding Q3).
 Five hand-placed call sites is five chances to forget and no compiler help on the
-sixth.
+sixth. The token must also not be obtainable by the caller asserting its own
+provenance: one type parameterized by a caller-supplied commit mode fails this
+rule (the external review's R1).
 
 Typestate is not free, so the bar is: it must remove a *demonstrated* invalid
 state or a *demonstrated* omission risk, not a hypothetical one. Five manual call
@@ -169,7 +172,10 @@ an accidental bump is caught only where a round-trip test happens to hardcode th
 literal, which is how the `3cd73631a1` regression was found.
 
 *Enforced by:* a committed schema snapshot with generated pinning tests
-(hardening spec H10). Does not exist yet. Debt item.
+(hardening spec H10), which makes an identifier change an acknowledged change and
+nothing more; compatibility with historical readers is a separate property,
+established by canonical-byte shape fixtures and old-reader tests per schema. Neither
+exists yet. Debt item.
 
 ---
 
@@ -653,19 +659,22 @@ the ledger should not let the second be read out of the first.
 
 ## 14. State recovery, serialization boundaries and tenant isolation
 
-**14.1 Lock-poison policy is uniform and decided once.** `std::sync::Mutex`
-poisons on a panic and stays poisoned for the process lifetime, so a single panic
-inside a critical section permanently disables whatever the lock guards. Pick one
-policy per guarded resource and apply it to every store: recover with
-`into_inner()` where the state is known-consistent after a panic, or wrap the
-critical section in `catch_unwind` so the panic becomes one failed operation. For
-a SQLite connection the state is recoverable, because an aborted transaction rolls
-back, so recovery is the default. Every mutex-guarded store's connection lock
-(18 stores, 26 sites) maps poison to a permanent error (finding S1). The 13 pooled
-stores, including the receipt store, are not exposed, and poison recovery is
-applied to a public-key cache lock elsewhere. So both remedies, pooling and
-recovery, are already in the tree and neither is applied to the 18.
-
+**14.1 Lock-poison recovery is decided by durable phase, verified, and fenced when
+it cannot be verified.** Recovering the mutex proves nothing about the resource
+behind it. `Transaction::drop` attempts a rollback and discards the result; an
+independent probe showed `into_inner()` returning a connection still inside a
+transaction with an uncommitted row readable. And every mutex-guarded store pairs
+database commits with external state (rollback anchors, path markers, fsync'd
+directories), so a panic after commit and before the anchor write is not an
+aborted transaction, and the next operation may be correct to refuse. Therefore:
+on a poisoned lock, establish the state before returning the guard
+(`is_autocommit()`, an explicit rollback, then owner and anchor consistency
+against the database head); where any of that cannot be verified, fence the
+resource with a named error and require a reopen. Test four phases per store
+(before commit, rollback failure, after commit before anchor, after anchor before
+acknowledgement), each asserting a specific outcome. "The next operation
+succeeds" is the wrong oracle. The first version of this rule said the opposite
+and was corrected by the external review's finding R3.
 *Enforced by:* a per-store test that panics inside the lock and asserts the next
 operation succeeds. Does not exist. Debt item.
 
@@ -707,19 +716,25 @@ reference shape; a chain-link column declared bare `TEXT` next to it is the
 inconsistency. Shape, nullability and range all belong in the schema, in addition
 to the Rust check, because rule 1.5 permits the same rule at a second *mechanism*.
 
-**14.6 Every tenant-scoped table is classified, and the classification is
-gated.** A table with a `tenant_id` column is either "tenant predicate required"
-or "accessed by a globally unique unguessable identifier whose derivation is
-named". Record which, next to the schema. Gate on statements touching the first
-class without a `tenant_id` predicate. 64 tables and 72 unscoped statements with
-no classification means nobody can state the isolation property, including a
-reviewer who tries (finding S3).
+**14.6 Every tenant-scoped table is classified by the principal that enforces
+its boundary, and the classification is gated.** A table with a `tenant_id` column
+is read either under a tenant predicate, under a privileged administrative
+principal that is named, or under an explicit bearer-capability contract in which
+possession of an identifier is deliberately authority. "Accessed by an unguessable
+identifier" is not a fourth class: it names how the row is found, not who is allowed
+to find it. Record the class next to the schema; gate on statements touching a
+tenant-predicate table without the predicate; and give every isolation test tenant
+B the exact valid identifier belonging to tenant A and require denial. 64 tables
+and 72 unscoped statements with no classification means nobody can state the
+isolation property (finding S3, as corrected by the external review's R4).
 
-**14.7 Unguessability is a derivation, not a hope.** Where isolation depends on
-an identifier being unguessable, derive it (`domain_hash(DOMAIN, &canonical)`, as
-`enterprise_receipt.rs:414` does) and give it a type whose constructor is that
-derivation. An opaque `String` identifier that *happens* to be unpredictable today
-is one convenience change away from being sequential, and nothing would fail.
+**14.7 A derived identifier is an identity, not a secret.** A content hash is
+computable by anyone holding its inputs, and any identifier, derived or random,
+stops being secret the moment it appears in a receipt, a log line or a link, which
+is where identifiers go. So derivation gives collision resistance and typed
+construction, both worth having, and never authorization. Where possession of an
+identifier is meant to confer access, say so as a bearer-capability contract with
+its own issuance, scope and revocation, and test it as one.
 
 **14.8 A vendored fork records its upstream, its patches and its diff.** The
 existing practice is the standard: an exact upstream pin, a `-chio` version

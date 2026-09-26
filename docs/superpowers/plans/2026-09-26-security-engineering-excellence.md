@@ -30,8 +30,8 @@ Packet 0   build, gate and measurement integrity     <- NEW, before parent Packe
 Packet 1   production signed response dry-run        (parent)
              + 1D  error taxonomy          <- FIRST, gates Packet 1's own test corpus
              + 1A  binding unconstructible
-             + 1B  mode typestate
-             + 1C  legacy provenance and sunset
+             + 1B  fresh and resume authority types
+             + 1C  legacy provenance, obligation-inventory retirement
              + 1E  domain constants
 Packet 2   prove repaired boundaries                 (parent) + 2A arch probe
                                                               + 2B syscall key validation
@@ -45,6 +45,15 @@ Packet 8   accounting type safety                    <- NEW, after Packet 7
 Packet 9   measurement and hot-path cost             <- NEW, 9.1 can start any time
 Packet 10  state recovery and isolation boundaries   <- NEW, 10.1 is COUPLED to Packet 0.2
 ```
+
+The external review of September 26 corrected four designs in this order (1B, 1C,
+10.1, 10.3) and the aggregation contract in 9.2; the corrected text is in place
+below and the dispositions are in
+[the review response](../../reviews/2026-09-26-external-design-review-response.md).
+The sequencing rule it set is adopted: finish the bounded production dry-run and
+its recovery and fuzz evidence first; keep gate work and CI repair independent;
+defer broad connection, module and toolchain migrations to separately reviewable
+changes with their own qualification.
 
 Packet 9's first task (benchmark coverage) has no dependency on any other packet
 and changes no production code, so it can run in parallel with Packet 0 whenever a
@@ -225,35 +234,43 @@ diagnosable from a receipt.
 
 ---
 
-### Correction 1B: Replace six manual mode checks with one typestate
+### Correction 1B: Replace the manual mode checks with two authority types
 
 **Owners:** `chio-security-types/src/response.rs`,
 `chio-quarantine/src/state_machine.rs`,
-`chio-kernel/src/kernel/active_response_coordinator.rs`.
+`chio-kernel/src/kernel/{active_response_coordinator,active_response_committed_recovery}.rs`.
 
 Addresses Q3. Land before the dry-run evaluator is wired, while the surface is six
 call sites (`state_machine.rs:118`, `:684`, `:1000`;
 `active_response_coordinator.rs:269`, `:281`).
 
-- [ ] Introduce `LiveAuthorizedPlan`, a newtype over `ResponsePlan` whose only
-      constructor performs the live-mode check, parameterized by
-      `ResponseDispatchCommitMode` so the `Fresh` and resume rules live in one
-      place.
-- [ ] Change `prepare_response_dispatch` and both kernel admission entry points to
-      accept it. Remove the duplicated inverse condition at `state_machine.rs:686-687`; the rule must exist exactly once.
+- [ ] Introduce `FreshLiveAdmission`, whose only constructor requires provenance
+      bound to the live mode, and `CommittedResumeAuthority`, constructible only
+      inside the durable recovery verification and binding the exact operation,
+      plan hash, tenant, dispatch and executor generation it verified. A single
+      token parameterized by a caller-supplied commit mode is rejected by the
+      external review's finding R1: it let a caller obtain authority for a legacy
+      plan by naming a resume mode.
+- [ ] Fresh dispatch and both kernel admission entry points accept
+      `FreshLiveAdmission` only; resume paths accept `CommittedResumeAuthority`
+      only. Fresh admission must not accept the resume type, as a compile error.
+      Remove the duplicated inverse condition at `state_machine.rs:686-687`; each
+      type carries its own rule exactly once.
 - [ ] Confirm by construction that no live path accepts a bare `ResponsePlan`.
       Grep for remaining `require_execution_mode` callers and expect only the
       constructor.
-- [ ] Add the dry-run isolation oracle as a test, not only as a fuzz oracle: a
-      `DryRun` plan is rejected at every live entry point including both resume
-      modes, and a simulated plan cannot populate recoverable live dispatch work.
-      Assert the specific rejection variant from 1D.
+- [ ] Negative tests, each asserting its `DispatchRejection` variant: a `DryRun`
+      plan at every fresh entry point; a legacy plan at every fresh entry point; a
+      legacy plan plus a caller-selected resume mode with no durable commitment;
+      and a simulated plan that cannot populate recoverable live dispatch work.
 - [ ] Record in the module docs that signature coverage of `execution` via
       `authorization_body()` is what blocks strip-to-legacy laundering, so a future
       change to the signed body does not silently remove that property.
 
-**Exit:** Omitting the mode check is a compile error, the rule exists once, and the
-property that defeats laundering is written down where the signed body is defined.
+**Exit:** Omitting the mode check is a compile error, fresh and resume authority
+are distinct types with distinct constructors, a caller cannot reach the resume
+rule by naming a mode, and the property that defeats laundering is written down
+where the signed body is defined.
 
 ---
 
@@ -267,16 +284,23 @@ Addresses Q4.
 - [ ] Replace `Option<ResponseExecutionBinding>` with
       `PlanProvenance::{Legacy, Bound(ResponseExecutionBinding)}`. Matches become
       exhaustive and the three cases are named at every site.
-- [ ] Add a query and a gate that count durable response-dispatch rows carrying
-      `Legacy` provenance. A legacy acceptance branch with no inventory has no
-      defensible retirement date.
-- [ ] Encode the retirement condition: the `Legacy` arm fails closed once the count
-      reaches zero or the maximum lease horizon has elapsed since migration,
-      whichever comes first.
-- [ ] Record the count and condition in the schema v5 migration note beside the
-      existing forward-migration warning.
+- [ ] Separate two switches. Stopping new legacy admissions is one and may happen
+      early. Retiring historical reconciliation is the other and requires an
+      inventory of every unresolved obligation: admission commitments without a
+      dispatch row (the kernel explicitly recovers a crash at that point,
+      `active_response_committed_recovery.rs:365` and `:509`), dispatches in
+      flight, retained preparations and cleanup obligations. A count of dispatch
+      rows is not that inventory.
+- [ ] Encode the retirement condition as: every inventoried obligation is
+      terminal or explicitly migrated. Neither a zero row count nor an elapsed
+      horizon is sufficient, per the external review's finding R2. Acceptance
+      includes the exact case: crash after admission commitment and before the
+      dispatch row, then migration, then restart, and the owed recovery completes.
+- [ ] Record the inventory and the condition in the schema v5 migration note
+      beside the existing forward-migration warning.
 
-**Exit:** Legacy tolerance is named, counted, and retires on a stated condition.
+**Exit:** Legacy tolerance is named, new admissions can be stopped independently,
+and reconciliation retires only when the obligation inventory is terminal.
 
 ---
 
@@ -302,8 +326,11 @@ Addresses R4 for the `chio.response-*` family, which Packet 1 is already editing
       same bytes (`EFFECT_ID_DOMAIN` versus `RESPONSE_EFFECT_ID_DOMAIN`,
       `TRANSITION_ID_DOMAIN` versus `RESPONSE_MUTATION_ID_DOMAIN`), which is why a
       grep by name missed the duplication.
-- [ ] Have test literals reference the constant rather than repeating the bytes, so
-      a future value change cannot leave a test asserting the old domain.
+- [ ] Production shares one declaration per value. Tests do **not** reference it:
+      a test that reads the constant it exists to pin asserts nothing about its
+      value and cannot detect a compatibility break (the external review's R10).
+      Tests keep independent literal known-answer fixtures for the domain bytes and
+      for digests computed over them.
 - [ ] Leave the `chio.fincred.*` and `chio.runtime-replay-source-seal.*` families
       to follow-ups outside this packet; they are not on the response path.
 
@@ -580,9 +607,12 @@ before-and-after number (standard rule 13.9).
 
 - [ ] Aggregate over the existing typed `cost_charged_be` column
       (`receipt_store/bootstrap/open.rs:569`) instead of
-      `json_extract(r.raw_json, '$.metadata.financial.cost_charged')`. The typed,
-      `CHECK`-constrained column already holds this value; the JSON parse per row is
-      pure waste.
+      `json_extract(r.raw_json, '$.metadata.financial.cost_charged')`. The column
+      is the eight big-endian bytes of a `u64` (`to_be_bytes()`), so SQL `SUM` or
+      `CAST` on the BLOB is not decoding it (the external review's R9). The
+      contract is exact: decode each row through a registered scalar function or
+      in Rust after a typed fetch, accumulate in `u128` or checked `u64`, and give
+      overflow a named error rather than a saturated value.
 - [ ] Do the same for `attempted_cost`, adding a typed column if one does not exist.
 - [ ] Replace the `(?N IS NULL OR col = ?N)` optional-filter shape so the six
       existing indexes on `timestamp`, `capability`, `subject`, `grant`, `tool` and
@@ -590,8 +620,13 @@ before-and-after number (standard rule 13.9).
 - [ ] Add a test that runs `EXPLAIN QUERY PLAN` and fails on a `SCAN` where an index
       is expected, so the shape cannot silently regress (standard rule 13.3).
 - [ ] Bound the unfiltered case with a required time window or a rollup table.
-- [ ] Confirm the aggregate values are unchanged against a populated fixture. This is
-      a financial report; the numbers must match byte for byte before and after.
+- [ ] Do not require byte-identical output: the current JSON path saturates any
+      value at or above 2^63 to 2^63 minus 1, a latent defect that "unchanged"
+      would preserve. Confirm equality against a populated fixture for every value
+      below 2^63, and add edge fixtures at 2^63 minus 1, 2^63, 2^64 minus 1 and a
+      sum that overflows `u64`, each asserting the exact decoded result or the
+      named overflow error. This is a financial report; the contract must be exact
+      and stated.
 
 #### 9.3 Statement caching on per-operation reads (P3)
 
@@ -637,27 +672,38 @@ optimization (standard rule 13.9).
 **Owners:** the seven SQLite stores' connection guards, `canonical.rs` consumers,
 the 64 tenant-scoped tables, `receipt_store/bootstrap/open.rs` triggers.
 
-#### 10.1 Uniform lock-poison policy (S1) - COUPLED to Packet 0.2
+#### 10.1 Phase-aware lock-poison recovery (S1, corrected by the external review's R3) - COUPLED to Packet 0.2
 
-- [ ] Decide one policy per guarded resource and apply it to every store. For a
-      SQLite connection, recover with `into_inner()`: an aborted transaction rolls
-      back, so the guarded state is consistent after a panic. This is the
-      shape `authority.rs:694-730` already uses for its public-key cache lock, or
-      catch the panic before it reaches the lock, which is the shape the receipt
-      store's writer actor uses.
-- [ ] Apply it to all 18 mutex-guarded stores (22 files, 26 connection lock sites),
-      which pass 7's census found include the admission-operation, budget,
-      revocation, security-state, serving-owner and tool-outcome stores, not only
-      the four first named (`fiscal_store.rs:177`, `finding_purchase_store.rs:397`,
-      `sealed_decoy_registry.rs:58`, `finding_challenge_store.rs:658`). No
-      connection guard recovers today. The receipt store is pool-based and not
-      exposed; 13 stores already use `Pool<SqliteConnectionManager>`, so decide
-      with Packet 9.4 whether the 18 adopt recovery or move to the pool shape.
-- [ ] Add a per-store test that panics inside the lock and asserts the next
-      operation succeeds. Four stores fail this today.
-- [ ] Do not reach for `parking_lot` to make the problem disappear. A non-poisoning
-      mutex hides a panic that left state inconsistent; the point is to decide
-      whether the state is recoverable, per resource, and record the decision.
+- [ ] Do not recover blindly. The first version of this item said "recover with
+      `into_inner()`, because an aborted transaction rolls back." `Transaction::drop`
+      discards the rollback result, an independent probe showed the recovered
+      connection still inside a transaction with the uncommitted row readable, and
+      every one of the 18 stores pairs commits with external anchors or filesystem
+      state (`fiscal_store.rs:338` commits before its anchor sync).
+- [ ] One shared helper that, on a poisoned lock, establishes state before returning
+      the guard: `is_autocommit()`, an explicit `ROLLBACK` if a transaction is open,
+      then the store's owner and anchor consistency check against the database head.
+      Where any step fails or cannot be verified, the helper returns a named fenced
+      error and the store stays fenced until reopened. Fail closed with a reason.
+- [ ] Per-store classification, recorded at the call sites, across all 18
+      mutex-guarded stores (22 files, 26 connection lock sites; the 13 pooled stores
+      including the receipt store are not exposed): which stores pair a commit with
+      an external artifact and what the consistency check is; which have no external
+      pairing and all writes through RAII transactions, where recovery after a
+      verified rollback is permitted with the reason stated.
+- [ ] Four tests per store with specific outcomes, never "the next operation
+      succeeds": panic before commit (rollback verified, next operation succeeds);
+      panic with rollback made to fail through the authorizer (fenced, uncommitted
+      row never read); panic after commit before the anchor write (refuse or
+      reconcile per the store's contract, assert which); panic after anchor before
+      acknowledgement (the store's prescribed recovery). Mutation check: blind
+      recovery in place of the fence must fail the rollback-failure test.
+- [ ] The coupling to Packet 0.2 stands with a changed argument: with fencing, a new
+      arithmetic panic becomes a named fenced store instead of an anonymous permanent
+      "unavailable", and that is the improvement the two changes deliver together.
+      Decide with Packet 9.4 which stores move to the pool shape instead; where one
+      does, the fence is removed in the same change.
+- [ ] Do not reach for `parking_lot`: a non-poisoning mutex hides the panic.
 
 #### 10.2 Type the untrusted-serialization boundary (S2)
 
@@ -668,21 +714,27 @@ the 64 tenant-scoped tables, `receipt_store/bootstrap/open.rs` triggers.
 - [ ] Add a gate listing the constructors, so a new boundary that forgets the type
       is visible in review.
 
-#### 10.3 Classify and gate tenant scoping (S3)
+#### 10.3 Classify tenant scoping by the enforcing principal (S3, corrected by the external review's R4)
 
-- [ ] Classify each of the 64 tenant-scoped tables as "tenant predicate required"
-      or "accessed by a globally unique unguessable identifier, derivation named".
-      Record it next to the schema.
-- [ ] Resolve the open question first: establish how `chio_tool_receipts.receipt_id`
-      is produced in production. If it is not derived, the 72 unscoped statements
-      need re-examining as a possible cross-tenant read and this becomes a P1.
-- [ ] Gate on statements touching a predicate-required table without a `tenant_id`
-      predicate.
-- [ ] Add a cross-tenant read attempt as a test for every table in the second
-      class. None exists today.
-- [ ] Where isolation depends on unguessability, give the identifier a typed
-      constructor that performs the derivation (standard rule 14.7), following
-      `enterprise_receipt.rs:414`.
+- [ ] Classify each of the 64 tenant-scoped tables by who is allowed to read it:
+      tenant predicate required; privileged administrative read under a named
+      principal; or an explicit bearer-capability contract where possession of an
+      identifier is deliberately authority. "Unguessable derived identifier" is not
+      a class: a content hash is computable from its inputs and identifiers appear
+      in receipts and logs.
+- [ ] Record the class next to the schema. Gate on statements touching a
+      tenant-predicate table without the predicate.
+- [ ] Every isolation test gives tenant B the exact valid identifier belonging to
+      tenant A and requires denial, for every table in every class. None exists
+      today.
+- [ ] Resolve how `chio_tool_receipts.receipt_id` is produced first
+      (`receipt/body.rs:240` derives it from the body); if unscoped reads on it are
+      meant to be authorized by possession, that is a bearer contract to specify,
+      not a property to assume. If no such contract is intended, the 72 unscoped
+      statements are a possible cross-tenant read and this becomes a P1.
+- [ ] Typed derivation (standard rule 14.7, following `enterprise_receipt.rs:414`)
+      is still worth having for collision resistance and construction discipline;
+      it is not the isolation mechanism and is not recorded as one.
 
 #### 10.4 One parser for signed data, and constrained columns (S4)
 

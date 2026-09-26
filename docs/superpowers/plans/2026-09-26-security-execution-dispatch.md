@@ -91,7 +91,7 @@ longest and is internally sequential.
 | Lane | Packets | Owned files (exclusive) | Model | Exit |
 | --- | --- | --- | --- | --- |
 | **A** gates and profile | 0.1, 0.2 (manifest half), 0.3, 0.4, 0.5 | `scripts/check-rust-file-hygiene.py` and its test; new `scripts/check-domain-separation.py` and `scripts/check-negative-assertions.py` with self-tests; root `Cargo.toml` (`[workspace.lints]`, `[profile.*]`) and scoped lint tables in budget/quota crates | Opus 5 | every new gate fails on its violating fixture; baselines recorded by ratchet; `overflow-checks = true` in release and docker-release with a release-profile check that an overflow aborts |
-| **B** poison policy | 10.1 (store half of the 0.2 coupling) | the 22 `chio-store-sqlite` files holding `Mutex<Connection>` and their test modules; no other store file | Fable 5.1 | 26 of 26 connection lock sites apply one recorded policy; 18 per-store tests panic inside the lock and assert the next operation succeeds |
+| **B** poison policy | 10.1 (store half of the 0.2 coupling) | the 22 `chio-store-sqlite` files holding `Mutex<Connection>` and their test modules; no other store file | Fable 5.1 | 26 of 26 connection lock sites go through one phase-aware helper that verifies rollback and anchor consistency or fences with a named error (the external review's R3); four phase tests per store with specific outcomes, and the blind-recovery mutation fails the rollback-failure test |
 | **C** measurement and analytics | 9.1, 9.2 | `chio-store-sqlite/benches/`, `receipt_store/reports/analytics.rs`, `receipt_store/bootstrap/open.rs` (typed column for attempted cost if absent), a populated-fixture test module | Opus 5 | composite-authorization, charge/release and denial-read benchmarks against a populated store, baselines in the ledger; all four `json_extract` aggregates replaced by the typed columns; `EXPLAIN QUERY PLAN` asserted in a test; aggregate values proved byte-identical against the fixture |
 | **D** Packet 1 continuation | 1D, then 1A 1B 1C 1E 1F, then the parent Packet 1 tasks | `chio-security-types/src/response*.rs`, `chio-quarantine/src/**`, `chio-kernel/src/kernel/active_response*`, `chio-active-response-authority/src/**`, `chio-control-plane/src/security/**`, `chio-core-types/src/receipt/security*` | Fable 5.1 | see below |
 | **E** CI triage (read-only) | none; a report | no edits; reads CI logs at `3cd73631a1` | Sonnet 5 | each of the six red steps classified as infrastructure, Packet 5 prerequisite, or code regression; a reproduction and proposed fix for any regression, delivered as a report for a Wave 2 lane |
@@ -106,9 +106,10 @@ rule, `StateMachineError::InvalidDispatch(DispatchRejection)`, replacement of th
 112 `map_err(|_| ...)` discards in the quarantine crate and the kernel response
 coordinator (26 in `state_machine.rs` first), and registration of the five ad-hoc
 `chio-security-types` port codes. Then 1A to 1F together, while the binding has
-five call sites: private fields with `try_from`, `LiveAuthorizedPlan` replacing the
-five `require_execution_mode` sites and the inverse rule at
-`state_machine.rs:686-687`, `PlanProvenance` with the counted sunset, the response
+five call sites: private fields with `try_from`, `FreshLiveAdmission` and `CommittedResumeAuthority`
+replacing the five `require_execution_mode` sites and the inverse rule at
+`state_machine.rs:686-687` (two types, per the external review's R1),
+`PlanProvenance` with the obligation-inventory retirement (R2), the response
 domain constants imported from `chio-security-types`, and the strict
 canonicalization boundary enumeration. Then the parent packet's remaining tasks,
 resuming from the red test: the deployment config accepts and authenticates
@@ -134,16 +135,27 @@ so D's code is measured by them from its first commit.
 
 ## Wave 2
 
-After Wave 1 merges and checkpoints. Ownership stays disjoint per lane.
+Rewritten after the external review's findings R5 and R6. The first version
+assigned four lanes to the same store files and left parent Packet 4 with no
+owner. Ownership below is by directory, published, and store changes are
+sequenced inside a single owner rather than merged across lanes. The
+requirement-to-lane ledger in
+[the review response](../../reviews/2026-09-26-external-design-review-response.md)
+is the authoritative map; nothing in the parent plan is without an owner.
 
-| Lane | Packets | Depends on | Notes |
+| Lane | Owns (exclusively, for the wave) | Work, in order | Starts after |
 | --- | --- | --- | --- |
-| F | Packet 8 `ExposureUnits` | B (touches the same budget store files) | the durable fix under A's `overflow-checks` backstop |
-| G | 4A clock port, then 4B assertion conversion | D (touches `active_response.rs`); 1D landed | 60 files; one port, three traits migrated, gate on new `SystemTime::now` |
-| H | 10.2 `UntrustedJsonText`, 10.3 tenant classification, 10.4 chain-link bind and `CHECK`, 3A wrapping sweep | 1F enumeration; C (shares `open.rs`) | 10.3 resolves `chio_tool_receipts.receipt_id` provenance before scheduling any remediation |
-| I | 9.3 `prepare_cached` on measured paths, 9.4 connection strategy | C's baselines; B | if 9.4 moves the 18 stores to the pool shape, B's recovery becomes moot and is removed in the same change |
-| J | Packet 2 boundaries, 2A, 2B; Packet 3 retention liveness #1045 | x86_64 runner or VM for the native cases | the process-cutpoint harness reruns against 9.4's connection strategy before 9.4 is accepted |
-| K | hardening toolchain per the [spec](../specs/2026-09-26-hardening-toolchain-spec.md): H0 lint-parity gate first, H10 schema snapshot and pins, H5 nextest, H3 `forbid` on 26 crates, H9 sanitizer audit, H11 helper dependency budget, H2 Miri lane, H1 unsafe lints (16 comments, measured), FV-E5 runbook for H6, H4 TCB deny set (last, after B, C, D merge) | B, C, D for H4 only | one commit per item, each with its gate's self-test or lane's red-on-mutation; H6's Verus lane, H7 `secrecy` and H8 semver follow in Wave 3 |
+| **M** parent Packet 4 | `fuzz/`, `formal/proof-manifest.toml`, `formal/rust-verification/`, `formal/apalache/`, the trace-validation surface | the `response_authority_protocol` and `response_lifecycle` fuzz harnesses with seeded corpora and recorded campaigns; production-linked Kani checks for the helpers 1A to 1C introduced; the response lifecycle model and trace validation; resolution of the temporal timeout in its owning lane | D merges |
+| **S** store owner | all of `chio-store-sqlite/src/` except `receipt_store/`; `chio-kernel/src/budget_store/` | Packet 8 `ExposureUnits`, then 9.3 `prepare_cached` on the paths C measured, then 9.4 connection strategy (which supersedes B's fencing where a store moves to the pool), then 10.3 classification, then 3A's store portion, then the H1/H3/H4 remediation for these crates | B, C merge |
+| **J** receipt-store owner and boundaries | `chio-store-sqlite/src/receipt_store/`, `chio-keyring/tests/`, `chio-secret-broker/src/process_boundary_tests/`, the process-cutpoint harness | Packet 3 retention liveness with #1045, then 10.4 chain-link bind and `CHECK`, then Packet 2 boundary proofs and 2A/2B (native cases on the CI runner); the cutpoint harness reruns against 9.4 before 9.4 is accepted | C merges; 2A/2B need the runner |
+| **G** kernel and security-types owner | `chio-security-types/src/`, `chio-kernel/src/` outside `budget_store/`, `chio-keyring/src/`, `chio-guards/src/external/cache.rs` | 4A clock port (one port, three traits migrated, gate on new `SystemTime::now`), then 10.2 `UntrustedJsonText` on 1F's enumeration, then 4B assertion conversion and H1/H3/H4 remediation for these crates | D merges |
+| **K** gates and configuration only | `scripts/`, `.github/workflows/`, `.config/`, `Cargo.toml` lint and profile tables, `formal/experiments/` | H0 parity gate (both lint tables), H10 snapshot and generated pins, H5 nextest configuration with per-group overrides, H9 sanitizer audit, H11 package dependency budget gate, H2 Miri lane configuration and crate list, FV-E5 runbook for H6; K writes no production source and hands the measured remediation lists to S, J and G | A merged (done) |
+
+Freeze and qualification (parent Packet 6) depend on the last source-changing
+lane above, not on the wave label. Corrections 4B, H1, H3 and H4 are exit
+criteria of the owning lanes, not separate work; K supplies the measurement and
+the gate. One commit per item, each with its gate's self-test or its lane's
+red-on-mutation.
 
 ## Wave 3
 
@@ -152,9 +164,15 @@ check) is assurance work that needs Connor's authority at several steps and runs
 alongside Waves 1 and 2 without competing builds. Packet 6 freezes the candidate
 and obtains the independent review. Packet 7 (structural remediation) runs last,
 against Lane A's measured baseline, one module at a time, cut and visibility and
-format as separate commits. Two further lanes open here per the hardening spec: a
-seeded deterministic scheduler over the store and broker actors, which depends on
-correction 4A's clock port, and a Hegel pilot on the SDK-parity surface only.
+format as separate commits, and against a **separately qualified follow-up
+candidate**, not the frozen launch candidate: broad post-freeze structural work
+would otherwise invalidate the qualification. Two further lanes open here per the
+hardening spec: a seeded deterministic scheduler over the store and broker actors,
+which depends on correction 4A's clock port, and a Hegel pilot on the SDK-parity
+surface only. H7's FROST round-2 envelope needs a design note (key suite distinct
+from the signature key, recipient binding, metadata authentication, replay) before
+it is a lane; removing `Serialize` from the plaintext round-2 form is the immediate
+boundary and may land earlier. H8 semver follows here as well.
 
 ## The brief every lane receives
 
