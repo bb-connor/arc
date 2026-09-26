@@ -8,7 +8,9 @@ use chio_core::capability::scope::Operation;
 use chio_core::capability::token::CapabilityToken;
 use chio_core::receipt::security::{ActiveDefenseReceiptBody, CorrelatedFindingReceiptBody};
 use chio_core::{canonical_json_bytes, Hash, PublicKey, Signature, SigningBackend};
-use chio_security_types::ports::{ActionId, Digest32, OpaqueReceiptRef, RecordId};
+use chio_security_types::ports::{
+    ActionId, Digest32, OpaqueReceiptRef, RecordId, RESPONSE_AFFECTED_SET_DOMAIN,
+};
 use chio_security_types::{
     ResponseApprovalRequirement, ResponseEffectKind, ResponsePlanAuthorizationBody, ResponseTarget,
 };
@@ -16,7 +18,6 @@ use serde::{Deserialize, Serialize};
 
 use super::{current_unix_timestamp_ms, ChioKernel, KernelCryptoFloor, KernelError};
 
-const AFFECTED_SET_HASH_DOMAIN: &[u8] = b"chio.response-affected-set.v1\0";
 pub const ACTIVE_RESPONSE_SUBMISSION_SCHEMA: &str = "chio.active-response-submission.v1";
 const ACTIVE_RESPONSE_SUBMISSION_SIGNATURE_DOMAIN: &[u8] = b"chio.active-response-submission.v1\0";
 
@@ -967,8 +968,8 @@ fn affected_set_hash(plan: &ResponsePlanAuthorizationBody) -> Result<Digest32, K
             "affected-set commitment canonicalization failed: {error}"
         ))
     })?;
-    let mut preimage = Vec::with_capacity(AFFECTED_SET_HASH_DOMAIN.len() + canonical.len());
-    preimage.extend_from_slice(AFFECTED_SET_HASH_DOMAIN);
+    let mut preimage = Vec::with_capacity(RESPONSE_AFFECTED_SET_DOMAIN.len() + canonical.len());
+    preimage.extend_from_slice(RESPONSE_AFFECTED_SET_DOMAIN);
     preimage.extend_from_slice(&canonical);
     Ok(Digest32::new(*chio_core::sha256(&preimage).as_bytes()))
 }

@@ -10,6 +10,7 @@ pub mod migration;
 pub mod ports;
 pub mod response;
 pub mod response_dispatch;
+mod response_domains;
 pub mod response_execution;
 
 pub use response_dispatch::DispatchRejection;

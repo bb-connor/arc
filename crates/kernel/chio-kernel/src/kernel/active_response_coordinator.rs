@@ -12,6 +12,7 @@ use chio_core::receipt::security::{
 use chio_core::{canonical_json_bytes, sha256, Hash};
 use chio_security_types::ports::{
     AdmissionArtifactRef, Digest32, EffectId, RecordId, ResponseDispatchApproval,
+    RESPONSE_AFFECTED_SET_DOMAIN, RESPONSE_EFFECT_ID_DOMAIN,
 };
 use chio_security_types::{
     PlannedResponseEffect, ResponseApprovalRequirement, ResponseEffectSpec, ResponseMutationRecord,
@@ -62,8 +63,6 @@ pub use admission_request::{
 
 const ACTIVE_RESPONSE_APPROVAL_TOOL_NAME: &str = "governed_response_plan";
 const ACTIVE_RESPONSE_COORDINATOR_LEASE_EPOCH: u64 = 1;
-const AFFECTED_SET_HASH_DOMAIN: &[u8] = b"chio.response-affected-set.v1\0";
-const EFFECT_ID_DOMAIN: &[u8] = b"chio.response-effect.v1\0";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ActiveResponseDispatchPermit {

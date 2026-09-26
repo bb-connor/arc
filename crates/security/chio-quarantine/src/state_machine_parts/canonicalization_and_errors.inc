@@ -8,7 +8,7 @@ struct RequestCommitment<'a> {
 
 fn request_id(plan: &ResponsePlan) -> Result<RecordId, StateMachineError> {
     let digest = domain_hash(
-        REQUEST_ID_DOMAIN,
+        RESPONSE_REQUEST_ID_DOMAIN,
         &RequestCommitment {
             tenant_id: plan.tenant_id.as_str(),
             action_id: plan.action_id.as_str(),
@@ -48,7 +48,7 @@ fn transition_id<T: Serialize>(
     mutation: &T,
 ) -> Result<RecordId, StateMachineError> {
     let digest = domain_hash(
-        TRANSITION_ID_DOMAIN,
+        RESPONSE_TRANSITION_ID_DOMAIN,
         &TransitionCommitment {
             kind,
             tenant_id: plan.tenant_id.as_str(),

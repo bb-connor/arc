@@ -585,7 +585,7 @@ fn response_transition_id<T: Serialize>(
         mutation: &'a T,
     }
     let digest = response_domain_hash(
-        RESPONSE_MUTATION_ID_DOMAIN,
+        RESPONSE_TRANSITION_ID_DOMAIN,
         &TransitionCommitment {
             kind,
             tenant_id: plan.tenant_id.as_str(),

@@ -28,8 +28,6 @@ pub const DETECTOR_HEALTH_RECEIPT_BODY_DIGEST_DOMAIN: &[u8] =
 pub const SCHEDULER_HEALTH_RECEIPT_BODY_DIGEST_DOMAIN: &[u8] =
     b"chio:active-defense-receipt:scheduler-health:v1";
 pub const ACTIVE_DEFENSE_EVIDENCE_ID_DOMAIN: &[u8] = b"chio:active-defense-evidence-id:v1";
-const RESPONSE_REQUEST_ID_DOMAIN: &[u8] = b"chio.response-request.v1\0";
-const RESPONSE_MUTATION_ID_DOMAIN: &[u8] = b"chio.response-transition.v1\0";
 const RESPONSE_DISPATCH_COMMITTED_RESUME_EXPIRED_ERROR: &str =
     "active_response.dispatch_committed_resume_expired";
 const RESPONSE_DISPATCH_APPLY_LEASE_EXPIRED_BEFORE_EFFECT_ERROR: &str =

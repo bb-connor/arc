@@ -35,7 +35,7 @@ pub const SESSION_THROTTLE_INSTALLED_CONTRIBUTION_DOMAIN: &[u8] =
     b"chio.response-effect-session-throttle-contribution.v1\0";
 pub const SESSION_THROTTLE_WINDOW_DOMAIN: &[u8] =
     b"chio.response-effect-session-throttle-window.v1\0";
-pub const RESPONSE_AFFECTED_SET_DOMAIN: &[u8] = b"chio.response-affected-set.v1\0";
+pub use crate::response_domains::*;
 pub const CAPABILITY_SET_SUSPENSION_VERSION_DOMAIN: &[u8] =
     b"chio.response-effect-capability-set-suspension-state.v1\0";
 pub const CAPABILITY_SET_SUSPENSION_INSTALLED_CONTRIBUTION_DOMAIN: &[u8] =

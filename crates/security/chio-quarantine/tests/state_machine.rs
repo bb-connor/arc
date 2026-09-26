@@ -1,3 +1,5 @@
+#[path = "state_machine/domain_compatibility.rs"]
+mod domain_compatibility;
 #[path = "state_machine/plan_authorization.rs"]
 mod plan_authorization;
 mod response_support;

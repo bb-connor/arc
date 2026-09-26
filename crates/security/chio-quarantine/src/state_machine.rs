@@ -7,7 +7,8 @@ use chio_security_types::ports::{
     response_affected_set_hash, BlastRadiusResult, BoundedVec, CanonicalBody, CreateOutcome,
     Digest32, EffectId, ErrorCode, IssuanceFreezeSpec, LeaseOwnerId, OpaqueReceiptRef, RecordId,
     RecordIdSet, ResponseCasRequest, ResponsePlanRecord, ResponseScheduledMutationCasRequest,
-    ResponseSchedulerStore, ResponseStore, ScheduledWork,
+    ResponseSchedulerStore, ResponseStore, ScheduledWork, RESPONSE_EFFECT_ID_DOMAIN,
+    RESPONSE_REQUEST_ID_DOMAIN, RESPONSE_TRANSITION_ID_DOMAIN,
 };
 use chio_security_types::{
     is_legal_response_transition, PlannedResponseEffect, PlannedResponseEffects,
@@ -32,9 +33,6 @@ pub use error::{
     CanonicalFailure, FreezeBindingField, PlanDefect, RecordDefect, StateMachineError,
 };
 
-const EFFECT_ID_DOMAIN: &[u8] = b"chio.response-effect.v1\0";
-const REQUEST_ID_DOMAIN: &[u8] = b"chio.response-request.v1\0";
-const TRANSITION_ID_DOMAIN: &[u8] = b"chio.response-transition.v1\0";
 const DISPATCH_COMMITTED_RESUME_EXPIRED_ERROR: &str =
     "active_response.dispatch_committed_resume_expired";
 const DISPATCH_APPLY_LEASE_EXPIRED_BEFORE_EFFECT_ERROR: &str =
@@ -1556,7 +1554,7 @@ fn derive_effect_id(
     spec: &ResponseEffectSpec,
 ) -> Result<EffectId, StateMachineError> {
     let digest = domain_hash(
-        EFFECT_ID_DOMAIN,
+        RESPONSE_EFFECT_ID_DOMAIN,
         &EffectCommitment {
             action_id: action_id.as_str(),
             ordinal,

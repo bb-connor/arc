@@ -94,16 +94,6 @@ def allow(
 # fewest declarations first: a single misspelled domain is a rename, a value
 # declared in four places has four call sites to reconcile first.
 DEBT: dict[str, DomainDebt] = {
-    r"chio.response-affected-set.v1\0": allow(
-        "2027-01-31",
-        "declared in 4 places across chio-kernel, chio-security-types; retires when one module owns the value and the rest import it",
-        declarations=4,
-    ),
-    r"chio.response-effect.v1\0": allow(
-        "2027-01-31",
-        "declared in 3 places across chio-kernel, chio-quarantine; retires when one module owns the value and the rest import it",
-        declarations=3,
-    ),
     r"chio.channel.release-authorization.signed-digest.v1\0": allow(
         "2026-12-31",
         "declared in 2 places across chio-settle, chio-store-sqlite; retires when one module owns the value and the rest import it",
@@ -117,16 +107,6 @@ DEBT: dict[str, DomainDebt] = {
     r"chio.fincred.source-disclosure.v1\0": allow(
         "2027-01-31",
         "declared in 2 places across chio-credentials, chio-credit; retires when one module owns the value and the rest import it",
-        declarations=2,
-    ),
-    r"chio.response-request.v1\0": allow(
-        "2027-01-31",
-        "declared in 2 places across chio-core-types, chio-quarantine; retires when one module owns the value and the rest import it",
-        declarations=2,
-    ),
-    r"chio.response-transition.v1\0": allow(
-        "2027-01-31",
-        "declared in 2 places across chio-core-types, chio-quarantine; retires when one module owns the value and the rest import it",
         declarations=2,
     ),
     r"chio.runtime-replay-source-seal.v1\0": allow(

@@ -14,7 +14,7 @@ use core::fmt;
 use chio_security_types::ports::{
     ActionId, BoundedVec, DeclassificationUseState, Digest32, EffectId, ErrorCode, EventId,
     GrantId, LeaseOwnerId, LineageId, OpaqueReceiptRef, RecordId, RequestId, RuleId, TenantId,
-    TripwireKind,
+    TripwireKind, RESPONSE_REQUEST_ID_DOMAIN, RESPONSE_TRANSITION_ID_DOMAIN,
 };
 use chio_security_types::{
     is_legal_response_transition, response_completion_effect_shape_is_valid,

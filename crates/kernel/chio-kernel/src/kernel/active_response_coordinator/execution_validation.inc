@@ -675,7 +675,7 @@ pub(super) fn validate_executable_response_plan_value(
     })?;
 
     let affected_set_hash = domain_digest(
-        AFFECTED_SET_HASH_DOMAIN,
+        RESPONSE_AFFECTED_SET_DOMAIN,
         &AffectedSetCommitment {
             tenant_id: plan.tenant_id.as_str(),
             affected_ids: plan.affected_ids.as_slice(),
@@ -758,7 +758,7 @@ fn derive_effect_id(
     spec: &ResponseEffectSpec,
 ) -> Result<EffectId, KernelError> {
     let digest = domain_digest(
-        EFFECT_ID_DOMAIN,
+        RESPONSE_EFFECT_ID_DOMAIN,
         &EffectCommitment {
             action_id: plan.action_id.as_str(),
             ordinal,

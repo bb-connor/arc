@@ -22,9 +22,6 @@ use crate::kernel::{
     ActiveResponseExecutorError, AutomaticActiveResponseDispatchFenceOutcome,
 };
 
-const AFFECTED_SET_HASH_DOMAIN: &[u8] = b"chio.response-affected-set.v1\0";
-const RESPONSE_EFFECT_ID_DOMAIN: &[u8] = b"chio.response-effect.v1\0";
-
 #[derive(Clone)]
 struct Pause {
     entered: Arc<Barrier>,
@@ -282,7 +279,7 @@ fn automatic_response_plan(identity: &ActiveResponseExecutorAuthorityIdentity) -
     ])
     .expect("affected ids");
     let affected_set_hash = domain_digest(
-        AFFECTED_SET_HASH_DOMAIN,
+        b"chio.response-affected-set.v1\0",
         &AffectedSetCommitment {
             tenant_id: tenant_id.as_str(),
             affected_ids: affected_ids.as_slice(),
@@ -303,7 +300,7 @@ fn automatic_response_plan(identity: &ActiveResponseExecutorAuthorityIdentity) -
         observed_base_version_hash: Digest32::new([0x31; 32]),
     };
     let effect_hash = domain_digest(
-        RESPONSE_EFFECT_ID_DOMAIN,
+        b"chio.response-effect.v1\0",
         &EffectCommitment {
             action_id: action_id.as_str(),
             ordinal: 0,
