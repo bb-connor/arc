@@ -22,11 +22,27 @@ impl ResponseExecutionMode {
     }
 }
 
+/// A validated execution binding. Unknown versions are rejected when decoded.
+///
+/// ```compile_fail
+/// use chio_security_types::{ResponseExecutionBinding, ResponseExecutionMode};
+/// let invalid = ResponseExecutionBinding {
+///     schema_version: 0,
+///     mode: ResponseExecutionMode::Live,
+/// };
+/// ```
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "ResponseExecutionBindingWire")]
 pub struct ResponseExecutionBinding {
-    pub schema_version: u8,
-    pub mode: ResponseExecutionMode,
+    schema_version: u8,
+    mode: ResponseExecutionMode,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ResponseExecutionBindingWire {
+    schema_version: u8,
+    mode: ResponseExecutionMode,
 }
 
 impl ResponseExecutionBinding {
@@ -38,14 +54,28 @@ impl ResponseExecutionBinding {
         }
     }
 
-    pub fn validate(&self) -> Result<(), ResponseExecutionBindingError> {
-        if self.schema_version != RESPONSE_EXECUTION_BINDING_SCHEMA_VERSION {
+    #[must_use]
+    pub const fn schema_version(self) -> u8 {
+        self.schema_version
+    }
+
+    #[must_use]
+    pub const fn mode(self) -> ResponseExecutionMode {
+        self.mode
+    }
+}
+
+impl TryFrom<ResponseExecutionBindingWire> for ResponseExecutionBinding {
+    type Error = ResponseExecutionBindingError;
+
+    fn try_from(wire: ResponseExecutionBindingWire) -> Result<Self, Self::Error> {
+        if wire.schema_version != RESPONSE_EXECUTION_BINDING_SCHEMA_VERSION {
             return Err(ResponseExecutionBindingError::UnsupportedSchemaVersion {
                 expected: RESPONSE_EXECUTION_BINDING_SCHEMA_VERSION,
-                observed: self.schema_version,
+                observed: wire.schema_version,
             });
         }
-        Ok(())
+        Ok(Self::new(wire.mode))
     }
 }
 

@@ -158,26 +158,68 @@ fn live_execution_rules_name_the_binding_that_refused() {
 }
 
 #[test]
+fn execution_binding_rejects_unsupported_wire_versions() {
+    for observed in [0, 2, 255] {
+        let encoded = serde_json::json!({ "schema_version": observed, "mode": "live" });
+        let error = match serde_json::from_value::<ResponseExecutionBinding>(encoded) {
+            Ok(binding) => panic!("unsupported execution binding decoded: {binding:?}"),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error.to_string(),
+            format!("response execution binding schema version {observed} is not the supported version 1")
+        );
+    }
+}
+
+#[test]
 fn execution_binding_rejection_carries_the_compared_versions() {
-    let mut plan = valid_response_plan();
-    plan.execution = Some(ResponseExecutionBinding {
-        schema_version: 7,
-        mode: ResponseExecutionMode::Live,
-    });
+    let mut encoded = serde_json::to_value(valid_response_plan())
+        .unwrap_or_else(|error| panic!("plan encoding failed: {error}"));
+    encoded["execution"] = serde_json::json!({ "schema_version": 7, "mode": "live" });
+    let error = match serde_json::from_value::<ResponsePlan>(encoded) {
+        Ok(plan) => panic!("plan with unsupported binding decoded: {plan:?}"),
+        Err(error) => error,
+    };
     let unsupported = ResponseExecutionBindingError::UnsupportedSchemaVersion {
         expected: 1,
         observed: 7,
     };
-    assert_eq!(
-        plan.validate_shape(),
-        Err(ResponseShapeError::InvalidExecutionBinding(unsupported))
-    );
-    assert_eq!(
-        plan.require_live_execution(),
-        Err(DispatchRejection::ExecutionBinding(unsupported))
-    );
+    assert_eq!(error.to_string(), unsupported.to_string());
     let message = DispatchRejection::ExecutionBinding(unsupported).to_string();
     assert!(message.contains("version 7") && message.contains("version 1"));
+}
+
+#[test]
+fn execution_binding_preserves_its_closed_wire_shape() {
+    for (encoded, diagnostic) in [
+        (
+            serde_json::json!({"schema_version": 1, "mode": "enforce"}),
+            "unknown variant `enforce`",
+        ),
+        (
+            serde_json::json!({"schema_version": 1, "mode": "live", "fallback": true}),
+            "unknown field `fallback`",
+        ),
+        (
+            serde_json::json!({"schema_version": 1}),
+            "missing field `mode`",
+        ),
+    ] {
+        let error = match serde_json::from_value::<ResponseExecutionBinding>(encoded) {
+            Ok(binding) => panic!("invalid execution binding decoded: {binding:?}"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains(diagnostic), "{error}");
+    }
+    let binding = ResponseExecutionBinding::new(ResponseExecutionMode::Live);
+    assert_eq!(binding.schema_version(), 1);
+    assert_eq!(binding.mode(), ResponseExecutionMode::Live);
+    assert_eq!(
+        serde_json::to_value(binding)
+            .unwrap_or_else(|error| panic!("binding encoding failed: {error}")),
+        serde_json::json!({"schema_version": 1, "mode": "live"}),
+    );
 }
 
 fn applying_snapshot_with_reversible_effects(effect_count: usize) -> ResponseSnapshot {

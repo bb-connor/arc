@@ -274,10 +274,9 @@ impl ResponsePlan {
         let binding = self
             .execution
             .ok_or(DispatchRejection::LegacyPlanFreshDispatch)?;
-        binding.validate()?;
-        if binding.mode != ResponseExecutionMode::Live {
+        if binding.mode() != ResponseExecutionMode::Live {
             return Err(DispatchRejection::ExecutionMode {
-                observed: binding.mode,
+                observed: binding.mode(),
             });
         }
         Ok(binding)
@@ -289,9 +288,9 @@ impl ResponsePlan {
     pub fn require_live_or_legacy_execution(&self) -> Result<(), DispatchRejection> {
         match self.execution {
             None => Ok(()),
-            Some(binding) if binding.mode == ResponseExecutionMode::Live => Ok(()),
+            Some(binding) if binding.mode() == ResponseExecutionMode::Live => Ok(()),
             Some(binding) => Err(DispatchRejection::ExecutionMode {
-                observed: binding.mode,
+                observed: binding.mode(),
             }),
         }
     }
@@ -330,11 +329,6 @@ impl ResponsePlan {
     }
 
     pub fn validate_shape(&self) -> Result<(), ResponseShapeError> {
-        if let Some(binding) = self.execution {
-            binding
-                .validate()
-                .map_err(ResponseShapeError::InvalidExecutionBinding)?;
-        }
         if self.effects.is_empty() {
             return Err(ResponseShapeError::EmptyEffects);
         }
