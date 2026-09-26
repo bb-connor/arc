@@ -1,0 +1,191 @@
+# Security execution dispatch
+
+How the [closeout plan](2026-09-25-security-assurance-closeout.md) and the
+[engineering excellence addendum](2026-09-26-security-engineering-excellence.md)
+are executed as concurrent lanes under one orchestrator, against the
+[security engineering standard](../../security/engineering-standard.md) and the
+[unrepresentable-defects design](../specs/2026-09-26-unrepresentable-defects-design.md).
+
+This document adds nothing to the packets. It assigns them to lanes, fixes the
+order and the ownership boundaries, and states the review gate every lane passes
+before its work reaches the integration branch.
+
+## Facts the dispatch is built on
+
+- `integration/process-security-m4` is at `d115ff3636` (documents only) locally
+  and on `origin`. PR #1160 is a draft, `BLOCKED`, with 101 green, 14 red and 15
+  skipped checks at the previous head `3cd73631a1`.
+- Codex's Packet 1 work is uncommitted in `/tmp/arc-security-launch`: 31 modified
+  files plus the new `chio-security-types/src/response_execution.rs`, unchanged
+  since 2026-09-25 23:42, stopped mid-red on
+  `combined_deployment_requires_and_authenticates_response_execution_mode`
+  (the authenticated deployment config does not yet accept
+  `responseExecutionMode`). `output/` is an untracked evidence directory and is
+  never committed. `.superpowers/sdd/` is Codex's gitignored execution ledger.
+- No other agent is in that worktree. (An earlier note claiming a resident Codex
+  process was a `pgrep` self-match on the orchestrator's own shell.)
+- Host: aarch64, 12 CPUs, 46G RAM, 263G free on `/home`, 49G on `/`. Toolchain
+  pinned at rustc 1.94.1. `kani` and `cargo-fuzz` present. No local PostgreSQL
+  server (Docker is available), no `sqlite3` CLI (Python's `sqlite3` works), no
+  `cargo-nextest`. **Native x86_64 cage enforcement cannot run on this host**;
+  those lanes use the designated CI runner or an x86_64 VM.
+- Red at `3cd73631a1`, by failing step: `Build, lint, test / Workspace structural
+  gates`; `MSRV workspace lane`; `cargo vet --locked` (the `aws-lc-rs 1.18.1`
+  audit, Packet 5); `enterprise-security-contract / Build canonical exact merge
+  binding` (Packet 5 trusted-capture chain); `nonce-fips-contract / Exact kernel
+  caller execution`; `Security contract / Require every security dependency`.
+  The last two may be regressions from the remediation commit and are triaged in
+  Wave 1 before anything is built on top of them.
+
+## Principles
+
+1. **One packet, one lane, one worktree, one branch, one Cargo owner.** Lanes that
+   run concurrently own disjoint files. A conflict is resolved by sequencing, never
+   by merging two lanes' edits to one file.
+2. **Checkpoint to git at every wave boundary.** Work exists when it is pushed. No
+   destructive git operation in any tree another lane can see.
+3. **Shared dependency build, isolated workspace artifacts.** One
+   `CARGO_TARGET_DIR` on `/home` for all lanes, so third-party crates compile once;
+   workspace crates are fingerprinted per worktree path. `CARGO_INCREMENTAL=0`,
+   `umask 022`, and `RUST_TEST_THREADS=1` where the parent plan requires it. Never
+   `cargo clean` while any lane is building.
+4. **Every commit carries its regressions.** Conventional commits, behavior and
+   tests together, mutation check recorded in the report (break the rule, name the
+   failing assertion), no em dashes, no production `unwrap`/`expect`, no new
+   `map_err(|_| ...)`, no new `pub` field on a `Verified*`/`Authorized*` type, no
+   new `include!`.
+5. **The orchestrator reviews every lane against the standard before merge.** The
+   orchestrator is not the independent reviewer rule 12.1 requires for P0 and P1;
+   that gate remains in Packet 6.
+6. **A lane reports what it did not verify** in the same message as what it did.
+
+## Step 0: take custody of the in-flight work
+
+Before any lane starts, in `/tmp/arc-security-launch`:
+
+1. `git checkout -b packet/1-dry-run` (branch pointer only; the dirty files stay).
+2. Stage the 31 modified files and `response_execution.rs`. Do not stage
+   `output/`.
+3. Commit as `feat(security): checkpoint execution-mode binding for response
+   plans`, with a body stating that the work is intentionally incomplete, naming
+   the one red test and why it is red, and listing what is done (binding type,
+   plan field, fresh-dispatch and admission checks) and what is next (the
+   deployment config field).
+4. Push `packet/1-dry-run`.
+
+The integration branch stays at `d115ff3636`. Lane D continues from this
+checkpoint. The reason to checkpoint rather than re-derive: the binding, the plan
+field threading and the signed-body coverage are exactly what corrections 1A to
+1C refactor, so the work is reusable, and the repository has lost uncommitted
+agent work before.
+
+## Wave 1
+
+Five lanes. A, B, C and E are disjoint from each other and from D. D is the
+longest and is internally sequential.
+
+| Lane | Packets | Owned files (exclusive) | Model | Exit |
+| --- | --- | --- | --- | --- |
+| **A** gates and profile | 0.1, 0.2 (manifest half), 0.3, 0.4, 0.5 | `scripts/check-rust-file-hygiene.py` and its test; new `scripts/check-domain-separation.py` and `scripts/check-negative-assertions.py` with self-tests; root `Cargo.toml` (`[workspace.lints]`, `[profile.*]`) and scoped lint tables in budget/quota crates | Opus 5 | every new gate fails on its violating fixture; baselines recorded by ratchet; `overflow-checks = true` in release and docker-release with a release-profile check that an overflow aborts |
+| **B** poison policy | 10.1 (store half of the 0.2 coupling) | the 22 `chio-store-sqlite` files holding `Mutex<Connection>` and their test modules; no other store file | Fable 5.1 | 26 of 26 connection lock sites apply one recorded policy; 18 per-store tests panic inside the lock and assert the next operation succeeds |
+| **C** measurement and analytics | 9.1, 9.2 | `chio-store-sqlite/benches/`, `receipt_store/reports/analytics.rs`, `receipt_store/bootstrap/open.rs` (typed column for attempted cost if absent), a populated-fixture test module | Opus 5 | composite-authorization, charge/release and denial-read benchmarks against a populated store, baselines in the ledger; all four `json_extract` aggregates replaced by the typed columns; `EXPLAIN QUERY PLAN` asserted in a test; aggregate values proved byte-identical against the fixture |
+| **D** Packet 1 continuation | 1D, then 1A 1B 1C 1E 1F, then the parent Packet 1 tasks | `chio-security-types/src/response*.rs`, `chio-quarantine/src/**`, `chio-kernel/src/kernel/active_response*`, `chio-active-response-authority/src/**`, `chio-control-plane/src/security/**`, `chio-core-types/src/receipt/security*` | Fable 5.1 | see below |
+| **E** CI triage (read-only) | none; a report | no edits; reads CI logs at `3cd73631a1` | Sonnet 5 | each of the six red steps classified as infrastructure, Packet 5 prerequisite, or code regression; a reproduction and proposed fix for any regression, delivered as a report for a Wave 2 lane |
+
+**Lane D order.** Correction 1D first: `DispatchRejection` with one variant per
+rule, `StateMachineError::InvalidDispatch(DispatchRejection)`, replacement of the
+112 `map_err(|_| ...)` discards in the quarantine crate and the kernel response
+coordinator (26 in `state_machine.rs` first), and registration of the five ad-hoc
+`chio-security-types` port codes. Then 1A to 1F together, while the binding has
+five call sites: private fields with `try_from`, `LiveAuthorizedPlan` replacing the
+five `require_execution_mode` sites and the inverse rule at
+`state_machine.rs:686-687`, `PlanProvenance` with the counted sunset, the response
+domain constants imported from `chio-security-types`, and the strict
+canonicalization boundary enumeration. Then the parent packet's remaining tasks,
+resuming from the red test: the deployment config accepts and authenticates
+`responseExecutionMode`; the simulation evaluator runs on an immutable snapshot with
+isolated state and no live `EffectPort`; the signed simulation report binds tenant,
+plan, configuration, authorization, snapshot versions and outcomes and persists
+through the real receipt path; the authority, kernel approval, scheduler and
+receipt store are wired through the profile; `response_dry_run.rs` corpora in
+`chio-quarantine/tests/` and `chio-control-plane/tests/` cover all six effect
+kinds, both approval requirements, missing and expired approval, stale scope,
+overlap, both expiry orders, rollback conflict, receipt failure, restart and
+cross-mode replay, every negative case asserting its `DispatchRejection` variant,
+and every case asserting zero live effect calls.
+
+**Merge order within Wave 1.** E reports first (it gates nothing but informs D).
+A and B merge together, because 0.2 without 10.1 trades a silent wrap for a bricked
+store. C merges independently. D merges last, after A and B, so its new tests run
+under the new gates and the release-profile arithmetic check.
+
+**Scheduling on this host.** Four building lanes on 12 cores is the edge. Start E
+and A first (cheap), then B and C, then D once A has the gate baselines committed
+so D's code is measured by them from its first commit.
+
+## Wave 2
+
+After Wave 1 merges and checkpoints. Ownership stays disjoint per lane.
+
+| Lane | Packets | Depends on | Notes |
+| --- | --- | --- | --- |
+| F | Packet 8 `ExposureUnits` | B (touches the same budget store files) | the durable fix under A's `overflow-checks` backstop |
+| G | 4A clock port, then 4B assertion conversion | D (touches `active_response.rs`); 1D landed | 60 files; one port, three traits migrated, gate on new `SystemTime::now` |
+| H | 10.2 `UntrustedJsonText`, 10.3 tenant classification, 10.4 chain-link bind and `CHECK`, 3A wrapping sweep | 1F enumeration; C (shares `open.rs`) | 10.3 resolves `chio_tool_receipts.receipt_id` provenance before scheduling any remediation |
+| I | 9.3 `prepare_cached` on measured paths, 9.4 connection strategy | C's baselines; B | if 9.4 moves the 18 stores to the pool shape, B's recovery becomes moot and is removed in the same change |
+| J | Packet 2 boundaries, 2A, 2B; Packet 3 retention liveness #1045 | x86_64 runner or VM for the native cases | the process-cutpoint harness reruns against 9.4's connection strategy before 9.4 is accepted |
+
+## Wave 3
+
+Packet 5 (the genuine `aws-lc-rs` audit, trusted definitions, capture, App-bound
+check) is assurance work that needs Connor's authority at several steps and runs
+alongside Waves 1 and 2 without competing builds. Packet 6 freezes the candidate
+and obtains the independent review. Packet 7 (structural remediation) runs last,
+against Lane A's measured baseline, one module at a time, cut and visibility and
+format as separate commits.
+
+## The brief every lane receives
+
+Worktree path and branch; base SHA; `CARGO_TARGET_DIR` and the environment
+variables above; the exclusive file list and the forbidden list; the packet text
+verbatim from the addendum; the path to the standard, with section 11 (no AI slop)
+quoted in full; the commit rules; the exit criteria; the report format (SHA,
+commands run, inventory counts, tool versions, what was not verified, mutation
+check per regression); and the standing instructions: do not run `cargo clean`,
+do not touch another lane's files, do not push to the integration branch, poll
+your own background jobs rather than waiting on them, and stop and report if a
+change would cross an ownership boundary.
+
+## Orchestrator review gate
+
+Run on every lane branch before merge. Mechanical checks first, judgment second,
+then merge, checkpoint, push.
+
+Mechanical: em dash scan; `unwrap`/`expect` outside `cfg(test)`; new
+`map_err(|_|`; new `pub` fields on `Verified*`/`Authorized*`; new `include!`;
+`#[allow(` outside test modules; new direct `SystemTime::now()` in TCB production
+code once 4A lands; new `.prepare(` on a path 9.1 measured as hot once 9.3 lands;
+conventional commit type and the co-author trailer; tests in the same commit as
+the behavior they cover; the lane's owning test targets and `cargo clippy -p
+<crate> --all-targets -- -D warnings` re-run by the orchestrator, not taken from
+the report.
+
+Judgment, against the standard: one responsibility per module (1.1); invalid
+values unconstructible and authority opaque (2.1, 2.2); rejection provenance
+preserved and one discriminant per rule (3.1, 3.2); locks covering the
+commitment and not I/O (5.2); negative assertions naming the variant and a
+recorded mutation check (10.1, 10.2); comments that preserve a threat model or
+an invisible discipline and nothing that narrates the work (11).
+
+A lane that fails the gate gets the specific finding back and revises on its own
+branch. Nothing is merged with a known standard violation to be fixed later.
+
+## Decisions taken, 2026-09-26
+
+1. Step 0 approved: Codex's in-flight work is checkpointed on `packet/1-dry-run`
+   and pushed; the integration branch stays at the docs commits.
+2. Models: Fable 5.1 on lanes D and B, Opus 5 on A and C, Sonnet 5 on E. The
+   orchestrator runs on Fable 5.1.
+3. Wave 1 runs all five lanes, staggered: E and A first, then B and C, then D.
+4. Native x86_64 work is deferred to the designated CI runner for Waves 1 and 2;
+   no local native lane.

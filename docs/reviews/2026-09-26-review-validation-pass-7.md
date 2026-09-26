@@ -81,10 +81,13 @@ that label.
 
 ## Environmental note
 
-A `codex` process (pid 1648241) is resident with `/tmp/arc-security-launch` as
-its working directory. It has modified nothing since 2026-09-25 23:42. Pass 1's
-statement that no codex process was running was either wrong or became wrong
-later; in either case, two agents should not edit that worktree concurrently.
+Pass 7 first reported a resident `codex` process (pid 1648241) in
+`/tmp/arc-security-launch`. That was wrong: `pgrep -f codex` matched the
+orchestrator's own `zsh -c` wrapper, because the command text contained the word
+"codex" in an `echo`. No Codex process is running; pass 1's statement was correct.
+The tree is unchanged since 2026-09-25 23:42:26 (33 dirty code entries then and
+now). The lesson is the one this lineage keeps relearning: a check whose search
+term appears in its own command line is a check that matches itself.
 
 ## Net effect on conclusions
 
