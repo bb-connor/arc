@@ -11,6 +11,9 @@ use chio_security_types::{Compartment, InformationLabel};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
+#[path = "manifest_v2/json_boundary.rs"]
+mod json_boundary;
+
 fn v2_manifest(public_key: String) -> ToolManifest {
     ToolManifest {
         schema: TOOL_MANIFEST_SCHEMA.to_string(),

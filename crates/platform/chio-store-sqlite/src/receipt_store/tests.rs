@@ -4,6 +4,8 @@ mod attempted_cost;
 mod background_checkpoints;
 #[path = "tests/bootstrap.rs"]
 mod bootstrap;
+#[path = "tests/canonical_readback.rs"]
+mod canonical_readback;
 #[path = "tests/checkpoint.rs"]
 mod checkpoint;
 #[path = "tests/errors.rs"]

@@ -776,7 +776,19 @@ fn read_existing_signed_manifest(path: &Path) -> Result<SignedManifest, Verified
             limit: MAX_SIGNED_MANIFEST_BYTES,
         });
     }
-    serde_json::from_slice(&bytes).map_err(|source| VerifiedManifestLoadError::Decode {
+    // Input schemas contain arbitrary JSON. Validate the original text before
+    // Value deserialization can collapse duplicate keys or rounded numbers.
+    let text = std::str::from_utf8(&bytes).map_err(|source| VerifiedManifestLoadError::Read {
+        path: path.to_path_buf(),
+        source: std::io::Error::new(std::io::ErrorKind::InvalidData, source),
+    })?;
+    let value = chio_core::canonical::parse_legacy_signed_json(text).map_err(|source| {
+        VerifiedManifestLoadError::CanonicalInput {
+            path: path.to_path_buf(),
+            source,
+        }
+    })?;
+    serde_json::from_value(value).map_err(|source| VerifiedManifestLoadError::Decode {
         path: path.to_path_buf(),
         source,
     })
@@ -847,6 +859,12 @@ pub enum VerifiedManifestLoadError {
         path: PathBuf,
         #[source]
         source: serde_json::Error,
+    },
+    #[error("signed manifest {path} has ambiguous or unsupported JSON: {source}")]
+    CanonicalInput {
+        path: PathBuf,
+        #[source]
+        source: chio_core::Error,
     },
     #[error("invalid registered manifest public key: {0}")]
     RegisteredPublicKey(chio_core::Error),

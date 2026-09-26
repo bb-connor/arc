@@ -126,12 +126,7 @@ pub(crate) fn decode_verified_chio_receipt(
     receipt_kind: &str,
     seq: Option<u64>,
 ) -> Result<ChioReceipt, ReceiptStoreError> {
-    let value: serde_json::Value = serde_json::from_str(raw_json).map_err(|error| {
-        ReceiptStoreError::Conflict(format!(
-            "{} failed to decode: {error}",
-            format_receipt_context(receipt_kind, None, seq)
-        ))
-    })?;
+    let value = decode_stored_json(raw_json, receipt_kind, seq)?;
     let receipt_id = value
         .get("id")
         .and_then(|field| field.as_str())
@@ -151,12 +146,7 @@ pub(crate) fn decode_verified_child_receipt(
     receipt_kind: &str,
     seq: Option<u64>,
 ) -> Result<ChildRequestReceipt, ReceiptStoreError> {
-    let value: serde_json::Value = serde_json::from_str(raw_json).map_err(|error| {
-        ReceiptStoreError::Conflict(format!(
-            "{} failed to decode: {error}",
-            format_receipt_context(receipt_kind, None, seq)
-        ))
-    })?;
+    let value = decode_stored_json(raw_json, receipt_kind, seq)?;
     let receipt_id = value
         .get("id")
         .and_then(|field| field.as_str())
@@ -169,4 +159,17 @@ pub(crate) fn decode_verified_child_receipt(
     })?;
     ensure_child_receipt_verified_with_context(&receipt, receipt_kind, seq)?;
     Ok(receipt)
+}
+
+/// Preserve both historical typed JSON and canonical writer encodings, including
+/// full-width u64 amounts, while refusing lossy input before signature checks.
+fn decode_stored_json(
+    raw_json: &str,
+    receipt_kind: &str,
+    seq: Option<u64>,
+) -> Result<serde_json::Value, ReceiptStoreError> {
+    let context = format_receipt_context(receipt_kind, None, seq);
+    chio_core::canonical::parse_legacy_signed_json(raw_json).map_err(|error| {
+        ReceiptStoreError::Conflict(format!("{context} failed to decode: {error}"))
+    })
 }
