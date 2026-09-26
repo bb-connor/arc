@@ -1,0 +1,67 @@
+name: miri
+
+# Nightly Miri run over the unit tests of the committed crate list at
+# .config/miri-crates.toml. Advisory: it gates nothing until it has a history.
+#
+# Miri interprets the tests it is given and reports undefined behaviour in the
+# code they execute: invalid pointer arithmetic, aliasing violations, reads of
+# uninitialised memory, data races in the interpreted schedule. It cannot call
+# into C and cannot execute most syscalls, which is why the list names, per
+# skipped test, which of those two stopped it, and why crates whose unsafe
+# code no unit test reaches are not on the list at all: a green run over
+# tests that never enter an unsafe block says nothing about the unsafe block.
+#
+# The toolchain and MIRIFLAGS are pinned in the list file, not here, so the
+# run is reproducible from the checkout alone:
+#   scripts/run-miri-crates.sh --list    prints the exact commands
+#   scripts/run-miri-crates.sh           runs them, one crate at a time
+
+on:
+  schedule:
+    # 05:17 UTC, after the sanitizer lane.
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  miri:
+    name: miri (committed crate list, unit tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Read the pinned toolchain from the crate list
+        id: toolchain
+        run: |
+          set -euo pipefail
+          toolchain="$(python3 -c 'import tomllib; print(tomllib.load(open(".config/miri-crates.toml", "rb"))["toolchain"])')"
+          echo "name=${toolchain}" >> "$GITHUB_OUTPUT"
+
+      - name: Install the pinned nightly with Miri
+        run: |
+          set -euo pipefail
+          rustup toolchain install --profile minimal --component miri --component rust-src "${{ steps.toolchain.outputs.name }}"
+          cargo "+${{ steps.toolchain.outputs.name }}" miri --version
+
+      - name: Install protobuf compiler
+        uses: ./.github/actions/apt-install
+        with:
+          packages: protobuf-compiler
+
+      - name: Validate the crate list
+        run: |
+          bash scripts/run-miri-crates.sh --list
+          bash scripts/tests/run-miri-crates.test.sh
+
+      - name: Prepare the Miri sysroot
+        run: cargo "+${{ steps.toolchain.outputs.name }}" miri setup
+
+      - name: Run the crate list under Miri
+        run: bash scripts/run-miri-crates.sh

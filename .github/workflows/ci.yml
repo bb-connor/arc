@@ -184,6 +184,8 @@ jobs:
           bash scripts/tests/check-wire-schemas.test.sh
           python3 scripts/check-dependency-budget.py
           bash scripts/tests/check-dependency-budget.test.sh
+          bash scripts/run-miri-crates.sh --list
+          bash scripts/tests/run-miri-crates.test.sh
 
       - name: Formal traceability gate
         run: bash scripts/check-mapping.sh

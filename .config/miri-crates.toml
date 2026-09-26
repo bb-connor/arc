@@ -1,0 +1,98 @@
+# Crates whose unit tests run under Miri, with the tests Miri cannot execute
+# and why. Consumed by scripts/run-miri-crates.sh and .github/workflows/miri.yml;
+# validated by scripts/tests/run-miri-crates.test.sh. Measured on 2026-09-26
+# with the toolchain below on aarch64; the reach figures come from
+# scripts/miri-unsafe-reach.py, a name-based call-chain analysis that
+# over-approximates (a site it calls unreached has no chain from any test).
+#
+# Only two reasons put a test or a crate outside the run: it calls into C
+# (Miri interprets Rust only), or it makes a syscall Miri does not implement
+# (process spawning, memfd, descriptor metadata, open flags such as
+# O_DIRECTORY). Anything else that fails under Miri is a finding, stays in
+# the run, and is red until its owner fixes it. Each skip here is the
+# `#[cfg_attr(miri, ignore = "...")]` its owner should add to the test, at
+# which point the skip entry is removed.
+
+toolchain = "nightly-2026-02-07"
+# Isolation off: the tests read the clock, the environment and files.
+miriflags = "-Zmiri-disable-isolation"
+timeout_seconds = 1800
+
+[[crate]]
+name = "chio-guard-sdk"
+unsafe_sites = 9
+reached = 8
+
+[[crate]]
+name = "chio-secure-ipc"
+unsafe_sites = 7
+reached = 5
+[[crate.skip]]
+test = "credentials::tests::anonymous_credentials_require_read_only_handles_and_all_seals"
+reason = "syscall: memfd_create (aarch64 number 279) is not implemented by Miri"
+[[crate.skip]]
+test = "tests::listener_refuses_same_process_and_non_private_parent"
+reason = "calls into C: chmod through std::fs::set_permissions"
+
+[[crate]]
+name = "chio-cage"
+unsafe_sites = 101
+reached = 16
+[[crate.skip]]
+test = "launch::linux_child_custody_tests::acknowledged_child_reaper_handoff_reaps"
+reason = "syscall: pidfd_spawnp, the child is spawned through posix_spawn"
+[[crate.skip]]
+test = "launch::linux_child_custody_tests::child_reaper_send_failure_reaps_synchronously"
+reason = "syscall: pidfd_spawnp, the child is spawned through posix_spawn"
+[[crate.skip]]
+test = "launch::linux_child_custody_tests::child_reaper_start_failure_reaps_synchronously"
+reason = "syscall: pidfd_spawnp, the child is spawned through posix_spawn"
+[[crate.skip]]
+test = "launch::linux_child_custody_tests::child_supervisor_retries_sigkill_until_reaped"
+reason = "syscall: pidfd_spawnp, the child is spawned through posix_spawn"
+[[crate.skip]]
+test = "launch::platform::stdio_tests::swapped_live_stdio_descriptors_fail_identity_verification"
+reason = "syscall: fstat on a descriptor that is not file-backed is not supported by Miri"
+
+[[crate]]
+name = "chio-keyring"
+unsafe_sites = 6
+reached = 6
+[[crate.skip]]
+test = "storage_identity_tests::retained_sqlite_descriptor_detects_hardlinks_and_path_rebinding"
+reason = "syscall: openat with O_DIRECTORY (flag 0x4000) is not supported by Miri"
+[[crate.skip]]
+test = "storage_identity_tests::trusted_parent_policy_requires_private_child_below_system_temp_directory"
+reason = "syscall: openat with O_DIRECTORY (flag 0x4000) is not supported by Miri"
+
+# Both FFI crates fail under Miri today with the same Stacked Borrows
+# violation: the buffer constructor takes a raw pointer with `as_mut_ptr()` on
+# a `Box<[u8]>` and then moves the box into `mem::forget`, which retags it
+# uniquely and invalidates the pointer the buffer keeps. That is a finding,
+# not an exclusion; the crates stay listed and the lane is red on them until
+# the constructors use `Box::into_raw`.
+[[crate]]
+name = "chio-cpp-kernel-ffi"
+unsafe_sites = 3
+reached = 3
+
+[[crate]]
+name = "chio-bindings-ffi"
+unsafe_sites = 4
+reached = 4
+
+[[excluded]]
+name = "chio-sqlite-file-identity"
+reason = "calls into C: all four unit tests open SQLite through rusqlite (sqlite3_threadsafe is the first foreign call); nothing runs once they are set aside"
+
+[[ineligible]]
+name = "chio-active-response-authority"
+reason = "its two reachable unsafe sites are reached only by the ignored process-boundary helper test, and the third is in the daemon binary; under Miri none of its unsafe code executes"
+
+[[ineligible]]
+name = "chio-guard-sdk-macros"
+reason = "its single unsafe site has no unit test reaching it, and Miri does not run proc-macro crate tests"
+
+[[ineligible]]
+name = "chio-commerce-order"
+reason = "the word unsafe appears only in a comment; the crate has no unsafe code"
