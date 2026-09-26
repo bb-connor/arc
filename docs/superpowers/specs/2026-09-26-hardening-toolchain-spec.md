@@ -78,8 +78,12 @@ makes it sound, or the build fails. Every unsafe operation inside an `unsafe fn`
 gets its own block and its own comment. One operation per block, so the comment
 and the operation it justifies cannot drift apart.
 
-**Expected red.** Roughly four blocks in the cage (the 39/38 and 25/22 files) and
-an unknown count in the other 21 crates that contain `unsafe`. Measure first with
+**Expected red, measured.** 34 crates contain `unsafe`: 210 `unsafe {` blocks against
+195 `// SAFETY` comments. The gap is **16 blocks in five crates**: `chio-cage` 4,
+`chio-cli` 5, `chio-guard-sdk` 5, `chio-guard-sdk-macros` 1, `chio-commerce-order` 1.
+Every other crate with `unsafe` is already at one comment per block. Five crates
+also declare `unsafe fn` (`chio-secret-broker` 3, `chio-guard-sdk` 1,
+`chio-secure-ipc` 1), which is where `unsafe_op_in_unsafe_fn` will add blocks. Measure first with
 `cargo clippy --workspace -- -W clippy::undocumented_unsafe_blocks -W
 clippy::multiple_unsafe_ops_per_block` and record both counts per crate; the
 second lint may split many blocks in the FFI-heavy crates, so decide its level
@@ -255,10 +259,14 @@ function the proof is about.
 credentials, seeds and tokens. `secrecy` wraps `zeroize`, so nothing is lost, and
 it removes what the standard's rule 7.1 forbids: `Debug` prints `[REDACTED]`,
 there is no `Display`, no `Serialize` without an explicit opt-in, and access is
-through `expose_secret()`, which is greppable. The inventory step: find every
-field of type `Zeroizing<Vec<u8>>` or `Zeroizing<String>` whose containing struct
-derives `Debug`, `Clone` or `Serialize`, and count them. Each is a place where a
-secret can reach a log or a wire by accident today.
+through `expose_secret()`, which is greppable. The inventory, measured: **8 structs** carry a `Zeroizing` field and derive `Clone`
+or `Serialize`; none derives `Debug`. Seven derive `Clone` only (six external-guard
+configurations holding API keys, and `DualSignReleaseInput`), which `Zeroizing`
+tolerates because clones zeroize on drop. One, `FrostAuthenticatedDkgPackage` in
+`chio-federation-authority`, derives **`Serialize`** on key-generation material;
+whether that field is encrypted for its recipient before serialization or written
+as plaintext decides whether this is a wire leak or a deliberate transport, and is
+checked before H7 touches it.
 
 **Acceptance.** No secret-bearing struct derives `Debug` or `Serialize` on the
 secret field; `expose_secret()` call sites are the complete inventory of where
@@ -302,10 +310,11 @@ unpinned are in the security TCB**, densest in `chio-kernel` (36),
 `chio-control-plane` (23) and `chio-keyring` (12), and including the entire
 secret-broker wire protocol (`chio.broker-execute.v1`, `chio.broker-capability.v1`,
 `chio.broker-execution-receipt.v2`), the key-log family, the cage envelopes and
-receipts, and `chio.dpop_proof.v2`. Separately, **55 schema values are declared in
-more than one file** (38 as the same constant name copy-pasted, 17 under
-different names), concentrated in `chio-runtime-core` (25), `chio-runtime` (23)
-and `chio-cli` (20).
+receipts, and `chio.dpop_proof.v2`. Separately, **55 schema values are declared in more than one file, 54 of them
+across crate boundaries** (38 as the same constant name copy-pasted, 17 under
+different names); `chio.receipt.v1` alone is declared in six files across five
+crates. Concentrated in `chio-runtime-core` (25), `chio-runtime` (23) and
+`chio-cli` (20).
 
 The CI regression at `3cd73631a1` is the case study: the caller-return-context
 bump from v4 to v6 was caught only because two round-trip tests happened to pin
@@ -325,6 +334,34 @@ deduplication touches owned files and lands with Packet 7 or the owning lane.
 **Acceptance.** Every hand-written schema constant appears in the snapshot; the
 generated tests fail on a deliberate bump without a snapshot edit; the duplicate
 count is 0 or each remaining duplicate has a reason in the registry.
+
+### H11. A dependency budget for privileged helpers
+
+**Census.** `chio-cage`, which ships the confinement helper binary
+`chio-cage-init`, has a normal-dependency graph of **344 unique crates**,
+unchanged with default features off, including `tokio`, `hyper`, `hyper-util`,
+`reqwest`, `tower-http`, `rustls-webpki`, `aws-lc-rs`, `regex`, `fancy-regex`,
+`serde_json` and `tracing`. The cause is the crate's dependency on `chio-core` and
+`chio-manifest`. `chio-secret-broker` is at 640, `chio-keyring` at 94,
+`chio-security-types` at 10.
+
+The helper is the most privileged program at runtime: it runs before confinement
+exists, as root during provisioning, and everything compiled into it is in its
+trust base. The existing static-PIE and ELF checks prove the artifact has no
+dynamic dependencies; they do not bound what was linked in.
+
+**Target.** Move the helper into its own crate depending only on the plan and
+envelope types, `seccompiler-chio` and `nono-chio`. Measure its graph on the musl
+target, set a committed ceiling from that measurement, and gate it: a script runs
+`cargo tree -p chio-cage-init --edges normal --target x86_64-unknown-linux-musl`,
+fails above the ceiling, and fails on any crate from a deny-list (`tokio`,
+`hyper`, `reqwest`, `rustls`, `regex`, `serde_json` unless the plan format needs
+it). Apply the same gate, with its own ceiling, to `chio-secret-brokerd`, whose
+640 is the next question.
+
+**Acceptance.** The helper's graph is under its ceiling with no deny-listed
+crate; the gate has a self-test that fails when a deny-listed crate is added;
+the ceilings are recorded in the ledger with the date measured.
 
 ## Direction, not yet tasks
 
@@ -373,6 +410,7 @@ finds anything the example suite does not before extending it.
 | H5 nextest | nothing | 2, first, so later lanes' tests run isolated | K |
 | H2 Miri lane | H1 (comments) helpful, not required | 2 | K |
 | H6 FV-E5 runbook on Kani, then Verus lane | FV-E5 runbook completion | 2 (runbook), 3 (lane) | K |
+| H11 helper dependency budget | measuring `chio-cage-init` on the musl target; touches the cage crate, which no Wave 1 lane owns | 2 | K |
 | H9 sanitizer audit | nothing | 2 | K |
 | H4 TCB deny set | B, C, D merged (touches their files) | 2, last in K | K |
 | H7 `secrecy` | inventory first; touches broker and keyring | 2 or 3 | K or D follow-on |

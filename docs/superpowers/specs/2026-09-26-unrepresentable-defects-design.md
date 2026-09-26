@@ -336,8 +336,16 @@ impl DispatchRejection {
 //     InvalidDispatch(#[from] DispatchRejection),
 ```
 
-The six `InvalidDispatch` return sites in `state_machine.rs` (`:685`, `:687`,
-`:696`, `:707`, `:715`, `:878`) map onto these variants; the `||` at `:689-696`
+The response path is the first application, not the whole program: across the
+security TCB there are up to 2,102 `map_err(|_| ...)` discards in production
+files (`chio-store-sqlite` 833, `chio-control-plane` 359, `chio-kernel` 324,
+`chio-secret-broker` 164, `chio-quarantine` 105, `chio-cage` 104), 291 error-enum
+variants whose only payload is a `String` or `&str` (`chio-kernel` 133,
+`chio-store-sqlite` 67, `chio-core-types` 40), and 82 variants that preserve a
+cause through `#[source]` or `#[from]`. Mechanism C is a TCB-wide migration that
+starts where Packet 1 needs it. The six `InvalidDispatch` return sites in
+`state_machine.rs` (`:685`, `:687`, `:696`, `:707`, `:715`, `:878`) map onto these
+variants; the `||` at `:689-696`
 splits into its six conditions. `StateMachineError::Shape(#[from]
 ResponseShapeError)` already exists, which means the new mode check could have
 written `?` and kept the cause; it wrote `.map_err(|_| InvalidDispatch)` and lost

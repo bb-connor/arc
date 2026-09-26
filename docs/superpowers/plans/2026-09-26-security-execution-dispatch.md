@@ -143,7 +143,7 @@ After Wave 1 merges and checkpoints. Ownership stays disjoint per lane.
 | H | 10.2 `UntrustedJsonText`, 10.3 tenant classification, 10.4 chain-link bind and `CHECK`, 3A wrapping sweep | 1F enumeration; C (shares `open.rs`) | 10.3 resolves `chio_tool_receipts.receipt_id` provenance before scheduling any remediation |
 | I | 9.3 `prepare_cached` on measured paths, 9.4 connection strategy | C's baselines; B | if 9.4 moves the 18 stores to the pool shape, B's recovery becomes moot and is removed in the same change |
 | J | Packet 2 boundaries, 2A, 2B; Packet 3 retention liveness #1045 | x86_64 runner or VM for the native cases | the process-cutpoint harness reruns against 9.4's connection strategy before 9.4 is accepted |
-| K | hardening toolchain per the [spec](../specs/2026-09-26-hardening-toolchain-spec.md): H0 lint-parity gate first, H10 schema snapshot and pins, H5 nextest, H3 `forbid` on 26 crates, H9 sanitizer audit, H2 Miri lane, H1 unsafe lints, FV-E5 runbook for H6, H4 TCB deny set (last, after B, C, D merge) | B, C, D for H4 only | one commit per item, each with its gate's self-test or lane's red-on-mutation; H6's Verus lane, H7 `secrecy` and H8 semver follow in Wave 3 |
+| K | hardening toolchain per the [spec](../specs/2026-09-26-hardening-toolchain-spec.md): H0 lint-parity gate first, H10 schema snapshot and pins, H5 nextest, H3 `forbid` on 26 crates, H9 sanitizer audit, H11 helper dependency budget, H2 Miri lane, H1 unsafe lints (16 comments, measured), FV-E5 runbook for H6, H4 TCB deny set (last, after B, C, D merge) | B, C, D for H4 only | one commit per item, each with its gate's self-test or lane's red-on-mutation; H6's Verus lane, H7 `secrecy` and H8 semver follow in Wave 3 |
 
 ## Wave 3
 
