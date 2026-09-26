@@ -57,8 +57,14 @@ async def main() -> None:
             print(f"not authorized: {error}")
 ```
 
-Authoritative enforcement uses the kernel-mediated `POST /v1/evaluate` route,
-which requires a full signed capability token and an execution nonce. The
+Caller preparation uses the kernel-mediated `POST /v1/evaluate` route,
+which requires a full signed capability token. Its reservation is not permission
+to execute. The trusted executor must use `start_mediated_execution`, verify and
+durably claim the committed authorization, then return authenticated evidence
+with `report_mediated_execution`. The SDK methods transport these artifacts;
+they do not implement an executor or verify its durable claim. See the
+[caller-delivery contract](../../../docs/security/authenticated-caller-delivery.md)
+for control credentials, compatibility and supported custody profiles. The
 id-only SDK wrappers hold a capability id, not a signed token, so
 `evaluate_tool_call` (and the adapters built on it) take a `capability_id` and
 delegate to the advisory `POST /v1/evaluate/advisory` route. The advisory route

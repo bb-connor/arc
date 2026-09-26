@@ -1,0 +1,10 @@
+{
+  "runtime_id": "714d3643-e7f7-42f9-95b5-6a3a0d734ce8",
+  "launch_policy_signers": {
+    "alice-probe": "9dd65391a577a1f252afd03367891014221cbb796dadbfaffd6dceb436c8f358",
+    "bob-probe": "8298c28e13aac2e243a45867e366ac4ea2c4034ebe6717e58d593ab822b1fc5c",
+    "carol-probe": "f7587c60f46deda215b7c9580f26d72ac147f8249cd347b66171ac5b215651ee",
+    "dave-probe": "05adb9772d0199d2a787d69ac9a40f21b18a1c1e9bdd3c5b59edbcaf3734c550"
+  },
+  "source": "retained operator state independently of submitted artifact"
+}

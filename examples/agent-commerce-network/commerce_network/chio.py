@@ -209,28 +209,6 @@ class TrustControl:
 
     # -- Budget & cost tracking -----------------------------------------------
 
-    def charge_budget(
-        self, capability_id: str, grant_index: int, cost_units: int,
-        *, max_invocations: int | None = None,
-        max_cost_per_invocation: int | None = None,
-        max_total_cost_units: int | None = None,
-    ) -> dict[str, Any]:
-        """Atomically check and charge cost against a capability's budget."""
-        r = self._http.post(
-            f"{self.url}/v1/budgets/charge",
-            headers=self._auth(),
-            json={
-                "capabilityId": capability_id,
-                "grantIndex": grant_index,
-                "maxInvocations": max_invocations,
-                "costUnits": cost_units,
-                "maxCostPerInvocation": max_cost_per_invocation,
-                "maxTotalCostUnits": max_total_cost_units,
-            },
-        )
-        r.raise_for_status()
-        return r.json()
-
     def query_budgets(self, capability_id: str | None = None) -> dict[str, Any]:
         """Query budget usage records."""
         params: dict[str, Any] = {"limit": 100}

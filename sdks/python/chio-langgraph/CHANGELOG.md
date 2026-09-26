@@ -5,6 +5,16 @@ All notable changes to `chio-langgraph` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+- Add `ChioProcessToolNode`, `ProcessTool`, `ChioProcessToolError` and stable
+  operation keys for kernel-mediated LangGraph tools. Original receipt JSON
+  stays in tool-message artifacts; noncompletion stops graph execution.
+- Add the optional `process` extra and a real worker-crash comparison using
+  persistent LangGraph SQLite checkpoints and the Rust Chio kernel.
+- Support LangGraph 1.x and set the minimum supported series to 0.6. Qualify
+  the current 1.2.11 and compatibility 0.6.11 profiles explicitly.
+
 ## [0.1.1]
 
 - note: `chio-adapter-base` 0.1.1 ships `bind_and_redact` and the

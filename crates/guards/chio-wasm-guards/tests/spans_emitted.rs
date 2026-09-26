@@ -185,6 +185,7 @@ fn make_test_request() -> ToolCallRequest {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 
@@ -248,6 +249,7 @@ fn evaluate_span_records_exact_field_set() {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let verdict = match guard.evaluate(&ctx) {
@@ -317,6 +319,7 @@ fn evaluation_emits_verdict_duration_and_fuel() {
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: None,
+        security_context: None,
     };
 
     let verdict = match guard.evaluate(&ctx) {
@@ -477,6 +480,7 @@ fn deny_records_bounded_reason_class_from_reason_string() {
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: None,
+        security_context: None,
     };
     let verdict = match guard.evaluate(&ctx) {
         Ok(verdict) => verdict,
@@ -524,6 +528,7 @@ fn malformed_argument_deny_records_metrics() {
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index: None,
+        security_context: None,
     };
     let verdict = match guard.evaluate(&ctx) {
         Ok(verdict) => verdict,

@@ -670,6 +670,11 @@ fn is_ipv6_private_or_special_use(address: &Ipv6Addr) -> bool {
 pub mod reqwest_helper;
 
 #[cfg(feature = "reqwest-egress")]
+mod operator_readiness;
+#[cfg(feature = "reqwest-egress")]
+pub use operator_readiness::{OperatorReadinessError, OperatorReadinessProbe};
+
+#[cfg(feature = "reqwest-egress")]
 #[allow(unused_imports)]
 pub use reqwest_helper::{
     client_builder_with_contract, send_with_contract, ContractClientBuilder, ContractResponse,

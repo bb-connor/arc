@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "sandbox-path-swap-001",
+  "class": "sandbox_path_swap",
+  "expected_verdict": "DENY",
+  "expected_reason": "sandbox_path_swap_detected",
+  "threat_id": "tool_server_escape",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "path_identity_control",
+        "package": "chio-cage",
+        "test_source": "crates/security/chio-cage/src/linux.rs",
+        "target_kind": "lib",
+        "required_target_os": "linux",
+        "test_name": "linux::tests::path_identity_control_rejects_changed_retained_resource_identity"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "sandbox_path_swap",
+        "control_id": "path_identity_control",
+        "package": "chio-cage",
+        "source": "crates/security/chio-cage/src/linux.rs",
+        "function": "retained_resource_identity_matches",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "true"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/sandbox_path_swap/mutants.out/outcomes.json",
+          "sha256": "4e5490c902608cc753503b8a9ded53c890b7e1b04d72945c4e4091edd1f63766",
+          "inputs_sha256": "55ba088e4bcf0702dc44c4bfaa5db7ebb26142f085a3a17907494ed8e0956013"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+  ]
+}

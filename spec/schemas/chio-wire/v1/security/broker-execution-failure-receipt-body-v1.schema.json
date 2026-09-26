@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/broker-execution-failure-receipt-body-v1.schema.json",
+  "title": "Chio broker execution failure receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "receiptId",
+    "issuedAtUnixSeconds",
+    "stage",
+    "outcome",
+    "diagnosticCode",
+    "requestDigest",
+    "capabilityDigest",
+    "attemptId",
+    "invocationId",
+    "holdId",
+    "parentCapabilityId",
+    "brokerCapabilityId",
+    "dispatchKnowledge"
+  ],
+  "properties": {
+    "schema": { "const": "chio.broker-execution-failure-receipt.v1" },
+    "receiptId": { "$ref": "#/$defs/identifier" },
+    "issuedAtUnixSeconds": { "type": "integer", "minimum": 1 },
+    "stage": { "enum": ["admission", "hold", "capture", "dispatch", "response", "receipt_persistence"] },
+    "outcome": { "enum": ["denied", "reversed", "failed", "unknown"] },
+    "diagnosticCode": {
+      "type": "string",
+      "minLength": 6,
+      "maxLength": 128,
+      "pattern": "^chio\\.[a-z0-9._-]+$"
+    },
+    "requestDigest": { "$ref": "#/$defs/digest" },
+    "capabilityDigest": { "$ref": "#/$defs/digestOrNull" },
+    "attemptId": { "$ref": "#/$defs/identifierOrNull" },
+    "invocationId": { "$ref": "#/$defs/identifierOrNull" },
+    "holdId": { "$ref": "#/$defs/identifierOrNull" },
+    "parentCapabilityId": { "$ref": "#/$defs/identifierOrNull" },
+    "brokerCapabilityId": { "$ref": "#/$defs/identifierOrNull" },
+    "dispatchKnowledge": { "enum": ["not_started", "not_committed", "committed", "unknown"] }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "identifierOrNull": {
+      "oneOf": [
+        { "$ref": "#/$defs/identifier" },
+        { "type": "null" }
+      ]
+    },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "digestOrNull": {
+      "oneOf": [
+        { "$ref": "#/$defs/digest" },
+        { "type": "null" }
+      ]
+    }
+  }
+}

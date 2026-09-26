@@ -81,16 +81,17 @@ pub use budget_split::{
     MAX_BUDGET_SHARE_BPS,
 };
 pub use capability_verify::{
-    verify_capability, verify_capability_full, verify_capability_full_with_root,
-    verify_capability_with_floor, verify_capability_with_floor_and_resolver,
-    verify_capability_with_floor_and_trust_root, verify_capability_with_negotiated_floor,
-    CapabilityError, CapabilityFeatureContext, TrustRootResolver, VerifiedCapability,
+    verify_capability, verify_capability_full, verify_capability_full_with_evidence,
+    verify_capability_full_with_root, verify_capability_with_floor,
+    verify_capability_with_floor_and_resolver, verify_capability_with_floor_and_trust_root,
+    verify_capability_with_negotiated_floor, CapabilityError, CapabilityEvidenceContext,
+    CapabilityFeatureContext, TrustRootResolver, VerifiedCapability,
 };
 pub use clock::{Clock, FixedClock};
 pub use evaluate::{
     evaluate, evaluate_with_crypto_floor, evaluate_with_crypto_floor_and_budgets,
-    evaluate_with_full_floor, evaluate_with_full_floor_and_root, EvaluateInput, EvaluationVerdict,
-    KernelCoreError,
+    evaluate_with_full_floor, evaluate_with_full_floor_and_evidence,
+    evaluate_with_full_floor_and_root, EvaluateInput, EvaluationVerdict, KernelCoreError,
 };
 pub use formal_core::{
     budget_charge_admits, budget_commit, budget_increment_admits, budget_precheck,

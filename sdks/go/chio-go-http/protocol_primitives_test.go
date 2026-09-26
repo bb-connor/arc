@@ -6,19 +6,25 @@ import (
 )
 
 func TestChioToolCallRequestPreservesApprovalSetAndOpaqueExtension(t *testing.T) {
+	var first CapabilityGovernedApprovalToken
+	if err := json.Unmarshal(protocolFixture(t, "governed-approval-token"), &first); err != nil {
+		t.Fatal(err)
+	}
+	second := first
+	first.Id, second.Id = "approval-a", "approval-b"
+	var proposal CapabilityThresholdApprovalProposal
+	if err := json.Unmarshal(protocolFixture(t, "threshold-proposal"), &proposal); err != nil {
+		t.Fatal(err)
+	}
+	// This is a wire projection, not verification of the modified fixture IDs.
 	request := ChioToolCallRequest{
-		Type:     "tool_call_request",
-		ID:       "request-go-1",
-		ServerID: "server-go-1",
-		Tool:     "execute",
-		Params:   json.RawMessage(`{"amount":7}`),
-		ApprovalTokens: []CapabilityGovernedApprovalToken{
-			{Id: "approval-a"},
-			{Id: "approval-b"},
-		},
-		ThresholdApprovalProposal: &CapabilityThresholdApprovalProposal{
-			ProposalId: "proposal-go-1",
-		},
+		Type:                      "tool_call_request",
+		ID:                        "request-go-1",
+		ServerID:                  "server-go-1",
+		Tool:                      "execute",
+		Params:                    json.RawMessage(`{"amount":7}`),
+		ApprovalTokens:            []CapabilityGovernedApprovalToken{first, second},
+		ThresholdApprovalProposal: &proposal,
 		SupplementalAuthorization: &CapabilitySupplementalAuthorization{
 			SignedExtension: "b3BhcXVl",
 		},

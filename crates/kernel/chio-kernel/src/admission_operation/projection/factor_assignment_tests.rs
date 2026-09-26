@@ -507,6 +507,7 @@ fn economic_terminal_capabilities() -> AdmissionProjectionCapabilities {
     AdmissionProjectionCapabilities {
         operation_terminal: true,
         economic_mutation_terminal: true,
+        execution_nonce_participant: false,
         ..AdmissionProjectionCapabilities::default()
     }
 }

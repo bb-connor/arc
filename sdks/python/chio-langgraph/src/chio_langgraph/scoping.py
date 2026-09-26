@@ -27,7 +27,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from chio_sdk.models import ChioScope, CapabilityToken
+from chio_sdk.models import CapabilityToken, ChioScope, scope_is_subset_of
 
 from chio_langgraph.errors import ChioLangGraphConfigError
 
@@ -85,9 +85,7 @@ class ChioGraphConfig:
 
     # Minted tokens live here once ``provision`` is called. Keyed by
     # node name; ``__graph__`` holds the workflow-level token.
-    _tokens: dict[str, CapabilityToken] = field(
-        default_factory=dict, repr=False, compare=False
-    )
+    _tokens: dict[str, CapabilityToken] = field(default_factory=dict, repr=False, compare=False)
 
     # ------------------------------------------------------------------
     # Validation
@@ -99,7 +97,7 @@ class ChioGraphConfig:
         self.node_scopes = dict(self.node_scopes)
         ceiling = self.effective_ceiling()
         for name, scope in list(self.node_scopes.items()):
-            if ceiling is not None and not scope.is_subset_of(ceiling):
+            if ceiling is not None and not scope_is_subset_of(scope, ceiling):
                 raise ChioLangGraphConfigError(
                     f"node {name!r} scope is broader than the graph ceiling; "
                     "subgraph / per-node scopes must attenuate, not widen"
@@ -124,7 +122,7 @@ class ChioGraphConfig:
             # the workflow_scope cannot widen it.
             if self.workflow_scope is None:
                 return self.parent_ceiling
-            if self.workflow_scope.is_subset_of(self.parent_ceiling):
+            if scope_is_subset_of(self.workflow_scope, self.parent_ceiling):
                 return self.workflow_scope
             # workflow_scope claims to be broader than parent_ceiling --
             # a misconfiguration; return the stricter parent ceiling.
@@ -219,7 +217,7 @@ def enforce_subgraph_ceiling(
     ceiling = config.effective_ceiling()
     if ceiling is None:
         return
-    if not scope.is_subset_of(ceiling):
+    if not scope_is_subset_of(scope, ceiling):
         raise ChioLangGraphConfigError(
             f"node {node_name!r} scope exceeds the parent graph ceiling; "
             "subgraph nodes must attenuate the ceiling, not widen it"

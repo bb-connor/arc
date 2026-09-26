@@ -59,6 +59,14 @@ pub type RuntimeProviderHealthReport = chio_runtime_core::RuntimeProviderHealthR
 pub type RuntimeProviderLoadedWeightsEvidence =
     chio_runtime_core::RuntimeProviderLoadedWeightsEvidence;
 pub type RuntimeRecoveryDrillReport = chio_runtime_core::RuntimeRecoveryDrillReport;
+pub type RuntimeReplayMarker = chio_runtime_core::RuntimeReplayMarker;
+pub type RuntimeReplayMarkerKind = chio_runtime_core::RuntimeReplayMarkerKind;
+pub type RuntimeReplaySourceBinding = chio_runtime_core::RuntimeReplaySourceBinding;
+pub type RuntimeReplaySourceSeal = chio_runtime_core::RuntimeReplaySourceSeal;
+pub const MAX_RUNTIME_REPLAY_SOURCE_MARKERS: usize =
+    chio_runtime_core::MAX_RUNTIME_REPLAY_SOURCE_MARKERS;
+pub const MAX_RUNTIME_REPLAY_SOURCE_BYTES: usize =
+    chio_runtime_core::MAX_RUNTIME_REPLAY_SOURCE_BYTES;
 pub type RuntimeRequestBinding = chio_runtime_core::RuntimeRequestBinding;
 pub type RuntimeRunContract = chio_runtime_core::RuntimeRunContract;
 pub type RuntimeRunLease = chio_runtime_core::RuntimeRunLease;
@@ -124,146 +132,8 @@ pub const CHIO_RUNTIME_PROVIDER_HEALTH_REPORT_SCHEMA: &str =
     "chio.runtime.provider-health-report.v1";
 pub const CHIO_RUNTIME_OPS_STATUS_REPORT_SCHEMA: &str = "chio.runtime.ops-status-report.v1";
 
-#[derive(Debug, Clone)]
-pub struct ChioRuntimeAdmissionHook<S> {
-    profile: RuntimeAdmissionProfile,
-    store: S,
-    runtime_trust_input: Option<SignedRuntimeVerifierTrustBundle>,
-    trusted_verifier_keys: Vec<RuntimeTrustedVerifierKey>,
-    pheromone_query_report: Option<SignedRuntimePheromoneQueryReport>,
-    runtime_pheromone_policy: Option<SignedRuntimePheromonePolicy>,
-    runtime_peer_weights: Option<SignedRuntimePeerWeights>,
-    swarm_witness_keys: Vec<chio_core_types::PublicKey>,
-    fixed_now_unix_ms: Option<u64>,
-}
-
-impl<S> ChioRuntimeAdmissionHook<S> {
-    #[must_use]
-    pub fn new(profile: RuntimeAdmissionProfile, store: S) -> Self {
-        Self {
-            profile,
-            store,
-            runtime_trust_input: None,
-            trusted_verifier_keys: Vec::new(),
-            pheromone_query_report: None,
-            runtime_pheromone_policy: None,
-            runtime_peer_weights: None,
-            swarm_witness_keys: Vec::new(),
-            fixed_now_unix_ms: None,
-        }
-    }
-
-    #[must_use]
-    pub fn with_runtime_trust_input(
-        mut self,
-        runtime_trust_input: SignedRuntimeVerifierTrustBundle,
-        trusted_verifier_keys: Vec<RuntimeTrustedVerifierKey>,
-    ) -> Self {
-        self.runtime_trust_input = Some(runtime_trust_input);
-        self.trusted_verifier_keys = trusted_verifier_keys;
-        self
-    }
-
-    #[must_use]
-    pub fn with_pheromone_query_report(
-        mut self,
-        report: SignedRuntimePheromoneQueryReport,
-    ) -> Self {
-        self.pheromone_query_report = Some(report);
-        self
-    }
-
-    #[must_use]
-    pub fn with_runtime_pheromone_policy(
-        mut self,
-        policy: SignedRuntimePheromonePolicy,
-        peer_weights: SignedRuntimePeerWeights,
-    ) -> Self {
-        self.runtime_pheromone_policy = Some(policy);
-        self.runtime_peer_weights = Some(peer_weights);
-        self
-    }
-
-    #[must_use]
-    pub fn with_swarm_witness_keys(
-        mut self,
-        witness_keys: Vec<chio_core_types::PublicKey>,
-    ) -> Self {
-        self.swarm_witness_keys = witness_keys;
-        self
-    }
-
-    #[must_use]
-    pub fn with_fixed_now_unix_ms(mut self, now_unix_ms: u64) -> Self {
-        self.fixed_now_unix_ms = Some(now_unix_ms);
-        self
-    }
-
-    fn core_hook(
-        &self,
-    ) -> chio_runtime_core::ChioRuntimeAdmissionHook<RuntimeCoreAdmissionStoreAdapter<'_>>
-    where
-        S: ChioRuntimeAdmissionStore,
-    {
-        let mut hook = chio_runtime_core::ChioRuntimeAdmissionHook::new(
-            self.profile.clone(),
-            RuntimeCoreAdmissionStoreAdapter { inner: &self.store },
-        );
-        if let Some(runtime_trust_input) = &self.runtime_trust_input {
-            hook = hook.with_runtime_trust_input(
-                runtime_trust_input.clone(),
-                self.trusted_verifier_keys.clone(),
-            );
-        }
-        if let Some(pheromone_query_report) = &self.pheromone_query_report {
-            hook = hook.with_pheromone_query_report(pheromone_query_report.clone());
-        }
-        if let (Some(policy), Some(peer_weights)) =
-            (&self.runtime_pheromone_policy, &self.runtime_peer_weights)
-        {
-            hook = hook.with_runtime_pheromone_policy(policy.clone(), peer_weights.clone());
-        }
-        hook = hook.with_swarm_witness_keys(self.swarm_witness_keys.clone());
-        if let Some(now_unix_ms) = self.fixed_now_unix_ms {
-            hook = hook.with_fixed_now_unix_ms(now_unix_ms);
-        }
-        hook
-    }
-}
-
-impl<S> chio_kernel::RuntimeAdmissionHook for ChioRuntimeAdmissionHook<S>
-where
-    S: ChioRuntimeAdmissionStore + Send + Sync,
-{
-    fn name(&self) -> &str {
-        "chio-runtime-admission"
-    }
-
-    fn evaluate(
-        &self,
-        context: &chio_kernel::RuntimeAdmissionContext<'_>,
-    ) -> Result<chio_kernel::RuntimeAdmissionDecision, chio_kernel::KernelError> {
-        chio_kernel::RuntimeAdmissionHook::evaluate(&self.core_hook(), context)
-    }
-
-    fn release_reserved(
-        &self,
-        metadata: &serde_json::Value,
-    ) -> Result<(), chio_kernel::KernelError> {
-        chio_kernel::RuntimeAdmissionHook::release_reserved(&self.core_hook(), metadata)
-    }
-
-    fn requires_dispatch_revalidation(&self) -> bool {
-        chio_kernel::RuntimeAdmissionHook::requires_dispatch_revalidation(&self.core_hook())
-    }
-
-    fn revalidate_before_dispatch(
-        &self,
-        context: &chio_kernel::RuntimeAdmissionRevalidationContext<'_>,
-    ) -> Result<(), chio_kernel::KernelError> {
-        chio_kernel::RuntimeAdmissionHook::revalidate_before_dispatch(&self.core_hook(), context)
-    }
-}
+mod admission_hook;
+pub use admission_hook::ChioRuntimeAdmissionHook;
 
 pub(crate) type RuntimeCoreError = chio_runtime_core::ChioRuntimeError;
 

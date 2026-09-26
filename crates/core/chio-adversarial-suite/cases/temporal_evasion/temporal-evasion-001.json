@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "temporal-evasion-001",
+  "class": "temporal_evasion",
+  "expected_verdict": "DENY",
+  "expected_reason": "temporal_evasion_detected",
+  "threat_id": "behavioral_sequence_attack",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "event_time_control",
+        "package": "chio-quarantine",
+        "test_source": "crates/security/chio-quarantine/src/correlation.rs",
+        "target_kind": "lib",
+        "test_name": "correlation::mutation_tests::event_time_window_rejects_reverse_and_expired_sequences"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "ingest_time_substitution",
+        "control_id": "event_time_control",
+        "package": "chio-quarantine",
+        "source": "crates/security/chio-quarantine/src/correlation.rs",
+        "function": "event_time_is_ordered_and_within",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "true"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/ingest_time_substitution/mutants.out/outcomes.json",
+          "sha256": "4af16f49727cbc88f647d365914d05ca7f7b698ef350ce973156831eac745caa",
+          "inputs_sha256": "6df7e0f486719d536a00c316a3b348d4f26e4bc9bf1b2aa0df13ee926ac48c6e"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+  ]
+}

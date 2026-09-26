@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "id": "containment-rollback-001",
+  "class": "containment_rollback",
+  "expected_verdict": "DENY",
+  "expected_reason": "containment_rollback_detected",
+  "threat_id": "resource_exhaustion_dos",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "blast_completeness_control",
+        "package": "chio-quarantine",
+        "test_source": "crates/security/chio-quarantine/src/blast.rs",
+        "target_kind": "lib",
+        "test_name": "blast::tests::corruption_truncation_lag_and_missing_completeness_are_never_exact"
+      },
+      {
+        "id": "plan_hash_control",
+        "package": "chio-quarantine",
+        "test_source": "crates/security/chio-quarantine/tests/state_machine.rs",
+        "target_kind": "test",
+        "target": "state_machine",
+        "test_name": "response_plan_hash_commits_to_exact_policy_and_finding_authority_bindings"
+      },
+      {
+        "id": "rollback_control",
+        "package": "chio-quarantine",
+        "test_source": "crates/security/chio-quarantine/tests/response_executor.rs",
+        "target_kind": "test",
+        "target": "response_executor",
+        "test_name": "executor_crash_stale_takeover_pending_rollback_never_calls_effect_port"
+      },
+      {
+        "id": "lift_truth_control",
+        "package": "chio-quarantine",
+        "test_source": "crates/security/chio-quarantine/tests/state_machine.rs",
+        "target_kind": "test",
+        "target": "state_machine",
+        "test_name": "lifted_is_unreachable_until_every_applied_reversible_effect_is_restored"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "truncation_ignored",
+        "control_id": "blast_completeness_control",
+        "package": "chio-quarantine",
+        "source": "crates/security/chio-quarantine/src/blast.rs",
+        "function": "resolve_snapshot",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "||",
+          "replacement": "&&",
+          "occurrence": 1
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/truncation_ignored/mutants.out/outcomes.json",
+          "sha256": "6c0b9d34df28f2f076be66aa57f0f3c1dceb0608210552daa42b1d208828b57b",
+          "inputs_sha256": "1737aa92df29dfb30c3de2747af82208d2ddb204bba02b5c852a012bf587d720"
+        }
+      },
+      {
+        "id": "approval_plan_field_omission",
+        "control_id": "plan_hash_control",
+        "package": "chio-quarantine",
+        "source": "crates/security/chio-quarantine/src/state_machine.rs",
+        "function": "compute_plan_hash",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok([0; 32])"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/approval_plan_field_omission/mutants.out/outcomes.json",
+          "sha256": "70c421bdc707475661006bd370172805c53108400989f4484703cb12fa860ec3",
+          "inputs_sha256": "af820898ae450bbc5d81e547d748cdbfc68c7a6834aa9294eb23fde8d2112c13"
+        }
+      },
+      {
+        "id": "root_only_lift",
+        "control_id": "rollback_control",
+        "package": "chio-quarantine",
+        "source": "crates/security/chio-quarantine/src/executor.rs",
+        "function": "ResponseExecutor<S, E, R, A>::drive_rollback",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "||",
+          "replacement": "&&",
+          "occurrence": 1
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/root_only_lift/mutants.out/outcomes.json",
+          "sha256": "3c6b17b659b00fa488d0adf75ff3feec1b5ee001cd08f17ce3de322b9b23ceb1",
+          "inputs_sha256": "fd33dff3d1dafc9b84cb1b2702cb6c087acc865791cb6dc7232df9b624688141"
+        }
+      },
+      {
+        "id": "false_lifted_status",
+        "control_id": "lift_truth_control",
+        "package": "chio-security-types",
+        "source": "crates/security/chio-security-types/src/response.rs",
+        "function": "ResponseSnapshot::all_applied_reversible_effects_restored",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "true"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/false_lifted_status/mutants.out/outcomes.json",
+          "sha256": "4f098fe6a994645eeab35b20bd4cac2a9d88c3d26f3fe2623b21bcaf595e04a2",
+          "inputs_sha256": "d84d3ea203fa1963a15bacfeafe43ed2faafc11c6aa995f438568d5859cd9809"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+  ]
+}

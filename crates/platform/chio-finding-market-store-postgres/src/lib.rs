@@ -692,7 +692,7 @@ impl PostgresFindingMarketStore {
     ) -> Result<Option<HostedMarketJob>, HostedMarketStoreError> {
         validate_identifier(job_id, MAX_JOB_ID_BYTES)
             .map_err(|_| HostedMarketStoreError::Invalid("job_id"))?;
-        let mut transaction = self.begin_tenant(tenant).await?;
+        let mut transaction = self.begin_tenant_snapshot(tenant).await?;
         let row = sqlx::query(JOB_SELECT)
             .bind(tenant.as_str())
             .bind(job_id)
@@ -737,13 +737,13 @@ impl PostgresFindingMarketStore {
         stored_u64(count)
     }
 
-    /// Prove that the runtime role can enter one configured tenant boundary
+    /// Prove that the connected role can read one enabled tenant boundary
     /// before a worker advertises readiness or claims a lease.
     pub async fn probe_tenant(
         &self,
         tenant: &HostedTenantId,
     ) -> Result<(), HostedMarketStoreError> {
-        let transaction = self.begin_tenant(tenant).await?;
+        let transaction = self.begin_tenant_snapshot(tenant).await?;
         transaction.commit().await.map_err(unavailable)
     }
 

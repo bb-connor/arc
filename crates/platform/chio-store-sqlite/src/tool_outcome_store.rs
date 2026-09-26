@@ -3,32 +3,41 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::sha256_hex;
 use chio_kernel::admission_operation::{
-    AdmissionOperationId, AdmissionOperationState, AdmissionOperationStoreError,
-    AdmissionOperationV1, AdmissionRecoveryLease, StoreMutationFence,
+    AdmissionDigest, AdmissionOperationId, AdmissionOperationState, AdmissionOperationStoreError,
+    AdmissionOperationV1, AdmissionRecoveryLease, ClaimedLease, QualifiedAdmissionOperationStore,
+    RecoveryClaimRequest, StoreMutationFence,
 };
 use chio_kernel::tool_outcome::{
-    CanonicalInvocationBlobV1, CanonicalResolvedOutputBlobV1,
+    AcknowledgedSecurityReleaseV1, CanonicalInvocationBlobV1, CanonicalResolvedOutputBlobV1,
     PersistedPostReturnEvaluationRecordV1, PersistedToolOutcomeRecordV1,
     PostReturnEvaluationRecordV1, QualifiedToolOutcomeStore, RawInvocationOutcomeV1,
-    ToolOutcomeInsertResultV1, ToolOutcomeRecordV1, ToolOutcomeStore, ToolOutcomeStoreError,
+    SecurityReleaseRecordV1, ToolOutcomeInsertResultV1, ToolOutcomeRecordV1, ToolOutcomeStore,
+    ToolOutcomeStoreError,
 };
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use serde::Serialize;
 
 use crate::admission_operation_store::{
     advance_tool_outcome_tx, append_participant_update_tx, load_operation_for_participant_tx,
-    verify_active_owner, verify_trusted_time,
+    resolve_recovery_authority, verify_active_owner, verify_trusted_time, RecoveryAuthority,
 };
 use crate::serving_owner::SqliteServingOwner;
 
 const TOOL_OUTCOME_SCHEMA_KEY: &str = "tool_outcome";
-pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 2;
+pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 3;
 const TOOL_OUTCOME_SCHEMA_ANCHORS: &[&str] = &[
     "tool_outcomes",
     "admission_operations",
     "chio_serving_owner",
 ];
 const TOOL_OUTCOME_SCHEMA: &str = include_str!("tool_outcome_store.sql");
+const SECURITY_RELEASE_SCHEMA: &str = include_str!("tool_outcome_security_release.sql");
+#[path = "tool_outcome_native_output.rs"]
+mod native_output;
+#[path = "tool_outcome_security_release.rs"]
+mod security_release;
+pub(crate) use native_output::verify_native_output_artifacts;
+pub(crate) use security_release::require_terminal_release;
 const MAX_OUTCOME_RECORD_BYTES: usize = 1024 * 1024;
 const MAX_EVALUATION_RECORD_BYTES: usize = 64 * 1024 * 1024;
 
@@ -187,11 +196,11 @@ impl SqliteToolOutcomeStore {
     }
 }
 
-impl ToolOutcomeStore for SqliteToolOutcomeStore {
-    fn record_tool_returned(
+impl SqliteToolOutcomeStore {
+    fn record_tool_returned_under(
         &self,
+        recovery: RecoveryAuthority<'_, '_>,
         operation: &AdmissionOperationV1,
-        recovery_lease: &AdmissionRecoveryLease,
         blob: &CanonicalInvocationBlobV1,
         record: &ToolOutcomeRecordV1,
         active_fence: &StoreMutationFence,
@@ -258,11 +267,18 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
             active_fence,
             trusted_now_unix_ms,
         )?;
+        let recovery_lease = resolve_recovery_authority(
+            &transaction,
+            &self.serving_owner,
+            recovery,
+            trusted_now_unix_ms,
+        )
+        .map_err(admission_error)?;
         let finalizing = advance_tool_outcome_tx(
             &transaction,
             &self.serving_owner,
             operation,
-            recovery_lease,
+            &recovery_lease,
             record.outcome_id().clone(),
             &participant_digest,
             trusted_now_unix_ms,
@@ -274,6 +290,167 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
             outcome: record.clone(),
             operation: finalizing,
         })
+    }
+
+    fn begin_post_return_evaluation_under(
+        &self,
+        recovery: RecoveryAuthority<'_, '_>,
+        record: &PostReturnEvaluationRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(PostReturnEvaluationRecordV1, AdmissionRecoveryLease), ToolOutcomeStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_write(&mut connection, active_fence, trusted_now_unix_ms)?;
+        let operation = load_operation_for_participant_tx(&transaction, record.operation_id())
+            .map_err(admission_error)?
+            .ok_or(ToolOutcomeStoreError::NotFound)?;
+        let outcome = load_outcome_tx(&transaction, record.operation_id())?
+            .ok_or(ToolOutcomeStoreError::NotFound)?;
+        require_finalizing_operation(&operation, &outcome)?;
+        record
+            .validate_against(&operation, &outcome)
+            .and_then(|_| record.validate_for_store_mutation(trusted_now_unix_ms))
+            .map_err(|error| invariant(error.to_string()))?;
+        let recovery_lease = resolve_recovery_authority(
+            &transaction,
+            &self.serving_owner,
+            recovery,
+            trusted_now_unix_ms,
+        )
+        .map_err(admission_error)?;
+        if let Some(existing) = load_evaluation_tx(&transaction, record.operation_id())? {
+            if existing != *record {
+                return Err(ToolOutcomeStoreError::Conflict);
+            }
+            // Replaying the evaluation can still persist a renewed recovery
+            // claim. Publish that write to the rollback anchor before returning.
+            self.commit_write(transaction)?;
+            self.sync_after_write(&connection)?;
+            return Ok((existing, recovery_lease.into_owned()));
+        }
+        let evaluation_json = encode_evaluation(record)?;
+        let participant_digest = evaluation_participant_digest(record, &evaluation_json)?;
+        insert_evaluation_tx(
+            &transaction,
+            record,
+            outcome.outcome_id().as_str(),
+            &evaluation_json,
+            &participant_digest,
+            active_fence,
+            trusted_now_unix_ms,
+        )?;
+        append_participant_update_tx(
+            &transaction,
+            &self.serving_owner,
+            &operation,
+            &recovery_lease,
+            &participant_digest,
+            trusted_now_unix_ms,
+        )
+        .map_err(admission_error)?;
+        self.commit_write(transaction)?;
+        self.sync_after_write(&connection)?;
+        Ok((record.clone(), recovery_lease.into_owned()))
+    }
+}
+
+impl ToolOutcomeStore for SqliteToolOutcomeStore {
+    fn require_security_release_checkpoint_support(&self) -> Result<(), ToolOutcomeStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let _: i64 = transaction
+            .query_row(
+                "SELECT COUNT(*) FROM tool_outcome_security_releases WHERE 0",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        transaction.commit().map_err(sqlite_error)
+    }
+
+    fn record_security_release(
+        &self,
+        release: &AcknowledgedSecurityReleaseV1,
+        recovery_lease: &AdmissionRecoveryLease,
+    ) -> Result<SecurityReleaseRecordV1, ToolOutcomeStoreError> {
+        self.persist_security_release(release, recovery_lease)
+    }
+
+    fn lookup_security_release(
+        &self,
+        operation_id: &AdmissionOperationId,
+    ) -> Result<Option<SecurityReleaseRecordV1>, ToolOutcomeStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let record = security_release::load(&transaction, operation_id.as_str())?;
+        if load_outcome_tx(&transaction, operation_id)?.is_some() {
+            verify_outcome_projection(&transaction, operation_id.as_str())?;
+        }
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(record)
+    }
+
+    fn record_tool_returned(
+        &self,
+        operation: &AdmissionOperationV1,
+        recovery_lease: &AdmissionRecoveryLease,
+        blob: &CanonicalInvocationBlobV1,
+        record: &ToolOutcomeRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<ToolOutcomeInsertResultV1, ToolOutcomeStoreError> {
+        self.record_tool_returned_under(
+            RecoveryAuthority::Lease(recovery_lease),
+            operation,
+            blob,
+            record,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn claim_and_record_tool_returned(
+        &self,
+        _admission: &dyn QualifiedAdmissionOperationStore,
+        claim: RecoveryClaimRequest<'_>,
+        lease: &mut ClaimedLease<'_>,
+        operation: &AdmissionOperationV1,
+        blob: &CanonicalInvocationBlobV1,
+        record: &ToolOutcomeRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<ToolOutcomeInsertResultV1, ToolOutcomeStoreError> {
+        self.record_tool_returned_under(
+            RecoveryAuthority::Claim {
+                request: claim,
+                lease,
+            },
+            operation,
+            blob,
+            record,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn claim_and_begin_post_return_evaluation(
+        &self,
+        _admission: &dyn QualifiedAdmissionOperationStore,
+        claim: RecoveryClaimRequest<'_>,
+        lease: &mut ClaimedLease<'_>,
+        record: &PostReturnEvaluationRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(PostReturnEvaluationRecordV1, AdmissionRecoveryLease), ToolOutcomeStoreError> {
+        self.begin_post_return_evaluation_under(
+            RecoveryAuthority::Claim {
+                request: claim,
+                lease,
+            },
+            record,
+            active_fence,
+            trusted_now_unix_ms,
+        )
     }
 
     fn lookup_by_operation(
@@ -322,48 +499,13 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeStoreError> {
-        let mut connection = self.connection()?;
-        let transaction = self.begin_write(&mut connection, active_fence, trusted_now_unix_ms)?;
-        let operation = load_operation_for_participant_tx(&transaction, record.operation_id())
-            .map_err(admission_error)?
-            .ok_or(ToolOutcomeStoreError::NotFound)?;
-        let outcome = load_outcome_tx(&transaction, record.operation_id())?
-            .ok_or(ToolOutcomeStoreError::NotFound)?;
-        require_finalizing_operation(&operation, &outcome)?;
-        record
-            .validate_against(&operation, &outcome)
-            .and_then(|_| record.validate_for_store_mutation(trusted_now_unix_ms))
-            .map_err(|error| invariant(error.to_string()))?;
-        if let Some(existing) = load_evaluation_tx(&transaction, record.operation_id())? {
-            if existing != *record {
-                return Err(ToolOutcomeStoreError::Conflict);
-            }
-            transaction.commit().map_err(sqlite_error)?;
-            return Ok(existing);
-        }
-        let evaluation_json = encode_evaluation(record)?;
-        let participant_digest = evaluation_participant_digest(record, &evaluation_json)?;
-        insert_evaluation_tx(
-            &transaction,
+        self.begin_post_return_evaluation_under(
+            RecoveryAuthority::Lease(recovery_lease),
             record,
-            outcome.outcome_id().as_str(),
-            &evaluation_json,
-            &participant_digest,
             active_fence,
             trusted_now_unix_ms,
-        )?;
-        append_participant_update_tx(
-            &transaction,
-            &self.serving_owner,
-            &operation,
-            recovery_lease,
-            &participant_digest,
-            trusted_now_unix_ms,
         )
-        .map_err(admission_error)?;
-        self.commit_write(transaction)?;
-        self.sync_after_write(&connection)?;
-        Ok(record.clone())
+        .map(|(evaluation, _)| evaluation)
     }
 
     fn stage_post_return_evaluation(
@@ -377,45 +519,18 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
     ) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, active_fence, trusted_now_unix_ms)?;
-        let operation = load_operation_for_participant_tx(&transaction, operation_id)
-            .map_err(admission_error)?
-            .ok_or(ToolOutcomeStoreError::NotFound)?;
-        let outcome =
-            load_outcome_tx(&transaction, operation_id)?.ok_or(ToolOutcomeStoreError::NotFound)?;
-        require_finalizing_operation(&operation, &outcome)?;
-        let current = load_evaluation_tx(&transaction, operation_id)?
-            .ok_or(ToolOutcomeStoreError::NotFound)?;
-        if current.version() != expected_version {
-            return Err(ToolOutcomeStoreError::CasConflict);
-        }
-        chio_kernel::tool_outcome::validate_evaluation_store_successor(&current, next)
-            .and_then(|_| next.validate_against(&operation, &outcome))
-            .and_then(|_| next.validate_for_store_mutation(trusted_now_unix_ms))
-            .map_err(|error| invariant(error.to_string()))?;
-        let evaluation_json = encode_evaluation(next)?;
-        let participant_digest = evaluation_participant_digest(next, &evaluation_json)?;
-        update_evaluation_tx(
+        let next = self.stage_post_return_evaluation_tx(
             &transaction,
             operation_id,
             expected_version,
+            recovery_lease,
             next,
-            &evaluation_json,
-            &participant_digest,
             active_fence,
             trusted_now_unix_ms,
         )?;
-        append_participant_update_tx(
-            &transaction,
-            &self.serving_owner,
-            &operation,
-            recovery_lease,
-            &participant_digest,
-            trusted_now_unix_ms,
-        )
-        .map_err(admission_error)?;
         self.commit_write(transaction)?;
         self.sync_after_write(&connection)?;
-        Ok(next.clone())
+        Ok(next)
     }
 
     fn finalize_post_return(
@@ -430,15 +545,166 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
+        self.finalize_post_return_with_pure_results(
+            operation_id,
+            expected_evaluation_version,
+            &[],
+            recovery_lease,
+            terminal_evaluation,
+            expected_outcome_version,
+            terminal_outcome,
+            resolved_output,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn finalize_post_return_with_pure_results(
+        &self,
+        operation_id: &AdmissionOperationId,
+        expected_evaluation_version: u64,
+        pure_result_digests: &[AdmissionDigest],
+        recovery_lease: &AdmissionRecoveryLease,
+        terminal_evaluation: &PostReturnEvaluationRecordV1,
+        expected_outcome_version: u64,
+        terminal_outcome: &ToolOutcomeRecordV1,
+        resolved_output: Option<&CanonicalResolvedOutputBlobV1>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, active_fence, trusted_now_unix_ms)?;
-        let operation = load_operation_for_participant_tx(&transaction, operation_id)
+        let mut version = expected_evaluation_version;
+        if !pure_result_digests.is_empty() {
+            let mut current = load_evaluation_tx(&transaction, operation_id)?
+                .ok_or(ToolOutcomeStoreError::NotFound)?;
+            if current.version() != version {
+                return Err(ToolOutcomeStoreError::CasConflict);
+            }
+            for digest in pure_result_digests {
+                let next = current
+                    .record_next_pure_result(digest.clone())
+                    .map_err(|error| invariant(error.to_string()))?;
+                current = self.stage_post_return_evaluation_tx(
+                    &transaction,
+                    operation_id,
+                    version,
+                    recovery_lease,
+                    &next,
+                    active_fence,
+                    trusted_now_unix_ms,
+                )?;
+                version = current.version();
+            }
+        }
+        let terminal = self.finalize_post_return_tx(
+            &transaction,
+            operation_id,
+            version,
+            recovery_lease,
+            terminal_evaluation,
+            expected_outcome_version,
+            terminal_outcome,
+            resolved_output,
+            active_fence,
+            trusted_now_unix_ms,
+        )?;
+        // No pure prefix or terminal result is published until all ordinary
+        // step and terminal checks pass and the anchor covers their commit.
+        self.commit_write(transaction)?;
+        self.sync_after_write(&connection)?;
+        Ok(terminal)
+    }
+
+    fn load_resolved_output_by_operation(
+        &self,
+        operation_id: &AdmissionOperationId,
+    ) -> Result<Option<CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let outcome = load_outcome_tx(&transaction, operation_id)?;
+        let resolved = outcome
+            .as_ref()
+            .map(|outcome| load_resolved_blob_connection(&transaction, outcome))
+            .transpose()?
+            .flatten();
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(resolved)
+    }
+}
+
+impl SqliteToolOutcomeStore {
+    #[allow(clippy::too_many_arguments)]
+    fn stage_post_return_evaluation_tx(
+        &self,
+        transaction: &Transaction<'_>,
+        operation_id: &AdmissionOperationId,
+        expected_version: u64,
+        recovery_lease: &AdmissionRecoveryLease,
+        next: &PostReturnEvaluationRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeStoreError> {
+        let operation = load_operation_for_participant_tx(transaction, operation_id)
+            .map_err(admission_error)?
+            .ok_or(ToolOutcomeStoreError::NotFound)?;
+        let outcome =
+            load_outcome_tx(transaction, operation_id)?.ok_or(ToolOutcomeStoreError::NotFound)?;
+        require_finalizing_operation(&operation, &outcome)?;
+        let current = load_evaluation_tx(transaction, operation_id)?
+            .ok_or(ToolOutcomeStoreError::NotFound)?;
+        if current.version() != expected_version {
+            return Err(ToolOutcomeStoreError::CasConflict);
+        }
+        chio_kernel::tool_outcome::validate_evaluation_store_successor(&current, next)
+            .and_then(|_| next.validate_against(&operation, &outcome))
+            .and_then(|_| next.validate_for_store_mutation(trusted_now_unix_ms))
+            .map_err(|error| invariant(error.to_string()))?;
+        let evaluation_json = encode_evaluation(next)?;
+        let participant_digest = evaluation_participant_digest(next, &evaluation_json)?;
+        update_evaluation_tx(
+            transaction,
+            operation_id,
+            expected_version,
+            next,
+            &evaluation_json,
+            &participant_digest,
+            active_fence,
+            trusted_now_unix_ms,
+        )?;
+        append_participant_update_tx(
+            transaction,
+            &self.serving_owner,
+            &operation,
+            recovery_lease,
+            &participant_digest,
+            trusted_now_unix_ms,
+        )
+        .map_err(admission_error)?;
+        Ok(next.clone())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn finalize_post_return_tx(
+        &self,
+        transaction: &Transaction<'_>,
+        operation_id: &AdmissionOperationId,
+        expected_evaluation_version: u64,
+        recovery_lease: &AdmissionRecoveryLease,
+        terminal_evaluation: &PostReturnEvaluationRecordV1,
+        expected_outcome_version: u64,
+        terminal_outcome: &ToolOutcomeRecordV1,
+        resolved_output: Option<&CanonicalResolvedOutputBlobV1>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
+        let operation = load_operation_for_participant_tx(transaction, operation_id)
             .map_err(admission_error)?
             .ok_or(ToolOutcomeStoreError::NotFound)?;
         let current_outcome =
-            load_outcome_tx(&transaction, operation_id)?.ok_or(ToolOutcomeStoreError::NotFound)?;
+            load_outcome_tx(transaction, operation_id)?.ok_or(ToolOutcomeStoreError::NotFound)?;
         require_finalizing_operation(&operation, &current_outcome)?;
-        let current_evaluation = load_evaluation_tx(&transaction, operation_id)?
+        let current_evaluation = load_evaluation_tx(transaction, operation_id)?
             .ok_or(ToolOutcomeStoreError::NotFound)?;
         if current_evaluation.version() != expected_evaluation_version
             || current_outcome.version() != expected_outcome_version
@@ -465,7 +731,7 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
         )?;
         if let Some(blob) = resolved_output {
             insert_blob_bytes_tx(
-                &transaction,
+                transaction,
                 blob.blob_ref().digest().as_str(),
                 blob.bytes(),
                 active_fence,
@@ -473,7 +739,7 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
             )?;
         }
         update_outcome_tx(
-            &transaction,
+            transaction,
             operation_id,
             expected_outcome_version,
             terminal_outcome,
@@ -483,7 +749,7 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
             trusted_now_unix_ms,
         )?;
         update_evaluation_tx(
-            &transaction,
+            transaction,
             operation_id,
             expected_evaluation_version,
             terminal_evaluation,
@@ -493,7 +759,7 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
             trusted_now_unix_ms,
         )?;
         append_participant_update_tx(
-            &transaction,
+            transaction,
             &self.serving_owner,
             &operation,
             recovery_lease,
@@ -501,25 +767,7 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
             trusted_now_unix_ms,
         )
         .map_err(admission_error)?;
-        self.commit_write(transaction)?;
-        self.sync_after_write(&connection)?;
         Ok((terminal_evaluation.clone(), terminal_outcome.clone()))
-    }
-
-    fn load_resolved_output_by_operation(
-        &self,
-        operation_id: &AdmissionOperationId,
-    ) -> Result<Option<CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError> {
-        let mut connection = self.connection()?;
-        let transaction = self.begin_read(&mut connection)?;
-        let outcome = load_outcome_tx(&transaction, operation_id)?;
-        let resolved = outcome
-            .as_ref()
-            .map(|outcome| load_resolved_blob_connection(&transaction, outcome))
-            .transpose()?
-            .flatten();
-        transaction.commit().map_err(sqlite_error)?;
-        Ok(resolved)
     }
 }
 
@@ -528,19 +776,22 @@ impl QualifiedToolOutcomeStore for SqliteToolOutcomeStore {}
 pub(crate) fn initialize_tool_outcome_schema(
     connection: &mut Connection,
 ) -> Result<(), ToolOutcomeStoreError> {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(sqlite_error)?;
+    security_release::verify_unstamped_source(&transaction)?;
     let on_disk = crate::check_schema_version(
-        connection,
+        &transaction,
         TOOL_OUTCOME_SCHEMA_KEY,
         TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
         TOOL_OUTCOME_SCHEMA_ANCHORS,
     )
     .map_err(|error| invariant(error.to_string()))?;
     if on_disk == TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION {
-        return verify_tool_outcome_invariants(connection);
+        verify_tool_outcome_invariants(&transaction)?;
+        return transaction.commit().map_err(sqlite_error);
     }
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
+    security_release::verify_pre_migration(&transaction, on_disk)?;
     // Version 2 permits a compacted payload to be restored when a later owner
     // supplies the same digest- and size-verified canonical bytes. Recreate the
     // trigger transactionally before applying the canonical schema definition.
@@ -549,6 +800,9 @@ pub(crate) fn initialize_tool_outcome_schema(
         .map_err(sqlite_error)?;
     transaction
         .execute_batch(TOOL_OUTCOME_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(SECURITY_RELEASE_SCHEMA)
         .map_err(sqlite_error)?;
     crate::stamp_schema_version(
         &transaction,
@@ -566,6 +820,9 @@ pub(crate) fn verify_tool_outcome_invariants(
     let expected = Connection::open_in_memory().map_err(sqlite_error)?;
     expected
         .execute_batch(TOOL_OUTCOME_SCHEMA)
+        .map_err(sqlite_error)?;
+    expected
+        .execute_batch(SECURITY_RELEASE_SCHEMA)
         .map_err(sqlite_error)?;
     if tool_outcome_schema_catalog(connection)? != tool_outcome_schema_catalog(&expected)? {
         return Err(invariant(
@@ -604,6 +861,15 @@ pub(crate) fn verify_tool_outcome_invariants(
     drop(statement);
     for operation_id in operation_ids {
         verify_outcome_projection(connection, &operation_id)?;
+    }
+    let orphan: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM tool_outcome_security_releases AS release LEFT JOIN tool_outcomes AS outcome USING(operation_id) WHERE outcome.operation_id IS NULL)",
+        [], |row| row.get(0),
+    ).map_err(sqlite_error)?;
+    if orphan {
+        return Err(invariant(
+            "security release is not owned by a retained tool outcome",
+        ));
     }
     Ok(())
 }
@@ -656,7 +922,7 @@ fn verify_outcome_projection(
         )
         .map_err(sqlite_error)?;
     let evaluation = load_evaluation_connection(connection, operation_id)?;
-    let (expected_outcome_digest, expected_evaluation_digest, expected_latest_digest) =
+    let (expected_outcome_digest, expected_evaluation_digest, mut expected_latest_digest) =
         if let Some(evaluation) = &evaluation {
             evaluation
                 .validate_against(&operation, &outcome)
@@ -705,6 +971,11 @@ fn verify_outcome_projection(
         return Err(invariant(
             "post-return evaluation row has an invalid participant commitment",
         ));
+    }
+    if let Some(digest) =
+        security_release::verify_projection(connection, &operation, &outcome, evaluation.as_ref())?
+    {
+        expected_latest_digest = digest;
     }
     let latest: Option<String> = connection
         .query_row(

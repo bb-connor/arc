@@ -19,6 +19,10 @@ url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
 [imports.zcash]
 url = "https://raw.githubusercontent.com/zcash/rust-ecosystem/main/supply-chain/audits.toml"
 
+[policy.aws-lc-rs]
+audit-as-crates-io = true
+notes = "Audit the published 1.18.1 base. Cargo Vet cannot authenticate the local path bytes; separately review CHIO-PATCH.patch and the restored-fixture manifest before accepting this fork."
+
 [policy.chio-a2a-adapter]
 audit-as-crates-io = true
 
@@ -396,6 +400,39 @@ audit-as-crates-io = true
 
 [policy.chio-workflow-preflight]
 audit-as-crates-io = true
+
+[policy.cmpv2]
+audit-as-crates-io = false
+
+[policy.crmf]
+audit-as-crates-io = false
+
+[policy.enumflags2_derive]
+audit-as-crates-io = false
+
+[policy.ignore]
+audit-as-crates-io = false
+
+[policy.nono]
+audit-as-crates-io = false
+
+[policy.regress]
+audit-as-crates-io = false
+
+[policy.seccompiler]
+audit-as-crates-io = false
+
+[policy.sigstore-crypto]
+audit-as-crates-io = false
+
+[policy.sigstore-merkle]
+audit-as-crates-io = false
+
+[policy.sigstore-trust-root]
+audit-as-crates-io = false
+
+[policy.sigstore-verify]
+audit-as-crates-io = false
 
 [[exemptions.addr2line]]
 version = "0.26.1"

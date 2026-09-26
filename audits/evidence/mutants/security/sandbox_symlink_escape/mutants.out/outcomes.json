@@ -1,0 +1,119 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.602023704,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--locked",
+            "--test=linux_compile"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.702233379,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--locked",
+            "--test=linux_compile",
+            "forbidden_hard_link_alias_is_rejected_before_compilation",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-cage",
+          "file": "crates/security/chio-cage/src/linux.rs",
+          "function": {
+            "function_name": "strict_resolution",
+            "return_type": "-> u64",
+            "span": {
+              "start": {
+                "line": 1015,
+                "column": 1
+              },
+              "end": {
+                "line": 1017,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 1016,
+              "column": 5
+            },
+            "end": {
+              "line": 1016,
+              "column": 66
+            }
+          },
+          "replacement": "0",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-cage__src__linux.rs_line_1016_col_5.log",
+      "diff_path": "diff/crates__security__chio-cage__src__linux.rs_line_1016_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 4.159575628,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--locked",
+            "--test=linux_compile"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.702215378,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--locked",
+            "--test=linux_compile",
+            "forbidden_hard_link_alias_is_rejected_before_compilation",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

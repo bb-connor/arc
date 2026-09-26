@@ -20,6 +20,8 @@ use crate::tool_outcome::{
 
 use super::*;
 
+mod capabilities;
+pub use capabilities::AdmissionProjectionCapabilities;
 mod participant_evidence;
 pub use participant_evidence::*;
 mod channel_terminal;
@@ -68,6 +70,44 @@ pub struct AdmissionReceiptMetadataV1 {
     pub compensation_status: AdmissionCompensationStatus,
     pub tool_outcome_id: Option<AdmissionDigest>,
     pub tool_outcome_version: Option<u64>,
+}
+
+impl AdmissionReceiptMetadataV1 {
+    /// Observe an already-retained unknown outcome without claiming a new
+    /// transition or a live recovery lease. Unlike terminal-transition metadata,
+    /// the version is unchanged and the coordinator/fence tuple is the validated
+    /// historical dispatch tuple. This is not `VerifiedAdmissionReceipt` authority.
+    pub(crate) fn retained_unknown_dispatch(
+        operation: &AdmissionOperationV1,
+        trusted_time_unix_ms: u64,
+    ) -> Result<Self, AdmissionOperationError> {
+        operation.validate()?;
+        super::state::validate_positive_ijson("trusted_time_unix_ms", trusted_time_unix_ms)?;
+        if operation.state() != AdmissionOperationState::OutcomeUnknownAfterDispatch {
+            return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
+        }
+        let dispatch = operation
+            .dispatch_commit()
+            .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+        Ok(Self {
+            schema: AdmissionReceiptSchema::V1,
+            operation_id: operation.binding().operation_id().clone(),
+            request_id: operation.binding().request_id().clone(),
+            request_namespace_digest: operation.binding().request_namespace_digest().clone(),
+            request_binding_hash: operation.binding().request_binding_hash().clone(),
+            projected_operation_version: operation.version(),
+            projected_state: operation.state(),
+            projected_dispatch_state: operation.dispatch_state(),
+            trusted_time_unix_ms,
+            coordinator_lease_id: dispatch.coordinator_lease_id.clone(),
+            coordinator_lease_epoch: dispatch.coordinator_lease_epoch,
+            store_fence: dispatch.store_fence.clone(),
+            retained_dispatch_commit: Some(dispatch.clone()),
+            compensation_status: AdmissionCompensationStatus::NotCompensated,
+            tool_outcome_id: None,
+            tool_outcome_version: None,
+        })
+    }
 }
 
 /// A receipt qualified by the kernel against the exact admission projection.
@@ -263,104 +303,6 @@ impl VerifiedAdmissionReceipt {
             compensation_status,
             tool_outcome,
         )
-    }
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct AdmissionProjectionCapabilities {
-    pub operation_terminal: bool,
-    pub incident_terminal: bool,
-    pub tool_outcome: bool,
-    pub payment_terminal: bool,
-    pub authorization_consumption: bool,
-    pub outcome_eligibility: bool,
-    pub observation_attempt_zero: bool,
-    pub obligation: bool,
-    pub channel_terminal: bool,
-    pub credit_exposure_terminal: bool,
-    pub economic_mutation_terminal: bool,
-}
-
-impl AdmissionProjectionCapabilities {
-    pub fn validate_for(
-        &self,
-        operation: &AdmissionOperationV1,
-        projection: &AdmissionTerminalProjection,
-    ) -> Result<(), AdmissionOperationError> {
-        let requirements = operation.binding.participant_requirements();
-        let require = |supported, capability| {
-            if supported {
-                Ok(())
-            } else {
-                Err(AdmissionOperationError::MissingProjectionCapability { capability })
-            }
-        };
-        require(self.operation_terminal, "operation_terminal")?;
-        require(
-            !requirements.credit_exposure || self.credit_exposure_terminal,
-            "credit_exposure_terminal",
-        )?;
-        match projection {
-            AdmissionTerminalProjection::Completed(_) => {
-                require(
-                    operation.binding.kind != AdmissionOperationKind::ToolDispatch
-                        || self.tool_outcome,
-                    "tool_outcome",
-                )?;
-                require(
-                    !requirements.payment || self.payment_terminal,
-                    "payment_terminal",
-                )?;
-                require(
-                    !requirements.authorization_consumption || self.authorization_consumption,
-                    "authorization_consumption",
-                )?;
-                require(
-                    !requirements.outcome_eligibility || self.outcome_eligibility,
-                    "outcome_eligibility",
-                )?;
-                require(
-                    !requirements.observation_attempt_zero || self.observation_attempt_zero,
-                    "observation_attempt_zero",
-                )?;
-                require(!requirements.obligation || self.obligation, "obligation")?;
-                require(
-                    !requirements.channel || self.channel_terminal,
-                    "channel_terminal",
-                )
-            }
-            AdmissionTerminalProjection::CompensatedBeforeDispatch { evidence, .. }
-            | AdmissionTerminalProjection::NotAcceptedAfterDispatchCommit { evidence, .. } => {
-                require(
-                    !matches!(evidence.as_ref(), AdmissionReceiptOrIncident::Incident(_))
-                        || self.incident_terminal,
-                    "incident_terminal",
-                )
-            }
-            AdmissionTerminalProjection::DeniedAfterDelivery { evidence, .. } => {
-                require(
-                    !matches!(evidence.as_ref(), AdmissionReceiptOrIncident::Incident(_))
-                        || self.incident_terminal,
-                    "incident_terminal",
-                )?;
-                require(
-                    !requirements.payment || self.payment_terminal,
-                    "payment_terminal",
-                )?;
-                require(
-                    !requirements.observation_attempt_zero || self.observation_attempt_zero,
-                    "observation_attempt_zero",
-                )
-            }
-            AdmissionTerminalProjection::OutcomeUnknownAfterDispatch { .. } => {
-                require(self.incident_terminal, "incident_terminal")
-            }
-            AdmissionTerminalProjection::EconomicMutationApplied { .. }
-            | AdmissionTerminalProjection::EconomicMutationNotApplied { .. } => require(
-                self.economic_mutation_terminal,
-                "economic_mutation_terminal",
-            ),
-        }
     }
 }
 

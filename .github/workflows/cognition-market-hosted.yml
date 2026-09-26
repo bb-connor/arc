@@ -52,6 +52,7 @@ on:
       - "sdks/typescript/chio-ts/**"
       - "spec/schemas/**"
       - "supply-chain/**"
+      - "third_party/aws-lc-rs-chio/**"
       - "scripts/qualify-cognition-market-hosted.sh"
       - "scripts/qualify-cognition-market-kvm.sh"
       - ".github/workflows/cognition-market-hosted.yml"
@@ -108,6 +109,7 @@ on:
       - "sdks/typescript/chio-ts/**"
       - "spec/schemas/**"
       - "supply-chain/**"
+      - "third_party/aws-lc-rs-chio/**"
       - "scripts/qualify-cognition-market-hosted.sh"
       - "scripts/qualify-cognition-market-kvm.sh"
       - ".github/workflows/cognition-market-hosted.yml"
@@ -121,7 +123,8 @@ jobs:
   postgres-store:
     name: Cognition market PostgreSQL isolation
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Cold Rust qualification plus evidence and cache upload can exceed 30 minutes.
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16.6-alpine

@@ -13,29 +13,28 @@ if ! command -v cmake >/dev/null 2>&1; then
 fi
 
 cmake -S sdks/cpp/chio-drogon -B "${build_dir}" \
-  -DCHIO_DROGON_BUILD_TESTS=ON
+  -DCHIO_DROGON_BUILD_TESTS=ON \
+  -DCHIO_DROGON_REQUIRE_DEPS=ON
 
-if [[ -f "${build_dir}/CMakeCache.txt" ]] &&
-   cmake --build "${build_dir}" --target help 2>/dev/null | grep -q "chio_drogon"; then
-  cmake --build "${build_dir}"
-  ctest --test-dir "${build_dir}" --output-on-failure
-else
-  echo "chio-drogon package build skipped because Drogon or ChioCpp was unavailable"
-fi
+# This is an acceptance gate, not the optional-dependency example launcher.
+# Requiring configuration avoids treating missing dependencies or SIGPIPE in a
+# target-help probe as successful qualification without compiling the library.
+cmake --build "${build_dir}"
+ctest --test-dir "${build_dir}" --output-on-failure --no-tests=error
 
 cmake -S examples/hello-drogon -B "${example_build_dir}"
 if [[ -f "${example_build_dir}/hello-drogon.skip" ]]; then
-  echo "hello-drogon example skipped: $(tr -d '\n' < "${example_build_dir}/hello-drogon.skip")"
+  echo "hello-drogon example dependencies are required for qualification" >&2
+  exit 1
 else
   cmake --build "${example_build_dir}" --target hello_drogon
   cmake --build "${example_build_dir}" --target hello_drogon_contract_tests
-  ctest --test-dir "${example_build_dir}" --output-on-failure
+  ctest --test-dir "${example_build_dir}" --output-on-failure --no-tests=error
 fi
 
 bash -n examples/hello-drogon/run.sh examples/hello-drogon/smoke.sh
-if [[ -f "${example_build_dir}/hello-drogon.skip" ]]; then
-  ./examples/hello-drogon/run.sh
-fi
-./examples/hello-drogon/smoke.sh
+cargo build --locked -p chio-cli --bin chio
+CHIO_BIN="${CARGO_TARGET_DIR:-${repo_root}/target}/debug/chio" \
+  CHIO_DROGON_REQUIRE_DEPS=1 ./examples/hello-drogon/smoke.sh
 
 echo "chio-drogon checks passed"

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "sandbox-syscall-escape-001",
+  "class": "sandbox_syscall_escape",
+  "expected_verdict": "DENY",
+  "expected_reason": "sandbox_syscall_escape_detected",
+  "threat_id": "tool_server_escape",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "seccomp_control",
+        "package": "chio-cage",
+        "test_source": "crates/security/chio-cage/src/launch/linux_parts/part_02.rs",
+        "target_kind": "lib",
+        "required_target_os": "linux",
+        "test_name": "launch::platform::tests::seccomp_control_rejects_forbidden_socket_before_default_deny"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "sandbox_syscall_escape",
+        "control_id": "seccomp_control",
+        "package": "chio-cage",
+        "source": "crates/security/chio-cage/src/launch/linux.rs",
+        "function": "seccomp_profile_is_fail_closed",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "true"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/sandbox_syscall_escape/mutants.out/outcomes.json",
+          "sha256": "7b40fa6bf8c503e0736cd3be5cc007cd4ac96f2e5fd994aced086a12969b30d7",
+          "inputs_sha256": "d52844f55fa04d9186ab085a63bcb90f736b034f36fcda1def8463cd961fdd2c"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+  ]
+}

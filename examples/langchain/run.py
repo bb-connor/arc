@@ -12,12 +12,14 @@ from pydantic import BaseModel, Field
 DEFAULT_CHIO_BASE_URL = "http://127.0.0.1:8931"
 DEFAULT_CHIO_CONTROL_URL = "http://127.0.0.1:8940"
 DEFAULT_CHIO_AUTH_TOKEN = "demo-token"
+DEFAULT_CHIO_ADMIN_TOKEN = "demo-admin-token"
+DEFAULT_CHIO_CONTROL_TOKEN = "demo-control-token"
 
 
-def session_capability_id(base_url: str, auth_token: str, session_id: str) -> str:
+def session_capability_id(base_url: str, admin_token: str, session_id: str) -> str:
     response = httpx.get(
         f"{base_url}/admin/sessions/{session_id}/trust",
-        headers={"Authorization": f"Bearer {auth_token}"},
+        headers={"Authorization": f"Bearer {admin_token}"},
         timeout=5.0,
     )
     response.raise_for_status()
@@ -39,6 +41,8 @@ def main() -> None:
     base_url = os.environ.get("CHIO_BASE_URL", DEFAULT_CHIO_BASE_URL)
     control_url = os.environ.get("CHIO_CONTROL_URL", DEFAULT_CHIO_CONTROL_URL)
     auth_token = os.environ.get("CHIO_AUTH_TOKEN", DEFAULT_CHIO_AUTH_TOKEN)
+    admin_token = os.environ.get("CHIO_ADMIN_TOKEN", DEFAULT_CHIO_ADMIN_TOKEN)
+    control_token = os.environ.get("CHIO_CONTROL_TOKEN", DEFAULT_CHIO_CONTROL_TOKEN)
     client = ChioClient.with_static_bearer(base_url, auth_token)
     session = client.initialize(
         client_info={"name": "chio-langchain-example", "version": "0.2.0"}
@@ -46,7 +50,7 @@ def main() -> None:
     try:
         tools_result = session.list_tools()
         tools = tools_result.get("result", {}).get("tools", [])
-        capability_id = session_capability_id(base_url, auth_token, session.session_id)
+        capability_id = session_capability_id(base_url, admin_token, session.session_id)
 
         def echo_via_chio(message: str) -> str:
             """Call the Chio-governed echo_text tool and return its text payload."""
@@ -68,7 +72,7 @@ def main() -> None:
 
         message = os.environ.get("CHIO_MESSAGE", "hello from LangChain")
         result = tool.invoke({"message": message})
-        receipts = ReceiptQueryClient(control_url, auth_token).query(
+        receipts = ReceiptQueryClient(control_url, control_token).query(
             {"capabilityId": capability_id, "limit": 10}
         )
         receipt_list = receipts.get("receipts", [])

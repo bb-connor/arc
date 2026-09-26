@@ -65,7 +65,7 @@ fn test_kernel_config() -> KernelConfig {
 
 fn test_manifest() -> ToolManifest {
     ToolManifest {
-        schema: "chio.manifest.v1".to_string(),
+        schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
         server_id: "test-srv".to_string(),
         name: "Test Server".to_string(),
         description: Some("Test".to_string()),
@@ -76,8 +76,14 @@ fn test_manifest() -> ToolManifest {
             input_schema: json!({"type": "object"}),
             output_schema: None,
             pricing: None,
-            has_side_effects: false,
+            annotations: chio_manifest::ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
             latency_hint: None,
+            flow: None,
         }],
         server_tools: Vec::new(),
         required_permissions: None,
@@ -140,8 +146,14 @@ fn generated_request_id_rejects_threshold_approvals() {
         supplemental_authorization: None,
         model_metadata: None,
     };
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![shared_manifest()])
-        .test_expect("ACP edge should construct");
+    let edge = ChioAcpEdge::new(
+        AcpEdgeConfig {
+            peer_capabilities: chio_mcp_edge::authorization::authorization_capabilities(),
+            ..AcpEdgeConfig::default()
+        },
+        vec![shared_manifest()],
+    )
+    .test_expect("ACP edge should construct");
     let kernel = ChioKernel::new(shared_kernel_config());
 
     let error = edge

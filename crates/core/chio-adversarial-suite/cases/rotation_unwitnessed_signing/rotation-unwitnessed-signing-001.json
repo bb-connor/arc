@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "id": "rotation-unwitnessed-signing-001",
+  "class": "rotation_unwitnessed_signing",
+  "expected_verdict": "DENY",
+  "expected_reason": "rotation_unwitnessed_signing_detected",
+  "threat_id": "kernel_impersonation",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "witnessed_activation_control",
+        "package": "chio-keyring",
+        "test_source": "crates/security/chio-keyring/tests/sqlite.rs",
+        "target_kind": "test",
+        "target": "sqlite",
+        "test_name": "append_checkpoint_witness_activation_and_reopen_are_transactional"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "rotation_unwitnessed_signing",
+        "control_id": "witnessed_activation_control",
+        "package": "chio-keyring",
+        "source": "crates/security/chio-keyring/src/checkpoint.rs",
+        "function": "SignedKeyLogCheckpoint::verify_witnesses",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "<",
+          "replacement": ">"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/rotation_unwitnessed_signing/mutants.out/outcomes.json",
+          "sha256": "3db30f21a7ae8b689fd75cbf970defa11e61e2257a9cb59101d3b2844749ed63",
+          "inputs_sha256": "5a3ccac377bf2f22e90fa8a6c4b817126b83892f1244c024c4ee3fd6b9c76aa5"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+  ]
+}

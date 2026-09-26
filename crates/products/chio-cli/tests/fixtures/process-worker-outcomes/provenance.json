@@ -1,0 +1,32 @@
+{
+  "v1-network": {
+    "runtime_source": "cb5a34e722b52c794f2aaf84fbcb02a40bac3f03",
+    "observer_source": "48c7b83148262ed83a415fc54dbed01ac21da54d",
+    "runtime_id": "a86fa37d-97ec-4e6b-afbd-b178dd9a10a8",
+    "source_directory": "outcomes-network-cb5a34e72-48c7b8314",
+    "sha256": "8fd7a5c8df02a55b209411b5f64c34ba0bda447f77a07aa447555c10c205f8d0",
+    "private_keys_exported": false,
+    "retrospective_observation": true,
+    "m5_acceptance_complete": false
+  },
+  "v2-budget": {
+    "runtime_source": "cb5a34e722b52c794f2aaf84fbcb02a40bac3f03",
+    "observer_source": "1ae9f9ddac749d71f27c9c7f62c49c519a53c7b3",
+    "runtime_id": "714d3643-e7f7-42f9-95b5-6a3a0d734ce8",
+    "source_directory": "outcomes-budget-cb5a34e72-1ae9f9dda",
+    "sha256": "40efb11f66702165309c2e5c7eb08b79f405fa66b77c88b2d0c848e44c10def4",
+    "private_keys_exported": false,
+    "retrospective_observation": true,
+    "m5_acceptance_complete": false
+  },
+  "v2-policy-bound-budget": {
+    "runtime_source": "f3a9a558eab15751c092f73c17e90a3ce93eb179",
+    "observer_source": "f3a9a558eab15751c092f73c17e90a3ce93eb179",
+    "runtime_id": "2aeedf94-f478-4c92-99fa-8a202c878aac",
+    "source_directory": "linux-x86-policy-binding-matrix-f3a9a558e",
+    "sha256": "8e3f2679fe1b6206ef553dea654df2e668af2dd5670b12f891f6c78abf81927a",
+    "private_keys_exported": false,
+    "retrospective_observation": false,
+    "m5_acceptance_complete": false
+  }
+}

@@ -149,6 +149,7 @@ fn peer_capabilities_and_roots_are_session_scoped() {
     let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
 
     session.set_peer_capabilities(PeerCapabilities {
+        authorization: None,
         supports_progress: false,
         supports_cancellation: false,
         supports_subscriptions: false,

@@ -73,7 +73,11 @@ pub(crate) fn build_remote_admission_stores(
     let status: AdmissionAuthorityStatusWire = decode_response(response).map_err(|error| {
         CliError::cli_other_error(format!("failed to connect to admission authority: {error}"))
     })?;
-    let budget = super::budget::build_shared_remote_budget_store(control_url, control_token)?;
+    let budget = super::budget::build_shared_remote_budget_store(
+        control_url,
+        control_token,
+        status.fence.clone(),
+    )?;
     let authority = Arc::new(RemoteAdmissionAuthority {
         client,
         fence: status.fence.clone(),
@@ -340,18 +344,10 @@ impl ReceiptStore for RemoteAdmissionAuthority {
     }
 
     fn admission_projection_capabilities(&self) -> AdmissionProjectionCapabilities {
+        // The remote authority does not serve the operation-owned nonce ports.
         AdmissionProjectionCapabilities {
-            operation_terminal: true,
-            incident_terminal: true,
-            tool_outcome: true,
-            payment_terminal: true,
-            authorization_consumption: true,
-            outcome_eligibility: true,
-            observation_attempt_zero: true,
-            obligation: true,
-            channel_terminal: true,
-            credit_exposure_terminal: true,
-            economic_mutation_terminal: true,
+            execution_nonce_participant: false,
+            ..AdmissionProjectionCapabilities::ALL
         }
     }
 

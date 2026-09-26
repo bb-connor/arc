@@ -1,14 +1,18 @@
 {
-  "caught": 0,
-  "needs_real_run": true,
-  "note": "Bootstrap placeholder. A real conformance test at crates/chio-conformance/tests/threats/device_key_extraction.rs exercises App Attest and Play Integrity rejection branches in chio-custody-hw, but this file is consumed by the per-row cargo-mutants evidence gate. Keep the row in bootstrap until a cargo-mutants run catches at least one device_key_extraction mutant and commits the real run timestamp.",
-  "ran_at": "1970-01-01T00:00:00Z",
+  "caught": 1,
+  "needs_real_run": false,
+  "status": "partial",
+  "closure_scope": "app-attest-credential-id-binding",
+  "deferred_follow_up": "App Attest credential-id binding has real mutation evidence, but device-key extraction defense remains DEFERRED-FOLLOW-UP. The conformance test enters the production WebAuthn-shaped verifier with production mode enabled and proves that an attestation credential cannot be presented under a different key id; its Android arm also rejects a signed fixture carrying only a downgraded device-integrity verdict. This run does not prove Secure Enclave or StrongBox non-exportability, App Attest certificate and leaf-key binding under real Apple evidence, hardware-reference receipt signing, propagation of the verified device trust level into capabilities, or physical-device behavior. Follow-up work must remove raw signing seeds from the mobile receipt FFI, bind platform key references and attestation evidence into issued capabilities, and qualify real iOS and Android devices.",
+  "note": "Real partial mutation evidence. The conformance test at crates/tooling/chio-conformance/tests/threats/device_key_extraction.rs presents a production-mode App Attest WebAuthn shape under the wrong key id and requires the typed KeyIdMismatch refusal before certificate processing. A targeted cargo-mutants run inverted the credential-id comparison at app_attest.rs:148; the typed rejection assertion caught the corrupted binding. PARTIAL: actual hardware non-exportability, real platform certificate evidence, hardware-reference receipt signing, Android trust projection, and device qualification remain deferred.",
+  "ran_at": "2026-09-04T22:35:37Z",
   "survivors": [],
   "test_path": "crates/chio-conformance/tests/threats/device_key_extraction.rs",
-  "evidence_status": "conformance-only",
-  "mutation_evidence_status": "not-run",
-  "promotion_status": "not-promoted",
-  "timestamp_kind": "bootstrap-placeholder",
-  "timestamp_note": "The epoch sentinel is required while needs_real_run is true; it must be replaced with the real cargo-mutants run timestamp when mutation evidence lands.",
-  "reproduction_command": "cargo test -p chio-conformance --test threats device_key_extraction"
+  "evidence_status": "cargo-mutants-run",
+  "mutation_evidence_status": "complete",
+  "promotion_status": "promoted",
+  "timestamp_kind": "cargo-mutants-run",
+  "timestamp_note": "ran_at was captured immediately after the targeted one-mutant cargo-mutants run completed.",
+  "baseline_command": "cargo test -p chio-conformance --test threats -- device_key_extraction",
+  "reproduction_command": "cargo mutants -p chio-custody-hw --no-config -F 'app_attest.rs:148:21: replace != with == in verify_webauthn_app_attest' --baseline skip -C '--package=chio-conformance' --timeout 600 --build-timeout 600 -j 1 --caught -- device_key_extraction"
 }

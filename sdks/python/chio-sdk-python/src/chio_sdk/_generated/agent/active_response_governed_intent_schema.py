@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 8ba0a80532a71a901c67466299ea1bfe1de2852479f67791d2ff4b08be726a8c
+# Schema sha256: c31fc3d855f29edabccd629866ae3f328d7322f74f9c97ed7c5788c1adc8efbe
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,7 +14,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, conint, constr
+from chio_sdk._manifest_wire import SecurityWireModel as BaseModel
+
+from pydantic import ConfigDict, Field, conint, constr
 
 
 class OrderedEffect(Enum):
@@ -29,11 +31,11 @@ class ChioGovernedActiveResponseIntentBody(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    plan_schema: Literal["chio.governed-response-plan.v1"]
+    plan_schema: Literal["chio.response-plan.v1"]
     plan_id: constr(min_length=1)
     operator_capability_id: constr(min_length=1)
     operator_capability_hash: constr(pattern=r"^[0-9a-f]{64}$")
-    operator_capability_expires_at: conint(ge=1)
+    operator_capability_expires_at: conint(strict=True, ge=1)
     executor_subject: constr(
         pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\+mldsa65)$"
     )
@@ -41,5 +43,5 @@ class ChioGovernedActiveResponseIntentBody(BaseModel):
     plan_body_hash: constr(pattern=r"^[0-9a-f]{64}$")
     target_binding: dict[str, Any]
     ordered_effects: list[OrderedEffect] = Field(..., max_length=32, min_length=1)
-    expires_at: conint(ge=1)
+    expires_at: conint(strict=True, ge=1)
     rollback_binding: dict[str, Any]

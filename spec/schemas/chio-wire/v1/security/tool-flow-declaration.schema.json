@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/tool-flow-declaration.schema.json",
+  "title": "Tool Flow Declaration",
+  "description": "Publisher-authenticated information-flow constraints retained across protocol bridges.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["egress"],
+  "properties": {
+    "output_label": { "$ref": "#/$defs/knownLabel" },
+    "input_clearance": { "$ref": "#/$defs/knownLabel" },
+    "egress": { "type": "boolean" },
+    "declassification_purposes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/flowIdentifier" }
+    }
+  },
+  "$defs": {
+    "flowIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    },
+    "knownLabel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "owners", "compartments"],
+      "properties": {
+        "kind": { "const": "known" },
+        "owners": {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": { "$ref": "#/$defs/flowIdentifier" },
+          "additionalProperties": {
+            "type": "array",
+            "maxItems": 256,
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/flowIdentifier" }
+          }
+        },
+        "compartments": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/flowIdentifier" }
+        }
+      }
+    }
+  }
+}

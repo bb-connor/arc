@@ -165,17 +165,8 @@ fn projection_context(operation: &AdmissionOperationV1) -> AdmissionProjectionCo
 
 fn full_projection_capabilities() -> AdmissionProjectionCapabilities {
     AdmissionProjectionCapabilities {
-        operation_terminal: true,
-        incident_terminal: true,
-        tool_outcome: true,
-        payment_terminal: true,
-        authorization_consumption: true,
-        outcome_eligibility: true,
-        observation_attempt_zero: true,
-        obligation: true,
-        channel_terminal: true,
-        credit_exposure_terminal: true,
-        economic_mutation_terminal: true,
+        execution_nonce_participant: false,
+        ..AdmissionProjectionCapabilities::ALL
     }
 }
 
@@ -1772,6 +1763,9 @@ fn transition_matrix_is_exhaustive() {
     }
 }
 
+#[path = "admission_operation_tests/caller_wait.rs"]
+mod caller_wait;
+
 #[test]
 fn dispatch_commit_version_follows_the_configured_state_path() {
     let tool = AdmissionParticipantRequirements {
@@ -2357,3 +2351,6 @@ fn admission_receipt_qualification_pins_kernel_and_exact_signed_body() {
 
 #[path = "admission_operation_tests/terminal_projection.rs"]
 mod terminal_projection;
+
+#[path = "admission_operation_tests/attachment_capacity.rs"]
+mod attachment_capacity;

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "broker-unbound-headers-001",
+  "class": "broker_unbound_headers",
+  "expected_verdict": "DENY",
+  "expected_reason": "broker_unbound_headers_detected",
+  "threat_id": "ssrf_via_http_substrate",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "proof_binding_control",
+        "package": "chio-secret-broker",
+        "test_source": "crates/security/chio-secret-broker/tests/execution.rs",
+        "target_kind": "test",
+        "target": "execution",
+        "test_name": "proof_rejects_body_path_header_option_key_stale_and_future_changes"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "broker_unbound_headers",
+        "control_id": "proof_binding_control",
+        "package": "chio-secret-broker",
+        "source": "crates/security/chio-secret-broker/src/proof.rs",
+        "function": "verify_request_proof",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(())"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/broker_unbound_headers/mutants.out/outcomes.json",
+          "sha256": "90dc81719dc578a20734cc83d1782efca93e04a547a7e8b94f16d8f62cee7244",
+          "inputs_sha256": "6a095b30dfef0f7adcdc69fa4c6244eb51904f774132177390ca91e3fc693e06"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+  ]
+}

@@ -97,7 +97,20 @@ fn task_response_from_orchestrated(
             message: None,
             metadata: receipt_metadata,
         },
-        KernelVerdict::Deny | KernelVerdict::PendingApproval => TaskResponse {
+        KernelVerdict::PendingApproval => TaskResponse {
+            id: task_id,
+            status: TaskStatus::Working,
+            status_message: response.reason,
+            message: chio_cross_protocol::execution::pending_approval_result(
+                response.verdict, response.output.as_ref(),
+            ).map(|pending| A2aMessage {
+                role: "agent".to_string(),
+                parts: vec![A2aPart::Data {data: pending}],
+                metadata: None,
+            }),
+            metadata: receipt_metadata,
+        },
+        KernelVerdict::Deny => TaskResponse {
             id: task_id,
             status: TaskStatus::Failed,
             status_message: response.reason,

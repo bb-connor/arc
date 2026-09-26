@@ -1,7 +1,6 @@
 use std::error::Error;
 
 use base64ct::{Base64UrlUnpadded, Encoding};
-use chio_custody_hw::attestation::apple_root::APPLE_APP_ATTEST_ROOT_SHA256;
 use chio_custody_hw::attestation::google_root::{
     play_integrity_encoding_key, GOOGLE_PLAY_INTEGRITY_ISSUER, GOOGLE_PLAY_INTEGRITY_ROOT_KID,
 };
@@ -12,9 +11,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 pub const APP_ID: &str = "TEAMID1234.dev.chio.patient";
-pub const KEY_ID: &str = "app-attest-key-1";
 pub const CHALLENGE: &[u8] = b"fresh-server-challenge";
-pub const PUBLIC_KEY: &[u8] = b"synthetic-credential-public-key";
 pub const PACKAGE: &str = "dev.chio.patient";
 pub const NONCE: &str = "issuer-nonce-1";
 pub const AUDIENCE: &str = "chio-mobile-issuer";
@@ -41,46 +38,6 @@ struct TestAppIntegrity {
 #[serde(rename_all = "camelCase")]
 struct TestDeviceIntegrity {
     device_recognition_verdict: Vec<String>,
-}
-
-pub fn app_attest_fixture(
-    app_id: &str,
-    key_id: &str,
-    challenge: &[u8],
-) -> Result<Vec<u8>, Box<dyn Error>> {
-    let entries = vec![
-        (
-            CborValue::Text("format".to_string()),
-            CborValue::Text(APP_ATTEST_FORMAT.to_string()),
-        ),
-        (
-            CborValue::Text("key_id".to_string()),
-            CborValue::Text(key_id.to_string()),
-        ),
-        (
-            CborValue::Text("app_id_hash".to_string()),
-            CborValue::Bytes(sha256(app_id.as_bytes()).to_vec()),
-        ),
-        (
-            CborValue::Text("challenge_hash".to_string()),
-            CborValue::Bytes(sha256(challenge).to_vec()),
-        ),
-        (
-            CborValue::Text("root_fingerprint_sha256".to_string()),
-            CborValue::Bytes(APPLE_APP_ATTEST_ROOT_SHA256.to_vec()),
-        ),
-        (
-            CborValue::Text("counter".to_string()),
-            CborValue::Integer(1.into()),
-        ),
-        (
-            CborValue::Text("credential_public_key".to_string()),
-            CborValue::Bytes(PUBLIC_KEY.to_vec()),
-        ),
-    ];
-    let mut bytes = Vec::new();
-    coset::cbor::ser::into_writer(&CborValue::Map(entries), &mut bytes)?;
-    Ok(bytes)
 }
 
 pub fn webauthn_fixture(

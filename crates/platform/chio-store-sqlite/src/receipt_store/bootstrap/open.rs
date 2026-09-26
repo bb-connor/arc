@@ -589,6 +589,23 @@ impl SqliteReceiptStore {
             CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_decision
                 ON chio_tool_receipts(decision_kind);
 
+            CREATE TABLE IF NOT EXISTS chio_security_evidence_index (
+                evidence_id TEXT NOT NULL PRIMARY KEY,
+                receipt_id TEXT NOT NULL UNIQUE
+            );
+
+            CREATE TRIGGER IF NOT EXISTS chio_security_evidence_index_reject_update
+            BEFORE UPDATE ON chio_security_evidence_index
+            BEGIN
+                SELECT RAISE(ABORT, 'security evidence index entries are immutable');
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS chio_security_evidence_index_reject_delete
+            BEFORE DELETE ON chio_security_evidence_index
+            BEGIN
+                SELECT RAISE(ABORT, 'security evidence index entries are immutable');
+            END;
+
             CREATE TABLE IF NOT EXISTS chio_authorization_receipt_consumptions (
                 authorization_receipt_id TEXT PRIMARY KEY REFERENCES chio_tool_receipts(receipt_id) ON DELETE RESTRICT,
                 consumer_receipt_id TEXT NOT NULL UNIQUE,
@@ -1235,9 +1252,6 @@ impl SqliteReceiptStore {
             );
             CREATE INDEX IF NOT EXISTS idx_receipt_lineage_request
                 ON receipt_lineage_statements(session_id, request_id);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_receipt_lineage_statement_id
-                ON receipt_lineage_statements(statement_id)
-                WHERE statement_id IS NOT NULL;
             CREATE INDEX IF NOT EXISTS idx_receipt_lineage_parent_request
                 ON receipt_lineage_statements(session_id, parent_request_id);
             CREATE INDEX IF NOT EXISTS idx_receipt_lineage_parent_receipt
@@ -1480,55 +1494,37 @@ impl SqliteReceiptStore {
 
             "#,
         )?;
-        schema_migration.commit()?;
-        connection.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
-        connection.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
-        connection.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
-        ensure_tool_receipt_attribution_columns(&connection)?;
-        super::support::ensure_receipt_lineage_statement_columns(&connection)?;
-        super::support::drop_transparency_projection_guards(&connection)?;
-        let backfill_result = (|| -> Result<(), ReceiptStoreError> {
-            super::support::ensure_receipt_retention_watermark_table(&connection)?;
-            super::support::ensure_receipt_retention_tombstones(&connection)?;
-            backfill_tool_receipt_attribution_columns(&connection)?;
-            let projection_backfill =
-                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-            super::support::backfill_provenance_lineage_tables(&projection_backfill)?;
-            super::support::backfill_claim_receipt_log_entries(&projection_backfill)?;
-            super::support::backfill_checkpoint_transparency_projections(&projection_backfill)?;
-            projection_backfill.commit()?;
-            if on_disk_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION {
-                let migration = connection
-                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-                migrate_receipt_cost_projection(&migration)?;
-                migration.commit()?;
-            }
-            Ok(())
-        })();
-        let guard_result = super::support::ensure_transparency_projection_guards(&connection);
-        match (backfill_result, guard_result) {
-            (Ok(()), Ok(())) => {}
-            (Err(error), Ok(())) => return Err(error),
-            (Ok(()), Err(error)) => return Err(error),
-            (Err(backfill_error), Err(guard_error)) => {
-                return Err(ReceiptStoreError::Canonical(format!(
-                    "receipt projection backfill failed ({backfill_error}); restoring immutability guards also failed ({guard_error})"
-                )));
-            }
+        // Keep schema changes, projection backfills and the temporary removal
+        // of immutability guards in one transaction. A failed or interrupted
+        // open must leave the original schema and guards intact; another
+        // connection must never observe an unguarded intermediate state.
+        schema_migration.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
+        schema_migration.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
+        schema_migration.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
+        ensure_tool_receipt_attribution_columns(&schema_migration)?;
+        super::support::migrate_indexed_security_evidence_schema(&schema_migration)?;
+        super::support::ensure_receipt_lineage_statement_columns(&schema_migration)?;
+        super::support::drop_transparency_projection_guards(&schema_migration)?;
+        super::support::ensure_receipt_retention_watermark_table(&schema_migration)?;
+        super::support::ensure_receipt_retention_tombstones(&schema_migration)?;
+        backfill_tool_receipt_attribution_columns(&schema_migration)?;
+        super::support::backfill_provenance_lineage_tables(&schema_migration)?;
+        super::support::backfill_claim_receipt_log_entries(&schema_migration)?;
+        super::support::backfill_checkpoint_transparency_projections(&schema_migration)?;
+        if on_disk_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION {
+            migrate_receipt_cost_projection(&schema_migration)?;
         }
-        verify_receipt_cost_projection(&connection)?;
-
-        let migration =
-            connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        ensure_capability_lineage_provenance_columns(&migration)?;
-        let internal_sink_id = ensure_receipt_sink_identity(&migration)?;
+        super::support::ensure_transparency_projection_guards(&schema_migration)?;
+        verify_receipt_cost_projection(&schema_migration)?;
+        ensure_capability_lineage_provenance_columns(&schema_migration)?;
+        let internal_sink_id = ensure_receipt_sink_identity(&schema_migration)?;
         crate::stamp_schema_version(
-            &migration,
+            &schema_migration,
             RECEIPT_STORE_SCHEMA_KEY,
             RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
         )
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
-        migration.commit()?;
+        schema_migration.commit()?;
 
         let QualifiedReceiptSink {
             durable_sink_id,

@@ -75,17 +75,19 @@ chio-appraisal = { workspace = true }
 chio-bounded = { workspace = true }
 chio-supervisor = { workspace = true }
 chio-core-types = { workspace = true }
-# The workspace declares chio-custody-hw with `default-features = false` so
-# mobile/conformance consumers can drop the passkey graph; the kernel needs the
-# default custody path, so it re-enables those features explicitly.
-chio-custody-hw = { workspace = true, features = ["passkey", "sqlite-store"] }
+chio-security-types = { workspace = true }
+# The kernel verifies signed custody envelopes; it does not run the WebAuthn
+# issuer or its stores. Inherit the workspace's disabled defaults. Issuer
+# applications select passkey and sqlite-store on their own custody dependency.
+chio-custody-hw = { workspace = true }
 chio-weights = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 chio-kernel-core = { workspace = true }
 chio-credit = { workspace = true }
 chio-federation = { workspace = true }
-chio-link = { path = "../../economy/chio-link", default-features = false }
+chio-link = { version = "=0.1.0", path = "../../economy/chio-link", default-features = false }
 chio-log-redact = { workspace = true }
+chio-manifest = { workspace = true }
 chio-metrics-spec = { workspace = true }
 chio-tool-call-fabric = { workspace = true }
 lru = "0.18.2"

@@ -7,21 +7,77 @@ use dashmap::DashMap;
 use crate::budget_store::BudgetCommitMetadata;
 use crate::*;
 
+mod active_response_admission;
+mod active_response_artifact;
+mod active_response_committed_recovery;
+mod active_response_coordinator;
+mod active_response_executor;
+mod active_response_operation_binding;
+mod active_response_policy;
+mod active_response_proof;
+mod admission_cleanup;
 #[path = "admission_coordinator.rs"]
 mod admission_coordinator;
+mod admission_terminal_receipt;
+mod approval_cleanup;
 mod credential_reservation;
 mod error;
 mod kernel_drop_guard;
 mod kernel_scopes;
 mod kernel_struct;
+mod nonce_admission;
 mod output_guard;
+mod security_dispatch;
+mod security_runtime;
+mod signing_authority;
+mod threshold_issuance;
 mod verified_treaty;
+
+pub use active_response_admission::{
+    ActiveResponseAuthorizationRequest, ActiveResponseFindingAuthority,
+    ActiveResponseFindingAuthorityError, ActiveResponseSubmissionProof,
+    ActiveResponseSubmissionProofBody, ActiveResponseSubmissionProofError,
+    AuthoritativeCorrelatedFindingEvidence, VerifiedActiveResponseBindings,
+    ACTIVE_RESPONSE_SUBMISSION_SCHEMA,
+};
+pub use active_response_artifact::ActiveResponseArtifactAuthorityAttestationInput;
+pub use active_response_artifact::{
+    active_response_admission_artifact_payload_digest,
+    active_response_artifact_authority_signing_bytes, active_response_submission_proof_digest,
+    ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
+    ActiveResponseArtifactAuthorityAttestationError,
+    ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,
+    ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA,
+};
+pub use active_response_committed_recovery::{
+    DispatchCommittedActiveResponseResume, PreDispatchActiveResponseReconstruction,
+};
+pub use active_response_coordinator::{
+    ActiveResponseAdmissionRequest, AutomaticActiveResponsePermit,
+    GovernedActiveResponseReservation, PreparedActiveResponseAdmission,
+};
+pub(crate) use active_response_executor::ActiveResponseExecutionRequestParts;
+pub use active_response_executor::{
+    derive_active_response_dispatch_id, ActiveResponseCommittedDispatch,
+    ActiveResponseDispatchIdError, ActiveResponseEffectEvidence, ActiveResponseExecutionApproval,
+    ActiveResponseExecutionEvidence, ActiveResponseExecutionEvidenceParts,
+    ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
+    ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,
+    ActiveResponseExecutorError, ActiveResponseExecutorIdentityError,
+    ActiveResponseFailedEffectEvidence, ActiveResponseFailureEvidence,
+    ActiveResponseReceiptProofSource, AutomaticActiveResponseDispatchFenceOutcome,
+};
+pub use active_response_policy::{
+    ActiveResponsePolicyRequest, ActiveResponsePolicyResolutionError, ActiveResponseRequirement,
+    ActiveResponseRequirementResolver,
+};
 
 pub use construction::KernelBuildError;
 pub use error::{
     HotPathStage, KernelError, OverloadResource, ReplayClockDirection,
     SettlementRuntimeConfigError, StructuredErrorReport,
 };
+pub use evaluation::{CallerExecutionReport, CallerStartCredentials, CallerStartResponse};
 pub use kernel_struct::{
     ChioKernel, HotPathDeadlineConfig, HybridSigningConfig, KernelConfig, MemoryBudgetConfig,
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
@@ -29,21 +85,42 @@ pub use kernel_struct::{
     DEFAULT_RECEIPT_WRITER_POLL_MS, DEFAULT_RECEIPT_WRITER_STALL_MS, DEFAULT_RETENTION_DAYS,
     DEFAULT_RUNTIME_ADMISSION_READINESS_TIMEOUT_MS, MIN_RECEIPT_APPEND_BUDGET_MS,
 };
+pub(crate) use security_dispatch::SecurityRequestLifecycleHandle;
+pub use security_runtime::{GovernedSecurityRuntimePublication, GovernedSecurityRuntimeStatus};
 pub use verified_treaty::{
     FederationTreatyAdmissionBinding, FederationTreatyVerification,
     VerifiedFederationTreatyMaterial,
 };
 
-pub(crate) use admission_coordinator::{
-    DurableAdmissionRuntime, DurableToolAdmission, DurableToolReturnInput,
+#[cfg(feature = "admission-test-support")]
+pub use admission_coordinator::DurableFinalizationCutpointHook;
+#[cfg(feature = "admission-test-support")]
+pub use admission_coordinator::NativeSecurityCaptureCheckpointHook;
+pub use admission_coordinator::NativeSecurityDispatchCaptureAuthority;
+#[cfg(feature = "admission-test-support")]
+pub use admission_coordinator::NativeSecurityEgressCheckpointHook;
+pub use admission_coordinator::NativeSecurityOutputJoinAuthority;
+pub use admission_coordinator::{
+    AcquiredNativeSecurityEgress, DurableFinalizationCutpoint, NativeSecurityFlowJoinAuthority,
+    NativeSecurityNoncePreflightJoinAuthority, PreparedNativeSecurityEgress,
+    RuntimeParticipantClaimAuthority,
 };
+#[cfg(feature = "admission-test-support")]
+pub use admission_coordinator::{CallerExecutionCheckpoint, CallerExecutionCheckpointHook};
+pub(crate) use admission_coordinator::{
+    DurableAdmissionRuntime, DurableDispatchCommitError, DurableToolAdmission,
+    DurableToolReturnContextInput, DurableToolReturnInput,
+};
+pub use credential_reservation::VerifiedNativeDispatchCredentials;
 pub(crate) use kernel_drop_guard::{PostAdmissionDropGuard, PostAdmissionReceiptContext};
+#[cfg(test)]
+pub(crate) use kernel_scopes::RECEIPT_EVALUATION_SCOPE_KEY;
 pub(crate) use kernel_scopes::{
     current_receipt_evaluation_scope_key, current_scoped_receipt_federation_admission,
     current_scoped_receipt_tenant_id, extract_tenant_id_from_auth_context,
-    scope_receipt_federation_admission, scope_receipt_tenant_id, ReceiptFederationAdmission,
-    ScopedKernelReceiptFederationAdmission, ScopedKernelReceiptTenantId,
-    RECEIPT_EVALUATION_SCOPE_KEY,
+    scope_async_receipt_context, scope_receipt_federation_admission, scope_receipt_tenant_id,
+    ReceiptFederationAdmission, ScopedKernelReceiptFederationAdmission,
+    ScopedKernelReceiptTenantId,
 };
 pub(crate) use kernel_struct::{
     capability_crypto_floor, receipt_crypto_floor, ReservedSiblingShare, RestartReservedHoldGate,
@@ -57,154 +134,367 @@ pub type CapabilityId = String;
 /// A string-typed server identifier.
 pub type ServerId = String;
 
+const MANIFEST_SECURITY_METADATA_KEY: &str = "chio_manifest_security_v1";
+const PROTOCOL_ADMISSION_METADATA_KEY: &str = "protocol_admission";
+const BUDGET_AUTHORITY_METADATA_KEY: &str = "budget_authority";
+const BUDGET_DENIAL_AUTHORITY_METADATA_KEY: &str = "budget_denial_authority";
+const FINANCIAL_METADATA_KEY: &str = "financial";
+const GOVERNED_TRANSACTION_METADATA_KEY: &str = "governed_transaction";
+const CALLER_DELIVERY_METADATA_KEY: &str = "caller_delivery";
+
+const RESERVED_RECEIPT_METADATA_KEYS: [&str; 7] = [
+    MANIFEST_SECURITY_METADATA_KEY,
+    PROTOCOL_ADMISSION_METADATA_KEY,
+    BUDGET_AUTHORITY_METADATA_KEY,
+    BUDGET_DENIAL_AUTHORITY_METADATA_KEY,
+    FINANCIAL_METADATA_KEY,
+    GOVERNED_TRANSACTION_METADATA_KEY,
+    CALLER_DELIVERY_METADATA_KEY,
+];
+
+fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
+    let object = metadata.and_then(serde_json::Value::as_object)?;
+    RESERVED_RECEIPT_METADATA_KEYS
+        .iter()
+        .copied()
+        .find(|key| object.contains_key(*key))
+}
+
+fn reject_reserved_receipt_metadata(
+    metadata: Option<&serde_json::Value>,
+) -> Result<(), KernelError> {
+    let Some(key) = reserved_receipt_metadata_key(metadata) else {
+        return Ok(());
+    };
+    let purpose = match key {
+        MANIFEST_SECURITY_METADATA_KEY => "registry-validated kernel entrypoints",
+        PROTOCOL_ADMISSION_METADATA_KEY => "kernel-derived admission receipts",
+        BUDGET_AUTHORITY_METADATA_KEY | BUDGET_DENIAL_AUTHORITY_METADATA_KEY => {
+            "kernel-derived budget receipts"
+        }
+        FINANCIAL_METADATA_KEY | GOVERNED_TRANSACTION_METADATA_KEY => {
+            "kernel-derived economic receipts"
+        }
+        _ => "kernel-derived receipts",
+    };
+    Err(KernelError::InvalidReceiptMetadata(format!(
+        "{key} is reserved for {purpose}"
+    )))
+}
+
+fn registry_validated_manifest_security_metadata(
+    request: &ToolCallRequest,
+    registry: &chio_manifest::VerifiedManifestRegistry,
+    security: &chio_manifest::BridgeSecurityMetadata,
+    metadata: Option<serde_json::Value>,
+) -> Result<serde_json::Value, KernelError> {
+    reject_reserved_receipt_metadata(metadata.as_ref())?;
+    registry
+        .validate_invocation_arguments(
+            &request.server_id,
+            &request.tool_name,
+            security,
+            &request.arguments,
+        )
+        .map_err(|error| KernelError::InvalidReceiptMetadata(error.to_string()))?;
+    security
+        .merge_into_kernel_metadata(metadata)
+        .map_err(|error| KernelError::InvalidReceiptMetadata(error.to_string()))
+}
+
+/// Fail-closed authority consulted immediately before capability issuance or
+/// delegation becomes visible to the governed runtime.
+pub trait CapabilityIssuanceAdmissionAuthority: Send + Sync {
+    fn ensure_ready(&self) -> chio_security_types::ports::PortResult<()>;
+
+    fn authorize(
+        &self,
+        query: &chio_security_types::ports::IssuanceFreezeAdmissionQuery,
+    ) -> chio_security_types::ports::PortResult<()>;
+}
+
+/// Authoritative security identity and isolation state supplied by a trusted
+/// runtime boundary. Tool-call request fields are not a source for this data.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "version", content = "context", rename_all = "snake_case")]
+pub enum SecurityInvocationContext {
+    V1(SecurityInvocationContextV1),
+}
+
+/// Version 1 fields carried by [`SecurityInvocationContext`].
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SecurityInvocationContextV1 {
+    tenant_id: chio_security_types::ports::TenantId,
+    session_id: chio_security_types::ports::SessionId,
+    principal_id: chio_security_types::PrincipalId,
+    isolation_epoch_id: chio_security_types::ports::IsolationEpochId,
+    lineage_root_id: chio_security_types::ports::LineageId,
+    context_generation: u64,
+    flow_state_generation: Option<u64>,
+}
+
+impl SecurityInvocationContextV1 {
+    #[must_use]
+    pub const fn new(
+        tenant_id: chio_security_types::ports::TenantId,
+        session_id: chio_security_types::ports::SessionId,
+        principal_id: chio_security_types::PrincipalId,
+        isolation_epoch_id: chio_security_types::ports::IsolationEpochId,
+        lineage_root_id: chio_security_types::ports::LineageId,
+        context_generation: u64,
+    ) -> Self {
+        Self {
+            tenant_id,
+            session_id,
+            principal_id,
+            isolation_epoch_id,
+            lineage_root_id,
+            context_generation,
+            flow_state_generation: None,
+        }
+    }
+
+    /// Attach mutable durable flow-state generation observed by the trusted
+    /// context resolver. This is not part of capability binding validation.
+    #[must_use]
+    pub const fn with_flow_state_generation(mut self, flow_state_generation: u64) -> Self {
+        self.flow_state_generation = Some(flow_state_generation);
+        self
+    }
+
+    #[must_use]
+    pub const fn tenant_id(&self) -> &chio_security_types::ports::TenantId {
+        &self.tenant_id
+    }
+
+    #[must_use]
+    pub const fn session_id(&self) -> &chio_security_types::ports::SessionId {
+        &self.session_id
+    }
+
+    #[must_use]
+    pub const fn principal_id(&self) -> &chio_security_types::PrincipalId {
+        &self.principal_id
+    }
+
+    #[must_use]
+    pub const fn isolation_epoch_id(&self) -> &chio_security_types::ports::IsolationEpochId {
+        &self.isolation_epoch_id
+    }
+
+    #[must_use]
+    pub const fn lineage_root_id(&self) -> &chio_security_types::ports::LineageId {
+        &self.lineage_root_id
+    }
+
+    #[must_use]
+    pub const fn context_generation(&self) -> u64 {
+        self.context_generation
+    }
+
+    #[must_use]
+    pub const fn flow_state_generation(&self) -> Option<u64> {
+        self.flow_state_generation
+    }
+}
+
+impl SecurityInvocationContext {
+    pub const V1_VERSION: u16 = 1;
+
+    #[must_use]
+    pub const fn v1(context: SecurityInvocationContextV1) -> Self {
+        Self::V1(context)
+    }
+
+    #[must_use]
+    pub const fn version(&self) -> u16 {
+        match self {
+            Self::V1(_) => Self::V1_VERSION,
+        }
+    }
+
+    #[must_use]
+    pub const fn as_v1(&self) -> &SecurityInvocationContextV1 {
+        match self {
+            Self::V1(context) => context,
+        }
+    }
+}
+
+/// Trusted host authority for identity, isolation, lineage, and generation
+/// state used by one tool dispatch.
+pub trait SecurityInvocationContextAuthority: Send + Sync {
+    fn resolve_security_invocation_context(
+        &self,
+        context: &chio_core::session::OperationContext,
+        operation: &chio_core::session::ToolCallOperation,
+    ) -> Result<SecurityInvocationContext, KernelError>;
+}
+
+/// Controls whether security state and a final pre-dispatch hook are required.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SecurityPreDispatchPolicy {
+    #[default]
+    Optional,
+    Enforce,
+}
+
+/// Canonical, authoritative input committed immediately before tool dispatch.
+pub struct SecurityPreDispatchContext<'a> {
+    pub request: &'a ToolCallRequest,
+    pub canonical_request: &'a [u8],
+    pub security_context: &'a SecurityInvocationContext,
+    pub dispatch_commitment_id: &'a chio_security_types::ports::RecordId,
+}
+
+/// Trusted preparation input before budget capture. Unlike the dispatch
+/// context this contains no commitment or permission to enter a connector.
+pub struct NativeSecurityAdmissionContext<'a> {
+    pub request: &'a ToolCallRequest,
+    pub security_context: &'a SecurityInvocationContext,
+}
+
+/// Durable terminal state for a security mutation consumed immediately before
+/// connector entry.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SecurityDispatchOutcome {
+    Released,
+    DispatchFailed,
+    OutcomeUnknownAfterDispatch,
+}
+
+pub trait SecurityDispatchOutcomeRecorder: Send {
+    fn record(&mut self, outcome: SecurityDispatchOutcome) -> Result<(), KernelError>;
+}
+
+/// One-shot owner for the terminal state of a consumed pre-dispatch mutation.
+pub struct SecurityDispatchOutcomeHandle {
+    request_id: String,
+    dispatch_commitment_id: chio_security_types::ports::RecordId,
+    recorder: Option<Box<dyn SecurityDispatchOutcomeRecorder>>,
+    drop_outcome: SecurityDispatchOutcome,
+}
+
+pub trait SecurityRequestLifecyclePermit: Send {
+    fn ensure_final_release(self: Box<Self>) -> Result<(), KernelError>;
+
+    /// Inspect the exact resolved output before durable release is acknowledged.
+    /// The context is borrowed from the original finalization, not reconstructed
+    /// from a receipt. Existing output-independent owners retain their contract.
+    /// An owner requiring output must override this method and reject the
+    /// context-free method; non-durable callers cannot supply this context.
+    fn ensure_final_release_with_output(
+        self: Box<Self>,
+        _context: &crate::tool_outcome::DurableSecurityReleaseContext<'_>,
+    ) -> Result<(), KernelError> {
+        self.ensure_final_release()
+    }
+}
+
+/// Last-moment security hook invoked before the kernel enters a connector.
+pub trait SecurityPreDispatchHook: Send + Sync {
+    fn name(&self) -> &str;
+
+    /// Explicit trusted-host opt-in. This declaration alone grants no custody:
+    /// the native callback must complete the kernel's original capture handoff.
+    fn supports_native_dispatch(&self) -> bool {
+        false
+    }
+
+    fn commit_native_dispatch(
+        &self,
+        _authority: &mut NativeSecurityDispatchCaptureAuthority<'_, '_>,
+    ) -> Result<(), KernelError> {
+        Err(KernelError::DurableAdmission(
+            "native security dispatch lifecycle is unsupported".into(),
+        ))
+    }
+
+    /// Non-consuming native authority selection from trusted host
+    /// configuration, never agent metadata. Returning data grants no mutation
+    /// authority. Native profiles require enforced security and trusted context;
+    /// the selection must remain stable through admission and recovery.
+    fn native_authority_binding(
+        &self,
+    ) -> Result<Option<crate::admission_operation::NativeSecurityAuthorityBindingV1>, KernelError>
+    {
+        Ok(None)
+    }
+
+    /// Prepare exactly one monotone join through the kernel-owned handle. Only
+    /// hooks selecting native authority are called here. The default rejects
+    /// unsupported native custody; successful return without a recorded join
+    /// also denies admission. This is not native lifecycle activation.
+    fn prepare_native_admission(
+        &self,
+        _context: &NativeSecurityAdmissionContext<'_>,
+        _authority: &NativeSecurityFlowJoinAuthority<'_>,
+    ) -> Result<(), KernelError> {
+        Err(KernelError::DurableAdmission(
+            "native security admission preparation is unsupported".into(),
+        ))
+    }
+
+    /// Separate strict-nonce preflight custody. Dispatch-only hooks fail closed;
+    /// a preflight journal never satisfies the dispatch input-join contract.
+    fn prepare_native_nonce_preflight(
+        &self,
+        _context: &NativeSecurityAdmissionContext<'_>,
+        _authority: &NativeSecurityNoncePreflightJoinAuthority<'_>,
+    ) -> Result<(), KernelError> {
+        Err(KernelError::DurableAdmission(
+            "native security nonce preflight preparation is unsupported".into(),
+        ))
+    }
+
+    /// Classify the actual guarded output using the original finalization's
+    /// operation-scoped writer. The kernel requires one confirmed monotone join;
+    /// returning success without it, or suppressing its error, denies release.
+    /// This callback neither replaces the live lifecycle owner nor grants release.
+    fn prepare_native_output(
+        &self,
+        _context: &crate::tool_outcome::DurableSecurityReleaseContext<'_>,
+        _authority: &NativeSecurityOutputJoinAuthority<'_>,
+    ) -> Result<(), KernelError> {
+        Err(KernelError::DurableAdmission(
+            "native security output preparation is unsupported".into(),
+        ))
+    }
+
+    fn acquire_request_lifecycle(
+        &self,
+        _context: &SecurityPreDispatchContext<'_>,
+    ) -> Result<Option<Box<dyn SecurityRequestLifecyclePermit>>, KernelError> {
+        Ok(None)
+    }
+
+    fn commit(
+        &self,
+        context: &SecurityPreDispatchContext<'_>,
+    ) -> Result<Option<SecurityDispatchOutcomeHandle>, KernelError>;
+}
+
+pub(crate) struct SecurityPreDispatchCommit {
+    pub(crate) dispatch_outcome: Option<SecurityDispatchOutcomeHandle>,
+    pub(crate) request_lifecycle: Option<SecurityRequestLifecycleHandle>,
+}
+
+pub(crate) struct SecurityPreDispatchDenial {
+    pub(crate) reason: &'static str,
+    pub(crate) evidence: GuardEvidence,
+}
+
 /// Deny reason surfaced by every evaluate path when the emergency kill
 /// switch is engaged. Exposed as `pub` so HTTP adapters and SDKs can
 /// pattern-match on the exact string without drifting.
 pub const EMERGENCY_STOP_DENY_REASON: &str = "kernel emergency stop active";
 
-/// Context passed to optional runtime admission hooks after capability,
-/// request matching, governed-admission, and guard checks pass, but before
-/// dispatch and federation co-signing side effects.
-pub struct RuntimeAdmissionContext<'a> {
-    pub request: &'a ToolCallRequest,
-    pub extra_metadata: Option<&'a serde_json::Value>,
-    pub now_unix_secs: u64,
-    pub now_unix_ms: u64,
-    pub matched_grant_index: Option<usize>,
-    pub local_kernel_id: String,
-}
-
-/// Non-consuming context for the final runtime-admission check immediately
-/// before payment authorization, nonce consumption, and tool dispatch.
-pub struct RuntimeAdmissionRevalidationContext<'a> {
-    pub request: &'a ToolCallRequest,
-    pub admission_metadata: Option<&'a serde_json::Value>,
-    pub now_unix_secs: u64,
-    pub now_unix_ms: u64,
-    pub matched_grant_index: Option<usize>,
-    pub local_kernel_id: String,
-}
-
-/// Opaque identifier for one in-flight runtime-admission readiness poll.
-/// Concurrent evaluations receive distinct tokens even when request IDs are
-/// equal, so unregistering one wait cannot remove another wait's state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct RuntimeAdmissionReadinessToken(u64);
-
-impl RuntimeAdmissionReadinessToken {
-    #[must_use]
-    pub fn as_u64(self) -> u64 {
-        self.0
-    }
-}
-
-/// Decision returned by a runtime admission hook.
-#[derive(Debug, Clone, PartialEq)]
-pub struct RuntimeAdmissionDecision {
-    pub allowed: bool,
-    pub reason: Option<String>,
-    pub metadata: Option<serde_json::Value>,
-    pub(crate) verified_treaty_material: Option<VerifiedFederationTreatyMaterial>,
-}
-
-impl RuntimeAdmissionDecision {
-    #[must_use]
-    pub fn has_verified_treaty_material(&self) -> bool {
-        self.verified_treaty_material.is_some()
-    }
-
-    #[must_use]
-    pub fn allow(metadata: Option<serde_json::Value>) -> Self {
-        Self {
-            allowed: true,
-            reason: None,
-            metadata,
-            verified_treaty_material: None,
-        }
-    }
-
-    #[must_use]
-    pub fn allow_with_verified_treaty_material(
-        metadata: Option<serde_json::Value>,
-        verified_treaty_material: VerifiedFederationTreatyMaterial,
-    ) -> Self {
-        Self {
-            allowed: true,
-            reason: None,
-            metadata,
-            verified_treaty_material: Some(verified_treaty_material),
-        }
-    }
-
-    #[must_use]
-    pub fn deny(reason: impl Into<String>, metadata: Option<serde_json::Value>) -> Self {
-        Self {
-            allowed: false,
-            reason: Some(reason.into()),
-            metadata,
-            verified_treaty_material: None,
-        }
-    }
-}
-
-/// Optional pre-dispatch admission hook for product-specific runtime gates.
-pub trait RuntimeAdmissionHook: Send + Sync {
-    fn name(&self) -> &str;
-
-    fn evaluate(
-        &self,
-        context: &RuntimeAdmissionContext<'_>,
-    ) -> Result<RuntimeAdmissionDecision, KernelError>;
-
-    /// Poll readiness after admission state has been reserved but before tool
-    /// dispatch is marked as started. The default is immediately ready.
-    fn poll_ready_before_dispatch(
-        &self,
-        _request: &ToolCallRequest,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<()> {
-        std::task::Poll::Ready(())
-    }
-
-    /// Token-aware readiness poll. Hooks retaining per-wait state should
-    /// override this method; the default preserves the original readiness API.
-    fn poll_ready_before_dispatch_with_token(
-        &self,
-        request: &ToolCallRequest,
-        _token: RuntimeAdmissionReadinessToken,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<()> {
-        self.poll_ready_before_dispatch(request, cx)
-    }
-
-    /// Return true when mutable admission state must be checked even if the
-    /// readiness poll completes immediately.
-    fn requires_dispatch_revalidation(&self) -> bool {
-        false
-    }
-
-    /// Revalidate mutable admission state without acquiring another
-    /// reservation. Mutable hooks opt in through
-    /// [`Self::requires_dispatch_revalidation`].
-    fn revalidate_before_dispatch(
-        &self,
-        _context: &RuntimeAdmissionRevalidationContext<'_>,
-    ) -> Result<(), KernelError> {
-        Ok(())
-    }
-
-    /// Remove request-scoped readiness state, including any retained waker.
-    fn unregister_ready_before_dispatch(
-        &self,
-        _request: &ToolCallRequest,
-        _token: RuntimeAdmissionReadinessToken,
-    ) {
-    }
-
-    fn release_reserved(&self, _metadata: &serde_json::Value) -> Result<(), KernelError> {
-        Ok(())
-    }
-}
+mod runtime_admission;
+pub use runtime_admission::{
+    RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
+    RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext,
+};
 
 #[derive(Debug)]
 pub(crate) struct ReceiptContent {
@@ -647,6 +937,52 @@ pub struct GuardContext<'a> {
     /// Index of the matched grant in the capability's scope, populated by
     /// check_and_increment_budget before guards run.
     pub matched_grant_index: Option<usize>,
+    /// Trusted identity and isolation state, when supplied by the host.
+    pub security_context: Option<&'a SecurityInvocationContext>,
+}
+
+impl<'a> GuardContext<'a> {
+    #[must_use]
+    pub fn new(request: &'a ToolCallRequest, scope: &'a ChioScope) -> Self {
+        Self {
+            request,
+            scope,
+            agent_id: &request.agent_id,
+            server_id: &request.server_id,
+            session_filesystem_roots: None,
+            matched_grant_index: None,
+            security_context: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_session_filesystem_roots(
+        mut self,
+        session_filesystem_roots: Option<&'a [String]>,
+    ) -> Self {
+        self.session_filesystem_roots = session_filesystem_roots;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_matched_grant_index(mut self, matched_grant_index: Option<usize>) -> Self {
+        self.matched_grant_index = matched_grant_index;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_security_context(
+        mut self,
+        security_context: Option<&'a SecurityInvocationContext>,
+    ) -> Self {
+        self.security_context = security_context;
+        self
+    }
+
+    #[must_use]
+    pub const fn security_context(&self) -> Option<&'a SecurityInvocationContext> {
+        self.security_context
+    }
 }
 
 /// Trait representing a resource provider.
@@ -1484,6 +1820,7 @@ mod governed_validation;
 // Guard evaluation, runtime admission, and tool dispatch.
 #[path = "dispatch.rs"]
 mod dispatch;
+pub(crate) use dispatch::derive_security_dispatch_commitment_id;
 // Purchase-marked admission checks for delivery-committed reveals.
 #[path = "delivery_contract.rs"]
 pub(crate) mod delivery_contract;
@@ -1502,6 +1839,7 @@ mod recovery_gate;
 mod responses;
 #[path = "session_ops.rs"]
 mod session_ops;
+pub use session_ops::NestedToolCallProofs;
 // Settlement observer slot. Wires `chio-settle::SettlementHook` into
 // the post-dispatch surface so finalized receipts can be routed through
 // the existing `chio-settle/ops.rs` pipeline. The observer is strictly

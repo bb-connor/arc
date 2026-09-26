@@ -88,6 +88,7 @@ fn openai_single_tool() -> ToolInvocation {
             },
             received_at: ms(1_745_452_800_000),
         },
+        bridge_security: None,
     }
 }
 
@@ -108,6 +109,7 @@ fn openai_multi_tool() -> ToolInvocation {
             },
             received_at: ms(1_745_452_801_000),
         },
+        bridge_security: None,
     }
 }
 
@@ -129,6 +131,7 @@ fn openai_streaming_init() -> ToolInvocation {
             },
             received_at: ms(1_745_452_802_000),
         },
+        bridge_security: None,
     }
 }
 
@@ -148,6 +151,7 @@ fn anthropic_single_tool_use() -> ToolInvocation {
             },
             received_at: ms(1_745_452_803_000),
         },
+        bridge_security: None,
     }
 }
 
@@ -169,6 +173,7 @@ fn anthropic_parallel_tool_use() -> ToolInvocation {
             },
             received_at: ms(1_745_452_804_000),
         },
+        bridge_security: None,
     }
 }
 
@@ -193,6 +198,7 @@ fn anthropic_server_tool() -> ToolInvocation {
             },
             received_at: ms(1_745_452_805_000),
         },
+        bridge_security: None,
     }
 }
 
@@ -214,6 +220,7 @@ fn bedrock_single_tool_use() -> ToolInvocation {
             },
             received_at: ms(1_745_452_806_000),
         },
+        bridge_security: None,
     }
 }
 
@@ -236,6 +243,7 @@ fn bedrock_parallel_tool_use() -> ToolInvocation {
             },
             received_at: ms(1_745_452_807_000),
         },
+        bridge_security: None,
     }
 }
 
@@ -264,6 +272,7 @@ fn bedrock_assumed_role() -> ToolInvocation {
             },
             received_at: ms(1_745_452_808_000),
         },
+        bridge_security: None,
     }
 }
 

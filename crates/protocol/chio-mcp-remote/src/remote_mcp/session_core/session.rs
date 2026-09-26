@@ -23,12 +23,14 @@ impl RemoteSession {
             auth_context: init.auth_context,
             auth_mode_fingerprint: init.auth_mode_fingerprint,
             policy_fingerprint: init.policy_fingerprint,
+            runtime_contract_fingerprint: init.runtime_contract_fingerprint,
             hosted_isolation: init.hosted_isolation,
             lifecycle_policy: init.lifecycle_policy,
             protocol_version: StdMutex::new(init.protocol_version),
             peer_capabilities: StdMutex::new(init.peer_capabilities),
             initialize_params: StdMutex::new(init.initialize_params),
             lifecycle: StdMutex::new(lifecycle_snapshot),
+            terminalization: Mutex::new(()),
             input_tx: init.input_tx,
             event_tx: init.event_tx,
             retained_notification_events: init.retained_notification_events,
@@ -36,14 +38,19 @@ impl RemoteSession {
             notification_stream_attached: Arc::new(AtomicBool::new(false)),
             next_event_id: init.next_event_id,
             session_db_path: init.session_db_path,
-            resume_integrity_secret: init.resume_integrity_secret,
+            session_store_lease: init.session_store_lease,
+            resume_hmac_keyring: init.resume_hmac_keyring,
+            resume_generation: AtomicU64::new(init.resume_generation),
+            upstream_transport: RemoteSessionUpstreamTransport {
+                inner: init.upstream_transport,
+            },
         }
     }
 
     pub(super) fn send(&self, message: Value) -> Result<(), CliError> {
-        self.input_tx
-            .send(message)
-            .map_err(|_| CliError::cli_other_error("remote MCP session worker is unavailable".to_string()))
+        self.input_tx.send(message).map_err(|_| {
+            CliError::cli_other_error("remote MCP session worker is unavailable".to_string())
+        })
     }
 
     pub(super) fn subscribe(&self) -> broadcast::Receiver<RemoteSessionEvent> {
@@ -127,25 +134,6 @@ impl RemoteSession {
             .and_then(|guard| guard.clone())
     }
 
-    pub(super) fn set_protocol_version(&self, protocol_version: Option<String>) {
-        if let Ok(mut guard) = self.protocol_version.lock() {
-            *guard = protocol_version;
-        }
-    }
-
-    pub(super) fn set_initialize_contract(
-        &self,
-        initialize_params: Value,
-        peer_capabilities: PeerCapabilities,
-    ) {
-        if let Ok(mut guard) = self.initialize_params.lock() {
-            *guard = Some(initialize_params);
-        }
-        if let Ok(mut guard) = self.peer_capabilities.lock() {
-            *guard = Some(peer_capabilities);
-        }
-    }
-
     pub(super) fn lifecycle_snapshot(&self) -> RemoteSessionLifecycleSnapshot {
         self.lifecycle
             .lock()
@@ -159,62 +147,135 @@ impl RemoteSession {
             })
     }
 
-    pub(super) fn resume_record(&self) -> Option<RemoteSessionResumeRecord> {
-        let lifecycle = self.lifecycle_snapshot();
+    pub(super) fn resume_record(&self) -> Result<Option<RemoteSessionResumeRecord>, CliError> {
+        let lifecycle = self
+            .lifecycle
+            .lock()
+            .map_err(|_| {
+                CliError::cli_other_error(format!(
+                    "failed to lock lifecycle state for MCP session {}",
+                    self.session_id
+                ))
+            })?
+            .clone();
         if lifecycle.state != RemoteSessionState::Ready {
-            return None;
+            return Ok(None);
         }
-        let protocol_version = self.protocol_version();
+        let protocol_version = self
+            .protocol_version
+            .lock()
+            .map_err(|_| {
+                CliError::cli_other_error(format!(
+                    "failed to lock protocol version for MCP session {}",
+                    self.session_id
+                ))
+            })?
+            .clone();
         let peer_capabilities = self
             .peer_capabilities
             .lock()
-            .ok()
-            .and_then(|guard| guard.clone())?;
+            .map_err(|_| {
+                CliError::cli_other_error(format!(
+                    "failed to lock peer capabilities for MCP session {}",
+                    self.session_id
+                ))
+            })?
+            .clone()
+            .ok_or_else(|| {
+                CliError::cli_other_error(format!(
+                    "ready MCP session {} is missing peer capabilities",
+                    self.session_id
+                ))
+            })?;
         let initialize_params = self
             .initialize_params
             .lock()
-            .ok()
-            .and_then(|guard| guard.clone())?;
+            .map_err(|_| {
+                CliError::cli_other_error(format!(
+                    "failed to lock initialize parameters for MCP session {}",
+                    self.session_id
+                ))
+            })?
+            .clone()
+            .ok_or_else(|| {
+                CliError::cli_other_error(format!(
+                    "ready MCP session {} is missing initialize parameters",
+                    self.session_id
+                ))
+            })?;
+        let keyring = self.resume_hmac_keyring.as_ref().ok_or_else(|| {
+            CliError::cli_other_error(format!(
+                "ready MCP session {} is missing its resume HMAC keyring",
+                self.session_id
+            ))
+        })?;
+        let resume_generation = self.resume_generation.fetch_add(1, Ordering::SeqCst) + 1;
         let mut record = RemoteSessionResumeRecord {
             session_id: self.session_id.clone(),
             agent_id: self.agent_id.clone(),
             auth_context: self.auth_context.clone(),
             auth_mode_fingerprint: Some(self.auth_mode_fingerprint.clone()),
             policy_fingerprint: Some(self.policy_fingerprint.clone()),
+            runtime_contract_fingerprint: self.runtime_contract_fingerprint.clone(),
             hosted_isolation: self.hosted_isolation,
             lifecycle,
             protocol_version,
             peer_capabilities,
             initialize_params,
             issued_capabilities: self.issued_capabilities.clone(),
-            resume_integrity_tag: None,
+            resume_generation,
+            resume_integrity: keyring.empty_tag_for_current(),
         };
-        let seed = self.resume_integrity_secret.as_ref()?;
-        record.resume_integrity_tag = Some(compute_resume_record_integrity_tag(seed, &record).ok()?);
-        Some(record)
+        record.resume_integrity.tag = compute_resume_record_integrity_tag(&keyring.current, &record)?;
+        Ok(Some(record))
     }
 
-    pub(super) fn persist_resumable_record(&self) {
+    pub(super) fn persist_resumable_record(&self) -> Result<(), CliError> {
         let Some(path) = self.session_db_path.as_deref() else {
-            return;
+            return Ok(());
         };
-        let Some(record) = self.resume_record() else {
-            return;
+        let Some(record) = self.resume_record()? else {
+            return Ok(());
         };
-        if let Err(error) = persist_active_session_record(path, &record) {
-            warn!(
-                session_id = %self.session_id,
-                error = %error,
-                "failed to persist resumable MCP session record"
-            );
-        }
+        let keyring = self.resume_hmac_keyring.as_deref().ok_or_else(|| {
+            CliError::cli_other_error(format!(
+                "refusing to persist resumable MCP session {} without a dedicated HMAC keyring",
+                self.session_id
+            ))
+        })?;
+        self.ensure_session_store_owned()?;
+        persist_active_session_record(path, &record, keyring)
     }
 
     pub(super) fn remove_resumable_record(&self) -> Result<(), CliError> {
         let Some(path) = self.session_db_path.as_deref() else {
             return Ok(());
         };
+        self.ensure_session_store_owned()?;
         delete_active_session_record(path, &self.session_id)
+    }
+
+    pub(super) fn ensure_session_store_owned(&self) -> Result<(), CliError> {
+        match self.session_store_lease.as_deref() {
+            Some(lease) => lease.ensure_owned(),
+            None if self.session_db_path.is_some() => Err(CliError::cli_other_error(
+                "remote MCP session has no retained database ownership lease".to_string(),
+            )),
+            None => Ok(()),
+        }
+    }
+
+    pub(super) fn next_terminal_persistence_epoch(&self) -> u64 {
+        self.resume_generation.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    pub(super) fn shutdown_upstream_transport(&self) -> Result<(), CliError> {
+        self.upstream_transport.inner.shutdown().map_err(|error| {
+            CliError::cli_other_error(format!(
+                "MCP session {} terminal receipt persistence failed: {error}",
+                self.session_id
+            ))
+        })
     }
 
     pub(super) fn mark_ready(
@@ -222,36 +283,63 @@ impl RemoteSession {
         protocol_version: Option<String>,
         initialize_params: Value,
         peer_capabilities: PeerCapabilities,
-    ) {
-        self.set_protocol_version(protocol_version);
-        self.set_initialize_contract(initialize_params, peer_capabilities);
-        if let Ok(mut guard) = self.lifecycle.lock() {
-            guard.state = RemoteSessionState::Ready;
-            guard.last_seen_at = session_now_millis();
-            guard.idle_expires_at = guard
-                .last_seen_at
-                .saturating_add(self.lifecycle_policy.idle_expiry_millis);
-            guard.drain_deadline_at = None;
-        }
-        self.persist_resumable_record();
+    ) -> Result<(), CliError> {
+        *self.protocol_version.lock().map_err(|_| {
+            CliError::cli_other_error(format!(
+                "failed to lock protocol version for MCP session {}",
+                self.session_id
+            ))
+        })? = protocol_version;
+        *self.initialize_params.lock().map_err(|_| {
+            CliError::cli_other_error(format!(
+                "failed to lock initialize parameters for MCP session {}",
+                self.session_id
+            ))
+        })? = Some(initialize_params);
+        *self.peer_capabilities.lock().map_err(|_| {
+            CliError::cli_other_error(format!(
+                "failed to lock peer capabilities for MCP session {}",
+                self.session_id
+            ))
+        })? = Some(peer_capabilities);
+        let mut lifecycle = self.lifecycle.lock().map_err(|_| {
+            CliError::cli_other_error(format!(
+                "failed to lock lifecycle state for MCP session {}",
+                self.session_id
+            ))
+        })?;
+        lifecycle.state = RemoteSessionState::Ready;
+        lifecycle.last_seen_at = session_now_millis();
+        lifecycle.idle_expires_at = lifecycle
+            .last_seen_at
+            .saturating_add(self.lifecycle_policy.idle_expiry_millis);
+        lifecycle.drain_deadline_at = None;
+        drop(lifecycle);
+        self.persist_resumable_record()
     }
 
-    pub(super) fn touch(&self) {
+    pub(super) fn touch(&self) -> Result<(), CliError> {
         let mut touched = false;
-        if let Ok(mut guard) = self.lifecycle.lock() {
-            if guard.state == RemoteSessionState::Ready {
-                let now = session_now_millis();
-                touched =
-                    now.saturating_sub(guard.last_seen_at) >= SESSION_TOUCH_PERSIST_INTERVAL_MILLIS;
-                guard.last_seen_at = now;
-                guard.idle_expires_at = guard
-                    .last_seen_at
-                    .saturating_add(self.lifecycle_policy.idle_expiry_millis);
-            }
+        let mut lifecycle = self.lifecycle.lock().map_err(|_| {
+            CliError::cli_other_error(format!(
+                "failed to lock lifecycle state for MCP session {}",
+                self.session_id
+            ))
+        })?;
+        if lifecycle.state == RemoteSessionState::Ready {
+            let now = session_now_millis();
+            touched = now.saturating_sub(lifecycle.last_seen_at)
+                >= SESSION_TOUCH_PERSIST_INTERVAL_MILLIS;
+            lifecycle.last_seen_at = now;
+            lifecycle.idle_expires_at = lifecycle
+                .last_seen_at
+                .saturating_add(self.lifecycle_policy.idle_expiry_millis);
         }
+        drop(lifecycle);
         if touched {
-            self.persist_resumable_record();
+            self.persist_resumable_record()?;
         }
+        Ok(())
     }
 
     pub(super) fn begin_draining(&self) -> Result<(), CliError> {

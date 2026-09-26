@@ -880,6 +880,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
         let frozen_purchase = VerifiedFindingPurchase {
             finding_id: "finding-1".to_owned(),

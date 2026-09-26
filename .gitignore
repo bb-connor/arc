@@ -1,6 +1,7 @@
 # Build artifacts
 /target/
 /target-shared/
+/target-xtask/
 **/*.rs.bk
 # Nested cargo/qualification output dirs at any depth (not the workspace root /target/).
 **/target/
@@ -144,3 +145,5 @@ _apalache-out/
 
 # Raw cargo-mutants output (dated JSON summaries stay tracked)
 audits/evidence/**/mutants.out/*.txt
+# Local environment documented by the repository review example.
+/examples/repository-review/.venv/

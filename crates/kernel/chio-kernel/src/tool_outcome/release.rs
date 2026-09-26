@@ -1030,15 +1030,7 @@ fn validate_pre_dispatch_context(
         .validate()
         .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
     if operation.dispatch_commit().is_some()
-        || !matches!(
-            operation.state(),
-            crate::admission_operation::AdmissionOperationState::Prepared
-                | crate::admission_operation::AdmissionOperationState::BrokerAttemptRegistered
-                | crate::admission_operation::AdmissionOperationState::BudgetAuthorized
-                | crate::admission_operation::AdmissionOperationState::ApprovalReserved
-                | crate::admission_operation::AdmissionOperationState::ReadyToDispatch
-                | crate::admission_operation::AdmissionOperationState::CapturePending
-        )
+        || !operation.state().is_pre_dispatch()
         || context.operation_id != *operation.binding().operation_id()
         || context.request_id != operation.replay_key().request_id
         || context.expected_operation_version != operation.version()

@@ -481,6 +481,89 @@ fn receipt_cost_projection_migration_backfills_full_u64_domain(
 }
 
 #[test]
+fn receipt_store_failed_open_rolls_back_schema_backfill_and_guards(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("migration.db");
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.append_chio_receipt(&sample_financial_receipt("migration-receipt", 7)?)?;
+        store.flush_receipt_writes()?;
+    }
+    let connection = rusqlite::Connection::open(&path)?;
+    let original: String = connection.query_row(
+        "SELECT raw_json FROM chio_tool_receipts WHERE seq = 1",
+        [],
+        |row| row.get(0),
+    )?;
+    // An older lineage schema needs migration, but a malformed receipt makes
+    // the later projection backfill fail. Opening must preserve both inputs.
+    connection.execute_batch(
+        "DROP INDEX idx_receipt_lineage_statement_id;\
+         ALTER TABLE receipt_lineage_statements DROP COLUMN statement_id;\
+         DROP TRIGGER chio_tool_receipts_reject_update;\
+         UPDATE chio_tool_receipts SET raw_json = '{' WHERE seq = 1;",
+    )?;
+    super::super::support::ensure_transparency_projection_guards(&connection)?;
+    let schema_before = connection
+        .prepare("SELECT type, name, sql FROM sqlite_schema ORDER BY type, name")?
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let Err(error) = SqliteReceiptStore::open(&path) else {
+        return Err("malformed receipt migration unexpectedly succeeded".into());
+    };
+    assert!(error.to_string().contains("malformed JSON"), "{error}");
+    let schema_after = connection
+        .prepare("SELECT type, name, sql FROM sqlite_schema ORDER BY type, name")?
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(schema_after, schema_before);
+    assert!(!table_has_column(
+        &connection,
+        "receipt_lineage_statements",
+        "statement_id"
+    ));
+    assert!(connection
+        .execute("DELETE FROM chio_tool_receipts WHERE seq = 1", [])
+        .is_err());
+    let raw: String = connection.query_row(
+        "SELECT raw_json FROM chio_tool_receipts WHERE seq = 1",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(raw, "{");
+
+    connection.execute_batch("DROP TRIGGER chio_tool_receipts_reject_update")?;
+    connection.execute(
+        "UPDATE chio_tool_receipts SET raw_json = ?1 WHERE seq = 1",
+        [original],
+    )?;
+    super::super::support::ensure_transparency_projection_guards(&connection)?;
+    let migrated = SqliteReceiptStore::open(&path)?;
+    migrated.flush_receipt_writes()?;
+    assert!(table_has_column(
+        &connection,
+        "receipt_lineage_statements",
+        "statement_id"
+    ));
+    assert!(migrated.receipt_store_health()?.healthy);
+    Ok(())
+}
+
+#[test]
 fn receipt_cost_projection_migration_rolls_back_malformed_receipt(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-receipts-cost-projection-malformed");

@@ -1,0 +1,359 @@
+# Chio reference runtime: supervision package
+
+systemd units, service accounts and directory declarations for running the
+Chio security runtime on one Linux host: the trust-control service, the
+remote MCP edge that wraps one MCP server under a signed native-launch
+policy, and the key-log witness and audit daemons of the keyring
+composition.
+
+Every unit is `Type=notify` and starts through `chio security supervise`,
+which delivers secrets from the manager's credentials directory, reports
+readiness only once the service answers, forwards stop signals so the
+service drains, and ends with the service's own exit status. Secrets never
+enter an environment file or an argument list; the environment file of the
+edge carries only public pins and the wrapped command.
+
+## Layout
+
+| Path | Purpose |
+|------|---------|
+| `systemd/chio-trust-control.service` | trust-control on `127.0.0.1:8940`, readiness on `/health` |
+| `systemd/chio-mcp-edge.service` | remote MCP edge on `127.0.0.1:8931`, preflight with `--require-enforcement`, readiness on `/admin/health` |
+| `systemd/chio-keylog-witness@.service` | key-log witness instance (`a`, `b`, `c`) |
+| `systemd/chio-keylog-audit@.service` | key-log audit monitor instance (`a`, `b`) |
+| `systemd/chio-secret-broker.service` | separately provisioned broker with descriptor credentials and child-bound socket readiness |
+| `sysusers.d/chio.conf` | the `chio-trust`, `chio-edge`, `chio-keylog` and `chio-broker` accounts |
+| `tmpfiles.d/chio.conf` | `/etc/chio` and the credential, launch and keylog directories |
+| `env/chio-mcp-edge.env.example` | public pins and the wrapped command for the edge |
+| `keylog/witness-a.json.example`, `keylog/audit-a.json.example` | service configs for one witness and one monitor |
+
+The structural gate `cargo test -p chio-cli --test reference_runtime_units`
+checks every unit against the built `chio` binary: each command and flag the
+units use exists, credentials are declared and consumed on both sides,
+environment references are declared in the template, accounts exist in
+`sysusers.d`, dependencies name units in this package, the hardening
+baseline is present, and the keylog example configs agree with the units.
+
+## Install
+
+1. Install the binaries from the Linux x86_64 release archive, whose
+   `native-runtime.json` identifies all ten executables, their build targets
+   and SHA-256 digests. Each executable has a corresponding
+   `<name>-<target>.cyclonedx.json` dependency inventory in that archive.
+   Verify the release archive's signature and checksum
+   before extracting it. From the extracted directory, verify and install:
+
+   ```bash
+   jq -r '.binaries[] | "\(.sha256)  \(.name)"' native-runtime.json | sha256sum -c -
+   install -m 0755 chio chio-keylog-witness chio-keylog-audit \
+     chio-secret-brokerd chio-active-response-authorityd \
+     chio-cage-init chio-broker-mcp /usr/local/bin/
+   ```
+
+   The archive includes this `reference-runtime` directory and the
+   `provision-mcp-launch.sh` helper. When following the remaining steps outside
+   a source checkout, replace `deploy/reference-runtime` with `reference-runtime`
+   and `scripts/lib/provision-mcp-launch.sh` with `provision-mcp-launch.sh`.
+   The five confined executables use the static musl target. Brokered native
+   enforcement requires the signed profile and the supported Linux kernel;
+   installing these files does not provision credentials or enable responses.
+
+   The broker and active-response authority consume binary credential files
+   through inherited descriptors. Their supervisor bindings append the actual
+   descriptor options to the daemon command, without putting key bytes in the
+   environment or argument list:
+
+   ```bash
+   chio security supervise --credentials-dir /run/credentials/chio-secret-broker.service \
+     --credential-fd master-key-fd=master-key \
+     --credential-fd signing-key-fd=signing-key \
+     --ready-unix-socket /run/chio/broker.sock \
+     -- chio-secret-brokerd --config /etc/chio/broker.json
+   chio security supervise --credentials-dir /run/credentials/chio-active-response.service \
+     --credential-fd signing-key-fd=signing-key \
+     --ready-unix-socket /run/chio/response-authority.sock \
+     -- chio-active-response-authorityd --config /etc/chio/response-authority.json
+   ```
+
+   Use the socket paths from the provisioned daemon configurations and declare
+   these credential names with `LoadCredential=` in the operator's units. Each
+   file must be private, singly linked and owned by the service user, or a
+   root-owned credential on systemd's read-only memory filesystem whose ACL
+   grants read access only to that service user. Group-readable ordinary files
+   remain invalid. On Linux the supervisor copies binary credentials into
+   service-owned, sealed memory files and transfers read-only descriptors.
+   Binary bytes, including trailing newlines, are transferred unchanged.
+   Descriptor delivery supports supervised launch; it is incompatible with `--exec`.
+
+   The packaged `chio-secret-broker.service` supplies these bindings. Before
+   enabling it, provision the canonical broker configuration and enterprise
+   migration state for the selected authority and service accounts:
+
+   - Install `broker.json` under `/etc/chio/secret-broker`, owned by
+     `chio-broker:chio-broker`, mode `0600`.
+   - Set `trustedServiceUid` to the `chio-broker` UID. Set `authorizedClientUid`
+     for the trusted host that prepares broker connections; the private socket
+     remains mode `0600`, so that host must also have access to this UID's socket.
+   - Use `/run/chio-secret-broker/broker.sock` for normal IPC and
+     `/run/chio-secret-broker/audit.sock` for privileged audit. Keep all five
+     durable database paths beneath `/var/lib/chio-secret-broker`, with private
+     files owned by the broker account. Pin the separately managed authority's
+     endpoint and key in the configuration.
+   - Install the distinct 32-byte master and signing keys as root-owned `0600`
+     files `/etc/chio/credentials/broker-master-key` and `broker-signing-key`.
+     Preserve the provisioned master key across upgrades and restarts; replacing
+     it would make existing encrypted credentials unreadable.
+
+   `systemctl enable --now chio-secret-broker.service` starts only the configured
+   broker. Readiness checks the kernel-reported PID of the listening child.
+   Capability issuance and migration promotion retain their existing governed
+   authorization. Stop grants up to 60 seconds for current requests to finish,
+   then the supervisor escalates; the manager owns runtime-directory cleanup.
+
+   The response authority requires a fresh combined deployment configuration
+   binding its exact PID and the client's PID to its immutable store. Its
+   launcher must prepare that configuration for each process start; it cannot
+   reuse a static configuration under an automatic `Restart=` unit. The packaged
+   authority executable and provisioning commands retain that requirement.
+
+2. Create the accounts and directories, then install the units.
+
+   ```bash
+   install -d -m 0755 /etc/sysusers.d /etc/tmpfiles.d
+   install -m 0644 deploy/reference-runtime/sysusers.d/chio.conf /etc/sysusers.d/chio.conf
+   install -m 0644 deploy/reference-runtime/tmpfiles.d/chio.conf /etc/tmpfiles.d/chio.conf
+   systemd-sysusers chio.conf
+   systemd-tmpfiles --create chio.conf
+   install -m 0644 deploy/reference-runtime/systemd/*.service /etc/systemd/system/
+   systemctl daemon-reload
+   ```
+
+   The units leave `RestrictSUIDSGID` disabled because its syscall filter also
+   blocks `openat2`, which the confinement boundary requires. They retain
+   dedicated unprivileged accounts, empty capability sets, `NoNewPrivileges`,
+   a read-only system filesystem and private writable state. Do not substitute
+   weaker path resolution or disable the enforcement preflight to work around
+   that filter.
+
+3. Create the credentials as root under `/etc/chio/credentials` (mode 0600).
+   The manager reads them and exposes each one to its service alone. Every
+   bearer must be distinct: the edge refuses a launch whose roles share a
+   value, and the preflight reports that before the launch.
+
+   ```bash
+   umask 077
+   for name in trust-service-token trust-authority-workload-token edge-session-token edge-admin-token; do
+     openssl rand -base64 33 | tr -d '\n' > /etc/chio/credentials/$name
+   done
+   ```
+
+   The edge presents the trust service token as its control token and the
+   trust authority workload token as its workload token, so those two
+   credentials are copies:
+
+   ```bash
+   cp /etc/chio/credentials/trust-service-token /etc/chio/credentials/edge-control-token
+   cp /etc/chio/credentials/trust-authority-workload-token /etc/chio/credentials/edge-workload-token
+   ```
+
+   Write the resume keyring with the helper from `scripts/lib/provision-mcp-launch.sh`:
+
+   ```bash
+   . scripts/lib/provision-mcp-launch.sh
+   chio_write_resume_hmac_keyring /etc/chio/credentials/edge-resume-hmac-keyring.json
+   ```
+
+   A credential is delivered exactly as written except that one trailing
+   newline is removed; any other padding or control character fails the
+   launch.
+
+4. Start trust-control and pin its authority key.
+
+   ```bash
+   systemctl enable --now chio-trust-control.service
+   curl -s -H "Authorization: Bearer $(cat /etc/chio/credentials/trust-service-token)" \
+     http://127.0.0.1:8940/v1/authority | jq -r .publicKey
+   ```
+
+   The key is stable across restarts because the unit runs with
+   `--authority-db`. Put it in `CHIO_CONTROL_AUTHORITY_PUBLIC_KEY` of the edge
+   environment file; the edge refuses any other current authority key.
+
+5. Install the cage helper and the three reference tools from the same verified
+   archive, then provision the edge's launch material as root at the Enforced
+   stage. These executables are already built static; installation requires no
+   source checkout or compiler. The archive includes their command and grant
+   reference in `reference-runtime/reference-tools.md`.
+
+   Mount a separately managed persistent filesystem at
+   `/srv/chio-receipt-anchors` before provisioning. Its device must differ from
+   the receipt database under `/var/lib/chio-mcp-edge`; the runtime checks this
+   boundary. Retain its contents across restarts and upgrades, and never restore
+   it with a database snapshot or replace it with a temporary filesystem. The
+   edge unit requires this mount and allows writes only to its private anchor
+   directory in addition to its managed state and runtime directories.
+
+   ```bash
+   install -d -m 0755 /usr/local/libexec/chio
+   install -m 0755 chio-cage-init chio-tool-repo-reader chio-tool-artifact-writer chio-tool-digest \
+     /usr/local/libexec/chio/
+   install -d -m 0750 -g chio-edge /srv/chio/repository
+   mountpoint -q /srv/chio-receipt-anchors
+   install -d -m 0700 -o chio-edge -g chio-edge /var/lib/chio-mcp-edge \
+     /srv/chio-receipt-anchors/mcp-edge
+   chio security provision-reference-runtime \
+     --output-dir /etc/chio/mcp-edge/provision \
+     --runtime-security-dir /var/lib/chio-mcp-edge/security \
+     --cage-init /usr/local/libexec/chio/chio-cage-init \
+     --max-artifact-bytes 67108864 \
+     --receipt-rollback-anchor-root /srv/chio-receipt-anchors/mcp-edge \
+     --discover-tools \
+     --target /usr/local/libexec/chio/chio-tool-repo-reader \
+     --target-arg --root --target-arg /srv/chio/repository \
+     --read-path /srv/chio/repository \
+     --working-directory /var/lib/chio-mcp-edge \
+     --execution-uid "$(id -u chio-edge)" --execution-gid "$(id -g chio-edge)" \
+     --server-id chio-mcp-edge --server-name "Chio MCP edge" --server-version 1
+   install -m 0640 -g chio-edge \
+     /etc/chio/mcp-edge/provision/{signed-manifest.json,cage-launch-policy.json,cage-migration-genesis.json,cage-migration-shadow.json,cage-migration-enforced.json,reviewed-tools.json,target-command} \
+     /etc/chio/mcp-edge/launch/
+   install -d -m 0700 -o chio-edge -g chio-edge /var/lib/chio-mcp-edge/security
+   install -m 0600 -o chio-edge -g chio-edge \
+     /etc/chio/mcp-edge/provision/{enterprise-migration.sqlite3,cage-receipt-signer.seed} \
+     /var/lib/chio-mcp-edge/security/
+   install -m 0640 -g chio-edge /etc/chio/mcp-edge/provision/*-public-key \
+     /etc/chio/mcp-edge/provision/cage-policy-signer /etc/chio/mcp-edge/launch/
+   install -m 0640 -g chio-edge deploy/reference-runtime/env/chio-mcp-edge.env.example \
+     /etc/chio/mcp-edge/chio-mcp-edge.env
+   install -m 0640 -g chio-edge your-policy.yaml /etc/chio/mcp-edge/policy.yaml
+   ```
+
+   The provisioner binds the helper's and the target's digests, the exact
+   argument list and working directory, the read grant on the repository,
+   and a migration ledger promoted through Shadow to Enforced, so the edge
+   composes a cage-required launch. It refuses a dynamically linked target
+   whose interpreter and shared objects are not declared with
+   `--runtime-file`, and a helper that is not a static position-independent
+   executable. The policy names the migration ledger, the receipt store and
+   the receipt signer seed under the runtime security directory, which the
+   edge writes receipts into, so that directory lives in the edge's state
+   directory and holds only those three files; every other signer seed stays
+   in the root-only provisioning directory. The signed 64 MiB artifact ceiling
+   must accommodate each selected binary; review and explicitly select a larger
+   bound if the release requires it. Enforced provisioning refuses a missing
+   rollback anchor before creating artifacts. Fill the environment file from
+   `launch/manifest-public-key`,
+   `launch/cage-policy-signer` and the authority key above, and set
+   `CHIO_MCP_UPSTREAM_COMMAND` to exactly the provisioned command. Run the
+   preflight by hand to see every finding before the unit does:
+
+   ```bash
+   systemd-run --wait --pipe --collect -p LoadCredential=session-token:/etc/chio/credentials/edge-session-token \
+     -p LoadCredential=admin-token:/etc/chio/credentials/edge-admin-token \
+     -p LoadCredential=control-token:/etc/chio/credentials/edge-control-token \
+     -p LoadCredential=workload-token:/etc/chio/credentials/edge-workload-token \
+     -p EnvironmentFile=/etc/chio/mcp-edge/chio-mcp-edge.env -p User=chio-edge \
+     /usr/local/bin/chio security supervise --exec \
+       --credential-env CHIO_AUTH_TOKEN=session-token --credential-env CHIO_ADMIN_TOKEN=admin-token \
+       --credential-env CHIO_CONTROL_TOKEN=control-token --credential-env CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN=workload-token \
+       -- /usr/local/bin/chio --session-db /var/lib/chio-mcp-edge/sessions.sqlite3 security preflight --require-enforcement \
+       --signed-manifest /etc/chio/mcp-edge/launch/signed-manifest.json --manifest-public-key "$CHIO_MANIFEST_PUBLIC_KEY" \
+       --cage-policy /etc/chio/mcp-edge/launch/cage-launch-policy.json --cage-policy-signer "$CHIO_CAGE_POLICY_SIGNER" \
+       --server-id chio-mcp-edge -- /usr/local/libexec/chio/chio-tool-repo-reader --root /srv/chio/repository
+   ```
+
+6. Start the edge.
+
+   ```bash
+   systemctl enable --now chio-mcp-edge.service
+   systemctl status chio-mcp-edge.service
+   ```
+
+   The unit is active only after `/admin/health` answers the admin bearer.
+   A failed preflight leaves the unit failed with the preflight report in
+   the journal.
+
+7. Key-log services, when the keyring composition is in use. Author the
+   key-log policy per `crates/security/chio-keyring/README.md` and install it
+   as `/etc/chio/keylog/policy.json`. Each instance needs a 32-byte seed
+   credential and a config:
+
+   ```bash
+   for instance in a b c; do
+     head -c 32 /dev/urandom > /etc/chio/credentials/keylog-witness-$instance.seed
+     sed "s/witness-a/witness-$instance/g; s/witness@a/witness@$instance/g; s/\"witness_id\": \"a\"/\"witness_id\": \"$instance\"/" \
+       deploy/reference-runtime/keylog/witness-a.json.example > /etc/chio/keylog/witness-$instance.json
+   done
+   for instance in a b; do
+     head -c 32 /dev/urandom > /etc/chio/credentials/keylog-audit-$instance.seed
+     sed "s/audit-a/audit-$instance/g; s/audit@a/audit@$instance/g; s/\"monitor_id\": \"a\"/\"monitor_id\": \"$instance\"/" \
+       deploy/reference-runtime/keylog/audit-a.json.example > /etc/chio/keylog/audit-$instance.json
+   done
+   chgrp chio-keylog /etc/chio/keylog/*.json && chmod 0640 /etc/chio/keylog/*.json
+   systemctl enable --now chio-keylog-witness@{a,b,c}.service chio-keylog-audit@{a,b}.service
+   ```
+
+   The config's `seed_file_path` is the fixed credentials path the manager
+   mounts for that unit (`/run/credentials/<unit>/seed`), and its
+   `socket_path` lives in the unit's runtime directory, which the manager
+   removes on stop so a restart never meets a stale socket.
+
+   `provision: true` permits exclusive database creation on the first start.
+   Subsequent starts reopen and validate the original database, retaining its
+   witnessed history and pins. Set it to `false` after initial provisioning
+   when a missing database must fail startup. Existing corrupt or mismatched
+   stores are never replaced. Each audit config's `operator_database_path`
+   must name the already provisioned operator database for this key-log policy;
+   the audit service opens it read-only and does not create an operator store.
+
+## Building the package from source
+
+On a Linux x86_64 build host with the musl linker installed, build the same
+executables from a committed checkout and stage them into an empty directory:
+
+```bash
+rustup target add x86_64-unknown-linux-musl
+cargo build --locked --release --target x86_64-unknown-linux-gnu \
+  -p chio-cli -p chio-secret-broker -p chio-active-response-authority -p chio-keyring --bins
+cargo build --locked --release --target x86_64-unknown-linux-musl \
+  -p chio-cage --bin chio-cage-init --features real-linux-enforcement
+cargo build --locked --release --target x86_64-unknown-linux-musl \
+  -p chio-secret-broker --bin chio-broker-mcp
+cargo build --locked --release --target x86_64-unknown-linux-musl \
+  -p chio-reference-tools --bins
+mkdir -p native-runtime-stage
+bash scripts/stage-native-security-runtime.sh target native-runtime-stage
+```
+
+Follow the installation steps from that directory. The release workflow also
+embeds dependency inventories and generates SBOMs, signatures and provenance;
+a local source build does not carry those release attestations.
+
+## Operations
+
+- Rotation: replace the credential file under `/etc/chio/credentials`, then
+  `systemctl restart` the unit; the manager re-reads credentials at every
+  start. The edge and trust-control must move together for the control and
+  workload tokens.
+- Stop: `systemctl stop` sends SIGTERM to the supervisor, which forwards it
+  and grants `--stop-grace` (30 s) for the bounded drain before SIGKILL;
+  `TimeoutStopSec` is 35 s so the manager escalates only after that. Keep
+  any platform grace period at least as high.
+- Memory: `MemoryHigh` and `MemoryMax` are starting points for one wrapped
+  MCP server; size them to the tool set and set `LimitNOFILE` from the same
+  bounded-memory guidance as the rest of the deployment.
+- Readiness: `systemctl status` shows the supervisor's status line, from
+  "starting, waiting for GET ..." to "ready".
+
+## Not supervised here
+
+- `chio-active-response-authorityd` requires the coordinated deployment
+  preparation described above. Its response client is not yet wired into a
+  production host binary. The launcher must start both children behind a
+  readiness barrier, bind their exact process IDs in the canonical deployment
+  configuration, and build the immutable store before either begins serving.
+  The packaged broker unit is separate: it connects to the process host's
+  production admission authority and preserves the configured durable state
+  across restarts.
+- The relay units under `docs/release/chio-pheromone-relay/systemd/`, which
+  are unchanged.

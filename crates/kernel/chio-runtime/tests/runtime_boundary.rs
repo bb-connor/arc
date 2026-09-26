@@ -13,6 +13,9 @@ use chio_runtime::{
     CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA, CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA,
 };
 
+#[path = "runtime_boundary/replay_source.rs"]
+mod replay_source;
+
 #[test]
 fn runtime_facade_exposes_chio_trust_floor_schema_and_runtime_types() {
     assert_eq!(
@@ -41,7 +44,16 @@ fn runtime_admission_hook_boundary_is_chio_owned() {
 
     let hook_type =
         std::any::type_name::<ChioRuntimeAdmissionHook<InMemoryRuntimeAdmissionStore>>();
-    assert!(hook_type.starts_with("chio_runtime::ChioRuntimeAdmissionHook<"));
+    // A private module move must not change this public facade contract, but
+    // aliasing the core implementation would relinquish the runtime boundary.
+    assert!(hook_type.starts_with("chio_runtime::"), "{hook_type}");
+    assert!(
+        hook_type
+            .split('<')
+            .next()
+            .is_some_and(|name| name.ends_with("::ChioRuntimeAdmissionHook")),
+        "{hook_type}"
+    );
     assert_eq!(
         std::any::type_name::<InMemoryRuntimeAdmissionStore>(),
         "chio_runtime::stores::InMemoryRuntimeAdmissionStore"
@@ -95,6 +107,7 @@ fn runtime_facade_immediate_dispatch_revalidation_is_opted_in_and_non_consuming(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let hook = ChioRuntimeAdmissionHook::new(
         RuntimeAdmissionProfile {
@@ -108,6 +121,7 @@ fn runtime_facade_immediate_dispatch_revalidation_is_opted_in_and_non_consuming(
         InMemoryRuntimeAdmissionStore::new(),
     );
     assert!(hook.requires_dispatch_revalidation());
+    assert!(hook.enforces_swarm_authority());
     let decision = hook.evaluate(&RuntimeAdmissionContext {
         request: &request,
         extra_metadata: None,

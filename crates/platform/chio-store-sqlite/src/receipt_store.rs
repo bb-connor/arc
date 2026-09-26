@@ -10,6 +10,7 @@ use chacha20poly1305::aead::rand_core::{OsRng, RngCore};
 use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
 use chio_core::capability::{scope::ChioScope, token::CapabilityToken};
 use chio_core::crypto::{sha256_hex, Keypair, Signature};
+use chio_core::receipt::security::ActiveDefenseReceiptBody;
 use chio_core::receipt::{
     body::ChioReceipt, crypto_floor::ReceiptCryptoFloor, decision::Decision,
     economics::FinancialReceiptMetadata, economics::SettlementStatus,
@@ -67,17 +68,17 @@ use chio_kernel::{
     CreditFacilityRow, CreditLossLifecycleEventKind, CreditLossLifecycleListQuery,
     CreditLossLifecycleListReport, CreditLossLifecycleListSummary, CreditLossLifecycleRow,
     EvidenceChildReceiptScope, EvidenceExportQuery, ExposureLedgerQuery,
-    FederatedEvidenceShareImport, FederatedEvidenceShareSummary, LiabilityAutoBindDisposition,
-    LiabilityClaimPayoutReconciliationState, LiabilityClaimResponseDisposition,
-    LiabilityClaimSettlementReconciliationState, LiabilityClaimWorkflowQuery,
-    LiabilityClaimWorkflowReport, LiabilityClaimWorkflowRow, LiabilityClaimWorkflowSummary,
-    LiabilityMarketWorkflowQuery, LiabilityMarketWorkflowReport, LiabilityMarketWorkflowRow,
-    LiabilityMarketWorkflowSummary, LiabilityProviderLifecycleState, LiabilityProviderListQuery,
-    LiabilityProviderListReport, LiabilityProviderListSummary, LiabilityProviderResolutionQuery,
-    LiabilityProviderResolutionReport, LiabilityProviderRow, LiabilityQuoteDisposition,
-    PendingSettlementObservation, ReceiptCheckpointCreateReport, ReceiptCheckpointRange,
-    ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore, ReceiptStoreError,
-    ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
+    FederatedEvidenceShareImport, FederatedEvidenceShareSummary, IndexedSecurityEvidenceStore,
+    LiabilityAutoBindDisposition, LiabilityClaimPayoutReconciliationState,
+    LiabilityClaimResponseDisposition, LiabilityClaimSettlementReconciliationState,
+    LiabilityClaimWorkflowQuery, LiabilityClaimWorkflowReport, LiabilityClaimWorkflowRow,
+    LiabilityClaimWorkflowSummary, LiabilityMarketWorkflowQuery, LiabilityMarketWorkflowReport,
+    LiabilityMarketWorkflowRow, LiabilityMarketWorkflowSummary, LiabilityProviderLifecycleState,
+    LiabilityProviderListQuery, LiabilityProviderListReport, LiabilityProviderListSummary,
+    LiabilityProviderResolutionQuery, LiabilityProviderResolutionReport, LiabilityProviderRow,
+    LiabilityQuoteDisposition, PendingSettlementObservation, ReceiptCheckpointCreateReport,
+    ReceiptCheckpointRange, ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore,
+    ReceiptStoreError, ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
     RetainedReceiptCommitment, RetentionConfig, SignedCreditBond, SignedCreditFacility,
     SignedCreditLossLifecycle, SignedLiabilityAutoBindDecision, SignedLiabilityBoundCoverage,
     SignedLiabilityClaimAdjudication, SignedLiabilityClaimDispute, SignedLiabilityClaimPackage,
@@ -95,6 +96,7 @@ use chio_kernel::{
     LIABILITY_CLAIM_WORKFLOW_REPORT_SCHEMA, LIABILITY_MARKET_WORKFLOW_REPORT_SCHEMA,
     LIABILITY_PROVIDER_LIST_REPORT_SCHEMA, LIABILITY_PROVIDER_RESOLUTION_REPORT_SCHEMA,
 };
+use chio_security_types::ports::OpaqueReceiptRef;
 use chio_supervisor::{
     HealthFlag, HealthLevel, SupervisedOutcome, SupervisedThread, SupervisorConfig,
 };
@@ -1885,28 +1887,27 @@ fn handle_non_append_command(
             }
         }
         ReceiptCommitCommand::Rotate { config, response } => {
-            // Unconditional decrement pairs with the pre-send increment in
-            // `SqliteReceiptStore::dispatch_rotate` (mirrors the Write arm's
-            // dequeue decrement above). It runs before every early return
-            // below, so no dequeue path (poisoned head, pool-acquire error,
-            // the panic-guarded rotation, success, or error) can leak the
-            // in-flight rotation writer.
-            atomic_saturating_sub(&health.inflight, 1);
+            // Adopt the dispatcher's in-flight ownership until the response,
+            // including pool acquisition, integrity checks and archive fsync.
+            let inflight_guard = WriterInflightGuard::new(&health.inflight);
             // Fail-closed: rotation deletes evidence, so it must never run on a
             // store whose chain integrity is unverified. Refuse on a poisoned
             // head (mirrors the Write arm) and point at the repair path.
             if let WriterHeadState::Poisoned(message) = head_state {
+                drop(inflight_guard);
                 let _ = response.send(Err(poisoned_head_error(message)));
                 return None;
             }
             let mut connection = match receipt_pool_connection(pool, sink_qualification) {
                 Ok(connection) => connection,
                 Err(error) => {
+                    drop(inflight_guard);
                     let _ = response.send(Err(error));
                     return None;
                 }
             };
             if let Err(error) = verify_rollback(&connection, rollback_anchor, false) {
+                drop(inflight_guard);
                 let _ = response.send(Err(error));
                 return None;
             }
@@ -1928,6 +1929,7 @@ fn handle_non_append_command(
             let verified_latest_checkpoint = match verify_checkpoint_chain_integrity(&connection) {
                 Ok(latest) => latest,
                 Err(error) => {
+                    drop(inflight_guard);
                     let _ = response.send(Err(error));
                     return None;
                 }
@@ -1943,6 +1945,7 @@ fn handle_non_append_command(
             // source rows) and then delete the live claim log, destroying the
             // evidence repair needs to recover. Refuse fail-closed instead.
             if let Err(error) = validate_claim_receipt_log_entries(&connection) {
+                drop(inflight_guard);
                 let _ = response.send(Err(error));
                 return None;
             }
@@ -1999,6 +2002,7 @@ fn handle_non_append_command(
                     health.store_head_snapshot(head);
                 }
             }
+            drop(inflight_guard);
             let _ = response.send(outcome);
         }
         ReceiptCommitCommand::InstallSigner(signer) => {
@@ -2129,10 +2133,8 @@ fn handle_non_append_command(
             archive_path,
             response,
         } => {
-            // Unconditional decrement pairs with the pre-send increment in
-            // `SqliteReceiptStore::retention_repair` (mirrors the Rotate arm's
-            // dequeue decrement above).
-            atomic_saturating_sub(&health.inflight, 1);
+            // Retain ownership through archive I/O and full head revalidation.
+            let inflight_guard = WriterInflightGuard::new(&health.inflight);
             // Runs regardless of `head_state` (like ReseedHead): the whole
             // point of this command is to repair a store whose head is
             // already Poisoned by the drift the repair removes, so gating it
@@ -2151,14 +2153,19 @@ fn handle_non_append_command(
                 // committed -- but it does update head_state/health so a
                 // subsequent health check or write surfaces the real cause
                 // instead of a stale poisoned message.
-                let reseed =
+                let reseed = if health.critical_write_poisoned.load(Ordering::SeqCst) {
+                    Err(ReceiptStoreError::Conflict(format!(
+                        "{}; repair the critical receipt projection and reopen the receipt store",
+                        critical_writer_error_message(health)
+                    )))
+                } else {
                     receipt_pool_connection(pool, sink_qualification).and_then(|connection| {
-                        if incremental_verification {
-                            seed_verified_head(&connection)
-                        } else {
-                            seed_head_snapshot(&connection)
-                        }
-                    });
+                        // Recovery must prove a clean head in both modes. The
+                        // cheap snapshot defers integrity checks to an append.
+                        support::audit_receipt_cost_projection(&connection)?;
+                        seed_verified_head(&connection)
+                    })
+                };
                 match reseed {
                     Ok(head) => {
                         health.store_head_snapshot(&head);
@@ -2173,16 +2180,19 @@ fn handle_non_append_command(
                         // returning the pre-repair append error. Fail-closed is
                         // unaffected: a real later batch failure re-sets it.
                         *pending_flush_error = None;
+                        health.set_head_poisoned(false);
                         *head_state = WriterHeadState::Verified(Box::new(head));
                     }
                     Err(error) => {
                         if let Ok(mut last_error) = health.last_error.lock() {
                             *last_error = Some(error.to_string());
                         }
+                        health.set_head_poisoned(true);
                         *head_state = WriterHeadState::Poisoned(error.to_string());
                     }
                 }
             }
+            drop(inflight_guard);
             let _ = response.send(outcome);
         }
         // Append/Flush are handled by the main loop; reaching here is
@@ -2640,211 +2650,8 @@ fn receipt_store_healthy(
         )
 }
 
-#[cfg(test)]
-mod writer_liveness_classifier_tests {
-    use super::*;
-    use chio_kernel::ReceiptWriterLiveness as Liveness;
-
-    const CAPACITY: u64 = RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY as u64;
-    const NOW: u64 = 1_000_000;
-    const STALL_MS: u64 = 10_000;
-
-    #[test]
-    fn timed_out_inflight_append_reports_wedged() {
-        // A caller timeout is not a terminal failure. The actor still owns the
-        // command, so accepted remains ahead of terminal outcomes until it drains.
-        let counters = ReceiptWriterCounters {
-            accepted_total: 1,
-            inflight: 1,
-            ..ReceiptWriterCounters::default()
-        };
-        assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, Some(NOW - 20_000), NOW),
-            Liveness::Wedged
-        );
-    }
-
-    #[test]
-    fn outstanding_timeout_reports_wedged_before_the_stall_threshold() {
-        let counters = ReceiptWriterCounters {
-            accepted_total: 1,
-            inflight: 1,
-            timed_out_total: 1,
-            timed_out_inflight: 1,
-            last_commit_unix_ms: None,
-            last_error: Some("sqlite receipt commit append timed out".to_string()),
-            ..ReceiptWriterCounters::default()
-        };
-        assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, Some(NOW - 6_000), NOW),
-            Liveness::Wedged
-        );
-    }
-
-    #[test]
-    fn never_committed_backlog_reports_wedged() {
-        // Wedged before the first commit: `last_commit_unix_ms` is `None`, so the
-        // stall clock must fall back to the current backlog start.
-        let counters = ReceiptWriterCounters {
-            accepted_total: 1,
-            inflight: 1,
-            last_commit_unix_ms: None,
-            ..ReceiptWriterCounters::default()
-        };
-        assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, Some(NOW - 20_000), NOW),
-            Liveness::Wedged
-        );
-    }
-
-    #[test]
-    fn honors_configured_stall_threshold() {
-        // Same backlog with a commit 600ms ago: wedged under a fail-fast 500ms
-        // threshold, healthy under a lenient 10s threshold. Proves the threshold
-        // is a parameter, not a hardcoded constant.
-        let counters = ReceiptWriterCounters {
-            accepted_total: 2,
-            committed_total: 1,
-            inflight: 1,
-            last_commit_unix_ms: Some(NOW - 600),
-            ..ReceiptWriterCounters::default()
-        };
-        assert_eq!(
-            classify_writer_liveness(&counters, 500, CAPACITY, None, NOW),
-            Liveness::Wedged
-        );
-        assert_eq!(
-            classify_writer_liveness(&counters, 10_000, CAPACITY, None, NOW),
-            Liveness::Healthy
-        );
-    }
-
-    #[test]
-    fn full_commit_channel_reports_saturated() {
-        // Channel full right now but still committing (recent commit): a new send
-        // would be rejected, so admission must be denied even though the writer
-        // is not wedged.
-        let counters = ReceiptWriterCounters {
-            accepted_total: CAPACITY + 5,
-            committed_total: 4,
-            inflight: CAPACITY,
-            queue_depth: CAPACITY,
-            last_commit_unix_ms: Some(NOW - 100),
-            ..ReceiptWriterCounters::default()
-        };
-        assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, None, NOW),
-            Liveness::Saturated
-        );
-        assert!(!Liveness::Saturated.healthy());
-    }
-
-    #[test]
-    fn a_drained_but_committing_batch_is_not_reported_saturated() {
-        // The actor has drained a full batch out of the channel and is committing
-        // it: `inflight` still counts that batch, but its channel slots are
-        // already free, so the next send would succeed. Saturation reads
-        // `queue_depth`, so this must classify Healthy rather than Saturated.
-        // Reading `inflight` here wrongly denied admission under heavy but
-        // healthy load.
-        let counters = ReceiptWriterCounters {
-            accepted_total: CAPACITY + RECEIPT_GROUP_COMMIT_MAX_BATCH as u64,
-            committed_total: 0,
-            inflight: CAPACITY,
-            queue_depth: CAPACITY - RECEIPT_GROUP_COMMIT_MAX_BATCH as u64,
-            last_commit_unix_ms: Some(NOW - 100),
-            ..ReceiptWriterCounters::default()
-        };
-        assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, Some(NOW - 100), NOW),
-            Liveness::Healthy
-        );
-    }
-
-    #[test]
-    fn idle_writer_with_fresh_backlog_is_not_wedged() {
-        // After a long idle period the last commit is naturally old, but a newly
-        // enqueued write has only just started. The stall clock must anchor to the
-        // fresh backlog start, not the stale last commit, or the writer is marked
-        // wedged and admission denied the instant it accepts work after a quiet
-        // period.
-        let counters = ReceiptWriterCounters {
-            accepted_total: 6,
-            committed_total: 5,
-            inflight: 1,
-            last_commit_unix_ms: Some(NOW - 60_000),
-            ..ReceiptWriterCounters::default()
-        };
-        assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, Some(NOW - 100), NOW),
-            Liveness::Healthy,
-            "fresh work after idle must not be judged wedged by the stale last commit"
-        );
-        // The same stale commit WITH a backlog that has itself gone unserviced
-        // past the threshold is a genuine wedge.
-        assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, Some(NOW - 20_000), NOW),
-            Liveness::Wedged,
-            "a backlog stalled past the threshold must still report wedged"
-        );
-    }
-
-    #[test]
-    fn unavailable_writer_reports_dead() {
-        let counters = ReceiptWriterCounters {
-            last_error: Some("sqlite receipt commit actor is unavailable".to_string()),
-            ..ReceiptWriterCounters::default()
-        };
-        assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, None, NOW),
-            Liveness::Dead
-        );
-    }
-
-    #[test]
-    fn drained_writer_reports_healthy() {
-        let counters = ReceiptWriterCounters {
-            accepted_total: 10,
-            committed_total: 10,
-            inflight: 0,
-            last_commit_unix_ms: Some(NOW - 50),
-            ..ReceiptWriterCounters::default()
-        };
-        assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, None, NOW),
-            Liveness::Healthy
-        );
-    }
-
-    #[test]
-    fn a_non_healthy_writer_makes_the_store_unhealthy() {
-        // Checkpoint chain intact and no recorded error, but the writer is not
-        // making progress: the pre-dispatch gate is denying tool calls, so the
-        // top-level health boolean must not stay green.
-        assert!(!receipt_store_healthy(true, None, Liveness::Wedged));
-        assert!(!receipt_store_healthy(true, None, Liveness::Saturated));
-        assert!(!receipt_store_healthy(true, None, Liveness::Dead));
-    }
-
-    #[test]
-    fn healthy_and_unknown_writers_do_not_downgrade_store_health() {
-        assert!(receipt_store_healthy(true, None, Liveness::Healthy));
-        // Unknown is the permissive verdict (no async writer, or a read-only
-        // observer that cannot see writer liveness).
-        assert!(receipt_store_healthy(true, None, Liveness::Unknown));
-        // A recorded writer error or an unhealthy checkpoint chain still fails
-        // closed regardless of a healthy liveness verdict.
-        assert!(!receipt_store_healthy(false, None, Liveness::Healthy));
-        assert!(!receipt_store_healthy(
-            true,
-            Some("checkpoint build failed"),
-            Liveness::Healthy
-        ));
-    }
-}
-
-/// Holds the writer `inflight` count for the DURATION of a writer-routed `Write`
-/// job. The pre-send increment in `WriterHandle::run_write_kind` is ADOPTED by
+/// Holds the writer `inflight` count through a writer-routed `Write` or `Rotate`
+/// job. The dispatcher's pre-send increment is adopted by
 /// this guard, so `receipt_store_health` reports `inflight > 0` while a slow or
 /// stuck writer-routed op (pool acquire, pre-check, closure, resync) is actually
 /// running. The `Write` arm releases it (`drop`) IMMEDIATELY BEFORE each
@@ -3696,6 +3503,9 @@ pub(crate) mod support;
 mod tests;
 #[path = "receipt_store/underwriting_credit.rs"]
 mod underwriting_credit;
+#[cfg(test)]
+#[path = "receipt_store/writer_liveness_classifier_tests.rs"]
+mod writer_liveness_classifier_tests;
 
 use support::*;
 pub(crate) use support::{decode_verified_child_receipt, decode_verified_chio_receipt, sqlite_u64};
@@ -3940,14 +3750,9 @@ impl SqliteReceiptStore {
     pub fn retention_repair(&self, archive_path: &str) -> Result<u64, ReceiptStoreError> {
         let (response, result) = mpsc::sync_channel(1);
         let health = &self.receipt_commit_actor.health;
-        // In-flight writer, same accounting discipline as a rotation
-        // (`dispatch_rotate`): increment before handing the command to the
-        // actor so a concurrent `receipt_store_health` cannot observe a
-        // dequeued-but-uncounted repair. The `RetentionRepair` arm
-        // decrements unconditionally on dequeue; any send/recv failure here
-        // undoes the speculative increment so a rejected repair never leaks
-        // inflight.
-        health.inflight.fetch_add(1, Ordering::SeqCst);
+        // The actor retains this ownership until repair and revalidation end.
+        let previous_inflight = health.inflight.fetch_add(1, Ordering::SeqCst);
+        health.note_channel_send();
         if let Err(error) =
             self.receipt_commit_actor
                 .sender
@@ -3956,16 +3761,25 @@ impl SqliteReceiptStore {
                     response,
                 })
         {
+            health.note_channel_send_rejected();
             atomic_saturating_sub(&health.inflight, 1);
             return Err(match error {
-                mpsc::TrySendError::Full(_) => receipt_actor_saturated_error(),
-                mpsc::TrySendError::Disconnected(_) => receipt_actor_unavailable_error(),
+                mpsc::TrySendError::Full(_) => {
+                    health.saturated_total.fetch_add(1, Ordering::SeqCst);
+                    receipt_actor_saturated_error()
+                }
+                mpsc::TrySendError::Disconnected(_) => {
+                    health.note_writer_unavailable();
+                    receipt_actor_unavailable_error()
+                }
             });
         }
+        health.note_accept(previous_inflight);
         match result.recv() {
             Ok(outcome) => outcome,
             Err(_) => {
                 atomic_saturating_sub(&health.inflight, 1);
+                health.note_writer_unavailable();
                 Err(receipt_actor_unavailable_error())
             }
         }

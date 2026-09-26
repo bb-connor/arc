@@ -8,10 +8,17 @@
 
 use std::sync::Arc;
 
+use chio_core::Keypair;
+use chio_manifest::{
+    RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest, VerifiedManifestRegistry,
+    TOOL_MANIFEST_SCHEMA,
+};
 use chio_mistral_tools_adapter::transport::{
     MistralHttpTransport, MISTRAL_API_VERSION, MISTRAL_CHAT_COMPLETIONS_PATH,
 };
-use chio_mistral_tools_adapter::{MistralAdapter, MistralAdapterConfig, MistralChatRequest};
+use chio_mistral_tools_adapter::{
+    MistralAdapter, MistralAdapterConfig, MistralChatRequest, Transport,
+};
 use chio_provider_adapter_core::http::{AuthScheme, HttpTransportConfig};
 use chio_tool_call_fabric::ProviderId;
 use serde_json::{json, Value};
@@ -44,6 +51,43 @@ fn chat_request() -> MistralChatRequest {
             }
         })],
     )
+}
+
+fn registry_bound_adapter(transport: Arc<dyn Transport>) -> MistralAdapter {
+    let signer = Keypair::from_seed(&[77; 32]);
+    let mut config = config();
+    config.public_key = signer.public_key().to_hex();
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: config.server_id.clone(),
+        name: config.server_name.clone(),
+        description: None,
+        version: config.server_version.clone(),
+        tools: vec![ToolDefinition {
+            name: "get_weather".to_string(),
+            description: "Get weather".to_string(),
+            input_schema: json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: true,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow: None,
+        }],
+        server_tools: Vec::new(),
+        required_permissions: None,
+        public_key: config.public_key.clone(),
+    };
+    let signed = chio_manifest::sign_manifest(&manifest, &signer).unwrap();
+    let mut registry = VerifiedManifestRegistry::default();
+    registry
+        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+        .unwrap();
+    MistralAdapter::new_with_registry(config, transport, &registry).unwrap()
 }
 
 #[tokio::test]
@@ -88,7 +132,7 @@ async fn real_transport_posts_with_bearer_and_lifts_tool_calls() {
         .with_auth(AuthScheme::Bearer("sk-mistral-test".to_string()))
         .with_header("x-mistral-api-version", MISTRAL_API_VERSION);
     let transport = MistralHttpTransport::from_config(http_config).unwrap();
-    let adapter = MistralAdapter::new(config(), Arc::new(transport));
+    let adapter = registry_bound_adapter(Arc::new(transport));
 
     let invocations = adapter
         .send_chat_completion(&chat_request())
@@ -163,7 +207,7 @@ async fn real_transport_streams_and_gates_tool_calls() {
     let http_config = HttpTransportConfig::new(server.uri())
         .with_auth(AuthScheme::Bearer("sk-mistral-test".to_string()));
     let transport = MistralHttpTransport::from_config(http_config).unwrap();
-    let adapter = MistralAdapter::new(config(), Arc::new(transport));
+    let adapter = registry_bound_adapter(Arc::new(transport));
 
     let verdict = chio_tool_call_fabric::VerdictResult::Allow {
         redactions: vec![],

@@ -93,11 +93,11 @@ HealProgressAction == partitioned /\ ~partitioned'
 HealEnabled == partitioned
 
 ObserveWeakFair ==
-    \/ <>[](~ObserveEnabled)
+    \/ []<>(~ObserveEnabled)
     \/ []<><<ObserveProgressAction>>_observedEpoch
 
 HealWeakFair ==
-    \/ <>[](~HealEnabled)
+    \/ []<>(~HealEnabled)
     \/ []<><<HealProgressAction>>_partitioned
 
 TemporalFairness ==

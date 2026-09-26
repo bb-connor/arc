@@ -181,6 +181,60 @@ pub(super) fn ensure(
         .map_err(|error| outcome_unknown(error.to_string()))
 }
 
+/// Remove only the identity marker belonging to this relocated authority.
+/// Copied markers legitimately have a new inode; their canonical path and
+/// store UUID must still match. Unrelated authorities keep their continuity.
+pub(super) fn remove_for_relocation(
+    lock_root: &Path,
+    database_path: &Path,
+    store_uuid: &str,
+    copied_only: bool,
+) -> Result<(), SqliteServingOwnerError> {
+    let path = marker_path(lock_root, database_path)?;
+    let metadata = match fs::symlink_metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    validate_marker_metadata(lock_root, &metadata)?;
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    let file = options.open(&path)?;
+    validate_inode_identity(&metadata, &file.metadata()?, None)?;
+    let mut bytes = Vec::new();
+    file.take(MAX_MARKER_BYTES + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_MARKER_BYTES {
+        return Err(invalid("oversized relocation marker"));
+    }
+    let record: PathIdentityRecord =
+        serde_json::from_slice(&bytes).map_err(|_| invalid("invalid relocation marker"))?;
+    if record.format != FORMAT
+        || record.store_uuid != store_uuid
+        || record.canonical_database_path != path_text(database_path)?
+        || canonical_json_bytes(&record)
+            .map_err(|_| invalid("invalid relocation marker encoding"))?
+            != bytes
+    {
+        return Err(invalid(
+            "relocation marker belongs to a different authority",
+        ));
+    }
+    if copied_only
+        && record.marker_device == read_u64(metadata_device(&metadata)?, "marker_device")?
+        && record.marker_inode == read_u64(metadata_inode(&metadata)?, "marker_inode")?
+    {
+        return Ok(());
+    }
+    validate_inode_identity(&metadata, &fs::symlink_metadata(&path)?, None)?;
+    fs::remove_file(path)?;
+    Ok(())
+}
+
 fn validate_record(
     record: &PathIdentityRecord,
     canonical_database_path: &Path,

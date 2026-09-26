@@ -1,0 +1,9 @@
+{
+  "schema": "chio.key-log.witness-service-config.v1",
+  "policy_path": "/etc/chio/keylog/policy.json",
+  "database_path": "/var/lib/chio-keylog/witness-a/witness.sqlite3",
+  "socket_path": "/run/chio-keylog/witness-a/witness.sock",
+  "witness_id": "a",
+  "seed_file_path": "/run/credentials/chio-keylog-witness@a.service/seed",
+  "provision": true
+}
