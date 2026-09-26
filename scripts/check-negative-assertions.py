@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Stop new weak negative assertions in the security crates.
+"""Ratchet the count of weak negative assertions per file in the security crates.
+
+This is a net-count budget per file, not a per-site pin: a change that
+strengthens one old assertion and adds one weak assertion elsewhere in the same
+file passes at an unchanged count. That trade is visible in the diff, so review
+of changed tests remains part of the contract until the baseline pins sites by
+identity rather than by count.
 
 `assert!(result.is_err())` in a fail-closed system is close to vacuous. Almost
 any mistake produces an error, so the assertion passes when the code rejects for
