@@ -52,6 +52,10 @@ pub const RECEIPT_SCHEMA: &str = "chio.example.receipt.v1";
 pub const BROKER_EXECUTE_SCHEMA: &str = "chio.example.broker-execute.v1";
 pub const NOT_VERSIONED: &str = "chio.example.label";
 pub const UNRELATED: &str = "https://example.invalid/v1";
+#[cfg(not(test))]
+pub const PRODUCTION_ONLY_SCHEMA: &str = "chio.example.production-only.v1";
+#[cfg(all(test, feature = "shape-fixtures"))]
+pub const FIXTURE_SCHEMA: &str = "chio.example.fixture-only.v1";
 
 #[cfg(test)]
 mod tests {
@@ -82,12 +86,18 @@ populate "$compliant"
 commit_case "$compliant"
 assert_rc "$(run_checker "$compliant" "$work/update.out" "$work/update.err" --update)" 0 \
   "--update writes the lock and the report from the tree"
-grep -F "wrote 3 identifiers to spec/wire-schemas.lock (3 new, 0 retired) and 1 unpinned" "$work/update.out" >/dev/null
+grep -F "wrote 4 identifiers to spec/wire-schemas.lock (4 new, 0 retired) and 2 unpinned" "$work/update.out" >/dev/null
 lock="$compliant/spec/wire-schemas.lock"
 report="$compliant/spec/wire-schemas-unpinned.md"
 test -f "$lock"
 test -f "$report"
 grep -F 'value = "chio.example.receipt.v1"' "$lock" >/dev/null
+grep -F 'value = "chio.example.production-only.v1"' "$lock" >/dev/null
+if grep -F 'chio.example.fixture-only.v1' "$lock" >/dev/null; then
+  echo "FAIL: a constant that exists only in a test build was recorded as a declaration" >&2
+  exit 1
+fi
+grep -F '`crates/security/chio-example/src/lib.rs:6` `PRODUCTION_ONLY_SCHEMA` = `chio.example.production-only.v1`' "$report" >/dev/null
 grep -F 'files = ["crates/products/chio-example-cli/src/lib.rs", "crates/security/chio-example/src/lib.rs"]' "$lock" >/dev/null
 grep -F 'value = "chio.example.report/v2"' "$lock" >/dev/null
 grep -F 'value = "chio.example.broker-execute.v1"' "$lock" >/dev/null
@@ -122,7 +132,7 @@ echo "ok: --update is deterministic"
 
 assert_rc "$(run_checker "$compliant" "$work/compliant.out" "$work/compliant.err")" 0 \
   "a tree that matches its lock passes"
-grep -F "4 identifier constants, 3 distinct values, 1 declared in more than one file, 3 lock entries; 1 of 2 security-crate constants unpinned" \
+grep -F "5 identifier constants, 4 distinct values, 1 declared in more than one file, 4 lock entries; 2 of 3 security-crate constants unpinned" \
   "$work/compliant.out" >/dev/null
 
 bumped="$work/bumped"
@@ -187,7 +197,18 @@ const EXPECTED: &str = "chio.example.broker-execute.v1";
 EOF
 assert_rc "$(run_checker "$pinned_later" "$work/pinned-later.out" "$work/pinned-later.err")" 0 \
   "adding a pin leaves a stale report entry in the safe direction and passes"
-grep -F "0 of 2 security-crate constants unpinned" "$work/pinned-later.out" >/dev/null
+grep -F "1 of 3 security-crate constants unpinned" "$work/pinned-later.out" >/dev/null
+
+not_test_bumped="$work/not-test-bumped"
+init_case "$not_test_bumped"
+populate "$not_test_bumped"
+commit_case "$not_test_bumped"
+run_checker "$not_test_bumped" /dev/null /dev/null --update >/dev/null
+sed -i 's/chio.example.production-only.v1/chio.example.production-only.v2/' "$not_test_bumped/crates/security/chio-example/src/lib.rs"
+assert_rc "$(run_checker "$not_test_bumped" "$work/not-test-bumped.out" "$work/not-test-bumped.err")" 1 \
+  "a bumped identifier under cfg(not(test)) is production code and fails without a lock change"
+grep -F 'crates/security/chio-example/src/lib.rs:6 PRODUCTION_ONLY_SCHEMA = "chio.example.production-only.v2" is not in the lock (new or bumped identifier)' \
+  "$work/not-test-bumped.err" >/dev/null
 
 unlisted="$work/unlisted"
 init_case "$unlisted"

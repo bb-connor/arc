@@ -27,10 +27,15 @@ needs a canonical-byte shape fixture and an old-reader test per schema.
 
 Scope: `const` or `static` `&str` items under `crates/` whose value starts with
 `chio` and carries a version segment (`v1`, `v2`, ...) delimited by `.`, `:`,
-`-`, `/` or `_`. Test paths, items behind a `test` or `test-support` cfg, and
+`-`, `/` or `_`. Test paths, items that exist only in a test or Kani build, and
 `_generated` output are not declarations: a test literal is a pin, and the
-codegen output is pinned by the spec it is generated from. Byte-string domain
-constants are covered by `check-domain-separation.py`.
+codegen output is pinned by the spec it is generated from. An item is test-only
+when its `cfg` predicate is false under every production configuration; `test`
+and `kani` are the only atoms known false, every other atom (a feature, a
+target, a custom flag) may be true, so `cfg(not(test))`, `cfg(any(test,
+feature = "x"))` and `cfg(feature = "test-support")` all gate production code
+and stay in scope. Byte-string domain constants are covered by
+`check-domain-separation.py`.
 
 `spec/wire-schemas-unpinned.md`, next to the lock, lists the identifier
 constants in the security crates whose value appears in no test-scope literal,
@@ -100,9 +105,14 @@ RUST_NOISE = re.compile(
     """,
     re.VERBOSE,
 )
-TEST_SCOPED_ITEM = re.compile(
-    r"#\[\s*cfg\s*\([^\n]*\b(?:test|test-support)\b[^\n]*\)\s*\]"
-)
+# An outer attribute opener. The attribute's extent is found by bracket matching,
+# so a `cfg` predicate may span lines and nest `all`, `any` and `not` freely.
+ATTRIBUTE_START = re.compile(r"#\[")
+# The cfg atoms that are false in every production build. Every other atom (a
+# feature, including `test-support`, a target, a custom flag) is unknown here
+# and may be true: a dependent can enable a feature in a non-test build.
+TEST_ONLY_ATOMS = frozenset({"test", "kani"})
+CFG_TOKEN = re.compile(r'"(?:[^"\\]|\\.)*"|[A-Za-z_][A-Za-z0-9_]*|[(),=]')
 
 
 @dataclass(frozen=True)
@@ -199,10 +209,93 @@ def blank_rust_comments(text: str) -> str:
         position = match.end()
 
 
+def evaluate_cfg(predicate: str) -> bool | None:
+    """Evaluate a cfg predicate under production assumptions.
+
+    `test` and `kani` are false; every other atom is unknown. The result is
+    `True`, `False`, or `None` when the atoms left unknown decide it. Only a
+    predicate that is `False` here can never gate production code.
+    """
+    tokens = CFG_TOKEN.findall(predicate)
+    position = 0
+
+    def parse() -> bool | None:
+        nonlocal position
+        if position >= len(tokens):
+            return None
+        token = tokens[position]
+        position += 1
+        if token in ("all", "any", "not") and position < len(tokens) and tokens[position] == "(":
+            position += 1
+            operands: list[bool | None] = []
+            while position < len(tokens) and tokens[position] != ")":
+                if tokens[position] == ",":
+                    position += 1
+                    continue
+                operands.append(parse())
+            position += 1
+            if token == "not":
+                operand = operands[0] if operands else None
+                return None if operand is None else not operand
+            if token == "all":
+                if any(operand is False for operand in operands):
+                    return False
+                return True if all(operand is True for operand in operands) else None
+            if any(operand is True for operand in operands):
+                return True
+            return False if all(operand is False for operand in operands) else None
+        if position < len(tokens) and tokens[position] == "=":
+            position += 1
+            if position < len(tokens) and tokens[position].startswith('"'):
+                position += 1
+        return False if token in TEST_ONLY_ATOMS else None
+
+    return parse()
+
+
+def is_test_scoped_attribute(body: str) -> bool:
+    """Whether the item under this attribute exists only in a test or Kani build.
+
+    `#[test]` and `#[kani::proof]` qualify outright. A `cfg` qualifies only when
+    its predicate is false under every production configuration, so
+    `cfg(not(test))`, `cfg(any(test, feature = "x"))` and
+    `cfg(all(not(kani), unix))` are production code and stay in the scan.
+    """
+    body = body.strip()
+    if body == "test" or body.startswith("kani::proof"):
+        return True
+    if not body.startswith("cfg"):
+        return False
+    predicate = body[len("cfg") :].strip()
+    if not (predicate.startswith("(") and predicate.endswith(")")):
+        return False
+    return evaluate_cfg(predicate[1:-1]) is False
+
+
+def attribute_end(text: str, opener: int) -> int:
+    """Index just past the `]` that closes the attribute opening at `opener`."""
+    depth = 0
+    cursor = opener
+    while cursor < len(text):
+        char = text[cursor]
+        if char == "[":
+            depth += 1
+        elif char == "]":
+            depth -= 1
+            if depth == 0:
+                return cursor + 1
+        cursor += 1
+    return len(text)
+
+
 def test_scoped_spans(text: str) -> list[tuple[int, int]]:
+    """Spans of items that exist only in a test or Kani build, attribute included."""
     spans: list[tuple[int, int]] = []
-    for match in TEST_SCOPED_ITEM.finditer(text):
-        cursor = match.end()
+    for match in ATTRIBUTE_START.finditer(text):
+        attribute_close = attribute_end(text, match.end() - 1)
+        if not is_test_scoped_attribute(text[match.end() : attribute_close - 1]):
+            continue
+        cursor = attribute_close
         depth = 0
         body = None
         while cursor < len(text):

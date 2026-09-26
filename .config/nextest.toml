@@ -1,8 +1,10 @@
 # cargo-nextest configuration.
 #
-# nextest runs every test in its own process, so a test that passes under
-# `cargo test` and fails here was relying on state a sibling left behind in
-# the shared process. Each such failure is a finding about the test.
+# nextest runs every test in its own process. A test that passes under
+# `cargo test` and fails here is a lead, not yet a finding: it may depend on
+# state a sibling left in the shared process, on environment or stdio the
+# harness inherited differently, or on the harness's own timing. Each case is
+# dispositioned individually before anything is called a defect.
 #
 # Timeouts are per test, not per binary. The default slow-timeout below is a
 # ceiling for tests that declare no deadline of their own; every test group

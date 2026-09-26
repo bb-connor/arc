@@ -436,9 +436,11 @@ jobs:
     # This lane runs the security crates under cargo-nextest, so each test
     # gets its own process, a per-test deadline and leak detection
     # (.config/nextest.toml). A test that passes under `cargo test` and fails
-    # here depended on a sibling's leftover state or left a child holding its
-    # stdio; each such failure is a finding about the test. Doctests are not
-    # nextest's to run and stay with the `cargo test` lanes.
+    # here is a lead, not yet a finding: it may depend on state a sibling left
+    # in the shared process, on environment or stdio the harness inherited
+    # differently, or on the harness's own timing, and each case is
+    # dispositioned individually before anything is called a defect. Doctests
+    # are not nextest's to run and stay with the `cargo test` lanes.
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
