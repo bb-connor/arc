@@ -173,6 +173,7 @@ fn create_plan_with_effects(
     effects: Vec<ResponseEffectSpec>,
 ) -> ResponsePlanRecord {
     let plan = build_response_plan(ResponsePlanInput {
+        execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
         action_id: ActionId::new("executor-action")
             .unwrap_or_else(|error| panic!("action id: {error}")),
         trigger_finding_id: record("executor-finding"),

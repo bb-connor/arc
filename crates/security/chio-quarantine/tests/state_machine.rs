@@ -105,6 +105,7 @@ fn plan_input(effect_count: u8) -> ResponsePlanInput {
         .map(|index| effect(ResponseEffectKind::ThrottleSession, index))
         .collect();
     ResponsePlanInput {
+        execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
         action_id: ActionId::new("action-response")
             .unwrap_or_else(|failure| panic!("invalid action id: {failure}")),
         trigger_finding_id: record("finding-response"),

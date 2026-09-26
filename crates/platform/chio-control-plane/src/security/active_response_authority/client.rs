@@ -307,6 +307,7 @@ impl AttestedFindingResponsePolicyPlanner for ProductionActiveResponseAuthorityC
             return Err(PortError::integrity_failure());
         }
         Ok(AttestedFindingResponsePolicySelection {
+            execution: selection.execution,
             admission_artifact_ref: selection.admission_artifact_ref,
             affected_ids: selection.affected_ids.into_vec(),
             effects: selection.effects.into_vec(),

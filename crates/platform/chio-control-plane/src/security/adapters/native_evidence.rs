@@ -1254,6 +1254,7 @@ mod tests {
         .unwrap_or_else(|error| panic!("contribution: {error}"));
         let contribution_hash = Digest32::new(*chio_core::sha256(&contribution_bytes).as_bytes());
         let plan = build_response_plan(ResponsePlanInput {
+            execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
             action_id: ActionId::new("action-scheduler-native")
                 .unwrap_or_else(|error| panic!("action: {error}")),
             trigger_finding_id: record("finding-scheduler-native"),

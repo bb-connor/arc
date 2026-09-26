@@ -733,6 +733,7 @@ mod tests {
             *chio_core::sha256(canonical_contribution.as_bytes()).as_bytes(),
         );
         let plan = build_response_plan(ResponsePlanInput {
+            execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
             action_id: ActionId::new(action_id)
                 .unwrap_or_else(|error| panic!("action id: {error}")),
             trigger_finding_id: RecordId::new("finding-scheduler-worker")

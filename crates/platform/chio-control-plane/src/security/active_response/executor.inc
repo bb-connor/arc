@@ -166,6 +166,9 @@ impl<
     ) -> Result<ValidatedExecutionRequest, ActiveResponseExecutorError> {
         let reject =
             |reason: &str| ActiveResponseExecutorError::RejectedBeforeCommit(reason.to_string());
+        if raw.response_plan.execution.is_some_and(|binding| binding.mode != chio_security_types::ResponseExecutionMode::Live) {
+            return Err(reject("simulation plans cannot enter the live response executor"));
+        }
         if raw.executor_authority != self.identity
             || raw.request_id != raw.response_plan.action_id.as_str()
             || raw.expires_at_unix_ms != raw.response_plan.expires_at_unix_ms

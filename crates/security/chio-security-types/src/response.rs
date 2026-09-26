@@ -8,6 +8,8 @@ use alloc::vec::Vec;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 
+use crate::ResponseExecutionBinding;
+
 pub const RESPONSE_STATE_SCHEMA_VERSION: u8 = 1;
 pub const MAX_RESPONSE_EFFECTS: usize = 64;
 pub const MAX_RESPONSE_MUTATIONS: usize = 1_024;
@@ -173,6 +175,7 @@ pub struct PlannedResponseEffect {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResponsePlanInput {
+    pub execution: ResponseExecutionBinding,
     pub action_id: ActionId,
     pub trigger_finding_id: RecordId,
     pub trigger_finding_hash: Digest32,
@@ -193,6 +196,9 @@ pub struct ResponsePlanInput {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResponsePlan {
+    /// Absent only in historical plans, which cannot authorize a fresh dispatch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution: Option<ResponseExecutionBinding>,
     pub action_id: ActionId,
     pub trigger_finding_id: RecordId,
     pub trigger_finding_hash: Digest32,
@@ -237,6 +243,8 @@ pub struct ResponsePlanAuthorizationEffect {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResponsePlanAuthorizationBody {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution: Option<ResponseExecutionBinding>,
     pub action_id: ActionId,
     pub trigger_finding_id: RecordId,
     pub trigger_finding_hash: Digest32,
@@ -257,9 +265,22 @@ pub struct ResponsePlanAuthorizationBody {
 }
 
 impl ResponsePlan {
+    pub fn require_execution_mode(
+        &self,
+        mode: crate::ResponseExecutionMode,
+    ) -> Result<ResponseExecutionBinding, ResponseShapeError> {
+        let binding = self.execution.ok_or(ResponseShapeError::InvalidExecutionBinding)?;
+        binding.validate().map_err(|_| ResponseShapeError::InvalidExecutionBinding)?;
+        if binding.mode != mode {
+            return Err(ResponseShapeError::InvalidExecutionBinding);
+        }
+        Ok(binding)
+    }
+
     #[must_use]
     pub fn authorization_body(&self) -> ResponsePlanAuthorizationBody {
         ResponsePlanAuthorizationBody {
+            execution: self.execution,
             action_id: self.action_id.clone(),
             trigger_finding_id: self.trigger_finding_id.clone(),
             trigger_finding_hash: self.trigger_finding_hash,
@@ -290,6 +311,9 @@ impl ResponsePlan {
     }
 
     pub fn validate_shape(&self) -> Result<(), ResponseShapeError> {
+        if self.execution.is_some_and(|binding| binding.validate().is_err()) {
+            return Err(ResponseShapeError::InvalidExecutionBinding);
+        }
         if self.effects.is_empty() {
             return Err(ResponseShapeError::EmptyEffects);
         }
@@ -1426,6 +1450,7 @@ fn applied_reversible_effect_count(snapshot: &ResponseSnapshot) -> Option<usize>
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ResponseShapeError {
+    InvalidExecutionBinding,
     InvalidAffectedSetHash,
     CapabilityExpiresBeforePlan,
     CrossTenantTarget,
@@ -1448,6 +1473,7 @@ pub enum ResponseShapeError {
 impl fmt::Display for ResponseShapeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
+            Self::InvalidExecutionBinding => "response execution binding is invalid",
             Self::InvalidAffectedSetHash => "response plan affected-set hash is zero",
             Self::CapabilityExpiresBeforePlan => "operator capability expires before the plan",
             Self::CrossTenantTarget => "response target crosses the plan tenant",

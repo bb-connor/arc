@@ -808,6 +808,7 @@ mod tests {
         let contribution_hash =
             Digest32::new(*chio_core::sha256(canonical_contribution.as_bytes()).as_bytes());
         AttestedFindingResponsePolicySelection {
+            execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
             affected_ids: vec![record("affected-policy")],
             effects: vec![ResponseEffectSpec {
                 kind: ResponseEffectKind::ThrottleSession,

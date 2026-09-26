@@ -81,6 +81,21 @@ fn combined_deployment_binds_processes_paths_keys_and_store() {
 }
 
 #[test]
+fn combined_deployment_requires_and_authenticates_response_execution_mode() {
+    let mut value = serde_json::to_value(deployment()).test_expect("deployment value");
+    value["responseAuthority"]["responseExecutionMode"] = serde_json::json!("dry_run");
+    let configured: ActiveDefenseDeploymentConfig =
+        serde_json::from_value(value.clone()).test_expect("explicit dry-run mode");
+    let dry_run_digest = configured.compute_deployment_digest().test_expect("dry-run digest");
+    value["responseAuthority"]["responseExecutionMode"] = serde_json::json!("live");
+    let live: ActiveDefenseDeploymentConfig =
+        serde_json::from_value(value.clone()).test_expect("explicit live mode");
+    assert_ne!(dry_run_digest, live.compute_deployment_digest().test_expect("live digest"));
+    value["responseAuthority"].as_object_mut().test_expect("authority object").remove("responseExecutionMode");
+    assert!(serde_json::from_value::<ActiveDefenseDeploymentConfig>(value).is_err());
+}
+
+#[test]
 fn runtime_config_rejects_same_process_role_aliasing() {
     let original = deployment();
     let authority = original.response_authority.service_identity;
