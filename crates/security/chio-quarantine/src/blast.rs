@@ -17,11 +17,13 @@ const MAX_QUERY_DEPTH: u32 = 64;
 const MAX_QUERY_NODES: u32 = 4_096;
 const MAX_QUERY_EDGES: u32 = 8_192;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FenceValidationOutcome {
     ApprovalInvalidated,
     InvalidApprovedResult,
-    PortFailure,
+    /// The fence the store holds is not the exact fence the approval names.
+    FenceMismatch,
+    PortFailure(PortError),
 }
 
 pub struct CausalBlastRadiusResolver<
@@ -103,7 +105,7 @@ impl<S: CausalLineageStore + ?Sized, F: CausalLineageFenceStore + ?Sized>
                 fence: expected.clone(),
                 frozen_affected_ids: approved_sorted_affected_ids.clone(),
             })
-            .map_err(|_| FenceValidationOutcome::PortFailure)?;
+            .map_err(FenceValidationOutcome::PortFailure)?;
         let usable_fence_identity = fence.tenant_id == request.tenant_id
             && fence.action_id == request.action_id
             && fence.fencing_token > 0
@@ -124,9 +126,9 @@ impl<S: CausalLineageStore + ?Sized, F: CausalLineageFenceStore + ?Sized>
                 };
                 self.fences
                     .release(&release)
-                    .map_err(|_| FenceValidationOutcome::PortFailure)?;
+                    .map_err(FenceValidationOutcome::PortFailure)?;
             }
-            return Err(FenceValidationOutcome::PortFailure);
+            return Err(FenceValidationOutcome::FenceMismatch);
         }
         let refreshed = self.resolve_with_fence(request, Some(request.action_id.clone()));
         let unchanged = matches!(
@@ -159,7 +161,7 @@ impl<S: CausalLineageStore + ?Sized, F: CausalLineageFenceStore + ?Sized>
         };
         self.fences
             .release(&release)
-            .map_err(|_| FenceValidationOutcome::PortFailure)?;
+            .map_err(FenceValidationOutcome::PortFailure)?;
         Err(FenceValidationOutcome::ApprovalInvalidated)
     }
 
@@ -175,7 +177,7 @@ impl<S: CausalLineageStore + ?Sized, F: CausalLineageFenceStore + ?Sized>
         let Some(fence) = self
             .fences
             .query(&action)
-            .map_err(|_| FenceValidationOutcome::PortFailure)?
+            .map_err(FenceValidationOutcome::PortFailure)?
         else {
             return Ok(None);
         };
@@ -188,7 +190,7 @@ impl<S: CausalLineageStore + ?Sized, F: CausalLineageFenceStore + ?Sized>
             || fence.scheduler_lease_owner_id != expected.scheduler_lease_owner_id
             || fence.scheduler_fencing_token != expected.scheduler_fencing_token
         {
-            return Err(FenceValidationOutcome::PortFailure);
+            return Err(FenceValidationOutcome::FenceMismatch);
         }
         Ok(Some(fence))
     }
@@ -276,7 +278,9 @@ fn fence_validation_error_to_port(error: FenceValidationOutcome) -> PortError {
     match error {
         FenceValidationOutcome::ApprovalInvalidated => PortError::conflict(),
         FenceValidationOutcome::InvalidApprovedResult => PortError::invalid_data(),
-        FenceValidationOutcome::PortFailure => PortError::unavailable(),
+        FenceValidationOutcome::FenceMismatch | FenceValidationOutcome::PortFailure(_) => {
+            PortError::unavailable()
+        }
     }
 }
 
@@ -1293,7 +1297,7 @@ mod tests {
         });
         assert_eq!(
             acquire_resolver.acquire_validated_fence(&blast_request, &approved, 50_000, &expected,),
-            Err(FenceValidationOutcome::PortFailure)
+            Err(FenceValidationOutcome::FenceMismatch)
         );
         assert_eq!(fences.release_count(), 0);
 
@@ -1321,7 +1325,7 @@ mod tests {
                 50_000,
                 &usable_expected,
             ),
-            Err(FenceValidationOutcome::PortFailure)
+            Err(FenceValidationOutcome::FenceMismatch)
         );
         assert_eq!(usable_fences.release_count(), 1);
 
@@ -1350,7 +1354,7 @@ mod tests {
                 scheduler_fencing_token: usable_expected.scheduler_fencing_token,
                 expires_at_unix_ms: 50_000,
             }),
-            Err(FenceValidationOutcome::PortFailure)
+            Err(FenceValidationOutcome::FenceMismatch)
         );
     }
 }
