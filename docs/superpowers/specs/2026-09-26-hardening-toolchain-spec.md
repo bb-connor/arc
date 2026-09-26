@@ -408,6 +408,7 @@ finds anything the example suite does not before extending it.
 | Item | Depends on | Wave | Owner lane |
 | --- | --- | --- | --- |
 | H0 lint-parity gate | nothing | 2, first | K |
+| delete the unreferenced `admission_cleanup/recovery_and_compensation.inc` (1,228 lines, found by Lane A) | a build confirming nothing needs it | 2 | K |
 | H10 schema snapshot and generated pins | nothing (additive) | 2, second | K |
 | H1 unsafe lints | the H1 measurement; the cage is owned by no Wave 1 lane; H0 for the mirror | 2 | K |
 | H3 `forbid` on 26 crates | nothing; disjoint from all lanes | 2 | K |

@@ -192,6 +192,48 @@ an invisible discipline and nothing that narrates the work (11).
 A lane that fails the gate gets the specific finding back and revises on its own
 branch. Nothing is merged with a known standard violation to be fixed later.
 
+## Wave 1 ledger
+
+**Lane E** delivered its triage (recorded in
+[the triage record](../../reviews/2026-09-26-ci-triage-3cd73631a1.md)).
+
+**Lane R** merged at `bfe421a6f6`: both regressions repaired, gate 11 of 11, tests
+re-run and the pin mutation-checked by the orchestrator.
+
+**Lane A** delivered five commits on `packet/0-gates`. Four are on the integration
+branch (`ad29ee469f` 0.1, `613025d7c8` 0.3, `94b12c679b` 0.4, `ee7170ca6c` 0.5);
+**0.2 (`19809a63c7`, `overflow-checks = true` plus the probe crate and the
+release-overflow gate) is held on `packet/0-gates` and merges together with Lane
+B's 10.1**, per the coupling. Mechanical gate 11 of 11; every gate and self-test
+re-run green by the orchestrator; the old gate confirmed green at `e8e5d592ec`
+while `chio-secret-broker/src/service.rs` assembled to thousands of lines from 3
+own, and the new gate with one allowlist entry removed reports `9371 ... (3 own
+plus 16 include! fragments) violation`.
+
+Lane A's design choice, accepted: fragments are frozen rather than forbidden.
+Every assembled module carries a `max_fragments` cap that only shrinks and any
+new `include!` fragment fails, because making `cargo fmt` reach the 21 fragments
+with genuine diffs would mean editing files the lane did not own.
+
+**Measured baselines from the gates, which supersede the review heuristics:**
+61 assembled modules (57 under `crates/`), 340 fragments (50 `.inc`, 290 `.rs`),
+48 over the 2,000-line cap, allowlist 77 to 123 entries; largest
+`chio-kernel/src/kernel/tests.rs` 40,754 (48 fragments),
+`control-plane/src/security/adapters.rs` 13,956 (40),
+`chio-store-sqlite/src/security_state.rs` 13,473 (13),
+`chio-secret-broker/src/service.rs` 9,371 (16), `chio-security-types/src/ports.rs`
+5,033 (4). Domain separation: 334 byte-string constants, 321 distinct, 10
+duplicated (the review's 8 plus two the tree grew since), 32 off the stricter
+shape. Accounting arithmetic: 55 unchecked sites in 13 modules, the three money
+stores holding 35. Negative assertions: 1,298 weak across 229 files including
+tests (282 production single-line). Lane A did not force these to match the
+review figures, which was correct.
+
+**Handed on by Lane A:**
+`crates/kernel/chio-kernel/src/kernel/admission_cleanup/recovery_and_compensation.inc`
+(1,228 lines) is referenced by nothing in the tree: no `include!`, no `#[path]`.
+Dead code, for Lane K or Packet 7 to delete after a build confirms it.
+
 ## Decisions taken, 2026-09-26
 
 1. Step 0 approved: Codex's in-flight work is checkpointed on `packet/1-dry-run`
