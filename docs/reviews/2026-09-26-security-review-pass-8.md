@@ -12,8 +12,9 @@ struct derives, dependency edges) are close to exact.
 `map_err` discard disease is TCB-wide, and wire-schema duplication crosses crate
 boundaries), one is new and Linus-shaped (a sandbox init helper that links an
 HTTP client), one is a confidentiality gap in a wire type that no transport yet
-exercises (FROST round-2 packages), and two sweeps come back clean in ways worth
-preserving.**
+exercises (FROST round-2 packages), two sweeps come back clean in ways worth
+preserving, and four leads the boundary review left open are dispositioned, three
+of them closed by fixes that were never recorded as closing them.**
 
 ## U1. High: the rejection-provenance disease is TCB-wide, not a quarantine problem
 
@@ -176,6 +177,30 @@ the system already models explicitly: an external effect between commit and
 acknowledgement, which is the "unknown outcome" state and is resolved only by
 exact durable readback. Cancellation safety here is a property of RAII plus the
 existing recovery design, not of care at each site.
+
+## U6 addendum: the `timeout()` sites, classified
+
+The 29 `timeout(` matches resolve as: 18 in `scheduler_worker_parts/part_02_tests_tail.inc`,
+a test fragment; one `ureq` client timeout setting (`approval_channels.rs:81`); one
+`checked_add` on a deadline (`bootstrap.inc:391`); and **nine real wrappers, all in
+`kernel/dispatch.rs`** (`:551`, `:612`, `:1338`, `:1361`, `:1406`, `:1716`, `:1746`,
+`:1763`), every one around a tool or guard *call* or the join of such calls. None
+wraps a store write. That is exactly the external-effect class the unknown-outcome
+design already governs. U6 is closed rather than "clean with a caveat".
+
+## U9. The four leads the September 25 review left unresolved, dispositioned
+
+The boundary review listed leads it had not closed. Four were never picked up.
+
+| Lead | Disposition | Evidence |
+| --- | --- | --- |
+| Shared-root identity-marker deletion during relocation | **Closed, fixed and tested.** Cleanup is keyed by the relocating authority's `store_uuid` (`relocation.rs:596`, `path_identity::remove_for_relocation(lock_root, database_path, store_uuid, false)`), and `serving_owner/tests/relocation.rs:39` `relocation_preserves_other_authorities_in_a_shared_lock_root` provisions an unrelated authority in the same lock root and asserts it survives an import. | direct read |
+| Discovery descendant cleanup | **Closed, with a residual named.** The probed tool runs in its own process group (`discovery/launch.rs:57` `.process_group(0)`) and is torn down with `kill(-pid, SIGKILL)` (`:23`); the enforced cage denies `clone`/`fork` so no descendant can exist (`discovery.rs:20`); descendant-held pipes respect the deadline (`transport.rs:118`, tested at `:182`). Residual: in the unconfined demo profile only, a descendant that calls `setsid()` leaves the group and outlives the kill. The demo profile is not a security boundary and says so. | direct read |
+| SDK tag and environment enforcement | **Closed.** PyPI: `release-pypi.yml:201` validates the tag version against `pyproject.toml`, publishes from a protected `environment:` (`:456`), signs with cosign keyless (`:163`). npm: `release-npm.yml:282` validates the tag against `package.json`, `:308` enforces the `ts/v*` namespace, and publishing uses `--provenance` under `id-token: write` (`:160`). | direct read of both workflows |
+| Provenance of the separately published capture verifier | **Correctly tracked, still open, in Packet 5.** `enterprise-hardening.yml:728-787` pins the verifier by `vars.CHIO_ENTERPRISE_EVIDENCE_VERIFIER_SHA256`, checks the shape, compares the downloaded digest and passes it on. A digest pin proves *which* binary; it does not prove *where it came from*. Verifying the verifier's own build attestation before use is the remaining Packet 5 item, as the plan already states. | direct read |
+
+Three of four were closed by the remediation commit and simply never recorded as
+such; the fourth is tracked where it belongs. Nothing here changes the plan.
 
 ## U7. Lane progress, read from git only
 
