@@ -11,7 +11,9 @@ struct derives, dependency edges) are close to exact.
 **Judgment: two findings widen earlier ones by an order of magnitude (the
 `map_err` discard disease is TCB-wide, and wire-schema duplication crosses crate
 boundaries), one is new and Linus-shaped (a sandbox init helper that links an
-HTTP client), and two sweeps come back clean in ways worth preserving.**
+HTTP client), one is a confidentiality gap in a wire type that no transport yet
+exercises (FROST round-2 packages), and two sweeps come back clean in ways worth
+preserving.**
 
 ## U1. High: the rejection-provenance disease is TCB-wide, not a quarantine problem
 
@@ -110,6 +112,52 @@ and it is not yet confirmed that `package_hex` holds ciphertext rather than a
 plaintext share. Confirming it is H7's first task; until then this is an open
 question, not a finding.
 
+## U8. Medium: FROST round-2 DKG packages are authenticated but not confidential as a type
+
+Following U5 to its answer. `chio-federation-authority/src/frost_ceremony.rs:348`
+calls `dkg::part2` and, for each recipient, wraps `package.serialize()` in
+`FrostAuthenticatedDkgPackage` through `authenticated_package(&context,
+FrostDkgRound::Round2, Some(recipient), bytes, transport_key)` (`:356-362`). The
+transport key **signs** the package (`transport_signature`); nothing encrypts it.
+`package_hex` is `hex::encode(package_bytes)` (`:37`), and the struct derives
+`Serialize`.
+
+What a round-2 package is, from the library: frost-core's
+`keys::dkg::round2::Package` holds `signing_share: SigningShare` (`dkg.rs:230-246`
+in the vendored source). It is the recipient's secret signing share, and
+frost-core's documentation requires round-2 packages to travel over a channel that
+is both authenticated and confidential.
+
+**What is right.** At rest, the ceremony store keeps the participant's own secret
+and each round's output as `EncryptedBlob`s with associated data
+(`frost_store/ceremony.rs:24, :42-43`; `schema.rs:28` `secret_ciphertext BLOB NOT
+NULL`). The design document states that key shares must not reach the coordinator.
+The field is `Zeroizing`, so the author knew it was sensitive in memory. Round-1
+packages are public commitments and are correctly plaintext.
+
+**What is missing.** The wire type does not enforce the confidentiality the
+protocol requires. Today no route, CLI command or IPC path in this tree serializes
+a round-2 package to another participant, so there is no live exposure to report.
+The gap is that the first transport someone adds (an operator export file, an HTTP
+route, a relay through the coordinator) inherits a plaintext signing share
+silently, because the type permits it. This is the design document's mechanism B
+in the wrong direction: the struct makes the unsafe state representable.
+
+**Fix.** Encrypt round-2 `package_bytes` to the recipient's transport key inside
+`authenticated_package` when `round == Round2`, so `package_hex` carries
+ciphertext for round 2 and plaintext only for round 1; the `transport_key_id`
+field already identifies the key, and HPKE or X25519 with an AEAD bound to the
+same associated data the store uses is the natural choice. Better still, split the
+types: `FrostRound1Package` (public, `Serialize`) and `SealedFrostRound2Package`
+(ciphertext, `Serialize`), with the plaintext round-2 form never implementing
+`Serialize` at all. Add a test that serializes a round-2 package and asserts the
+signing-share bytes do not appear in the output. Hardening item H7 now carries this
+as its first task.
+
+**Confidence:** high on the code path and the library type, both read directly.
+The absence of an in-tree transport was established by search, not proof; a
+transport in a companion repository would change the severity to a P1.
+
 ## U6. Clean, with the reason recorded: async cancellation across durable writes
 
 Seven `tokio::select!` sites and 29 `tokio::time::timeout` wrappers in TCB
@@ -135,7 +183,8 @@ target directory is at 2.3G with 259G free.
 
 ## What changed in the documents
 
-Hardening spec: H1 and H7 carry the measured figures above; H10 records the
-cross-crate count; H11 (dependency budget for privileged helpers) is new.
+Hardening spec: H1 and H7 carry the measured figures above, and H7's first task
+is U8's fix; H10 records the cross-crate count; H11 (dependency budget for
+privileged helpers) is new.
 Unrepresentable-defects design: mechanism C states its TCB-wide scope. Dispatch:
 Lane K gains H11.

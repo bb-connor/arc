@@ -262,11 +262,15 @@ there is no `Display`, no `Serialize` without an explicit opt-in, and access is
 through `expose_secret()`, which is greppable. The inventory, measured: **8 structs** carry a `Zeroizing` field and derive `Clone`
 or `Serialize`; none derives `Debug`. Seven derive `Clone` only (six external-guard
 configurations holding API keys, and `DualSignReleaseInput`), which `Zeroizing`
-tolerates because clones zeroize on drop. One, `FrostAuthenticatedDkgPackage` in
-`chio-federation-authority`, derives **`Serialize`** on key-generation material;
-whether that field is encrypted for its recipient before serialization or written
-as plaintext decides whether this is a wire leak or a deliberate transport, and is
-checked before H7 touches it.
+tolerates because clones zeroize on drop. One, `FrostAuthenticatedDkgPackage` in `chio-federation-authority`, derives
+**`Serialize`** on key-generation material, and pass 8 confirmed (finding U8) that
+for round 2 the field is the recipient's secret signing share, hex-encoded, signed
+by the transport key and not encrypted. No in-tree transport serializes it yet, so
+there is no live exposure; the type permits one. H7's first task is therefore not
+`secrecy` but sealing: encrypt round-2 package bytes to the recipient's transport
+key inside `authenticated_package`, or split the type so the plaintext round-2 form
+never implements `Serialize`, with a test asserting the share bytes are absent from
+the serialized output.
 
 **Acceptance.** No secret-bearing struct derives `Debug` or `Serialize` on the
 secret field; `expose_secret()` call sites are the complete inventory of where
