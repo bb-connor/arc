@@ -9,7 +9,8 @@ pub mod scheduler;
 pub mod state_machine;
 
 pub use approval::{
-    opaque_admission_artifact, ApprovalCoordinatorError, ResponseApprovalCoordinator,
+    opaque_admission_artifact, AdmissionArtifactDefect, ApprovalCoordinatorError,
+    ResponseApprovalCoordinator,
 };
 pub use blast::{CausalBlastRadiusResolver, FenceValidationOutcome};
 pub use correlation::{

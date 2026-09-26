@@ -1322,9 +1322,9 @@ fn map_approval_coordinator_error(error: ApprovalCoordinatorError) -> PortError 
         }
         ApprovalCoordinatorError::AutomaticPlan
         | ApprovalCoordinatorError::InvalidRequest
-        | ApprovalCoordinatorError::InvalidAdmissionArtifact
+        | ApprovalCoordinatorError::InvalidAdmissionArtifact(_)
         | ApprovalCoordinatorError::InvalidReservation
-        | ApprovalCoordinatorError::Canonical => PortError::integrity_failure(),
+        | ApprovalCoordinatorError::Canonical(_) => PortError::integrity_failure(),
     }
 }
 

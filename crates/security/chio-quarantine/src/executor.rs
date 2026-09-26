@@ -7,6 +7,8 @@ mod error;
 
 pub use error::ExecutorError;
 
+use crate::state_machine::CanonicalFailure;
+
 use crate::native_receipts::{
     latest_response_receipt, receipt_append_request, response_receipt_for_mutation,
 };
@@ -357,8 +359,7 @@ impl<
                 validate_dispatch_authorization_proof(&current_snapshot, authorization)
             })
             .transpose()?;
-        let completion =
-            latest_response_receipt(&snapshot).map_err(|_| ExecutorError::Canonical)?;
+        let completion = latest_response_receipt(&snapshot).map_err(CanonicalFailure::Receipt)?;
         match &completion {
             chio_core_types::receipt::security::ActiveDefenseReceiptBody::ResponseCompletion(
                 _,
@@ -369,7 +370,7 @@ impl<
             _ => return Err(ExecutorError::InvalidActiveEvidence),
         }
         let completion_receipt_request =
-            receipt_append_request(&completion).map_err(|_| ExecutorError::Canonical)?;
+            receipt_append_request(&completion).map_err(CanonicalFailure::Receipt)?;
         let completion_evidence_id = completion_receipt_request.evidence_id.clone();
         let completion_body_hash = completion_receipt_request.body_hash;
         let failure = match outcome {
@@ -1387,9 +1388,9 @@ fn encode_effect_record(
     scheduler_fencing_token: u64,
     encrypted_rollback_ref: Option<RecordId>,
 ) -> Result<ResponseEffectRecord, ExecutorError> {
-    let canonical = canonical_json_bytes(journal).map_err(|_| ExecutorError::Canonical)?;
+    let canonical = canonical_json_bytes(journal).map_err(CanonicalFailure::Encoding)?;
     let body_hash = Digest32::new(*sha256(&canonical).as_bytes());
-    let canonical_body = CanonicalBody::new(canonical).map_err(|_| ExecutorError::Canonical)?;
+    let canonical_body = CanonicalBody::new(canonical).map_err(CanonicalFailure::Body)?;
     Ok(ResponseEffectRecord {
         tenant_id: journal.tenant_id.clone(),
         action_id: journal.action_id.clone(),
@@ -1431,11 +1432,11 @@ fn effect_command_id(
             attempt,
         },
     )?;
-    RecordId::new(format!(
+    Ok(RecordId::new(format!(
         "response_effect_command:{}",
         hex_bytes(digest.as_bytes())
     ))
-    .map_err(|_| ExecutorError::Canonical)
+    .map_err(CanonicalFailure::Identifier)?)
 }
 
 #[derive(Serialize)]
@@ -1507,8 +1508,7 @@ fn validate_receipt_cursor(
     initial: &ResponseReceiptCursor,
     snapshot: &ResponseSnapshot,
 ) -> Result<(), ExecutorError> {
-    let generation =
-        usize::try_from(cursor.generation).map_err(|_| ExecutorError::ReceiptLineageMismatch)?;
+    let generation = usize::try_from(cursor.generation).map_err(ExecutorError::GenerationWidth)?;
     if cursor.tenant_id != initial.tenant_id
         || cursor.action_id != initial.action_id
         || cursor.plan_hash != initial.plan_hash
@@ -1521,11 +1521,11 @@ fn validate_receipt_cursor(
     } else if generation == snapshot.mutations.len() {
         latest_response_receipt(snapshot)
             .and_then(|body| body.evidence_id())
-            .map_err(|_| ExecutorError::Canonical)?
+            .map_err(CanonicalFailure::Receipt)?
     } else {
         response_receipt_for_mutation(snapshot, generation - 1)
             .and_then(|body| body.evidence_id())
-            .map_err(|_| ExecutorError::Canonical)?
+            .map_err(CanonicalFailure::Receipt)?
     };
     if cursor.current_evidence_id != expected {
         return Err(ExecutorError::ReceiptLineageMismatch);
@@ -1539,12 +1539,14 @@ fn domain_record_id<T: Serialize>(
     value: &T,
 ) -> Result<RecordId, ExecutorError> {
     let digest = domain_hash(domain, value)?;
-    RecordId::new(format!("{prefix}_{}", hex_bytes(digest.as_bytes())))
-        .map_err(|_| ExecutorError::Canonical)
+    Ok(
+        RecordId::new(format!("{prefix}_{}", hex_bytes(digest.as_bytes())))
+            .map_err(CanonicalFailure::Identifier)?,
+    )
 }
 
 fn domain_hash<T: Serialize>(domain: &[u8], value: &T) -> Result<Digest32, ExecutorError> {
-    let canonical = canonical_json_bytes(value).map_err(|_| ExecutorError::Canonical)?;
+    let canonical = canonical_json_bytes(value).map_err(CanonicalFailure::Encoding)?;
     let mut input = Vec::with_capacity(domain.len() + canonical.len());
     input.extend_from_slice(domain);
     input.extend_from_slice(&canonical);
@@ -1552,11 +1554,11 @@ fn domain_hash<T: Serialize>(domain: &[u8], value: &T) -> Result<Digest32, Execu
 }
 
 fn record_id(value: &str) -> Result<RecordId, ExecutorError> {
-    RecordId::new(value).map_err(|_| ExecutorError::Canonical)
+    Ok(RecordId::new(value).map_err(CanonicalFailure::Identifier)?)
 }
 
 fn error_code(value: &str) -> Result<ErrorCode, ExecutorError> {
-    ErrorCode::new(value).map_err(|_| ExecutorError::Canonical)
+    Ok(ErrorCode::new(value).map_err(CanonicalFailure::Identifier)?)
 }
 
 fn valid_effect_result(result: &EffectResult, effect_id: &EffectId, applied: bool) -> bool {

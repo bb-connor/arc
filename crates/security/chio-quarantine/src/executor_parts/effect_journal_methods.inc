@@ -80,9 +80,9 @@ impl<
         record: &ResponseEffectRecord,
     ) -> Result<EffectJournal, ExecutorError> {
         let journal: EffectJournal = serde_json::from_slice(record.canonical_body.as_bytes())
-            .map_err(|_| ExecutorError::InvalidEffectJournal)?;
+            .map_err(ExecutorError::EffectJournalDecode)?;
         let canonical =
-            canonical_json_bytes(&journal).map_err(|_| ExecutorError::InvalidEffectJournal)?;
+            canonical_json_bytes(&journal).map_err(ExecutorError::EffectJournalEncoding)?;
         if canonical.as_slice() != record.canonical_body.as_bytes()
             || Digest32::new(*sha256(&canonical).as_bytes()) != record.body_hash
             || record.tenant_id != plan.tenant_id
@@ -236,7 +236,7 @@ impl<
         let snapshot = decode_response_record(plan_record)?;
         let expected = latest_response_receipt(&snapshot)
             .and_then(|body| body.evidence_id())
-            .map_err(|_| ExecutorError::Canonical)?;
+            .map_err(CanonicalFailure::Receipt)?;
         let cursor = self
             .store
             .load_receipt_cursor(&ResponsePlanKey {
@@ -257,8 +257,7 @@ impl<
             &snapshot,
         )?;
         if cursor.generation
-            != u64::try_from(snapshot.mutations.len())
-                .map_err(|_| ExecutorError::GenerationOverflow)?
+            != u64::try_from(snapshot.mutations.len()).map_err(ExecutorError::GenerationWidth)?
             || cursor.current_evidence_id != expected
         {
             return Err(ExecutorError::ReceiptLineageMismatch);
@@ -313,17 +312,17 @@ impl<
         validate_receipt_cursor(&cursor, &initial, snapshot)?;
 
         loop {
-            let mutation_index = usize::try_from(cursor.generation)
-                .map_err(|_| ExecutorError::GenerationOverflow)?;
+            let mutation_index =
+                usize::try_from(cursor.generation).map_err(ExecutorError::GenerationWidth)?;
             if mutation_index == snapshot.mutations.len() {
                 return Ok(());
             }
             let body = response_receipt_for_mutation(snapshot, mutation_index)
-                .map_err(|_| ExecutorError::Canonical)?;
+                .map_err(CanonicalFailure::Receipt)?;
             if body.header().prior_receipt_ids.as_slice() != [cursor.current_evidence_id.clone()] {
                 return Err(ExecutorError::ReceiptLineageMismatch);
             }
-            let request = receipt_append_request(&body).map_err(|_| ExecutorError::Canonical)?;
+            let request = receipt_append_request(&body).map_err(CanonicalFailure::Receipt)?;
             let appended = self
                 .receipts
                 .sign_and_append(&request)
