@@ -295,8 +295,9 @@ struct in the security crates. For the FROST round-2 package specifically: the
 immediate boundary is removing `Serialize` from the plaintext round-2 form;
 sealing is a separate design note (encryption key suite distinct from the
 signature key, recipient binding, authenticated metadata, decryption and replay
-tests), because encrypting to the existing transport *signature* key is not an
-envelope, per the external review.
+tests), because encrypting to the existing transport *signature* key is not an envelope,
+per the external review. The design note now exists:
+[FROST round-2 sealing design](2026-09-26-frost-round2-envelope-design.md).
 
 ### H8. `cargo-semver-checks` and `cargo-public-api` for the publishable crates
 

@@ -169,10 +169,12 @@ candidate**, not the frozen launch candidate: broad post-freeze structural work
 would otherwise invalidate the qualification. Two further lanes open here per the
 hardening spec: a seeded deterministic scheduler over the store and broker actors,
 which depends on correction 4A's clock port, and a Hegel pilot on the SDK-parity
-surface only. H7's FROST round-2 envelope needs a design note (key suite distinct
-from the signature key, recipient binding, metadata authentication, replay) before
-it is a lane; removing `Serialize` from the plaintext round-2 form is the immediate
-boundary and may land earlier. H8 semver follows here as well.
+surface only. H7's FROST round-2 envelope has its design note
+([sealing design](../specs/2026-09-26-frost-round2-envelope-design.md): X25519 sealing
+keys separate from the Ed25519 transport keys, HKDF-SHA256, ChaCha20-Poly1305,
+encrypt-then-sign over one canonical metadata string, per-ceremony replay rule);
+its step 1, the type split that removes `Serialize` from the plaintext round-2
+form, may land earlier than the lane. H8 semver follows here as well.
 
 ## The brief every lane receives
 
