@@ -6,62 +6,81 @@ use rusqlite::functions::{Aggregate, Context, FunctionFlags};
 use rusqlite::types::ValueRef;
 use rusqlite::ToSql;
 
-/// SQL name of the aggregate that totals the charged-cost projection.
 const TOTAL_COST_CHARGED: &str = "chio_total_cost_charged";
-
-/// Width of the `cost_charged_be` projection the receipt append path writes.
-const COST_CHARGED_BYTES: usize = 8;
-
-/// Width the charged-cost aggregate returns its running total in.
+const TOTAL_ATTEMPTED_COST: &str = "chio_total_attempted_cost";
+const COST_BYTES: usize = 8;
 const COST_TOTAL_BYTES: usize = 16;
-
-/// Refusal when the charges in scope total more than the report's metrics carry.
 const COST_TOTAL_UNREPORTABLE: &str =
     "receipt analytics charged-cost total exceeds the reportable range";
+const ATTEMPTED_COST_TOTAL_UNREPORTABLE: &str =
+    "receipt analytics attempted-cost total exceeds the reportable range";
 
-/// Receipts one analytics report may aggregate.
-///
-/// No rollup table stands behind this report, so each of its four dimensions
-/// visits every matching receipt and parses its JSON once for the attempted
-/// cost. At the cost this lane measured, around 22 microseconds of report time
-/// per receipt across the four dimensions, this ceiling puts the slowest
-/// accepted report in the seconds and makes a whole-table request an error that
-/// names the filters that bound it.
+/// Each dimension visits every matching receipt. Bound the snapshot and scan
+/// work until a separately verified rollup is available; filters narrow it.
 const MAX_ANALYTICS_RECEIPT_SCAN: i64 = 250_000;
 
-/// Totals the eight-byte big-endian charged-cost projection.
-///
-/// SQLite arithmetic is signed 64-bit and degrades silently to floating point on
-/// overflow, so no SQL expression can sum the unsigned charge domain exactly.
-/// The running total is a `u128` here and comes back as a big-endian blob the
-/// report decodes. A NULL projection is a receipt with no financial block and
-/// contributes nothing; any other width violates the column's `CHECK`
-/// constraint and refuses rather than contributing a wrong number to a financial
-/// report.
-struct TotalCostCharged;
+#[derive(Clone, Copy)]
+enum CostMetric {
+    Charged,
+    Attempted,
+}
 
-impl Aggregate<u128, Vec<u8>> for TotalCostCharged {
+impl CostMetric {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Charged => "charged-cost",
+            Self::Attempted => "attempted-cost",
+        }
+    }
+
+    fn refusal(self) -> &'static str {
+        match self {
+            Self::Charged => COST_TOTAL_UNREPORTABLE,
+            Self::Attempted => ATTEMPTED_COST_TOTAL_UNREPORTABLE,
+        }
+    }
+}
+
+/// Sum exact eight-byte unsigned projections in u128. SQLite's signed integer
+/// and floating-point arithmetic cannot represent the receipt's full domain.
+/// NULL contributes zero; malformed storage refuses the report.
+struct TotalCost(CostMetric);
+
+impl Aggregate<u128, Vec<u8>> for TotalCost {
     fn init(&self, _context: &mut Context<'_>) -> rusqlite::Result<u128> {
         Ok(0)
     }
 
     fn step(&self, context: &mut Context<'_>, total: &mut u128) -> rusqlite::Result<()> {
-        let charged = match context.get_raw(0) {
+        let amount = match context.get_raw(0) {
             ValueRef::Null => 0,
-            ValueRef::Blob(projection) => decode_cost_charged(projection)?,
+            ValueRef::Blob(projection) => {
+                let bytes: [u8; COST_BYTES] = projection.try_into().map_err(|_| {
+                    rusqlite::Error::UserFunctionError(
+                        format!(
+                            "{} projection is {} bytes, not {COST_BYTES}",
+                            self.0.label(),
+                            projection.len()
+                        )
+                        .into(),
+                    )
+                })?;
+                u128::from(u64::from_be_bytes(bytes))
+            }
             other => {
                 return Err(rusqlite::Error::UserFunctionError(
                     format!(
-                        "charged-cost projection is {:?}, not a blob",
+                        "{} projection is {:?}, not a blob",
+                        self.0.label(),
                         other.data_type()
                     )
                     .into(),
-                ))
+                ));
             }
         };
         *total = total
-            .checked_add(charged)
-            .ok_or_else(|| rusqlite::Error::UserFunctionError(COST_TOTAL_UNREPORTABLE.into()))?;
+            .checked_add(amount)
+            .ok_or_else(|| rusqlite::Error::UserFunctionError(self.0.refusal().into()))?;
         Ok(())
     }
 
@@ -74,37 +93,30 @@ impl Aggregate<u128, Vec<u8>> for TotalCostCharged {
     }
 }
 
-fn decode_cost_charged(projection: &[u8]) -> rusqlite::Result<u128> {
-    let charged: [u8; COST_CHARGED_BYTES] = projection.try_into().map_err(|_| {
-        rusqlite::Error::UserFunctionError(
-            format!(
-                "charged-cost projection is {} bytes, not {COST_CHARGED_BYTES}",
-                projection.len()
-            )
-            .into(),
-        )
-    })?;
-    Ok(u128::from(u64::from_be_bytes(charged)))
-}
-
-/// The charged-cost total, refused rather than truncated when the receipts in
-/// scope total more than the report's `u64` metric holds.
-fn decoded_cost_total(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<u64> {
+/// Refuse totals outside the public u64 metric instead of truncating them.
+fn decoded_cost_total(
+    row: &rusqlite::Row<'_>,
+    index: usize,
+    metric: CostMetric,
+) -> rusqlite::Result<u64> {
     let total = u128::from_be_bytes(row.get::<_, [u8; COST_TOTAL_BYTES]>(index)?);
     u64::try_from(total).map_err(|_| {
-        rusqlite::Error::UserFunctionError(format!("{COST_TOTAL_UNREPORTABLE}: {total}").into())
+        rusqlite::Error::UserFunctionError(format!("{}: {total}", metric.refusal()).into())
     })
 }
 
-/// Registered on the connection the report runs on, which keeps a SQL function
-/// that only this report uses out of the shared connection setup.
-fn register_total_cost_charged(connection: &Connection) -> Result<(), ReceiptStoreError> {
-    connection.create_aggregate_function(
-        TOTAL_COST_CHARGED,
-        1,
-        FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
-        TotalCostCharged,
-    )?;
+fn register_cost_aggregates(connection: &Connection) -> Result<(), ReceiptStoreError> {
+    for (name, metric) in [
+        (TOTAL_COST_CHARGED, CostMetric::Charged),
+        (TOTAL_ATTEMPTED_COST, CostMetric::Attempted),
+    ] {
+        connection.create_aggregate_function(
+            name,
+            1,
+            FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
+            TotalCost(metric),
+        )?;
+    }
     Ok(())
 }
 
@@ -120,8 +132,7 @@ fn metric_columns() -> String {
          COALESCE(SUM(CASE WHEN r.decision_kind = 'incomplete' THEN 1 ELSE 0 END), 0) \
          AS incomplete_count, \
          {TOTAL_COST_CHARGED}(r.cost_charged_be) AS total_cost_charged, \
-         COALESCE(SUM(CAST(COALESCE(json_extract(r.raw_json, \
-         '$.metadata.financial.attempted_cost'), 0) AS INTEGER)), 0) AS total_attempted_cost"
+         {TOTAL_ATTEMPTED_COST}(r.attempted_cost_be) AS total_attempted_cost"
     )
 }
 
@@ -135,8 +146,8 @@ fn metrics_from_row(
         row.get::<_, i64>(first + 2)?.max(0) as u64,
         row.get::<_, i64>(first + 3)?.max(0) as u64,
         row.get::<_, i64>(first + 4)?.max(0) as u64,
-        decoded_cost_total(row, first + 5)?,
-        row.get::<_, i64>(first + 6)?.max(0) as u64,
+        decoded_cost_total(row, first + 5, CostMetric::Charged)?,
+        decoded_cost_total(row, first + 6, CostMetric::Attempted)?,
     ))
 }
 
@@ -397,7 +408,7 @@ impl SqliteReceiptStore {
         let scope = AnalyticsScope::from_query(query);
 
         let connection = self.connection()?;
-        register_total_cost_charged(&connection)?;
+        register_cost_aggregates(&connection)?;
         let snapshot = report_snapshot(&connection)?;
 
         let ceiling = receipt_ceiling.saturating_add(1);

@@ -8,6 +8,9 @@ use chio_core::receipt::body::ChioReceiptBody;
 use chio_core::receipt::decision::ToolCallAction;
 use chio_test_support::prelude::*;
 
+#[path = "analytics_tests/attempted_cost.rs"]
+mod attempted_cost;
+
 /// Charged-cost aggregate the analytics queries carried before the typed
 /// projection replaced it. Kept here as the oracle the replacement is measured
 /// against: it is exact for every charged cost below `2^63`.
@@ -829,7 +832,7 @@ fn append_one_more(fixture: &Fixture, id: usize) {
 fn a_report_reads_one_snapshot_across_its_dimensions() {
     let fixture = populate("chio-analytics-snapshot", json_domain_receipts());
     let connection = fixture.store.connection().test_expect("reader connection");
-    register_total_cost_charged(&connection).test_expect("register charged-cost aggregate");
+    register_cost_aggregates(&connection).test_expect("register cost aggregates");
 
     let snapshot = report_snapshot(&connection).test_expect("report snapshot");
     let (summary, _) = summary_and_bucketed_totals(&snapshot);
@@ -908,7 +911,7 @@ fn is_receipt_table_scan(step: &str) -> bool {
 fn every_supported_analytics_filter_reaches_the_receipts_through_an_index() {
     let fixture = populate("chio-analytics-query-plan", json_domain_receipts());
     let connection = fixture.store.connection().test_expect("reader connection");
-    register_total_cost_charged(&connection).test_expect("register charged-cost aggregate");
+    register_cost_aggregates(&connection).test_expect("register cost aggregates");
 
     for (shape, query, _) in filter_shapes() {
         if shape == "unfiltered" {

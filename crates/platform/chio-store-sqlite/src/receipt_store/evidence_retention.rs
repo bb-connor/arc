@@ -1003,6 +1003,11 @@ pub(super) fn create_archive_schema(
                     typeof(cost_charged_be) = 'blob' AND
                     length(cost_charged_be) = 8
                 )
+            ),
+            attempted_cost_be BLOB CHECK (
+                attempted_cost_be IS NULL OR (
+                    typeof(attempted_cost_be) = 'blob' AND length(attempted_cost_be) = 8
+                )
             )
         );
         CREATE TABLE IF NOT EXISTS archive.chio_child_receipts (
@@ -1113,8 +1118,11 @@ pub(super) fn create_archive_schema(
             "retention archive sink identity is not canonical".to_owned(),
         ));
     }
-    if archive_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION {
-        migrate_archive_receipt_cost_projection(&transaction)?;
+    if archive_schema_version < RECEIPT_ATTEMPTED_COST_SCHEMA_VERSION {
+        migrate_archive_receipt_cost_projection(
+            &transaction,
+            archive_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION,
+        )?;
     }
     verify_archive_receipt_cost_projection(&transaction)?;
     for (column, definition) in [
@@ -1209,10 +1217,10 @@ pub(super) fn copy_archived_prefix(
         INSERT OR IGNORE INTO archive.chio_tool_receipts
             (seq, receipt_id, timestamp, capability_id, subject_key, issuer_key,
              grant_index, tool_server, tool_name, decision_kind, policy_hash,
-             content_hash, raw_json, tenant_id, cost_currency, cost_charged_be)
+             content_hash, raw_json, tenant_id, cost_currency, cost_charged_be, attempted_cost_be)
             SELECT seq, receipt_id, timestamp, capability_id, subject_key, issuer_key,
                    grant_index, tool_server, tool_name, decision_kind, policy_hash,
-                   content_hash, raw_json, tenant_id, cost_currency, cost_charged_be
+                   content_hash, raw_json, tenant_id, cost_currency, cost_charged_be, attempted_cost_be
             FROM main.chio_tool_receipts WHERE seq IN (
                 SELECT source_seq FROM main.claim_receipt_log_entries
                 WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
@@ -1349,7 +1357,8 @@ fn verify_co_archival_complete(
                  AND a.content_hash IS m.content_hash AND a.raw_json IS m.raw_json \
                  AND a.tenant_id IS m.tenant_id \
                  AND a.cost_currency IS m.cost_currency \
-                 AND a.cost_charged_be IS m.cost_charged_be)"
+                 AND a.cost_charged_be IS m.cost_charged_be
+                 AND a.attempted_cost_be IS m.attempted_cost_be)"
             ),
         ),
         (

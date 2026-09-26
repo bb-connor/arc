@@ -583,7 +583,7 @@ fn receipt_cost_projection_migration_rolls_back_malformed_receipt(
     )?;
     let migration =
         connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-    let error = match migrate_receipt_cost_projection(&migration) {
+    let error = match migrate_receipt_cost_projection(&migration, true) {
         Ok(()) => {
             return Err(std::io::Error::other("malformed receipt migration succeeded").into())
         }
@@ -625,7 +625,7 @@ fn receipt_cost_projection_migration_rolls_back_divergent_projection(
     )?;
     let migration =
         connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-    let error = match migrate_receipt_cost_projection(&migration) {
+    let error = match migrate_receipt_cost_projection(&migration, true) {
         Ok(()) => {
             return Err(std::io::Error::other("divergent projection migration succeeded").into())
         }

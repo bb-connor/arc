@@ -15,6 +15,11 @@ const RECEIPT_COST_KEY_COLUMN: &str = r#"cost_charged_be BLOB CHECK (
         length(cost_charged_be) = 8
     )
 )"#;
+const RECEIPT_ATTEMPTED_COST_COLUMN: &str = r#"attempted_cost_be BLOB CHECK (
+    attempted_cost_be IS NULL OR (
+        typeof(attempted_cost_be) = 'blob' AND length(attempted_cost_be) = 8
+    )
+)"#;
 const RECEIPT_COST_INDEX_SQL: &str = "CREATE INDEX IF NOT EXISTS \
     idx_chio_tool_receipts_cost ON \
     chio_tool_receipts(tenant_id, cost_currency, cost_charged_be, seq)";
@@ -32,7 +37,8 @@ CREATE TABLE chio_tool_receipts (
     seq INTEGER,
     tenant_id TEXT,
     cost_currency TEXT,
-    cost_charged_be BLOB
+    cost_charged_be BLOB,
+    attempted_cost_be BLOB
 );
 CREATE TABLE chio_child_receipts (id INTEGER);
 CREATE TABLE claim_receipt_log_entries (id INTEGER);
@@ -50,18 +56,25 @@ struct ReceiptCostSchemaObject {
     sql: String,
 }
 
+#[derive(Default)]
+pub(crate) struct ReceiptCostProjection {
+    pub(crate) currency: Option<String>,
+    pub(crate) charged: Option<Vec<u8>>,
+    pub(crate) attempted: Option<Vec<u8>>,
+}
+
 pub(crate) fn receipt_cost_projection(
     receipt: &ChioReceipt,
-) -> Result<(Option<String>, Option<Vec<u8>>), ReceiptStoreError> {
+) -> Result<ReceiptCostProjection, ReceiptStoreError> {
     let Some(financial) = receipt
         .metadata
         .as_ref()
         .and_then(|metadata| metadata.get("financial"))
     else {
-        return Ok((None, None));
+        return Ok(ReceiptCostProjection::default());
     };
     if financial.is_null() {
-        return Ok((None, None));
+        return Ok(ReceiptCostProjection::default());
     }
     let financial =
         serde_json::from_value::<FinancialReceiptMetadata>(financial.clone()).map_err(|error| {
@@ -81,14 +94,18 @@ pub(crate) fn receipt_cost_projection(
             receipt.id
         )));
     }
-    Ok((
-        Some(financial.currency),
-        Some(financial.cost_charged.to_be_bytes().to_vec()),
-    ))
+    Ok(ReceiptCostProjection {
+        currency: Some(financial.currency),
+        charged: Some(financial.cost_charged.to_be_bytes().to_vec()),
+        attempted: financial
+            .attempted_cost
+            .map(|cost| cost.to_be_bytes().to_vec()),
+    })
 }
 
 pub(crate) fn migrate_receipt_cost_projection(
     transaction: &rusqlite::Transaction<'_>,
+    backfill_charged: bool,
 ) -> Result<(), ReceiptStoreError> {
     migrate_receipt_cost_projection_table(
         transaction,
@@ -97,6 +114,7 @@ pub(crate) fn migrate_receipt_cost_projection(
         RECEIPT_COST_INDEX_SQL,
         RECEIPT_GLOBAL_COST_INDEX_SQL,
         "tool receipt cost projection migration",
+        backfill_charged,
     )
 }
 
@@ -120,12 +138,21 @@ pub(crate) fn audit_receipt_cost_projection(
         "chio_tool_receipts",
         "persisted tool receipt cost projection",
         false,
+        false,
     )
 }
 
 pub(crate) fn migrate_archive_receipt_cost_projection(
     transaction: &rusqlite::Transaction<'_>,
+    backfill_charged: bool,
 ) -> Result<(), ReceiptStoreError> {
+    // An archive inspected through open_existing has the canonical update and
+    // delete guards. Remove only its update guard inside this transaction, then
+    // restore the same verified definition before the migration commits.
+    let update_guard = archive_receipt_update_guard(transaction)?;
+    if update_guard.is_some() {
+        transaction.execute_batch("DROP TRIGGER archive.chio_tool_receipts_reject_update")?;
+    }
     migrate_receipt_cost_projection_table(
         transaction,
         "archive.chio_tool_receipts",
@@ -133,7 +160,16 @@ pub(crate) fn migrate_archive_receipt_cost_projection(
         ARCHIVE_RECEIPT_COST_INDEX_SQL,
         ARCHIVE_RECEIPT_GLOBAL_COST_INDEX_SQL,
         "archived tool receipt cost projection migration",
-    )
+        backfill_charged,
+    )?;
+    if let Some(sql) = update_guard {
+        transaction.execute_batch(&sql.replacen(
+            "CREATE TRIGGER ",
+            "CREATE TRIGGER archive.",
+            1,
+        ))?;
+    }
+    Ok(())
 }
 
 pub(crate) fn verify_archive_receipt_cost_projection(
@@ -144,8 +180,33 @@ pub(crate) fn verify_archive_receipt_cost_projection(
         "archive.sqlite_schema",
         "PRAGMA archive.table_info(chio_tool_receipts)",
         "SELECT sql FROM archive.sqlite_schema WHERE type = 'table' AND name = 'chio_tool_receipts'",
-        false,
+        archive_receipt_update_guard(connection)?.is_some(),
     )
+}
+
+/// Archives may be uninspected (no receipt guards) or inspected (both exact
+/// guards). A partial or substituted set is neither state and fails closed.
+fn archive_receipt_update_guard(
+    connection: &Connection,
+) -> Result<Option<String>, ReceiptStoreError> {
+    let actual = receipt_cost_schema_catalog(connection, "archive.sqlite_schema")?
+        .into_iter()
+        .filter(|object| object.object_type == "trigger")
+        .collect::<Vec<_>>();
+    if actual.is_empty() {
+        return Ok(None);
+    }
+    let reference = Connection::open_in_memory()?;
+    reference.execute_batch(RECEIPT_COST_REFERENCE_SCHEMA)?;
+    ensure_transparency_projection_guards(&reference)?;
+    let expected = receipt_cost_schema_catalog(&reference, "sqlite_schema")?;
+    if actual != expected {
+        return Err(receipt_cost_schema_error());
+    }
+    Ok(actual
+        .into_iter()
+        .find(|object| object.name == "chio_tool_receipts_reject_update")
+        .map(|object| object.sql))
 }
 
 fn verify_receipt_cost_projection_schema(
@@ -161,10 +222,16 @@ fn verify_receipt_cost_projection_schema(
             Ok((row.get::<_, String>(1)?, row.get::<_, String>(2)?))
         })?
         .collect::<Result<Vec<_>, _>>()?;
-    columns.retain(|(name, _)| name == "cost_currency" || name == "cost_charged_be");
+    columns.retain(|(name, _)| {
+        matches!(
+            name.as_str(),
+            "cost_currency" | "cost_charged_be" | "attempted_cost_be"
+        )
+    });
     columns.sort();
     if columns
         != [
+            ("attempted_cost_be".to_string(), "BLOB".to_string()),
             ("cost_charged_be".to_string(), "BLOB".to_string()),
             ("cost_currency".to_string(), "TEXT".to_string()),
         ]
@@ -179,6 +246,7 @@ fn verify_receipt_cost_projection_schema(
     let normalized_table_sql = normalize_schema_sql(&table_sql);
     if !normalized_table_sql.contains(&normalize_schema_sql(RECEIPT_COST_CURRENCY_COLUMN))
         || !normalized_table_sql.contains(&normalize_schema_sql(RECEIPT_COST_KEY_COLUMN))
+        || !normalized_table_sql.contains(&normalize_schema_sql(RECEIPT_ATTEMPTED_COST_COLUMN))
     {
         return Err(receipt_cost_schema_error());
     }
@@ -242,11 +310,18 @@ fn migrate_receipt_cost_projection_table(
     create_index: &str,
     create_global_index: &str,
     context: &str,
+    backfill_charged: bool,
 ) -> Result<(), ReceiptStoreError> {
     let columns = transaction
         .prepare(table_info)?
         .query_map([], |row| row.get::<_, String>(1))?
         .collect::<Result<Vec<_>, _>>()?;
+    if !backfill_charged
+        && (!columns.iter().any(|column| column == "cost_currency")
+            || !columns.iter().any(|column| column == "cost_charged_be"))
+    {
+        return Err(receipt_cost_schema_error());
+    }
     if !columns.iter().any(|column| column == "cost_currency") {
         transaction.execute(
             &format!("ALTER TABLE {table} ADD COLUMN {RECEIPT_COST_CURRENCY_COLUMN}"),
@@ -260,7 +335,20 @@ fn migrate_receipt_cost_projection_table(
         )?;
     }
 
-    reconcile_receipt_cost_projection(transaction, table, context, true)?;
+    let backfill_attempted = !columns.iter().any(|column| column == "attempted_cost_be");
+    if backfill_attempted {
+        transaction.execute(
+            &format!("ALTER TABLE {table} ADD COLUMN {RECEIPT_ATTEMPTED_COST_COLUMN}"),
+            [],
+        )?;
+    }
+    reconcile_receipt_cost_projection(
+        transaction,
+        table,
+        context,
+        backfill_charged,
+        backfill_attempted,
+    )?;
     transaction.execute(create_index, [])?;
     transaction.execute(create_global_index, [])?;
     Ok(())
@@ -270,12 +358,13 @@ fn reconcile_receipt_cost_projection(
     connection: &Connection,
     table: &str,
     context: &str,
-    backfill_missing: bool,
+    backfill_charged: bool,
+    backfill_attempted: bool,
 ) -> Result<(), ReceiptStoreError> {
     let mut previous_seq = 0_i64;
     loop {
         let sql = format!(
-            "SELECT seq, raw_json, cost_currency, cost_charged_be FROM {table} \
+            "SELECT seq, raw_json, cost_currency, cost_charged_be, attempted_cost_be FROM {table} \
              WHERE seq > ?1 ORDER BY seq ASC LIMIT 1"
         );
         let row = connection
@@ -285,10 +374,11 @@ fn reconcile_receipt_cost_projection(
                     row.get::<_, String>(1)?,
                     row.get::<_, Option<String>>(2)?,
                     row.get::<_, Option<Vec<u8>>>(3)?,
+                    row.get::<_, Option<Vec<u8>>>(4)?,
                 ))
             })
             .optional()?;
-        let Some((seq, raw_json, existing_currency, existing_key)) = row else {
+        let Some((seq, raw_json, currency, charged, attempted)) = row else {
             break;
         };
         let receipt = decode_verified_chio_receipt(
@@ -296,28 +386,26 @@ fn reconcile_receipt_cost_projection(
             context,
             Some(sqlite_positive_u64(seq, "tool receipt source_seq")?),
         )?;
-        let (expected_currency, expected_key) = receipt_cost_projection(&receipt)?;
-        if existing_currency.is_none() && existing_key.is_none() {
-            if expected_currency.is_some() {
-                if backfill_missing {
-                    connection.execute(
-                        &format!(
-                            "UPDATE {table} SET cost_currency = ?1, cost_charged_be = ?2 WHERE seq = ?3"
-                        ),
-                        params![expected_currency.as_deref(), expected_key.as_deref(), seq],
-                    )?;
-                } else {
-                    return Err(ReceiptStoreError::Conflict(format!(
-                        "tool receipt `{}` already exists with different cost projection",
-                        receipt.id
-                    )));
-                }
-            }
-        } else if existing_currency != expected_currency || existing_key != expected_key {
+        let expected = receipt_cost_projection(&receipt)?;
+        let fill_charged = backfill_charged && currency.is_none() && charged.is_none();
+        // Only a newly added attempted-cost column can be filled. A preexisting
+        // projection must match the signed body, including absence versus zero.
+        if (!fill_charged && (currency != expected.currency || charged != expected.charged))
+            || (!backfill_attempted && attempted != expected.attempted)
+        {
             return Err(ReceiptStoreError::Conflict(format!(
                 "tool receipt `{}` already exists with different cost projection",
                 receipt.id
             )));
+        }
+        if fill_charged || backfill_attempted {
+            connection.execute(
+                &format!(
+                    "UPDATE {table} SET cost_currency = ?1, cost_charged_be = ?2, \
+                     attempted_cost_be = ?3 WHERE seq = ?4"
+                ),
+                params![expected.currency, expected.charged, expected.attempted, seq],
+            )?;
         }
         previous_seq = seq;
     }

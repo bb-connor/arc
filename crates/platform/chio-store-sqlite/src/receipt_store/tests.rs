@@ -1,3 +1,5 @@
+#[path = "tests/attempted_cost.rs"]
+mod attempted_cost;
 #[path = "tests/background_checkpoints.rs"]
 mod background_checkpoints;
 #[path = "tests/bootstrap.rs"]

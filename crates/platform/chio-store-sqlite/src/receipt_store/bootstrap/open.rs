@@ -573,6 +573,11 @@ impl SqliteReceiptStore {
                         typeof(cost_charged_be) = 'blob' AND
                         length(cost_charged_be) = 8
                     )
+                ),
+                attempted_cost_be BLOB CHECK (
+                    attempted_cost_be IS NULL OR (
+                        typeof(attempted_cost_be) = 'blob' AND length(attempted_cost_be) = 8
+                    )
                 )
             );
 
@@ -1511,8 +1516,11 @@ impl SqliteReceiptStore {
         super::support::backfill_provenance_lineage_tables(&schema_migration)?;
         super::support::backfill_claim_receipt_log_entries(&schema_migration)?;
         super::support::backfill_checkpoint_transparency_projections(&schema_migration)?;
-        if on_disk_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION {
-            migrate_receipt_cost_projection(&schema_migration)?;
+        if on_disk_schema_version < RECEIPT_ATTEMPTED_COST_SCHEMA_VERSION {
+            migrate_receipt_cost_projection(
+                &schema_migration,
+                on_disk_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION,
+            )?;
         }
         super::support::ensure_transparency_projection_guards(&schema_migration)?;
         verify_receipt_cost_projection(&schema_migration)?;
