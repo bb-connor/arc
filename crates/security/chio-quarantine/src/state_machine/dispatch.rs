@@ -20,7 +20,7 @@ use chio_security_types::{
 use super::{
     encode_response_record, encode_response_record_with_mode, latest_evidence_id, push_mutation,
     request_id, transition_due_at, transition_mutation, validate_plan, validate_transition_request,
-    ResponseTransitionRequest, StateMachineError, TransitionMutationContext,
+    CanonicalFailure, ResponseTransitionRequest, StateMachineError, TransitionMutationContext,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -131,7 +131,7 @@ pub fn prepare_response_dispatch(
         occurred_at_unix_ms: plan.created_at_unix_ms,
     });
     let mutations =
-        ResponseMutationLog::new(vec![requested]).map_err(|_| StateMachineError::MutationLimit)?;
+        ResponseMutationLog::new(vec![requested]).map_err(StateMachineError::MutationLimit)?;
     let execution_dispatch = ResponseExecutionDispatchBinding {
         schema_version: RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION,
         tenant_id: plan.tenant_id.clone(),
@@ -193,10 +193,10 @@ pub fn prepare_response_dispatch(
         authorized_at_unix_ms,
     };
     let authorization_bytes =
-        canonical_json_bytes(&authorization_body).map_err(|_| StateMachineError::Canonical)?;
+        canonical_json_bytes(&authorization_body).map_err(CanonicalFailure::Encoding)?;
     let authorization_hash = Digest32::new(*sha256(&authorization_bytes).as_bytes());
     let canonical_authorization =
-        CanonicalBody::new(authorization_bytes).map_err(|_| StateMachineError::Canonical)?;
+        CanonicalBody::new(authorization_bytes).map_err(CanonicalFailure::Body)?;
     snapshot.dispatch_authorization_hash = Some(authorization_hash);
     let response_plan = encode_response_record(&snapshot)?;
     Ok(ResponseDispatchCommitRequest {

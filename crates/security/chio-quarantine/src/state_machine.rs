@@ -16,8 +16,7 @@ use chio_security_types::{
     ResponseFailureRecord, ResponseFinalRecord, ResponseMutationLog, ResponseMutationRecord,
     ResponsePlan, ResponsePlanInput, ResponseRequestedRecord, ResponseRollbackOutcome,
     ResponseRollbackRecord, ResponseSnapshot, ResponseState, ResponseTransitionCause,
-    ResponseTransitionRecord, MAX_RESPONSE_EFFECTS, MAX_RESPONSE_MUTATIONS,
-    RESPONSE_STATE_SCHEMA_VERSION,
+    ResponseTransitionRecord, MAX_RESPONSE_EFFECTS, RESPONSE_STATE_SCHEMA_VERSION,
 };
 use serde::Serialize;
 use std::sync::Arc;
@@ -29,7 +28,9 @@ mod error;
 
 pub(crate) use dispatch::encode_normalized_dispatch_response_record;
 pub use dispatch::{prepare_response_dispatch, ResponseDispatchPreparationRequest};
-pub use error::StateMachineError;
+pub use error::{
+    CanonicalFailure, FreezeBindingField, PlanDefect, RecordDefect, StateMachineError,
+};
 
 const EFFECT_ID_DOMAIN: &[u8] = b"chio.response-effect.v1\0";
 const REQUEST_ID_DOMAIN: &[u8] = b"chio.response-request.v1\0";
@@ -113,7 +114,7 @@ impl<S: ResponseStore + ?Sized> ResponseStateMachine<S> {
                 occurred_at_unix_ms: plan.created_at_unix_ms,
             },
         )])
-        .map_err(|_| StateMachineError::MutationLimit)?;
+        .map_err(StateMachineError::MutationLimit)?;
         let snapshot = ResponseSnapshot {
             schema_version: RESPONSE_STATE_SCHEMA_VERSION,
             execution_dispatch: None,
@@ -545,7 +546,7 @@ impl<S: ResponseSchedulerStore + ?Sized> ResponseStateMachine<S> {
         }
         let current_expiry = snapshot
             .applying_lease_expires_at_unix_ms
-            .ok_or(StateMachineError::InvalidRecord)?;
+            .ok_or(RecordDefect::MissingApplyingLease)?;
         let renewed_expiry = work
             .lease_expires_at_unix_ms
             .min(snapshot.plan.expires_at_unix_ms);
@@ -586,24 +587,30 @@ impl<S: ResponseSchedulerStore + ?Sized> ResponseStateMachine<S> {
 }
 
 pub fn build_response_plan(input: ResponsePlanInput) -> Result<ResponsePlan, StateMachineError> {
-    if input.effects.is_empty() || input.effects.len() > MAX_RESPONSE_EFFECTS {
-        return Err(StateMachineError::InvalidPlan);
+    if input.effects.is_empty() {
+        return Err(PlanDefect::NoEffects.into());
+    }
+    if input.effects.len() > MAX_RESPONSE_EFFECTS {
+        return Err(PlanDefect::TooManyEffects {
+            count: input.effects.len(),
+            bound: MAX_RESPONSE_EFFECTS,
+        }
+        .into());
     }
     if input.ttl_ms == 0 {
-        return Err(StateMachineError::InvalidPlan);
+        return Err(PlanDefect::ZeroTtl.into());
     }
     let expires_at_unix_ms = input
         .created_at_unix_ms
         .checked_add(input.ttl_ms)
-        .ok_or(StateMachineError::InvalidPlan)?;
-    let affected_ids =
-        RecordIdSet::new(input.affected_ids).map_err(|_| StateMachineError::InvalidPlan)?;
+        .ok_or(PlanDefect::ExpiryOverflow)?;
+    let affected_ids = RecordIdSet::new(input.affected_ids).map_err(PlanDefect::AffectedIds)?;
     let affected_set_hash = response_affected_set_hash(&input.tenant_id, &affected_ids)
-        .map_err(|_| StateMachineError::InvalidPlan)?;
+        .map_err(PlanDefect::AffectedSetHash)?;
     let mut effects = Vec::with_capacity(input.effects.len());
     for (index, spec) in input.effects.into_iter().enumerate() {
         validate_effect_contribution(&spec.canonical_contribution, &spec.contribution_hash)?;
-        let ordinal = u16::try_from(index).map_err(|_| StateMachineError::InvalidPlan)?;
+        let ordinal = u16::try_from(index).map_err(PlanDefect::EffectOrdinalOverflow)?;
         let effect_id = derive_effect_id(&input.action_id, ordinal, &spec)?;
         effects.push(PlannedResponseEffect {
             effect_id,
@@ -615,8 +622,7 @@ pub fn build_response_plan(input: ResponsePlanInput) -> Result<ResponsePlan, Sta
             observed_base_version_hash: spec.observed_base_version_hash,
         });
     }
-    let effects =
-        PlannedResponseEffects::new(effects).map_err(|_| StateMachineError::InvalidPlan)?;
+    let effects = PlannedResponseEffects::new(effects).map_err(PlanDefect::EffectBound)?;
     let mut plan = ResponsePlan {
         execution: Some(input.execution),
         action_id: input.action_id,
@@ -646,18 +652,29 @@ pub fn build_response_plan(input: ResponsePlanInput) -> Result<ResponsePlan, Sta
 pub fn decode_response_record(
     record: &ResponsePlanRecord,
 ) -> Result<ResponseSnapshot, StateMachineError> {
-    let snapshot: ResponseSnapshot = serde_json::from_slice(record.canonical_body.as_bytes())
-        .map_err(|_| StateMachineError::InvalidRecord)?;
-    let canonical = canonical_json_bytes(&snapshot).map_err(|_| StateMachineError::Canonical)?;
-    if canonical.as_slice() != record.canonical_body.as_bytes()
-        || Digest32::new(*sha256(&canonical).as_bytes()) != record.body_hash
-        || snapshot.plan.tenant_id != record.tenant_id
-        || snapshot.plan.action_id != record.action_id
-        || snapshot.generation != record.generation
-        || snapshot.state.as_str() != record.state.as_str()
-        || snapshot.due_at_unix_ms != record.due_at_unix_ms
-    {
-        return Err(StateMachineError::InvalidRecord);
+    let snapshot: ResponseSnapshot =
+        serde_json::from_slice(record.canonical_body.as_bytes()).map_err(RecordDefect::Decode)?;
+    let canonical = canonical_json_bytes(&snapshot).map_err(CanonicalFailure::Encoding)?;
+    if canonical.as_slice() != record.canonical_body.as_bytes() {
+        return Err(RecordDefect::NotCanonical.into());
+    }
+    if Digest32::new(*sha256(&canonical).as_bytes()) != record.body_hash {
+        return Err(RecordDefect::BodyHashMismatch.into());
+    }
+    if snapshot.plan.tenant_id != record.tenant_id {
+        return Err(RecordDefect::TenantMismatch.into());
+    }
+    if snapshot.plan.action_id != record.action_id {
+        return Err(RecordDefect::ActionMismatch.into());
+    }
+    if snapshot.generation != record.generation {
+        return Err(RecordDefect::GenerationMismatch.into());
+    }
+    if snapshot.state.as_str() != record.state.as_str() {
+        return Err(RecordDefect::StateMismatch.into());
+    }
+    if snapshot.due_at_unix_ms != record.due_at_unix_ms {
+        return Err(RecordDefect::DueAtMismatch.into());
     }
     validate_snapshot(&snapshot)?;
     Ok(snapshot)
@@ -674,14 +691,14 @@ fn encode_response_record_with_mode(
     allow_normalized_dispatch: bool,
 ) -> Result<ResponsePlanRecord, StateMachineError> {
     validate_snapshot_with_mode(snapshot, allow_normalized_dispatch)?;
-    let bytes = canonical_json_bytes(snapshot).map_err(|_| StateMachineError::Canonical)?;
+    let bytes = canonical_json_bytes(snapshot).map_err(CanonicalFailure::Encoding)?;
     let body_hash = Digest32::new(*sha256(&bytes).as_bytes());
-    let canonical_body = CanonicalBody::new(bytes).map_err(|_| StateMachineError::Canonical)?;
+    let canonical_body = CanonicalBody::new(bytes).map_err(CanonicalFailure::Body)?;
     Ok(ResponsePlanRecord {
         tenant_id: snapshot.plan.tenant_id.clone(),
         action_id: snapshot.plan.action_id.clone(),
         generation: snapshot.generation,
-        state: RecordId::new(snapshot.state.as_str()).map_err(|_| StateMachineError::Canonical)?,
+        state: RecordId::new(snapshot.state.as_str()).map_err(CanonicalFailure::Identifier)?,
         canonical_body,
         body_hash,
         due_at_unix_ms: snapshot.due_at_unix_ms,
@@ -692,9 +709,9 @@ fn validate_plan(plan: &ResponsePlan) -> Result<(), StateMachineError> {
     plan.validate_shape()?;
     if plan.affected_set_hash
         != response_affected_set_hash(&plan.tenant_id, &plan.affected_ids)
-            .map_err(|_| StateMachineError::InvalidPlan)?
+            .map_err(PlanDefect::AffectedSetHash)?
     {
-        return Err(StateMachineError::InvalidPlan);
+        return Err(PlanDefect::AffectedSetHashMismatch.into());
     }
     for effect in plan.effects.as_slice() {
         let spec = ResponseEffectSpec {
@@ -706,12 +723,12 @@ fn validate_plan(plan: &ResponsePlan) -> Result<(), StateMachineError> {
         };
         validate_effect_contribution(&spec.canonical_contribution, &spec.contribution_hash)?;
         if effect.effect_id != derive_effect_id(&plan.action_id, effect.ordinal, &spec)? {
-            return Err(StateMachineError::InvalidPlan);
+            return Err(PlanDefect::EffectIdMismatch.into());
         }
         validate_effect_plan_binding(plan, effect)?;
     }
     if plan.plan_hash != Digest32::new(compute_plan_hash(plan)?) {
-        return Err(StateMachineError::InvalidPlan);
+        return Err(PlanDefect::PlanHashMismatch.into());
     }
     Ok(())
 }
@@ -725,9 +742,9 @@ fn validate_effect_plan_binding(
     }
     let freeze: IssuanceFreezeSpec =
         serde_json::from_slice(effect.canonical_contribution.as_bytes())
-            .map_err(|_| StateMachineError::InvalidPlan)?;
+            .map_err(PlanDefect::FreezeContribution)?;
     let chio_security_types::ResponseTarget::Lineage { lineage_id } = &effect.target else {
-        return Err(StateMachineError::InvalidPlan);
+        return Err(PlanDefect::FreezeTargetNotLineage.into());
     };
     let BlastRadiusResult::Exact {
         sorted_affected_ids,
@@ -735,15 +752,23 @@ fn validate_effect_plan_binding(
         ..
     } = &freeze.acquisition.approved_result
     else {
-        return Err(StateMachineError::InvalidPlan);
+        return Err(PlanDefect::FreezeAcquisitionNotExact.into());
     };
-    if &freeze.lineage_id != lineage_id
-        || freeze.acquisition.request.tenant_id != plan.tenant_id
-        || freeze.acquisition.request.action_id != plan.action_id
-        || sorted_affected_ids != &plan.affected_ids
-        || *affected_set_hash != plan.affected_set_hash
-    {
-        return Err(StateMachineError::InvalidPlan);
+    let mismatch = |field: FreezeBindingField| PlanDefect::FreezeBindingMismatch(field).into();
+    if &freeze.lineage_id != lineage_id {
+        return Err(mismatch(FreezeBindingField::Lineage));
+    }
+    if freeze.acquisition.request.tenant_id != plan.tenant_id {
+        return Err(mismatch(FreezeBindingField::Tenant));
+    }
+    if freeze.acquisition.request.action_id != plan.action_id {
+        return Err(mismatch(FreezeBindingField::Action));
+    }
+    if sorted_affected_ids != &plan.affected_ids {
+        return Err(mismatch(FreezeBindingField::AffectedIds));
+    }
+    if *affected_set_hash != plan.affected_set_hash {
+        return Err(mismatch(FreezeBindingField::AffectedSetHash));
     }
     Ok(())
 }
@@ -753,12 +778,13 @@ fn validate_effect_contribution(
     expected_hash: &Digest32,
 ) -> Result<(), StateMachineError> {
     let value: serde_json::Value =
-        serde_json::from_slice(body.as_bytes()).map_err(|_| StateMachineError::InvalidPlan)?;
-    let canonical = canonical_json_bytes(&value).map_err(|_| StateMachineError::Canonical)?;
-    if canonical.as_slice() != body.as_bytes()
-        || Digest32::new(*sha256(&canonical).as_bytes()) != *expected_hash
-    {
-        return Err(StateMachineError::InvalidPlan);
+        serde_json::from_slice(body.as_bytes()).map_err(PlanDefect::ContributionNotJson)?;
+    let canonical = canonical_json_bytes(&value).map_err(CanonicalFailure::Encoding)?;
+    if canonical.as_slice() != body.as_bytes() {
+        return Err(PlanDefect::ContributionNotCanonical.into());
+    }
+    if Digest32::new(*sha256(&canonical).as_bytes()) != *expected_hash {
+        return Err(PlanDefect::ContributionHashMismatch.into());
     }
     Ok(())
 }
@@ -773,7 +799,8 @@ fn validate_snapshot_with_mode(
 ) -> Result<(), StateMachineError> {
     validate_plan(&snapshot.plan)?;
     validate_response_snapshot_lifecycle(snapshot, allow_normalized_dispatch)
-        .map_err(|_| StateMachineError::InvalidRecord)
+        .map_err(RecordDefect::Lifecycle)?;
+    Ok(())
 }
 
 fn validate_transition_request(
@@ -826,7 +853,7 @@ fn validate_transition_request(
     if snapshot.state == ResponseState::Applying && actual_target == ResponseState::Active {
         let lease = snapshot
             .applying_lease_expires_at_unix_ms
-            .ok_or(StateMachineError::InvalidRecord)?;
+            .ok_or(RecordDefect::MissingApplyingLease)?;
         if request.occurred_at_unix_ms >= lease {
             return Err(StateMachineError::NotDue);
         }
@@ -864,7 +891,7 @@ fn validate_transition_request(
     if snapshot.state == ResponseState::Applying && actual_target == ResponseState::Failed {
         let lease = snapshot
             .applying_lease_expires_at_unix_ms
-            .ok_or(StateMachineError::InvalidRecord)?;
+            .ok_or(RecordDefect::MissingApplyingLease)?;
         if request.occurred_at_unix_ms >= lease
             && !dispatch_failure_before_effect
             && !exact_effect_failure
@@ -1499,13 +1526,9 @@ fn push_mutation(
     snapshot: &mut ResponseSnapshot,
     mutation: ResponseMutationRecord,
 ) -> Result<(), StateMachineError> {
-    if snapshot.mutations.len() >= MAX_RESPONSE_MUTATIONS {
-        return Err(StateMachineError::MutationLimit);
-    }
     let mut mutations = snapshot.mutations.clone().into_vec();
     mutations.push(mutation);
-    snapshot.mutations =
-        BoundedVec::new(mutations).map_err(|_| StateMachineError::MutationLimit)?;
+    snapshot.mutations = BoundedVec::new(mutations).map_err(StateMachineError::MutationLimit)?;
     Ok(())
 }
 
@@ -1540,17 +1563,18 @@ fn derive_effect_id(
             spec,
         },
     )?;
-    EffectId::new(format!("response_effect_{}", hex_bytes(digest.as_bytes())))
-        .map_err(|_| StateMachineError::Canonical)
+    Ok(
+        EffectId::new(format!("response_effect_{}", hex_bytes(digest.as_bytes())))
+            .map_err(CanonicalFailure::Identifier)?,
+    )
 }
 
 fn compute_plan_hash(plan: &ResponsePlan) -> Result<[u8; 32], StateMachineError> {
-    let body = serde_json::to_value(plan.authorization_body())
-        .map_err(|_| StateMachineError::Canonical)?;
-    let digest = GovernedResponsePlanIntentBody::plan_body_hash(&body)
-        .map_err(|_| StateMachineError::InvalidPlan)?;
+    let body = serde_json::to_value(plan.authorization_body()).map_err(CanonicalFailure::Value)?;
+    let digest =
+        GovernedResponsePlanIntentBody::plan_body_hash(&body).map_err(PlanDefect::PlanBodyHash)?;
     let mut bytes = [0_u8; 32];
-    hex::decode_to_slice(digest, &mut bytes).map_err(|_| StateMachineError::InvalidPlan)?;
+    hex::decode_to_slice(digest, &mut bytes).map_err(PlanDefect::PlanBodyHashEncoding)?;
     Ok(bytes)
 }
 

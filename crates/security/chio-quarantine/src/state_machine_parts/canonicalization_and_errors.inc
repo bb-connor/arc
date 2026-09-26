@@ -16,8 +16,8 @@ fn request_id(plan: &ResponsePlan) -> Result<RecordId, StateMachineError> {
             created_at_unix_ms: plan.created_at_unix_ms,
         },
     )?;
-    RecordId::new(format!("response_request_{}", hex_bytes(digest.as_bytes())))
-        .map_err(|_| StateMachineError::Canonical)
+    Ok(RecordId::new(format!("response_request_{}", hex_bytes(digest.as_bytes())))
+        .map_err(CanonicalFailure::Identifier)?)
 }
 
 fn latest_evidence_id(snapshot: &ResponseSnapshot) -> Result<OpaqueReceiptRef, StateMachineError> {
@@ -25,10 +25,10 @@ fn latest_evidence_id(snapshot: &ResponseSnapshot) -> Result<OpaqueReceiptRef, S
         .mutations
         .len()
         .checked_sub(1)
-        .ok_or(StateMachineError::InvalidRecord)?;
-    response_receipt_for_mutation(snapshot, mutation_index)
+        .ok_or(RecordDefect::EmptyMutationLog)?;
+    Ok(response_receipt_for_mutation(snapshot, mutation_index)
         .and_then(|body| body.evidence_id())
-        .map_err(|_| StateMachineError::Canonical)
+        .map_err(CanonicalFailure::Receipt)?)
 }
 
 #[derive(Serialize)]
@@ -58,11 +58,11 @@ fn transition_id<T: Serialize>(
             mutation,
         },
     )?;
-    RecordId::new(format!(
+    Ok(RecordId::new(format!(
         "response_transition_{}",
         hex_bytes(digest.as_bytes())
     ))
-    .map_err(|_| StateMachineError::Canonical)
+    .map_err(CanonicalFailure::Identifier)?)
 }
 
 #[derive(Serialize)]
@@ -322,7 +322,7 @@ fn canonical_mutation_id(
     let expected_generation = body
         .generation()
         .checked_sub(1)
-        .ok_or(StateMachineError::InvalidRecord)?;
+        .ok_or(RecordDefect::ZeroMutationGeneration)?;
     transition_id("mutation", plan, expected_generation, body)
 }
 
@@ -335,7 +335,7 @@ fn finalize_mutation(
 }
 
 fn domain_hash<T: Serialize>(domain: &[u8], value: &T) -> Result<Digest32, StateMachineError> {
-    let canonical = canonical_json_bytes(value).map_err(|_| StateMachineError::Canonical)?;
+    let canonical = canonical_json_bytes(value).map_err(CanonicalFailure::Encoding)?;
     let mut input = Vec::with_capacity(domain.len() + canonical.len());
     input.extend_from_slice(domain);
     input.extend_from_slice(&canonical);
@@ -343,7 +343,7 @@ fn domain_hash<T: Serialize>(domain: &[u8], value: &T) -> Result<Digest32, State
 }
 
 fn error_code(value: &str) -> Result<ErrorCode, StateMachineError> {
-    ErrorCode::new(value).map_err(|_| StateMachineError::Canonical)
+    Ok(ErrorCode::new(value).map_err(CanonicalFailure::Identifier)?)
 }
 
 fn hex_bytes(bytes: &[u8]) -> String {

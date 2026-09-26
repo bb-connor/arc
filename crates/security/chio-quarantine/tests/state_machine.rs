@@ -4,7 +4,8 @@ mod response_support;
 
 use chio_quarantine::{
     build_response_plan, decode_response_record, EffectMutation, EffectMutationRequest,
-    EffectReceiptContext, ResponseStateMachine, ResponseTransitionRequest, StateMachineError,
+    EffectReceiptContext, PlanDefect, ResponseStateMachine, ResponseTransitionRequest,
+    StateMachineError,
 };
 use chio_security_types::ports::{
     response_affected_set_hash, ActionId, BlastRadiusFenceAcquisition, BlastRadiusQueryBounds,
@@ -1006,7 +1007,10 @@ fn receipt_backed_effect_generation_and_fencing_token_cannot_regress() {
 
 #[test]
 fn response_plan_rejects_authorization_body_above_governance_node_ceiling() {
-    assert!(build_response_plan(plan_input(64)).is_err());
+    assert!(matches!(
+        build_response_plan(plan_input(64)),
+        Err(StateMachineError::InvalidPlan(PlanDefect::PlanBodyHash(_)))
+    ));
 }
 
 #[test]

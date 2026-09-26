@@ -60,6 +60,6 @@ fn response_plan_rejects_authorization_body_above_governance_ceiling() {
 
     assert!(matches!(
         build_response_plan(input),
-        Err(StateMachineError::InvalidPlan)
+        Err(StateMachineError::InvalidPlan(PlanDefect::PlanBodyHash(_)))
     ));
 }
