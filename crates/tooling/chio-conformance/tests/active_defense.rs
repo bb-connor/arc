@@ -1598,4 +1598,5 @@ fn overlapping_ttl_lift() {
     );
 }
 
-include!("active_defense/partial_rollback.rs");
+#[path = "active_defense/partial_rollback.rs"]
+mod partial_rollback;
