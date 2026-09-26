@@ -187,20 +187,25 @@ fn two_kernel_fixture(
         policy_decision_hash,
         approval: ResponseDispatchApproval::Automatic,
     };
-    let execution = ActiveResponseExecutionRequest::new(ActiveResponseExecutionRequestParts {
-        response_plan: response_plan.clone(),
-        dispatch_id,
-        executor_authority: identity.clone(),
-        request_id: response_plan.action_id.as_str().to_string(),
-        plan_body_hash: digest_hex(&response_plan.plan_hash),
-        authorization_capability_hash: digest_hex(&authorization_capability_hash),
-        governed_intent_hash: digest_hex(&governed_intent_hash),
-        policy_decision_hash: digest_hex(&policy_decision_hash),
-        approval: execution_approval,
-        authorized_at_unix_ms,
-        expires_at_unix_ms: response_plan.expires_at_unix_ms,
-        dispatch_committed_resume: false,
-    });
+    let fresh = chio_security_types::FreshLiveAdmission::new(response_plan.clone())
+        .expect("fresh live response plan");
+    let execution = ActiveResponseExecutionRequest::from_fresh(
+        &fresh,
+        ActiveResponseExecutionRequestParts {
+            response_plan: response_plan.clone(),
+            dispatch_id,
+            executor_authority: identity.clone(),
+            request_id: response_plan.action_id.as_str().to_string(),
+            plan_body_hash: digest_hex(&response_plan.plan_hash),
+            authorization_capability_hash: digest_hex(&authorization_capability_hash),
+            governed_intent_hash: digest_hex(&governed_intent_hash),
+            policy_decision_hash: digest_hex(&policy_decision_hash),
+            approval: execution_approval,
+            authorized_at_unix_ms,
+            expires_at_unix_ms: response_plan.expires_at_unix_ms,
+        },
+    )
+    .expect("fresh live execution request");
     let authority = Arc::new(RacingAutomaticExecutorAuthority {
         identity,
         expected_plan: response_plan.clone(),

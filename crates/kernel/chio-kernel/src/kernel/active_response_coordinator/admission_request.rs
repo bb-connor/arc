@@ -50,6 +50,10 @@ impl ActiveResponseAdmissionRequest {
         self.response_plan.plan()
     }
 
+    pub(in crate::kernel) const fn fresh_live_admission(&self) -> &FreshLiveAdmission {
+        &self.response_plan
+    }
+
     #[must_use]
     pub const fn authorization(&self) -> &ActiveResponseAuthorizationRequest {
         &self.authorization

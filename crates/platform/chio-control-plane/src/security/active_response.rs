@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod authority_tests;
 mod committed_readback;
 mod config;
 mod expired_resume;
@@ -13,10 +15,10 @@ use super::active_response_validation::{
 use chio_kernel::{
     derive_active_response_dispatch_id, ActiveResponseCommittedDispatch,
     ActiveResponseEffectEvidence, ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
-    ActiveResponseExecutionEvidenceParts, ActiveResponseExecutionOutcome,
-    ActiveResponseExecutionRequest, ActiveResponseExecutorAuthority,
-    ActiveResponseExecutorAuthorityIdentity, ActiveResponseExecutorError,
-    ActiveResponseFailedEffectEvidence, ActiveResponseFailureEvidence,
+    ActiveResponseExecutionEvidenceParts, ActiveResponseExecutionOrigin,
+    ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
+    ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,
+    ActiveResponseExecutorError, ActiveResponseFailedEffectEvidence, ActiveResponseFailureEvidence,
     ActiveResponseReceiptProofSource, AutomaticActiveResponseDispatchFenceOutcome,
 };
 use chio_quarantine::{
@@ -795,7 +797,7 @@ mod tests {
             policy_decision_hash,
             expires_at_unix_ms: plan.expires_at_unix_ms,
             authorized_at_unix_ms,
-            dispatch_committed_resume: false,
+            origin: ActiveResponseExecutionOrigin::Fresh,
             response_plan: plan,
             executor_authority,
             approval,

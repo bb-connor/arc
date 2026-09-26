@@ -114,7 +114,7 @@ impl<
             policy_decision_hash,
             expires_at_unix_ms: response_plan.expires_at_unix_ms,
             authorized_at_unix_ms,
-            dispatch_committed_resume: false,
+            origin: ActiveResponseExecutionOrigin::Fresh,
             response_plan,
             executor_authority: self.identity.clone(),
             approval,
@@ -152,6 +152,13 @@ impl<
             Ok(ResponseDispatchLoadOutcome::Found(record)) => {
                 self.validate_existing_dispatch(&request, &record)?;
                 self.drive_loaded_dispatch(&request, &record, true)
+            }
+            Ok(ResponseDispatchLoadOutcome::Missing)
+                if request.raw.origin == ActiveResponseExecutionOrigin::CommittedDispatch =>
+            {
+                Err(ActiveResponseExecutorError::OutcomeUnknown(
+                    "previously committed dispatch is missing during recovery".to_owned(),
+                ))
             }
             Ok(ResponseDispatchLoadOutcome::Missing) => self.commit_fresh_dispatch(request),
             Err(error) => Err(ActiveResponseExecutorError::OutcomeUnknown(format!(
@@ -235,7 +242,7 @@ impl<
                 ))
             }
         };
-        if raw.dispatch_committed_resume
+        if raw.origin == ActiveResponseExecutionOrigin::CommittedAdmission
             && !matches!(&approval, ResponseDispatchApproval::Governed { .. })
         {
             return Err(reject(
@@ -275,7 +282,7 @@ impl<
         let resumed_after_expiry = now_unix_ms >= request.raw.response_plan.expires_at_unix_ms;
         if now_unix_ms < request.raw.response_plan.created_at_unix_ms
             || request.raw.authorized_at_unix_ms > now_unix_ms
-            || (resumed_after_expiry && !request.raw.dispatch_committed_resume)
+            || (resumed_after_expiry && request.raw.origin != ActiveResponseExecutionOrigin::CommittedAdmission)
         {
             return Err(ActiveResponseExecutorError::RejectedBeforeCommit(
                 "active-response plan is not live".to_string(),
@@ -317,7 +324,7 @@ impl<
             },
             commit_mode: if resumed_after_expiry {
                 ResponseDispatchCommitMode::GovernedCommittedExpiredResume
-            } else if request.raw.dispatch_committed_resume {
+            } else if request.raw.origin == ActiveResponseExecutionOrigin::CommittedAdmission {
                 ResponseDispatchCommitMode::GovernedCommittedResume
             } else {
                 ResponseDispatchCommitMode::Fresh

@@ -1,3 +1,7 @@
+mod authority;
+use authority::RecoveredDispatchApproval;
+pub(super) use authority::{CommittedAdmissionAuthority, CommittedDispatchAuthority};
+
 use crate::security_admission_operation::{
     AdmissionCleanupAction, AdmissionCleanupActionKind, AdmissionCleanupActionState,
     AdmissionDispatchState, AdmissionOperation, AdmissionOperationKind, AdmissionOperationState,
@@ -348,18 +352,14 @@ impl ChioKernel {
             ));
         }
 
-        let execution = validate_committed_dispatch(
+        let authority = self.verify_committed_dispatch_authority(
             response_plan,
             dispatch_id,
             &installed.identity,
             &committed,
         )?;
-        let governed_permit = self.validate_committed_governed_operation(&execution)?;
-        let evidence = self.execute_active_response_with_authority(&execution)?;
-        if let Some(permit) = governed_permit.as_ref() {
-            self.complete_active_response_dispatch(permit, &execution, &evidence)?;
-        }
-        Ok(Some(evidence))
+        self.execute_committed_dispatch_authority(authority)
+            .map(Some)
     }
 
     /// Resume an irreversible governed admission commitment that may have
@@ -370,6 +370,9 @@ impl ChioKernel {
         binding: &PreparedActiveResponseDispatchBinding,
     ) -> Result<DispatchCommittedActiveResponseResume, KernelError> {
         validate_executable_response_plan_value(response_plan)?;
+        response_plan
+            .require_live_or_legacy_execution()
+            .map_err(|error| committed_resume_denied(error.to_string()))?;
         let (expected_executor, execution_approval) =
             validate_prepared_binding(response_plan, binding)?;
         let installed = self.active_response_executor.as_ref().ok_or_else(|| {
@@ -516,21 +519,18 @@ impl ChioKernel {
             ));
         }
         if let Some(committed) = committed {
-            let execution = validate_committed_dispatch(
+            let authority = self.verify_committed_dispatch_authority(
                 response_plan,
                 &binding.dispatch_id,
                 &installed.identity,
                 &committed,
             )?;
-            let permit = self
-                .validate_committed_governed_operation(&execution)?
-                .ok_or_else(|| {
-                    committed_resume_internal(
-                        "committed governed dispatch resolved to automatic approval",
-                    )
-                })?;
-            let evidence = self.execute_active_response_with_authority(&execution)?;
-            self.complete_active_response_dispatch(&permit, &execution, &evidence)?;
+            if matches!(authority.approval(), RecoveredDispatchApproval::Automatic) {
+                return Err(committed_resume_internal(
+                    "committed governed dispatch resolved to automatic approval",
+                ));
+            }
+            let evidence = self.execute_committed_dispatch_authority(authority)?;
             return Ok(DispatchCommittedActiveResponseResume::Completed(Box::new(
                 evidence,
             )));
@@ -541,19 +541,19 @@ impl ChioKernel {
             ));
         }
 
-        let execution = execution_request_from_prepared_binding(
-            response_plan,
-            binding,
-            expected_executor,
-            execution_approval,
-            true,
+        let authority = CommittedAdmissionAuthority::new(
+            execution_parts_from_prepared_binding(
+                response_plan,
+                binding,
+                expected_executor,
+                execution_approval,
+            ),
+            ActiveResponseDispatchPermit {
+                operation,
+                recovery: true,
+            },
         );
-        let permit = ActiveResponseDispatchPermit {
-            operation,
-            recovery: true,
-        };
-        let evidence = self.execute_active_response_with_authority(&execution)?;
-        self.complete_active_response_dispatch(&permit, &execution, &evidence)?;
+        let evidence = self.execute_committed_admission_authority(authority)?;
         Ok(DispatchCommittedActiveResponseResume::Completed(Box::new(
             evidence,
         )))
@@ -825,27 +825,63 @@ impl ChioKernel {
         )
     }
 
+    fn verify_committed_dispatch_authority(
+        &self,
+        plan: &ResponsePlan,
+        dispatch_id: &RecordId,
+        executor: &ActiveResponseExecutorAuthorityIdentity,
+        committed: &ActiveResponseCommittedDispatch,
+    ) -> Result<CommittedDispatchAuthority, KernelError> {
+        plan.require_live_or_legacy_execution()
+            .map_err(|error| committed_recovery_denied(error.to_string()))?;
+        let execution = validate_committed_dispatch(plan, dispatch_id, executor, committed)?;
+        let approval = self.validate_committed_governed_operation(&execution)?;
+        Ok(CommittedDispatchAuthority::new(execution, approval))
+    }
+
+    fn execute_committed_dispatch_authority(
+        &self,
+        authority: CommittedDispatchAuthority,
+    ) -> Result<ActiveResponseExecutionEvidence, KernelError> {
+        let execution = ActiveResponseExecutionRequest::from_committed_dispatch(&authority);
+        let evidence = self.execute_active_response_with_authority(&execution)?;
+        if let RecoveredDispatchApproval::Governed(permit) = authority.approval() {
+            self.complete_active_response_dispatch(permit, &execution, &evidence)?;
+        }
+        Ok(evidence)
+    }
+
+    fn execute_committed_admission_authority(
+        &self,
+        authority: CommittedAdmissionAuthority,
+    ) -> Result<ActiveResponseExecutionEvidence, KernelError> {
+        let execution = ActiveResponseExecutionRequest::from_committed_admission(&authority);
+        let evidence = self.execute_active_response_with_authority(&execution)?;
+        self.complete_active_response_dispatch(authority.permit(), &execution, &evidence)?;
+        Ok(evidence)
+    }
+
     fn validate_committed_governed_operation(
         &self,
-        execution: &ActiveResponseExecutionRequest,
-    ) -> Result<Option<ActiveResponseDispatchPermit>, KernelError> {
+        execution: &ActiveResponseExecutionRequestParts,
+    ) -> Result<RecoveredDispatchApproval, KernelError> {
         let ActiveResponseExecutionApproval::Governed {
             admission_operation_id,
             admission_operation_version,
             approval_set_hash,
-        } = execution.approval()
+        } = &execution.approval
         else {
-            return Ok(None);
+            return Ok(RecoveredDispatchApproval::Automatic);
         };
         let operation = self.load_active_response_operation(admission_operation_id)?;
         let expected_request_binding_hash = derive_active_response_operation_request_binding_hash(
-            execution.plan_body_hash(),
-            execution.executor_authority_id(),
-            execution.executor_authority_generation(),
-            execution.authorization_capability_hash(),
-            execution.governed_intent_hash(),
+            execution.plan_body_hash.as_str(),
+            execution.executor_authority.authority_id(),
+            execution.executor_authority.generation(),
+            execution.authorization_capability_hash.as_str(),
+            execution.governed_intent_hash.as_str(),
             approval_set_hash,
-            &digest_hex(&execution.response_plan().policy_hash),
+            &digest_hex(&execution.response_plan.policy_hash),
         )?;
         if operation.kind() != AdmissionOperationKind::GovernedActiveResponse
             || !matches!(
@@ -858,11 +894,11 @@ impl ChioKernel {
                 } else {
                     AdmissionDispatchState::Committed
                 }
-            || operation.coordinator_authority_id() != execution.executor_authority_id()
-            || operation.request_id() != execution.request_id()
+            || operation.coordinator_authority_id() != execution.executor_authority.authority_id()
+            || operation.request_id() != execution.request_id.as_str()
             || operation.authorization_capability_hash()
-                != execution.authorization_capability_hash()
-            || operation.policy_hash() != digest_hex(&execution.response_plan().policy_hash)
+                != execution.authorization_capability_hash.as_str()
+            || operation.policy_hash() != digest_hex(&execution.response_plan.policy_hash)
             || operation.approval_set_hash() != Some(approval_set_hash.as_str())
             || operation.request_binding_hash() != expected_request_binding_hash
             || active_response_dispatch_operation_version(&operation)?
@@ -873,12 +909,12 @@ impl ChioKernel {
             ));
         }
         let expected_anchor = build_active_response_operation_anchor(
-            execution.response_plan(),
-            execution.executor_authority(),
-            execution.authorized_at_unix_ms(),
-            execution.authorization_capability_hash(),
-            execution.governed_intent_hash(),
-            execution.policy_decision_hash(),
+            &execution.response_plan,
+            &execution.executor_authority,
+            execution.authorized_at_unix_ms,
+            execution.authorization_capability_hash.as_str(),
+            execution.governed_intent_hash.as_str(),
+            execution.policy_decision_hash.as_str(),
             approval_set_hash,
         )?;
         if self.load_active_response_operation_anchor(&operation)? != expected_anchor {
@@ -913,10 +949,12 @@ impl ChioKernel {
                 "durable governed approval does not match the committed dispatch",
             ));
         }
-        Ok(Some(ActiveResponseDispatchPermit {
-            operation,
-            recovery: true,
-        }))
+        Ok(RecoveredDispatchApproval::Governed(Box::new(
+            ActiveResponseDispatchPermit {
+                operation,
+                recovery: true,
+            },
+        )))
     }
 }
 
@@ -977,14 +1015,13 @@ fn validate_prepared_binding(
     Ok((executor, approval))
 }
 
-fn execution_request_from_prepared_binding(
+fn execution_parts_from_prepared_binding(
     response_plan: &ResponsePlan,
     binding: &PreparedActiveResponseDispatchBinding,
     executor_authority: ActiveResponseExecutorAuthorityIdentity,
     approval: ActiveResponseExecutionApproval,
-    dispatch_committed_resume: bool,
-) -> ActiveResponseExecutionRequest {
-    ActiveResponseExecutionRequest::new(ActiveResponseExecutionRequestParts {
+) -> ActiveResponseExecutionRequestParts {
+    ActiveResponseExecutionRequestParts {
         response_plan: response_plan.clone(),
         dispatch_id: binding.dispatch_id.clone(),
         executor_authority,
@@ -996,8 +1033,7 @@ fn execution_request_from_prepared_binding(
         approval,
         authorized_at_unix_ms: binding.authorized_at_unix_ms,
         expires_at_unix_ms: response_plan.expires_at_unix_ms,
-        dispatch_committed_resume,
-    })
+    }
 }
 
 fn validate_durable_governed_operation_binding(
@@ -1130,7 +1166,7 @@ fn validate_committed_dispatch(
     expected_dispatch_id: &RecordId,
     executor: &super::ActiveResponseExecutorAuthorityIdentity,
     committed: &ActiveResponseCommittedDispatch,
-) -> Result<ActiveResponseExecutionRequest, KernelError> {
+) -> Result<ActiveResponseExecutionRequestParts, KernelError> {
     if committed.response_plan() != expected_plan {
         return Err(committed_recovery_denied(
             "durable dispatch response plan does not match the requested recovery plan",
@@ -1273,22 +1309,19 @@ fn validate_committed_dispatch(
             "committed dispatch identifier is not the canonical recovery identifier",
         ));
     }
-    Ok(ActiveResponseExecutionRequest::new(
-        ActiveResponseExecutionRequestParts {
-            response_plan: expected_plan.clone(),
-            dispatch_id: expected_dispatch_id.clone(),
-            executor_authority: executor.clone(),
-            request_id: expected_plan.action_id.as_str().to_string(),
-            plan_body_hash: digest_hex(&expected_plan.plan_hash),
-            authorization_capability_hash,
-            governed_intent_hash,
-            policy_decision_hash,
-            approval,
-            authorized_at_unix_ms: body.authorized_at_unix_ms,
-            expires_at_unix_ms: expected_plan.expires_at_unix_ms,
-            dispatch_committed_resume: false,
-        },
-    ))
+    Ok(ActiveResponseExecutionRequestParts {
+        response_plan: expected_plan.clone(),
+        dispatch_id: expected_dispatch_id.clone(),
+        executor_authority: executor.clone(),
+        request_id: expected_plan.action_id.as_str().to_string(),
+        plan_body_hash: digest_hex(&expected_plan.plan_hash),
+        authorization_capability_hash,
+        governed_intent_hash,
+        policy_decision_hash,
+        approval,
+        authorized_at_unix_ms: body.authorized_at_unix_ms,
+        expires_at_unix_ms: expected_plan.expires_at_unix_ms,
+    })
 }
 
 fn committed_response_history_is_exact(

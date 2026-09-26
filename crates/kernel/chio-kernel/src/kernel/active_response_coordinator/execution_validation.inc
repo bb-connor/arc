@@ -80,7 +80,8 @@ pub(super) fn build_active_response_execution_request(
         &approval,
     )
     .map_err(|error| active_response_denied(error.to_string()))?;
-    Ok(ActiveResponseExecutionRequest::new(
+    ActiveResponseExecutionRequest::from_fresh(
+        request.fresh_live_admission(),
         ActiveResponseExecutionRequestParts {
             response_plan: response_plan.clone(),
             dispatch_id,
@@ -93,9 +94,8 @@ pub(super) fn build_active_response_execution_request(
             approval,
             authorized_at_unix_ms,
             expires_at_unix_ms: response_plan.expires_at_unix_ms,
-            dispatch_committed_resume: false,
         },
-    ))
+    )
 }
 
 fn validate_active_response_execution_evidence(

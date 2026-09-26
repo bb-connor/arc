@@ -61,7 +61,7 @@ pub use active_response_executor::{
     derive_active_response_dispatch_id, ActiveResponseCommittedDispatch,
     ActiveResponseDispatchIdError, ActiveResponseEffectEvidence, ActiveResponseExecutionApproval,
     ActiveResponseExecutionEvidence, ActiveResponseExecutionEvidenceParts,
-    ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
+    ActiveResponseExecutionOrigin, ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
     ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,
     ActiveResponseExecutorError, ActiveResponseExecutorIdentityError,
     ActiveResponseFailedEffectEvidence, ActiveResponseFailureEvidence,

@@ -1,7 +1,7 @@
 use super::{
-    has_durable_execution_proof, ActiveResponseExecutionEvidence, ActiveResponseExecutorError,
-    ActiveResponseReceiptProofSource, DurableActiveResponseExecutor, EffectPort,
-    ResponseApprovalRequirement, ResponseDispatchApproval, ResponseDispatchRecord,
+    has_durable_execution_proof, ActiveResponseExecutionEvidence, ActiveResponseExecutionOrigin,
+    ActiveResponseExecutorError, ActiveResponseReceiptProofSource, DurableActiveResponseExecutor,
+    EffectPort, ResponseApprovalRequirement, ResponseDispatchApproval, ResponseDispatchRecord,
     ResponseDispatchStore, ResponsePlanKey, ResponseState, SecurityAlertPort, SecurityReceiptSink,
     ValidatedExecutionRequest,
 };
@@ -31,7 +31,7 @@ impl<
         dispatch: &ResponseDispatchRecord,
         recovered: bool,
     ) -> Result<ActiveResponseExecutionEvidence, ActiveResponseExecutorError> {
-        if request.raw.dispatch_committed_resume
+        if request.raw.origin == ActiveResponseExecutionOrigin::CommittedAdmission
             && !matches!(
                 (
                     &request.raw.response_plan.approval_requirement,
@@ -155,8 +155,8 @@ impl<
 mod tests {
     use super::super::tests::{require_error, require_success, Harness};
     use super::super::{
-        decode_response_record, has_durable_execution_proof, ActiveResponseExecutionOutcome,
-        ActiveResponseExecutorError, ResponseState,
+        decode_response_record, has_durable_execution_proof, ActiveResponseExecutionOrigin,
+        ActiveResponseExecutionOutcome, ActiveResponseExecutorError, ResponseState,
     };
     use chio_security_types::{ResponseEffectProgress, ResponseMutationRecord};
 
@@ -164,7 +164,7 @@ mod tests {
     fn governed_dispatch_committed_resume_after_expiry_fails_without_late_effects() {
         let harness = Harness::new();
         let mut request = harness.expired_governed_request();
-        request.dispatch_committed_resume = true;
+        request.origin = ActiveResponseExecutionOrigin::CommittedAdmission;
 
         let evidence = require_success(
             harness.executor.execute_source(&request),
@@ -259,7 +259,7 @@ mod tests {
     fn resume_flag_and_stable_authorization_time_fail_closed_when_invalid() {
         let harness = Harness::new();
         let mut automatic = harness.automatic_request();
-        automatic.dispatch_committed_resume = true;
+        automatic.origin = ActiveResponseExecutionOrigin::CommittedAdmission;
         assert!(matches!(
             harness.executor.execute_source(&automatic),
             Err(ActiveResponseExecutorError::RejectedBeforeCommit(_))
@@ -276,7 +276,7 @@ mod tests {
         ));
 
         let mut at_expiry = harness.governed_request();
-        at_expiry.dispatch_committed_resume = true;
+        at_expiry.origin = ActiveResponseExecutionOrigin::CommittedAdmission;
         at_expiry.authorized_at_unix_ms = at_expiry.response_plan.expires_at_unix_ms;
         assert!(matches!(
             harness.executor.execute_source(&at_expiry),
@@ -305,7 +305,7 @@ mod tests {
         assert!(!has_durable_execution_proof(&before_expiry));
         assert_eq!(harness.effect_executions(), 0);
 
-        request.dispatch_committed_resume = true;
+        request.origin = ActiveResponseExecutionOrigin::CommittedAdmission;
         harness.set_clock(request.response_plan.expires_at_unix_ms.saturating_add(1));
         assert!(matches!(
             require_error(harness.executor.execute_source(&request)),

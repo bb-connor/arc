@@ -1,5 +1,5 @@
 use chio_kernel::{
-    ActiveResponseExecutionApproval, ActiveResponseExecutionRequest,
+    ActiveResponseExecutionApproval, ActiveResponseExecutionOrigin, ActiveResponseExecutionRequest,
     ActiveResponseExecutorAuthorityIdentity,
 };
 use chio_security_types::ports::RecordId;
@@ -18,7 +18,7 @@ pub(super) struct RawActiveResponseExecutionRequest {
     pub(super) approval: ActiveResponseExecutionApproval,
     pub(super) expires_at_unix_ms: u64,
     pub(super) authorized_at_unix_ms: u64,
-    pub(super) dispatch_committed_resume: bool,
+    pub(super) origin: ActiveResponseExecutionOrigin,
 }
 
 pub(super) trait ActiveResponseRequestSource {
@@ -39,7 +39,7 @@ impl ActiveResponseRequestSource for ActiveResponseExecutionRequest {
             approval: self.approval().clone(),
             expires_at_unix_ms: self.expires_at_unix_ms(),
             authorized_at_unix_ms: self.authorized_at_unix_ms(),
-            dispatch_committed_resume: self.dispatch_committed_resume(),
+            origin: self.origin(),
         }
     }
 }

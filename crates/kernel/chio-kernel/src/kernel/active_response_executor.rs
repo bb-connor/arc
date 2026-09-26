@@ -1,3 +1,8 @@
+use super::active_response_committed_recovery::{
+    CommittedAdmissionAuthority, CommittedDispatchAuthority,
+};
+use chio_security_types::FreshLiveAdmission;
+
 use chio_core::receipt::body::ChioReceipt;
 use chio_core::{canonical_json_bytes, sha256_hex, PublicKey};
 use chio_security_types::ports::{
@@ -205,6 +210,15 @@ pub enum AutomaticActiveResponseDispatchFenceOutcome {
     DispatchCommitted,
 }
 
+/// Provenance of a sealed kernel request. Naming a variant grants no authority;
+/// only the kernel's fresh validator or exact durable verifier can mint a request.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ActiveResponseExecutionOrigin {
+    Fresh,
+    CommittedDispatch,
+    CommittedAdmission,
+}
+
 /// Immutable kernel-built request accepted by the trusted executor authority.
 #[derive(Clone, Debug)]
 pub struct ActiveResponseExecutionRequest {
@@ -219,9 +233,10 @@ pub struct ActiveResponseExecutionRequest {
     approval: ActiveResponseExecutionApproval,
     authorized_at_unix_ms: u64,
     expires_at_unix_ms: u64,
-    dispatch_committed_resume: bool,
+    origin: ActiveResponseExecutionOrigin,
 }
 
+#[derive(Clone, Debug)]
 pub(crate) struct ActiveResponseExecutionRequestParts {
     pub(crate) response_plan: ResponsePlan,
     pub(crate) dispatch_id: RecordId,
@@ -234,11 +249,42 @@ pub(crate) struct ActiveResponseExecutionRequestParts {
     pub(crate) approval: ActiveResponseExecutionApproval,
     pub(crate) authorized_at_unix_ms: u64,
     pub(crate) expires_at_unix_ms: u64,
-    pub(crate) dispatch_committed_resume: bool,
 }
 
 impl ActiveResponseExecutionRequest {
-    pub(super) fn new(parts: ActiveResponseExecutionRequestParts) -> Self {
+    pub(super) fn from_fresh(
+        admission: &FreshLiveAdmission,
+        parts: ActiveResponseExecutionRequestParts,
+    ) -> Result<Self, super::KernelError> {
+        if &parts.response_plan != admission.plan() {
+            return Err(super::active_response_coordinator::active_response_denied(
+                "fresh admission plan differs from the execution commitment",
+            ));
+        }
+        Ok(Self::from_parts(
+            parts,
+            ActiveResponseExecutionOrigin::Fresh,
+        ))
+    }
+
+    pub(super) fn from_committed_dispatch(authority: &CommittedDispatchAuthority) -> Self {
+        Self::from_parts(
+            authority.execution().clone(),
+            ActiveResponseExecutionOrigin::CommittedDispatch,
+        )
+    }
+
+    pub(super) fn from_committed_admission(authority: &CommittedAdmissionAuthority) -> Self {
+        Self::from_parts(
+            authority.execution().clone(),
+            ActiveResponseExecutionOrigin::CommittedAdmission,
+        )
+    }
+
+    fn from_parts(
+        parts: ActiveResponseExecutionRequestParts,
+        origin: ActiveResponseExecutionOrigin,
+    ) -> Self {
         let ActiveResponseExecutionRequestParts {
             response_plan,
             dispatch_id,
@@ -251,7 +297,6 @@ impl ActiveResponseExecutionRequest {
             approval,
             authorized_at_unix_ms,
             expires_at_unix_ms,
-            dispatch_committed_resume,
         } = parts;
         Self {
             response_plan,
@@ -265,7 +310,7 @@ impl ActiveResponseExecutionRequest {
             approval,
             authorized_at_unix_ms,
             expires_at_unix_ms,
-            dispatch_committed_resume,
+            origin,
         }
     }
 
@@ -341,7 +386,15 @@ impl ActiveResponseExecutionRequest {
 
     #[must_use]
     pub const fn dispatch_committed_resume(&self) -> bool {
-        self.dispatch_committed_resume
+        matches!(
+            self.origin,
+            ActiveResponseExecutionOrigin::CommittedAdmission
+        )
+    }
+
+    #[must_use]
+    pub const fn origin(&self) -> ActiveResponseExecutionOrigin {
+        self.origin
     }
 }
 
