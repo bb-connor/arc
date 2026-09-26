@@ -859,3 +859,83 @@ fn a_report_reads_one_snapshot_across_its_dimensions() {
     assert_eq!(report.summary.total_receipts, summary.0 + 2);
     assert_eq!(report.summary.total_cost_charged, summary.1 + 22);
 }
+
+fn query_plan(
+    connection: &SqliteStoreConnection,
+    sql: &str,
+    params: &[&dyn rusqlite::ToSql],
+) -> Vec<String> {
+    let mut statement = connection
+        .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+        .test_expect("prepare query plan");
+    let steps = statement
+        .query_map(params, |row| row.get::<_, String>(3))
+        .test_expect("read query plan");
+    steps.map(|step| step.test_expect("plan step")).collect()
+}
+
+fn dimension_plans(
+    connection: &SqliteStoreConnection,
+    query: &ReceiptAnalyticsQuery,
+) -> Vec<(&'static str, Vec<String>)> {
+    let scope = AnalyticsScope::from_query(query);
+    let group_limit = MAX_ANALYTICS_GROUP_LIMIT as i64;
+    let bucket_width = DAY_SECS as i64;
+    let summary = summary_query(&scope);
+    let agent = agent_query(&scope, &group_limit);
+    let tool = tool_query(&scope, &group_limit);
+    let time = time_query(&scope, &bucket_width, &group_limit);
+    vec![
+        (
+            "summary",
+            query_plan(connection, &summary.0, summary.1.params()),
+        ),
+        (
+            "by_agent",
+            query_plan(connection, &agent.0, agent.1.params()),
+        ),
+        ("by_tool", query_plan(connection, &tool.0, tool.1.params())),
+        ("by_time", query_plan(connection, &time.0, time.1.params())),
+    ]
+}
+
+/// A step that walks the receipt table itself rather than descending an index.
+fn is_receipt_table_scan(step: &str) -> bool {
+    step == "SCAN r" || step == "SCAN chio_tool_receipts"
+}
+
+#[test]
+fn every_supported_analytics_filter_reaches_the_receipts_through_an_index() {
+    let fixture = populate("chio-analytics-query-plan", json_domain_receipts());
+    let connection = fixture.store.connection().test_expect("reader connection");
+    register_total_cost_charged(&connection).test_expect("register charged-cost aggregate");
+
+    for (shape, query, _) in filter_shapes() {
+        if shape == "unfiltered" {
+            continue;
+        }
+        for (dimension, plan) in dimension_plans(&connection, &query) {
+            assert!(
+                !plan.iter().any(|step| is_receipt_table_scan(step)),
+                "{shape}/{dimension} scans the receipt table: {plan:?}"
+            );
+            assert!(
+                plan.iter()
+                    .any(|step| step.contains("idx_chio_tool_receipts_")),
+                "{shape}/{dimension} uses no receipt index: {plan:?}"
+            );
+        }
+    }
+
+    // The unfiltered report is the shape no index can narrow, which is why the
+    // receipt ceiling exists rather than an index.
+    let unfiltered = dimension_plans(&connection, &admin_query());
+    assert!(
+        unfiltered
+            .iter()
+            .any(|(_, plan)| plan.iter().any(|step| is_receipt_table_scan(step))),
+        "the unfiltered report is expected to scan: {unfiltered:?}"
+    );
+}
+
+use super::*;

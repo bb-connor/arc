@@ -4,6 +4,7 @@ use super::*;
 
 use rusqlite::functions::{Aggregate, Context, FunctionFlags};
 use rusqlite::types::ValueRef;
+use rusqlite::ToSql;
 
 /// SQL name of the aggregate that totals the charged-cost projection.
 const TOTAL_COST_CHARGED: &str = "chio_total_cost_charged";
@@ -24,8 +25,9 @@ const COST_TOTAL_UNREPORTABLE: &str =
 /// overflow, so no SQL expression can sum the unsigned charge domain exactly.
 /// The running total is a `u128` here and comes back as a big-endian blob the
 /// report decodes. A NULL projection is a receipt with no financial block and
-/// contributes nothing; any other width violates the column's `CHECK` constraint
-/// and refuses rather than contributing a wrong number to a financial report.
+/// contributes nothing; any other width violates the column's `CHECK`
+/// constraint and refuses rather than contributing a wrong number to a financial
+/// report.
 struct TotalCostCharged;
 
 impl Aggregate<u128, Vec<u8>> for TotalCostCharged {
@@ -144,14 +146,183 @@ fn report_snapshot(
     )?)
 }
 
-const ANALYTICS_FROM_WHERE: &str = "FROM chio_tool_receipts r
-            LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
-            WHERE (?1 IS NULL OR r.capability_id = ?1)
-              AND (?2 IS NULL OR r.tool_server = ?2)
-              AND (?3 IS NULL OR r.tool_name = ?3)
-              AND (?4 IS NULL OR r.timestamp >= ?4)
-              AND (?5 IS NULL OR r.timestamp <= ?5)
-              AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6)";
+/// The filters a report was asked for, owned so the bound parameters can borrow
+/// from one place for every dimension.
+struct AnalyticsScope {
+    capability_id: Option<String>,
+    tool_server: Option<String>,
+    tool_name: Option<String>,
+    since: Option<i64>,
+    until: Option<i64>,
+    agent_subject: Option<String>,
+}
+
+/// Whether a dimension resolves each receipt's subject through capability
+/// lineage.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SubjectDimension {
+    /// The dimension neither filters nor groups by subject.
+    Absent,
+    /// The dimension groups by the resolved subject and drops receipts whose
+    /// subject resolves to nothing.
+    Grouped,
+}
+
+/// The `FROM` and `WHERE` text for one dimension with the values its positional
+/// parameters bind to. Values are bound, never interpolated.
+struct AnalyticsScan<'bind> {
+    from_where: String,
+    bound: Vec<&'bind dyn ToSql>,
+}
+
+impl<'bind> AnalyticsScan<'bind> {
+    /// Bind one more value and return the positional index that names it.
+    fn bind(&mut self, value: &'bind dyn ToSql) -> usize {
+        self.bound.push(value);
+        self.bound.len()
+    }
+
+    fn params(&self) -> &[&'bind dyn ToSql] {
+        &self.bound
+    }
+}
+
+impl AnalyticsScope {
+    fn from_query(query: &ReceiptAnalyticsQuery) -> Self {
+        Self {
+            capability_id: query.capability_id.clone(),
+            tool_server: query.tool_server.clone(),
+            tool_name: query.tool_name.clone(),
+            since: query.since.map(|value| value as i64),
+            until: query.until.map(|value| value as i64),
+            agent_subject: query.agent_subject.clone(),
+        }
+    }
+
+    /// Build the scan for one dimension.
+    ///
+    /// Only the filters the caller supplied become predicates. Under the
+    /// `(?N IS NULL OR col = ?N)` form the planner has no usable index on any of
+    /// the six indexed columns, so a report was a full table scan whatever it
+    /// filtered on.
+    fn scan(&self, subject: SubjectDimension) -> AnalyticsScan<'_> {
+        let mut bound: Vec<&dyn ToSql> = Vec::new();
+        let mut predicates: Vec<String> = Vec::new();
+
+        if self.capability_id.is_some() {
+            bound.push(&self.capability_id);
+            predicates.push(format!("r.capability_id = ?{}", bound.len()));
+        }
+        if self.tool_server.is_some() {
+            bound.push(&self.tool_server);
+            predicates.push(format!("r.tool_server = ?{}", bound.len()));
+        }
+        if self.tool_name.is_some() {
+            bound.push(&self.tool_name);
+            predicates.push(format!("r.tool_name = ?{}", bound.len()));
+        }
+        if self.since.is_some() {
+            bound.push(&self.since);
+            predicates.push(format!("r.timestamp >= ?{}", bound.len()));
+        }
+        if self.until.is_some() {
+            bound.push(&self.until);
+            predicates.push(format!("r.timestamp <= ?{}", bound.len()));
+        }
+        if self.agent_subject.is_some() {
+            bound.push(&self.agent_subject);
+            let subject_param = bound.len();
+            // Written as a disjunction rather than over COALESCE so the subject
+            // index stays usable: a receipt carries its own subject whenever its
+            // metadata named one, and capability lineage is the fallback for the
+            // rest.
+            predicates.push(format!(
+                "(r.subject_key = ?{subject_param} \
+                 OR (r.subject_key IS NULL AND cl.subject_key = ?{subject_param}))"
+            ));
+        }
+        if subject == SubjectDimension::Grouped {
+            predicates.push("COALESCE(r.subject_key, cl.subject_key) IS NOT NULL".to_string());
+        }
+
+        // `capability_lineage.capability_id` is that table's primary key, so the
+        // left join can neither add nor drop a receipt row, and it is left out
+        // where no predicate or grouping reads the lineage subject.
+        let resolves_subject = self.agent_subject.is_some() || subject == SubjectDimension::Grouped;
+        let mut from_where = String::from("FROM chio_tool_receipts r");
+        if resolves_subject {
+            from_where.push_str(
+                "\n            LEFT JOIN capability_lineage cl \
+                 ON r.capability_id = cl.capability_id",
+            );
+        }
+        if !predicates.is_empty() {
+            from_where.push_str("\n            WHERE ");
+            from_where.push_str(&predicates.join("\n              AND "));
+        }
+
+        AnalyticsScan { from_where, bound }
+    }
+}
+
+fn summary_query(scope: &AnalyticsScope) -> (String, AnalyticsScan<'_>) {
+    let scan = scope.scan(SubjectDimension::Absent);
+    let sql = format!("SELECT {} {}", metric_columns(), scan.from_where);
+    (sql, scan)
+}
+
+fn agent_query<'bind>(
+    scope: &'bind AnalyticsScope,
+    group_limit: &'bind i64,
+) -> (String, AnalyticsScan<'bind>) {
+    let mut scan = scope.scan(SubjectDimension::Grouped);
+    let limit = scan.bind(group_limit);
+    let sql = format!(
+        "SELECT COALESCE(r.subject_key, cl.subject_key) AS subject_key, {} {}
+            GROUP BY COALESCE(r.subject_key, cl.subject_key)
+            ORDER BY total_receipts DESC, subject_key ASC
+            LIMIT ?{limit}",
+        metric_columns(),
+        scan.from_where
+    );
+    (sql, scan)
+}
+
+fn tool_query<'bind>(
+    scope: &'bind AnalyticsScope,
+    group_limit: &'bind i64,
+) -> (String, AnalyticsScan<'bind>) {
+    let mut scan = scope.scan(SubjectDimension::Absent);
+    let limit = scan.bind(group_limit);
+    let sql = format!(
+        "SELECT r.tool_server, r.tool_name, {} {}
+            GROUP BY r.tool_server, r.tool_name
+            ORDER BY total_receipts DESC, r.tool_server ASC, r.tool_name ASC
+            LIMIT ?{limit}",
+        metric_columns(),
+        scan.from_where
+    );
+    (sql, scan)
+}
+
+fn time_query<'bind>(
+    scope: &'bind AnalyticsScope,
+    bucket_width: &'bind i64,
+    group_limit: &'bind i64,
+) -> (String, AnalyticsScan<'bind>) {
+    let mut scan = scope.scan(SubjectDimension::Absent);
+    let width = scan.bind(bucket_width);
+    let limit = scan.bind(group_limit);
+    let sql = format!(
+        "SELECT CAST((r.timestamp / ?{width}) * ?{width} AS INTEGER) AS bucket_start, {} {}
+            GROUP BY bucket_start
+            ORDER BY bucket_start ASC
+            LIMIT ?{limit}",
+        metric_columns(),
+        scan.from_where
+    );
+    (sql, scan)
+}
 
 impl SqliteReceiptStore {
     /// Receipt activity and financial totals over the receipts a report's
@@ -187,123 +358,53 @@ impl SqliteReceiptStore {
             .clamp(1, MAX_ANALYTICS_GROUP_LIMIT) as i64;
         let time_bucket = query.time_bucket.unwrap_or(AnalyticsTimeBucket::Day);
         let bucket_width = time_bucket.width_secs() as i64;
-
-        let capability_id = query.capability_id.as_deref();
-        let tool_server = query.tool_server.as_deref();
-        let tool_name = query.tool_name.as_deref();
-        let since = query.since.map(|value| value as i64);
-        let until = query.until.map(|value| value as i64);
-        let agent_subject = query.agent_subject.as_deref();
+        let scope = AnalyticsScope::from_query(query);
 
         let connection = self.connection()?;
         register_total_cost_charged(&connection)?;
         let snapshot = report_snapshot(&connection)?;
 
-        let summary_sql = format!("SELECT {} {ANALYTICS_FROM_WHERE}", metric_columns());
-        let summary = snapshot.query_row(
-            &summary_sql,
-            params![
-                capability_id,
-                tool_server,
-                tool_name,
-                since,
-                until,
-                agent_subject
-            ],
-            |row| metrics_from_row(row, 0),
-        )?;
+        let (summary_sql, summary_scan) = summary_query(&scope);
+        let summary = snapshot.query_row(&summary_sql, summary_scan.params(), |row| {
+            metrics_from_row(row, 0)
+        })?;
 
-        let by_agent_sql = format!(
-            "SELECT COALESCE(r.subject_key, cl.subject_key) AS subject_key, {} \
-             {ANALYTICS_FROM_WHERE}
-              AND COALESCE(r.subject_key, cl.subject_key) IS NOT NULL
-            GROUP BY COALESCE(r.subject_key, cl.subject_key)
-            ORDER BY total_receipts DESC, subject_key ASC
-            LIMIT ?7",
-            metric_columns()
-        );
+        let (agent_sql, agent_scan) = agent_query(&scope, &group_limit);
         let by_agent = snapshot
-            .prepare(&by_agent_sql)?
-            .query_map(
-                params![
-                    capability_id,
-                    tool_server,
-                    tool_name,
-                    since,
-                    until,
-                    agent_subject,
-                    group_limit
-                ],
-                |row| {
-                    Ok(AgentAnalyticsRow {
-                        subject_key: row.get(0)?,
-                        metrics: metrics_from_row(row, 1)?,
-                    })
-                },
-            )?
+            .prepare(&agent_sql)?
+            .query_map(agent_scan.params(), |row| {
+                Ok(AgentAnalyticsRow {
+                    subject_key: row.get(0)?,
+                    metrics: metrics_from_row(row, 1)?,
+                })
+            })?
             .collect::<Result<Vec<_>, _>>()?;
 
-        let by_tool_sql = format!(
-            "SELECT r.tool_server, r.tool_name, {} {ANALYTICS_FROM_WHERE}
-            GROUP BY r.tool_server, r.tool_name
-            ORDER BY total_receipts DESC, r.tool_server ASC, r.tool_name ASC
-            LIMIT ?7",
-            metric_columns()
-        );
+        let (tool_sql, tool_scan) = tool_query(&scope, &group_limit);
         let by_tool = snapshot
-            .prepare(&by_tool_sql)?
-            .query_map(
-                params![
-                    capability_id,
-                    tool_server,
-                    tool_name,
-                    since,
-                    until,
-                    agent_subject,
-                    group_limit
-                ],
-                |row| {
-                    Ok(ToolAnalyticsRow {
-                        tool_server: row.get(0)?,
-                        tool_name: row.get(1)?,
-                        metrics: metrics_from_row(row, 2)?,
-                    })
-                },
-            )?
+            .prepare(&tool_sql)?
+            .query_map(tool_scan.params(), |row| {
+                Ok(ToolAnalyticsRow {
+                    tool_server: row.get(0)?,
+                    tool_name: row.get(1)?,
+                    metrics: metrics_from_row(row, 2)?,
+                })
+            })?
             .collect::<Result<Vec<_>, _>>()?;
 
-        let by_time_sql = format!(
-            "SELECT CAST((r.timestamp / ?7) * ?7 AS INTEGER) AS bucket_start, {} \
-             {ANALYTICS_FROM_WHERE}
-            GROUP BY bucket_start
-            ORDER BY bucket_start ASC
-            LIMIT ?8",
-            metric_columns()
-        );
+        let (time_sql, time_scan) = time_query(&scope, &bucket_width, &group_limit);
         let by_time = snapshot
-            .prepare(&by_time_sql)?
-            .query_map(
-                params![
-                    capability_id,
-                    tool_server,
-                    tool_name,
-                    since,
-                    until,
-                    agent_subject,
-                    bucket_width,
-                    group_limit
-                ],
-                |row| {
-                    let bucket_start = row.get::<_, i64>(0)?.max(0) as u64;
-                    Ok(TimeAnalyticsRow {
-                        bucket_start,
-                        bucket_end: bucket_start
-                            .saturating_add(bucket_width.max(1) as u64)
-                            .saturating_sub(1),
-                        metrics: metrics_from_row(row, 1)?,
-                    })
-                },
-            )?
+            .prepare(&time_sql)?
+            .query_map(time_scan.params(), |row| {
+                let bucket_start = row.get::<_, i64>(0)?.max(0) as u64;
+                Ok(TimeAnalyticsRow {
+                    bucket_start,
+                    bucket_end: bucket_start
+                        .saturating_add(bucket_width.max(1) as u64)
+                        .saturating_sub(1),
+                    metrics: metrics_from_row(row, 1)?,
+                })
+            })?
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(ReceiptAnalyticsResponse {
