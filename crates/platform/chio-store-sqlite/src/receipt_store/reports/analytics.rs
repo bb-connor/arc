@@ -19,6 +19,16 @@ const COST_TOTAL_BYTES: usize = 16;
 const COST_TOTAL_UNREPORTABLE: &str =
     "receipt analytics charged-cost total exceeds the reportable range";
 
+/// Receipts one analytics report may aggregate.
+///
+/// No rollup table stands behind this report, so each of its four dimensions
+/// visits every matching receipt and parses its JSON once for the attempted
+/// cost. At the cost this lane measured, around 22 microseconds of report time
+/// per receipt across the four dimensions, this ceiling puts the slowest
+/// accepted report in the seconds and makes a whole-table request an error that
+/// names the filters that bound it.
+const MAX_ANALYTICS_RECEIPT_SCAN: i64 = 250_000;
+
 /// Totals the eight-byte big-endian charged-cost projection.
 ///
 /// SQLite arithmetic is signed 64-bit and degrades silently to floating point on
@@ -265,6 +275,21 @@ impl AnalyticsScope {
     }
 }
 
+fn receipt_ceiling_query<'bind>(
+    scope: &'bind AnalyticsScope,
+    ceiling: &'bind i64,
+) -> (String, AnalyticsScan<'bind>) {
+    let mut scan = scope.scan(SubjectDimension::Absent);
+    let limit = scan.bind(ceiling);
+    // The subquery's LIMIT stops the walk one row past the ceiling, so the check
+    // costs a bounded scan rather than a count of the whole match.
+    let sql = format!(
+        "SELECT COUNT(*) FROM (SELECT 1 {} LIMIT ?{limit})",
+        scan.from_where
+    );
+    (sql, scan)
+}
+
 fn summary_query(scope: &AnalyticsScope) -> (String, AnalyticsScan<'_>) {
     let scan = scope.scan(SubjectDimension::Absent);
     let sql = format!("SELECT {} {}", metric_columns(), scan.from_where);
@@ -344,9 +369,20 @@ impl SqliteReceiptStore {
     ///
     /// `total_attempted_cost` has no typed projection and is still summed out of
     /// the signed receipt body, which is exact below `2^63` and clamps above it.
+    ///
+    /// A report matching more receipts than `MAX_ANALYTICS_RECEIPT_SCAN` is
+    /// refused. `since` and `until` bound it.
     pub fn query_receipt_analytics(
         &self,
         query: &ReceiptAnalyticsQuery,
+    ) -> Result<ReceiptAnalyticsResponse, ReceiptStoreError> {
+        self.receipt_analytics_within(query, MAX_ANALYTICS_RECEIPT_SCAN)
+    }
+
+    fn receipt_analytics_within(
+        &self,
+        query: &ReceiptAnalyticsQuery,
+        receipt_ceiling: i64,
     ) -> Result<ReceiptAnalyticsResponse, ReceiptStoreError> {
         require_admin_receipt_read_context(
             query.read_context.as_ref(),
@@ -363,6 +399,17 @@ impl SqliteReceiptStore {
         let connection = self.connection()?;
         register_total_cost_charged(&connection)?;
         let snapshot = report_snapshot(&connection)?;
+
+        let ceiling = receipt_ceiling.saturating_add(1);
+        let (ceiling_sql, ceiling_scan) = receipt_ceiling_query(&scope, &ceiling);
+        let matched: i64 =
+            snapshot.query_row(&ceiling_sql, ceiling_scan.params(), |row| row.get(0))?;
+        if matched > receipt_ceiling {
+            return Err(ReceiptStoreError::ReadBoundary(format!(
+                "receipt analytics report covers more than {receipt_ceiling} receipts; \
+                 bound it with `since` and `until`"
+            )));
+        }
 
         let (summary_sql, summary_scan) = summary_query(&scope);
         let summary = snapshot.query_row(&summary_sql, summary_scan.params(), |row| {
