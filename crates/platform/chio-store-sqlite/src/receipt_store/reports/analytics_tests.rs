@@ -508,3 +508,354 @@ fn attempted_cost_still_comes_from_the_signed_body() {
     assert_eq!(total, expected);
     assert!(expected > 0, "the fixture must carry attempted costs");
 }
+
+fn admin_query() -> ReceiptAnalyticsQuery {
+    ReceiptAnalyticsQuery {
+        group_limit: Some(MAX_ANALYTICS_GROUP_LIMIT),
+        time_bucket: Some(AnalyticsTimeBucket::Day),
+        read_context: Some(chio_kernel::ReceiptReadContext::local_operator_admin_all()),
+        ..ReceiptAnalyticsQuery::default()
+    }
+}
+
+/// One stored receipt as the analytics predicates see it, read back so the
+/// oracle re-derives the aggregation and nothing else.
+struct StoredRow {
+    capability_id: String,
+    tool_server: String,
+    tool_name: String,
+    subject_key: Option<String>,
+    timestamp: i64,
+    decision_kind: String,
+    cost_charged: Option<u64>,
+    attempted_cost: u64,
+}
+
+fn stored_rows(fixture: &Fixture) -> Vec<StoredRow> {
+    let connection = fixture.store.connection().test_expect("reader connection");
+    let mut statement = connection
+        .prepare(
+            "SELECT capability_id, tool_server, tool_name, subject_key, timestamp, \
+             decision_kind, cost_charged_be, raw_json FROM chio_tool_receipts",
+        )
+        .test_expect("prepare stored row read");
+    let rows = statement
+        .query_map([], |row| {
+            Ok(StoredRow {
+                capability_id: row.get(0)?,
+                tool_server: row.get(1)?,
+                tool_name: row.get(2)?,
+                subject_key: row.get(3)?,
+                timestamp: row.get(4)?,
+                decision_kind: row.get(5)?,
+                cost_charged: row.get::<_, Option<[u8; 8]>>(6)?.map(u64::from_be_bytes),
+                attempted_cost: signed_attempted_cost(&row.get::<_, String>(7)?),
+            })
+        })
+        .test_expect("read stored rows");
+    rows.map(|row| row.test_expect("stored row")).collect()
+}
+
+fn signed_attempted_cost(raw_json: &str) -> u64 {
+    serde_json::from_str::<serde_json::Value>(raw_json)
+        .test_expect("fixture receipt is valid json")
+        .get("metadata")
+        .and_then(|metadata| metadata.get("financial"))
+        .and_then(|financial| financial.get("attempted_cost"))
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(0)
+}
+
+fn expected_metrics<'row>(rows: impl Iterator<Item = &'row StoredRow>) -> ReceiptAnalyticsMetrics {
+    let mut total_receipts = 0_u64;
+    let mut allow = 0_u64;
+    let mut deny = 0_u64;
+    let mut cancelled = 0_u64;
+    let mut incomplete = 0_u64;
+    let mut charged = 0_u128;
+    let mut attempted = 0_u64;
+    for row in rows {
+        total_receipts += 1;
+        match row.decision_kind.as_str() {
+            "allow" => allow += 1,
+            "deny" => deny += 1,
+            "cancelled" => cancelled += 1,
+            "incomplete" => incomplete += 1,
+            other => panic!("unexpected decision kind {other}"),
+        }
+        charged += u128::from(row.cost_charged.unwrap_or(0));
+        attempted += row.attempted_cost;
+    }
+    ReceiptAnalyticsMetrics::from_raw(
+        total_receipts,
+        allow,
+        deny,
+        cancelled,
+        incomplete,
+        u64::try_from(charged).test_expect("charged total fits the report"),
+        attempted,
+    )
+}
+
+type RowPredicate = Box<dyn Fn(&StoredRow) -> bool>;
+
+/// A window narrow enough to select a handful of the fixture's receipts, used
+/// both for the filter-shape comparison and for the scan ceiling.
+const NARROW_WINDOW: (u64, u64) = (DAY_SECS, DAY_SECS + 20);
+
+fn filter_shapes() -> Vec<(&'static str, ReceiptAnalyticsQuery, RowPredicate)> {
+    let (since, until) = NARROW_WINDOW;
+    vec![
+        (
+            "unfiltered",
+            admin_query(),
+            Box::new(|_: &StoredRow| true) as RowPredicate,
+        ),
+        (
+            "capability",
+            ReceiptAnalyticsQuery {
+                capability_id: Some("cap-2".to_string()),
+                ..admin_query()
+            },
+            Box::new(|row: &StoredRow| row.capability_id == "cap-2"),
+        ),
+        (
+            "tool",
+            ReceiptAnalyticsQuery {
+                tool_server: Some("shell".to_string()),
+                tool_name: Some("bash".to_string()),
+                ..admin_query()
+            },
+            Box::new(|row: &StoredRow| row.tool_server == "shell" && row.tool_name == "bash"),
+        ),
+        (
+            "time window",
+            ReceiptAnalyticsQuery {
+                since: Some(since),
+                until: Some(until),
+                ..admin_query()
+            },
+            Box::new(move |row: &StoredRow| {
+                row.timestamp >= since as i64 && row.timestamp <= until as i64
+            }),
+        ),
+        (
+            "agent subject",
+            ReceiptAnalyticsQuery {
+                agent_subject: Some("agent-beta".to_string()),
+                ..admin_query()
+            },
+            Box::new(|row: &StoredRow| row.subject_key.as_deref() == Some("agent-beta")),
+        ),
+    ]
+}
+
+#[test]
+fn analytics_report_totals_the_typed_projection_for_every_filter_shape() {
+    let fixture = populate("chio-analytics-report-shapes", json_domain_receipts());
+    let rows = stored_rows(&fixture);
+    assert_eq!(rows.len(), fixture.receipts.len());
+    assert!(
+        rows.iter().any(|row| row.cost_charged.is_none()),
+        "the fixture must carry receipts with no financial block"
+    );
+
+    for (shape, query, matches) in filter_shapes() {
+        let report = fixture
+            .store
+            .query_receipt_analytics(&query)
+            .test_expect(shape);
+        let expected = expected_metrics(rows.iter().filter(|row| matches(row)));
+        assert_eq!(report.summary, expected, "summary differs for {shape}");
+        assert!(
+            expected.total_receipts > 0,
+            "{shape} selects no receipts, so it proves nothing"
+        );
+    }
+}
+
+#[test]
+fn analytics_report_groups_match_the_typed_projection() {
+    let fixture = populate("chio-analytics-report-groups", json_domain_receipts());
+    let rows = stored_rows(&fixture);
+    let report = fixture
+        .store
+        .query_receipt_analytics(&admin_query())
+        .test_expect("analytics report");
+
+    for agent in &report.by_agent {
+        let expected = expected_metrics(
+            rows.iter()
+                .filter(|row| row.subject_key.as_deref() == Some(agent.subject_key.as_str())),
+        );
+        assert_eq!(agent.metrics, expected, "agent {}", agent.subject_key);
+    }
+    assert_eq!(
+        report.by_agent.len(),
+        rows.iter()
+            .filter_map(|row| row.subject_key.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+    );
+
+    for tool in &report.by_tool {
+        let expected =
+            expected_metrics(rows.iter().filter(|row| {
+                row.tool_server == tool.tool_server && row.tool_name == tool.tool_name
+            }));
+        assert_eq!(
+            tool.metrics, expected,
+            "tool {}/{}",
+            tool.tool_server, tool.tool_name
+        );
+    }
+
+    let bucket = DAY_SECS as i64;
+    for time in &report.by_time {
+        let start = time.bucket_start as i64;
+        let expected = expected_metrics(
+            rows.iter()
+                .filter(|row| (row.timestamp / bucket) * bucket == start),
+        );
+        assert_eq!(time.metrics, expected, "bucket {}", time.bucket_start);
+    }
+}
+
+#[test]
+fn analytics_report_returns_the_exact_charge_at_each_unsigned_boundary() {
+    let fixture = populate("chio-analytics-boundaries", range_edge_receipts());
+    for (capability_id, cost_charged) in RANGE_EDGE_COSTS {
+        let report = fixture
+            .store
+            .query_receipt_analytics(&ReceiptAnalyticsQuery {
+                capability_id: Some(capability_id.to_string()),
+                ..admin_query()
+            })
+            .test_expect(capability_id);
+        assert_eq!(report.summary.total_receipts, 1, "{capability_id}");
+        assert_eq!(
+            report.summary.total_cost_charged, cost_charged,
+            "{capability_id}"
+        );
+    }
+
+    let signed_overflow = fixture
+        .store
+        .query_receipt_analytics(&ReceiptAnalyticsQuery {
+            capability_id: Some(SIGNED_TOTAL_OVERFLOW_CAPABILITY.to_string()),
+            ..admin_query()
+        })
+        .test_expect("charges beyond the signed total");
+    assert_eq!(
+        signed_overflow.summary.total_cost_charged,
+        SIGNED_TOTAL_OVERFLOW_CHARGE * SIGNED_TOTAL_OVERFLOW_ROWS as u64
+    );
+}
+
+#[test]
+fn analytics_report_refuses_a_charge_total_beyond_the_reportable_range() {
+    let fixture = populate("chio-analytics-unreportable", range_edge_receipts());
+    let refusal = fixture
+        .store
+        .query_receipt_analytics(&admin_query())
+        .test_unwrap_err();
+    match refusal {
+        ReceiptStoreError::Sqlite(rusqlite::Error::UserFunctionError(error)) => {
+            let message = error.to_string();
+            assert!(
+                message.starts_with(COST_TOTAL_UNREPORTABLE),
+                "unexpected refusal: {message}"
+            );
+        }
+        other => panic!("expected an unreportable-total refusal, got {other:?}"),
+    }
+}
+
+/// The report's own metric columns over the whole table, grouped as the summary
+/// groups them and again as the time dimension does, so the two can be compared
+/// across an append that lands between the two reads.
+fn summary_and_bucketed_totals(source: &Connection) -> ((u64, u64), (u64, u64)) {
+    let summary = source
+        .query_row(
+            &format!("SELECT {} FROM chio_tool_receipts r", metric_columns()),
+            [],
+            |row| metrics_from_row(row, 0),
+        )
+        .test_expect("summary metrics");
+
+    let bucket_sql = format!(
+        "SELECT CAST((r.timestamp / {DAY_SECS}) * {DAY_SECS} AS INTEGER) AS bucket_start, {} \
+         FROM chio_tool_receipts r GROUP BY bucket_start",
+        metric_columns()
+    );
+    let mut statement = source.prepare(&bucket_sql).test_expect("prepare buckets");
+    let buckets = statement
+        .query_map([], |row| metrics_from_row(row, 1))
+        .test_expect("bucket metrics");
+    let mut bucketed = (0_u64, 0_u64);
+    for bucket in buckets {
+        let metrics = bucket.test_expect("bucket row");
+        bucketed.0 += metrics.total_receipts;
+        bucketed.1 += metrics.total_cost_charged;
+    }
+
+    (
+        (summary.total_receipts, summary.total_cost_charged),
+        bucketed,
+    )
+}
+
+fn append_one_more(fixture: &Fixture, id: usize) {
+    let receipt = FixtureReceipt {
+        capability_id: "cap-interleaved".to_string(),
+        subject_key: "agent-interleaved",
+        tool_server: "shell",
+        tool_name: "bash",
+        decision: Decision::Allow,
+        timestamp: DAY_SECS,
+        financial: Some((11, None)),
+    };
+    fixture
+        .store
+        .append_chio_receipt_returning_seq(&sign_fixture_receipt(100_000 + id, &receipt))
+        .test_expect("append an interleaved receipt");
+    fixture
+        .store
+        .flush_receipt_writes()
+        .test_expect("flush the interleaved receipt");
+}
+
+#[test]
+fn a_report_reads_one_snapshot_across_its_dimensions() {
+    let fixture = populate("chio-analytics-snapshot", json_domain_receipts());
+    let connection = fixture.store.connection().test_expect("reader connection");
+    register_total_cost_charged(&connection).test_expect("register charged-cost aggregate");
+
+    let snapshot = report_snapshot(&connection).test_expect("report snapshot");
+    let (summary, _) = summary_and_bucketed_totals(&snapshot);
+    append_one_more(&fixture, 1);
+    let (_, bucketed) = summary_and_bucketed_totals(&snapshot);
+    assert_eq!(
+        summary, bucketed,
+        "an append between two dimensions reached the second one"
+    );
+    drop(snapshot);
+
+    // Outside a snapshot the same interleaving is visible, which is what makes
+    // the snapshot load-bearing rather than decorative.
+    let (unpinned_summary, _) = summary_and_bucketed_totals(&connection);
+    append_one_more(&fixture, 2);
+    let (_, unpinned_buckets) = summary_and_bucketed_totals(&connection);
+    assert_eq!(
+        unpinned_buckets,
+        (unpinned_summary.0 + 1, unpinned_summary.1 + 11),
+        "statements outside a snapshot are expected to see the append"
+    );
+
+    let report = fixture
+        .store
+        .query_receipt_analytics(&admin_query())
+        .test_expect("analytics report");
+    assert_eq!(report.summary.total_receipts, summary.0 + 2);
+    assert_eq!(report.summary.total_cost_charged, summary.1 + 22);
+}
