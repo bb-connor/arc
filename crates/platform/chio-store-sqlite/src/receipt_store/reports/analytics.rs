@@ -6,6 +6,11 @@ use rusqlite::functions::{Aggregate, Context, FunctionFlags};
 use rusqlite::types::ValueRef;
 use rusqlite::ToSql;
 
+#[path = "analytics/integrity.rs"]
+mod integrity;
+#[path = "analytics/work_budget.rs"]
+mod work_budget;
+
 const TOTAL_COST_CHARGED: &str = "chio_total_cost_charged";
 const TOTAL_ATTEMPTED_COST: &str = "chio_total_attempted_cost";
 const COST_BYTES: usize = 8;
@@ -18,6 +23,7 @@ const ATTEMPTED_COST_TOTAL_UNREPORTABLE: &str =
 /// Each dimension visits every matching receipt. Bound the snapshot and scan
 /// work until a separately verified rollup is available; filters narrow it.
 const MAX_ANALYTICS_RECEIPT_SCAN: i64 = 250_000;
+const MAX_ANALYTICS_SQL_STEPS: u64 = 100_000_000;
 
 #[derive(Clone, Copy)]
 enum CostMetric {
@@ -378,8 +384,9 @@ impl SqliteReceiptStore {
     /// more than one currency totals unlike units. Read the total as money only
     /// where one currency is in use.
     ///
-    /// `total_attempted_cost` has no typed projection and is still summed out of
-    /// the signed receipt body, which is exact below `2^63` and clamps above it.
+    /// Charged and attempted costs use exact unsigned projections. Before
+    /// aggregation, their values must match the verified signed receipts in
+    /// the same read snapshot. A reportable total must fit in `u64`.
     ///
     /// A report matching more receipts than `MAX_ANALYTICS_RECEIPT_SCAN` is
     /// refused. `since` and `until` bound it.
@@ -394,6 +401,15 @@ impl SqliteReceiptStore {
         &self,
         query: &ReceiptAnalyticsQuery,
         receipt_ceiling: i64,
+    ) -> Result<ReceiptAnalyticsResponse, ReceiptStoreError> {
+        self.receipt_analytics_with_limits(query, receipt_ceiling, MAX_ANALYTICS_SQL_STEPS)
+    }
+
+    fn receipt_analytics_with_limits(
+        &self,
+        query: &ReceiptAnalyticsQuery,
+        receipt_ceiling: i64,
+        sql_steps: u64,
     ) -> Result<ReceiptAnalyticsResponse, ReceiptStoreError> {
         require_admin_receipt_read_context(
             query.read_context.as_ref(),
@@ -410,67 +426,72 @@ impl SqliteReceiptStore {
         let connection = self.connection()?;
         register_cost_aggregates(&connection)?;
         let snapshot = report_snapshot(&connection)?;
-
-        let ceiling = receipt_ceiling.saturating_add(1);
-        let (ceiling_sql, ceiling_scan) = receipt_ceiling_query(&scope, &ceiling);
-        let matched: i64 =
-            snapshot.query_row(&ceiling_sql, ceiling_scan.params(), |row| row.get(0))?;
-        if matched > receipt_ceiling {
-            return Err(ReceiptStoreError::ReadBoundary(format!(
-                "receipt analytics report covers more than {receipt_ceiling} receipts; \
+        let budget = work_budget::SqlWorkBudget::new(&snapshot, sql_steps)?;
+        let result = (|| {
+            let ceiling = receipt_ceiling.saturating_add(1);
+            let (ceiling_sql, ceiling_scan) = receipt_ceiling_query(&scope, &ceiling);
+            let matched: i64 =
+                snapshot.query_row(&ceiling_sql, ceiling_scan.params(), |row| row.get(0))?;
+            if matched > receipt_ceiling {
+                return Err(ReceiptStoreError::ReadBoundary(format!(
+                    "receipt analytics report covers more than {receipt_ceiling} receipts; \
                  bound it with `since` and `until`"
-            )));
-        }
+                )));
+            }
 
-        let (summary_sql, summary_scan) = summary_query(&scope);
-        let summary = snapshot.query_row(&summary_sql, summary_scan.params(), |row| {
-            metrics_from_row(row, 0)
-        })?;
+            integrity::verify_report_costs(&snapshot, &scope)?;
 
-        let (agent_sql, agent_scan) = agent_query(&scope, &group_limit);
-        let by_agent = snapshot
-            .prepare(&agent_sql)?
-            .query_map(agent_scan.params(), |row| {
-                Ok(AgentAnalyticsRow {
-                    subject_key: row.get(0)?,
-                    metrics: metrics_from_row(row, 1)?,
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
+            let (summary_sql, summary_scan) = summary_query(&scope);
+            let summary = snapshot.query_row(&summary_sql, summary_scan.params(), |row| {
+                metrics_from_row(row, 0)
+            })?;
 
-        let (tool_sql, tool_scan) = tool_query(&scope, &group_limit);
-        let by_tool = snapshot
-            .prepare(&tool_sql)?
-            .query_map(tool_scan.params(), |row| {
-                Ok(ToolAnalyticsRow {
-                    tool_server: row.get(0)?,
-                    tool_name: row.get(1)?,
-                    metrics: metrics_from_row(row, 2)?,
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
+            let (agent_sql, agent_scan) = agent_query(&scope, &group_limit);
+            let by_agent = snapshot
+                .prepare(&agent_sql)?
+                .query_map(agent_scan.params(), |row| {
+                    Ok(AgentAnalyticsRow {
+                        subject_key: row.get(0)?,
+                        metrics: metrics_from_row(row, 1)?,
+                    })
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
 
-        let (time_sql, time_scan) = time_query(&scope, &bucket_width, &group_limit);
-        let by_time = snapshot
-            .prepare(&time_sql)?
-            .query_map(time_scan.params(), |row| {
-                let bucket_start = row.get::<_, i64>(0)?.max(0) as u64;
-                Ok(TimeAnalyticsRow {
-                    bucket_start,
-                    bucket_end: bucket_start
-                        .saturating_add(bucket_width.max(1) as u64)
-                        .saturating_sub(1),
-                    metrics: metrics_from_row(row, 1)?,
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
+            let (tool_sql, tool_scan) = tool_query(&scope, &group_limit);
+            let by_tool = snapshot
+                .prepare(&tool_sql)?
+                .query_map(tool_scan.params(), |row| {
+                    Ok(ToolAnalyticsRow {
+                        tool_server: row.get(0)?,
+                        tool_name: row.get(1)?,
+                        metrics: metrics_from_row(row, 2)?,
+                    })
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(ReceiptAnalyticsResponse {
-            summary,
-            by_agent,
-            by_tool,
-            by_time,
-        })
+            let (time_sql, time_scan) = time_query(&scope, &bucket_width, &group_limit);
+            let by_time = snapshot
+                .prepare(&time_sql)?
+                .query_map(time_scan.params(), |row| {
+                    let bucket_start = row.get::<_, i64>(0)?.max(0) as u64;
+                    Ok(TimeAnalyticsRow {
+                        bucket_start,
+                        bucket_end: bucket_start
+                            .saturating_add(bucket_width.max(1) as u64)
+                            .saturating_sub(1),
+                        metrics: metrics_from_row(row, 1)?,
+                    })
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+
+            Ok(ReceiptAnalyticsResponse {
+                summary,
+                by_agent,
+                by_tool,
+                by_time,
+            })
+        })();
+        budget.finish(result)
     }
 }
 

@@ -10,6 +10,8 @@ use chio_test_support::prelude::*;
 
 #[path = "analytics_tests/attempted_cost.rs"]
 mod attempted_cost;
+#[path = "analytics_tests/integrity.rs"]
+mod integrity;
 
 /// Charged-cost aggregate the analytics queries carried before the typed
 /// projection replaced it. Kept here as the oracle the replacement is measured
@@ -17,8 +19,8 @@ mod attempted_cost;
 const JSON_COST_CHARGED_SUM: &str = "COALESCE(SUM(CAST(COALESCE(json_extract(r.raw_json, \
      '$.metadata.financial.cost_charged'), 0) AS INTEGER)), 0)";
 
-/// Attempted-cost aggregate. No typed projection exists for this field, so the
-/// analytics queries still carry this expression.
+/// Legacy attempted-cost aggregate, retained only for the exact signed-i64
+/// comparison domain. Production uses the full-u64 typed projection.
 const JSON_ATTEMPTED_COST_SUM: &str = "COALESCE(SUM(CAST(COALESCE(json_extract(r.raw_json, \
      '$.metadata.financial.attempted_cost'), 0) AS INTEGER)), 0)";
 
