@@ -34,8 +34,12 @@ before its work reaches the integration branch.
   audit, Packet 5); `enterprise-security-contract / Build canonical exact merge
   binding` (Packet 5 trusted-capture chain); `nonce-fips-contract / Exact kernel
   caller execution`; `Security contract / Require every security dependency`.
-  The last two may be regressions from the remediation commit and are triaged in
-  Wave 1 before anything is built on top of them.
+  Lane E's triage ([record](../../reviews/2026-09-26-ci-triage-3cd73631a1.md))
+  found steps 2 and 5 are one code regression (a v4-to-v6 wire-schema bump left two
+  pinning tests on v4; reproduced locally), step 1 is a racy new test (a fixed 50 ms
+  sleep before a `/proc` identity check), and steps 3, 4 and 6 are Packet 5
+  prerequisites (the audit, a trusted-definition pin that predates the `GH_TOKEN`
+  fix, and an unconfigured `CHIO_COMMITTED_LINUX_EVIDENCE_SHA` repository variable).
 
 ## Principles
 
@@ -91,6 +95,7 @@ longest and is internally sequential.
 | **C** measurement and analytics | 9.1, 9.2 | `chio-store-sqlite/benches/`, `receipt_store/reports/analytics.rs`, `receipt_store/bootstrap/open.rs` (typed column for attempted cost if absent), a populated-fixture test module | Opus 5 | composite-authorization, charge/release and denial-read benchmarks against a populated store, baselines in the ledger; all four `json_extract` aggregates replaced by the typed columns; `EXPLAIN QUERY PLAN` asserted in a test; aggregate values proved byte-identical against the fixture |
 | **D** Packet 1 continuation | 1D, then 1A 1B 1C 1E 1F, then the parent Packet 1 tasks | `chio-security-types/src/response*.rs`, `chio-quarantine/src/**`, `chio-kernel/src/kernel/active_response*`, `chio-active-response-authority/src/**`, `chio-control-plane/src/security/**`, `chio-core-types/src/receipt/security*` | Fable 5.1 | see below |
 | **E** CI triage (read-only) | none; a report | no edits; reads CI logs at `3cd73631a1` | Sonnet 5 | each of the six red steps classified as infrastructure, Packet 5 prerequisite, or code regression; a reproduction and proposed fix for any regression, delivered as a report for a Wave 2 lane |
+| **R** regression repair | the two regressions Lane E confirmed | `crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs` (a schema-pinning test beside the constants only), `crates/kernel/chio-runtime-core/tests/runtime_admission/operation_owned/caller.rs`, `crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/dispatch_context.rs`, `integrations/required-agents/prepare-session.py` and `qualification/test_prepare_session_readiness.py` | Opus 5 | both reproduced failures pass; the two v4 literals are v6 by deliberate edit and a kernel test pins `SCHEMA` v6 and `CUSTODY_SCHEMA` v4; the fixed sleep is a bounded poll with a unit test that injects a probe failing N times before succeeding; 40 consecutive runs of the suite clean |
 
 **Lane D order.** Correction 1D first: `DispatchRejection` with one variant per
 rule, `StateMachineError::InvalidDispatch(DispatchRejection)`, replacement of the
@@ -114,7 +119,7 @@ overlap, both expiry orders, rollback conflict, receipt failure, restart and
 cross-mode replay, every negative case asserting its `DispatchRejection` variant,
 and every case asserting zero live effect calls.
 
-**Merge order within Wave 1.** E reports first (it gates nothing but informs D).
+**Merge order within Wave 1.** E reports first (it gates nothing but informs D). R merges as soon as it passes the gate; it is disjoint from every other lane and turns two required checks green.
 A and B merge together, because 0.2 without 10.1 trades a silent wrap for a bricked
 store. C merges independently. D merges last, after A and B, so its new tests run
 under the new gates and the release-profile arithmetic check.
@@ -134,6 +139,7 @@ After Wave 1 merges and checkpoints. Ownership stays disjoint per lane.
 | H | 10.2 `UntrustedJsonText`, 10.3 tenant classification, 10.4 chain-link bind and `CHECK`, 3A wrapping sweep | 1F enumeration; C (shares `open.rs`) | 10.3 resolves `chio_tool_receipts.receipt_id` provenance before scheduling any remediation |
 | I | 9.3 `prepare_cached` on measured paths, 9.4 connection strategy | C's baselines; B | if 9.4 moves the 18 stores to the pool shape, B's recovery becomes moot and is removed in the same change |
 | J | Packet 2 boundaries, 2A, 2B; Packet 3 retention liveness #1045 | x86_64 runner or VM for the native cases | the process-cutpoint harness reruns against 9.4's connection strategy before 9.4 is accepted |
+| K | hardening toolchain per the [spec](../specs/2026-09-26-hardening-toolchain-spec.md): H5 nextest first, then H3 `forbid` on 26 crates, H6 Verus lane, H9 sanitizer audit, H2 Miri lane, H1 unsafe lints (after B, touches cage files), H4 TCB deny set (last, after B, C, D merge) | B for H1; B, C, D for H4 | one commit per item, each with its gate's self-test or lane's red-on-mutation; H7 `secrecy` and H8 semver lanes follow in Wave 3 |
 
 ## Wave 3
 
@@ -142,7 +148,9 @@ check) is assurance work that needs Connor's authority at several steps and runs
 alongside Waves 1 and 2 without competing builds. Packet 6 freezes the candidate
 and obtains the independent review. Packet 7 (structural remediation) runs last,
 against Lane A's measured baseline, one module at a time, cut and visibility and
-format as separate commits.
+format as separate commits. Two further lanes open here per the hardening spec: a
+seeded deterministic scheduler over the store and broker actors, which depends on
+correction 4A's clock port, and a Hegel pilot on the SDK-parity surface only.
 
 ## The brief every lane receives
 

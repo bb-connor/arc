@@ -318,6 +318,10 @@ broker's.
 `Debug`, `Display`, `Serialize` or `Clone` without a named reason.** Accidental
 inclusion in a log line or a serialized struct is the most common real leak.
 
+*Enforced by:* `secrecy::SecretBox` for key material and credentials, whose
+`Debug` prints `[REDACTED]` and whose reads go through a greppable
+`expose_secret()`. Not adopted yet; hardening spec item H7. Debt item.
+
 **7.2 Scan every release surface, including the ones that are not values.** The
 P2 header-name finding is the lesson: containment scanning covered header values
 and a credential was releasable as a header *name*. Enumerate the surfaces a
@@ -405,6 +409,12 @@ The existing closures comply exactly, including the PDEATHSIG race guard (set
 during any refactor; it is invisible discipline that a well-meaning cleanup would
 break.
 
+*Enforced by:* `clippy::undocumented_unsafe_blocks` and `unsafe_op_in_unsafe_fn`
+as workspace denies, and a Miri lane on every crate whose `unsafe` is pure Rust.
+Neither exists yet; both are specified in the
+[hardening toolchain spec](../superpowers/specs/2026-09-26-hardening-toolchain-spec.md)
+(H1, H2). Debt item.
+
 ---
 
 ## 10. Testing
@@ -455,7 +465,10 @@ found (prepare versus disable, expiry versus commit, emergency stop versus repla
 archive authentication versus replacement) needs a barrier-driven test that fails
 reliably before the fix.
 
-**10.6 Test what the tests cannot see.** Some properties are invisible to the test
+**10.6 Test what the tests cannot see.** Run tests in isolated processes with
+bounded time and leak detection (`cargo-nextest`, hardening spec H5), so a test
+that depends on a sibling's leftover state, or leaves a child behind, is named
+rather than hidden. Some properties are invisible to the test
 profile by construction: release-profile arithmetic, a `seccompiler` prologue
 delegated to a dependency, a fragment excluded from `cargo fmt`. Each needs an
 explicit check outside the ordinary suite, or it is unverified (finding R6).

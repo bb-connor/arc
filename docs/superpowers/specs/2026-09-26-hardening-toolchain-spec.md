@@ -1,0 +1,302 @@
+# Spec: hardening toolchain for the security TCB
+
+What Chio's verification and enforcement stack already contains, what it lacks,
+and the exact target state for each gap. Companion to the
+[security engineering standard](../../security/engineering-standard.md), whose
+"Enforced by: review. No gate. Debt item." markers this spec retires one by one.
+
+The measurements below were taken on `integration/process-security-m4` at
+`e8e5d592ec`. Where a number is a workflow count, it is the number of files under
+`.github/workflows/` that mention the tool, not a count of lanes that gate on it;
+each item's first task is to confirm what actually gates.
+
+## Position first
+
+The stack is already unusually deep for a Rust security product. Present and
+gating in at least one workflow: cargo-mutants (7), Kani (6), Creusot (4), Aeneas
+(4), Lean (16), Apalache and TLA+ (7), loom (2), proptest (6), libFuzzer (5),
+sanitizers (5), cargo-vet (8), cargo-deny (6), cargo-auditable (4), SLSA
+provenance (9), reproducible builds (8). The gaps are not "add formal methods".
+They are narrower and mostly cheap: undefined-behaviour detection on the code
+that contains `unsafe`, compiler enforcement of two disciplines the codebase
+already follows by hand, a test runner that isolates processes, a proof that has
+no lane, and the type for secrets that the standard already requires.
+
+The organizing principle is the standard's: an invariant that depends on a human
+remembering it is a convention with a good reputation. Every item below converts a
+convention the codebase already follows into something the compiler, a gate, or a
+lane enforces.
+
+## The gaps
+
+### H1. `clippy::undocumented_unsafe_blocks` and `unsafe_op_in_unsafe_fn`
+
+**Census.** `undocumented_unsafe_blocks`: 0 crates. `unsafe_op_in_unsafe_fn`: 2
+lib roots. The cage carries 101 `unsafe` occurrences with SAFETY comments at
+nearly one to one per file (`linux.rs` 11/11, `launch.rs` 3/3, `part_02.rs`
+38/39, `bootstrap.inc` 23/23, `sandbox.inc` 22/25). That discipline is what pass 2
+called exemplary and invisible; nothing enforces it.
+
+**Target.** Workspace-wide:
+
+```toml
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
+```
+
+Every `unsafe` block carries a `// SAFETY:` comment stating the invariant that
+makes it sound, or the build fails. Every unsafe operation inside an `unsafe fn`
+gets its own block and its own comment. One operation per block, so the comment
+and the operation it justifies cannot drift apart.
+
+**Expected red.** Roughly four blocks in the cage (the 39/38 and 25/22 files) and
+an unknown count in the other 21 crates that contain `unsafe`. Measure first with
+`cargo clippy --workspace -- -W clippy::undocumented_unsafe_blocks` and record
+the count per crate. Then write the missing comments, each stating the invariant
+and not the mechanism. Do not `#[allow]` any of them.
+
+**Acceptance.** The lint is `deny` at workspace level; `cargo clippy --workspace
+--all-targets -- -D warnings` passes; a deliberately uncommented `unsafe` block in
+a scratch test fails the build.
+
+### H2. Miri on every crate whose `unsafe` is pure Rust
+
+**Census.** Miri: 0 workflows. 22 crates contain `unsafe` (files with unsafe in
+parentheses): `chio-kernel` (6), `chio-cage` (6), `chio-secret-broker` (6),
+`chio-transaction-passport` (4), `chio-active-response-authority` (3),
+`chio-agent-web-interop` (2), `chio-commerce-order` (2), `chio-control-plane` (2),
+`chio-enterprise-export` (2), `chio-cpp-kernel-ffi` (2), `chio-guard-sdk` (2),
+`chio-secure-ipc` (2), `chio-core-types` (1), `chio-wasm-guards` (1), and eight
+more with one file each.
+
+**Target.** A nightly `miri.yml` lane running `cargo +nightly miri test -p
+<crate>` on every crate in a committed list, with `MIRIFLAGS` pinned in the
+workflow and the nightly date pinned in `rust-toolchain`-adjacent config so the
+lane is reproducible. Miri cannot execute `seccomp`, Landlock, `fork`, `memfd` or
+raw socket syscalls; tests that reach them are marked `#[cfg_attr(miri, ignore)]`
+with the syscall named in a comment. Everything else runs: pointer casts, slice
+construction, FFI-adjacent buffer handling, the decimal formatter in
+`write_current_pid`, transmute-free but layout-sensitive code, the parsers under
+their proptest generators.
+
+**Classification task.** For each of the 22 crates, record: runs under Miri
+entirely; runs with named syscall tests ignored; excluded with a reason (only the
+OS-boundary modules of the cage should qualify). Commit the classification as the
+lane's crate list with a one-line reason per exclusion.
+
+**Acceptance.** The lane is green on the committed list; a deliberately
+introduced out-of-bounds read in a scratch test under one listed crate fails the
+lane; the exclusion list names a syscall for every excluded test.
+
+### H3. `#![forbid(unsafe_code)]` on every crate that has none
+
+**Census.** 101 of 149 lib roots forbid unsafe. Of the 48 that do not, 26 contain
+no `unsafe` at all: among them `chio-bounded`, `chio-supervisor`,
+`chio-web3-bindings`, `chio-data-guards/redactors/default`, `chio-wasm-guards/fuzz`,
+`chio-kernel-browser`, `chio-kernel-core`, `chio-swarm-authority`,
+`chio-finding-market-store-postgres`, `chio-finding-worker`. The remaining 22 use
+`unsafe` legitimately and are the H2 list.
+
+**Target.** `#![forbid(unsafe_code)]` at the root of all 26. `forbid` rather than
+`deny` so no inner `#[allow]` can reopen it. A gate (extend the hygiene gate or a
+short sibling) fails on any lib root that neither forbids unsafe nor appears in
+the H2 list with a reason.
+
+**Acceptance.** 127 of 149 lib roots forbid; the remaining 22 are exactly the H2
+list; the gate has a self-test.
+
+### H4. The TCB deny set
+
+**Census.** In the 22 security, kernel and store crates: `clippy::indexing_slicing`
+0, `clippy::panic` 0, `clippy::todo` 0, `clippy::unimplemented` 0,
+`clippy::dbg_macro` 0, `clippy::print_stdout` 0, `clippy::as_conversions` 0,
+`missing_docs` 1, `unreachable_pub` 0.
+
+**Target.** A `[lints]` table in each of the 22 crates, inheriting the workspace
+table and adding:
+
+| Lint | Why, for this TCB |
+| --- | --- |
+| `clippy::indexing_slicing = "deny"` | an out-of-bounds index is a panic, and a panic in a fail-closed kernel is a denial of service that in 18 stores also poisons the connection mutex |
+| `clippy::panic`, `todo`, `unimplemented`, `unreachable` = `deny` | explicit panics in production paths; `unreachable!` in a security match is how a new variant crashes instead of denying |
+| `clippy::dbg_macro`, `print_stdout`, `print_stderr` = `deny` | the two most common ways secret material reaches a log |
+| `clippy::as_conversions = "deny"` | the lossy-cast cousin of the overflow finding; `as` between integer widths silently truncates; use `try_from` |
+| `clippy::exhaustive_enums`, `exhaustive_structs` = `warn` first | wire and state-machine types must be exhaustively matched; measure noise before promoting |
+| `unreachable_pub = "warn"` | the visibility-minimization Packet 7 performs by hand, as a lint; promote to `deny` per crate as Packet 7 finishes each module |
+| `missing_docs = "warn"` on public security items | rule 2.2's "state the invariant and the caller's obligation" needs a doc comment to exist |
+
+**Allow discipline.** Where a deny must be relaxed at a site, the attribute
+carries a reason: `#[allow(clippy::indexing_slicing, reason = "index bounded by
+the length check two lines above")]`. A gate fails on any `#[allow(clippy::` in
+these crates without `reason =`. That gate is the mechanism that keeps the deny
+set honest over time.
+
+**Expected red and sequencing.** Measure first (`-W` per lint, count per crate).
+Fix or reason-allow each site. Land per crate, one commit per crate, so a
+regression is attributable. This lane touches files owned by other Wave 1 and
+Wave 2 lanes, so it runs after they merge (see sequencing).
+
+**Acceptance.** All 22 crates carry the table; `-D warnings` passes; every
+`#[allow(clippy::` in the 22 has a reason; the reason gate has a self-test.
+
+### H5. cargo-nextest
+
+**Census.** 0 workflows; not installed on the build host.
+
+**Target.** `cargo-nextest` pinned by version, installed by the CI setup step, with
+`.config/nextest.toml` committed:
+
+- `slow-timeout = { period = "60s", terminate-after = 3 }` so a hung test is
+  killed and named instead of hanging the lane
+- `leak-timeout = "500ms"` so a test that leaves a child process or thread behind
+  is reported (this is the "background waiter killed" class recorded in the
+  ledger)
+- `retries = 0` in the required lanes. Retries hide flakes. A separate,
+  non-required "flake census" lane runs with `retries = 2` and `--no-fail-fast`
+  and publishes which tests needed a retry, so flakes are measured, never
+  green-washed
+- `fail-fast = false` so one failure does not hide the rest
+- JUnit output archived per lane, so the inventory counts the ledger requires are
+  machine-produced rather than typed
+
+Process-per-test isolation is the point: any test that passes under `cargo test`
+and fails under nextest was depending on state left by a sibling test in the same
+process. Each such failure is a real finding about the test, occasionally about the
+code.
+
+**Acceptance.** The workspace test step runs under nextest; every test that
+failed only under isolation has a recorded disposition; the flake census lane
+publishes its list.
+
+### H6. A Verus lane
+
+**Census.** `formal/experiments/verus-eval/` exists with `tools/install-verus.sh`.
+0 workflows. The ledger records that the spike proved unbounded concurrent
+conservation and killed the mutants, and that it has no lane.
+
+**Target.** `formal-verus.yml`, nightly, pinning the Verus release the spike used,
+running the conservation proof, failing on any proof failure, and registering the
+obligation in `formal/proof-manifest.toml` beside the Kani, Creusot and Lean
+entries. A proof with no lane rots the day its target changes; a lane with no
+required status is a lane nobody reads. Make it required on the formal-proof
+contract once it has been green for a week.
+
+**Acceptance.** The lane is green; a deliberate mutation of the proved function
+(the spike's own mutants) turns it red; the manifest entry names the production
+function the proof is about.
+
+### H7. `secrecy` for secret material
+
+**Census.** `zeroize` is a workspace dependency; `secrecy` is not.
+
+**Target.** `secrecy::SecretBox<T>` and `SecretString` for key material,
+credentials, seeds and tokens. `secrecy` wraps `zeroize`, so nothing is lost, and
+it removes what the standard's rule 7.1 forbids: `Debug` prints `[REDACTED]`,
+there is no `Display`, no `Serialize` without an explicit opt-in, and access is
+through `expose_secret()`, which is greppable. The inventory step: find every
+field of type `Zeroizing<Vec<u8>>` or `Zeroizing<String>` whose containing struct
+derives `Debug`, `Clone` or `Serialize`, and count them. Each is a place where a
+secret can reach a log or a wire by accident today.
+
+**Acceptance.** No secret-bearing struct derives `Debug` or `Serialize` on the
+secret field; `expose_secret()` call sites are the complete inventory of where
+secrets are read; a gate fails on a new `Zeroizing<` field in a `Debug`-deriving
+struct in the security crates.
+
+### H8. `cargo-semver-checks` and `cargo-public-api` for the publishable crates
+
+**Census.** 0 workflows. Every crate is `publish = false` today; Milestone D plans
+`0.2.0-alpha.N` publication.
+
+**Target.** A lane that runs both against every crate whose manifest is
+publishable, with public-API snapshots committed and diffed on every change. It
+gates nothing until the first crate flips to publishable, and it exists before
+that flip, because the first breaking release is otherwise discovered by a
+consumer.
+
+**Acceptance.** Snapshots exist for the intended publishable set; the lane turns
+red on a deliberate public signature change.
+
+### H9. Confirm the sanitizer lanes
+
+**Census.** 5 workflows mention sanitizers; which sanitizers run on which crates
+was not extracted.
+
+**Target.** Record which of ASan, TSan, MSan and UBSan run and on what. ASan is
+expected via libFuzzer. TSan on the loom-adjacent concurrent code (the store
+writer actor, the broker service, the scheduler worker) is the one most likely to
+be absent and most valuable; it finds data races loom's bounded model does not
+reach. Add it if absent.
+
+**Acceptance.** A table in the ledger: sanitizer, lane, crates, last green run.
+
+## Direction, not yet tasks
+
+### Deterministic simulation testing
+
+The hardest bugs in this system are crash, recovery and concurrency across
+processes; that is the entire content of parent Packet 2 and of the P1 findings.
+The process-cutpoint harness is a hand-built partial deterministic simulation.
+The full form (FoundationDB, TigerBeetle, and Antithesis as the commercial
+whole-system version) runs the system under a seeded scheduler and injected
+faults so a failure reproduces from a seed.
+
+Correction 4A's injected clock port is the prerequisite; an ambient
+`SystemTime::now()` in 60 files is why the system cannot be simulated today. The
+next step after 4A is a seeded scheduler over the store and broker actors and the
+scheduler worker, with the existing cutpoint hooks as the fault-injection points.
+`turmoil` is worth evaluating for the tokio-network parts. Antithesis is the
+option for launch qualification if the budget exists; it is not a substitute for
+the in-tree work, because the in-tree work is what makes the system simulable at
+all.
+
+### Hegel
+
+Hegel (hegel.dev) is a property-based testing engine built on Hypothesis by the
+Hypothesis maintainers at Antithesis, with client libraries for Rust, Go, C++,
+TypeScript, Java and OCaml behind one server that owns generation and shrinking.
+It is a PBT tool, not verification. Chio runs proptest in six workflows.
+Replacing proptest inside the TCB with a young client library plus a server
+process is maturity risk for better shrinking; not worth it now.
+
+The place it could earn its keep is the one gap proptest cannot cover: one
+generator driving malformed and edge-case protocol payloads (`spec/PROTOCOL.md`,
+canonical JSON, receipts) into the Rust kernel and the TypeScript, Python, Go and
+C++ SDKs at once, with one shrinker. SDK parity testing is example-based today.
+Pilot Hegel there, in Wave 3, on the SDK surface only, and measure whether it
+finds anything the example suite does not before extending it.
+
+## Sequencing
+
+| Item | Depends on | Wave | Owner lane |
+| --- | --- | --- | --- |
+| H1 unsafe lints | nothing, but touches cage files | 2, after B merges | K |
+| H3 `forbid` on 26 crates | nothing; disjoint from all lanes | 2 | K |
+| H5 nextest | nothing | 2, first, so later lanes' tests run isolated | K |
+| H2 Miri lane | H1 (comments) helpful, not required | 2 | K |
+| H6 Verus lane | nothing | 2 | K |
+| H9 sanitizer audit | nothing | 2 | K |
+| H4 TCB deny set | B, C, D merged (touches their files) | 2, last in K | K |
+| H7 `secrecy` | inventory first; touches broker and keyring | 2 or 3 | K or D follow-on |
+| H8 semver and public API | the publishable set decision | 3 | K |
+| DST scheduler | 4A clock port | 3 | new lane |
+| Hegel SDK pilot | nothing | 3 | new lane |
+
+Lane K's items land one commit each, each with its gate's self-test or its lane's
+red-on-mutation demonstration, per the standard's rule 12.6: a gate that cannot
+fail on a real violation has not been shown to work.
+
+## Rationale
+
+Most of this is the oldest kind of engineering advice: turn on every warning that
+finds real bugs and make it fatal; refuse patches that add an exemption without a
+reason; keep each patch small enough to review; never break the wire format
+without saying so; and understand that no tool fixes a data structure that lies
+about what it is. The type-design work in the
+[unrepresentable-defects design](2026-09-26-unrepresentable-defects-design.md)
+addresses the last point and comes first. This spec is everything that can be done
+mechanically alongside it.
