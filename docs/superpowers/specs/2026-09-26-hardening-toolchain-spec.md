@@ -12,8 +12,7 @@ each item's first task is to confirm what actually gates.
 
 ## Position first
 
-The stack is already unusually deep for a Rust security product. Present and
-gating in at least one workflow: cargo-mutants (7), Kani (6), Creusot (4), Aeneas
+The stack is already unusually deep for a Rust security product. Present in at least one workflow (whether each gates is item H9's first question): cargo-mutants (7), Kani (6), Creusot (4), Aeneas
 (4), Lean (16), Apalache and TLA+ (7), loom (2), proptest (6), libFuzzer (5),
 sanitizers (5), cargo-vet (8), cargo-deny (6), cargo-auditable (4), SLSA
 provenance (9), reproducible builds (8). The gaps are not "add formal methods".
@@ -28,6 +27,32 @@ convention the codebase already follows into something the compiler, a gate, or 
 lane enforces.
 
 ## The gaps
+
+### H0. Workspace lint additions do not reach 20 crates unless mirrored
+
+**Census.** 157 crate manifests; 137 inherit `[lints] workspace = true`; 20 do
+not, because they carry a local `[lints.rust] unexpected_cfgs` check-cfg table
+(for `kani`, `loom`, `dhat` and `creusot` cfgs) and Cargo forbids mixing
+`workspace = true` with local entries. Among the 20 are `chio-kernel`,
+`chio-kernel-core`, `chio-store-sqlite` and `chio-core-types`. All 19 library
+crates replicate `unwrap_used = "deny"` and `expect_used = "deny"` by hand in
+their own `[lints.clippy]`; the twentieth, `chio-wasm-guards/fuzz`, is a fuzz
+harness and does not, which is acceptable there.
+
+So the current policy is intact everywhere it matters, by 19 hand-maintained
+copies. The trap is what happens next: every lint this spec adds to the workspace
+table (H1, H4) silently misses those 19 crates unless each manifest is edited
+too, and nothing today would notice. The manifest's own comment ("every member
+crate inherits this block") is already untrue.
+
+**Target.** A gate that parses every opt-out manifest and asserts its
+`[lints.clippy]` is a superset of the workspace table, with a self-test that
+fails when a workspace lint is added and not mirrored. Run it first in Lane K, so
+H1 and H4 land on a base where reaching all crates is checked rather than
+assumed.
+
+**Acceptance.** The gate passes on the current tree; adding a lint to the
+workspace table alone turns it red; the manifest comment is corrected.
 
 ### H1. `clippy::undocumented_unsafe_blocks` and `unsafe_op_in_unsafe_fn`
 
@@ -55,9 +80,13 @@ and the operation it justifies cannot drift apart.
 
 **Expected red.** Roughly four blocks in the cage (the 39/38 and 25/22 files) and
 an unknown count in the other 21 crates that contain `unsafe`. Measure first with
-`cargo clippy --workspace -- -W clippy::undocumented_unsafe_blocks` and record
-the count per crate. Then write the missing comments, each stating the invariant
-and not the mechanism. Do not `#[allow]` any of them.
+`cargo clippy --workspace -- -W clippy::undocumented_unsafe_blocks -W
+clippy::multiple_unsafe_ops_per_block` and record both counts per crate; the
+second lint may split many blocks in the FFI-heavy crates, so decide its level
+from the count. Then write the missing comments, each stating the invariant and
+not the mechanism. Do not `#[allow]` any of them. Mirror both lints into the 19
+opt-out manifests (H0) or they reach none of the kernel, the store or
+`chio-core-types`.
 
 **Acceptance.** The lint is `deny` at workspace level; `cargo clippy --workspace
 --all-targets -- -D warnings` passes; a deliberately uncommented `unsafe` block in
@@ -73,12 +102,17 @@ parentheses): `chio-kernel` (6), `chio-cage` (6), `chio-secret-broker` (6),
 `chio-secure-ipc` (2), `chio-core-types` (1), `chio-wasm-guards` (1), and eight
 more with one file each.
 
-**Target.** A nightly `miri.yml` lane running `cargo +nightly miri test -p
-<crate>` on every crate in a committed list, with `MIRIFLAGS` pinned in the
-workflow and the nightly date pinned in `rust-toolchain`-adjacent config so the
-lane is reproducible. Miri cannot execute `seccomp`, Landlock, `fork`, `memfd` or
-raw socket syscalls; tests that reach them are marked `#[cfg_attr(miri, ignore)]`
-with the syscall named in a comment. Everything else runs: pointer casts, slice
+**Target.** A nightly `miri.yml` lane running `cargo +nightly miri test -p <crate>`
+on every crate in a committed list, with `MIRIFLAGS` and a nightly date pinned in
+the workflow so the lane is reproducible; the workspace's stable 1.94.1 pin is
+untouched. Two limits bound the scope honestly. Miri cannot execute `seccomp`,
+Landlock, `fork`, `memfd` or raw socket syscalls; tests that reach them are
+marked `#[cfg_attr(miri, ignore)]` with the syscall named in a comment. Miri also
+cannot call into C: anything that opens SQLite (`rusqlite`, so the whole store
+crate) or signs and verifies through `aws-lc-rs` is out of reach unless a
+pure-Rust backend feature exists for the test build. Classify each crate's
+tests accordingly before promising coverage, and run unit tests only; Miri is
+10 to 100 times slower than native execution. Everything else runs: pointer casts, slice
 construction, FFI-adjacent buffer handling, the decimal formatter in
 `write_current_pid`, transmute-free but layout-sensitive code, the parsers under
 their proptest generators.
@@ -123,9 +157,9 @@ table and adding:
 | --- | --- |
 | `clippy::indexing_slicing = "deny"` | an out-of-bounds index is a panic, and a panic in a fail-closed kernel is a denial of service that in 18 stores also poisons the connection mutex |
 | `clippy::panic`, `todo`, `unimplemented`, `unreachable` = `deny` | explicit panics in production paths; `unreachable!` in a security match is how a new variant crashes instead of denying |
-| `clippy::dbg_macro`, `print_stdout`, `print_stderr` = `deny` | the two most common ways secret material reaches a log |
+| `clippy::dbg_macro`, `print_stdout`, `print_stderr` = `deny` on library targets | the two most common ways secret material reaches a log; the 31 existing sites are all in `src/bin/` daemons writing startup diagnostics to stderr, which is legitimate for a binary, so scope these to `lib` targets |
 | `clippy::as_conversions = "deny"` | the lossy-cast cousin of the overflow finding; `as` between integer widths silently truncates; use `try_from` |
-| `clippy::exhaustive_enums`, `exhaustive_structs` = `warn` first | wire and state-machine types must be exhaustively matched; measure noise before promoting |
+
 | `unreachable_pub = "warn"` | the visibility-minimization Packet 7 performs by hand, as a lint; promote to `deny` per crate as Packet 7 finishes each module |
 | `missing_docs = "warn"` on public security items | rule 2.2's "state the invariant and the caller's obligation" needs a doc comment to exist |
 
@@ -135,10 +169,19 @@ the length check two lines above")]`. A gate fails on any `#[allow(clippy::` in
 these crates without `reason =`. That gate is the mechanism that keeps the deny
 set honest over time.
 
-**Expected red and sequencing.** Measure first (`-W` per lint, count per crate).
-Fix or reason-allow each site. Land per crate, one commit per crate, so a
-regression is attributable. This lane touches files owned by other Wave 1 and
-Wave 2 lanes, so it runs after they merge (see sequencing).
+**Expected red and sequencing.** A lexical scan of production files in the 22
+crates gives upper bounds only, because inline `#[cfg(test)]` modules cannot be
+excluded reliably without compiling: at most 563 `as` integer casts, at most 49
+variable-index expressions, 31 print sites (all in binaries), and 0 production
+`unwrap`/`expect` by construction, since that deny is active in every TCB crate
+and Clippy is green. The only trustworthy measurement is `cargo clippy -p <crate>
+-- -W clippy::<lint>` per lint, per crate; record those counts before choosing
+`deny` versus `warn`. Fix or reason-allow each site. Land per crate, one commit
+per crate, so a regression is attributable. This lane touches files owned by
+other Wave 1 and Wave 2 lanes, so it runs after they merge (see sequencing).
+Do not add `clippy::exhaustive_enums` or `exhaustive_structs`: they push public
+types toward `#[non_exhaustive]`, which forces downstream `_ =>` arms, the exact
+thing the standard's rule 2.5 forbids for closed wire and state-machine types.
 
 **Acceptance.** All 22 crates carry the table; `-D warnings` passes; every
 `#[allow(clippy::` in the 22 has a reason; the reason gate has a self-test.
@@ -162,6 +205,10 @@ Wave 2 lanes, so it runs after they merge (see sequencing).
 - `fail-fast = false` so one failure does not hide the rest
 - JUnit output archived per lane, so the inventory counts the ledger requires are
   machine-produced rather than typed
+- doctests still run through `cargo test --doc`; nextest does not execute them
+- the parent plan's `RUST_TEST_THREADS=1` for the store suites becomes a nextest
+  `test-group` with `max-threads = 1` scoped to those binaries, so isolation is
+  per group rather than a global environment variable
 
 Process-per-test isolation is the point: any test that passes under `cargo test`
 and fails under nextest was depending on state left by a sibling test in the same
@@ -174,19 +221,30 @@ publishes its list.
 
 ### H6. A Verus lane
 
-**Census.** `formal/experiments/verus-eval/` exists with `tools/install-verus.sh`.
-0 workflows. The ledger records that the spike proved unbounded concurrent
-conservation and killed the mutants, and that it has no lane.
+**Census.** `formal/experiments/verus-eval/` exists, pinned to
+`release/0.2026.07.18.3a4d30b`. 0 workflows. The FV-B5 spec records the outcome:
+executed 2026-07-23, the concurrent conservation law proved unbounded in
+schedules, actors and amounts, both broken variants falsified, and **no lane
+created, because the FV-E5 enforcement precondition is the sole blocker**: the
+formal estate's own rule is that no seventh proof toolchain is added until one
+existing lane has completed the FV-E5 promotion runbook, so that the enforcement
+layer is exercised before the estate widens. That is a good rule and this spec
+keeps it.
 
-**Target.** `formal-verus.yml`, nightly, pinning the Verus release the spike used,
-running the conservation proof, failing on any proof failure, and registering the
-obligation in `formal/proof-manifest.toml` beside the Kani, Creusot and Lean
-entries. A proof with no lane rots the day its target changes; a lane with no
-required status is a lane nobody reads. Make it required on the formal-proof
-contract once it has been green for a week.
+**Target.** In order: first, run the FV-E5 promotion runbook to completion on the
+strongest existing lane (the PR-tier Kani lane, with its 49 proofs, is the
+natural candidate), which satisfies the precondition and exercises the ratchet
+machinery on a lane that already gates. Then `formal-verus.yml`, nightly, at the
+spike's pinned release, running the conservation proof, failing on any proof
+failure, registering the obligation in `formal/proof-manifest.toml`, and taking
+FV-B5's decision outcome (a): a narrow concurrency-only lane. A proof with no
+lane rots the day its target changes; a lane with no required status is a lane
+nobody reads. Make it required on the formal-proof contract once it has been
+green for a week.
 
-**Acceptance.** The lane is green; a deliberate mutation of the proved function
-(the spike's own mutants) turns it red; the manifest entry names the production
+**Acceptance.** The FV-E5 runbook is recorded complete for one existing lane; the
+Verus lane is green; a deliberate mutation of the proved function (the spike's
+own broken variants) turns it red; the manifest entry names the production
 function the proof is about.
 
 ### H7. `secrecy` for secret material
@@ -234,6 +292,40 @@ reach. Add it if absent.
 
 **Acceptance.** A table in the ledger: sanitizer, lane, crates, last green run.
 
+### H10. Wire-schema pinning
+
+**Census.** 588 hand-written `const ..._SCHEMA...: &str = "chio....vN"` constants
+in production code (the spec codegen produces one; everything else is typed by
+hand). Crediting Rust test literals, JSON and TOML fixtures under test
+directories, and `spec/`, **308 are pinned somewhere and 280 are not; 68 of the
+unpinned are in the security TCB**, densest in `chio-kernel` (36),
+`chio-control-plane` (23) and `chio-keyring` (12), and including the entire
+secret-broker wire protocol (`chio.broker-execute.v1`, `chio.broker-capability.v1`,
+`chio.broker-execution-receipt.v2`), the key-log family, the cage envelopes and
+receipts, and `chio.dpop_proof.v2`. Separately, **55 schema values are declared in
+more than one file** (38 as the same constant name copy-pasted, 17 under
+different names), concentrated in `chio-runtime-core` (25), `chio-runtime` (23)
+and `chio-cli` (20).
+
+The CI regression at `3cd73631a1` is the case study: the caller-return-context
+bump from v4 to v6 was caught only because two round-trip tests happened to pin
+the literal. A bump to `chio.broker-execute.v1` would be caught by nothing.
+"Never break userspace" has no enforcement for 280 of 588 wire formats.
+
+**Target.** A committed snapshot, `spec/wire-schemas.lock` (value, declaring
+files, first-seen commit), and a generated test per crate asserting every schema
+constant equals its snapshot entry. A bump then requires editing the snapshot in
+the same commit, which is the deliberate acknowledgement a wire change deserves,
+and the diff shows exactly which format moved. For the 55 duplicates: one
+declaration per value in a `WireSchema` registry, the same shape as the `Domain`
+enum in the unrepresentable-defects design, imported everywhere else. The
+snapshot and generated tests are additive and belong early in Lane K; the
+deduplication touches owned files and lands with Packet 7 or the owning lane.
+
+**Acceptance.** Every hand-written schema constant appears in the snapshot; the
+generated tests fail on a deliberate bump without a snapshot edit; the duplicate
+count is 0 or each remaining duplicate has a reason in the registry.
+
 ## Direction, not yet tasks
 
 ### Deterministic simulation testing
@@ -274,11 +366,13 @@ finds anything the example suite does not before extending it.
 
 | Item | Depends on | Wave | Owner lane |
 | --- | --- | --- | --- |
-| H1 unsafe lints | nothing, but touches cage files | 2, after B merges | K |
+| H0 lint-parity gate | nothing | 2, first | K |
+| H10 schema snapshot and generated pins | nothing (additive) | 2, second | K |
+| H1 unsafe lints | the H1 measurement; the cage is owned by no Wave 1 lane; H0 for the mirror | 2 | K |
 | H3 `forbid` on 26 crates | nothing; disjoint from all lanes | 2 | K |
 | H5 nextest | nothing | 2, first, so later lanes' tests run isolated | K |
 | H2 Miri lane | H1 (comments) helpful, not required | 2 | K |
-| H6 Verus lane | nothing | 2 | K |
+| H6 FV-E5 runbook on Kani, then Verus lane | FV-E5 runbook completion | 2 (runbook), 3 (lane) | K |
 | H9 sanitizer audit | nothing | 2 | K |
 | H4 TCB deny set | B, C, D merged (touches their files) | 2, last in K | K |
 | H7 `secrecy` | inventory first; touches broker and keyring | 2 or 3 | K or D follow-on |

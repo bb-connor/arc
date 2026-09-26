@@ -159,11 +159,17 @@ to forget in a fifth implementation.
 *Enforced by:* review, and by the arithmetic lint in rule 4.2 once scoped. No
 gate today. Debt item.
 
-**2.7 Schema versions are compared for exact equality, never ordering.** A `>=`
-comparison on a closed security schema is a downgrade vector: it accepts a version
-whose semantics the reader was not written against. The current code is fully
-compliant (zero ordering comparisons, 13 files using exact equality). Preserve it
-deliberately.
+**2.7 Schema versions are compared for exact equality, never ordering, and every
+schema constant is pinned.** A `>=` comparison on a closed security schema is a
+downgrade vector: it accepts a version whose semantics the reader was not written
+against. The current code is fully compliant on comparison (zero ordering
+comparisons, 13 files using exact equality). It is not on pinning: 280 of 588
+hand-written schema constants have no test or fixture asserting their value, so
+an accidental bump is caught only where a round-trip test happens to hardcode the
+literal, which is how the `3cd73631a1` regression was found.
+
+*Enforced by:* a committed schema snapshot with generated pinning tests
+(hardening spec H10). Does not exist yet. Debt item.
 
 ---
 

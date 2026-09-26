@@ -97,7 +97,11 @@ longest and is internally sequential.
 | **E** CI triage (read-only) | none; a report | no edits; reads CI logs at `3cd73631a1` | Sonnet 5 | each of the six red steps classified as infrastructure, Packet 5 prerequisite, or code regression; a reproduction and proposed fix for any regression, delivered as a report for a Wave 2 lane |
 | **R** regression repair | the two regressions Lane E confirmed | `crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs` (a schema-pinning test beside the constants only), `crates/kernel/chio-runtime-core/tests/runtime_admission/operation_owned/caller.rs`, `crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/dispatch_context.rs`, `integrations/required-agents/prepare-session.py` and `qualification/test_prepare_session_readiness.py` | Opus 5 | both reproduced failures pass; the two v4 literals are v6 by deliberate edit and a kernel test pins `SCHEMA` v6 and `CUSTODY_SCHEMA` v4; the fixed sleep is a bounded poll with a unit test that injects a probe failing N times before succeeding; 40 consecutive runs of the suite clean |
 
-**Lane D order.** Correction 1D first: `DispatchRejection` with one variant per
+**Lane D order.** The mechanical gate run on the checkpoint against `3cd73631a1`
+found four new `map_err(|_| ...)` discards in the in-flight code
+(`state_machine.rs` mapping to `InvalidPlan`, `InvalidDispatch` and
+`InvalidTransition`; `response.rs` mapping to `InvalidExecutionBinding`); those
+are 1D's first four edits. Correction 1D first: `DispatchRejection` with one variant per
 rule, `StateMachineError::InvalidDispatch(DispatchRejection)`, replacement of the
 112 `map_err(|_| ...)` discards in the quarantine crate and the kernel response
 coordinator (26 in `state_machine.rs` first), and registration of the five ad-hoc
@@ -139,7 +143,7 @@ After Wave 1 merges and checkpoints. Ownership stays disjoint per lane.
 | H | 10.2 `UntrustedJsonText`, 10.3 tenant classification, 10.4 chain-link bind and `CHECK`, 3A wrapping sweep | 1F enumeration; C (shares `open.rs`) | 10.3 resolves `chio_tool_receipts.receipt_id` provenance before scheduling any remediation |
 | I | 9.3 `prepare_cached` on measured paths, 9.4 connection strategy | C's baselines; B | if 9.4 moves the 18 stores to the pool shape, B's recovery becomes moot and is removed in the same change |
 | J | Packet 2 boundaries, 2A, 2B; Packet 3 retention liveness #1045 | x86_64 runner or VM for the native cases | the process-cutpoint harness reruns against 9.4's connection strategy before 9.4 is accepted |
-| K | hardening toolchain per the [spec](../specs/2026-09-26-hardening-toolchain-spec.md): H5 nextest first, then H3 `forbid` on 26 crates, H6 Verus lane, H9 sanitizer audit, H2 Miri lane, H1 unsafe lints (after B, touches cage files), H4 TCB deny set (last, after B, C, D merge) | B for H1; B, C, D for H4 | one commit per item, each with its gate's self-test or lane's red-on-mutation; H7 `secrecy` and H8 semver lanes follow in Wave 3 |
+| K | hardening toolchain per the [spec](../specs/2026-09-26-hardening-toolchain-spec.md): H0 lint-parity gate first, H10 schema snapshot and pins, H5 nextest, H3 `forbid` on 26 crates, H9 sanitizer audit, H2 Miri lane, H1 unsafe lints, FV-E5 runbook for H6, H4 TCB deny set (last, after B, C, D merge) | B, C, D for H4 only | one commit per item, each with its gate's self-test or lane's red-on-mutation; H6's Verus lane, H7 `secrecy` and H8 semver follow in Wave 3 |
 
 ## Wave 3
 
