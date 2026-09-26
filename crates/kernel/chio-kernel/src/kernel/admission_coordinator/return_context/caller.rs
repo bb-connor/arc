@@ -14,6 +14,19 @@ const PARTICIPANT_SCHEMA: &str = "chio.kernel-caller-return-context.v3";
 const CUSTODY_SCHEMA: &str = "chio.kernel-caller-return-context.v4";
 const SCHEMA: &str = "chio.kernel-caller-return-context.v6";
 
+#[cfg(test)]
+#[test]
+fn caller_return_wire_pins_its_written_and_legacy_schema_identities() {
+    // The written identity skips v5 because the native custody payload owns that
+    // number, and v4 stays readable because the validation ladder accepts it.
+    assert_eq!(SCHEMA, "chio.kernel-caller-return-context.v6");
+    assert_eq!(CUSTODY_SCHEMA, "chio.kernel-caller-return-context.v4");
+    assert_eq!(
+        NATIVE_CALLER_CONTEXT_SCHEMA,
+        "chio.kernel-caller-return-context.v5"
+    );
+}
+
 #[path = "caller/custody.rs"]
 mod custody;
 #[path = "caller/deadline.rs"]

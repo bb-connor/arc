@@ -88,7 +88,7 @@ fn caller_context_retains_exact_runtime_episode_and_released_predecessor_after_r
         .load_caller_dispatch_context(operation.binding().operation_id(), &fence, NOW)?
         .ok_or("caller frame")?;
     let payload: serde_json::Value = serde_json::from_slice(frame.kernel_context_json())?;
-    assert_eq!(payload["schema"], "chio.kernel-caller-return-context.v4");
+    assert_eq!(payload["schema"], "chio.kernel-caller-return-context.v6");
     let selected = &payload["participant_custody"]["runtime"];
     assert_eq!(
         selected["episode_id"],
