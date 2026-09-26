@@ -4702,6 +4702,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-profile-probe"
+version = "0.1.0"
+
+[[package]]
 name = "chio-proof-room"
 version = "0.1.0"
 dependencies = [
