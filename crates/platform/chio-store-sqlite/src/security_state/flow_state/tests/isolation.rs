@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Weak;
+use std::sync::{Mutex, Weak};
 
 use super::*;
 

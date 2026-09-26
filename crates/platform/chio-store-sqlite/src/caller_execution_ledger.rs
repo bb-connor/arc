@@ -7,7 +7,6 @@
 
 use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::crypto::{Keypair, PublicKey};
@@ -20,6 +19,8 @@ use chio_kernel::caller_delivery::{
 use chio_kernel::{CallerExecutionReport, KernelError};
 use chio_sqlite_file_identity::{main_database_file_identity, SqliteFileIdentity};
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension, TransactionBehavior};
+
+use crate::store_connection::StoreConnection;
 
 const SCHEMA: &str = include_str!("caller_execution_ledger.sql");
 const APPLICATION_ID: i64 = 0x43484345;
@@ -42,7 +43,7 @@ type Result<T> = std::result::Result<T, CallerExecutionLedgerError>;
 /// Persistent local executor custody. It has no authority to issue a kernel
 /// start authorization and cannot turn a reservation nonce into one.
 pub struct SqliteCallerExecutionLedger {
-    connection: Mutex<Connection>,
+    connection: StoreConnection,
     path: PathBuf,
     file_identity: SqliteFileIdentity,
     executor: CallerExecutorIdentityV1,
@@ -164,7 +165,10 @@ impl SqliteCallerExecutionLedger {
         }
         tx.commit().map_err(storage)?;
         Ok(Self {
-            connection: Mutex::new(connection),
+            // The ledger's path identity is verified before every write and
+            // its directory is synced only at provisioning; a commit pairs with
+            // nothing outside the database.
+            connection: StoreConnection::transaction_only("caller_execution_ledger", connection),
             path,
             file_identity: identity,
             executor,
@@ -200,7 +204,7 @@ impl SqliteCallerExecutionLedger {
             let mut connection = self
                 .connection
                 .lock()
-                .map_err(|_| invalid("executor connection lock poisoned"))?;
+                .map_err(|fenced| invalid(fenced.to_string()))?;
             let tx = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(storage)?;
@@ -318,7 +322,7 @@ impl SqliteCallerExecutionLedger {
         let mut connection = self
             .connection
             .lock()
-            .map_err(|_| invalid("executor connection lock poisoned"))?;
+            .map_err(|fenced| invalid(fenced.to_string()))?;
         let tx = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(storage)?;
@@ -519,3 +523,7 @@ fn storage(error: impl std::fmt::Display) -> CallerExecutionLedgerError {
 fn invalid(message: impl Into<String>) -> CallerExecutionLedgerError {
     CallerExecutionLedgerError::Storage(message.into())
 }
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod connection_recovery;

@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::MutexGuard;
+
 use std::time::Duration;
 
 use chio_core::canonical::canonical_json_bytes;
@@ -18,6 +19,8 @@ use chio_security_types::{
 };
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Row, Rows, TransactionBehavior};
 
+use crate::store_connection::StoreConnection;
+
 const RECORDS_TABLE: &str = "sealed_decoy_records_v1";
 const OPERATIONS_TABLE: &str = "sealed_decoy_operation_owners_v1";
 const TRANSITIONS_TABLE: &str = "sealed_decoy_transitions_v1";
@@ -27,7 +30,7 @@ const OBSERVATIONS_TABLE: &str = "watermark_observations_v1";
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub struct SqliteSealedDecoyRegistryStore {
-    connection: Mutex<Connection>,
+    connection: StoreConnection,
 }
 
 impl SqliteSealedDecoyRegistryStore {
@@ -50,7 +53,9 @@ impl SqliteSealedDecoyRegistryStore {
         migrate(&connection)?;
         verify_runtime_configuration(&connection)?;
         Ok(Self {
-            connection: Mutex::new(connection),
+            // Every mutation is one RAII transaction and nothing outside the
+            // database records a commit.
+            connection: StoreConnection::transaction_only("sealed_decoy_registry", connection),
         })
     }
 
@@ -1478,3 +1483,7 @@ fn sqlite_error(error: rusqlite::Error) -> PortError {
         _ => PortError::unavailable(),
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod connection_recovery;

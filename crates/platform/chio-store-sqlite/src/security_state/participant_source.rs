@@ -2,12 +2,13 @@
 //! fingerprint is not an admission owner, transferred inventory or activation.
 
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::time::Duration;
 
 use chio_security_types::ports::{PortError, PortResult};
 use chio_sqlite_file_identity::{main_database_file_identity, SqliteFileIdentity};
 use rusqlite::{params, Connection, OpenFlags, TransactionBehavior};
+
+use crate::store_connection::StoreConnection;
 
 mod evidence;
 mod inventory;
@@ -73,7 +74,7 @@ impl std::fmt::Debug for SecurityParticipantSourceSeal {
 /// qualify destination import, a live admission owner or filesystem rollback
 /// resistance. SQLite main-file identity must be supported by the native VFS.
 pub struct SqliteSecurityParticipantSource {
-    connection: Mutex<Connection>,
+    connection: StoreConnection,
     path: PathBuf,
     identity: SqliteFileIdentity,
 }
@@ -93,7 +94,7 @@ impl SqliteSecurityParticipantSource {
         let mut connection = self
             .connection
             .lock()
-            .map_err(|_| Error::Invalid("source lock poisoned"))?;
+            .map_err(|_| Error::Invalid("source connection is fenced after a panic"))?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
         let seal = load_seal(&tx, &self.path, self.identity)?
             .ok_or(Error::Invalid("source is not sealed"))?;
@@ -155,7 +156,13 @@ impl SqliteSecurityParticipantSource {
         }
         tx.commit()?;
         Ok(Self {
-            connection: Mutex::new(connection),
+            // The seal is a row committed in one RAII transaction; durability
+            // pragmas are verified before each write and nothing outside the
+            // database records a commit.
+            connection: StoreConnection::transaction_only(
+                "security_participant_source",
+                connection,
+            ),
             path,
             identity,
         })
@@ -170,7 +177,7 @@ impl SqliteSecurityParticipantSource {
         let mut connection = self
             .connection
             .lock()
-            .map_err(|_| Error::Invalid("source lock poisoned"))?;
+            .map_err(|_| Error::Invalid("source connection is fenced after a panic"))?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
         if schema::has_evidence(&tx)? {
             return Err(Error::Invalid("preview requires an unretired source"));
@@ -192,7 +199,7 @@ impl SqliteSecurityParticipantSource {
         let mut connection = self
             .connection
             .lock()
-            .map_err(|_| Error::Invalid("source lock poisoned"))?;
+            .map_err(|_| Error::Invalid("source connection is fenced after a panic"))?;
         require_durability(&connection)?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         if let Some(seal) = load_seal(&tx, &self.path, self.identity)? {
@@ -230,7 +237,7 @@ impl SqliteSecurityParticipantSource {
         let mut connection = self
             .connection
             .lock()
-            .map_err(|_| Error::Invalid("source lock poisoned"))?;
+            .map_err(|_| Error::Invalid("source connection is fenced after a panic"))?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
         let seal = load_seal(&tx, &self.path, self.identity)?;
         tx.commit()?;

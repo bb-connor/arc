@@ -7,10 +7,10 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 #[cfg(unix)]
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::encrypted_blob::SqliteEncryptedBlobStore;
+use crate::{encrypted_blob::SqliteEncryptedBlobStore, store_connection::StoreConnection};
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::hashing::sha256;
 use chio_core::receipt::body::ChioReceipt;
@@ -681,7 +681,7 @@ impl SecurityStateClock for SystemSecurityStateClock {
 }
 
 pub struct SqliteSecurityStateStore {
-    connection: Mutex<Connection>,
+    connection: StoreConnection,
     isolation_epoch_verifier: Arc<dyn IsolationEpochEvidenceVerifierPort>,
     clock: Arc<dyn SecurityStateClock>,
     #[cfg(unix)]
@@ -799,7 +799,7 @@ impl SqliteSecurityStateStore {
         #[cfg(unix)]
         let database_identity = security_state_database_path_identity(&database_path)?;
         Ok(Self {
-            connection: Mutex::new(connection),
+            connection: StoreConnection::transaction_only("security_state", connection),
             isolation_epoch_verifier,
             clock,
             #[cfg(unix)]

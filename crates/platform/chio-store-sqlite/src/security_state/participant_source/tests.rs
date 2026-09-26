@@ -15,6 +15,7 @@ use crate::SqliteSecurityStateStore;
 
 mod barriers;
 mod codec;
+mod connection_recovery;
 mod crash;
 mod declassification;
 mod egress_history;

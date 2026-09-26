@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::MutexGuard;
 
 use chio_core::{canonical_json_bytes, sha256, Keypair, PublicKey, Signature};
 use chio_security_types::ports::{Digest32, PortError, PortResult, RecordId};
@@ -17,6 +17,8 @@ use rusqlite::{
     params, Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior,
 };
 use thiserror::Error;
+
+use crate::store_connection::StoreConnection;
 
 const TABLE_NAME: &str = "enterprise_migration_transitions";
 const NO_UPDATE_TRIGGER_NAME: &str = "enterprise_migration_transitions_no_update";
@@ -182,7 +184,7 @@ struct DatabaseFileIdentity {
 }
 
 pub struct SqliteEnterpriseMigrationStateStore {
-    connection: Mutex<Connection>,
+    connection: StoreConnection,
     path: PathBuf,
     identity_file: File,
     identity: DatabaseFileIdentity,
@@ -237,7 +239,10 @@ impl SqliteEnterpriseMigrationStateStore {
         let identity_file = open_database_identity_file(&path)?;
         let identity = database_file_identity(&path, &identity_file)?;
         let store = Self {
-            connection: Mutex::new(connection),
+            // File identity and sidecar checks are read-only guards run before
+            // every lock; the signed ledger is appended inside RAII transactions
+            // and nothing outside the database records a commit.
+            connection: StoreConnection::transaction_only("enterprise_migration_state", connection),
             path,
             identity_file,
             identity,
@@ -1091,3 +1096,7 @@ fn decode_control(value: &str) -> PortResult<EnterpriseMigrationControl> {
         _ => Err(PortError::integrity_failure()),
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod connection_recovery;

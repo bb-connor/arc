@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::MutexGuard;
 
 use chio_kernel::{
     AdmissionCleanupAction, AdmissionCleanupActionCasOutcome, AdmissionCleanupActionClaimOutcome,
@@ -11,9 +11,10 @@ use chio_kernel::{
     AdmissionOperationStoreProfile, PersistedAdmissionCleanupAction, PersistedAdmissionOperation,
 };
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+use crate::store_connection::StoreConnection;
 
 pub struct SqliteAdmissionOperationStore {
-    connection: Mutex<Connection>,
+    connection: StoreConnection,
     authority_profile: AdmissionOperationStoreProfile,
 }
 
@@ -171,18 +172,15 @@ impl SqliteAdmissionOperationStore {
             )
             .map_err(sqlite_error)?;
         Ok(Self {
-            connection: Mutex::new(connection),
+            connection: StoreConnection::transaction_only("admission_operation", connection),
             authority_profile,
         })
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, AdmissionOperationError> {
-        let connection = self.connection.lock().map_err(|_| {
-            AdmissionOperationError::Unavailable(
-                "sqlite admission operation lock poisoned".to_string(),
-            )
-        })?;
-        Ok(connection)
+        self.connection
+            .lock()
+            .map_err(|fenced| AdmissionOperationError::Unavailable(fenced.to_string()))
     }
 
     fn mutate_claimed_cleanup_action<F>(
