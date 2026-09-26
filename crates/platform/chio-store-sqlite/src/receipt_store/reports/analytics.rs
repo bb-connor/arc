@@ -238,3 +238,7 @@ impl SqliteReceiptStore {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "analytics_tests.rs"]
+mod analytics_tests;
