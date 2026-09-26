@@ -1,5 +1,8 @@
 //! Dispatch preparation: the one place a plan and its executor authorization
 //! become the durable record and first lease an executor commits.
+//!
+//! Every refusal here is a [`DispatchRejection`], one per rule, so the caller,
+//! the receipt and the operator log can each name what refused the dispatch.
 
 use chio_core_types::{canonical_json_bytes, sha256};
 use chio_security_types::ports::{
@@ -9,9 +12,9 @@ use chio_security_types::ports::{
     RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION,
 };
 use chio_security_types::{
-    is_legal_response_transition, ResponseApprovalRequirement, ResponseExecutionDispatchBinding,
-    ResponseMutationLog, ResponseMutationRecord, ResponsePlan, ResponseRequestedRecord,
-    ResponseSnapshot, ResponseState, RESPONSE_STATE_SCHEMA_VERSION,
+    is_legal_response_transition, DispatchRejection, ResponseApprovalRequirement,
+    ResponseExecutionDispatchBinding, ResponseMutationLog, ResponseMutationRecord, ResponsePlan,
+    ResponseRequestedRecord, ResponseSnapshot, ResponseState, RESPONSE_STATE_SCHEMA_VERSION,
 };
 
 use super::{
@@ -59,34 +62,58 @@ pub fn prepare_response_dispatch(
         commit_mode,
     } = request;
     validate_plan(&plan)?;
-    if matches!(commit_mode, ResponseDispatchCommitMode::Fresh) {
-        plan.require_execution_mode(chio_security_types::ResponseExecutionMode::Live)
-            .map_err(|_| StateMachineError::InvalidDispatch)?;
-    } else if plan
-        .execution
-        .is_some_and(|binding| binding.mode != chio_security_types::ResponseExecutionMode::Live)
-    {
-        return Err(StateMachineError::InvalidDispatch);
+    match commit_mode {
+        ResponseDispatchCommitMode::Fresh => {
+            plan.require_live_execution()?;
+        }
+        ResponseDispatchCommitMode::GovernedCommittedResume
+        | ResponseDispatchCommitMode::GovernedCommittedExpiredResume => {
+            plan.require_live_or_legacy_execution()?;
+        }
     }
-    if authorization_capability_hash != plan.operator_capability.capability_digest
-        || executor_authority_generation == 0
-        || authorized_at_unix_ms < plan.created_at_unix_ms
+    if authorization_capability_hash != plan.operator_capability.capability_digest {
+        return Err(DispatchRejection::CapabilityDigestMismatch.into());
+    }
+    if executor_authority_generation == 0 {
+        return Err(DispatchRejection::ZeroExecutorGeneration.into());
+    }
+    if authorized_at_unix_ms < plan.created_at_unix_ms
         || authorized_at_unix_ms >= plan.expires_at_unix_ms
-        || initial_lease.lease_expires_at_unix_ms <= authorized_at_unix_ms
+    {
+        return Err(DispatchRejection::AuthorizationOutsideWindow {
+            authorized_at_unix_ms,
+            created_at_unix_ms: plan.created_at_unix_ms,
+            expires_at_unix_ms: plan.expires_at_unix_ms,
+        }
+        .into());
+    }
+    if initial_lease.lease_expires_at_unix_ms <= authorized_at_unix_ms
         || initial_lease.lease_expires_at_unix_ms > plan.expires_at_unix_ms
     {
-        return Err(StateMachineError::InvalidDispatch);
+        return Err(DispatchRejection::LeaseOutsideWindow {
+            lease_expires_at_unix_ms: initial_lease.lease_expires_at_unix_ms,
+            authorized_at_unix_ms,
+            plan_expires_at_unix_ms: plan.expires_at_unix_ms,
+        }
+        .into());
     }
     let governed = match (&plan.approval_requirement, &approval) {
         (ResponseApprovalRequirement::Automatic, ResponseDispatchApproval::Automatic) => false,
         (
             ResponseApprovalRequirement::Governed { .. },
             ResponseDispatchApproval::Governed {
-                admission_operation_version,
+                admission_operation_version: 0,
                 ..
             },
-        ) if *admission_operation_version > 0 => true,
-        _ => return Err(StateMachineError::InvalidDispatch),
+        ) => return Err(DispatchRejection::ZeroAdmissionOperationVersion.into()),
+        (
+            ResponseApprovalRequirement::Governed { .. },
+            ResponseDispatchApproval::Governed { .. },
+        ) => true,
+        (ResponseApprovalRequirement::Automatic, ResponseDispatchApproval::Governed { .. })
+        | (ResponseApprovalRequirement::Governed { .. }, ResponseDispatchApproval::Automatic) => {
+            return Err(DispatchRejection::ApprovalRequirementMismatch.into());
+        }
     };
     if matches!(
         commit_mode,
@@ -94,7 +121,7 @@ pub fn prepare_response_dispatch(
             | ResponseDispatchCommitMode::GovernedCommittedExpiredResume
     ) && !governed
     {
-        return Err(StateMachineError::InvalidDispatch);
+        return Err(DispatchRejection::ResumeRequiresGovernedApproval { commit_mode }.into());
     }
 
     let requested = ResponseMutationRecord::Requested(ResponseRequestedRecord {
@@ -230,8 +257,78 @@ fn prepare_dispatch_transition(
 pub(crate) fn encode_normalized_dispatch_response_record(
     snapshot: &ResponseSnapshot,
 ) -> Result<ResponsePlanRecord, StateMachineError> {
-    if snapshot.execution_dispatch.is_none() || snapshot.dispatch_authorization_hash.is_some() {
-        return Err(StateMachineError::InvalidDispatch);
+    if snapshot.execution_dispatch.is_none() {
+        return Err(DispatchRejection::SnapshotWithoutExecutionDispatch.into());
+    }
+    if snapshot.dispatch_authorization_hash.is_some() {
+        return Err(DispatchRejection::SnapshotAlreadyAuthorized.into());
     }
     encode_response_record_with_mode(snapshot, true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chio_security_types::ports::TenantId;
+
+    fn fixture_snapshot() -> ResponseSnapshot {
+        let plan: ResponsePlan = serde_json::from_str(include_str!(
+            "../../../../../tests/bindings/vectors/security/active-defense/positive/response-plan-v1.json"
+        ))
+        .unwrap_or_else(|error| panic!("response plan fixture failed: {error}"));
+        ResponseSnapshot {
+            schema_version: RESPONSE_STATE_SCHEMA_VERSION,
+            plan,
+            execution_dispatch: None,
+            dispatch_authorization_hash: None,
+            state: ResponseState::Planned,
+            generation: 0,
+            applying_lease_expires_at_unix_ms: None,
+            due_at_unix_ms: None,
+            operator_page_required: false,
+            mutations: ResponseMutationLog::new(Vec::new())
+                .unwrap_or_else(|error| panic!("empty mutation log failed: {error}")),
+        }
+    }
+
+    fn record_id(value: &str) -> RecordId {
+        RecordId::new(value).unwrap_or_else(|error| panic!("invalid record id: {error}"))
+    }
+
+    #[test]
+    fn normalized_dispatch_record_refuses_a_snapshot_without_its_binding() {
+        let unbound = fixture_snapshot();
+        assert!(matches!(
+            encode_normalized_dispatch_response_record(&unbound),
+            Err(StateMachineError::InvalidDispatch(
+                DispatchRejection::SnapshotWithoutExecutionDispatch
+            ))
+        ));
+    }
+
+    #[test]
+    fn normalized_dispatch_record_refuses_a_snapshot_already_authorized() {
+        let mut authorized = fixture_snapshot();
+        authorized.execution_dispatch = Some(ResponseExecutionDispatchBinding {
+            schema_version: RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION,
+            tenant_id: TenantId::new("tenant").unwrap_or_else(|error| panic!("{error}")),
+            dispatch_id: record_id("dispatch"),
+            action_id: authorized.plan.action_id.clone(),
+            plan_hash: authorized.plan.plan_hash,
+            executor_authority_id: record_id("executor-authority"),
+            executor_authority_generation: 1,
+            authorization_capability_hash: Digest32::new([1; 32]),
+            governed_intent_hash: Digest32::new([2; 32]),
+            policy_decision_hash: Digest32::new([3; 32]),
+            approval: ResponseDispatchApproval::Automatic,
+            authorized_at_unix_ms: 1,
+        });
+        authorized.dispatch_authorization_hash = Some(Digest32::new([4; 32]));
+        assert!(matches!(
+            encode_normalized_dispatch_response_record(&authorized),
+            Err(StateMachineError::InvalidDispatch(
+                DispatchRejection::SnapshotAlreadyAuthorized
+            ))
+        ));
+    }
 }

@@ -5,11 +5,13 @@ use chio_security_types::ports::{
 };
 use chio_security_types::{
     is_legal_response_transition, response_required_mutation_suffix,
-    response_snapshot_has_mutation_capacity, PlannedResponseEffects, ResponseEffectAppliedRecord,
-    ResponseEffectKind, ResponseEffectRequestedRecord, ResponseMutationLog, ResponseMutationRecord,
-    ResponsePlan, ResponseRequestedRecord, ResponseRollbackOutcome, ResponseRollbackRecord,
-    ResponseShapeError, ResponseSnapshot, ResponseState, ResponseTarget, ResponseTransitionCause,
-    ResponseTransitionRecord, MAX_RESPONSE_MUTATIONS, RESPONSE_STATE_SCHEMA_VERSION,
+    response_snapshot_has_mutation_capacity, DispatchRejection, PlannedResponseEffects,
+    ResponseEffectAppliedRecord, ResponseEffectKind, ResponseEffectRequestedRecord,
+    ResponseExecutionBinding, ResponseExecutionBindingError, ResponseExecutionMode,
+    ResponseMutationLog, ResponseMutationRecord, ResponsePlan, ResponseRequestedRecord,
+    ResponseRollbackOutcome, ResponseRollbackRecord, ResponseShapeError, ResponseSnapshot,
+    ResponseState, ResponseTarget, ResponseTransitionCause, ResponseTransitionRecord,
+    MAX_RESPONSE_MUTATIONS, RESPONSE_STATE_SCHEMA_VERSION,
 };
 
 const STATES: [ResponseState; 12] = [
@@ -130,6 +132,52 @@ fn response_execution_binding_is_preserved_in_authorization() {
     let authorization = serde_json::to_value(plan.authorization_body())
         .unwrap_or_else(|error| panic!("response authorization encoding failed: {error}"));
     assert_eq!(authorization["execution"], execution);
+}
+
+#[test]
+fn live_execution_rules_name_the_binding_that_refused() {
+    let mut plan = valid_response_plan();
+    plan.execution = None;
+    assert_eq!(
+        plan.require_live_execution(),
+        Err(DispatchRejection::LegacyPlanFreshDispatch)
+    );
+    assert_eq!(plan.require_live_or_legacy_execution(), Ok(()));
+
+    plan.execution = Some(ResponseExecutionBinding::new(ResponseExecutionMode::DryRun));
+    let simulated = DispatchRejection::ExecutionMode {
+        observed: ResponseExecutionMode::DryRun,
+    };
+    assert_eq!(plan.require_live_execution(), Err(simulated));
+    assert_eq!(plan.require_live_or_legacy_execution(), Err(simulated));
+
+    let live = ResponseExecutionBinding::new(ResponseExecutionMode::Live);
+    plan.execution = Some(live);
+    assert_eq!(plan.require_live_execution(), Ok(live));
+    assert_eq!(plan.require_live_or_legacy_execution(), Ok(()));
+}
+
+#[test]
+fn execution_binding_rejection_carries_the_compared_versions() {
+    let mut plan = valid_response_plan();
+    plan.execution = Some(ResponseExecutionBinding {
+        schema_version: 7,
+        mode: ResponseExecutionMode::Live,
+    });
+    let unsupported = ResponseExecutionBindingError::UnsupportedSchemaVersion {
+        expected: 1,
+        observed: 7,
+    };
+    assert_eq!(
+        plan.validate_shape(),
+        Err(ResponseShapeError::InvalidExecutionBinding(unsupported))
+    );
+    assert_eq!(
+        plan.require_live_execution(),
+        Err(DispatchRejection::ExecutionBinding(unsupported))
+    );
+    let message = DispatchRejection::ExecutionBinding(unsupported).to_string();
+    assert!(message.contains("version 7") && message.contains("version 1"));
 }
 
 fn applying_snapshot_with_reversible_effects(effect_count: usize) -> ResponseSnapshot {

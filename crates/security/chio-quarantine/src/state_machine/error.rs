@@ -1,7 +1,12 @@
 //! Errors the response state machine returns.
+//!
+//! Each variant is a category the callers match on. A category that several
+//! rules can produce carries a payload naming the rule, so a rejection stays
+//! distinguishable in a test, a receipt and an operator log. Inner causes
+//! travel as sources rather than being flattened into the category.
 
 use chio_security_types::ports::PortError;
-use chio_security_types::ResponseShapeError;
+use chio_security_types::{DispatchRejection, ResponseShapeError};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -16,8 +21,8 @@ pub enum StateMachineError {
     InvalidFailureRecord,
     #[error("response plan is invalid")]
     InvalidPlan,
-    #[error("response dispatch authorization is invalid")]
-    InvalidDispatch,
+    #[error(transparent)]
+    InvalidDispatch(#[from] DispatchRejection),
     #[error("response state record is invalid")]
     InvalidRecord,
     #[error("response transition timing is invalid")]

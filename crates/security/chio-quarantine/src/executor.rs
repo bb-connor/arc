@@ -185,11 +185,10 @@ impl<
         let mut current = current.clone();
         loop {
             let snapshot = decode_response_record(&current)?;
-            if snapshot.plan.execution.is_some_and(|binding| {
-                binding.mode != chio_security_types::ResponseExecutionMode::Live
-            }) {
-                return Err(StateMachineError::InvalidDispatch.into());
-            }
+            snapshot
+                .plan
+                .require_live_or_legacy_execution()
+                .map_err(StateMachineError::from)?;
             self.validate_work(&snapshot, work, now_unix_ms)?;
             self.reconcile_receipts(&current)?;
             if let Some(reconciled) =
