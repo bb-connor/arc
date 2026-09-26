@@ -155,8 +155,12 @@ signing-share bytes do not appear in the output. Hardening item H7 now carries t
 as its first task.
 
 **Confidence:** high on the code path and the library type, both read directly.
-The absence of an in-tree transport was established by search, not proof; a
-transport in a companion repository would change the severity to a P1.
+The absence of a transport was established by search, not proof: this tree, and
+the six companion checkouts on this host that reference the type (the public
+mirror `backbay-labs/chio`, three `chio-world` site checkouts holding example
+JSON, a `chio-desktop` research file and a review audit file), contain no route,
+CLI command, IPC path or serialization site that sends a round-2 package. A
+transport added anywhere later inherits the gap and would raise this to a P1.
 
 ## U6. Clean, with the reason recorded: async cancellation across durable writes
 
