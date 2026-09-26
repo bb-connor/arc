@@ -266,6 +266,8 @@ impl ChioKernel {
         &self,
         request: &ActiveResponseAdmissionRequest,
     ) -> Result<PreparedActiveResponseAdmission, KernelError> {
+        request.response_plan().require_execution_mode(chio_security_types::ResponseExecutionMode::Live)
+            .map_err(|error| active_response_denied(error.to_string()))?;
         let verified_admission =
             self.verify_active_response_admission_at(request, current_unix_timestamp_ms())?;
         self.prepare_verified_active_response_admission(request, verified_admission)
@@ -276,6 +278,8 @@ impl ChioKernel {
         request: &ActiveResponseAdmissionRequest,
         verified_admission: VerifiedActiveResponseAdmission,
     ) -> Result<PreparedActiveResponseAdmission, KernelError> {
+        request.response_plan().require_execution_mode(chio_security_types::ResponseExecutionMode::Live)
+            .map_err(|error| active_response_denied(error.to_string()))?;
         match verified_admission {
             VerifiedActiveResponseAdmission::Automatic(permit) => {
                 Ok(PreparedActiveResponseAdmission::Automatic(permit))
@@ -998,6 +1002,9 @@ impl ChioKernel {
             ));
         }
         validate_executable_response_plan(request)?;
+        if request.response_plan().execution.is_some_and(|binding| binding.mode != chio_security_types::ResponseExecutionMode::Live) {
+            return Err(active_response_denied("simulation plans cannot authorize live response execution"));
+        }
         let bindings = self.verify_active_response_authorization_at(
             request.authorization(),
             validation_now_unix_ms,
@@ -1069,7 +1076,7 @@ impl ChioKernel {
         }
     }
 
-    fn verify_active_response_threshold(
+    pub(super) fn verify_active_response_threshold(
         &self,
         request: &ActiveResponseAdmissionRequest,
         bindings: &VerifiedActiveResponseBindings,

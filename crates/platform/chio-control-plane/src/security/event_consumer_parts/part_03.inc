@@ -5,6 +5,7 @@
 /// returned.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AttestedFindingResponsePolicySelection {
+    pub execution: chio_security_types::ResponseExecutionBinding,
     pub affected_ids: Vec<RecordId>,
     pub effects: Vec<ResponseEffectSpec>,
     pub ttl_ms: u64,

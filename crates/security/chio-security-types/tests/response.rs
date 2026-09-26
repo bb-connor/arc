@@ -116,6 +116,22 @@ fn valid_response_plan() -> ResponsePlan {
     .unwrap_or_else(|error| panic!("response plan fixture failed: {error}"))
 }
 
+#[test]
+fn response_execution_binding_is_preserved_in_authorization() {
+    let mut value = serde_json::to_value(valid_response_plan())
+        .unwrap_or_else(|error| panic!("response plan encoding failed: {error}"));
+    let execution = serde_json::json!({
+        "schema_version": 1,
+        "mode": "dry_run",
+    });
+    value["execution"] = execution.clone();
+    let plan = serde_json::from_value::<ResponsePlan>(value)
+        .unwrap_or_else(|error| panic!("explicit response execution binding rejected: {error}"));
+    let authorization = serde_json::to_value(plan.authorization_body())
+        .unwrap_or_else(|error| panic!("response authorization encoding failed: {error}"));
+    assert_eq!(authorization["execution"], execution);
+}
+
 fn applying_snapshot_with_reversible_effects(effect_count: usize) -> ResponseSnapshot {
     let mut plan = valid_response_plan();
     let template = plan.effects.as_slice()[0].clone();

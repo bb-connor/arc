@@ -324,6 +324,7 @@ fn automatic_response_plan(identity: &ActiveResponseExecutorAuthorityIdentity) -
     let created_at_unix_ms = 1_700_000_000_000;
     let expires_at_unix_ms = created_at_unix_ms + 10_000;
     let mut plan = ResponsePlan {
+        execution: Some(chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live)),
         action_id,
         trigger_finding_id: RecordId::new("finding-two-kernel-fence").expect("finding id"),
         trigger_finding_hash: Digest32::new([0x41; 32]),

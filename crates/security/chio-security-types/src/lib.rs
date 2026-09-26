@@ -9,6 +9,11 @@ pub mod flow;
 pub mod migration;
 pub mod ports;
 pub mod response;
+pub mod response_execution;
+
+pub use response_execution::{
+    ResponseExecutionBinding, ResponseExecutionMode, RESPONSE_EXECUTION_BINDING_SCHEMA_VERSION,
+};
 
 pub use deception::{
     DecoyAeadNonce, DecoyArtifactLookup, DecoyErrorClass, DecoyEvidenceRef, DecoyLifecycle,

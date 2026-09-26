@@ -52,6 +52,7 @@ fn plan(approval_requirement: ResponseApprovalRequirement) -> chio_security_type
     let contribution_hash =
         Digest32::new(*chio_core_types::sha256(canonical_contribution.as_bytes()).as_bytes());
     build_response_plan(ResponsePlanInput {
+        execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
         action_id: ActionId::new("action-dispatch")
             .unwrap_or_else(|error| panic!("invalid action id: {error}")),
         trigger_finding_id: record_id("finding-dispatch"),
@@ -199,6 +200,29 @@ fn automatic_dispatch_prepares_one_atomic_applying_transition() {
         due_at_unix_ms: authorization_without_dispatch.due_at_unix_ms,
     };
     assert!(decode_response_record(&mismatched_record).is_err());
+}
+
+#[test]
+fn fresh_live_dispatch_rejects_simulation_and_legacy_authority() {
+    use chio_security_types::{ResponseExecutionBinding, ResponseExecutionMode};
+    for execution in [
+        None,
+        Some(ResponseExecutionBinding::new(ResponseExecutionMode::DryRun)),
+    ] {
+        let mut response_plan = plan(ResponseApprovalRequirement::Automatic);
+        response_plan.execution = execution;
+        let body = serde_json::to_value(response_plan.authorization_body())
+            .unwrap_or_else(|error| panic!("authorization body: {error}"));
+        let hash = chio_core_types::capability::governance::GovernedResponsePlanIntentBody::compute_plan_body_digest(&body)
+            .unwrap_or_else(|error| panic!("authorization hash: {error}"));
+        response_plan.plan_hash = Digest32::new(*hash.as_bytes());
+        assert!(prepare_response_dispatch(preparation(
+            response_plan.clone(),
+            ResponseDispatchApproval::Automatic,
+        )).is_err(), "fresh dispatch accepted {execution:?}");
+        let state = ResponseStateMachine::new(Arc::new(TestResponseStore::default()));
+        assert!(state.create(response_plan).is_err(), "live state accepted {execution:?}");
+    }
 }
 
 #[test]

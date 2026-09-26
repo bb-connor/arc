@@ -216,6 +216,7 @@ fn response_plan_for_tenant(
         .unwrap_or_else(|| panic!("response expiry is below the fixture TTL"));
     let canonical_contribution = body(b"{}");
     let plan = build_response_plan(ResponsePlanInput {
+        execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
         action_id: action(value),
         trigger_finding_id: record(&format!("finding-{value}")),
         trigger_finding_hash: digest(format!("finding:{value}").as_bytes()),

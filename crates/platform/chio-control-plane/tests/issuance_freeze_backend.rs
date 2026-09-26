@@ -1021,6 +1021,7 @@ fn maintenance_plan(apply: &mut EffectRequest) -> ResponsePlan {
         .checked_sub(ttl_ms)
         .unwrap_or_else(|| panic!("plan expiry is shorter than maintenance test TTL"));
     let plan = build_response_plan(ResponsePlanInput {
+        execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
         action_id: apply.action_id.clone(),
         trigger_finding_id: record("freeze-maintenance-finding"),
         trigger_finding_hash: digest(b"freeze-maintenance-finding"),

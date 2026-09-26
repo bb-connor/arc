@@ -459,6 +459,7 @@ fn build_reserved_response_plan(
     validate_authoritative_finding_binding(finding, binding)?;
     let receipt = finding.body();
     let AttestedFindingResponsePolicySelection {
+        execution,
         affected_ids,
         effects,
         ttl_ms,
@@ -470,6 +471,7 @@ fn build_reserved_response_plan(
         admission_artifact_ref,
     } = policy.select_response_policy(finding, binding)?;
     let response_plan = build_response_plan(ResponsePlanInput {
+        execution,
         action_id: binding.action_id.clone(),
         trigger_finding_id: receipt.finding_id.clone(),
         trigger_finding_hash: receipt.finding_hash,

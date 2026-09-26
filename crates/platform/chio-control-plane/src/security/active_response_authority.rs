@@ -132,6 +132,7 @@ pub struct SignedActiveResponseAuthorityRequest {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ActiveResponsePolicySelectionWire {
+    pub execution: chio_security_types::ResponseExecutionBinding,
     pub action_id: ActionId,
     pub evidence_id: OpaqueReceiptRef,
     pub admission_artifact_ref: AdmissionArtifactRef,

@@ -622,6 +622,7 @@
         let approval_policy_id = record("real-adapter-approval-policy");
         let response_plan = chio_quarantine::build_response_plan(
             chio_security_types::ResponsePlanInput {
+                execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
                 action_id: binding.action_id.clone(),
                 trigger_finding_id: binding.finding_id.clone(),
                 trigger_finding_hash: binding.finding_hash,

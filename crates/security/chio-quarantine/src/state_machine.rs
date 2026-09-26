@@ -115,6 +115,8 @@ impl<S: ResponseStore + ?Sized> ResponseStateMachine<S> {
 
     pub fn create(&self, plan: ResponsePlan) -> Result<ResponsePlanRecord, StateMachineError> {
         validate_plan(&plan)?;
+        plan.require_execution_mode(chio_security_types::ResponseExecutionMode::Live)
+            .map_err(|_| StateMachineError::InvalidPlan)?;
         let request_id = request_id(&plan)?;
         let mutations = ResponseMutationLog::new(vec![ResponseMutationRecord::Requested(
             ResponseRequestedRecord {
@@ -629,6 +631,7 @@ pub fn build_response_plan(input: ResponsePlanInput) -> Result<ResponsePlan, Sta
     let effects =
         PlannedResponseEffects::new(effects).map_err(|_| StateMachineError::InvalidPlan)?;
     let mut plan = ResponsePlan {
+        execution: Some(input.execution),
         action_id: input.action_id,
         trigger_finding_id: input.trigger_finding_id,
         trigger_finding_hash: input.trigger_finding_hash,
@@ -677,6 +680,12 @@ pub fn prepare_response_dispatch(
         commit_mode,
     } = request;
     validate_plan(&plan)?;
+    if matches!(commit_mode, ResponseDispatchCommitMode::Fresh) {
+        plan.require_execution_mode(chio_security_types::ResponseExecutionMode::Live)
+            .map_err(|_| StateMachineError::InvalidDispatch)?;
+    } else if plan.execution.is_some_and(|binding| binding.mode != chio_security_types::ResponseExecutionMode::Live) {
+        return Err(StateMachineError::InvalidDispatch);
+    }
     if authorization_capability_hash != plan.operator_capability.capability_digest
         || executor_authority_generation == 0
         || authorized_at_unix_ms < plan.created_at_unix_ms
@@ -987,6 +996,10 @@ fn validate_transition_request(
         return Err(StateMachineError::InvalidTransition);
     }
     if actual_target == ResponseState::Applying {
+        if snapshot.state != ResponseState::Applying {
+            snapshot.plan.require_execution_mode(chio_security_types::ResponseExecutionMode::Live)
+                .map_err(|_| StateMachineError::InvalidTransition)?;
+        }
         let lease = request
             .applying_lease_expires_at_unix_ms
             .ok_or(StateMachineError::InvalidTiming)?;
