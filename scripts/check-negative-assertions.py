@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Ratchet the count of weak negative assertions per file in the security crates.
-
-This is a net-count budget per file, not a per-site pin: a change that
-strengthens one old assertion and adds one weak assertion elsewhere in the same
-file passes at an unchanged count. That trade is visible in the diff, so review
-of changed tests remains part of the contract until the baseline pins sites by
-identity rather than by count.
+"""Stop new weak negative assertions in the security crates.
 
 `assert!(result.is_err())` in a fail-closed system is close to vacuous. Almost
 any mistake produces an error, so the assertion passes when the code rejects for
@@ -23,27 +17,34 @@ Scope: `crates/security`, `crates/kernel/chio-kernel` and
 Negative assertions live mostly in tests, which is exactly where the weakness
 matters.
 
-Baseline policy: the existing counts are debt, per file, and can only shrink.
-Nothing here converts them, because most cannot be converted yet: several
-distinct rejection rules currently share one error variant, which leaves an
-author nothing more specific to assert. The conversions land per boundary as
-each rule gets its own discriminant.
+Baseline policy: the existing sites are debt, pinned one by one. Each entry in
+`scripts/negative-assertions-baseline.txt` names the file, the enclosing
+function, the assertion's condition text, and how many assertions of exactly
+that shape the function holds. A weak assertion whose identity is not in the
+baseline is new and fails, whichever file it lands in and whatever else that
+file lost in the same change. The first version of this gate pinned one count
+per file, which let a change strengthen an old assertion and add a new weak one
+beside it without a failure; identities close that gap. Line numbers are not
+part of the identity because they move with every edit above them, and the
+condition text is normalised to single spaces so a reflow is not a new site.
 
-The baseline carries one expiry rather than a spread of them, because one change
-retires all of it: once each rejection rule is distinguishable, every entry
-becomes convertible at once. That is also why the entries carry no individual
-rationale; they share this one, and repeating it per file would say nothing.
-Renew only through `--ratchet`, which re-counts each file, never upward, drops
-files that have none left, and moves the expiry forward but never back.
+Nothing here converts the debt, because most of it cannot be converted yet:
+several distinct rejection rules currently share one error variant, which leaves
+an author nothing more specific to assert. The conversions land per boundary as
+each rule gets its own discriminant. The baseline carries one expiry rather than
+a spread of them, because one change retires all of it. Renew only through
+`--ratchet`, which re-counts each site, never upward, drops sites that no longer
+exist, and moves the expiry forward but never back. The first `--ratchet`, with
+no baseline file present, records the debt as it stands.
 """
 
 from __future__ import annotations
 
 import argparse
-import re
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -54,242 +55,8 @@ ASSERTION_ROOTS = (
     "crates/kernel/chio-kernel/",
     "crates/platform/chio-control-plane/",
 )
-
-BASELINE_EXPIRES = "2027-01-31"
-
-# Weak negative assertions per file. Entries are debt, not configuration.
-BASELINE: dict[str, int] = {
-    "crates/kernel/chio-kernel/src/admission_operation.part3.inc": 8,
-    "crates/kernel/chio-kernel/src/admission_operation/authority_profile/tests.rs": 6,
-    "crates/kernel/chio-kernel/src/admission_operation/capture_tests.rs": 1,
-    "crates/kernel/chio-kernel/src/admission_operation/dpop_claim/tests.rs": 1,
-    "crates/kernel/chio-kernel/src/admission_operation/execution_nonce/profile.rs": 4,
-    "crates/kernel/chio-kernel/src/admission_operation/native_flow_observation.rs": 5,
-    "crates/kernel/chio-kernel/src/admission_operation/native_input_join/tests.rs": 12,
-    "crates/kernel/chio-kernel/src/admission_operation/projection/channel_terminal_tests.rs": 8,
-    "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs": 3,
-    "crates/kernel/chio-kernel/src/admission_operation/runtime_participant.rs": 4,
-    "crates/kernel/chio-kernel/src/admission_operation/sequencer.rs": 1,
-    "crates/kernel/chio-kernel/src/admission_operation_tests.rs": 2,
-    "crates/kernel/chio-kernel/src/admission_operation_tests/terminal_projection.rs": 1,
-    "crates/kernel/chio-kernel/src/authority.rs": 2,
-    "crates/kernel/chio-kernel/src/authority/aggregate.rs": 8,
-    "crates/kernel/chio-kernel/src/caller_delivery/tests.rs": 14,
-    "crates/kernel/chio-kernel/src/capability_lineage.rs": 1,
-    "crates/kernel/chio-kernel/src/dispatch_status_tests.rs": 3,
-    "crates/kernel/chio-kernel/src/dpop.rs": 6,
-    "crates/kernel/chio-kernel/src/dpop/authority/tests.rs": 13,
-    "crates/kernel/chio-kernel/src/dpop/identity/tests.rs": 5,
-    "crates/kernel/chio-kernel/src/dpop/replay_source/snapshot/tests.rs": 11,
-    "crates/kernel/chio-kernel/src/dpop/replay_source/tests.rs": 21,
-    "crates/kernel/chio-kernel/src/finding_pool_tests.rs": 2,
-    "crates/kernel/chio-kernel/src/governed_approval_replay.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests.rs": 8,
-    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests/custody.rs": 5,
-    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/tests/participants.rs": 7,
-    "crates/kernel/chio-kernel/src/kernel/dispatch/timer_probe_tests.rs": 2,
-    "crates/kernel/chio-kernel/src/kernel/kernel_struct.rs": 3,
-    "crates/kernel/chio-kernel/src/kernel/recovery_gate.rs": 8,
-    "crates/kernel/chio-kernel/src/kernel/tests/automatic_active_response_fence.rs": 3,
-    "crates/kernel/chio-kernel/src/kernel/tests/boot_receipts.rs": 2,
-    "crates/kernel/chio-kernel/src/kernel/tests/budget.rs": 6,
-    "crates/kernel/chio-kernel/src/kernel/tests/capability_liveness.rs": 9,
-    "crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs": 4,
-    "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime.rs": 8,
-    "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime_url_elicitation.rs": 2,
-    "crates/kernel/chio-kernel/src/kernel/tests/dispatch_credentials.rs": 4,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/authority_profile.rs": 2,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/dispatch_commit_failure.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/dpop_acquisition.rs": 7,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/federation_context.rs": 2,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/federation_context/evidence.rs": 5,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/federation_context/recovery_isolation.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/governed_acquisition.rs": 3,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/native_acquisition.rs": 3,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/native_acquisition/input.rs": 2,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/native_dispatch_ledger.rs": 2,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/native_egress.rs": 12,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/return_context.rs": 5,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/return_signing.rs": 3,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/return_signing/callbacks.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/review_regressions.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/runtime_participant.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/runtime_participant/acquisition.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/runtime_participant/selection.rs": 2,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/security_binding.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/security_binding/native_authority.rs": 2,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/security_binding/native_authority/codec.rs": 2,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/security_binding/retention.rs": 4,
-    "crates/kernel/chio-kernel/src/kernel/tests/execution_nonce.rs": 3,
-    "crates/kernel/chio-kernel/src/kernel/tests/immediate_dispatch_revalidation.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/invocation_dispatch.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/nested_url_side_effects.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/nonce_admission.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/payment_ambiguity.rs": 2,
-    "crates/kernel/chio-kernel/src/kernel/tests/prepared_dispatch_credentials.rs": 5,
-    "crates/kernel/chio-kernel/src/kernel/tests/receipts.rs": 3,
-    "crates/kernel/chio-kernel/src/kernel/tests/revocation_durability.rs": 2,
-    "crates/kernel/chio-kernel/src/kernel/tests/security_dispatch.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/security_dispatch/legacy_nonce.rs": 4,
-    "crates/kernel/chio-kernel/src/kernel/tests/session_reports.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/support_monetary_durability.rs": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/threshold_crypto_floor.rs": 16,
-    "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance.rs": 2,
-    "crates/kernel/chio-kernel/src/memory_provenance.rs": 1,
-    "crates/kernel/chio-kernel/src/payment.rs": 7,
-    "crates/kernel/chio-kernel/src/session/tests.rs": 1,
-    "crates/kernel/chio-kernel/src/threshold_approval.rs": 3,
-    "crates/kernel/chio-kernel/src/tool_outcome/release/tests.rs": 29,
-    "crates/kernel/chio-kernel/src/tool_outcome_tests.rs": 46,
-    "crates/kernel/chio-kernel/tests/dpop.rs": 6,
-    "crates/kernel/chio-kernel/tests/receipt_signing_async.rs": 1,
-    "crates/kernel/chio-kernel/tests/retention.rs": 1,
-    "crates/kernel/chio-kernel/tests/signer_crash.rs": 3,
-    "crates/kernel/chio-kernel/tests/threshold_approval_records.rs": 8,
-    "crates/kernel/chio-kernel/tests/threshold_collector_recovery.rs": 23,
-    "crates/platform/chio-control-plane/src/durable_admission.rs": 5,
-    "crates/platform/chio-control-plane/src/durable_admission/windows.rs": 11,
-    "crates/platform/chio-control-plane/src/economic_effect_coordinator.rs": 2,
-    "crates/platform/chio-control-plane/src/economic_state_anchor.rs": 11,
-    "crates/platform/chio-control-plane/src/economic_state_recovery_tests.rs": 10,
-    "crates/platform/chio-control-plane/src/fiscal_state_recovery.rs": 2,
-    "crates/platform/chio-control-plane/src/issuance/tests/aggregate.rs": 1,
-    "crates/platform/chio-control-plane/src/lib.rs": 1,
-    "crates/platform/chio-control-plane/src/policy/capability_budget_tests.rs": 1,
-    "crates/platform/chio-control-plane/src/policy/swarm_admission_tests.rs": 1,
-    "crates/platform/chio-control-plane/src/policy/tests.rs": 2,
-    "crates/platform/chio-control-plane/src/security/active_defense_host_tests.rs": 11,
-    "crates/platform/chio-control-plane/src/security/active_response_authority/tests.rs": 16,
-    "crates/platform/chio-control-plane/src/security/adapters/native_broker_authority_tests.rs": 11,
-    "crates/platform/chio-control-plane/src/security/adapters/native_broker_capture_tests.rs": 4,
-    "crates/platform/chio-control-plane/src/security/adapters/native_broker_connection_tests.rs": 2,
-    "crates/platform/chio-control-plane/src/security/adapters/native_broker_live_authority_tests.rs": 4,
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_caller_process_tests.rs": 3,
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_caller_tests.rs": 2,
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_capture_ack_tests.rs": 3,
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_capture_corruption_tests.rs": 3,
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_capture_tests.rs": 1,
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_nonce_tests.rs": 1,
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_output_fault_tests.rs": 4,
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_output_preparation_tests.rs": 2,
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_output_tests.rs": 6,
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_restart.rs": 4,
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_test_support.rs": 3,
-    "crates/platform/chio-control-plane/src/security/adapters_parts/part_03.inc": 1,
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02.inc": 11,
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02_recovery.inc": 7,
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_05.inc": 4,
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_06.inc": 1,
-    "crates/platform/chio-control-plane/src/security/migration_evidence.rs": 12,
-    "crates/platform/chio-control-plane/src/security/scheduler_worker_parts/part_02.inc": 2,
-    "crates/platform/chio-control-plane/src/security/scheduler_worker_parts/part_02_tests_tail.inc": 16,
-    "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs": 5,
-    "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs": 1,
-    "crates/platform/chio-control-plane/src/trust_control/finding_challenge_handlers.rs": 3,
-    "crates/platform/chio-control-plane/src/trust_control/finding_hosted_profile.rs": 15,
-    "crates/platform/chio-control-plane/src/trust_control/finding_operator_seller_routes.rs": 5,
-    "crates/platform/chio-control-plane/src/trust_control/finding_purchase_routes/bounded_serving.rs": 6,
-    "crates/platform/chio-control-plane/src/trust_control/finding_retraction_resolver.rs": 5,
-    "crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs": 3,
-    "crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs": 1,
-    "crates/platform/chio-control-plane/src/trust_control/frost.rs": 1,
-    "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs": 7,
-    "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_challenge_enforcement_e2e_tests.rs": 1,
-    "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_challenge_enforcement_e2e_tests/status_impairment_tests.rs": 4,
-    "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_market_exit_tests.rs": 7,
-    "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_market_exit_tests/activation_security.rs": 5,
-    "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_market_exit_tests/market_config.rs": 4,
-    "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_wedge_purchase_e2e_tests.rs": 1,
-    "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_wedge_purchase_e2e_tests/status_and_settlement_tests.rs": 1,
-    "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority.rs": 5,
-    "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests.rs": 1,
-    "crates/platform/chio-control-plane/src/trust_control/service_runtime/tests/retained_budget_hold.rs": 3,
-    "crates/platform/chio-control-plane/src/trust_control/service_runtime/tests/structured_budget.rs": 20,
-    "crates/platform/chio-control-plane/src/trust_control/service_types/cluster_budget.rs": 4,
-    "crates/platform/chio-control-plane/src/trust_control/service_types/finding_market_config.rs": 19,
-    "crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs": 1,
-    "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support.rs": 1,
-    "crates/platform/chio-control-plane/tests/active_defense_recovery.rs": 1,
-    "crates/platform/chio-control-plane/tests/native_security_evidence.rs": 13,
-    "crates/security/chio-active-response-authority/src/config/tests.rs": 8,
-    "crates/security/chio-active-response-authority/src/runtime.rs": 2,
-    "crates/security/chio-active-response-authority/src/store/tests.rs": 5,
-    "crates/security/chio-cage/src/execution_identity.rs": 14,
-    "crates/security/chio-cage/src/launch/linux_parts/part_02.rs": 5,
-    "crates/security/chio-cage/src/lib_parts/part_02.rs": 3,
-    "crates/security/chio-cage/tests/enforcement_evidence.rs": 24,
-    "crates/security/chio-decoy/tests/watermark_vectors.rs": 2,
-    "crates/security/chio-flow/src/lattice.rs": 1,
-    "crates/security/chio-keyring/src/lib.rs": 11,
-    "crates/security/chio-keyring/tests/checkpoint.rs": 8,
-    "crates/security/chio-keyring/tests/enterprise_receipt.rs": 2,
-    "crates/security/chio-keyring/tests/event.rs": 10,
-    "crates/security/chio-keyring/tests/history.rs": 7,
-    "crates/security/chio-keyring/tests/independent_services.rs": 10,
-    "crates/security/chio-keyring/tests/router.rs": 15,
-    "crates/security/chio-keyring/tests/service.rs": 9,
-    "crates/security/chio-keyring/tests/sqlite.rs": 18,
-    "crates/security/chio-keyring/tests/state.rs": 20,
-    "crates/security/chio-keyring/tests/time.rs": 3,
-    "crates/security/chio-keyring/tests/witness_sync.rs": 13,
-    "crates/security/chio-quarantine/src/executor_proof.rs": 4,
-    "crates/security/chio-quarantine/tests/correlation.rs": 3,
-    "crates/security/chio-quarantine/tests/response_dispatch.rs": 6,
-    "crates/security/chio-quarantine/tests/response_executor.rs": 19,
-    "crates/security/chio-quarantine/tests/response_scheduler.rs": 1,
-    "crates/security/chio-quarantine/tests/rules.rs": 1,
-    "crates/security/chio-quarantine/tests/state_machine.rs": 17,
-    "crates/security/chio-secret-broker/src/audit.rs": 5,
-    "crates/security/chio-secret-broker/src/authority_ipc.rs": 1,
-    "crates/security/chio-secret-broker/src/budget.rs": 4,
-    "crates/security/chio-secret-broker/src/capability.rs": 2,
-    "crates/security/chio-secret-broker/src/daemon.rs": 21,
-    "crates/security/chio-secret-broker/src/daemon_runtime.rs": 2,
-    "crates/security/chio-secret-broker/src/encrypted_blob_backend.rs": 9,
-    "crates/security/chio-secret-broker/src/generic_https.rs": 10,
-    "crates/security/chio-secret-broker/src/generic_https/rustls_transport.rs": 6,
-    "crates/security/chio-secret-broker/src/inherited_fd.rs": 2,
-    "crates/security/chio-secret-broker/src/ipc_client.rs": 1,
-    "crates/security/chio-secret-broker/src/kernel_admission/registration.rs": 1,
-    "crates/security/chio-secret-broker/src/kernel_admission/tests.rs": 10,
-    "crates/security/chio-secret-broker/src/kernel_admission/tests/kernel.rs": 2,
-    "crates/security/chio-secret-broker/src/kernel_admission/tests/registration.rs": 2,
-    "crates/security/chio-secret-broker/src/migration.rs": 11,
-    "crates/security/chio-secret-broker/src/prepared_mcp/tests.rs": 2,
-    "crates/security/chio-secret-broker/src/privileged_audit.rs": 4,
-    "crates/security/chio-secret-broker/src/process_boundary_tests/native.rs": 3,
-    "crates/security/chio-secret-broker/src/process_boundary_tests/native_keyring.rs": 4,
-    "crates/security/chio-secret-broker/src/process_boundary_tests/native_response_tests.rs": 1,
-    "crates/security/chio-secret-broker/src/proof.rs": 2,
-    "crates/security/chio-secret-broker/src/protocol.rs": 6,
-    "crates/security/chio-secret-broker/src/reconcile.rs": 1,
-    "crates/security/chio-secret-broker/src/registration.rs": 2,
-    "crates/security/chio-secret-broker/src/revocation.rs": 6,
-    "crates/security/chio-secret-broker/src/service_parts/tests_01_sections/cases.inc": 16,
-    "crates/security/chio-secret-broker/src/service_parts/tests_02.rs": 5,
-    "crates/security/chio-secret-broker/src/service_parts/tests_03.rs": 17,
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs": 2,
-    "crates/security/chio-secret-broker/src/sqlite.rs": 1,
-    "crates/security/chio-secret-broker/tests/daemon_runtime.rs": 11,
-    "crates/security/chio-secret-broker/tests/execution.rs": 18,
-    "crates/security/chio-secret-broker/tests/no_secret_crossing.rs": 1,
-    "crates/security/chio-secret-broker/tests/production_surfaces.rs": 15,
-    "crates/security/chio-secure-ipc/src/credentials.rs": 2,
-    "crates/security/chio-secure-ipc/src/tests.rs": 3,
-    "crates/security/chio-security-kernel/tests/adapters/security_callbacks.rs": 1,
-    "crates/security/chio-security-types/src/declassification.rs": 2,
-    "crates/security/chio-security-types/src/flow.rs": 19,
-    "crates/security/chio-security-types/tests/capability_set_suspension.rs": 3,
-    "crates/security/chio-security-types/tests/egress_restriction.rs": 4,
-    "crates/security/chio-security-types/tests/event.rs": 6,
-    "crates/security/chio-security-types/tests/issuance_freeze.rs": 5,
-    "crates/security/chio-security-types/tests/ports_compile.rs": 9,
-    "crates/security/chio-security-types/tests/response.rs": 10,
-    "crates/security/chio-security-types/tests/response_dispatch.rs": 11,
-    "crates/security/chio-security-types/tests/session_throttle.rs": 1,
-}
-
+BASELINE_NAME = "negative-assertions-baseline.txt"
+MODULE_SCOPE = "<module>"
 
 RUST_NOISE = re.compile(
     r"""
@@ -302,6 +69,7 @@ RUST_NOISE = re.compile(
     re.VERBOSE,
 )
 ASSERT_CALL = re.compile(r"\bassert!\s*\(")
+FN_ITEM = re.compile(r"\bfn\s+([A-Za-z_][A-Za-z0-9_]*)")
 # A condition that says only "something failed". `matches!` and a boolean
 # operator both mean the assertion says more than that, so they are not weak.
 STRONGER_CONDITION = ("matches!", "&&", "||")
@@ -311,11 +79,26 @@ STRONGER_CONDITION = ("matches!", "&&", "||")
 class WeakAssertion:
     path: str
     line: int
+    function: str
     condition: str
+
+    @property
+    def identity(self) -> tuple[str, str, str]:
+        return (self.path, self.function, self.condition)
+
+
+@dataclass(frozen=True)
+class Baseline:
+    expires: str
+    sites: dict[tuple[str, str, str], int]
 
 
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
+
+
+def default_baseline_path() -> Path:
+    return Path(__file__).resolve().parent / BASELINE_NAME
 
 
 def discover_sources(root: Path) -> list[str]:
@@ -405,8 +188,19 @@ def assertion_condition(text: str, start: int) -> tuple[str, int] | None:
     return text[start : condition_end if condition_end is not None else cursor], cursor
 
 
+def enclosing_function(functions: list[tuple[int, str]], offset: int) -> str:
+    """The nearest `fn` declared before `offset`, which is the item holding it."""
+    name = MODULE_SCOPE
+    for start, candidate in functions:
+        if start > offset:
+            break
+        name = candidate
+    return name
+
+
 def weak_assertions(path: str, text: str) -> list[WeakAssertion]:
     scanned = blank_rust_noise(text)
+    functions = [(match.start(), match.group(1)) for match in FN_ITEM.finditer(scanned)]
     found: list[WeakAssertion] = []
     for match in ASSERT_CALL.finditer(scanned):
         parsed = assertion_condition(scanned, match.end())
@@ -422,6 +216,7 @@ def weak_assertions(path: str, text: str) -> list[WeakAssertion]:
             WeakAssertion(
                 path=path,
                 line=scanned.count("\n", 0, match.start()) + 1,
+                function=enclosing_function(functions, match.start()),
                 condition=collapsed,
             )
         )
@@ -440,19 +235,63 @@ def count_weak(root: Path, paths: list[str]) -> dict[str, list[WeakAssertion]]:
     return counted
 
 
-def validate_baseline(errors: list[str]) -> None:
+def group_sites(counted: dict[str, list[WeakAssertion]]) -> dict[tuple[str, str, str], list[WeakAssertion]]:
+    sites: dict[tuple[str, str, str], list[WeakAssertion]] = {}
+    for found in counted.values():
+        for assertion in found:
+            sites.setdefault(assertion.identity, []).append(assertion)
+    return sites
+
+
+def read_baseline(path: Path, failures: list[str]) -> Baseline | None:
+    if not path.is_file():
+        failures.append(f"{path.name}: missing; run --ratchet to record the current debt")
+        return None
+    expires = None
+    sites: dict[tuple[str, str, str], int] = {}
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        if line.startswith("#"):
+            marker = line[1:].strip()
+            if marker.startswith("expires "):
+                expires = marker[len("expires ") :].strip()
+            continue
+        fields = line.split("\t")
+        if len(fields) != 4 or not fields[0].isdigit() or int(fields[0]) <= 0:
+            failures.append(f"{path.name}:{number} malformed entry; expected count, path, function, condition")
+            continue
+        count, site_path, function, condition = fields
+        if not site_path.startswith(ASSERTION_ROOTS):
+            failures.append(f"{path.name}:{number} {site_path} is outside the gated crates")
+        identity = (site_path, function, condition)
+        if identity in sites:
+            failures.append(f"{path.name}:{number} duplicate entry for {site_path} {function}")
+            continue
+        sites[identity] = int(count)
+    if expires is None:
+        failures.append(f"{path.name}: no `# expires YYYY-MM-DD` line")
+        return None
     try:
-        expires_on = date.fromisoformat(BASELINE_EXPIRES)
+        expires_on = date.fromisoformat(expires)
     except ValueError:
-        errors.append(f"baseline expiry {BASELINE_EXPIRES!r} is not an ISO date")
-        return
+        failures.append(f"{path.name}: expiry {expires!r} is not an ISO date")
+        return None
     if expires_on < date.today():
-        errors.append(f"weak negative assertion baseline expired on {BASELINE_EXPIRES}")
-    for path, cap in sorted(BASELINE.items()):
-        if cap <= 0:
-            errors.append(f"{path}: baseline entry is not a positive count")
-        if not path.startswith(ASSERTION_ROOTS):
-            errors.append(f"{path}: baseline entry is outside the gated crates")
+        failures.append(f"weak negative assertion baseline expired on {expires}")
+    return Baseline(expires=expires, sites=sites)
+
+
+def render_baseline(expires: str, sites: dict[tuple[str, str, str], int]) -> str:
+    lines = [
+        "# Weak negative assertions in the security crates, pinned by site: count,",
+        "# file, enclosing function, condition. Written by",
+        "# scripts/check-negative-assertions.py --ratchet; counts only shrink.",
+        f"# expires {expires}",
+    ]
+    for (path, function, condition), count in sorted(sites.items()):
+        lines.append(f"{count}\t{path}\t{function}\t{condition}")
+    return "\n".join(lines) + "\n"
 
 
 def next_month_end(today: date) -> date:
@@ -464,43 +303,36 @@ def next_month_end(today: date) -> date:
     return date.fromordinal(date(year, month + 1, 1).toordinal() - 1)
 
 
-def ratchet_baseline(root: Path) -> int:
-    counted = count_weak(root, discover_sources(root))
-    kept: list[tuple[str, int]] = []
+def ratchet_baseline(root: Path, baseline_path: Path) -> int:
+    sites = group_sites(count_weak(root, discover_sources(root)))
+    previous = read_baseline(baseline_path, []) if baseline_path.is_file() else None
+    kept: dict[tuple[str, str, str], int] = {}
     dropped: list[str] = []
     tightened: list[str] = []
-    for path, cap in BASELINE.items():
-        found = counted.get(path, [])
-        if not found:
-            dropped.append(f"{path}: no weak negative assertions remain")
-            continue
-        count = min(len(found), cap)
-        if count < cap:
-            tightened.append(f"{path}: {cap} -> {count}")
-        kept.append((path, count))
-    script = Path(__file__).resolve()
-    source = script.read_text(encoding="utf-8")
-    expiry_marker = 'BASELINE_EXPIRES = "'
-    expiry_start = source.index(expiry_marker) + len(expiry_marker)
-    expiry_end = source.index('"', expiry_start)
-    # Forward only. A reviewed deadline further out survives a ratchet; a
-    # deadline that has arrived moves one month and the commit is the review.
-    expires = max(next_month_end(date.today()).isoformat(), BASELINE_EXPIRES)
-    source = source[:expiry_start] + expires + source[expiry_end:]
-    start_marker = "BASELINE: dict[str, int] = {\n"
-    start = source.index(start_marker) + len(start_marker)
-    end = source.index("\n}\n", start)
-    rendered = "".join(f'    "{path}": {count},\n' for path, count in sorted(kept))
-    script.write_text(
-        source[:start] + rendered.rstrip("\n") + source[end:], encoding="utf-8"
-    )
+    if previous is None:
+        kept = {identity: len(found) for identity, found in sites.items()}
+        expires = next_month_end(date.today()).isoformat()
+    else:
+        for identity, cap in previous.sites.items():
+            found = sites.get(identity, [])
+            if not found:
+                dropped.append(f"{identity[0]} {identity[1]}: `{identity[2]}` no longer present")
+                continue
+            count = min(len(found), cap)
+            if count < cap:
+                tightened.append(f"{identity[0]} {identity[1]}: {cap} -> {count}")
+            kept[identity] = count
+        # Forward only. A reviewed deadline further out survives a ratchet; a
+        # deadline that has arrived moves one month and the commit is the review.
+        expires = max(next_month_end(date.today()).isoformat(), previous.expires)
+    baseline_path.write_text(render_baseline(expires, kept), encoding="utf-8")
     for line in dropped:
         print(f"dropped: {line}")
     for line in tightened:
         print(f"tightened: {line}")
     print(
-        f"weak negative assertion baseline ratcheted: {len(kept)} files kept, "
-        f"{sum(count for _, count in kept)} assertions, {len(dropped)} dropped, "
+        f"weak negative assertion baseline {'recorded' if previous is None else 'ratcheted'}: "
+        f"{len(kept)} sites, {sum(kept.values())} assertions, {len(dropped)} dropped, "
         f"{len(tightened)} tightened, expires {expires}"
     )
     return 0
@@ -512,22 +344,29 @@ def main() -> int:
     )
     parser.add_argument("--root", type=Path, default=repo_root(), help="repository root")
     parser.add_argument(
+        "--baseline",
+        type=Path,
+        default=default_baseline_path(),
+        help=f"baseline file (default: scripts/{BASELINE_NAME} beside this script)",
+    )
+    parser.add_argument(
         "--ratchet",
         action="store_true",
         help=(
-            "rewrite the baseline in place: re-count each file (never upward), "
-            "drop files with none left, and move the expiry forward if it has "
-            "arrived"
+            "rewrite the baseline in place: re-count each site (never upward), "
+            "drop sites that no longer exist, and move the expiry forward if it "
+            "has arrived; with no baseline present, record the current debt"
         ),
     )
     args = parser.parse_args()
+    root = args.root.resolve()
+    baseline_path = args.baseline.resolve()
 
     if args.ratchet:
-        return ratchet_baseline(args.root.resolve())
+        return ratchet_baseline(root, baseline_path)
 
-    root = args.root.resolve()
     failures: list[str] = []
-    validate_baseline(failures)
+    baseline = read_baseline(baseline_path, failures)
 
     try:
         paths = discover_sources(root)
@@ -536,34 +375,40 @@ def main() -> int:
         return 1
 
     counted = count_weak(root, paths)
+    sites = group_sites(counted)
     total = sum(len(found) for found in counted.values())
+    pinned = baseline.sites if baseline is not None else {}
     print(
         f"Weak negative assertions: {total} across {len(counted)} files, "
-        f"baseline {sum(BASELINE.values())} across {len(BASELINE)} files, "
-        f"expires {BASELINE_EXPIRES}"
+        f"baseline {sum(pinned.values())} assertions at {len(pinned)} sites across "
+        f"{len({identity[0] for identity in pinned})} files"
+        + (f", expires {baseline.expires}" if baseline is not None else "")
     )
 
-    for path, found in sorted(counted.items()):
-        cap = BASELINE.get(path)
+    for identity, found in sorted(sites.items(), key=lambda item: (item[1][0].path, item[1][0].line)):
+        cap = pinned.get(identity)
+        first = found[0]
         if cap is None:
             failures.append(
-                f"{path}: {len(found)} weak negative assertions and no baseline "
-                f"entry; assert the variant that rejected "
-                f"(first at {path}:{found[0].line})"
+                f"{first.path}:{first.line} new weak negative assertion in `{first.function}`: "
+                f"assert!({first.condition}); assert the variant that rejected"
             )
             continue
         if len(found) > cap:
+            extra = found[cap]
             failures.append(
-                f"{path}: {len(found)} weak negative assertions, baseline is {cap}; "
+                f"{extra.path}:{extra.line} {len(found)} weak negative assertions of the shape "
+                f"assert!({extra.condition}) in `{extra.function}`, baseline pins {cap}; "
                 "assert the variant that rejected"
             )
 
     present = set(paths)
-    for path in sorted(set(BASELINE) - set(counted)):
+    for identity in sorted(set(pinned) - set(sites)):
+        path, function, condition = identity
         if path in present:
             failures.append(
-                f"{path}: no weak negative assertions remain; remove its baseline "
-                "entry (run --ratchet)"
+                f"{path}: baseline entry for `{function}` assert!({condition}) no longer matches "
+                "anything; remove it (run --ratchet)"
             )
 
     if failures:
