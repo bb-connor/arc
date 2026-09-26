@@ -86,13 +86,25 @@ fn combined_deployment_requires_and_authenticates_response_execution_mode() {
     value["responseAuthority"]["responseExecutionMode"] = serde_json::json!("dry_run");
     let configured: ActiveDefenseDeploymentConfig =
         serde_json::from_value(value.clone()).test_expect("explicit dry-run mode");
-    let dry_run_digest = configured.compute_deployment_digest().test_expect("dry-run digest");
+    let dry_run_digest = configured
+        .compute_deployment_digest()
+        .test_expect("dry-run digest");
     value["responseAuthority"]["responseExecutionMode"] = serde_json::json!("live");
     let live: ActiveDefenseDeploymentConfig =
         serde_json::from_value(value.clone()).test_expect("explicit live mode");
-    assert_ne!(dry_run_digest, live.compute_deployment_digest().test_expect("live digest"));
-    value["responseAuthority"].as_object_mut().test_expect("authority object").remove("responseExecutionMode");
-    assert!(serde_json::from_value::<ActiveDefenseDeploymentConfig>(value).is_err());
+    assert_ne!(
+        dry_run_digest,
+        live.compute_deployment_digest().test_expect("live digest")
+    );
+    value["responseAuthority"]
+        .as_object_mut()
+        .test_expect("authority object")
+        .remove("responseExecutionMode");
+    let missing_mode = serde_json::from_value::<ActiveDefenseDeploymentConfig>(value)
+        .test_expect_err("deployment without an execution mode");
+    assert!(missing_mode
+        .to_string()
+        .contains("missing field `responseExecutionMode`"));
 }
 
 #[test]

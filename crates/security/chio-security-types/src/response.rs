@@ -269,8 +269,12 @@ impl ResponsePlan {
         &self,
         mode: crate::ResponseExecutionMode,
     ) -> Result<ResponseExecutionBinding, ResponseShapeError> {
-        let binding = self.execution.ok_or(ResponseShapeError::InvalidExecutionBinding)?;
-        binding.validate().map_err(|_| ResponseShapeError::InvalidExecutionBinding)?;
+        let binding = self
+            .execution
+            .ok_or(ResponseShapeError::InvalidExecutionBinding)?;
+        binding
+            .validate()
+            .map_err(|_| ResponseShapeError::InvalidExecutionBinding)?;
         if binding.mode != mode {
             return Err(ResponseShapeError::InvalidExecutionBinding);
         }
@@ -311,7 +315,10 @@ impl ResponsePlan {
     }
 
     pub fn validate_shape(&self) -> Result<(), ResponseShapeError> {
-        if self.execution.is_some_and(|binding| binding.validate().is_err()) {
+        if self
+            .execution
+            .is_some_and(|binding| binding.validate().is_err())
+        {
             return Err(ResponseShapeError::InvalidExecutionBinding);
         }
         if self.effects.is_empty() {

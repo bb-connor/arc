@@ -201,7 +201,9 @@ mod tests {
         let contribution_hash =
             Digest32::new(*sha256(canonical_contribution.as_bytes()).as_bytes());
         let plan = build_response_plan(ResponsePlanInput {
-            execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
+            execution: chio_security_types::ResponseExecutionBinding::new(
+                chio_security_types::ResponseExecutionMode::Live,
+            ),
             action_id: ActionId::new("action-proof")
                 .unwrap_or_else(|error| panic!("invalid action id: {error}")),
             trigger_finding_id: record_id("finding-proof"),
