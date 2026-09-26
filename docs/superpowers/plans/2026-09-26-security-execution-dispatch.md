@@ -256,6 +256,21 @@ review figures, which was correct.
 (1,228 lines) is referenced by nothing in the tree: no `include!`, no `#[path]`.
 Dead code, for Lane K or Packet 7 to delete after a build confirms it.
 
+## Wave 2 ledger
+
+| Lane | Spawned | Base | Model | Prerequisite handling |
+| --- | --- | --- | --- | --- |
+| K gates and configuration | 2026-09-26, restarted on Fable 5.1 the same day | `3788269c6a`, rebased onto `07e963e8f5` | Fable 5.1 | none; H0 landed as `407a590e17` on its branch, self-test and workspace check rerun independently by the orchestrator |
+| J receipt store and boundaries | 2026-09-26 | `07e963e8f5` | Fable 5.1 | started before C merged with an explicit exclusion: no edits under `receipt_store/reports/`, `benches/` or the `[[bench]]` manifest entries until told C merged |
+| M parent Packet 4 | 2026-09-26 | `07e963e8f5` | Fable 5.1 | started before D merged, phased: the lifecycle model, trace validation and the temporal timeout first; no Kani harness file or entry calling a Packet 1 helper until told D merged with the final names |
+| F canonicalization boundary census (1F) | 2026-09-26 | `07e963e8f5` | Fable 5.1 | documentation only, no code; any typed-form-on-untrusted-text boundary is reported as a P1 to the orchestrator for the owning lane |
+| H FROST round-2 type split (design note step 1) | not yet | after B merges | Fable 5.1 | the ceremony store persists round-2 packages through the type's `Serialize` before encrypting them (`frost_store/ceremony.rs:351`), so the split edits `frost_store/mod.rs` and `ceremony.rs`, which B holds |
+| G, S | not yet | after D (G); after B and C (S) | Fable 5.1 | briefs drafted at `/home/connor/lanes/briefs/` |
+
+Each new lane builds in its own Cargo target directory
+(`/home/connor/chio-lanes-target-<lane>`, `CARGO_BUILD_JOBS=4`), after the
+follow-up review observed B and C serializing on the shared directory's lock.
+
 ## Decisions taken, 2026-09-26
 
 1. Step 0 approved: Codex's in-flight work is checkpointed on `packet/1-dry-run`

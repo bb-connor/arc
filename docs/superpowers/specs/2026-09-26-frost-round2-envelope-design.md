@@ -43,11 +43,16 @@ except `package_hex` and the signature itself with the sender's transport
 `Deserialize`; `Debug` redacts the package.
 
 So the round-2 signing share is plaintext inside a signed, serializable value.
-No in-tree code serializes that value onto a wire or into a store (pass 8, U8,
-confirmed against the six companion checkouts on this host), which is why this
-is a type-design finding today and becomes a confidentiality break the first
-time a transport or persistence path does the obvious thing with a type that
-offers `Serialize`.
+No in-tree transport serializes that value (pass 8, U8, confirmed against the
+six companion checkouts on this host). One in-tree path does serialize it: the
+ceremony store persists a participant's outbound round-2 packages as
+`StoredCeremonyOutput::Round2(Vec<FrostAuthenticatedDkgPackage>)`, canonical
+JSON that is then encrypted into the store's `EncryptedBlob` with associated
+data (`chio-store-sqlite/src/frost_store/ceremony.rs:351`, `mod.rs:560`). That
+path is sound because the bytes are encrypted before they rest, and it is the
+reason step 1 cannot simply delete the derive: the store needs an explicit,
+named way to obtain the secret bytes for encryption. Everything else that could
+call `Serialize` on the type is the exposure.
 
 ## What is not a design
 
@@ -67,10 +72,22 @@ Land this first, separately, and before any sealing work:
 1. Split the type. `FrostRound1Package` is public: it keeps `Serialize` and
    `Deserialize`. `FrostRound2Package` holds the plaintext share for the local
    process only: no `Serialize`, no `Deserialize`, `Debug` redacted, the share
-   in `Zeroizing<Vec<u8>>` rather than hex text. A round-2 value that must leave
-   the process is a `SealedFrostRound2Package` (step 2), and nothing else.
+   in `Zeroizing<Vec<u8>>` rather than hex text. The one way to obtain its
+   bytes is an explicitly named accessor in the register of `expose_secret()`
+   (`secret_bytes(&self) -> Zeroizing<Vec<u8>>`), so every place the share
+   leaves the type is greppable and is the complete inventory. A round-2 value
+   that must leave the process is a `SealedFrostRound2Package` (step 2), and
+   nothing else.
 2. `FrostRound2Transition::packages` becomes `Vec<FrostRound2Package>` until
-   step 2 lands, at which point it becomes `Vec<SealedFrostRound2Package>`.
+   step 2 lands, at which point it becomes `Vec<SealedFrostRound2Package>`. The
+   ceremony store's at-rest form becomes a private type inside its persistence
+   module, built from the public metadata plus `secret_bytes()` immediately
+   before `encrypt_blob`, and decoded back into `FrostRound2Package` only after
+   `decrypt_blob`; the store never holds the plaintext form in a serializable
+   shape outside that function. This is the only permitted call site of the
+   accessor until step 2 adds sealing, and a test asserts the call-site count.
+   Because this touches `frost_store/mod.rs` and `ceremony.rs`, step 1 waits for
+   Lane B's store changes to merge.
 3. A test asserts, for every serializable type in the module, that the
    serialized bytes of a round-2 transition do not contain the share bytes.
    Serialization of the plaintext form does not compile, so the test's purpose
@@ -264,7 +281,7 @@ confirms the plaintext is zeroized after the share is installed.
 
 ## Exit for the lane
 
-Step 1 is one commit and may land as soon as it is reviewed. Step 2 is a
+Step 1 is one commit and may land as soon as it is reviewed and Lane B has merged. Step 2 is a
 separate commit series: roster change with migration and validation, the
 sealing primitive with vectors, the transition and verifier changes, the
 negative suite. The hardening spec's H7 acceptance (no secret-bearing struct
