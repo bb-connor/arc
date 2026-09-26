@@ -144,6 +144,44 @@ assert_rc "$(run_checker "$CHECKER" "$test_scoped" "$work/test-scoped.out" "$wor
   "arithmetic behind a test or kani cfg, and in test scope, does not count"
 grep -F "Accounting arithmetic: 0 unchecked sites" "$work/test-scoped.out" >/dev/null
 
+negative_cfg="$work/negative-cfg"
+init_case "$negative_cfg"
+mkdir -p "$negative_cfg/crates/kernel/chio-kernel/src/budget_store"
+cat > "$negative_cfg/crates/kernel/chio-kernel/src/budget_store/limits.rs" <<'EOF'
+#[cfg(not(test))]
+pub fn remaining(limit: u64, used: u64) -> u64 {
+    limit - used
+}
+
+#[cfg(any(test, feature = "diagnostics"))]
+pub fn remaining_with_diagnostics(limit: u64, used: u64) -> u64 {
+    limit - used
+}
+
+#[cfg(all(
+    not(kani),
+    unix
+))]
+pub fn charged(total: u64, refund: u64) -> u64 {
+    total - refund
+}
+
+#[cfg(all(test, feature = "diagnostics"))]
+pub fn remaining_in_tests_only(limit: u64, used: u64) -> u64 {
+    limit - used
+}
+
+#[cfg(not(any(test, kani)))]
+pub fn production_only(limit: u64, used: u64) -> u64 {
+    limit - used
+}
+EOF
+track_case "$negative_cfg"
+assert_rc "$(run_checker "$CHECKER" "$negative_cfg" "$work/negative-cfg.out" "$work/negative-cfg.err")" 1 \
+  "arithmetic behind cfg(not(test)), a feature-enabled cfg, a multi-line mixed cfg and cfg(not(any(test, kani))) is production and counts"
+grep -F "crates/kernel/chio-kernel/src/budget_store/limits.rs: 4 unchecked arithmetic sites and no baseline entry" \
+  "$work/negative-cfg.err" >/dev/null
+
 word_scope="$work/word-scope"
 init_case "$word_scope"
 write_subtractions "$word_scope/crates/kernel/chio-kernel/src/channel_release_publisher.rs" 3
