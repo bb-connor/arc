@@ -45,11 +45,13 @@ upper-bound on the absolute discard count.
 
 `chio-cage` ships the confinement helper binary `chio-cage-init`, the static-PIE
 program that applies seccomp and Landlock and then `exec`s the confined tool. Its
-crate's normal-dependency graph is **344 unique crates**, identical with default
+crate's normal-dependency graph is **344 unique crates** (corrected below), identical with default
 features disabled (the crate's two features are enforcement toggles, not
 dependency toggles). The graph includes `tokio`, `hyper`, `hyper-util`, `reqwest`,
 `tower-http`, `rustls-webpki`, `aws-lc-rs`, `aws-lc-sys`, `regex`, `fancy-regex`,
 `serde_json` and `tracing`. `chio-secret-broker` is at 640; `chio-keyring` at 94;
+(Correction from Lane K's gate: the 344 and 640 counted `cargo tree` lines including
+`(*)` markers; unique packages on the musl release recipe are 260 and 478.)
 `chio-security-types`, correctly, at 10.
 
 The cause is structural: `chio-cage` depends on `chio-core` and `chio-manifest`,
@@ -83,7 +85,9 @@ is the lane's first measurement.
 ## U3. Medium: wire-schema duplication crosses crate boundaries
 
 Refining pass-7's H10 numbers: of the 55 schema values declared in more than one
-file, **54 are declared in more than one crate**. `chio.receipt.v1` is declared in
+file, **54 are declared in more than one crate** (Lane K's broader extractor later
+measured 200 multi-file values, 199 across crates, over 1,369 constants; the
+conclusion stands, the count was an undercount). `chio.receipt.v1` is declared in
 six files across five crates (`chio-core-types`, `chio-enterprise-export`,
 `chio-trust-market-context`, `chio-cli` twice, `chio-proof-room`). The runtime
 attestation schemas are declared identically in `chio-core-types`,

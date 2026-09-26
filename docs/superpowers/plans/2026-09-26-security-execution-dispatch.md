@@ -260,7 +260,7 @@ Dead code, for Lane K or Packet 7 to delete after a build confirms it.
 
 | Lane | Spawned | Base | Model | Prerequisite handling |
 | --- | --- | --- | --- | --- |
-| K gates and configuration | 2026-09-26, restarted on Fable 5.1 the same day | `3788269c6a`, rebased onto `07e963e8f5` | Fable 5.1 | none; H0 landed as `407a590e17` on its branch, self-test and workspace check rerun independently by the orchestrator |
+| K gates and configuration | 2026-09-26, restarted on Fable 5.1 the same day | `3788269c6a`, rebased onto `07e963e8f5` | Fable 5.1 | **merged as `37ce39c8a0`** (nine commits, `--no-ff`); every self-test and gate rerun independently by the orchestrator before the merge, and all nine gates run on the merged tree by the integration script |
 | J receipt store and boundaries | 2026-09-26 | `07e963e8f5` | Fable 5.1 | started before C merged with an explicit exclusion: no edits under `receipt_store/reports/`, `benches/` or the `[[bench]]` manifest entries until told C merged |
 | M parent Packet 4 | 2026-09-26 | `07e963e8f5` | Fable 5.1 | started before D merged, phased: the lifecycle model, trace validation and the temporal timeout first; no Kani harness file or entry calling a Packet 1 helper until told D merged with the final names |
 | F canonicalization boundary census (1F) | 2026-09-26 | `07e963e8f5` | Fable 5.1 | documentation only, no code; any typed-form-on-untrusted-text boundary is reported as a P1 to the orchestrator for the owning lane |
