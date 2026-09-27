@@ -96,9 +96,12 @@ impl DpopNonceStore {
     }
 
     fn source_lock(&self) -> Result<MutexGuard<'_, DpopNonceState>, KernelError> {
-        self.inner
+        let state = self
+            .inner
             .lock()
-            .map_err(|_| invalid("source mutex poisoned"))
+            .map_err(|_| invalid("source mutex poisoned"))?;
+        state.ensure_accounting()?;
+        Ok(state)
     }
 
     fn source_snapshot(

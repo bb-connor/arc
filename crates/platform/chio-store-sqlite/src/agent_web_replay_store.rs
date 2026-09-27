@@ -706,7 +706,7 @@ impl SqliteAgentWebReplayStore {
                 "replay batch size exceeds SQLite integer range: {error}"
             ))
         })?;
-        if live_global.saturating_add(batch_size) > global_capacity {
+        if checked_live_entry_total(live_global, batch_size)? > global_capacity {
             transaction
                 .commit()
                 .map_err(|error| AgentWebReplayStoreError::Unavailable(error.to_string()))?;
@@ -732,7 +732,7 @@ impl SqliteAgentWebReplayStore {
                     "per-scope replay batch size exceeds SQLite integer range: {error}"
                 ))
             })?;
-            if live_for_scope.saturating_add(batch_count) > per_scope_capacity {
+            if checked_live_entry_total(live_for_scope, batch_count)? > per_scope_capacity {
                 transaction
                     .commit()
                     .map_err(|error| AgentWebReplayStoreError::Unavailable(error.to_string()))?;
@@ -926,6 +926,17 @@ fn append_length_prefixed(
     Ok(())
 }
 
+fn checked_live_entry_total(live: i64, additional: i64) -> Result<i64, AgentWebReplayStoreError> {
+    if live < 0 || additional < 0 {
+        return Err(AgentWebReplayStoreError::Unavailable(
+            "replay live-entry count is negative".into(),
+        ));
+    }
+    live.checked_add(additional).ok_or_else(|| {
+        AgentWebReplayStoreError::Unavailable("replay live-entry count overflow".into())
+    })
+}
+
 fn validate_capacities(
     global_capacity: usize,
     per_scope_capacity: usize,
@@ -951,6 +962,26 @@ fn count_as_usize(count: i64, description: &str) -> Result<usize, SqliteAgentWeb
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn replay_capacity_totals_require_nonnegative_representable_counts() {
+        assert_eq!(
+            super::checked_live_entry_total(i64::MAX - 1, 1)
+                .test_expect("representable boundary count"),
+            i64::MAX
+        );
+        for (live, additional, expected) in [
+            (i64::MAX, 1, "replay live-entry count overflow"),
+            (-1, 1, "replay live-entry count is negative"),
+            (1, -1, "replay live-entry count is negative"),
+        ] {
+            let result = super::checked_live_entry_total(live, additional);
+            assert!(
+                matches!(result, Err(AgentWebReplayStoreError::Unavailable(ref reason)) if reason == expected),
+                "{result:?}"
+            );
+        }
+    }
+
     use std::{
         sync::Arc,
         thread,

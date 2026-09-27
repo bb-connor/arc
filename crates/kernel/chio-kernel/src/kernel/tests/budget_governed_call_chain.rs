@@ -42,7 +42,7 @@ fn governed_monetary_allow_receipt_contains_approval_metadata() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -121,7 +121,7 @@ fn governed_monetary_allow_receipt_preserves_metered_billing_quote_context() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -200,7 +200,7 @@ fn governed_request_rejects_empty_metered_billing_provider() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -261,7 +261,7 @@ fn governed_monetary_allow_receipt_preserves_call_chain_context() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -317,13 +317,15 @@ fn governed_call_chain_receipt_observes_local_parent_receipt_linkage() {
         commerce: None,
         metered_billing: None,
         runtime_attestation: None,
-        call_chain: Some(chio_core::capability::governance::GovernedCallChainContext {
-            chain_id: "chain-local-parent-receipt".to_string(),
-            parent_request_id: "req-upstream-local".to_string(),
-            parent_receipt_id: Some(prior_response.receipt.id.clone()),
-            origin_subject: "origin-subject".to_string(),
-            delegator_subject: "delegator-subject".to_string(),
-        }),
+        call_chain: Some(
+            chio_core::capability::governance::GovernedCallChainContext {
+                chain_id: "chain-local-parent-receipt".to_string(),
+                parent_request_id: "req-upstream-local".to_string(),
+                parent_receipt_id: Some(prior_response.receipt.id.clone()),
+                origin_subject: "origin-subject".to_string(),
+                delegator_subject: "delegator-subject".to_string(),
+            },
+        ),
         autonomy: None,
         context: None,
         body: Default::default(),
@@ -346,7 +348,7 @@ fn governed_call_chain_receipt_observes_local_parent_receipt_linkage() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -380,7 +382,9 @@ fn governed_call_chain_receipt_observes_capability_lineage_subjects() {
         .record_capability_snapshot(&root_capability, None)
         .unwrap();
     drop(seed_store);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     set_capability_trust_root_for_scope(&kernel, &root_scope);
     kernel
         .register_budget_parent(root_capability.id.clone(), 10_000)
@@ -425,13 +429,15 @@ fn governed_call_chain_receipt_observes_capability_lineage_subjects() {
                 commerce: None,
                 metered_billing: None,
                 runtime_attestation: None,
-                call_chain: Some(chio_core::capability::governance::GovernedCallChainContext {
-                    chain_id: "chain-capability-lineage".to_string(),
-                    parent_request_id: "req-upstream-capability".to_string(),
-                    parent_receipt_id: None,
-                    origin_subject: root_subject.clone(),
-                    delegator_subject: root_subject,
-                }),
+                call_chain: Some(
+                    chio_core::capability::governance::GovernedCallChainContext {
+                        chain_id: "chain-capability-lineage".to_string(),
+                        parent_request_id: "req-upstream-capability".to_string(),
+                        parent_receipt_id: None,
+                        origin_subject: root_subject.clone(),
+                        delegator_subject: root_subject,
+                    },
+                ),
                 autonomy: None,
                 context: None,
                 body: Default::default(),
@@ -442,7 +448,7 @@ fn governed_call_chain_receipt_observes_capability_lineage_subjects() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -478,7 +484,9 @@ fn governed_call_chain_receipt_verifies_signed_upstream_delegator_proof() {
         .record_capability_snapshot(&root_capability, None)
         .unwrap();
     drop(seed_store);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     set_capability_trust_root_for_scope(&kernel, &root_scope);
     kernel
         .register_budget_parent(root_capability.id.clone(), 10_000)
@@ -545,12 +553,13 @@ fn governed_call_chain_receipt_verifies_signed_upstream_delegator_proof() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
 
     assert_eq!(
-        response.verdict, Verdict::Allow,
+        response.verdict,
+        Verdict::Allow,
         "unexpected deny reason: {:?}",
         response.reason
     );
@@ -625,7 +634,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
     let asserted_governed = asserted_response
@@ -692,7 +701,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
     let observed_governed = observed_response
@@ -718,17 +727,14 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
     let mut root_grant = make_grant("srv-echo", "delegate");
     root_grant.operations.push(Operation::Delegate);
     let root_scope = make_scope(vec![root_grant]);
-    let root_capability = make_capability(
-        &verified_kernel,
-        &root_kp,
-        root_scope.clone(),
-        300,
-    );
+    let root_capability = make_capability(&verified_kernel, &root_kp, root_scope.clone(), 300);
     seed_store
         .record_capability_snapshot(&root_capability, None)
         .unwrap();
     drop(seed_store);
-    verified_kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    verified_kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     set_capability_trust_root_for_scope(&verified_kernel, &root_scope);
     verified_kernel
         .register_budget_parent(root_capability.id.clone(), 10_000)
@@ -795,7 +801,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
     let verified_governed = verified_response
@@ -838,7 +844,9 @@ fn governed_request_rejects_upstream_call_chain_proof_subject_mismatch() {
         .record_capability_snapshot(&root_capability, None)
         .unwrap();
     drop(seed_store);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
 
     set_capability_trust_root_for_scope(&kernel, &root_scope);
     kernel
@@ -906,7 +914,7 @@ fn governed_request_rejects_upstream_call_chain_proof_subject_mismatch() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -936,7 +944,9 @@ fn governed_request_rejects_call_chain_delegator_subject_that_conflicts_with_cap
         .record_capability_snapshot(&root_capability, None)
         .unwrap();
     drop(seed_store);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
 
     set_capability_trust_root_for_scope(&kernel, &root_scope);
     kernel
@@ -979,13 +989,15 @@ fn governed_request_rejects_call_chain_delegator_subject_that_conflicts_with_cap
                 commerce: None,
                 metered_billing: None,
                 runtime_attestation: None,
-                call_chain: Some(chio_core::capability::governance::GovernedCallChainContext {
-                    chain_id: "chain-capability-lineage-deny".to_string(),
-                    parent_request_id: "req-upstream-capability-deny".to_string(),
-                    parent_receipt_id: None,
-                    origin_subject: root_kp.public_key().to_hex(),
-                    delegator_subject: "subject-wrong".to_string(),
-                }),
+                call_chain: Some(
+                    chio_core::capability::governance::GovernedCallChainContext {
+                        chain_id: "chain-capability-lineage-deny".to_string(),
+                        parent_request_id: "req-upstream-capability-deny".to_string(),
+                        parent_receipt_id: None,
+                        origin_subject: root_kp.public_key().to_hex(),
+                        delegator_subject: "subject-wrong".to_string(),
+                    },
+                ),
                 autonomy: None,
                 context: None,
                 body: Default::default(),
@@ -996,7 +1008,7 @@ fn governed_request_rejects_call_chain_delegator_subject_that_conflicts_with_cap
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1021,7 +1033,9 @@ fn governed_call_chain_receipt_observes_session_parent_request_lineage() {
         make_scope(vec![make_grant("srv-echo", "delegate")]),
         300,
     );
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![capability.clone()]).unwrap();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![capability.clone()])
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
 
     let parent_context = make_operation_context(
@@ -1069,13 +1083,15 @@ fn governed_call_chain_receipt_observes_session_parent_request_lineage() {
                     commerce: None,
                     metered_billing: None,
                     runtime_attestation: None,
-                    call_chain: Some(chio_core::capability::governance::GovernedCallChainContext {
-                        chain_id: "chain-session-lineage".to_string(),
-                        parent_request_id: parent_context.request_id.to_string(),
-                        parent_receipt_id: None,
-                        origin_subject: "origin-subject".to_string(),
-                        delegator_subject: "delegator-subject".to_string(),
-                    }),
+                    call_chain: Some(
+                        chio_core::capability::governance::GovernedCallChainContext {
+                            chain_id: "chain-session-lineage".to_string(),
+                            parent_request_id: parent_context.request_id.to_string(),
+                            parent_receipt_id: None,
+                            origin_subject: "origin-subject".to_string(),
+                            delegator_subject: "delegator-subject".to_string(),
+                        },
+                    ),
                     autonomy: None,
                     context: None,
                     body: Default::default(),
@@ -1086,7 +1102,7 @@ fn governed_call_chain_receipt_observes_session_parent_request_lineage() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
-        declassification_grant: None,
+                declassification_grant: None,
             },
             &mut client,
             None,
@@ -1122,17 +1138,21 @@ fn cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anch
         300,
     );
 
-    let parent_session_id = parent_kernel.open_session(child_kp.public_key().to_hex(), Vec::new()).unwrap();
+    let parent_session_id = parent_kernel
+        .open_session(child_kp.public_key().to_hex(), Vec::new())
+        .unwrap();
     parent_kernel.activate_session(&parent_session_id).unwrap();
     parent_kernel
         .with_session_mut(&parent_session_id, |session| {
             assert!(
-                session.set_auth_context(SessionAuthContext::streamable_http_static_bearer(
-                    "static-bearer:parent",
-                    "token-parent",
-                    Some("https://parent.example".to_string()),
-                ))
-                .0
+                session
+                    .set_auth_context(SessionAuthContext::streamable_http_static_bearer(
+                        "static-bearer:parent",
+                        "token-parent",
+                        Some("https://parent.example".to_string()),
+                    ))
+                    .unwrap()
+                    .0
             );
             Ok(())
         })
@@ -1232,7 +1252,7 @@ fn cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anch
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1308,7 +1328,7 @@ fn governed_request_rejects_self_referential_call_chain_parent_request() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1365,7 +1385,7 @@ fn governed_request_rejects_empty_call_chain_chain_id() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         .unwrap();
 
@@ -1384,7 +1404,9 @@ fn governed_call_chain_evidence_store_error_consumes_no_budget() {
     // Appends fine (so the request's own receipt persists) but errors on every
     // point load; the governed call-chain evidence lookup is the first (and
     // only) admission-path store read for this request, so it fails closed here.
-    kernel.set_receipt_store(Box::new(ErroringReceiptStore)).unwrap();
+    kernel
+        .set_receipt_store(Box::new(ErroringReceiptStore))
+        .unwrap();
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
 
@@ -1432,7 +1454,7 @@ fn governed_call_chain_evidence_store_error_consumes_no_budget() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        declassification_grant: None,
+            declassification_grant: None,
         })
         // The evidence-lookup store error must fail closed as a clean deny here,
         // not propagate out of evaluate.
@@ -1448,7 +1470,9 @@ fn nested_governed_call_chain_evidence_store_error_consumes_no_budget() {
     // The nested-flow admission path performs the evidence lookup before budget
     // authorization, so a transient store failure never burns invocation quota.
     let mut kernel = make_kernel(make_config());
-    kernel.set_receipt_store(Box::new(ErroringReceiptStore)).unwrap();
+    kernel
+        .set_receipt_store(Box::new(ErroringReceiptStore))
+        .unwrap();
     let agent_kp = make_keypair();
     kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
 
@@ -1511,13 +1535,15 @@ fn nested_governed_call_chain_evidence_store_error_consumes_no_budget() {
                     // so validate_governed_transaction passes and we reach the
                     // evidence lookup; parent_receipt_id = Some(..) then forces
                     // the erroring store read there.
-                    call_chain: Some(chio_core::capability::governance::GovernedCallChainContext {
-                        chain_id: "chain-nested-store-error".to_string(),
-                        parent_request_id: parent_context.request_id.to_string(),
-                        parent_receipt_id: Some("rc-nested-missing".to_string()),
-                        origin_subject: "origin-subject".to_string(),
-                        delegator_subject: "delegator-subject".to_string(),
-                    }),
+                    call_chain: Some(
+                        chio_core::capability::governance::GovernedCallChainContext {
+                            chain_id: "chain-nested-store-error".to_string(),
+                            parent_request_id: parent_context.request_id.to_string(),
+                            parent_receipt_id: Some("rc-nested-missing".to_string()),
+                            origin_subject: "origin-subject".to_string(),
+                            delegator_subject: "delegator-subject".to_string(),
+                        },
+                    ),
                     autonomy: None,
                     context: None,
                     body: Default::default(),
@@ -1528,7 +1554,7 @@ fn nested_governed_call_chain_evidence_store_error_consumes_no_budget() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
-        declassification_grant: None,
+                declassification_grant: None,
             },
             &mut client,
             None,
@@ -1549,11 +1575,7 @@ fn nested_governed_call_chain_evidence_store_error_consumes_no_budget() {
         response.reason
     );
 
-    assert!(kernel
-        .budget_store
-        .get_usage(&cap_id, 0)
-        .unwrap()
-        .is_none());
+    assert!(kernel.budget_store.get_usage(&cap_id, 0).unwrap().is_none());
 }
 
 #[test]
@@ -1621,7 +1643,7 @@ fn nested_missing_session_roots_lookup_reverses_pre_execution_budget() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
-        declassification_grant: None,
+                declassification_grant: None,
             },
             &mut client,
             None,
@@ -1665,11 +1687,8 @@ fn missing_approval_replay_store_denies_before_dispatch_and_reverses_monetary_ad
 
     let agent_kp = Keypair::generate();
     let grant = make_governed_monetary_grant("cost-srv", "compute", 100, 1_000, "USD", 50);
-    let capability = kernel.issue_capability(
-        &agent_kp.public_key(),
-        make_scope(vec![grant]),
-        3_600,
-    )?;
+    let capability =
+        kernel.issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3_600)?;
     let request_id = "req-governed-missing-replay-store";
     let intent = make_governed_intent(
         "intent-governed-missing-replay-store",
@@ -1715,14 +1734,9 @@ fn missing_approval_replay_store_denies_before_dispatch_and_reverses_monetary_ad
         "unexpected denial reason: {:?}",
         response.reason
     );
+    assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
     assert_eq!(
-        invocations.load(std::sync::atomic::Ordering::SeqCst),
-        0
-    );
-    assert_eq!(
-        payment
-            .authorized
-            .load(std::sync::atomic::Ordering::SeqCst),
+        payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
         0
     );
     assert_eq!(
@@ -1735,10 +1749,7 @@ fn missing_approval_replay_store_denies_before_dispatch_and_reverses_monetary_ad
     );
 
     let usage = kernel.budget_store.get_usage(&capability.id, 0)?;
-    assert_eq!(
-        usage.as_ref().map_or(0, |usage| usage.invocation_count),
-        0
-    );
+    assert_eq!(usage.as_ref().map_or(0, |usage| usage.invocation_count), 0);
     let committed_cost = match usage.as_ref() {
         Some(usage) => usage.committed_cost_units()?,
         None => 0,

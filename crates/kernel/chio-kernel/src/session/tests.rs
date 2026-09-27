@@ -691,12 +691,13 @@ fn session_anchor_rotates_on_auth_context_change() {
         SessionAuthContext::in_process_anonymous()
     );
 
-    let (rotated, _snapshot, supersedes_anchor_id) =
-        session.set_auth_context(SessionAuthContext::streamable_http_static_bearer(
+    let (rotated, _snapshot, supersedes_anchor_id) = session
+        .set_auth_context(SessionAuthContext::streamable_http_static_bearer(
             "static-bearer:abcd1234",
             "cafebabe",
             Some("http://localhost:3000".to_string()),
-        ));
+        ))
+        .unwrap();
 
     assert!(rotated);
     assert_eq!(supersedes_anchor_id.as_deref(), Some(initial_anchor.id()));
@@ -723,11 +724,13 @@ fn session_anchor_does_not_rotate_when_auth_context_is_unchanged() {
     );
     let initial_anchor = session.session_anchor().clone();
 
-    let (rotated, _snapshot, supersedes_anchor_id) = session.set_auth_context(auth_context.clone());
+    let (rotated, _snapshot, supersedes_anchor_id) =
+        session.set_auth_context(auth_context.clone()).unwrap();
     assert!(rotated);
     assert_eq!(supersedes_anchor_id.as_deref(), Some(initial_anchor.id()));
     let rotated_anchor = session.session_anchor().clone();
-    let (rotated, _snapshot, supersedes_anchor_id) = session.set_auth_context(auth_context);
+    let (rotated, _snapshot, supersedes_anchor_id) =
+        session.set_auth_context(auth_context).unwrap();
     assert!(!rotated);
     assert_eq!(supersedes_anchor_id, None);
 
@@ -738,12 +741,13 @@ fn session_anchor_does_not_rotate_when_auth_context_is_unchanged() {
 fn close_persisted_appends_terminal_anchor_with_supersedes_link() {
     let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
     let initial_anchor = session.session_anchor().clone();
-    let (rotated, _snapshot, supersedes_anchor_id) =
-        session.set_auth_context(SessionAuthContext::streamable_http_static_bearer(
+    let (rotated, _snapshot, supersedes_anchor_id) = session
+        .set_auth_context(SessionAuthContext::streamable_http_static_bearer(
             "static-bearer:abcd1234",
             "cafebabe",
             Some("http://localhost:3000".to_string()),
-        ));
+        ))
+        .unwrap();
     assert!(rotated);
     assert_eq!(supersedes_anchor_id.as_deref(), Some(initial_anchor.id()));
     let active_anchor = session.session_anchor().clone();
@@ -776,11 +780,13 @@ fn close_persisted_appends_terminal_anchor_with_supersedes_link() {
 #[test]
 fn close_persisted_is_idempotent_once_closed() {
     let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
-    session.set_auth_context(SessionAuthContext::streamable_http_static_bearer(
-        "static-bearer:abcd1234",
-        "cafebabe",
-        Some("http://localhost:3000".to_string()),
-    ));
+    session
+        .set_auth_context(SessionAuthContext::streamable_http_static_bearer(
+            "static-bearer:abcd1234",
+            "cafebabe",
+            Some("http://localhost:3000".to_string()),
+        ))
+        .unwrap();
 
     let mut persisted = Vec::new();
     session
@@ -826,6 +832,7 @@ fn child_request_is_rejected_after_parent_anchor_rotation() {
                 "cafebabe",
                 Some("http://localhost:3000".to_string()),
             ))
+            .unwrap()
             .0
     );
 

@@ -101,32 +101,4 @@ impl SqliteRuntimeOrchestrationStore {
         }
         Ok(run_ids)
     }
-
-    pub(super) fn pending_run_ids(&self) -> Result<Vec<String>, ChioRuntimeError> {
-        let connection = self.lock_connection()?;
-        let mut statement = connection
-            .prepare(
-                r#"
-                SELECT runs.run_id
-                FROM runtime_runs runs
-                WHERE runs.status IN ('pending', 'planned', 'proof_pending')
-                  AND NOT EXISTS (
-                    SELECT 1
-                    FROM runtime_run_leases leases
-                    WHERE leases.run_id = runs.run_id
-                      AND leases.state = 'active'
-                  )
-                ORDER BY runs.updated_at_unix_ms, runs.run_id
-                "#,
-            )
-            .map_err(sqlite_error)?;
-        let rows = statement
-            .query_map([], |row| row.get::<_, String>(0))
-            .map_err(sqlite_error)?;
-        let mut run_ids = Vec::new();
-        for row in rows {
-            run_ids.push(row.map_err(sqlite_error)?);
-        }
-        Ok(run_ids)
-    }
 }

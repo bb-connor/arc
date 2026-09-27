@@ -47,6 +47,7 @@ use crate::replay_retention::{
 };
 use crate::KernelError;
 
+mod accounting;
 pub mod authority;
 mod identity;
 pub mod replay_source;
@@ -199,6 +200,7 @@ struct DpopNonceState {
     per_capability_capacity: usize,
     identity_byte_capacity: usize,
     identity_bytes: usize,
+    accounting_failed: bool,
     wall_clock_high_water: SystemTime,
     monotonic_high_water: Instant,
     pending_clock_rebaseline: Option<PendingReplayClockRebaseline>,
@@ -209,16 +211,17 @@ struct DpopNonceEntry {
     dispatch_reservation_id: Option<String>,
 }
 
-/// Project production clock and configuration inputs into the verified DPoP
-/// freshness predicate.
+/// Require a representable proof deadline before applying the verified DPoP
+/// freshness predicate to production clock and configuration inputs.
 #[must_use]
 pub fn dpop_freshness_admits(now_secs: u64, issued_at: u64, config: &DpopConfig) -> bool {
-    dpop_freshness_valid(
-        now_secs,
-        issued_at,
-        config.proof_ttl_secs,
-        config.max_clock_skew_secs,
-    )
+    checked_dpop_valid_through(issued_at, config.proof_ttl_secs).is_ok()
+        && dpop_freshness_valid(
+            now_secs,
+            issued_at,
+            config.proof_ttl_secs,
+            config.max_clock_skew_secs,
+        )
 }
 
 impl DpopNonceStore {
@@ -292,6 +295,7 @@ impl DpopNonceStore {
                 per_capability_capacity,
                 identity_byte_capacity,
                 identity_bytes: 0,
+                accounting_failed: false,
                 wall_clock_high_water: SystemTime::now(),
                 monotonic_high_water: Instant::now(),
                 pending_clock_rebaseline: None,
@@ -402,6 +406,7 @@ impl DpopNonceStore {
                 "nonce store mutex poisoned; cannot verify replay safety".to_string(),
             )
         })?;
+        state.ensure_accounting()?;
         state.source.begin_mutation()?;
         let mut wall_clock_high_water = state.wall_clock_high_water;
         let mut monotonic_high_water = state.monotonic_high_water;
@@ -445,16 +450,9 @@ impl DpopNonceStore {
                 .map(|bytes| (expired_key.clone(), bytes))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        for (expired_key, bytes) in expired_keys {
-            let remaining = state
-                .identity_bytes
-                .checked_sub(bytes)
-                .ok_or_else(identity::byte_budget_error)?;
-            if state.cache.pop(&expired_key).is_some() {
-                state.identity_bytes = remaining;
-                state.source.note_pruned(validated_high_water);
-                decrement_capability_count(&mut state.capability_counts, &expired_key.1);
-            }
+        state.release_accounted_entries(&expired_keys)?;
+        if !expired_keys.is_empty() {
+            state.source.note_pruned(validated_high_water);
         }
         if retention.is_signed() && retention.signed_horizon_elapsed_at(validated_high_water) {
             error!("elapsed signed horizon; denying replay reservation");
@@ -494,6 +492,9 @@ impl DpopNonceStore {
             .filter(|bytes| *bytes <= state.identity_byte_capacity)
             .ok_or_else(identity::byte_budget_error)?;
 
+        let next_capability_entries = capability_entries
+            .checked_add(1)
+            .ok_or_else(accounting::accounting_error)?;
         state.cache.put(
             key,
             DpopNonceEntry {
@@ -502,10 +503,9 @@ impl DpopNonceStore {
             },
         );
         state.identity_bytes = retained_bytes;
-        *state
+        state
             .capability_counts
-            .entry(capability_id.to_string())
-            .or_insert(0) += 1;
+            .insert(capability_id.to_string(), next_capability_entries);
         warn_on_high_utilization("DPoP nonce", state.cache.len(), state.cache.cap().get());
         Ok(true)
     }
@@ -559,37 +559,22 @@ impl DpopNonceStore {
                 "nonce store mutex poisoned; cannot roll back dispatch reservation".to_string(),
             )
         })?;
+        state.ensure_accounting()?;
         state.source.begin_mutation()?;
         let owned = state
             .cache
             .peek(&key)
             .is_some_and(|entry| entry.dispatch_reservation_id.as_deref() == Some(reservation_id));
         if owned {
-            let remaining = state
-                .identity_bytes
-                .checked_sub(bytes)
-                .ok_or_else(identity::byte_budget_error)?;
-            if state.cache.pop(&key).is_some() {
-                state.identity_bytes = remaining;
-                decrement_capability_count(&mut state.capability_counts, capability_id);
-            }
+            state.release_accounted_entries(&[(key, bytes)])?;
         }
         Ok(owned)
     }
 }
 
-fn decrement_capability_count(counts: &mut HashMap<String, usize>, capability_id: &str) {
-    let Some(count) = counts.get_mut(capability_id) else {
-        return;
-    };
-    *count = count.saturating_sub(1);
-    if *count == 0 {
-        counts.remove(capability_id);
-    }
-}
-
 fn warn_on_high_utilization(store: &'static str, live_entries: usize, capacity: usize) {
-    let alert_threshold = capacity.saturating_sub(capacity / 5);
+    // The reserved fifth never exceeds capacity; this is a utilization bound.
+    let alert_threshold = capacity - capacity / 5;
     if live_entries >= alert_threshold {
         warn!(
             store,
@@ -645,6 +630,12 @@ pub fn verify_dpop_proof_stateless(
     )
 }
 
+fn checked_dpop_valid_through(issued_at: u64, ttl_secs: u64) -> Result<u64, KernelError> {
+    issued_at.checked_add(ttl_secs).ok_or_else(|| {
+        KernelError::DpopVerificationFailed("proof validity window overflows Unix seconds".into())
+    })
+}
+
 /// Shared cryptographic checks only. The caller must first enforce its exact
 /// schema and independently selected authority domain. This never burns a nonce.
 fn verify_dpop_bindings_at(
@@ -674,10 +665,10 @@ fn verify_dpop_bindings_at(
         ));
     }
 
-    // Step 4: Freshness check.
-    // Proof must not be future-dated beyond clock skew tolerance: issued_at <= now + skew.
-    // Check this first so that an astronomically large issued_at (e.g. u64::MAX) is
-    // rejected here before the expiry arithmetic below can overflow.
+    // Step 4: Refuse an unrepresentable validity window before either the
+    // formal comparison predicate or replay reservation can accept it.
+    checked_dpop_valid_through(proof.body.issued_at, config.proof_ttl_secs)?;
+    // Saturation of now + skew is an intentional upper comparison bound.
     if !dpop_freshness_admits(now_secs, proof.body.issued_at, config) {
         if proof.body.issued_at > now_secs.saturating_add(config.max_clock_skew_secs) {
             return Err(KernelError::DpopVerificationFailed(format!(
@@ -744,7 +735,7 @@ pub fn verify_dpop_proof(
     )?;
 
     // Step 6: Nonce replay check.
-    let valid_through = proof.body.issued_at.saturating_add(config.proof_ttl_secs);
+    let valid_through = checked_dpop_valid_through(proof.body.issued_at, config.proof_ttl_secs)?;
     if !nonce_store.check_and_insert_through(
         &proof.body.nonce,
         &proof.body.capability_id,

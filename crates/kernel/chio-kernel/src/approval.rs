@@ -220,6 +220,16 @@ impl ApprovalToken {
             None => {}
         }
 
+        // Lifetime cap: a token whose lifetime exceeds MAX_APPROVAL_TTL_SECS
+        // cannot be safely tracked in the single-use replay registry.
+        let lifetime = self
+            .governed_token
+            .expires_at
+            .checked_sub(self.governed_token.issued_at)
+            .ok_or_else(|| {
+                KernelError::ApprovalRejected("approval token validity window is inverted".into())
+            })?;
+
         // Time bounds.
         if now >= self.governed_token.expires_at {
             return Err(KernelError::ApprovalRejected(
@@ -232,12 +242,6 @@ impl ApprovalToken {
             ));
         }
 
-        // Lifetime cap: a token whose lifetime exceeds MAX_APPROVAL_TTL_SECS
-        // cannot be safely tracked in the single-use replay registry.
-        let lifetime = self
-            .governed_token
-            .expires_at
-            .saturating_sub(self.governed_token.issued_at);
         if lifetime > MAX_APPROVAL_TTL_SECS {
             return Err(KernelError::ApprovalRejected(format!(
                 "approval token lifetime {lifetime}s exceeds cap {MAX_APPROVAL_TTL_SECS}s"
@@ -722,6 +726,16 @@ pub fn compute_parameter_hash(
     }
 }
 
+fn checked_approval_request_expiry(now: u64, ttl_secs: u64) -> Result<u64, KernelError> {
+    if !(1..=MAX_APPROVAL_TTL_SECS).contains(&ttl_secs) {
+        return Err(KernelError::ApprovalRejected(
+            "approval request lifetime is outside the supported range".into(),
+        ));
+    }
+    now.checked_add(ttl_secs)
+        .ok_or_else(|| KernelError::ApprovalRejected("approval request expiry overflow".into()))
+}
+
 /// The built-in HITL guard. Runs before the generic guard pipeline and
 /// decides whether a call passes straight through, requires approval,
 /// or was already approved by an accompanying token.
@@ -862,9 +876,9 @@ impl ApprovalGuard {
                     tool_name: ctx.request.tool_name.clone(),
                     action: "invoke".to_string(),
                     parameter_hash: parameter_hash.clone(),
-                    expires_at: now + self.default_ttl_secs,
+                    expires_at: token.governed_token.expires_at,
                     callback_hint: None,
-                    created_at: now,
+                    created_at: token.governed_token.issued_at,
                     summary: String::new(),
                     governed_intent: ctx.request.governed_intent.clone(),
                     trusted_approvers: ctx.trusted_approvers.to_vec(),
@@ -908,7 +922,7 @@ impl ApprovalGuard {
                 &ctx.request.arguments,
                 ctx.request.governed_intent.as_ref(),
             );
-            let expires_at = now.saturating_add(self.default_ttl_secs);
+            let expires_at = checked_approval_request_expiry(now, self.default_ttl_secs)?;
             let summary = format!(
                 "agent {} requests approval for {}:{}",
                 ctx.request.agent_id, ctx.request.server_id, ctx.request.tool_name

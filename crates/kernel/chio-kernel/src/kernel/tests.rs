@@ -35,6 +35,8 @@ include!("tests/emergency.rs");
 include!("tests/constraint_variants.rs");
 include!("tests/plan_evaluation.rs");
 include!("tests/approval_flow.rs");
+#[path = "tests/approval_deadlines.rs"]
+mod approval_deadlines;
 #[path = "tests/boot_receipts.rs"]
 mod boot_receipts;
 #[path = "tests/session_reports.rs"]

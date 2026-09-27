@@ -18,8 +18,8 @@ crates/kernel/chio-kernel/src/admission_operation/dpop_claim.rs	87	pending	Needs
 crates/kernel/chio-kernel/src/approval.rs	1375	removed_api	Removed ownerless pattern-based standing approval API and backend; request-bound approval decisions remain	batch.used_calls = batch.used_calls.saturating_add(1);
 crates/kernel/chio-kernel/src/approval.rs	1377	removed_api	Removed ownerless pattern-based standing approval API and backend; request-bound approval decisions remain	batch.used_total_units = batch.used_total_units.saturating_add(amt.units);
 crates/kernel/chio-kernel/src/approval.rs	1426	removed_api	Removed ownerless pattern-based standing approval API and backend; request-bound approval decisions remain	|| batch.used_total_units.saturating_add(amt.units) > total.units
-crates/kernel/chio-kernel/src/approval.rs	240	pending	Needs semantic review; no correctness claim	.saturating_sub(self.governed_token.issued_at);
-crates/kernel/chio-kernel/src/approval.rs	959	pending	Needs semantic review; no correctness claim	let expires_at = now.saturating_add(self.default_ttl_secs);
+crates/kernel/chio-kernel/src/approval.rs	240	fixed	Checked signed lifetime rejects inverted bounds; existing expiry and issue-time checks also reject malformed windows	.saturating_sub(self.governed_token.issued_at);
+crates/kernel/chio-kernel/src/approval.rs	959	fixed	Checked request deadline and bounded positive TTL refuse before store or notification publication	let expires_at = now.saturating_add(self.default_ttl_secs);
 crates/kernel/chio-kernel/src/authority.rs	262	intentional_bound	Clock skew widens an upper comparison bound; no timestamp exists beyond u64 MAX	let latest_issued_at = now.saturating_add(allowed_clock_skew_seconds);
 crates/kernel/chio-kernel/src/authority.rs	276	fixed	Response validation rejects an unrepresentable requested lifetime before widening the skew bound	.saturating_add(requested_ttl_seconds)
 crates/kernel/chio-kernel/src/authority.rs	277	intentional_bound	Only the extra skew allowance clamps after checked requested expiry	.saturating_add(allowed_clock_skew_seconds);
@@ -37,10 +37,10 @@ crates/kernel/chio-kernel/src/checkpoint/tests.rs	214	pending	Needs semantic rev
 crates/kernel/chio-kernel/src/checkpoint/tests.rs	654	pending	Needs semantic review; no correctness claim	checkpoint.body.issued_at = checkpoint.body.issued_at.saturating_add(1);
 crates/kernel/chio-kernel/src/compliance_score.rs	132	pending	Needs semantic review; no correctness claim	let points = weight.saturating_sub(deduction);
 crates/kernel/chio-kernel/src/compliance_score.rs	251	pending	Needs semantic review; no correctness claim	let raw_score = COMPLIANCE_SCORE_MAX.saturating_sub(breakdown.total_deductions());
-crates/kernel/chio-kernel/src/dpop.rs	585	pending	Needs semantic review; no correctness claim	*count = count.saturating_sub(1);
-crates/kernel/chio-kernel/src/dpop.rs	592	pending	Needs semantic review; no correctness claim	let alert_threshold = capacity.saturating_sub(capacity / 5);
-crates/kernel/chio-kernel/src/dpop.rs	682	pending	Needs semantic review; no correctness claim	if proof.body.issued_at > now_secs.saturating_add(config.max_clock_skew_secs) {
-crates/kernel/chio-kernel/src/dpop.rs	747	pending	Needs semantic review; no correctness claim	let valid_through = proof.body.issued_at.saturating_add(config.proof_ttl_secs);
+crates/kernel/chio-kernel/src/dpop.rs	585	fixed	Whole release plan checks bytes and capability counts before deleting markers; invariant failure latches refusal	*count = count.saturating_sub(1);
+crates/kernel/chio-kernel/src/dpop.rs	592	intentional_bound	Utilization threshold subtracts one fifth of capacity; division proves this cannot underflow	let alert_threshold = capacity.saturating_sub(capacity / 5);
+crates/kernel/chio-kernel/src/dpop.rs	682	intentional_bound	Saturated now plus skew is the inclusive upper comparison bound; proof expiry is independently checked	if proof.body.issued_at > now_secs.saturating_add(config.max_clock_skew_secs) {
+crates/kernel/chio-kernel/src/dpop.rs	747	fixed	Checked proof validity horizon rejects overflow before replay reservation	let valid_through = proof.body.issued_at.saturating_add(config.proof_ttl_secs);
 crates/kernel/chio-kernel/src/execution_nonce.rs	360	pending	Needs semantic review; no correctness claim	let expires_at = now.saturating_add(ttl);
 crates/kernel/chio-kernel/src/execution_nonce.rs	783	pending	Needs semantic review; no correctness claim	.saturating_add(30);
 crates/kernel/chio-kernel/src/finding_pool.rs	907	pending	Needs semantic review; no correctness claim	.saturating_add(FINDING_POOL_CLAIM_WINDOW_MS)
@@ -124,10 +124,10 @@ crates/kernel/chio-kernel/src/replay_retention.rs	36	pending	Needs semantic revi
 crates/kernel/chio-kernel/src/replay_retention.rs	39	pending	Needs semantic review; no correctness claim	let unexplained_gap = wall_progress.saturating_sub(monotonic_progress);
 crates/kernel/chio-kernel/src/runtime.rs	249	pending	Needs semantic review; no correctness claim	total = total.saturating_add(bytes.len() as u64);
 crates/kernel/chio-kernel/src/runtime.rs	287	pending	Needs semantic review; no correctness claim	let next = running_bytes.saturating_add(chunk_bytes);
-crates/kernel/chio-kernel/src/session.rs	1102	pending	Needs semantic review; no correctness claim	let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
-crates/kernel/chio-kernel/src/session.rs	1155	pending	Needs semantic review; no correctness claim	let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
-crates/kernel/chio-kernel/src/session.rs	1240	pending	Needs semantic review; no correctness claim	let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
-crates/kernel/chio-kernel/src/session.rs	1284	pending	Needs semantic review; no correctness claim	let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
+crates/kernel/chio-kernel/src/session.rs	1102	fixed	Checked auth epoch successor with reserved terminal epoch; shared fallible transitions persist before publication	let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
+crates/kernel/chio-kernel/src/session.rs	1155	fixed	Checked auth epoch successor with reserved terminal epoch; shared fallible transitions persist before publication	let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
+crates/kernel/chio-kernel/src/session.rs	1240	fixed	Checked auth epoch successor with reserved terminal epoch; shared fallible transitions persist before publication	let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
+crates/kernel/chio-kernel/src/session.rs	1284	fixed	Checked auth epoch successor with reserved terminal epoch; shared fallible transitions persist before publication	let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
 crates/kernel/chio-kernel/src/tool_outcome_tests.rs	1291	pending	Needs semantic review; no correctness claim	.saturating_sub(1);
 crates/kernel/chio-kernel/tests/dst/support.rs	1293	pending	Needs semantic review; no correctness claim	receipts_after_restart == receipts_before_restart.saturating_add(1),
 crates/kernel/chio-kernel/tests/dst/support.rs	1910	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	value = value.wrapping_add(0x9e37_79b9_7f4a_7c15);
@@ -148,16 +148,16 @@ crates/kernel/chio-process/tests/mailbox_effect_boundary.rs	264	pending	Needs se
 crates/kernel/chio-runtime-core/src/ops.rs	384	pending	Needs semantic review; no correctness claim	healthy_provider_count: checked_provider_count.saturating_sub(degraded_count),
 crates/kernel/chio-runtime-core/src/pheromone_policy.rs	135	pending	Needs semantic review; no correctness claim	.saturating_sub(advisory.evaluated_at_unix_ms)
 crates/kernel/chio-runtime-core/src/store/sqlite/health_summaries.rs	306	pending	Needs semantic review; no correctness claim	expected_index = expected_index.saturating_add(1);
-crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	116	pending	Needs semantic review; no correctness claim	now_unix_ms.saturating_add(ttl_ms),
-crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	183	pending	Needs semantic review; no correctness claim	expires_at_unix_ms: now_unix_ms.saturating_add(ttl_ms),
-crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	214	pending	Needs semantic review; no correctness claim	now_unix_ms.saturating_sub(profile.stale_run_after_ms),
-crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	243	pending	Needs semantic review; no correctness claim	.saturating_sub(active_lease_count);
-crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	247	pending	Needs semantic review; no correctness claim	.saturating_sub(usize::try_from(claim_limit).unwrap_or(usize::MAX))
-crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	261	pending	Needs semantic review; no correctness claim	Err(_) => skipped_run_count = skipped_run_count.saturating_add(1),
-crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	30	pending	Needs semantic review; no correctness claim	now_unix_ms.saturating_add(ttl_ms),
-crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	339	pending	Needs semantic review; no correctness claim	let stale_before = now_unix_ms.saturating_sub(stale_run_after_ms);
-crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	53	pending	Needs semantic review; no correctness claim	"sqlite_u64(existing_token, ""runtime run lease fencing token"")?.saturating_add(1)"
-crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	63	pending	Needs semantic review; no correctness claim	expires_at_unix_ms: now_unix_ms.saturating_add(ttl_ms),
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	116	fixed	Lease expiry is checked once against u64 and SQLite i64 before transactional publication	now_unix_ms.saturating_add(ttl_ms),
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	183	fixed	Lease expiry is checked once against u64 and SQLite i64 before transactional publication	expires_at_unix_ms: now_unix_ms.saturating_add(ttl_ms),
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	214	fixed	Optional checked stale cutoff prevents heartbeat zero from expiring before a full timeout has elapsed	now_unix_ms.saturating_sub(profile.stale_run_after_ms),
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	243	intentional_bound	Existing leases above a lowered profile capacity intentionally leave zero new admission slots	.saturating_sub(active_lease_count);
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	247	fixed	Skipped count is exact pending minus committed claims; unexpected acquisition failures roll back the entire tick	.saturating_sub(usize::try_from(claim_limit).unwrap_or(usize::MAX))
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	261	fixed	Skipped count is exact pending minus committed claims; unexpected acquisition failures roll back the entire tick	Err(_) => skipped_run_count = skipped_run_count.saturating_add(1),
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	30	fixed	Lease expiry is checked once against u64 and SQLite i64 before transactional publication	now_unix_ms.saturating_add(ttl_ms),
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	339	fixed	Optional checked stale cutoff prevents heartbeat zero from expiring before a full timeout has elapsed	let stale_before = now_unix_ms.saturating_sub(stale_run_after_ms);
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	53	fixed	Positive persisted fencing token advances with checked i64 addition; exhaustion leaves the row unchanged	"sqlite_u64(existing_token, ""runtime run lease fencing token"")?.saturating_add(1)"
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	63	fixed	Lease expiry is checked once against u64 and SQLite i64 before transactional publication	expires_at_unix_ms: now_unix_ms.saturating_add(ttl_ms),
 crates/kernel/chio-runtime-core/src/validation/ops.rs	370	pending	Needs semantic review; no correctness claim	expected_checked_provider_count.saturating_sub(failed_provider_count);
 crates/kernel/chio-runtime-core/tests/runtime_buyer_review.rs	1259	pending	Needs semantic review; no correctness claim	.saturating_add(10_000);
 crates/kernel/chio-runtime-core/tests/runtime_buyer_review.rs	1399	pending	Needs semantic review; no correctness claim	.saturating_sub(1);
@@ -174,8 +174,8 @@ crates/platform/chio-store-sqlite/src/admission_operation_store/credit_exposure.
 crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs	787	pending	Needs semantic review; no correctness claim	let remaining = limit.saturating_sub(operations.len());
 crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	1035	pending	Needs semantic review; no correctness claim	let verifier_now = unix_now().saturating_sub(5);
 crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	1049	pending	Needs semantic review; no correctness claim	let verifier_now = unix_now().saturating_sub(5);
-crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	709	pending	Needs semantic review; no correctness claim	if live_global.saturating_add(batch_size) > global_capacity {
-crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	735	pending	Needs semantic review; no correctness claim	if live_for_scope.saturating_add(batch_count) > per_scope_capacity {
+crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	709	fixed	Nonnegative checked live plus batch total precedes inserts inside the existing replay transaction	if live_global.saturating_add(batch_size) > global_capacity {
+crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	735	fixed	Nonnegative checked live plus batch total precedes inserts inside the existing replay transaction	if live_for_scope.saturating_add(batch_count) > per_scope_capacity {
 crates/platform/chio-store-sqlite/src/authority.rs	118	fixed	IMMEDIATE rotation checks generation increment and SQLite integer range before atomically publishing seed and history	let next_generation = status_before.generation.saturating_add(1);
 crates/platform/chio-store-sqlite/src/authority.rs	863	fixed	Shared checked expiry rejects unrepresentable TTL before signing	expires_at: now.saturating_add(ttl_seconds),
 crates/platform/chio-store-sqlite/src/batch_approval_store.rs	168	removed_api	Removed ownerless pattern-based standing approval API and backend; request-bound approval decisions remain	|| batch.used_total_units.saturating_add(amt.units) > total.units

@@ -565,6 +565,9 @@ impl TerminalRegistry {
 /// Errors for session lifecycle and in-flight management.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum SessionError {
+    #[error("session {session_id} authentication epoch is exhausted")]
+    AuthEpochExhausted { session_id: SessionId },
+
     #[error("invalid session transition from {from} to {to}")]
     InvalidTransition {
         from: &'static str,
@@ -641,6 +644,28 @@ pub enum SessionError {
 pub enum SessionPersistError<E> {
     Session(SessionError),
     Persist(E),
+}
+
+// Reserve the final epoch for terminal closure. Every active epoch still has
+// a distinct successor that can revoke its authentication, even at exhaustion.
+fn next_auth_epoch(
+    session_id: &SessionId,
+    current: u64,
+    closing: bool,
+) -> Result<u64, SessionError> {
+    current
+        .checked_add(1)
+        .filter(|next| closing || *next < u64::MAX)
+        .ok_or_else(|| SessionError::AuthEpochExhausted {
+            session_id: session_id.clone(),
+        })
+}
+
+fn in_memory_session_error(error: SessionPersistError<std::convert::Infallible>) -> SessionError {
+    match error {
+        SessionPersistError::Session(error) => error,
+        SessionPersistError::Persist(never) => match never {},
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -798,12 +823,17 @@ fn validate_parent_request_lineage_locked(
 
 impl Clone for Session {
     fn clone(&self) -> Self {
-        let inner = self.read_inner().clone();
+        // Lifecycle and authentication must describe the same transition.
+        // In particular, an active snapshot cannot inherit the terminal epoch.
+        let (inner, auth_state) = {
+            let inner = self.read_inner();
+            (inner.clone(), self.auth_state.clone())
+        };
         Self {
             id: self.id.clone(),
             agent_id: self.agent_id.clone(),
             inner: RwLock::new(inner),
-            auth_state: self.auth_state.clone(),
+            auth_state,
             peer_capabilities: self.peer_capabilities.clone(),
             roots: self.roots.clone(),
             issued_capabilities: self.issued_capabilities.clone(),
@@ -1091,45 +1121,13 @@ impl Session {
         self.subscriptions.contains_resource(uri)
     }
 
+    /// Replace authentication atomically, refusing closed sessions or exhausted epochs.
     pub fn set_auth_context(
         &self,
         auth_context: SessionAuthContext,
-    ) -> (bool, SessionAnchorSnapshot, Option<String>) {
-        self.auth_state.replace_with(|current| {
-            let rotated = current.auth_context != auth_context;
-            if rotated {
-                let previous_anchor_id = current.session_anchor.id().to_string();
-                let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
-                let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
-                let snapshot = SessionAnchorSnapshot {
-                    session_id: self.id.clone(),
-                    agent_id: self.agent_id.clone(),
-                    auth_context: auth_context.clone(),
-                    session_anchor: session_anchor.clone(),
-                };
-                (
-                    Some(SessionAuthState {
-                        auth_context,
-                        session_anchor,
-                    }),
-                    (true, snapshot, Some(previous_anchor_id)),
-                )
-            } else {
-                (
-                    None,
-                    (
-                        false,
-                        SessionAnchorSnapshot {
-                            session_id: self.id.clone(),
-                            agent_id: self.agent_id.clone(),
-                            auth_context: current.auth_context.clone(),
-                            session_anchor: current.session_anchor.clone(),
-                        },
-                        None,
-                    ),
-                )
-            }
-        })
+    ) -> Result<(bool, SessionAnchorSnapshot, Option<String>), SessionError> {
+        self.update_auth_context(auth_context, |_, _| Ok::<(), std::convert::Infallible>(()))
+            .map_err(in_memory_session_error)
     }
 
     pub fn set_auth_context_persisted<E>(
@@ -1137,6 +1135,14 @@ impl Session {
         auth_context: SessionAuthContext,
         persist: impl FnOnce(&SessionAnchorSnapshot, Option<&str>) -> Result<(), E>,
     ) -> Result<(), SessionPersistError<E>> {
+        self.update_auth_context(auth_context, persist).map(|_| ())
+    }
+
+    fn update_auth_context<E>(
+        &self,
+        auth_context: SessionAuthContext,
+        persist: impl FnOnce(&SessionAnchorSnapshot, Option<&str>) -> Result<(), E>,
+    ) -> Result<(bool, SessionAnchorSnapshot, Option<String>), SessionPersistError<E>> {
         let state_guard = self.write_inner();
         if state_guard.state == SessionState::Closed {
             return Err(SessionPersistError::Session(
@@ -1152,7 +1158,11 @@ impl Session {
             let rotated = current.auth_context != auth_context;
             let (next, snapshot, supersedes_anchor_id) = if rotated {
                 let previous_anchor_id = current.session_anchor.id().to_string();
-                let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
+                let next_epoch =
+                    match next_auth_epoch(&self.id, current.session_anchor.auth_epoch, false) {
+                        Ok(epoch) => epoch,
+                        Err(error) => return (None, Err(SessionPersistError::Session(error))),
+                    };
                 let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
                 let snapshot = SessionAnchorSnapshot {
                     session_id: self.id.clone(),
@@ -1183,7 +1193,7 @@ impl Session {
 
             let result = persist(&snapshot, supersedes_anchor_id.as_deref());
             match result {
-                Ok(()) => (next, Ok(())),
+                Ok(()) => (next, Ok((rotated, snapshot, supersedes_anchor_id))),
                 Err(error) => (None, Err(SessionPersistError::Persist(error))),
             }
         })
@@ -1213,47 +1223,8 @@ impl Session {
     }
 
     pub fn close(&self) -> Result<(), SessionError> {
-        {
-            let mut inner = self.write_inner();
-            if inner.state == SessionState::Closed {
-                return Ok(());
-            }
-
-            let active_count = self.inflight.len() as u64;
-            if active_count > 0 {
-                if inner.state != SessionState::Closed {
-                    inner.state = SessionState::Draining;
-                }
-                return Err(SessionError::CloseRequiresDrain {
-                    session_id: self.id.clone(),
-                    active_count,
-                });
-            }
-
-            inner.state = SessionState::Closed;
-        }
-
-        self.inflight.clear();
-        self.subscriptions.clear();
-        self.auth_state.replace_with(|current| {
-            let auth_context = SessionAuthContext::in_process_anonymous();
-            let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
-            let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
-            (
-                Some(SessionAuthState {
-                    auth_context,
-                    session_anchor,
-                }),
-                (),
-            )
-        });
-        self.roots.replace(SessionRoots {
-            roots: Vec::new(),
-            normalized_roots: Vec::new(),
-        });
-        self.write_pending_url_elicitations().clear();
-        self.write_late_events().clear();
-        Ok(())
+        self.close_persisted(|_, _| Ok::<(), std::convert::Infallible>(()))
+            .map_err(in_memory_session_error)
     }
 
     pub fn close_persisted<E>(
@@ -1281,7 +1252,11 @@ impl Session {
         self.auth_state.replace_with(|current| {
             let auth_context = SessionAuthContext::in_process_anonymous();
             let previous_anchor_id = current.session_anchor.id().to_string();
-            let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
+            let next_epoch =
+                match next_auth_epoch(&self.id, current.session_anchor.auth_epoch, true) {
+                    Ok(epoch) => epoch,
+                    Err(error) => return (None, Err(SessionPersistError::Session(error))),
+                };
             let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
             let snapshot = SessionAnchorSnapshot {
                 session_id: self.id.clone(),
@@ -1608,3 +1583,7 @@ pub enum SessionOperationResponse {
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests;
+
+#[cfg(all(test, not(loom)))]
+#[path = "session/auth_epoch_tests.rs"]
+mod auth_epoch_tests;
