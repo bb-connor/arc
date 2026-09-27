@@ -218,7 +218,7 @@ fn load_receipt_lineage_statement_row(
             |row| row.get::<_, String>(0),
         )
         .optional()?
-        .map(|raw| serde_json::from_str(&raw).map_err(ReceiptStoreError::from))
+        .map(|raw| decode_verified_lineage_statement(&raw, receipt_id))
         .transpose()
 }
 
@@ -351,22 +351,7 @@ impl SqliteReceiptStore {
         let receipt_id = receipt_id.to_string();
         self.writer_handle().run_write_anchored_metadata(move |tx| {
             ensure_receipt_lineage_statement_for_receipt_id_tx(tx, &receipt_id)?;
-            let raw = tx
-                .query_row(
-                    "SELECT raw_json FROM receipt_lineage_statements WHERE receipt_id = ?1",
-                    params![&receipt_id],
-                    |row| row.get::<_, String>(0),
-                )
-                .optional()?;
-            let statement = raw
-                .map(|raw| {
-                    serde_json::from_str::<chio_core::receipt::lineage::ReceiptLineageStatement>(
-                        &raw,
-                    )
-                    .map_err(ReceiptStoreError::from)
-                })
-                .transpose()?;
-            Ok(statement)
+            load_receipt_lineage_statement_row(tx, &receipt_id)
         })
     }
 

@@ -19,6 +19,8 @@ mod receipt_verify;
 mod retention_watermark;
 #[path = "support/security_evidence.rs"]
 mod security_evidence;
+#[path = "support/signed_readback.rs"]
+mod signed_readback;
 #[path = "support/store_impl.rs"]
 mod store_impl;
 
@@ -29,4 +31,5 @@ pub(crate) use self::lineage::*;
 pub(crate) use self::receipt_verify::*;
 pub(crate) use self::retention_watermark::*;
 pub(crate) use self::security_evidence::*;
+pub(crate) use self::signed_readback::*;
 pub(crate) use self::store_impl::*;

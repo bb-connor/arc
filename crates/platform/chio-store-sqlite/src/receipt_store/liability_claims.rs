@@ -80,7 +80,7 @@ impl SqliteReceiptStore {
                 ))
             })?;
         let stored_bound: SignedLiabilityBoundCoverage =
-            serde_json::from_str(&stored_bound_raw_json)?;
+            decode_verified_signed_export(&stored_bound_raw_json)?;
         if stored_bound.body != artifact.bound_coverage.body {
             return Err(ReceiptStoreError::Conflict(
                 "liability claim package bound_coverage does not match the persisted bound coverage"
@@ -103,7 +103,7 @@ impl SqliteReceiptStore {
                     artifact.bond.body.bond_id
                 ))
             })?;
-        let stored_bond: SignedCreditBond = serde_json::from_str(&stored_bond_raw_json)?;
+        let stored_bond: SignedCreditBond = decode_verified_signed_export(&stored_bond_raw_json)?;
         if stored_bond.body != artifact.bond.body {
             return Err(ReceiptStoreError::Conflict(
                 "liability claim package bond does not match the persisted credit bond".to_string(),
@@ -125,7 +125,7 @@ impl SqliteReceiptStore {
                     artifact.loss_event.body.event_id
                 ))
             })?;
-        let stored_loss: SignedCreditLossLifecycle = serde_json::from_str(&stored_loss_raw_json)?;
+        let stored_loss: SignedCreditLossLifecycle = decode_verified_signed_export(&stored_loss_raw_json)?;
         if stored_loss.body != artifact.loss_event.body {
             return Err(ReceiptStoreError::Conflict(
                 "liability claim package loss_event does not match the persisted credit loss lifecycle event"
@@ -259,7 +259,7 @@ impl SqliteReceiptStore {
                         ))
                     })?;
                 let stored_claim: SignedLiabilityClaimPackage =
-                    serde_json::from_str(&stored_claim_raw_json)?;
+                    decode_verified_signed_export(&stored_claim_raw_json)?;
                 if stored_claim.body != artifact.claim.body {
                     return Err(ReceiptStoreError::Conflict(
                         "liability claim response claim does not match the persisted claim package"
@@ -355,7 +355,7 @@ impl SqliteReceiptStore {
                 ))
             })?;
         let stored_response: SignedLiabilityClaimResponse =
-            serde_json::from_str(&stored_response_raw_json)?;
+            decode_verified_signed_export(&stored_response_raw_json)?;
         if stored_response.body != artifact.provider_response.body {
             return Err(ReceiptStoreError::Conflict(
                 "liability claim dispute provider_response does not match the persisted claim response"
@@ -455,7 +455,7 @@ impl SqliteReceiptStore {
                         ))
                     })?;
                 let stored_dispute: SignedLiabilityClaimDispute =
-                    serde_json::from_str(&stored_dispute_raw_json)?;
+                    decode_verified_signed_export(&stored_dispute_raw_json)?;
                 if stored_dispute.body != artifact.dispute.body {
                     return Err(ReceiptStoreError::Conflict(
                 "liability claim adjudication dispute does not match the persisted claim dispute"
@@ -548,7 +548,7 @@ impl SqliteReceiptStore {
                 ))
             })?;
         let stored_adjudication: SignedLiabilityClaimAdjudication =
-            serde_json::from_str(&stored_adjudication_raw_json)?;
+            decode_verified_signed_export(&stored_adjudication_raw_json)?;
         if stored_adjudication.body != artifact.adjudication.body {
             return Err(ReceiptStoreError::Conflict(
                 "liability claim payout instruction adjudication does not match the persisted adjudication"
@@ -648,7 +648,7 @@ impl SqliteReceiptStore {
                 ))
             })?;
         let stored_instruction: SignedLiabilityClaimPayoutInstruction =
-            serde_json::from_str(&stored_instruction_raw_json)?;
+            decode_verified_signed_export(&stored_instruction_raw_json)?;
         if stored_instruction.body != artifact.payout_instruction.body {
             return Err(ReceiptStoreError::Conflict(
                 "liability claim payout receipt payout_instruction does not match the persisted payout instruction"
@@ -748,7 +748,7 @@ impl SqliteReceiptStore {
                 ))
             })?;
         let stored_payout_receipt: SignedLiabilityClaimPayoutReceipt =
-            serde_json::from_str(&stored_payout_receipt_raw_json)?;
+            decode_verified_signed_export(&stored_payout_receipt_raw_json)?;
         if stored_payout_receipt.body != artifact.payout_receipt.body {
             return Err(ReceiptStoreError::Conflict(
                 "liability claim settlement instruction payout_receipt does not match the persisted payout receipt"
@@ -866,7 +866,7 @@ impl SqliteReceiptStore {
                 ))
             })?;
         let stored_instruction: SignedLiabilityClaimSettlementInstruction =
-            serde_json::from_str(&stored_instruction_raw_json)?;
+            decode_verified_signed_export(&stored_instruction_raw_json)?;
         if stored_instruction.body != artifact.settlement_instruction.body {
             return Err(ReceiptStoreError::Conflict(
                 "liability claim settlement receipt settlement_instruction does not match the persisted settlement instruction"
@@ -950,7 +950,7 @@ impl SqliteReceiptStore {
 
         for row in rows {
             let raw_json = row?;
-            let claim: SignedLiabilityClaimPackage = serde_json::from_str(&raw_json)?;
+            let claim: SignedLiabilityClaimPackage = decode_verified_signed_export(&raw_json)?;
             if !liability_claim_workflow_matches_query(&claim, &normalized) {
                 continue;
             }
@@ -968,7 +968,11 @@ impl SqliteReceiptStore {
                     |row| row.get::<_, String>(0),
                 )
                 .optional()?
-                .map(|raw_json| serde_json::from_str::<SignedLiabilityClaimResponse>(&raw_json))
+                .map(
+                    |raw_json| -> Result<SignedLiabilityClaimResponse, ReceiptStoreError> {
+                        decode_verified_signed_export(&raw_json)
+                    },
+                )
                 .transpose()?;
             if let Some(response) = provider_response.as_ref() {
                 provider_responses += 1;
@@ -991,7 +995,11 @@ impl SqliteReceiptStore {
                     |row| row.get::<_, String>(0),
                 )
                 .optional()?
-                .map(|raw_json| serde_json::from_str::<SignedLiabilityClaimDispute>(&raw_json))
+                .map(
+                    |raw_json| -> Result<SignedLiabilityClaimDispute, ReceiptStoreError> {
+                        decode_verified_signed_export(&raw_json)
+                    },
+                )
                 .transpose()?;
             if dispute.is_some() {
                 disputes += 1;
@@ -1009,7 +1017,11 @@ impl SqliteReceiptStore {
                     |row| row.get::<_, String>(0),
                 )
                 .optional()?
-                .map(|raw_json| serde_json::from_str::<SignedLiabilityClaimAdjudication>(&raw_json))
+                .map(
+                    |raw_json| -> Result<SignedLiabilityClaimAdjudication, ReceiptStoreError> {
+                        decode_verified_signed_export(&raw_json)
+                    },
+                )
                 .transpose()?;
             if adjudication.is_some() {
                 adjudications += 1;
@@ -1027,9 +1039,11 @@ impl SqliteReceiptStore {
                     |row| row.get::<_, String>(0),
                 )
                 .optional()?
-                .map(|raw_json| {
-                    serde_json::from_str::<SignedLiabilityClaimPayoutInstruction>(&raw_json)
-                })
+                .map(
+                    |raw_json| -> Result<SignedLiabilityClaimPayoutInstruction, ReceiptStoreError> {
+                        decode_verified_signed_export(&raw_json)
+                    },
+                )
                 .transpose()?;
             if payout_instruction.is_some() {
                 payout_instructions += 1;
@@ -1047,9 +1061,11 @@ impl SqliteReceiptStore {
                     |row| row.get::<_, String>(0),
                 )
                 .optional()?
-                .map(|raw_json| {
-                    serde_json::from_str::<SignedLiabilityClaimPayoutReceipt>(&raw_json)
-                })
+                .map(
+                    |raw_json| -> Result<SignedLiabilityClaimPayoutReceipt, ReceiptStoreError> {
+                        decode_verified_signed_export(&raw_json)
+                    },
+                )
                 .transpose()?;
             if let Some(receipt) = payout_receipt.as_ref() {
                 payout_receipts += 1;
@@ -1063,22 +1079,25 @@ impl SqliteReceiptStore {
                 }
             }
 
-            let settlement_instruction = self
-                .connection()?
-                .query_row(
-                    "SELECT raw_json
+            let settlement_instruction =
+                self.connection()?
+                    .query_row(
+                        "SELECT raw_json
                      FROM liability_claim_settlement_instructions
                      WHERE claim_id = ?1
                      ORDER BY issued_at DESC, settlement_instruction_id DESC
                      LIMIT 1",
-                    params![claim.body.claim_id],
-                    |row| row.get::<_, String>(0),
-                )
-                .optional()?
-                .map(|raw_json| {
-                    serde_json::from_str::<SignedLiabilityClaimSettlementInstruction>(&raw_json)
-                })
-                .transpose()?;
+                        params![claim.body.claim_id],
+                        |row| row.get::<_, String>(0),
+                    )
+                    .optional()?
+                    .map(
+                        |raw_json| -> Result<
+                            SignedLiabilityClaimSettlementInstruction,
+                            ReceiptStoreError,
+                        > { decode_verified_signed_export(&raw_json) },
+                    )
+                    .transpose()?;
             if settlement_instruction.is_some() {
                 settlement_instructions += 1;
             }
@@ -1095,9 +1114,11 @@ impl SqliteReceiptStore {
                     |row| row.get::<_, String>(0),
                 )
                 .optional()?
-                .map(|raw_json| {
-                    serde_json::from_str::<SignedLiabilityClaimSettlementReceipt>(&raw_json)
-                })
+                .map(
+                    |raw_json| -> Result<SignedLiabilityClaimSettlementReceipt, ReceiptStoreError> {
+                        decode_verified_signed_export(&raw_json)
+                    },
+                )
                 .transpose()?;
             if let Some(receipt) = settlement_receipt.as_ref() {
                 settlement_receipts += 1;

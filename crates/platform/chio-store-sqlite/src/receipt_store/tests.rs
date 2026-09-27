@@ -40,6 +40,8 @@ mod scale_recovery;
 mod schema_archive;
 #[path = "tests/settlement.rs"]
 mod settlement;
+#[path = "tests/signed_readback.rs"]
+mod signed_readback;
 #[path = "tests/single_writer.rs"]
 mod single_writer;
 #[path = "tests/support.rs"]
