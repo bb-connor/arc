@@ -225,9 +225,8 @@ pub use threshold_approval::{
 pub use approval::{
     compute_parameter_hash, resume_with_decision, ApprovalChannel, ApprovalContext,
     ApprovalDecision, ApprovalFilter, ApprovalGuard, ApprovalOutcome, ApprovalRequest,
-    ApprovalStore, ApprovalStoreError, ApprovalToken, BatchApproval, BatchApprovalStore,
-    ChannelError, ChannelHandle, HitlVerdict, InMemoryApprovalStore, InMemoryBatchApprovalStore,
-    ResolvedApproval, MAX_APPROVAL_TTL_SECS,
+    ApprovalStore, ApprovalStoreError, ApprovalToken, ChannelError, ChannelHandle, HitlVerdict,
+    InMemoryApprovalStore, ResolvedApproval, MAX_APPROVAL_TTL_SECS,
 };
 #[cfg(not(loom))]
 pub use approval_channels::{RecordingChannel, WebhookChannel, WebhookPayload};

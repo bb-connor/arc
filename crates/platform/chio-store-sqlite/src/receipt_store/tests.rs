@@ -54,3 +54,5 @@ mod support;
 mod underwriting_credit;
 #[path = "tests/verified_head.rs"]
 mod verified_head;
+#[path = "tests/writer_checkpoint_boundaries.rs"]
+mod writer_checkpoint_boundaries;

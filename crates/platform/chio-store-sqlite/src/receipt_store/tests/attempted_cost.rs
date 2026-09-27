@@ -48,11 +48,14 @@ fn version_five_migration_preserves_signed_bytes_and_unsigned_attempted_cost(
     drop(connection);
     assert!(matches!(SqliteReceiptStore::open_existing(&path),
         Err(ReceiptStoreError::Conflict(message)) if message ==
-        "receipt database schema version 5 requires writable migration to version 6; reopen it with SqliteReceiptStore::open"
+        format!("receipt database schema version 5 requires writable migration to version {RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION}; reopen it with SqliteReceiptStore::open")
     ));
     let migrated = SqliteReceiptStore::open(&path)?;
     assert_eq!(projections(&*migrated.connection()?)?, before);
-    assert_eq!(schema_version(&*migrated.connection()?)?, 6);
+    assert_eq!(
+        schema_version(&*migrated.connection()?)?,
+        RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+    );
     migrated.audit_receipt_cost_projection()?;
     drop(migrated);
     let reopened = SqliteReceiptStore::open_existing(&path)?;
@@ -215,7 +218,10 @@ fn archive_preserves_and_migrates_exact_attempted_projection(
     drop(connection);
     let archived = SqliteReceiptStore::open_existing(&archive)?;
     assert_eq!(projections(&*archived.connection()?)?, before);
-    assert_eq!(schema_version(&*archived.connection()?)?, 6);
+    assert_eq!(
+        schema_version(&*archived.connection()?)?,
+        RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+    );
     archived.audit_receipt_cost_projection()?;
     drop(archived);
     fs::remove_file(path)?;

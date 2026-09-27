@@ -20,25 +20,24 @@ use std::sync::Arc as StdArc;
 // paths intentionally resolve through `crate::approval*` so the test
 // exercises the same type identities that downstream consumers see.
 use crate::approval::{
-    compute_parameter_hash, resume_with_decision, ApprovalContext, ApprovalDecision,
-    ApprovalGuard, ApprovalOutcome, ApprovalRequest, ApprovalStore, ApprovalToken, BatchApproval,
-    BatchApprovalStore, HitlVerdict, InMemoryApprovalStore, InMemoryBatchApprovalStore,
+    compute_parameter_hash, resume_with_decision, ApprovalContext, ApprovalDecision, ApprovalGuard,
+    ApprovalOutcome, ApprovalRequest, ApprovalStore, ApprovalToken, HitlVerdict,
+    InMemoryApprovalStore,
 };
 use crate::approval_channels::RecordingChannel;
 use crate::governed_active_response::{
     GovernedActiveResponseDispatchCommit, GovernedActiveResponseRequest,
 };
 use crate::threshold_approval::ThresholdApprovalRequirementResolver;
-use chio_log_redact::redacted;
 use chio_core::capability::governance::{
     GovernedResponseEffect, GovernedResponsePlanIntentBody, GovernedTransactionIntentBody,
     ThresholdApprovalProposal, ThresholdApprovalProposalBody, ACTIVE_RESPONSE_PLAN_TOOL_NAME,
-    ACTIVE_RESPONSE_SERVER_ID, GOVERNED_RESPONSE_PLAN_SCHEMA,
-    THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+    ACTIVE_RESPONSE_SERVER_ID, GOVERNED_RESPONSE_PLAN_SCHEMA, THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
 };
 use chio_core::capability::threshold_approval::{
     ThresholdApprovalRequirement, ThresholdApproverIdentity,
 };
+use chio_log_redact::redacted;
 
 struct FixedThresholdRequirement(ThresholdApprovalRequirement);
 
@@ -439,9 +438,9 @@ fn threshold_approval_set_is_policy_bound_and_order_independent() {
         300,
     )
     .unwrap();
-    kernel.set_threshold_approval_requirement_resolver(StdArc::new(
-        FixedThresholdRequirement(requirement.clone()),
-    ));
+    kernel.set_threshold_approval_requirement_resolver(StdArc::new(FixedThresholdRequirement(
+        requirement.clone(),
+    )));
 
     let subject = CoreKeypair::generate();
     let cap = make_capability(
@@ -513,12 +512,7 @@ fn threshold_approval_set_is_policy_bound_and_order_independent() {
     };
     let token_a = make_token("token-a", &approver_a);
     let token_b = make_token("token-b", &approver_b);
-    let mut request = make_request(
-        "request-threshold-1",
-        &cap,
-        "transfer",
-        "srv-threshold",
-    );
+    let mut request = make_request("request-threshold-1", &cap, "transfer", "srv-threshold");
     request.governed_intent = Some(intent);
     request.approval_tokens = vec![token_b.clone(), token_a.clone()];
     request.threshold_approval_proposal = Some(proposal.clone());
@@ -600,9 +594,9 @@ fn active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch()
     config.policy_hash = policy_hash;
     config.ca_public_keys.push(policy_authority.public_key());
     let mut kernel = make_kernel(config);
-    kernel.set_threshold_approval_requirement_resolver(StdArc::new(
-        FixedThresholdRequirement(requirement.clone()),
-    ));
+    kernel.set_threshold_approval_requirement_resolver(StdArc::new(FixedThresholdRequirement(
+        requirement.clone(),
+    )));
 
     let fence = admission_test_fence();
     let store = StdArc::new(TestAdmissionOperationStore::new(fence.clone()));
@@ -628,11 +622,7 @@ fn active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch()
         executor: &executor,
         now,
     };
-    let request = fixture.request(
-        "active-response-1",
-        effects.clone(),
-        grants,
-    );
+    let request = fixture.request("active-response-1", effects.clone(), grants);
 
     let mut mismatched = request.clone();
     let GovernedTransactionIntentBody::ActiveResponsePlan(plan) =
@@ -808,7 +798,10 @@ fn active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch()
         .admit_governed_active_response_at(&request, now, now * 1_000)
         .unwrap();
     assert_eq!(recovered.operation_id(), operation_id);
-    assert_eq!(recovered.state(), AdmissionOperationState::DispatchCommitted);
+    assert_eq!(
+        recovered.state(),
+        AdmissionOperationState::DispatchCommitted
+    );
     assert_eq!(
         kernel
             .commit_governed_active_response_dispatch_at(&mut recovered, now * 1_000)
@@ -841,7 +834,9 @@ fn hitl_force_approval_returns_pending() {
 
     let verdict = guard.evaluate(ctx, 1_000_000).unwrap();
     match verdict {
-        HitlVerdict::Pending { request: approval, .. } => {
+        HitlVerdict::Pending {
+            request: approval, ..
+        } => {
             assert_eq!(approval.approval_id, "ap-force-1");
             assert_eq!(approval.subject_id, request.agent_id);
             assert_eq!(approval.tool_server, "srv-a");
@@ -919,12 +914,11 @@ fn hitl_resume_approved_executes() {
 
     // Pending record is gone; resolved record exists.
     assert!(store.get_pending("ap-approve-1").unwrap().is_none());
-    assert!(store
-        .get_resolution("ap-approve-1")
-        .unwrap()
-        .is_some());
+    assert!(store.get_resolution("ap-approve-1").unwrap().is_some());
     assert_eq!(
-        store.count_approved(&request.agent_id, "policy-hitl").unwrap(),
+        store
+            .count_approved(&request.agent_id, "policy-hitl")
+            .unwrap(),
         1
     );
 }
@@ -987,7 +981,9 @@ fn hitl_resume_denied_records_denial() {
 
     // Approved counter stays zero.
     assert_eq!(
-        store.count_approved(&request.agent_id, "policy-hitl").unwrap(),
+        store
+            .count_approved(&request.agent_id, "policy-hitl")
+            .unwrap(),
         0
     );
     // Resolution record is present with Denied outcome.
@@ -1062,9 +1058,7 @@ fn hitl_replay_of_consumed_token_rejected() {
     );
 
     // Consumed registry records the token.
-    assert!(store
-        .is_consumed(&token.id, &hash)
-        .unwrap());
+    assert!(store.is_consumed(&token.id, &hash).unwrap());
 
     // Re-storing the pending row and replaying the consumed token
     // should also fail with a replay error (the consumed registry is
@@ -1185,9 +1179,21 @@ fn hitl_batch_respond_applies_multiple_decisions() {
     }
 
     let decisions = [
-        (ids[0], GovernedApprovalDecision::Approved, ApprovalOutcome::Approved),
-        (ids[1], GovernedApprovalDecision::Denied, ApprovalOutcome::Denied),
-        (ids[2], GovernedApprovalDecision::Approved, ApprovalOutcome::Approved),
+        (
+            ids[0],
+            GovernedApprovalDecision::Approved,
+            ApprovalOutcome::Approved,
+        ),
+        (
+            ids[1],
+            GovernedApprovalDecision::Denied,
+            ApprovalOutcome::Denied,
+        ),
+        (
+            ids[2],
+            GovernedApprovalDecision::Approved,
+            ApprovalOutcome::Approved,
+        ),
     ];
 
     let mut approved = 0usize;
@@ -1212,45 +1218,11 @@ fn hitl_batch_respond_applies_multiple_decisions() {
     assert_eq!(approved, 2);
     assert_eq!(denied, 1);
     assert_eq!(
-        store.count_approved(&request.agent_id, "policy-batch").unwrap(),
+        store
+            .count_approved(&request.agent_id, "policy-batch")
+            .unwrap(),
         2
     );
-}
-
-// ---------------------------------------------------------------------
-// Batch approval store: find_matching and record_usage.
-// ---------------------------------------------------------------------
-
-#[test]
-fn hitl_batch_store_find_and_record() {
-    let store = InMemoryBatchApprovalStore::new();
-    let approver = CoreKeypair::generate();
-    let batch = BatchApproval {
-        batch_id: "ba-1".into(),
-        approver_hex: approver.public_key().to_hex(),
-        subject_id: "agent-1".into(),
-        server_pattern: "search-*".into(),
-        tool_pattern: "*".into(),
-        max_amount_per_call: None,
-        max_total_amount: None,
-        max_calls: Some(3),
-        not_before: 100,
-        not_after: 1000,
-        used_calls: 0,
-        used_total_units: 0,
-        revoked: false,
-    };
-    store.store(&batch).unwrap();
-
-    let found = store
-        .find_matching("agent-1", "search-primary", "query", None, 500)
-        .unwrap()
-        .expect("batch should match");
-    assert_eq!(found.batch_id, "ba-1");
-
-    store.record_usage("ba-1", None).unwrap();
-    let after = store.get("ba-1").unwrap().unwrap();
-    assert_eq!(after.used_calls, 1);
 }
 
 // ---------------------------------------------------------------------

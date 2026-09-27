@@ -41,10 +41,10 @@ group-commit actor onto one writer connection (`DEFAULT_WRITER_POOL_MAX_SIZE
   `chio_kernel::BudgetStore`. Per-grant invocation and cost limits with a
   two-phase authorize-then-settle model, plus replication sequencing and
   ack-head bookkeeping for multi-node budget sync.
-- **Approval stores** (`approval_store`, `batch_approval_store`): implement
-  `chio_kernel::ApprovalStore` and `BatchApprovalStore`. Durable
-  human-in-the-loop approval requests and resolutions, and standing batch
-  approvals matched by pattern, call count, and spend cap.
+- **Approval store** (`approval_store`, `SqliteApprovalStore`): implements
+  `chio_kernel::ApprovalStore`. Durable human approval requests, resolutions
+  and consumed-token replay protection. Each approved request retains its own
+  authorization binding when several decisions are submitted together.
 - **Governed approval replay** (`governed_approval_replay_store`): durable,
   subject-scoped replay reservations with retained clock and capacity state.
   Explicit exact-expected source sealing permanently freezes all retained
@@ -306,7 +306,6 @@ Re-exported at the crate root (`chio_store_sqlite::*`):
 | `SqliteReceiptStore`, `BackgroundCheckpointSigner` | `chio_kernel::ReceiptStore`; background checkpoint signing |
 | `SqliteBudgetStore` | `chio_kernel::BudgetStore` |
 | `SqliteApprovalStore` | `chio_kernel::ApprovalStore` |
-| `SqliteBatchApprovalStore` | `chio_kernel::BatchApprovalStore` |
 | `SqliteRevocationStore` | `chio_kernel::RevocationStore` |
 | `SqliteExecutionNonceStore`, `SqliteExecutionNonceStoreError` | `chio_kernel::ExecutionNonceStore` |
 | `SqliteCapabilityAuthority` | `chio_kernel::CapabilityAuthority` |

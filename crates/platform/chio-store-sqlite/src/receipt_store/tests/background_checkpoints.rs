@@ -1227,9 +1227,13 @@ fn frontier_cache_miss_rejects_disconnected_legacy_prefix_after_failed_build(
     assert_eq!(
         connection.execute(
             "UPDATE kernel_checkpoints
-             SET statement_json = ?1, signature = ?2
+             SET statement_json = ?1, signature = ?2, previous_checkpoint_sha256 = ?3
              WHERE checkpoint_seq = 2",
-            rusqlite::params![replacement_two_json, replacement_two_signature],
+            rusqlite::params![
+                replacement_two_json,
+                replacement_two_signature,
+                replacement_predecessor
+            ],
         )?,
         1
     );

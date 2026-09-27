@@ -15,9 +15,9 @@ crates/kernel/chio-kernel/benches/fixtures/dispatch_request_fixture.rs	442	pendi
 crates/kernel/chio-kernel/benches/paper_security_components.rs	42	pending	Needs semantic review; no correctness claim	let next = sequence.get().saturating_add(1);
 crates/kernel/chio-kernel/benches/receipt_append.rs	27	pending	Needs semantic review; no correctness claim	let next = sequence.get().saturating_add(1);
 crates/kernel/chio-kernel/src/admission_operation/dpop_claim.rs	87	pending	Needs semantic review; no correctness claim	> seconds.saturating_add(self.authority.max_clock_skew_secs())
-crates/kernel/chio-kernel/src/approval.rs	1375	pending	Needs semantic review; no correctness claim	batch.used_calls = batch.used_calls.saturating_add(1);
-crates/kernel/chio-kernel/src/approval.rs	1377	pending	Needs semantic review; no correctness claim	batch.used_total_units = batch.used_total_units.saturating_add(amt.units);
-crates/kernel/chio-kernel/src/approval.rs	1426	pending	Needs semantic review; no correctness claim	|| batch.used_total_units.saturating_add(amt.units) > total.units
+crates/kernel/chio-kernel/src/approval.rs	1375	removed_api	Removed ownerless pattern-based standing approval API and backend; request-bound approval decisions remain	batch.used_calls = batch.used_calls.saturating_add(1);
+crates/kernel/chio-kernel/src/approval.rs	1377	removed_api	Removed ownerless pattern-based standing approval API and backend; request-bound approval decisions remain	batch.used_total_units = batch.used_total_units.saturating_add(amt.units);
+crates/kernel/chio-kernel/src/approval.rs	1426	removed_api	Removed ownerless pattern-based standing approval API and backend; request-bound approval decisions remain	|| batch.used_total_units.saturating_add(amt.units) > total.units
 crates/kernel/chio-kernel/src/approval.rs	240	pending	Needs semantic review; no correctness claim	.saturating_sub(self.governed_token.issued_at);
 crates/kernel/chio-kernel/src/approval.rs	959	pending	Needs semantic review; no correctness claim	let expires_at = now.saturating_add(self.default_ttl_secs);
 crates/kernel/chio-kernel/src/authority.rs	262	intentional_bound	Clock skew widens an upper comparison bound; no timestamp exists beyond u64 MAX	let latest_issued_at = now.saturating_add(allowed_clock_skew_seconds);
@@ -178,7 +178,7 @@ crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	709	pending	Need
 crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	735	pending	Needs semantic review; no correctness claim	if live_for_scope.saturating_add(batch_count) > per_scope_capacity {
 crates/platform/chio-store-sqlite/src/authority.rs	118	fixed	IMMEDIATE rotation checks generation increment and SQLite integer range before atomically publishing seed and history	let next_generation = status_before.generation.saturating_add(1);
 crates/platform/chio-store-sqlite/src/authority.rs	863	fixed	Shared checked expiry rejects unrepresentable TTL before signing	expires_at: now.saturating_add(ttl_seconds),
-crates/platform/chio-store-sqlite/src/batch_approval_store.rs	168	pending	Needs semantic review; no correctness claim	|| batch.used_total_units.saturating_add(amt.units) > total.units
+crates/platform/chio-store-sqlite/src/batch_approval_store.rs	168	removed_api	Removed ownerless pattern-based standing approval API and backend; request-bound approval decisions remain	|| batch.used_total_units.saturating_add(amt.units) > total.units
 crates/platform/chio-store-sqlite/src/budget_store/replication.rs	102	checked_storage_bound	Every iteration rejects at i64 storage limit before u64 can saturate	let next_seq = current.saturating_add(1);
 crates/platform/chio-store-sqlite/src/budget_store/replication.rs	37	checked_storage_bound	Every iteration rejects at i64 storage limit before u64 can saturate	next_seq = next_seq.saturating_add(1);
 crates/platform/chio-store-sqlite/src/budget_store/replication.rs	63	checked_storage_bound	Every iteration rejects at i64 storage limit before u64 can saturate	event_seq = event_seq.saturating_add(1);
@@ -269,46 +269,46 @@ crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	953	pend
 crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	961	pending	Needs semantic review; no correctness claim	before_open.saturating_sub(MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64 + 1),
 crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	977	pending	Needs semantic review; no correctness claim	let expiry = u64::try_from(base).unwrap().saturating_add(10_000);
 crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	992	pending	Needs semantic review; no correctness claim	let latched_high_water = base.saturating_add(1_000);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	1144	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	1333	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	1339	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	1664	pending	Needs semantic review; no correctness claim	// runs; `atomic_saturating_sub` keeps a rare overlap with the
-crates/platform/chio-store-sqlite/src/receipt_store.rs	2316	pending	Needs semantic review; no correctness claim	.saturating_sub(head.checkpointed_entry_seq())
-crates/platform/chio-store-sqlite/src/receipt_store.rs	2352	pending	Needs semantic review; no correctness claim	.saturating_sub(head.checkpointed_entry_seq())
-crates/platform/chio-store-sqlite/src/receipt_store.rs	2355	pending	Needs semantic review; no correctness claim	let start_seq = head.checkpointed_entry_seq().saturating_add(1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	2356	pending	Needs semantic review; no correctness claim	let end_seq = start_seq.saturating_add(signer.max_batch - 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	2431	pending	Needs semantic review; no correctness claim	head.claim_log_count = head.claim_log_count.saturating_add(delta_count);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	2527	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.inflight, results.len() as u64);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	2555	pending	Needs semantic review; no correctness claim	fn atomic_saturating_sub(value: &AtomicU64, amount: u64) {
-crates/platform/chio-store-sqlite/src/receipt_store.rs	2558	pending	Needs semantic review; no correctness claim	let next = current.saturating_sub(amount);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	2609	pending	Needs semantic review; no correctness claim	.saturating_add(counters.failed_total);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	1144	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	1333	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	1339	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	1664	retired_bookkeeping	Removed obsolete caller compensation helper or explanatory text; each command now owns a checked permit	// runs; `atomic_saturating_sub` keeps a rare overlap with the
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2316	intentional_exhaustion	A fully archived live prefix has max sequence zero below its retained checkpoint; pending entries are intentionally zero	.saturating_sub(head.checkpointed_entry_seq())
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2352	intentional_exhaustion	A fully archived live prefix has max sequence zero below its retained checkpoint; pending entries are intentionally zero	.saturating_sub(head.checkpointed_entry_seq())
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2355	fixed	Checked successor and batch-end arithmetic rejects sequence exhaustion explicitly	let start_seq = head.checkpointed_entry_seq().saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2356	fixed	Checked successor and batch-end arithmetic rejects sequence exhaustion explicitly	let end_seq = start_seq.saturating_add(signer.max_batch - 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2431	fixed	Checked claim count sum; append computes the next count before committing its transaction	head.claim_log_count = head.claim_log_count.saturating_add(delta_count);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2527	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&health.inflight, results.len() as u64);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2555	retired_bookkeeping	Removed obsolete caller compensation helper or explanatory text; each command now owns a checked permit	fn atomic_saturating_sub(value: &AtomicU64, amount: u64) {
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2558	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	let next = current.saturating_sub(amount);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2609	fixed	Checked terminal total sum classifies an overflowing writer snapshot as Dead	.saturating_add(counters.failed_total);
 crates/platform/chio-store-sqlite/src/receipt_store.rs	2620	pending	Needs semantic review; no correctness claim	Some(reference) => now_unix_ms.saturating_sub(reference) >= stall_threshold_ms,
-crates/platform/chio-store-sqlite/src/receipt_store.rs	2663	pending	Needs semantic review; no correctness claim	/// saturates at zero via `atomic_saturating_sub` rather than underflowing.
-crates/platform/chio-store-sqlite/src/receipt_store.rs	2676	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(self.inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	2956	pending	Needs semantic review; no correctness claim	let next_seq = cursor.saturating_add(1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	3184	pending	Needs semantic review; no correctness claim	.saturating_add(pre_delta)
-crates/platform/chio-store-sqlite/src/receipt_store.rs	3185	pending	Needs semantic review; no correctness claim	.saturating_add(delta_count);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	3405	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.inflight, batch_len);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	362	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.queue_depth, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	366	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.queue_depth, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	3768	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	3784	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	4376	pending	Needs semantic review; no correctness claim	let end_seq = latest_committed.min(start_seq.saturating_add(max_batch - 1));
-crates/platform/chio-store-sqlite/src/receipt_store.rs	444	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.timed_out_inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	475	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.timed_out_inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	4923	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.timed_out_inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	5141	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	708	pending	Needs semantic review; no correctness claim	// `atomic_saturating_sub(&health.inflight, n)` (see
-crates/platform/chio-store-sqlite/src/receipt_store.rs	723	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	729	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	738	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	782	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	788	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store.rs	801	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2663	retired_bookkeeping	Removed obsolete caller compensation helper or explanatory text; each command now owns a checked permit	/// saturates at zero via `atomic_saturating_sub` rather than underflowing.
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2676	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(self.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2956	fixed	Checked successor and batch-end arithmetic rejects sequence exhaustion explicitly	let next_seq = cursor.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	3184	fixed	Checked claim count sum; append computes the next count before committing its transaction	.saturating_add(pre_delta)
+crates/platform/chio-store-sqlite/src/receipt_store.rs	3185	fixed	Checked claim count sum; append computes the next count before committing its transaction	.saturating_add(delta_count);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	3405	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&health.inflight, batch_len);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	362	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&self.queue_depth, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	366	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&self.queue_depth, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	3768	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	3784	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	4376	intentional_bound	Requested range upper bound clamps before min with the latest committed representable sequence	let end_seq = latest_committed.min(start_seq.saturating_add(max_batch - 1));
+crates/platform/chio-store-sqlite/src/receipt_store.rs	444	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&self.health.timed_out_inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	475	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&self.health.timed_out_inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	4923	intentional_fixture	Fixture now completes the accepted command permit or uses checked timeout accounting without manual inflight compensation	atomic_saturating_sub(&health.timed_out_inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	5141	intentional_fixture	Fixture now completes the accepted command permit or uses checked timeout accounting without manual inflight compensation	atomic_saturating_sub(&health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	708	retired_bookkeeping	Removed obsolete caller compensation helper or explanatory text; each command now owns a checked permit	// `atomic_saturating_sub(&health.inflight, n)` (see
+crates/platform/chio-store-sqlite/src/receipt_store.rs	723	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	729	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	738	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	782	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	788	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	801	fixed	Command-owned checked reservations release once on rejection, completion or unwind; response loss never compensates another command	atomic_saturating_sub(&self.health.inflight, 1);
 crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs	523	pending	Needs semantic review; no correctness claim	let time_cutoff = now.saturating_sub(config.retention_days.saturating_mul(86_400));
 crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs	571	pending	Needs semantic review; no correctness claim	let size_cutoff = (median_ts.max(0) as u64).saturating_add(1);
-crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention/dispatch.rs	39	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.inflight, 1);
-crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention/dispatch.rs	57	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention/dispatch.rs	39	fixed	Maintenance command permit owns checked inflight lifetime through timeout and response loss	atomic_saturating_sub(&health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention/dispatch.rs	57	fixed	Maintenance command permit owns checked inflight lifetime through timeout and response loss	atomic_saturating_sub(&health.inflight, 1);
 crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics.rs	431	pending	Needs semantic review; no correctness claim	let ceiling = receipt_ceiling.saturating_add(1);
 crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics.rs	480	pending	Needs semantic review; no correctness claim	.saturating_add(bucket_width.max(1) as u64)
 crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics.rs	481	pending	Needs semantic review; no correctness claim	.saturating_sub(1),

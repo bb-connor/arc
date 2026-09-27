@@ -30,7 +30,7 @@ use chio_core::capability::{
         GovernedApprovalDecision, GovernedApprovalToken, GovernedAutonomyTier,
         GovernedTransactionIntent,
     },
-    scope::{Constraint, MonetaryAmount},
+    scope::Constraint,
 };
 use chio_core::crypto::{sha256_hex, PublicKey};
 use chio_log_redact::redacted;
@@ -634,54 +634,6 @@ pub trait ApprovalStore: Send + Sync {
             "operation-owned approval reservations are unavailable".to_string(),
         ))
     }
-}
-
-/// Batch approvals let a human pre-approve a class of calls.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct BatchApproval {
-    pub batch_id: String,
-    pub approver_hex: String,
-    pub subject_id: AgentId,
-    pub server_pattern: String,
-    pub tool_pattern: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_amount_per_call: Option<MonetaryAmount>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_total_amount: Option<MonetaryAmount>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_calls: Option<u32>,
-    pub not_before: u64,
-    pub not_after: u64,
-    #[serde(default)]
-    pub used_calls: u32,
-    #[serde(default)]
-    pub used_total_units: u64,
-    #[serde(default)]
-    pub revoked: bool,
-}
-
-/// Store for batch approvals. Counterpart to `ApprovalStore`.
-pub trait BatchApprovalStore: Send + Sync {
-    fn store(&self, batch: &BatchApproval) -> Result<(), ApprovalStoreError>;
-
-    fn find_matching(
-        &self,
-        subject_id: &str,
-        server_id: &str,
-        tool_name: &str,
-        amount: Option<&MonetaryAmount>,
-        now: u64,
-    ) -> Result<Option<BatchApproval>, ApprovalStoreError>;
-
-    fn record_usage(
-        &self,
-        batch_id: &str,
-        amount: Option<&MonetaryAmount>,
-    ) -> Result<(), ApprovalStoreError>;
-
-    fn revoke(&self, batch_id: &str) -> Result<(), ApprovalStoreError>;
-
-    fn get(&self, batch_id: &str) -> Result<Option<BatchApproval>, ApprovalStoreError>;
 }
 
 /// Contract a channel must satisfy to dispatch an approval request.
@@ -1308,127 +1260,6 @@ impl ApprovalStore for InMemoryApprovalStore {
             .map_err(|_| ApprovalStoreError::Backend("resolved map poisoned".into()))?;
         Ok(guard.get(id).cloned())
     }
-}
-
-/// In-memory `BatchApprovalStore` used in tests. Production backends
-/// should persist via `SqliteBatchApprovalStore`.
-#[derive(Default)]
-pub struct InMemoryBatchApprovalStore {
-    batches: RwLock<HashMap<String, BatchApproval>>,
-}
-
-impl InMemoryBatchApprovalStore {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl BatchApprovalStore for InMemoryBatchApprovalStore {
-    fn store(&self, batch: &BatchApproval) -> Result<(), ApprovalStoreError> {
-        let mut guard = self
-            .batches
-            .write()
-            .map_err(|_| ApprovalStoreError::Backend("batch map poisoned".into()))?;
-        guard.insert(batch.batch_id.clone(), batch.clone());
-        Ok(())
-    }
-
-    fn find_matching(
-        &self,
-        subject_id: &str,
-        server_id: &str,
-        tool_name: &str,
-        amount: Option<&MonetaryAmount>,
-        now: u64,
-    ) -> Result<Option<BatchApproval>, ApprovalStoreError> {
-        let guard = self
-            .batches
-            .read()
-            .map_err(|_| ApprovalStoreError::Backend("batch map poisoned".into()))?;
-        Ok(guard
-            .values()
-            .find(|b| {
-                !b.revoked
-                    && b.subject_id == subject_id
-                    && pattern_matches(&b.server_pattern, server_id)
-                    && pattern_matches(&b.tool_pattern, tool_name)
-                    && now >= b.not_before
-                    && now < b.not_after
-                    && b.max_calls.is_none_or(|c| b.used_calls < c)
-                    && amount_fits(b, amount)
-            })
-            .cloned())
-    }
-
-    fn record_usage(
-        &self,
-        batch_id: &str,
-        amount: Option<&MonetaryAmount>,
-    ) -> Result<(), ApprovalStoreError> {
-        let mut guard = self
-            .batches
-            .write()
-            .map_err(|_| ApprovalStoreError::Backend("batch map poisoned".into()))?;
-        let Some(batch) = guard.get_mut(batch_id) else {
-            return Err(ApprovalStoreError::NotFound(batch_id.to_string()));
-        };
-        batch.used_calls = batch.used_calls.saturating_add(1);
-        if let Some(amt) = amount {
-            batch.used_total_units = batch.used_total_units.saturating_add(amt.units);
-        }
-        Ok(())
-    }
-
-    fn revoke(&self, batch_id: &str) -> Result<(), ApprovalStoreError> {
-        let mut guard = self
-            .batches
-            .write()
-            .map_err(|_| ApprovalStoreError::Backend("batch map poisoned".into()))?;
-        let Some(batch) = guard.get_mut(batch_id) else {
-            return Err(ApprovalStoreError::NotFound(batch_id.to_string()));
-        };
-        batch.revoked = true;
-        Ok(())
-    }
-
-    fn get(&self, batch_id: &str) -> Result<Option<BatchApproval>, ApprovalStoreError> {
-        let guard = self
-            .batches
-            .read()
-            .map_err(|_| ApprovalStoreError::Backend("batch map poisoned".into()))?;
-        Ok(guard.get(batch_id).cloned())
-    }
-}
-
-fn pattern_matches(pattern: &str, value: &str) -> bool {
-    if pattern == "*" {
-        return true;
-    }
-    if let Some(prefix) = pattern.strip_suffix('*') {
-        return value.starts_with(prefix);
-    }
-    pattern == value
-}
-
-fn amount_fits(batch: &BatchApproval, amount: Option<&MonetaryAmount>) -> bool {
-    let Some(amt) = amount else {
-        // Calls without a monetary intent match only batches that don't
-        // constrain per-call amount.
-        return batch.max_amount_per_call.is_none() && batch.max_total_amount.is_none();
-    };
-    if let Some(per_call) = &batch.max_amount_per_call {
-        if amt.currency != per_call.currency || amt.units > per_call.units {
-            return false;
-        }
-    }
-    if let Some(total) = &batch.max_total_amount {
-        if amt.currency != total.currency
-            || batch.used_total_units.saturating_add(amt.units) > total.units
-        {
-            return false;
-        }
-    }
-    true
 }
 
 #[cfg(test)]

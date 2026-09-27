@@ -12,10 +12,12 @@ fn receipt_commit_actor_channel_has_fixed_capacity() -> Result<(), Box<dyn std::
 
     let (response, _result) = mpsc::sync_channel(1);
     match sender.try_send(ReceiptCommitCommand::Flush(response)) {
-        Err(mpsc::TrySendError::Full(_)) => Ok(()),
-        Err(mpsc::TrySendError::Disconnected(_)) => {
-            Err("commit actor channel disconnected unexpectedly".into())
+        Err(ReceiptStoreError::Pool(message))
+            if message == "sqlite receipt commit queue saturated" =>
+        {
+            Ok(())
         }
+        Err(error) => Err(error.into()),
         Ok(()) => Err("commit actor channel accepted beyond fixed capacity".into()),
     }
 }
@@ -24,7 +26,7 @@ fn receipt_commit_actor_channel_has_fixed_capacity() -> Result<(), Box<dyn std::
 fn receipt_commit_actor_append_fails_closed_when_queue_is_full(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (sender, _receiver) = receipt_commit_channel();
-    let health = Arc::new(ReceiptCommitWriterHealth::default());
+    let health = Arc::clone(&sender.health);
     for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
         let (response, _result) = mpsc::sync_channel(1);
         sender.try_send(ReceiptCommitCommand::Flush(response))?;
@@ -306,7 +308,7 @@ fn append_batch_panic_poisons_the_head_and_fails_closed() -> Result<(), Box<dyn 
 #[test]
 fn run_write_fails_closed_when_queue_is_full() -> Result<(), Box<dyn std::error::Error>> {
     let (sender, _receiver) = receipt_commit_channel();
-    let health = Arc::new(ReceiptCommitWriterHealth::default());
+    let health = Arc::clone(&sender.health);
     for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
         let (response, _result) = mpsc::sync_channel(1);
         sender.try_send(ReceiptCommitCommand::Flush(response))?;
@@ -348,7 +350,7 @@ fn disconnected_writer_routes_preserve_supervisor_context() -> Result<(), Box<dy
             thread_id: Arc::new(OnceLock::new()),
         }),
     });
-    let health = Arc::new(ReceiptCommitWriterHealth::default());
+    let health = Arc::clone(&sender.health);
     let writer = WriterHandle {
         sender: sender.clone(),
         health: Arc::clone(&health),
@@ -407,13 +409,13 @@ fn accepted_flush_samples_supervisor_failure_after_response_loss(
         }),
     });
     let actor = ReceiptCommitActor {
+        health: Arc::clone(&sender.health),
         sender,
-        health: Arc::new(ReceiptCommitWriterHealth::default()),
         worker,
     };
     let receiver_thread = thread::spawn(move || -> Result<(), &'static str> {
         let command = receiver.recv().map_err(|_| "flush command was not sent")?;
-        let ReceiptCommitCommand::Flush(response) = command else {
+        let (ReceiptCommitCommand::Flush(response), _permit) = command.dequeue() else {
             return Err("expected flush command");
         };
         receiver_health.record_failure("writer failed after accepting flush", 1, 1);
@@ -613,7 +615,7 @@ fn writer_health_starts_with_a_poisoned_head_until_seeding_clears_it() {
 #[test]
 fn receipt_commit_actor_flush_honors_timeout() -> Result<(), Box<dyn std::error::Error>> {
     let (sender, _receiver) = receipt_commit_channel();
-    let health = Arc::new(ReceiptCommitWriterHealth::default());
+    let health = Arc::clone(&sender.health);
     let actor = ReceiptCommitActor {
         sender,
         health,
@@ -686,7 +688,7 @@ fn run_write_executes_jobs_serially_on_the_writer_thread() -> Result<(), Box<dyn
 /// A writer-routed `Write` job (liability write, manual checkpoint creation)
 /// must keep `writer_inflight` nonzero for the DURATION of the job, not just
 /// at enqueue, so a health poll during a slow or stuck Write does not report
-/// `inflight: 0` and hide active writer work. The `WriterInflightGuard`
+/// `inflight: 0` and hide active writer work. The `WriterCommandPermit`
 /// holds the count until the job completes, mirroring the Append path.
 #[test]
 fn write_job_holds_inflight_for_its_duration() -> Result<(), Box<dyn std::error::Error>> {
@@ -733,7 +735,7 @@ fn write_job_holds_inflight_for_its_duration() -> Result<(), Box<dyn std::error:
     );
 
     // Release the job and confirm inflight drains back to baseline. The
-    // `WriterInflightGuard` decrements just BEFORE the caller's response is
+    // `WriterCommandPermit` decrements just BEFORE the caller's response is
     // delivered, so this is already at baseline once the worker join
     // returns; poll defensively regardless.
     release_tx.send(())?;
@@ -758,17 +760,9 @@ fn write_job_holds_inflight_for_its_duration() -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
-/// The `WriterInflightGuard` decrement must be SYNCHRONOUS with
-/// caller-return: the guard drops IMMEDIATELY BEFORE each `respond(...)`,
-/// matching the Append path's decrement-then-fan-out ordering
-/// (`commit_receipt_batch`), so caller-return implies the decrement already
-/// happened. If the guard instead dropped at the END of the Write arm (after
-/// `respond(...)` unblocked `run_write`), a caller could return while
-/// `inflight` was still counted, the exact window that would make
-/// `run_write_executes_jobs_serially_on_the_writer_thread` intermittently
-/// observe `inflight == 1`. This asserts the guarantee DIRECTLY and
-/// deterministically (no `wait_until`): right after `run_write` returns,
-/// `inflight` reads 0 on every one of many iterations.
+/// The responder finishes the command permit before sending the result, so a
+/// returned Write has already released its inflight reservation. This checks
+/// the ordering immediately after each call, without polling for cleanup.
 #[test]
 fn write_decrements_inflight_before_returning_to_caller() -> Result<(), Box<dyn std::error::Error>>
 {

@@ -2,8 +2,12 @@ use super::*;
 
 pub(crate) const RECEIPT_COST_PROJECTION_SCHEMA_VERSION: i32 = 3;
 pub(crate) const RECEIPT_ATTEMPTED_COST_SCHEMA_VERSION: i32 = 6;
-pub(crate) const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 6;
+pub(crate) const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 7;
 pub(crate) const RECEIPT_STORE_SCHEMA_KEY: &str = "receipt";
+
+#[path = "support/checkpoint_schema.rs"]
+mod checkpoint_schema;
+pub(crate) use checkpoint_schema::*;
 
 #[path = "support/checkpoint_projection.rs"]
 mod checkpoint_projection;

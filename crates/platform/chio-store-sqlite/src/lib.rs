@@ -14,7 +14,7 @@
 //! - [`receipt_store`] / [`receipt_query`] -- receipt persistence and the
 //!   query path.
 //! - [`budget_store`] -- durable budget state.
-//! - [`approval_store`] / [`batch_approval_store`] -- human-approval state.
+//! - [`approval_store`] -- human-approval state.
 //! - [`capability_lineage`] / [`revocation_store`] -- capability provenance and
 //!   revocation.
 //! - [`execution_nonce_store`] / [`dead_letters`] / [`iou_store`] -- nonce
@@ -35,7 +35,6 @@ pub mod admission_operation_store;
 mod agent_web_replay_store;
 pub mod approval_store;
 pub mod authority;
-pub mod batch_approval_store;
 pub mod budget_store;
 pub mod caller_execution_ledger;
 pub mod capability_lineage;
@@ -360,7 +359,6 @@ pub use agent_web_replay_store::{
 };
 pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
-pub use batch_approval_store::SqliteBatchApprovalStore;
 pub use budget_store::{BudgetStoreSnapshot, SqliteBudgetStore};
 pub use channel_lifecycle_store::{
     ChannelLifecycleStoreError, ChannelPreparedAdmissionRecordV1, ChannelPreparedBeginResult,

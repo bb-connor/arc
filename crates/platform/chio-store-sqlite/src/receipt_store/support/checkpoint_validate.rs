@@ -39,10 +39,10 @@ BEGIN
             AND NEW.batch_start_seq != 1
             THEN RAISE(ABORT, 'first checkpoint must start at entry_seq 1')
         WHEN NEW.checkpoint_seq = 1
-            AND json_extract(NEW.statement_json, '$.previous_checkpoint_sha256') IS NOT NULL
+            AND NEW.previous_checkpoint_sha256 IS NOT NULL
             THEN RAISE(ABORT, 'first checkpoint must not include a predecessor digest')
         WHEN NEW.checkpoint_seq > 1
-            AND json_extract(NEW.statement_json, '$.previous_checkpoint_sha256') IS NULL
+            AND NEW.previous_checkpoint_sha256 IS NULL
             THEN RAISE(ABORT, 'checkpoint predecessor digest is required')
         WHEN EXISTS (
             SELECT 1
@@ -77,6 +77,7 @@ pub(crate) struct PersistedCheckpointRow {
     pub(crate) statement_json: String,
     pub(crate) signature_hex: String,
     pub(crate) kernel_key_hex: String,
+    pub(crate) previous_checkpoint_sha256: Option<String>,
 }
 
 pub(crate) fn checkpoint_error_to_receipt_store(
@@ -210,7 +211,7 @@ pub(crate) fn load_persisted_checkpoint_row(
         .query_row(
             r#"
             SELECT id, checkpoint_seq, batch_start_seq, batch_end_seq, tree_size,
-                   merkle_root, issued_at, statement_json, signature, kernel_key
+                   merkle_root, issued_at, statement_json, signature, kernel_key, previous_checkpoint_sha256
             FROM kernel_checkpoints
             WHERE checkpoint_seq = ?1
             "#,
@@ -227,6 +228,7 @@ pub(crate) fn load_persisted_checkpoint_row(
                     row.get::<_, String>(7)?,
                     row.get::<_, String>(8)?,
                     row.get::<_, String>(9)?,
+                    row.get::<_, Option<String>>(10)?,
                 ))
             },
         )
@@ -243,6 +245,7 @@ pub(crate) fn load_persisted_checkpoint_row(
                 statement_json,
                 signature_hex,
                 kernel_key_hex,
+                previous_checkpoint_sha256,
             )| {
                 Ok(PersistedCheckpointRow {
                     id: sqlite_u64(id, "checkpoint id")?,
@@ -255,6 +258,7 @@ pub(crate) fn load_persisted_checkpoint_row(
                     statement_json,
                     signature_hex,
                     kernel_key_hex,
+                    previous_checkpoint_sha256,
                 })
             },
         )
@@ -282,14 +286,22 @@ pub(crate) fn load_latest_persisted_checkpoint_row(
 pub(crate) fn load_all_persisted_checkpoint_rows(
     connection: &Connection,
 ) -> Result<Vec<PersistedCheckpointRow>, ReceiptStoreError> {
-    let mut statement = connection.prepare(
+    load_checkpoint_rows_in_schema(connection, CheckpointSchema::Main)
+}
+
+pub(crate) fn load_checkpoint_rows_in_schema(
+    connection: &Connection,
+    schema: CheckpointSchema,
+) -> Result<Vec<PersistedCheckpointRow>, ReceiptStoreError> {
+    let name = schema.name();
+    let mut statement = connection.prepare(&format!(
         r#"
         SELECT id, checkpoint_seq, batch_start_seq, batch_end_seq, tree_size,
-               merkle_root, issued_at, statement_json, signature, kernel_key
-        FROM kernel_checkpoints
+               merkle_root, issued_at, statement_json, signature, kernel_key, previous_checkpoint_sha256
+        FROM {name}.kernel_checkpoints
         ORDER BY checkpoint_seq ASC
-        "#,
-    )?;
+        "#
+    ))?;
     let rows = statement.query_map([], |row| {
         Ok((
             row.get::<_, i64>(0)?,
@@ -302,6 +314,7 @@ pub(crate) fn load_all_persisted_checkpoint_rows(
             row.get::<_, String>(7)?,
             row.get::<_, String>(8)?,
             row.get::<_, String>(9)?,
+            row.get::<_, Option<String>>(10)?,
         ))
     })?;
 
@@ -317,6 +330,7 @@ pub(crate) fn load_all_persisted_checkpoint_rows(
             statement_json,
             signature_hex,
             kernel_key_hex,
+            previous_checkpoint_sha256,
         ) = row.map_err(ReceiptStoreError::from)?;
         Ok(PersistedCheckpointRow {
             id: sqlite_u64(id, "checkpoint id")?,
@@ -329,6 +343,7 @@ pub(crate) fn load_all_persisted_checkpoint_rows(
             statement_json,
             signature_hex,
             kernel_key_hex,
+            previous_checkpoint_sha256,
         })
     })
     .collect::<Result<Vec<_>, _>>()
@@ -336,6 +351,14 @@ pub(crate) fn load_all_persisted_checkpoint_rows(
 
 pub(crate) fn parse_persisted_checkpoint_row(
     row: PersistedCheckpointRow,
+) -> Result<KernelCheckpoint, ReceiptStoreError> {
+    let checkpoint = parse_checkpoint_signed_columns(&row)?;
+    ensure_checkpoint_predecessor_column(&row, &checkpoint.body)?;
+    Ok(checkpoint)
+}
+
+pub(crate) fn parse_checkpoint_signed_columns(
+    row: &PersistedCheckpointRow,
 ) -> Result<KernelCheckpoint, ReceiptStoreError> {
     let body: KernelCheckpointBody = serde_json::from_str(&row.statement_json)?;
     let signature = Signature::from_hex(&row.signature_hex)
@@ -415,6 +438,7 @@ pub(crate) fn ensure_checkpoint_columns_match_body(
     row: &PersistedCheckpointRow,
     body: &KernelCheckpointBody,
 ) -> Result<(), ReceiptStoreError> {
+    ensure_checkpoint_predecessor_column(row, body)?;
     if body.checkpoint_seq != row.checkpoint_seq {
         return Err(ReceiptStoreError::Conflict(format!(
             "checkpoint row seq {} does not match signed checkpoint_seq {}; run `chio receipt audit`",
@@ -1324,8 +1348,8 @@ pub(crate) fn insert_checkpoint_incremental_tx(
         r#"
         INSERT INTO kernel_checkpoints (
             checkpoint_seq, batch_start_seq, batch_end_seq, tree_size,
-            merkle_root, issued_at, statement_json, signature, kernel_key
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            merkle_root, issued_at, statement_json, signature, kernel_key, previous_checkpoint_sha256
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
         "#,
         params![
             sqlite_i64(checkpoint.body.checkpoint_seq, "checkpoint_seq")?,
@@ -1337,6 +1361,7 @@ pub(crate) fn insert_checkpoint_incremental_tx(
             statement_json,
             checkpoint.signature.to_hex(),
             checkpoint.body.kernel_key.to_hex(),
+            checkpoint.body.previous_checkpoint_sha256,
         ],
     )
     .map_err(|error| ReceiptStoreError::Conflict(format!("checkpoint append conflict: {error}")))?;
@@ -1568,4 +1593,17 @@ fn projection_set_drift(expected: &BTreeSet<u64>, existing: &BTreeSet<u64>) -> S
             .map(|value| value.to_string())
             .unwrap_or_else(|| "<none>".to_string())
     )
+}
+
+fn ensure_checkpoint_predecessor_column(
+    row: &PersistedCheckpointRow,
+    body: &KernelCheckpointBody,
+) -> Result<(), ReceiptStoreError> {
+    if row.previous_checkpoint_sha256 != body.previous_checkpoint_sha256 {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} predecessor column does not match signed body",
+            row.checkpoint_seq
+        )));
+    }
+    Ok(())
 }

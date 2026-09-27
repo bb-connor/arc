@@ -449,8 +449,8 @@ launch regression typechecks there and requires x86_64 to execute.
 - [x] Retain the `saturating_*` and `wrapping_*` inventory in the security crates,
       kernel and stores: 638 source lines at `4c35ce7867`, including fixtures.
 - [ ] Finish classifying each site as correct-by-intent or defect. The retained
-      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 60
-      sites (19 repaired sites); 578 remain explicitly pending.
+      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 101
+      sites (47 repaired sites); 537 remain explicitly pending.
 - [ ] A `wrapping_*` in an accounting, quota, counter or deadline path is a defect:
       fix it and add the regression.
 - [ ] A `saturating_sub` in an accounting path silently clamps to zero, hiding the
@@ -462,6 +462,9 @@ launch regression typechecks there and requires x86_64 to execute.
       [Authority/accounting continuation](../../reviews/2026-09-27-authority-accounting-execution.md)
       records atomic authority updates, checked expiry and holder/share arithmetic,
       and exact replication floors with rollback and contention regressions.
+      [Writer/checkpoint continuation](../../reviews/2026-09-27-writer-checkpoint-execution.md)
+      records command-owned writer accounting, exact claim counts and removal of
+      the unused pattern-based standing-approval API.
 
 **Exit:** Every clamping or wrapping operation in an accounting path is either
 fixed or justified in one line at the call site.
@@ -778,17 +781,21 @@ the 64 tenant-scoped tables, `receipt_store/bootstrap/open.rs` triggers.
 
 #### 10.4 One parser for signed data, and constrained columns (S4)
 
-- [ ] Bind `previous_checkpoint_sha256` from the verified typed struct as a
-      parameter and have the triggers copy the column instead of calling
-      `json_extract` on signed `statement_json`
-      (`receipt_store/bootstrap/open.rs:1361`, `:1376`, `:1379`, `:1400`).
-- [ ] Add a `CHECK` constraint on the projected chain-link columns' hex shape,
-      matching the discipline `cost_charged_be` already has at `open.rs:569`.
-- [ ] Leave `kernel_checkpoints_enforce_append_only` exactly as it is. Its
-      append-only structural enforcement is correct and is defense in depth at a
-      second mechanism, which the standard encourages.
-- [ ] Sequence with parent Packet 3's storage work; this touches receipt-store
-      schema and must not run concurrently with the retention changes.
+- [x] Bind `previous_checkpoint_sha256` from the verified typed struct as a
+      parameter. Projection triggers copy the column, with no JSON parser.
+- [x] Add nullable lowercase 64-character text CHECK constraints to checkpoint
+      and projected chain-link columns. Witness predecessors remain required.
+- [x] Preserve `kernel_checkpoints_enforce_append_only` structural enforcement.
+      Its two JSON presence lookups now use the typed predecessor column; all
+      sequence, genesis and continuity rules remain. Literal byte preservation
+      would conflict with the single-parser requirement.
+- [x] Sequence with Packet 3 in the same storage worktree. Schema version 7
+      verifies signed checkpoints during transactional upgrade and checks the
+      typed column on full and incremental reads, including archived evidence.
+
+[Writer/checkpoint execution evidence](../../reviews/2026-09-27-writer-checkpoint-execution.md)
+records local migration, restart, archive and malformed-column coverage. The
+other Packet 10 boundaries remain open.
 
 **Exit:** Poison policy is uniform and tested, untrusted serialized text is a type,
 every tenant-scoped table has a recorded and gated classification, and no signed

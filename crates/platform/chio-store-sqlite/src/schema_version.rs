@@ -371,7 +371,6 @@ mod tests {
         crate::SqliteRevocationStore::open(dir.path().join("revocation.db"))?;
         crate::SqliteBudgetStore::open(dir.path().join("budget.db"))?;
         crate::SqliteApprovalStore::open(dir.path().join("approval.db"))?;
-        crate::SqliteBatchApprovalStore::open(dir.path().join("batch.db"))?;
         crate::SqliteExecutionNonceStore::open(dir.path().join("nonce.db"))?;
         crate::SqliteMemoryProvenanceStore::open(dir.path().join("provenance.db"))?;
         crate::SqliteEncryptedBlobStore::open(dir.path().join("blob.db"))?;
@@ -381,7 +380,6 @@ mod tests {
             "revocation.db",
             "budget.db",
             "approval.db",
-            "batch.db",
             "nonce.db",
             "provenance.db",
             "blob.db",
