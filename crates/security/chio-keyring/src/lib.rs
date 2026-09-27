@@ -24,7 +24,7 @@ pub use ipc::*;
 pub use router::*;
 pub use runtime::*;
 pub use service::*;
-pub use sqlite::SqliteKeyLogStore;
+pub use sqlite::{KeyLogSyncSnapshot, SqliteKeyLogStore};
 pub use state::*;
 pub use store::*;
 pub use sync::*;
@@ -972,12 +972,20 @@ pub(crate) fn persist_or_validate_policy_binding(
 
 pub(crate) fn from_bounded_json<T>(bytes: &[u8]) -> Result<T>
 where
-    T: serde::de::DeserializeOwned,
+    T: serde::de::DeserializeOwned + serde::Serialize,
 {
     if bytes.len() > MAX_CANONICAL_RECORD_BYTES {
         return Err(KeyringError::Canonical(
             "canonical record exceeds 1048576 bytes".to_string(),
         ));
     }
-    Ok(serde_json::from_slice(bytes)?)
+    let decoded: T = serde_json::from_slice(bytes)?;
+    // These records are persisted and transported by canonical writers. Check
+    // the original bytes before verification; retain the signed u64 contract.
+    if chio_core_types::canonical_json_bytes(&decoded)?.as_slice() != bytes {
+        return Err(KeyringError::Canonical(
+            "record is not canonical JSON".to_owned(),
+        ));
+    }
+    Ok(decoded)
 }

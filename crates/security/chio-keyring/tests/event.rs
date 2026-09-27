@@ -13,6 +13,58 @@ fn backend(seed: u8) -> Ed25519Backend {
 }
 
 #[test]
+fn canonical_key_event_reader_rejects_alternate_encodings_of_a_signed_envelope() {
+    let event = genesis(&backend(1), &backend(2));
+    let canonical = event.canonical_envelope_bytes().test_unwrap();
+    let text = String::from_utf8(canonical.clone()).test_unwrap();
+    let escaped = text.replacen("event.genesis", r"event.\u0067enesis", 1);
+    let reordered = serde_json::to_string(&event).test_unwrap();
+    assert_ne!(escaped, text);
+    assert_ne!(reordered, text);
+    for alternate in [
+        format!(" {text}"),
+        escaped,
+        reordered,
+        serde_json::to_string_pretty(&event).test_unwrap(),
+    ] {
+        // These encodings decode into exactly the signed value. The boundary
+        // must reject them before they can be used as canonical stored bytes.
+        let decoded: SignedKeyLogEvent = serde_json::from_str(&alternate).test_unwrap();
+        assert_eq!(decoded, event);
+        assert_eq!(
+            decoded.envelope_hash().test_unwrap(),
+            event.envelope_hash().test_unwrap()
+        );
+        assert!(
+            matches!(SignedKeyLogEvent::from_canonical_envelope_bytes(alternate.as_bytes()),
+            Err(chio_keyring::KeyringError::Canonical(message))
+                if message == "record is not canonical JSON")
+        );
+    }
+    assert_eq!(
+        SignedKeyLogEvent::from_canonical_envelope_bytes(&canonical).test_unwrap(),
+        event
+    );
+}
+
+#[test]
+fn canonical_key_event_reader_preserves_signed_full_width_timestamps() {
+    let signer = backend(1);
+    for issued_at in [(1_u64 << 53) - 1, 1_u64 << 53, (1_u64 << 53) + 1, u64::MAX] {
+        let mut event = genesis(&signer, &backend(2));
+        event.body.issued_at = issued_at;
+        event.authorizations = KeyLogAuthorizations::bootstrap(
+            BootstrapAuthorization::sign(&event.body, &signer).test_unwrap(),
+        );
+        let canonical = event.canonical_envelope_bytes().test_unwrap();
+        let decoded = SignedKeyLogEvent::from_canonical_envelope_bytes(&canonical).test_unwrap();
+        assert_eq!(decoded.body.issued_at, issued_at);
+        assert_eq!(decoded, event);
+        assert_eq!(decoded.canonical_envelope_bytes().test_unwrap(), canonical);
+    }
+}
+
+#[test]
 fn recovery_authorizations_are_sorted_and_bounded_before_vector_growth() {
     let signer = backend(50);
     let body = genesis(&backend(1), &backend(2)).body;

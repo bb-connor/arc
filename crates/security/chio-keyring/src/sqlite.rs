@@ -1,6 +1,13 @@
 include!("sqlite_parts/part_01.rs");
 include!("sqlite_parts/part_02.rs");
 
+mod synchronization;
+pub use synchronization::KeyLogSyncSnapshot;
+
+#[cfg(test)]
+#[path = "sqlite/synchronization_tests.rs"]
+mod synchronization_tests;
+
 fn persist_state(
     connection: &Connection,
     state: &KeyLogState,

@@ -269,11 +269,10 @@ fn poll_once(
     let mut pending_operator_head = false;
     for _ in 0..MAX_AUDIT_SYNC_PAGES {
         let before = monitor.pin()?;
-        let synchronization = operator.synchronization_response(before.as_ref())?;
-        let target = operator.head_pin()?.ok_or(KeyringError::StateInvariant(
-            "operator key log is uninitialized",
-        ))?;
-        let pending_tail = operator.head_stage()? == Some(CheckpointStage::Pending)
+        let snapshot = operator.synchronization_snapshot(before.as_ref())?;
+        let synchronization = snapshot.response;
+        let target = snapshot.head;
+        let pending_tail = snapshot.head_stage == CheckpointStage::Pending
             && synchronization_is_pending_tail(&synchronization, &target, policy)?;
         let operator_pin = match monitor.poll(&synchronization) {
             Ok(pin) => pin,
