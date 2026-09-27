@@ -30,3 +30,5 @@ pub use state_machine::{
     EffectMutationRequest, EffectReceiptContext, FreezeBindingField, PlanDefect, RecordDefect,
     ResponseStateMachine, ResponseTransitionRequest, StateMachineError,
 };
+
+pub mod simulation;

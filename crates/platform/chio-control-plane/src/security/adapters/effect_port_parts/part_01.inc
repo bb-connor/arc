@@ -6,25 +6,26 @@ use chio_quarantine::decode_response_record;
 use chio_security_types::ports::{
     capability_set_suspension_installed_version_hash, capability_set_suspension_version_hash,
     containment_installed_version_hash, containment_overlay_version_hash,
-    containment_session_target, empty_capability_set_suspension_snapshot,
+    containment_session_target, egress_snapshot_version_hash,
+    empty_capability_set_suspension_snapshot, empty_egress_restriction_snapshot,
     empty_issuance_freeze_snapshot, empty_session_throttle_snapshot,
     issuance_freeze_installed_version_hash, issuance_freeze_version_hash,
     predict_capability_set_suspension_apply, predict_capability_set_suspension_remove,
-    predict_containment_overlay_apply, predict_containment_overlay_remove,
-    predict_issuance_freeze_apply, predict_issuance_freeze_remove, predict_session_throttle_apply,
-    predict_session_throttle_remove, response_affected_set_hash,
+    predict_containment_overlay_apply, predict_containment_overlay_remove, predict_egress_apply,
+    predict_egress_removal, predict_issuance_freeze_apply, predict_issuance_freeze_remove,
+    predict_session_throttle_apply, predict_session_throttle_remove, response_affected_set_hash,
     session_throttle_installed_version_hash, session_throttle_version_hash,
     validate_capability_set_suspension_snapshot, validate_containment_overlay_snapshot,
-    validate_issuance_freeze_contribution, validate_issuance_freeze_snapshot,
-    validate_session_throttle_snapshot, AlertDeliveryQuery, AlertDeliveryStatus, BlastRadiusPort,
-    BlastRadiusResult, CanonicalBody, CapabilitySetSuspensionApplyRequest,
-    CapabilitySetSuspensionCommand, CapabilitySetSuspensionContribution,
-    CapabilitySetSuspensionKey, CapabilitySetSuspensionRemoveRequest,
-    CapabilitySetSuspensionSnapshot, CapabilitySetSuspensionSpec, CapabilitySetSuspensionStore,
-    ContainmentOverlayCommand, ContainmentOverlayStore, Digest32, EffectExecutionStatus, EffectId,
-    EffectOperation, EffectPort, EffectRequest, EffectResult, EffectResultQuery,
-    EgressDeniedDestinations, EgressDestinationSet, EgressRestrictionApplyRequest,
-    EgressRestrictionCommand, EgressRestrictionContribution, EgressRestrictionContributions,
+    validate_egress_restriction_snapshot, validate_issuance_freeze_contribution,
+    validate_issuance_freeze_snapshot, validate_session_throttle_snapshot, AlertDeliveryQuery,
+    AlertDeliveryStatus, BlastRadiusPort, BlastRadiusResult, CanonicalBody,
+    CapabilitySetSuspensionApplyRequest, CapabilitySetSuspensionCommand,
+    CapabilitySetSuspensionContribution, CapabilitySetSuspensionKey,
+    CapabilitySetSuspensionRemoveRequest, CapabilitySetSuspensionSnapshot,
+    CapabilitySetSuspensionSpec, CapabilitySetSuspensionStore, ContainmentOverlayCommand,
+    ContainmentOverlayStore, Digest32, EffectExecutionStatus, EffectId, EffectOperation,
+    EffectPort, EffectRequest, EffectResult, EffectResultQuery, EgressDestinationSet,
+    EgressRestrictionApplyRequest, EgressRestrictionCommand, EgressRestrictionContribution,
     EgressRestrictionRemoveRequest, EgressRestrictionSessionKey, EgressRestrictionSnapshot,
     EgressRestrictionStore, IssuanceFreezeApplyRequest, IssuanceFreezeCommand,
     IssuanceFreezeContribution, IssuanceFreezeFenceMaintenanceRequest, IssuanceFreezeKey,
@@ -43,11 +44,10 @@ use chio_security_types::{
     ResponseEffectKind, ResponseEffectProgress, ResponseSnapshot, ResponseState, ResponseTarget,
 };
 use chio_store_sqlite::security_state::SqliteSecurityStateStore;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use super::native_evidence::SqliteSiemOutbox;
 
-const EGRESS_VERSION_DOMAIN: &[u8] = b"chio.response-effect-egress-state.v1\0";
 const INSTALLED_EGRESS_CONTRIBUTION_DOMAIN: &[u8] =
     b"chio.response-effect-egress-contribution.v1\0";
 const EFFECT_COMMAND_ID_PREFIX: &str = "response_effect_command:";

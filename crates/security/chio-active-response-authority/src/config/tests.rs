@@ -109,6 +109,27 @@ fn combined_deployment_requires_and_authenticates_response_execution_mode() {
 }
 
 #[test]
+fn response_dry_run_profile_requires_the_configured_simulator() {
+    let mut configured = deployment();
+    assert!(matches!(
+        configured
+            .response_execution_profile(None)
+            .test_expect("live profile"),
+        chio_control_plane::security::ActiveResponseExecutionProfile::Live
+    ));
+    configured.response_authority.response_execution_mode = ResponseExecutionMode::DryRun;
+    let digest = configured
+        .compute_deployment_digest()
+        .test_expect("dry-run digest");
+    configured.deployment_digest = digest;
+    configured.response_authority.deployment_digest = digest;
+    let result = configured.response_execution_profile(None);
+    assert!(
+        matches!(result, Err(AuthorityError::InvalidConfig(reason)) if reason.contains("execution profile"))
+    );
+}
+
+#[test]
 fn runtime_config_rejects_same_process_role_aliasing() {
     let original = deployment();
     let authority = original.response_authority.service_identity;

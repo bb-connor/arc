@@ -68,7 +68,10 @@ impl AuthorityDaemonRuntime {
             config.store_digest,
             &config.authority_identity,
         )?);
-        let handler = Arc::new(PreAdmittedAuthorityHandler::new(store));
+        let handler = Arc::new(PreAdmittedAuthorityHandler::new(
+            store,
+            config.response_execution_mode,
+        ));
         let signer: Arc<dyn SigningBackend> = Arc::new(Ed25519Backend::new(keypair));
         let server = Arc::new(
             ActiveResponseAuthorityProtocolServer::new(
@@ -448,6 +451,7 @@ mod tests {
                     Arc::new(Ed25519Backend::new(Keypair::from_seed(&[0x62; 32]))),
                     Arc::new(PanicOnHealthHandler(PreAdmittedAuthorityHandler::new(
                         store,
+                        config.response_execution_mode,
                     ))),
                 )
                 .test_expect("build panic-injecting authority server"),

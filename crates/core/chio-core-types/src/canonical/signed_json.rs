@@ -1,6 +1,6 @@
-//! Lossless parsing for established signed typed-JSON formats.
+//! Lossless parsing for signed typed JSON.
 //! Keep full-width integer tokens. Reject duplicate keys before they disappear
-//! into a map, and numeric spellings neither existing writer could emit.
+//! into a map, and numeric spellings neither canonical nor typed writers can emit.
 
 use alloc::{
     format,
@@ -11,15 +11,12 @@ use alloc::{
 use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde_json::{Map, Number, Value};
 
-/// Parse established signed JSON formats without discarding duplicate keys or
-/// numeric precision. This preserves both canonical and ordinary typed-writer
-/// number spellings, including full-width integers and integer-valued floats.
+/// Parse signed typed JSON without discarding duplicate keys or numeric
+/// precision, including full-width integers and integer-valued floats.
 /// Whitespace and object ordering are immaterial. No signature is verified here.
-///
-/// Use this compatibility contract only for existing formats whose typed writer
-/// already permits these numbers. New I-JSON protocols should use
-/// [`super::canonical_json_bytes_from_str`] and its narrower number domain.
-pub fn parse_legacy_signed_json(input: &str) -> crate::error::Result<Value> {
+/// The verifier must reconstruct the typed signing body and verify its signature.
+/// Protocols constrained to I-JSON use [`super::canonical_json_bytes_from_str`].
+pub fn parse_signed_json(input: &str) -> crate::error::Result<Value> {
     parse(input).map_err(crate::error::Error::CanonicalJson)
 }
 

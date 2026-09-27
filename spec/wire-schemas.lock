@@ -4575,6 +4575,11 @@ files = ["crates/core/chio-core-types/src/capability/governance.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
+value = "chio.response-simulation.v1"
+files = ["crates/security/chio-security-types/src/response_simulation.rs"]
+first_seen = "93277b4209"
+
+[[schema]]
 value = "chio.response.digest.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/products/chio-proof-room/src/lib.rs"]
 first_seen = "1b9620751d"

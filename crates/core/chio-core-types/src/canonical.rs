@@ -26,9 +26,9 @@ use serde_json::{Map, Value};
 
 use crate::error::{Error, Result};
 
-#[path = "canonical/legacy_json.rs"]
-mod legacy_json;
-pub use legacy_json::parse_legacy_signed_json;
+#[path = "canonical/signed_json.rs"]
+mod signed_json;
+pub use signed_json::parse_signed_json;
 
 /// Largest integer magnitude permitted for interoperable JSON exchange
 /// (`2^53 - 1`). RFC 7493 (I-JSON) §2.2 requires integers to fall within

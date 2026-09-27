@@ -10,7 +10,7 @@ use crate::threshold_approval::ThresholdApprovalProposal;
 use super::active_response_admission::{
     ActiveResponseSubmissionProof, VerifiedActiveResponseBindings,
 };
-use super::active_response_coordinator::ActiveResponseAdmissionRequest;
+use super::active_response_simulation::ActiveResponseApprovalInputs;
 use super::{ChioKernel, KernelError};
 
 pub const ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA: &str =
@@ -313,7 +313,7 @@ impl ChioKernel {
 
     pub(super) fn verify_active_response_artifact_authority_attestation(
         &self,
-        request: &ActiveResponseAdmissionRequest,
+        request: &(impl ActiveResponseApprovalInputs + ?Sized),
         bindings: &VerifiedActiveResponseBindings,
         now_unix_ms: u64,
     ) -> Result<(), KernelError> {

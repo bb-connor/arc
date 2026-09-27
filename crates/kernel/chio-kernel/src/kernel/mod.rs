@@ -1,3 +1,7 @@
+mod active_response_simulation;
+pub use active_response_simulation::{
+    ActiveResponseSimulationRequest, VerifiedResponseSimulationAuthorization,
+};
 use std::sync::Arc;
 
 use chio_appraisal::VerifiedRuntimeAttestationRecord;

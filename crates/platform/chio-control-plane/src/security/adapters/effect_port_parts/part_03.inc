@@ -56,6 +56,7 @@ impl RestrictEgressOverlayBackend {
         } else if egress_snapshot_version_hash(&current)? != request.expected_version_hash {
             return Err(PortError::conflict());
         }
+        let predicted = predict_egress_apply(&current, &desired, request.scheduler_fencing_token)?;
         let result = egress_installed_result(request, &key, &desired, true)?;
         let applied =
             self.restrictions
@@ -71,6 +72,7 @@ impl RestrictEgressOverlayBackend {
                     },
                 })?;
         validate_egress_restriction_snapshot(&applied, &key)?;
+        if applied != predicted { return Err(PortError::integrity_failure()); }
         let stored = applied
             .contributions
             .as_slice()
@@ -272,37 +274,6 @@ fn valid_egress_effect_result(
     &result.effect_id == effect_id && result.applied == matches!(operation, EffectOperation::Apply)
 }
 
-fn predict_egress_removal(
-    current: &EgressRestrictionSnapshot,
-    effect_id: &chio_security_types::ports::EffectId,
-    scheduler_fencing_token: u64,
-) -> PortResult<EgressRestrictionSnapshot> {
-    let mut contributions = current.contributions.as_slice().to_vec();
-    let before = contributions.len();
-    contributions.retain(|contribution| &contribution.effect_id != effect_id);
-    let generation = if contributions.len() == before {
-        current.generation
-    } else {
-        current
-            .generation
-            .checked_add(1)
-            .ok_or_else(PortError::integrity_failure)?
-    };
-    let mut denied = BTreeSet::new();
-    for contribution in &contributions {
-        denied.extend(contribution.destinations.as_slice().iter().cloned());
-    }
-    Ok(EgressRestrictionSnapshot {
-        key: current.key.clone(),
-        generation,
-        contributions: EgressRestrictionContributions::new(contributions)
-            .map_err(|_| PortError::integrity_failure())?,
-        denied_destinations: EgressDeniedDestinations::new(denied.into_iter().collect())
-            .map_err(|_| PortError::integrity_failure())?,
-        highest_fencing_token: current.highest_fencing_token.max(scheduler_fencing_token),
-    })
-}
-
 /// Reads and commits to the exact destination-restriction version observed by a plan.
 pub fn egress_restriction_version_hash(
     restrictions: &dyn EgressRestrictionStore,
@@ -318,20 +289,6 @@ pub fn egress_restriction_version_hash(
     egress_snapshot_version_hash(&snapshot)
 }
 
-fn empty_egress_restriction_snapshot(
-    key: EgressRestrictionSessionKey,
-) -> PortResult<EgressRestrictionSnapshot> {
-    Ok(EgressRestrictionSnapshot {
-        key,
-        generation: 0,
-        contributions: EgressRestrictionContributions::new(Vec::new())
-            .map_err(|_| PortError::integrity_failure())?,
-        denied_destinations: EgressDeniedDestinations::new(Vec::new())
-            .map_err(|_| PortError::integrity_failure())?,
-        highest_fencing_token: 0,
-    })
-}
-
 fn decode_egress_restriction(body: &CanonicalBody) -> PortResult<RestrictEgressContribution> {
     let contribution: RestrictEgressContribution =
         serde_json::from_slice(body.as_bytes()).map_err(|_| PortError::invalid_data())?;
@@ -341,61 +298,6 @@ fn decode_egress_restriction(body: &CanonicalBody) -> PortResult<RestrictEgressC
         return Err(PortError::integrity_failure());
     }
     Ok(contribution)
-}
-
-fn validate_egress_restriction_snapshot(
-    snapshot: &EgressRestrictionSnapshot,
-    expected_key: &EgressRestrictionSessionKey,
-) -> PortResult<()> {
-    if &snapshot.key != expected_key {
-        return Err(PortError::integrity_failure());
-    }
-    let contributions = snapshot.contributions.as_slice();
-    if contributions
-        .windows(2)
-        .any(|pair| pair[0].effect_id >= pair[1].effect_id)
-        || (snapshot.highest_fencing_token == 0 && !contributions.is_empty())
-        || snapshot.generation
-            < u64::try_from(contributions.len()).map_err(|_| PortError::integrity_failure())?
-    {
-        return Err(PortError::integrity_failure());
-    }
-    let mut recomputed = BTreeSet::new();
-    for contribution in contributions {
-        if contribution.expires_at_unix_ms == 0 {
-            return Err(PortError::integrity_failure());
-        }
-        recomputed.extend(contribution.destinations.as_slice().iter().cloned());
-    }
-    let recomputed = EgressDeniedDestinations::new(recomputed.into_iter().collect())
-        .map_err(|_| PortError::integrity_failure())?;
-    if recomputed != snapshot.denied_destinations {
-        return Err(PortError::integrity_failure());
-    }
-    Ok(())
-}
-
-#[derive(Serialize)]
-#[serde(deny_unknown_fields)]
-struct EgressVersionCommitment<'a> {
-    schema_version: u8,
-    key: &'a EgressRestrictionSessionKey,
-    generation: u64,
-    contributions: &'a EgressRestrictionContributions,
-    denied_destinations: &'a EgressDeniedDestinations,
-}
-
-fn egress_snapshot_version_hash(snapshot: &EgressRestrictionSnapshot) -> PortResult<Digest32> {
-    domain_hash(
-        EGRESS_VERSION_DOMAIN,
-        &EgressVersionCommitment {
-            schema_version: 1,
-            key: &snapshot.key,
-            generation: snapshot.generation,
-            contributions: &snapshot.contributions,
-            denied_destinations: &snapshot.denied_destinations,
-        },
-    )
 }
 
 #[derive(Serialize)]

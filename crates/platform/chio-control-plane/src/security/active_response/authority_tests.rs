@@ -5,16 +5,9 @@ use super::{
 };
 
 #[test]
-fn committed_legacy_admission_prepares_and_recovers_its_dispatch() {
+fn committed_live_admission_prepares_and_recovers_its_dispatch() {
     let harness = Harness::new();
     let mut request = harness.governed_request();
-    request.response_plan.execution = chio_security_types::PlanProvenance::Legacy;
-    let body = serde_json::to_value(request.response_plan.authorization_body())
-        .unwrap_or_else(|error| panic!("legacy authorization body: {error}"));
-    let hash = chio_core::capability::governance::GovernedResponsePlanIntentBody::compute_plan_body_digest(&body)
-        .unwrap_or_else(|error| panic!("legacy authorization digest: {error}"));
-    request.response_plan.plan_hash = chio_security_types::ports::Digest32::new(*hash.as_bytes());
-    request.plan_body_hash = hash.to_hex();
     request.origin = ActiveResponseExecutionOrigin::CommittedAdmission;
     request.dispatch_id = super::derive_active_response_dispatch_id(
         &request.response_plan,
@@ -25,16 +18,16 @@ fn committed_legacy_admission_prepares_and_recovers_its_dispatch() {
         request.authorized_at_unix_ms,
         &request.approval,
     )
-    .unwrap_or_else(|error| panic!("legacy dispatch identity: {error}"));
+    .unwrap_or_else(|error| panic!("live dispatch identity: {error}"));
 
     let first = require_success(
         harness.executor.execute_source(&request),
-        "legacy committed admission",
+        "live committed admission",
     );
     request.origin = ActiveResponseExecutionOrigin::CommittedDispatch;
     let recovered = require_success(
         harness.executor.execute_source(&request),
-        "legacy committed dispatch replay",
+        "live committed dispatch replay",
     );
     assert_eq!(recovered.proof_evidence_id(), first.proof_evidence_id());
     assert_eq!(recovered.response_record(), first.response_record());

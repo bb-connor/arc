@@ -1,5 +1,11 @@
 # Security execution dispatch
 
+> September 27 execution update: the user's no-compatibility directive supersedes
+> `PlanProvenance` and obligation-retirement work. Every response plan requires a
+> signed execution binding, including committed recovery. Continue inline with
+> focused checks and no delegated lanes. Current implementation and verification:
+> [production response simulation](../../reviews/2026-09-27-production-response-simulation.md).
+
 How the [closeout plan](2026-09-25-security-assurance-closeout.md) and the
 [engineering excellence addendum](2026-09-26-security-engineering-excellence.md)
 are executed as concurrent lanes under one orchestrator, against the

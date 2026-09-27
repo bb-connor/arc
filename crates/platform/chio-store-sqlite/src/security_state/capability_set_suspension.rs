@@ -329,7 +329,7 @@ fn load_members(
     RecordIdSet::new(members).map_err(|_| PortError::integrity_failure())
 }
 
-fn load_snapshot(
+pub(super) fn load_snapshot(
     connection: &Connection,
     key: &CapabilitySetSuspensionKey,
 ) -> PortResult<CapabilitySetSuspensionSnapshot> {

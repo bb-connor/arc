@@ -73673,10 +73673,10 @@ pub mod security_cage_init_plan_v2 {
     ///  "minItems": 1,
     ///  "prefixItems": [
     ///    {
-    ///      "maxLength": 16384,
+    ///      "type": "string",
     ///      "minLength": 1,
-    ///      "pattern": "^[^\\u0000]*$",
-    ///      "type": "string"
+    ///      "maxLength": 16384,
+    ///      "pattern": "^[^\\u0000]*$"
     ///    }
     ///  ]
     ///}
@@ -85734,10 +85734,10 @@ pub mod security_cage_receipt_metadata_v1 {
     ///  "minItems": 1,
     ///  "prefixItems": [
     ///    {
-    ///      "maxLength": 16384,
+    ///      "type": "string",
     ///      "minLength": 1,
-    ///      "pattern": "^[^\\u0000]*$",
-    ///      "type": "string"
+    ///      "maxLength": 16384,
+    ///      "pattern": "^[^\\u0000]*$"
     ///    }
     ///  ]
     ///}
@@ -100211,11 +100211,11 @@ pub mod security_key_log_sync_response_v1 {
     ///      },
     ///      "additionalProperties": false,
     ///      "dependentRequired": {
-    ///        "recovery_policy_binding": [
-    ///          "recovery_policy_id"
-    ///        ],
     ///        "recovery_policy_id": [
     ///          "recovery_policy_binding"
+    ///        ],
+    ///        "recovery_policy_binding": [
+    ///          "recovery_policy_id"
     ///        ]
     ///      }
     ///    },
@@ -113158,10 +113158,10 @@ pub mod security_mcp_cage_launch_policy_v2 {
     ///      "minItems": 1,
     ///      "prefixItems": [
     ///        {
-    ///          "maxLength": 16384,
+    ///          "type": "string",
     ///          "minLength": 1,
-    ///          "pattern": "^[^\\u0000]*$",
-    ///          "type": "string"
+    ///          "maxLength": 16384,
+    ///          "pattern": "^[^\\u0000]*$"
     ///        }
     ///      ]
     ///    },
@@ -114081,10 +114081,10 @@ pub mod security_mcp_cage_launch_policy_v2 {
     ///  "minItems": 1,
     ///  "prefixItems": [
     ///    {
-    ///      "maxLength": 16384,
+    ///      "type": "string",
     ///      "minLength": 1,
-    ///      "pattern": "^[^\\u0000]*$",
-    ///      "type": "string"
+    ///      "maxLength": 16384,
+    ///      "pattern": "^[^\\u0000]*$"
     ///    }
     ///  ]
     ///}
@@ -121059,6 +121059,7 @@ pub mod security_response_plan_v1 {
     ///    "approval_requirement",
     ///    "created_at_unix_ms",
     ///    "effects",
+    ///    "execution",
     ///    "expires_at_unix_ms",
     ///    "operator_capability",
     ///    "plan_hash",
@@ -121143,6 +121144,9 @@ pub mod security_response_plan_v1 {
     ///      "maxItems": 64,
     ///      "minItems": 1
     ///    },
+    ///    "execution": {
+    ///      "$ref": "#/$defs/executionBinding"
+    ///    },
     ///    "expires_at_unix_ms": {
     ///      "$ref": "#/$defs/time"
     ///    },
@@ -121193,6 +121197,7 @@ pub mod security_response_plan_v1 {
         pub approval_requirement: ApprovalRequirement,
         pub created_at_unix_ms: Time,
         pub effects: ::std::vec::Vec<ChioResponseEffectV1>,
+        pub execution: ExecutionBinding,
         pub expires_at_unix_ms: Time,
         pub operator_capability: OperatorCapability,
         pub plan_hash: Digest,
@@ -121250,6 +121255,175 @@ pub mod security_response_plan_v1 {
     impl ::std::convert::From<[u8; 32usize]> for Digest {
         fn from(value: [u8; 32usize]) -> Self {
             Self(value)
+        }
+    }
+    ///`ExecutionBinding`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "mode",
+    ///    "schema_version"
+    ///  ],
+    ///  "properties": {
+    ///    "mode": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "dry_run",
+    ///        "live"
+    ///      ]
+    ///    },
+    ///    "schema_version": {
+    ///      "type": "integer",
+    ///      "enum": [
+    ///        1
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ExecutionBinding {
+        pub mode: ExecutionBindingMode,
+        pub schema_version: ExecutionBindingSchemaVersion,
+    }
+    impl ::std::convert::From<&ExecutionBinding> for ExecutionBinding {
+        fn from(value: &ExecutionBinding) -> Self {
+            value.clone()
+        }
+    }
+    ///`ExecutionBindingMode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "dry_run",
+    ///    "live"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ExecutionBindingMode {
+        #[serde(rename = "dry_run")]
+        DryRun,
+        #[serde(rename = "live")]
+        Live,
+    }
+    impl ::std::convert::From<&Self> for ExecutionBindingMode {
+        fn from(value: &ExecutionBindingMode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ExecutionBindingMode {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::DryRun => f.write_str("dry_run"),
+                Self::Live => f.write_str("live"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ExecutionBindingMode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "dry_run" => Ok(Self::DryRun),
+                "live" => Ok(Self::Live),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ExecutionBindingMode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ExecutionBindingMode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ExecutionBindingMode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ExecutionBindingSchemaVersion`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "enum": [
+    ///    1
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct ExecutionBindingSchemaVersion(i64);
+    impl ::std::ops::Deref for ExecutionBindingSchemaVersion {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ExecutionBindingSchemaVersion> for i64 {
+        fn from(value: ExecutionBindingSchemaVersion) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ExecutionBindingSchemaVersion> for ExecutionBindingSchemaVersion {
+        fn from(value: &ExecutionBindingSchemaVersion) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::TryFrom<i64> for ExecutionBindingSchemaVersion {
+        type Error = self::error::ConversionError;
+        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if ![1_i64].contains(&value) {
+                Err("invalid value".into())
+            } else {
+                Ok(Self(value))
+            }
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ExecutionBindingSchemaVersion {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            Self::try_from(<i64>::deserialize(deserializer)?)
+                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
         }
     }
     ///`Identifier`

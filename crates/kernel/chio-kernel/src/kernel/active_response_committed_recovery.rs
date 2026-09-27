@@ -371,7 +371,7 @@ impl ChioKernel {
     ) -> Result<DispatchCommittedActiveResponseResume, KernelError> {
         validate_executable_response_plan_value(response_plan)?;
         response_plan
-            .require_live_or_legacy_execution()
+            .require_live_execution()
             .map_err(|error| committed_resume_denied(error.to_string()))?;
         let (expected_executor, execution_approval) =
             validate_prepared_binding(response_plan, binding)?;
@@ -832,7 +832,7 @@ impl ChioKernel {
         executor: &ActiveResponseExecutorAuthorityIdentity,
         committed: &ActiveResponseCommittedDispatch,
     ) -> Result<CommittedDispatchAuthority, KernelError> {
-        plan.require_live_or_legacy_execution()
+        plan.require_live_execution()
             .map_err(|error| committed_recovery_denied(error.to_string()))?;
         let execution = validate_committed_dispatch(plan, dispatch_id, executor, committed)?;
         let approval = self.validate_committed_governed_operation(&execution)?;

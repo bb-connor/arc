@@ -782,7 +782,7 @@ fn read_existing_signed_manifest(path: &Path) -> Result<SignedManifest, Verified
         path: path.to_path_buf(),
         source: std::io::Error::new(std::io::ErrorKind::InvalidData, source),
     })?;
-    let value = chio_core::canonical::parse_legacy_signed_json(text).map_err(|source| {
+    let value = chio_core::canonical::parse_signed_json(text).map_err(|source| {
         VerifiedManifestLoadError::CanonicalInput {
             path: path.to_path_buf(),
             source,

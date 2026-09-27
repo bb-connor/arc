@@ -19,10 +19,9 @@ use thiserror::Error;
 use tokio::sync::watch;
 
 use super::adapters::{
-    effect_port::ActiveResponseEffectPort, DeclassificationReceiptDrainReport,
-    DeclassificationReceiptOutboxDrainer, NativeActiveResponseFindingAuthority,
-    NativeFindingAuthorityConfigError, NativeSchedulerHealthPort, NativeSecurityReceiptSink,
-    SqliteSiemOutbox,
+    DeclassificationReceiptDrainReport, DeclassificationReceiptOutboxDrainer,
+    NativeActiveResponseFindingAuthority, NativeFindingAuthorityConfigError,
+    NativeSchedulerHealthPort, NativeSecurityReceiptSink, SqliteSiemOutbox,
 };
 use super::event_consumer::{
     AttestedFindingBatchPlanner, AttestedFindingResponseCoordinator,
@@ -756,11 +755,12 @@ impl ProductionActiveDefenseOrchestrator {
             &context.clock,
         )?;
         let security_store = Arc::clone(context.security_state_authority.store());
-        let effects: Arc<dyn EffectPort> = Arc::new(ActiveResponseEffectPort::production(
-            Arc::clone(&security_store),
+        let effects = super::response_simulation::production_response_effects(
+            context.response_coordinator.execution_mode(),
+            security_store,
             Arc::clone(&alert_outbox),
             blast_radius,
-        )?);
+        )?;
         let alerts: Arc<dyn SecurityAlertPort> = alert_outbox;
         Self::new_with_lifecycle(context, effects, alerts)
     }

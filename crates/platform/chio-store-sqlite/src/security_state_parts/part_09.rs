@@ -68,6 +68,7 @@ fn response_completion_state(value: &str) -> PortResult<AttestedFindingResponseC
         "outcome_unknown_after_dispatch" => {
             Ok(AttestedFindingResponseCompletionState::OutcomeUnknownAfterDispatch)
         }
+        "simulated" => Ok(AttestedFindingResponseCompletionState::Simulated),
         "completed" => Ok(AttestedFindingResponseCompletionState::Completed),
         _ => Err(PortError::integrity_failure()),
     }
@@ -81,6 +82,7 @@ fn response_completion_state_name(value: AttestedFindingResponseCompletionState)
             "outcome_unknown_after_dispatch"
         }
         AttestedFindingResponseCompletionState::Completed => "completed",
+        AttestedFindingResponseCompletionState::Simulated => "simulated",
     }
 }
 
@@ -89,9 +91,7 @@ fn response_completion_outcome(
 ) -> PortResult<AttestedFindingResponseCompletionOutcome> {
     match value {
         "activated" => Ok(AttestedFindingResponseCompletionOutcome::Activated),
-        "failed_before_effect" => {
-            Ok(AttestedFindingResponseCompletionOutcome::FailedBeforeEffect)
-        }
+        "failed_before_effect" => Ok(AttestedFindingResponseCompletionOutcome::FailedBeforeEffect),
         "rolled_back_after_partial" => {
             Ok(AttestedFindingResponseCompletionOutcome::RolledBackAfterPartial)
         }
@@ -187,6 +187,20 @@ fn validate_attested_finding_response_outbox_record(
         }
         _ => false,
     };
+    let simulation = record.completion_state == AttestedFindingResponseCompletionState::Simulated;
+    if simulation
+        && !record.publication.as_ref().is_some_and(|p| {
+            p.body.response_plan.execution.mode()
+                == chio_security_types::ResponseExecutionMode::DryRun
+        })
+        || (record.prepared_dispatch_binding.is_some()
+            && record
+                .publication
+                .as_ref()
+                .is_none_or(|p| p.body.response_plan.require_live_execution().is_err()))
+    {
+        return Err(PortError::integrity_failure());
+    }
     let execution_state_valid = match (
         record.admission_state,
         record.completion_state,
@@ -195,7 +209,8 @@ fn validate_attested_finding_response_outbox_record(
     ) {
         (
             AttestedFindingResponseAdmissionState::Pending,
-            AttestedFindingResponseCompletionState::NotStarted,
+            AttestedFindingResponseCompletionState::NotStarted
+            | AttestedFindingResponseCompletionState::Simulated,
             None,
             None,
         )
@@ -237,27 +252,34 @@ fn validate_attested_finding_response_outbox_record(
         }
         _ => false,
     };
-    let completion_evidence_valid = matches!(
-        (
-        record.completion_state,
-        record.completion_outcome,
-        record.completion_evidence_id.as_ref(),
-        record.completion_evidence_body_hash.as_ref(),
-        ),
-        (
-            AttestedFindingResponseCompletionState::Completed,
-            Some(_),
-            Some(_),
-            Some(_),
-        ) | (
-            AttestedFindingResponseCompletionState::NotStarted
-            | AttestedFindingResponseCompletionState::Pending
-            | AttestedFindingResponseCompletionState::OutcomeUnknownAfterDispatch,
-            None,
-            None,
-            None,
-        )
-    );
+    let completion_evidence_valid = (simulation
+        && record.admission_artifact_digest.is_some()
+        && record.completion_outcome.is_none()
+        && record.completion_evidence_id.is_some()
+        && record
+            .completion_evidence_body_hash
+            .is_some_and(|hash| !hash.is_zero()))
+        || matches!(
+            (
+                record.completion_state,
+                record.completion_outcome,
+                record.completion_evidence_id.as_ref(),
+                record.completion_evidence_body_hash.as_ref(),
+            ),
+            (
+                AttestedFindingResponseCompletionState::Completed,
+                Some(_),
+                Some(_),
+                Some(_),
+            ) | (
+                AttestedFindingResponseCompletionState::NotStarted
+                    | AttestedFindingResponseCompletionState::Pending
+                    | AttestedFindingResponseCompletionState::OutcomeUnknownAfterDispatch,
+                None,
+                None,
+                None,
+            )
+        );
     if !publication_valid
         || !prepared_binding_valid
         || !execution_state_valid
@@ -314,17 +336,15 @@ fn decode_attested_finding_response_outbox_row(
 ) -> PortResult<AttestedFindingResponseOutboxRecord> {
     let tenant_id = TenantId::new(stored.tenant_id).map_err(|_| PortError::integrity_failure())?;
     let batch_id = RecordId::new(stored.batch_id).map_err(|_| PortError::integrity_failure())?;
-    let ordinal = u32::try_from(from_i64(stored.ordinal)?)
-        .map_err(|_| PortError::integrity_failure())?;
+    let ordinal =
+        u32::try_from(from_i64(stored.ordinal)?).map_err(|_| PortError::integrity_failure())?;
     let binding = chio_security_types::ports::AttestedFindingBatchBinding {
         tenant_id,
         evidence_id: OpaqueReceiptRef::new(stored.evidence_id)
             .map_err(|_| PortError::integrity_failure())?,
-        finding_id: RecordId::new(stored.finding_id)
-            .map_err(|_| PortError::integrity_failure())?,
+        finding_id: RecordId::new(stored.finding_id).map_err(|_| PortError::integrity_failure())?,
         finding_hash: decode_digest(stored.finding_hash)?,
-        action_id: ActionId::new(stored.action_id)
-            .map_err(|_| PortError::integrity_failure())?,
+        action_id: ActionId::new(stored.action_id).map_err(|_| PortError::integrity_failure())?,
         reservation_id: RecordId::new(stored.reservation_id)
             .map_err(|_| PortError::integrity_failure())?,
     };
@@ -480,7 +500,8 @@ fn validate_attested_finding_response_outbox_schema(connection: &Connection) -> 
     )? || table_has_foreign_key_violation(
         connection,
         "security_attested_finding_response_outbox",
-    )? || !attested_finding_response_outbox_is_one_to_one(connection)? {
+    )? || !attested_finding_response_outbox_is_one_to_one(connection)?
+    {
         return Err(PortError::integrity_failure());
     }
     Ok(())
@@ -539,7 +560,9 @@ impl AttestedFindingResponseOutboxStore for SqliteSecurityStateStore {
                 )
                 .map_err(sqlite_error)?;
             let keys = statement
-                .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+                .query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })
                 .map_err(sqlite_error)?
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(sqlite_error)?;
@@ -547,10 +570,8 @@ impl AttestedFindingResponseOutboxStore for SqliteSecurityStateStore {
         };
         for (tenant_id, action_id) in keys {
             let key = AttestedFindingResponseOutboxKey {
-                tenant_id: TenantId::new(tenant_id)
-                    .map_err(|_| PortError::integrity_failure())?,
-                action_id: ActionId::new(action_id)
-                    .map_err(|_| PortError::integrity_failure())?,
+                tenant_id: TenantId::new(tenant_id).map_err(|_| PortError::integrity_failure())?,
+                action_id: ActionId::new(action_id).map_err(|_| PortError::integrity_failure())?,
             };
             let record = load_attested_finding_response_outbox_record(&connection, &key)?
                 .ok_or_else(PortError::integrity_failure)?;
@@ -659,7 +680,7 @@ impl AttestedFindingResponseOutboxStore for SqliteSecurityStateStore {
         scan_attested_finding_response_outbox(
             &connection,
             "planning_state = 'planned' AND admission_state IN ('pending', 'prepared') \
-             AND completion_state != 'completed'",
+             AND completion_state NOT IN ('completed', 'simulated')",
             now_unix_ms,
             max_records,
         )
@@ -803,6 +824,28 @@ impl AttestedFindingResponseOutboxStore for SqliteSecurityStateStore {
                 next.prepared_dispatch_binding = Some(*prepared_dispatch_binding);
                 next.last_error_code = None;
             }
+            AttestedFindingResponseOutboxTransition::Simulated {
+                evidence_id,
+                evidence_body_hash,
+            } => {
+                if next.admission_state != AttestedFindingResponseAdmissionState::Pending
+                    || next.completion_state != AttestedFindingResponseCompletionState::NotStarted
+                    || next.admission_artifact_digest.is_none()
+                    || next.execution_dispatch_id.is_some()
+                    || next.prepared_dispatch_binding.is_some()
+                    || evidence_body_hash.is_zero()
+                    || next.publication.as_ref().is_none_or(|p| {
+                        p.body.response_plan.execution.mode()
+                            != chio_security_types::ResponseExecutionMode::DryRun
+                    })
+                {
+                    return Err(PortError::conflict());
+                }
+                next.completion_state = AttestedFindingResponseCompletionState::Simulated;
+                next.completion_evidence_id = Some(evidence_id);
+                next.completion_evidence_body_hash = Some(evidence_body_hash);
+                next.last_error_code = None;
+            }
             AttestedFindingResponseOutboxTransition::Completed {
                 execution_dispatch_id,
                 outcome,
@@ -860,7 +903,8 @@ impl AttestedFindingResponseOutboxStore for SqliteSecurityStateStore {
                     prepared_dispatch_binding_hash
                         .as_ref()
                         .map(|hash| hash.as_slice()),
-                    next.completion_outcome.map(response_completion_outcome_name),
+                    next.completion_outcome
+                        .map(response_completion_outcome_name),
                     next.completion_evidence_id
                         .as_ref()
                         .map(OpaqueReceiptRef::as_str),
@@ -894,15 +938,15 @@ impl AttestedFindingResponseOutboxStore for SqliteSecurityStateStore {
         &self,
     ) -> PortResult<AttestedFindingResponseOutboxHealth> {
         let connection = self.connection()?;
-        let values: (i64, i64, i64, i64, i64, i64, i64, i64, i64, i64) = connection
+        let values: (i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64) = connection
             .query_row(
                 r#"
                 SELECT
                     COALESCE(SUM(CASE WHEN planning_state = 'pending' THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE WHEN planning_state = 'planned'
-                        AND admission_state = 'pending' THEN 1 ELSE 0 END), 0),
+                        AND admission_state = 'pending' AND completion_state = 'not_started' THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE WHEN planning_state = 'planned'
-                        AND admission_state = 'pending'
+                        AND admission_state = 'pending' AND completion_state = 'not_started'
                         AND admission_artifact_digest IS NULL THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE WHEN completion_state = 'pending'
                         THEN 1 ELSE 0 END), 0),
@@ -916,7 +960,8 @@ impl AttestedFindingResponseOutboxStore for SqliteSecurityStateStore {
                     COALESCE(SUM(CASE WHEN completion_outcome = 'failed_before_effect'
                         THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE WHEN completion_outcome = 'rolled_back_after_partial'
-                        THEN 1 ELSE 0 END), 0)
+                        THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN completion_state = 'simulated' THEN 1 ELSE 0 END), 0)
                 FROM security_attested_finding_response_outbox
                 "#,
                 [],
@@ -924,7 +969,7 @@ impl AttestedFindingResponseOutboxStore for SqliteSecurityStateStore {
                     Ok((
                         row.get(0)?, row.get(1)?, row.get(2)?,
                         row.get(3)?, row.get(4)?, row.get(5)?,
-                        row.get(6)?, row.get(7)?, row.get(8)?, row.get(9)?,
+                        row.get(6)?, row.get(7)?, row.get(8)?, row.get(9)?, row.get(10)?,
                     ))
                 },
             )
@@ -940,6 +985,7 @@ impl AttestedFindingResponseOutboxStore for SqliteSecurityStateStore {
             terminal_activated: from_i64(values.7)?,
             terminal_failed_before_effect: from_i64(values.8)?,
             terminal_rolled_back_after_partial: from_i64(values.9)?,
+            terminal_simulated: from_i64(values.10)?,
         })
     }
 }

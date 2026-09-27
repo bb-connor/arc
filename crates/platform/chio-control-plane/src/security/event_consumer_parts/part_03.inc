@@ -47,7 +47,9 @@ pub struct AttestedFindingAdmissionArtifacts {
 enum AttestedFindingAdmissionArtifactPayload {
     Kernel(Box<KernelAttestedFindingAdmissionArtifactPayload>),
     #[cfg(test)]
-    Synthetic { digest: Digest32 },
+    Synthetic {
+        digest: Digest32,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -146,7 +148,8 @@ impl AttestedFindingAdmissionArtifacts {
                 let governed_intent_hash = digest_from_canonical_hex(
                     payload.submission_proof.body.governed_intent_hash.as_str(),
                 )?;
-                let signature_valid = payload.authority_attestation
+                let signature_valid = payload
+                    .authority_attestation
                     .verify_signature()
                     .map_err(|_| PortError::integrity_failure())?;
                 if &payload.artifact_ref != expected_ref
@@ -162,7 +165,8 @@ impl AttestedFindingAdmissionArtifacts {
                     || payload.submission_proof.body.action_id.as_str()
                         != response_plan.action_id.as_str()
                     || payload.submission_proof.body.tenant_id != response_plan.tenant_id
-                    || !payload.submission_proof
+                    || !payload
+                        .submission_proof
                         .verify_signature()
                         .map_err(|_| PortError::integrity_failure())?
                     || attestation.issued_at_unix_ms
@@ -203,16 +207,13 @@ impl AttestedFindingAdmissionArtifacts {
             payload: AttestedFindingAdmissionArtifactPayload::Synthetic { digest },
         }
     }
-
-
 }
 
 fn governed_approval_request_from_native(
     request: &ActiveResponseAdmissionRequest,
 ) -> PortResult<GovernedApprovalRequest> {
     let response_plan = request.response_plan();
-    let ResponseApprovalRequirement::Governed { policy_id } =
-        &response_plan.approval_requirement
+    let ResponseApprovalRequirement::Governed { policy_id } = &response_plan.approval_requirement
     else {
         return Err(PortError::integrity_failure());
     };
@@ -255,11 +256,9 @@ fn governed_approval_request_from_native(
         request.artifact_authority_attestation(),
         &payload_digest,
     )?;
-    let admission_artifact = opaque_admission_artifact(
-        request.admission_artifact_ref().clone(),
-        artifact_digest,
-    )
-    .map_err(map_approval_coordinator_error)?;
+    let admission_artifact =
+        opaque_admission_artifact(request.admission_artifact_ref().clone(), artifact_digest)
+            .map_err(map_approval_coordinator_error)?;
     Ok(GovernedApprovalRequest {
         tenant_id: response_plan.tenant_id.clone(),
         action_id: response_plan.action_id.clone(),
@@ -456,10 +455,9 @@ impl PreparedAttestedFindingResponse {
                 .durable_dispatch_binding(response_plan)
                 .map_err(map_active_response_kernel_error)?,
             #[cfg(test)]
-            Self::Synthetic { dispatch_id } => synthetic_prepared_dispatch_binding(
-                response_plan,
-                dispatch_id.clone(),
-            )?,
+            Self::Synthetic { dispatch_id } => {
+                synthetic_prepared_dispatch_binding(response_plan, dispatch_id.clone())?
+            }
         };
         binding
             .validate_for_plan(response_plan)
@@ -473,10 +471,8 @@ impl PreparedAttestedFindingResponse {
                 &response.governed_approval,
             ) {
                 (ResponseApprovalRequirement::Automatic, None) => {}
-                (
-                    ResponseApprovalRequirement::Governed { .. },
-                    Some(reservation),
-                ) if reservation.prepared_dispatch_binding == binding => {}
+                (ResponseApprovalRequirement::Governed { .. }, Some(reservation))
+                    if reservation.prepared_dispatch_binding == binding => {}
                 _ => return Err(PortError::integrity_failure()),
             },
             #[cfg(test)]
@@ -585,6 +581,23 @@ pub(crate) enum AttestedFindingPreDispatchReconstruction {
 }
 
 pub(crate) trait AttestedFindingResponseCoordinator: Send + Sync {
+    fn execution_mode(&self) -> chio_security_types::ResponseExecutionMode {
+        chio_security_types::ResponseExecutionMode::Live
+    }
+    fn recover_simulation(
+        &self,
+        _plan: &ResponsePlan,
+    ) -> PortResult<Option<chio_kernel::response_simulation_report::ResponseSimulationReport>> {
+        Err(PortError::invalid_data())
+    }
+    fn simulate(
+        &self,
+        _plan: &ReservedAttestedFindingResponsePlan,
+        _artifacts: AttestedFindingAdmissionArtifacts,
+    ) -> PortResult<chio_kernel::response_simulation_report::ResponseSimulationReport> {
+        Err(PortError::invalid_data())
+    }
+
     fn ensure_configured(&self) -> PortResult<()> {
         self.ensure_ready()
     }
@@ -722,10 +735,7 @@ impl<'a> KernelActiveResponseApprovalVerifier<'a> {
         }
     }
 
-    fn require_exact_request(
-        &self,
-        request: &GovernedApprovalRequest,
-    ) -> PortResult<()> {
+    fn require_exact_request(&self, request: &GovernedApprovalRequest) -> PortResult<()> {
         let native_projection = governed_approval_request_from_native(self.native_request)?;
         if request != self.expected_request || request != &native_projection {
             return Err(PortError::integrity_failure());
@@ -733,14 +743,8 @@ impl<'a> KernelActiveResponseApprovalVerifier<'a> {
         Ok(())
     }
 
-    fn retain_prepared(
-        &self,
-        prepared: PreparedActiveResponseAdmission,
-    ) -> PortResult<()> {
-        let mut retained = self
-            .prepared
-            .lock()
-            .map_err(|_| PortError::unavailable())?;
+    fn retain_prepared(&self, prepared: PreparedActiveResponseAdmission) -> PortResult<()> {
+        let mut retained = self.prepared.lock().map_err(|_| PortError::unavailable())?;
         if retained
             .as_ref()
             .is_some_and(|existing| existing != &prepared)
@@ -864,6 +868,7 @@ pub struct KernelAttestedFindingResponseCoordinator {
     kernel: Mutex<Option<Arc<ChioKernel>>>,
     executor_authority: ActiveResponseExecutorAuthorityIdentity,
     clock: Arc<dyn SecurityClock>,
+    profile: super::response_simulation::ActiveResponseExecutionProfile,
 }
 
 impl KernelAttestedFindingResponseCoordinator {
@@ -871,11 +876,13 @@ impl KernelAttestedFindingResponseCoordinator {
     pub fn new_unbound(
         executor_authority: ActiveResponseExecutorAuthorityIdentity,
         clock: Arc<dyn SecurityClock>,
+        profile: super::response_simulation::ActiveResponseExecutionProfile,
     ) -> Self {
         Self {
             kernel: Mutex::new(None),
             executor_authority,
             clock,
+            profile,
         }
     }
 
@@ -918,6 +925,56 @@ impl KernelAttestedFindingResponseCoordinator {
 }
 
 impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordinator {
+    fn execution_mode(&self) -> chio_security_types::ResponseExecutionMode {
+        match self.profile {
+            super::response_simulation::ActiveResponseExecutionProfile::Live => {
+                chio_security_types::ResponseExecutionMode::Live
+            }
+            super::response_simulation::ActiveResponseExecutionProfile::DryRun(_) => {
+                chio_security_types::ResponseExecutionMode::DryRun
+            }
+        }
+    }
+
+    fn recover_simulation(
+        &self,
+        plan: &ResponsePlan,
+    ) -> PortResult<Option<chio_kernel::response_simulation_report::ResponseSimulationReport>> {
+        let super::response_simulation::ActiveResponseExecutionProfile::DryRun(service) =
+            &self.profile
+        else {
+            return Err(PortError::invalid_data());
+        };
+        service
+            .load(plan)
+            .map(|result| result.map(|(report, _)| report))
+    }
+
+    fn simulate(
+        &self,
+        plan: &ReservedAttestedFindingResponsePlan,
+        artifacts: AttestedFindingAdmissionArtifacts,
+    ) -> PortResult<chio_kernel::response_simulation_report::ResponseSimulationReport> {
+        let super::response_simulation::ActiveResponseExecutionProfile::DryRun(service) =
+            &self.profile
+        else {
+            return Err(PortError::invalid_data());
+        };
+        let kernel = self.bound_kernel()?;
+        self.validate_kernel(kernel.as_ref())?;
+        if plan.admission_artifact_digest()
+            != Some(&artifacts.canonical_digest(plan.response_plan())?)
+        {
+            return Err(PortError::integrity_failure());
+        }
+        let request = artifacts
+            .into_simulation_request(plan.response_plan().clone())
+            .map_err(map_active_response_kernel_error)?;
+        service
+            .run(kernel.as_ref(), &request)
+            .map(|(report, _)| report)
+    }
+
     fn ensure_configured(&self) -> PortResult<()> {
         if self.executor_authority.generation() == 0 {
             return Err(PortError::invalid_data());
@@ -928,6 +985,11 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
 
     fn ensure_ready(&self) -> PortResult<()> {
         self.clock.now_unix_ms()?;
+        if let super::response_simulation::ActiveResponseExecutionProfile::DryRun(service) =
+            &self.profile
+        {
+            service.ensure_ready()?;
+        }
         let kernel = self.bound_kernel()?;
         self.validate_kernel(kernel.as_ref())
     }
@@ -937,16 +999,15 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
         response_plan: &ResponsePlan,
         dispatch_id: &RecordId,
     ) -> PortResult<Option<AttestedFindingResponseCompletionProof>> {
+        if self.execution_mode() != chio_security_types::ResponseExecutionMode::Live {
+            return Err(PortError::invalid_data());
+        }
         let kernel = self.bound_kernel()?;
         kernel
             .recover_committed_active_response(response_plan, dispatch_id)
             .map_err(map_active_response_kernel_error)?
             .map(|evidence| {
-                validated_active_response_completion_proof(
-                    response_plan,
-                    dispatch_id,
-                    evidence,
-                )
+                validated_active_response_completion_proof(response_plan, dispatch_id, evidence)
             })
             .transpose()
     }
@@ -956,6 +1017,9 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
         response_plan: &ResponsePlan,
         binding: &PreparedActiveResponseDispatchBinding,
     ) -> PortResult<AttestedFindingDispatchCommittedResume> {
+        if self.execution_mode() != chio_security_types::ResponseExecutionMode::Live {
+            return Err(PortError::invalid_data());
+        }
         let kernel = self.bound_kernel()?;
         match kernel
             .resume_dispatch_committed_active_response(response_plan, binding)
@@ -981,6 +1045,9 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
         artifacts: AttestedFindingAdmissionArtifacts,
         binding: &PreparedActiveResponseDispatchBinding,
     ) -> PortResult<AttestedFindingPreDispatchReconstruction> {
+        if self.execution_mode() != chio_security_types::ResponseExecutionMode::Live {
+            return Err(PortError::invalid_data());
+        }
         let kernel = self.bound_kernel()?;
         self.validate_kernel(kernel.as_ref())?;
         let expected_artifact_digest = plan
@@ -1006,9 +1073,7 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
                 PreDispatchActiveResponseReconstruction::NotPrepared => {
                     return Ok(AttestedFindingPreDispatchReconstruction::NotPrepared);
                 }
-                PreDispatchActiveResponseReconstruction::Prepared(prepared) => {
-                    (prepared, None)
-                }
+                PreDispatchActiveResponseReconstruction::Prepared(prepared) => (prepared, None),
             },
             Some(governed_request) => {
                 let retained = GovernedApprovalReservation {
@@ -1054,6 +1119,9 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
         binding: &PreparedActiveResponseDispatchBinding,
         current_artifacts: Option<&AttestedFindingAdmissionArtifacts>,
     ) -> PortResult<()> {
+        if self.execution_mode() != chio_security_types::ResponseExecutionMode::Live {
+            return Err(PortError::invalid_data());
+        }
         let kernel = self.bound_kernel()?;
         let current_request = current_artifacts
             .cloned()
@@ -1074,6 +1142,9 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
         plan: &ReservedAttestedFindingResponsePlan,
         artifacts: AttestedFindingAdmissionArtifacts,
     ) -> PortResult<PreparedAttestedFindingResponse> {
+        if self.execution_mode() != chio_security_types::ResponseExecutionMode::Live {
+            return Err(PortError::invalid_data());
+        }
         let kernel = self.bound_kernel()?;
         self.validate_kernel(kernel.as_ref())?;
         let expected_artifact_digest = plan
@@ -1130,6 +1201,9 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
         plan: &ReservedAttestedFindingResponsePlan,
         prepared: &PreparedAttestedFindingResponse,
     ) -> PortResult<()> {
+        if self.execution_mode() != chio_security_types::ResponseExecutionMode::Live {
+            return Err(PortError::invalid_data());
+        }
         let kernel = self.bound_kernel()?;
         self.validate_kernel(kernel.as_ref())?;
         let prepared = prepared.kernel_prepared()?;
@@ -1170,6 +1244,9 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
         plan: &ReservedAttestedFindingResponsePlan,
         prepared: PreparedAttestedFindingResponse,
     ) -> PortResult<AttestedFindingResponseCompletionProof> {
+        if self.execution_mode() != chio_security_types::ResponseExecutionMode::Live {
+            return Err(PortError::invalid_data());
+        }
         let kernel = self.bound_kernel()?;
         self.validate_kernel(kernel.as_ref())?;
         let expected_dispatch_id = prepared.dispatch_id().clone();
@@ -1187,7 +1264,10 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
                 return Err(PortError::integrity_failure());
             }
         };
-        match (&plan.response_plan().approval_requirement, governed_approval) {
+        match (
+            &plan.response_plan().approval_requirement,
+            governed_approval,
+        ) {
             (ResponseApprovalRequirement::Automatic, None) => {}
             (ResponseApprovalRequirement::Governed { .. }, Some(reservation)) => {
                 let native_binding = prepared
@@ -1291,7 +1371,7 @@ fn map_approval_coordinator_error(error: ApprovalCoordinatorError) -> PortError 
     }
 }
 
-fn map_active_response_kernel_error(error: KernelError) -> PortError {
+pub(super) fn map_active_response_kernel_error(error: KernelError) -> PortError {
     let definitively_never_committed =
         matches!(&error, KernelError::ActiveResponseNeverCommitted(_));
     let retryable = matches!(

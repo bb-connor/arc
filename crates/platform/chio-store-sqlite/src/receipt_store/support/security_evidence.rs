@@ -4,6 +4,11 @@ pub(crate) fn validate_indexed_security_receipt(
     evidence_id: &OpaqueReceiptRef,
     receipt: &ChioReceipt,
 ) -> Result<(), ReceiptStoreError> {
+    if receipt.tool_name == chio_security_types::response_simulation::RESPONSE_SIMULATION_SCHEMA {
+        return chio_kernel::response_simulation_report::validate_response_simulation_receipt_binding(receipt, evidence_id)
+            .map(|_| ())
+            .map_err(|error| ReceiptStoreError::Conflict(format!("invalid response simulation receipt: {error}")));
+    }
     let metadata = receipt.metadata.as_ref().ok_or_else(|| {
         ReceiptStoreError::Conflict(
             "indexed active-defense receipt is missing security metadata".to_string(),

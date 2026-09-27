@@ -30,8 +30,7 @@ impl AttestedFindingResponseRecoveryLimits {
             || max_startup_records < u64::from(max_records_per_pass)
             || max_startup_records > MAX_ATTESTED_FINDING_STARTUP_RECOVERY_RECORDS
             || max_startup_wall_clock_ms == 0
-            || max_startup_wall_clock_ms
-                > MAX_ATTESTED_FINDING_STARTUP_RECOVERY_WALL_CLOCK_MS
+            || max_startup_wall_clock_ms > MAX_ATTESTED_FINDING_STARTUP_RECOVERY_WALL_CLOCK_MS
         {
             return Err(PortError::invalid_data());
         }
@@ -112,8 +111,7 @@ impl DurableAttestedFindingBatchPlanner {
     }
 
     pub(crate) fn outbox_health(&self) -> PortResult<AttestedFindingResponseOutboxHealth> {
-        self.outbox_store
-            .attested_finding_response_outbox_health()
+        self.outbox_store.attested_finding_response_outbox_health()
     }
 
     pub(crate) fn response_coordinator_is_ready(&self) -> bool {
@@ -216,8 +214,7 @@ impl DurableAttestedFindingBatchPlanner {
         &self,
         max_records: u32,
     ) -> PortResult<AttestedFindingResponseRecoveryReport> {
-        let (report, first_error) =
-            self.resume_incomplete_pass_collecting(max_records, None)?;
+        let (report, first_error) = self.resume_incomplete_pass_collecting(max_records, None)?;
         match first_error {
             Some(error) => Err(error),
             None => Ok(report),
@@ -228,10 +225,7 @@ impl DurableAttestedFindingBatchPlanner {
         &self,
         max_records: u32,
         deadline: Option<Instant>,
-    ) -> PortResult<(
-        AttestedFindingResponseRecoveryReport,
-        Option<PortError>,
-    )> {
+    ) -> PortResult<(AttestedFindingResponseRecoveryReport, Option<PortError>)> {
         if max_records == 0 || max_records > MAX_ATTESTED_FINDING_RESPONSE_OUTBOX_SCAN {
             return Err(PortError::invalid_data());
         }
@@ -239,10 +233,10 @@ impl DurableAttestedFindingBatchPlanner {
         let now_unix_ms = self.clock.now_unix_ms()?;
         let mut report = AttestedFindingResponseRecoveryReport::default();
         let mut first_error = None;
-        for pending in self.outbox_store.scan_incomplete_attested_finding_responses(
-            now_unix_ms,
-            max_records,
-        )? {
+        for pending in self
+            .outbox_store
+            .scan_incomplete_attested_finding_responses(now_unix_ms, max_records)?
+        {
             if deadline
                 .as_ref()
                 .is_some_and(|deadline| Instant::now() >= *deadline)
@@ -269,10 +263,10 @@ impl DurableAttestedFindingBatchPlanner {
                 Ok(()) => {
                     let remaining =
                         u32::try_from(remaining).map_err(|_| PortError::invalid_data())?;
-                    for pending in self.outbox_store.scan_unplanned_attested_finding_responses(
-                        now_unix_ms,
-                        remaining,
-                    )? {
+                    for pending in self
+                        .outbox_store
+                        .scan_unplanned_attested_finding_responses(now_unix_ms, remaining)?
+                    {
                         if deadline
                             .as_ref()
                             .is_some_and(|deadline| Instant::now() >= *deadline)
@@ -348,11 +342,9 @@ impl DurableAttestedFindingBatchPlanner {
             }
             if examined == 0 {
                 let remaining = wall_clock_budget.saturating_sub(started.elapsed());
-                std::thread::sleep(
-                    remaining.min(Duration::from_millis(
-                        ATTESTED_FINDING_STARTUP_RECOVERY_POLL_MS,
-                    )),
-                );
+                std::thread::sleep(remaining.min(Duration::from_millis(
+                    ATTESTED_FINDING_STARTUP_RECOVERY_POLL_MS,
+                )));
             }
         }
     }
@@ -362,8 +354,8 @@ impl DurableAttestedFindingBatchPlanner {
         current: &AttestedFindingResponseOutboxRecord,
         now_unix_ms: u64,
     ) -> PortResult<AttestedFindingResponseOutboxRecord> {
-        let exponent = u32::try_from(current.attempts.min(12))
-            .map_err(|_| PortError::integrity_failure())?;
+        let exponent =
+            u32::try_from(current.attempts.min(12)).map_err(|_| PortError::integrity_failure())?;
         let delay = ATTESTED_FINDING_RESPONSE_INITIAL_RETRY_MS
             .checked_shl(exponent)
             .unwrap_or(ATTESTED_FINDING_RESPONSE_MAX_RETRY_MS)
@@ -464,6 +456,31 @@ impl DurableAttestedFindingBatchPlanner {
         Err(error)
     }
 
+    fn persist_simulation(
+        &self,
+        current: &AttestedFindingResponseOutboxRecord,
+        simulation: &chio_kernel::response_simulation_report::ResponseSimulationReport,
+        report: &mut AttestedFindingResponseRecoveryReport,
+    ) -> PortResult<()> {
+        let publication = current
+            .publication
+            .as_ref()
+            .ok_or_else(PortError::integrity_failure)?;
+        if simulation.plan != publication.body.response_plan {
+            return Err(PortError::integrity_failure());
+        }
+        self.outbox_store
+            .transition_attested_finding_response_outbox(
+                current,
+                AttestedFindingResponseOutboxTransition::Simulated {
+                    evidence_id: simulation.evidence_id()?,
+                    evidence_body_hash: simulation.body_hash()?,
+                },
+            )?;
+        report.completions_persisted = report.completions_persisted.saturating_add(1);
+        Ok(())
+    }
+
     fn execute_pending_response(
         &self,
         current: AttestedFindingResponseOutboxRecord,
@@ -479,6 +496,23 @@ impl DurableAttestedFindingBatchPlanner {
             .publication
             .as_ref()
             .ok_or_else(PortError::integrity_failure)?;
+        if publication.body.response_plan.execution.mode() != self.coordinator.execution_mode() {
+            return self.close_admission_failure(&claimed, PortError::invalid_data(), report);
+        }
+        if publication.body.response_plan.execution.mode()
+            == chio_security_types::ResponseExecutionMode::DryRun
+        {
+            match self
+                .coordinator
+                .recover_simulation(&publication.body.response_plan)
+            {
+                Ok(Some(simulation)) => {
+                    return self.persist_simulation(&claimed, &simulation, report)
+                }
+                Ok(None) => {}
+                Err(error) => return self.close_admission_failure(&claimed, error, report),
+            }
+        }
         if let Some(dispatch_id) = claimed.execution_dispatch_id.as_ref() {
             let binding = match claimed.prepared_dispatch_binding.as_ref() {
                 Some(binding)
@@ -525,9 +559,7 @@ impl DurableAttestedFindingBatchPlanner {
                         report,
                     );
                 }
-                Ok(None)
-                    if now_unix_ms >= publication.body.response_plan.expires_at_unix_ms =>
-                {
+                Ok(None) if now_unix_ms >= publication.body.response_plan.expires_at_unix_ms => {
                     return self.terminate_prepared_never_committed(
                         &claimed,
                         &publication.body.response_plan,
@@ -636,6 +668,14 @@ impl DurableAttestedFindingBatchPlanner {
             admission_artifact_digest: Some(artifact_digest),
             ..plan
         };
+        if plan.response_plan().execution.mode()
+            == chio_security_types::ResponseExecutionMode::DryRun
+        {
+            return match self.coordinator.simulate(&plan, artifacts) {
+                Ok(simulation) => self.persist_simulation(&artifact_bound, &simulation, report),
+                Err(error) => self.close_admission_failure(&artifact_bound, error, report),
+            };
+        }
         let termination_artifacts = artifacts.clone();
         let preparation = match artifact_bound.admission_state {
             AttestedFindingResponseAdmissionState::Pending => {
@@ -697,15 +737,16 @@ impl DurableAttestedFindingBatchPlanner {
         let prepared_dispatch_id = prepared_dispatch_binding.dispatch_id.clone();
         let admitted = match artifact_bound.admission_state {
             AttestedFindingResponseAdmissionState::Pending => {
-                match self.outbox_store.transition_attested_finding_response_outbox(
-                    &artifact_bound,
-                    AttestedFindingResponseOutboxTransition::AdmissionPrepared {
-                        prepared_dispatch_binding: Box::new(prepared_dispatch_binding.clone()),
-                    },
-                ) {
+                match self
+                    .outbox_store
+                    .transition_attested_finding_response_outbox(
+                        &artifact_bound,
+                        AttestedFindingResponseOutboxTransition::AdmissionPrepared {
+                            prepared_dispatch_binding: Box::new(prepared_dispatch_binding.clone()),
+                        },
+                    ) {
                     Ok(admitted) => {
-                        report.admissions_prepared =
-                            report.admissions_prepared.saturating_add(1);
+                        report.admissions_prepared = report.admissions_prepared.saturating_add(1);
                         admitted
                     }
                     Err(error) => {
@@ -713,10 +754,8 @@ impl DurableAttestedFindingBatchPlanner {
                             .outbox_store
                             .load_attested_finding_response_outbox(&artifact_bound.key())?
                             .ok_or_else(PortError::integrity_failure)?;
-                        if latest.admission_state
-                            == AttestedFindingResponseAdmissionState::Prepared
-                            && latest.execution_dispatch_id.as_ref()
-                                == Some(&prepared_dispatch_id)
+                        if latest.admission_state == AttestedFindingResponseAdmissionState::Prepared
+                            && latest.execution_dispatch_id.as_ref() == Some(&prepared_dispatch_id)
                             && latest.prepared_dispatch_binding.as_ref()
                                 == Some(&prepared_dispatch_binding)
                         {
@@ -808,15 +847,17 @@ impl DurableAttestedFindingBatchPlanner {
         dispatch_id: &RecordId,
         report: &mut AttestedFindingResponseRecoveryReport,
     ) -> PortResult<()> {
-        match self.outbox_store.transition_attested_finding_response_outbox(
-            current,
-            AttestedFindingResponseOutboxTransition::Completed {
-                execution_dispatch_id: dispatch_id.clone(),
-                outcome: evidence.outcome(),
-                evidence_id: evidence.evidence_id().clone(),
-                evidence_body_hash: *evidence.evidence_body_hash(),
-            },
-        ) {
+        match self
+            .outbox_store
+            .transition_attested_finding_response_outbox(
+                current,
+                AttestedFindingResponseOutboxTransition::Completed {
+                    execution_dispatch_id: dispatch_id.clone(),
+                    outcome: evidence.outcome(),
+                    evidence_id: evidence.evidence_id().clone(),
+                    evidence_body_hash: *evidence.evidence_body_hash(),
+                },
+            ) {
             Ok(_) => {
                 report.completions_persisted = report.completions_persisted.saturating_add(1);
                 Ok(())
@@ -834,8 +875,7 @@ impl DurableAttestedFindingBatchPlanner {
                     Some(record)
                         if record.admission_state
                             == AttestedFindingResponseAdmissionState::Prepared
-                            && record.execution_dispatch_id.as_ref()
-                                == Some(dispatch_id)
+                            && record.execution_dispatch_id.as_ref() == Some(dispatch_id)
                             && record.completion_state
                                 != AttestedFindingResponseCompletionState::Completed =>
                     {
@@ -883,11 +923,10 @@ impl DurableAttestedFindingBatchPlanner {
         {
             return Err(PortError::integrity_failure());
         }
-        match self.coordinator.terminate_never_committed(
-            response_plan,
-            binding,
-            current_artifacts,
-        ) {
+        match self
+            .coordinator
+            .terminate_never_committed(response_plan, binding, current_artifacts)
+        {
             Ok(()) => self.close_prepared_never_committed(
                 current,
                 PortError::new(
@@ -897,10 +936,7 @@ impl DurableAttestedFindingBatchPlanner {
                 report,
             ),
             Err(error) => {
-                let retryable = PortError::new(
-                    PortErrorKind::Unavailable,
-                    error.code().clone(),
-                );
+                let retryable = PortError::new(PortErrorKind::Unavailable, error.code().clone());
                 self.mark_outcome_unknown_after_dispatch(current, retryable, report)
             }
         }
@@ -965,16 +1001,22 @@ fn error_code(value: &str) -> PortResult<ErrorCode> {
 }
 
 fn terminal_admission_error(current: &AttestedFindingResponseOutboxRecord) -> PortError {
-    current.last_error_code.clone().map_or_else(
-        PortError::integrity_failure,
-        |error_code| PortError::new(PortErrorKind::InvalidData, error_code),
-    )
+    current
+        .last_error_code
+        .clone()
+        .map_or_else(PortError::integrity_failure, |error_code| {
+            PortError::new(PortErrorKind::InvalidData, error_code)
+        })
 }
 
 fn published_response_terminal_result(
     current: &AttestedFindingResponseOutboxRecord,
 ) -> Option<PortResult<()>> {
-    if current.completion_state == AttestedFindingResponseCompletionState::Completed {
+    if matches!(
+        current.completion_state,
+        AttestedFindingResponseCompletionState::Completed
+            | AttestedFindingResponseCompletionState::Simulated
+    ) {
         return Some(Ok(()));
     }
     if current.is_complete() {
@@ -1046,7 +1088,8 @@ impl AttestedFindingBatchPlanner for DurableAttestedFindingBatchPlanner {
         findings: &[AuthoritativeCorrelatedFindingEvidence],
     ) -> PortResult<()> {
         let publication = build_attested_finding_batch_publication(findings)?;
-        self.batch_store.publish_attested_finding_batch(&publication)?;
+        self.batch_store
+            .publish_attested_finding_batch(&publication)?;
         let persisted = self
             .batch_store
             .load_attested_finding_batch(&AttestedFindingBatchKey {

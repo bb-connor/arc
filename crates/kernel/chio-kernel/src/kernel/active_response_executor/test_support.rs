@@ -37,7 +37,7 @@ pub fn execution_request(fixture: ExecutionRequestFixture) -> ActiveResponseExec
     )
 }
 
-pub struct HistoricalAdmissionFixture {
+pub struct CommittedAdmissionFixture {
     pub response_plan: ResponsePlan,
     pub executor_authority: ActiveResponseExecutorAuthorityIdentity,
     pub governed_intent_hash: String,
@@ -48,9 +48,9 @@ pub struct HistoricalAdmissionFixture {
 /// Seed the durable boundary left by an older binary, without constructing a
 /// fresh admission or an execution permit. Recovery must still verify the real
 /// operation, approval reservation and anchor before it can prepare a dispatch.
-pub fn seed_historical_admission(
+pub fn seed_committed_admission(
     kernel: &super::super::ChioKernel,
-    fixture: HistoricalAdmissionFixture,
+    fixture: CommittedAdmissionFixture,
     approval_set: &crate::approval::ApprovalSetReservationInput,
 ) -> Result<
     chio_security_types::ports::PreparedActiveResponseDispatchBinding,
@@ -65,9 +65,7 @@ pub fn seed_historical_admission(
         AdmissionOperationState, PreparedAdmissionOperation,
     };
     let plan = &fixture.response_plan;
-    if !plan.execution.is_legacy() {
-        return Err("historical fixture requires legacy provenance".into());
-    }
+    plan.require_live_execution()?;
     let policy_hash = chio_core::Hash::from_bytes(*plan.policy_hash.as_bytes()).to_hex();
     let plan_body_hash = chio_core::Hash::from_bytes(*plan.plan_hash.as_bytes()).to_hex();
     let authorization_capability_hash =
@@ -112,7 +110,7 @@ pub fn seed_historical_admission(
     kernel.journal_active_response_operation_anchor(&operation, anchor, approval_set)
         .map_err(|error| match error {
             super::super::admission_cleanup::ActiveResponseOperationAnchorJournalError::Conflict =>
-                std::io::Error::other("historical anchor conflict"),
+                std::io::Error::other("committed anchor conflict"),
             super::super::admission_cleanup::ActiveResponseOperationAnchorJournalError::Kernel(error) =>
                 std::io::Error::other(error.to_string()),
         })?;

@@ -33,8 +33,7 @@ impl PreparedActiveResponseDispatchBinding {
             || self.tenant_id != plan.tenant_id
             || self.action_id != plan.action_id
             || self.plan_hash != plan.plan_hash
-            || self.authorization_capability_hash
-                != plan.operator_capability.capability_digest
+            || self.authorization_capability_hash != plan.operator_capability.capability_digest
             || validate_nonzero_id(self.tenant_id.as_str()).is_err()
             || validate_nonzero_id(self.action_id.as_str()).is_err()
             || validate_nonzero_id(self.dispatch_id.as_str()).is_err()
@@ -108,6 +107,7 @@ pub enum AttestedFindingResponseCompletionState {
     Pending,
     OutcomeUnknownAfterDispatch,
     Completed,
+    Simulated,
 }
 
 /// Closed, signed outcome of one admitted active-response dispatch.
@@ -190,34 +190,48 @@ impl AttestedFindingResponseOutboxRecord {
 
     #[must_use]
     pub const fn is_complete(&self) -> bool {
-        matches!(self.planning_state, AttestedFindingResponsePlanningState::Failed)
-            || matches!(
-                self.admission_state,
-                AttestedFindingResponseAdmissionState::Rejected
-                    | AttestedFindingResponseAdmissionState::Expired
-            )
-            || matches!(
-                self.completion_state,
-                AttestedFindingResponseCompletionState::Completed
-            )
+        matches!(
+            self.planning_state,
+            AttestedFindingResponsePlanningState::Failed
+        ) || matches!(
+            self.admission_state,
+            AttestedFindingResponseAdmissionState::Rejected
+                | AttestedFindingResponseAdmissionState::Expired
+        ) || matches!(
+            self.completion_state,
+            AttestedFindingResponseCompletionState::Completed
+                | AttestedFindingResponseCompletionState::Simulated
+        )
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AttestedFindingResponseOutboxTransition {
-    BeginAttempt { next_attempt_at_unix_ms: u64 },
+    BeginAttempt {
+        next_attempt_at_unix_ms: u64,
+    },
     RetryableFailure {
         next_attempt_at_unix_ms: u64,
         error_code: ErrorCode,
         outcome_unknown_after_dispatch: bool,
     },
-    PlanningFailed { error_code: ErrorCode },
-    AdmissionRejected { error_code: ErrorCode },
+    PlanningFailed {
+        error_code: ErrorCode,
+    },
+    AdmissionRejected {
+        error_code: ErrorCode,
+    },
     ExpiredBeforeAdmission,
     ExpiredAfterPreparedNeverCommitted,
-    AdmissionArtifactsBound { artifact_digest: Digest32 },
+    AdmissionArtifactsBound {
+        artifact_digest: Digest32,
+    },
     AdmissionPrepared {
         prepared_dispatch_binding: Box<PreparedActiveResponseDispatchBinding>,
+    },
+    Simulated {
+        evidence_id: OpaqueReceiptRef,
+        evidence_body_hash: Digest32,
     },
     Completed {
         execution_dispatch_id: RecordId,
@@ -239,6 +253,7 @@ pub struct AttestedFindingResponseOutboxHealth {
     pub terminal_activated: u64,
     pub terminal_failed_before_effect: u64,
     pub terminal_rolled_back_after_partial: u64,
+    pub terminal_simulated: u64,
 }
 
 /// Crash-recovery ledger between durable finding publication and the kernel's

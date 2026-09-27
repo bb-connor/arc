@@ -20,6 +20,7 @@
     "expires_at_unix_ms",
     "operator_capability",
     "approval_requirement",
+    "execution",
     "submitter",
     "reason_hash",
     "plan_hash"
@@ -50,11 +51,21 @@
     "expires_at_unix_ms": { "$ref": "#/$defs/time" },
     "operator_capability": { "$ref": "#/$defs/operatorCapability" },
     "approval_requirement": { "$ref": "#/$defs/approvalRequirement" },
+    "execution": { "$ref": "#/$defs/executionBinding" },
     "submitter": { "$ref": "#/$defs/identifier" },
     "reason_hash": { "$ref": "#/$defs/digest" },
     "plan_hash": { "$ref": "#/$defs/digest" }
   },
   "$defs": {
+    "executionBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "mode"],
+      "properties": {
+        "schema_version": { "type": "integer", "enum": [1] },
+        "mode": { "type": "string", "enum": ["dry_run", "live"] }
+      }
+    },
     "identifier": {
       "type": "string",
       "minLength": 1,

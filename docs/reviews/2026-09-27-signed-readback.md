@@ -1,5 +1,9 @@
 # Signed readback execution checkpoint
 
+> Superseded response compatibility decision (September 27): execution bindings are
+> required for all plans and recovery. The unshipped legacy path and retirement
+> queue are removed. See [production response simulation](2026-09-27-production-response-simulation.md).
+
 This batch follows the user's direction to prioritize substantial implementation
 with focused verification. The previous broad sweep was deliberately interrupted;
 its partial results remain in the [response/keyring checkpoint](2026-09-26-execution-boundaries.md).

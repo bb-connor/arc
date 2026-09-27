@@ -630,7 +630,7 @@ fn load_completed_release(
     Ok(completed)
 }
 
-fn load_snapshot(
+pub(super) fn load_snapshot(
     connection: &Connection,
     key: &IssuanceFreezeKey,
 ) -> PortResult<IssuanceFreezeSnapshot> {

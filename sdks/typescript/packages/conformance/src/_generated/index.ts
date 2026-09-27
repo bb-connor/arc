@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 08faf07045652f03607d089909a59cfced06a3823f816dadcf6d267fe9e4f5a2
+// Schema SHA: 0c05c693bd501d20c5d787ce557e1341f1f5ff2c819d21045707090ba7976ed4
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -9359,6 +9359,7 @@ export namespace Security_ResponsePlanV1 {
     expires_at_unix_ms: Time;
     operator_capability: OperatorCapability;
     approval_requirement: ApprovalRequirement;
+    execution: ExecutionBinding;
     submitter: Identifier;
     reason_hash: Digest;
     plan_hash: Digest;
@@ -9402,6 +9403,10 @@ export namespace Security_ResponsePlanV1 {
     capability_digest: Digest;
     expires_at_unix_ms: Time;
     executor_subject: Identifier;
+  }
+  export interface ExecutionBinding {
+    schema_version: 1;
+    mode: "dry_run" | "live";
   }
 }
 

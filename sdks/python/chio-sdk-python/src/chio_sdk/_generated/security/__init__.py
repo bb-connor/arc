@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: c31fc3d855f29edabccd629866ae3f328d7322f74f9c97ed7c5788c1adc8efbe
+# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -88,7 +88,7 @@ from .mcp_cage_launch_policy_v2_schema import AbsoluteCanonicalPath, BrokerBindi
 from .response_completion_receipt_body_v1_schema import ChioResponseCompletionReceiptBodyV1, CompletionOutcome, CompletionOutcome1, CompletionOutcome2, CompletionOutcome3, DispatchApproval, DispatchApproval1, DispatchApproval2, Effect, ExecutionDispatch, FinalState, Header
 from .response_effect_v1_schema import CanonicalContributionItem, ChioResponseEffectV1, Digest, DigestItem, Identifier, Kind, Target, Target5, Target6, Target7, Target8
 from .response_plan_receipt_body_v1_schema import ChioResponsePlanReceiptBodyV1
-from .response_plan_v1_schema import ApprovalRequirement, ApprovalRequirement1, ApprovalRequirement2, ChioResponsePlanV1, Digest, DigestItem, Identifier, OperatorCapability, Time
+from .response_plan_v1_schema import ApprovalRequirement, ApprovalRequirement1, ApprovalRequirement2, ChioResponsePlanV1, Digest, DigestItem, ExecutionBinding, Identifier, Mode, OperatorCapability, SchemaVersion, Time
 from .response_state_transition_receipt_body_v1_schema import Cause, ChioResponseStateTransitionReceiptBodyV1, Digest, DigestItem, Header, Header4, Identifier, Policy, Response, State, Time
 from .scheduler_health_receipt_body_v1_schema import ChioSchedulerHealthReceiptBodyV1
 from .security_event_body_v1_schema import ChioSecurityEventBodyV1, EventKind, Identifier, Severity, Subject, Time, TrustClass
@@ -269,6 +269,7 @@ __all__ = [
     "EventSigner2",
     "EventSigner3",
     "EventSigner4",
+    "ExecutionBinding",
     "ExecutionDispatch",
     "ExecutionIdentity",
     "ExitCode",
@@ -408,6 +409,7 @@ __all__ = [
     "RevocationResult",
     "RevocationSnapshot",
     "Runtime",
+    "SchemaVersion",
     "Scheme",
     "SeccompPlan",
     "ServerTool",

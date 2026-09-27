@@ -588,7 +588,8 @@
         let coordinator = KernelAttestedFindingResponseCoordinator::new_unbound(
             executor,
             Arc::new(FixedClock(1)),
-        );
+        super::super::ActiveResponseExecutionProfile::Live,
+);
         let unbound = rejected(
             coordinator.ensure_ready(),
             "an unbound response coordinator must not report ready",

@@ -169,7 +169,7 @@ fn decode_stored_json(
     seq: Option<u64>,
 ) -> Result<serde_json::Value, ReceiptStoreError> {
     let context = format_receipt_context(receipt_kind, None, seq);
-    chio_core::canonical::parse_legacy_signed_json(raw_json).map_err(|error| {
+    chio_core::canonical::parse_signed_json(raw_json).map_err(|error| {
         ReceiptStoreError::Conflict(format!("{context} failed to decode: {error}"))
     })
 }

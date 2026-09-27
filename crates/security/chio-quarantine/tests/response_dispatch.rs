@@ -136,13 +136,10 @@ fn governed_approval(admission_operation_version: u64) -> ResponseDispatchApprov
 /// only the binding rule can refuse it.
 fn plan_with_execution(
     approval_requirement: ResponseApprovalRequirement,
-    execution: Option<ResponseExecutionBinding>,
+    execution: ResponseExecutionBinding,
 ) -> ResponsePlan {
     let mut response_plan = plan(approval_requirement);
-    response_plan.execution = match execution {
-        None => chio_security_types::PlanProvenance::Legacy,
-        Some(binding) => chio_security_types::PlanProvenance::Bound(binding),
-    };
+    response_plan.execution = execution;
     let body = serde_json::to_value(response_plan.authorization_body())
         .unwrap_or_else(|error| panic!("authorization body: {error}"));
     let hash =
@@ -253,17 +250,14 @@ fn automatic_dispatch_prepares_one_atomic_applying_transition() {
 }
 
 #[test]
-fn fresh_live_dispatch_rejects_simulation_and_legacy_authority() {
+fn fresh_live_dispatch_rejects_simulation_authority() {
     let simulated = DispatchRejection::ExecutionMode {
         observed: ResponseExecutionMode::DryRun,
     };
-    for (execution, expected) in [
-        (None, DispatchRejection::LegacyPlanFreshDispatch),
-        (
-            Some(ResponseExecutionBinding::new(ResponseExecutionMode::DryRun)),
-            simulated,
-        ),
-    ] {
+    for (execution, expected) in [(
+        ResponseExecutionBinding::new(ResponseExecutionMode::DryRun),
+        simulated,
+    )] {
         let response_plan = plan_with_execution(ResponseApprovalRequirement::Automatic, execution);
         let observed = match chio_security_types::FreshLiveAdmission::new(response_plan) {
             Err(rejection) => rejection,
@@ -274,16 +268,13 @@ fn fresh_live_dispatch_rejects_simulation_and_legacy_authority() {
 }
 
 #[test]
-fn direct_state_transition_cannot_activate_a_retained_legacy_or_simulated_plan() {
-    for (execution, expected) in [
-        (None, DispatchRejection::LegacyPlanFreshDispatch),
-        (
-            Some(ResponseExecutionBinding::new(ResponseExecutionMode::DryRun)),
-            DispatchRejection::ExecutionMode {
-                observed: ResponseExecutionMode::DryRun,
-            },
-        ),
-    ] {
+fn direct_state_transition_cannot_activate_a_simulated_plan() {
+    for (execution, expected) in [(
+        ResponseExecutionBinding::new(ResponseExecutionMode::DryRun),
+        DispatchRejection::ExecutionMode {
+            observed: ResponseExecutionMode::DryRun,
+        },
+    )] {
         let store = Arc::new(TestResponseStore::default());
         let snapshot = chio_quarantine::state_machine::projection::initial_response_snapshot(
             plan_with_execution(ResponseApprovalRequirement::Automatic, execution),

@@ -121,6 +121,42 @@ fn apply_json_mutation(value: &mut serde_json::Value, mutation: &serde_json::Val
 }
 
 #[test]
+fn generated_response_plan_requires_exact_execution_binding() {
+    let base: serde_json::Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../tests/bindings/vectors/security/active-defense/positive/response-plan-v1.json"
+    )))
+    .test_expect("response plan fixture");
+    let corpus: serde_json::Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../tests/bindings/vectors/security/active-defense/mutations-v1.json"
+    )))
+    .test_expect("response mutation corpus");
+    let mut checked = 0;
+    for case in corpus["cases"].as_array().test_expect("mutation cases") {
+        if !case["id"]
+            .as_str()
+            .test_expect("mutation id")
+            .starts_with("response_plan_execution_")
+        {
+            continue;
+        }
+        let mut changed = base.clone();
+        apply_json_mutation(&mut changed, &case["mutation"]);
+        assert!(
+            serde_json::from_value::<generated::security_response_plan_v1::ChioResponsePlanV1>(
+                changed
+            )
+            .is_err(),
+            "accepted {}",
+            case["id"]
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 6);
+}
+
+#[test]
 fn generated_active_defense_types_decode_reencode_and_reject() {
     assert_generated_round_trip::<
         generated::security_signed_security_event_envelope_v1::ChioSecurityEventBodyV1,

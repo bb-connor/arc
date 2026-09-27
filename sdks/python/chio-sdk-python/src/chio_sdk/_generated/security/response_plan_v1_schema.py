@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: c31fc3d855f29edabccd629866ae3f328d7322f74f9c97ed7c5788c1adc8efbe
+# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,11 +11,29 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
 
 from . import response_effect_v1_schema
+
+
+class SchemaVersion(Enum):
+    integer_1 = 1
+
+
+class Mode(Enum):
+    dry_run = "dry_run"
+    live = "live"
+
+
+class ExecutionBinding(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    schema_version: SchemaVersion
+    mode: Mode
 
 
 class Identifier(
@@ -96,6 +114,7 @@ class ChioResponsePlanV1(BaseModel):
     expires_at_unix_ms: Time
     operator_capability: OperatorCapability
     approval_requirement: ApprovalRequirement
+    execution: ExecutionBinding
     submitter: Identifier
     reason_hash: Digest
     plan_hash: Digest

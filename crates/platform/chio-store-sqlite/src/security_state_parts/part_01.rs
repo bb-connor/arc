@@ -28,24 +28,21 @@ use chio_security_types::ports::{
     session_throttle_version_hash, session_throttle_window_identity,
     validate_attested_finding_batch_body, validate_containment_overlay_snapshot,
     validate_session_throttle_snapshot, ActionId, AdvisorySecurityEvent, AttestedFindingBatchBody,
-    AttestedFindingBatchKey, AttestedFindingBatchPublication,
-    AttestedFindingBatchStore, AttestedFindingResponseAdmissionState,
-    AttestedFindingResponseCompletionOutcome, AttestedFindingResponseCompletionState,
-    AttestedFindingResponseOutboxHealth,
+    AttestedFindingBatchKey, AttestedFindingBatchPublication, AttestedFindingBatchStore,
+    AttestedFindingResponseAdmissionState, AttestedFindingResponseCompletionOutcome,
+    AttestedFindingResponseCompletionState, AttestedFindingResponseOutboxHealth,
     AttestedFindingResponseOutboxKey, AttestedFindingResponseOutboxRecord,
     AttestedFindingResponseOutboxStore, AttestedFindingResponseOutboxTransition,
     AttestedFindingResponsePlanBody, AttestedFindingResponsePlanPublication,
-    AttestedFindingResponsePlanningState, CanonicalBody, CapabilitySetSuspensionStore,
-    CommittedEgressFence, AutomaticResponseDispatchFenceOutcome,
-    AutomaticResponseDispatchFenceRecord, AutomaticResponseDispatchFenceRequest,
-    ContainmentOverlayCommand, ContainmentOverlayStore, CorrelationCasRequest,
-    CorrelationDeleteRequest, CorrelationEventAdmission, CorrelationEventAdmissionRequest,
-    CorrelationEventIndexRequest, CorrelationIngressStore, CorrelationOutcomeCommitRequest,
-    CorrelationOutcomeKey, CorrelationOutcomePublication, CorrelationOutcomeStatus,
-    CorrelationPartial,
-    CorrelationPartitionKey, CorrelationScan,
-    CreateOutcome, DeclassificationCompactionCandidate, DeclassificationCompactionQuery,
-    DeclassificationCompactionRequest, DeclassificationConsume,
+    AttestedFindingResponsePlanningState, AutomaticResponseDispatchFenceOutcome,
+    AutomaticResponseDispatchFenceRecord, AutomaticResponseDispatchFenceRequest, CanonicalBody,
+    CapabilitySetSuspensionStore, CommittedEgressFence, ContainmentOverlayCommand,
+    ContainmentOverlayStore, CorrelationCasRequest, CorrelationDeleteRequest,
+    CorrelationEventAdmission, CorrelationEventAdmissionRequest, CorrelationEventIndexRequest,
+    CorrelationIngressStore, CorrelationOutcomeCommitRequest, CorrelationOutcomeKey,
+    CorrelationOutcomePublication, CorrelationOutcomeStatus, CorrelationPartial,
+    CorrelationPartitionKey, CorrelationScan, CreateOutcome, DeclassificationCompactionCandidate,
+    DeclassificationCompactionQuery, DeclassificationCompactionRequest, DeclassificationConsume,
     DeclassificationConsumptionEvidenceCommit, DeclassificationEvidenceAckRequest,
     DeclassificationEvidenceCommitStore, DeclassificationEvidencePendingQuery,
     DeclassificationEvidencePhase, DeclassificationEvidenceQuery, DeclassificationEvidenceRecord,
@@ -63,29 +60,26 @@ use chio_security_types::ports::{
     IssuanceFreezeStore, LeaseOwnerId, LineageFence, LineageFenceRelease, LineageFenceRenewal,
     LineageFenceRequest, LineageFenceStore, LineageFenceTakeover, OpaqueReceiptRef,
     OverlayApplyRequest, OverlayContribution, OverlayContributions, OverlayRemoveRequest,
-    OverlaySnapshot, PortError, PortResult, ProducerId, ProducerTrustClass, ReceiptAppendRequest,
-    PreparedActiveResponseDispatchBinding, RecordId, ResponseCasRequest,
-    ResponseDispatchApproval, ResponseDispatchAuthorization,
-    ResponseDispatchAuthorizationBody, ResponseDispatchCommitMode,
-    ResponseDispatchCommitOutcome, ResponseDispatchCommitRequest, ResponseDispatchKey,
-    ResponseDispatchLease,
-    ResponseDispatchLoadOutcome, ResponseDispatchRecord, ResponseDispatchRecoveryOutcome,
-    ResponseDispatchRecoveryRequest, ResponseDispatchStore, ResponseEffectCasRequest,
-    ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord,
-    ResponseReceiptCursor, ResponseReceiptCursorCasRequest, ResponseScheduledMutationCasRequest,
-    ResponseSchedulerStore, ResponseStore, RuleId, ScheduledWork, SchedulerClaimRequest,
-    SchedulerHealthAckRequest, SchedulerLeaseReleaseRequest,
+    OverlaySnapshot, PortError, PortResult, PreparedActiveResponseDispatchBinding, ProducerId,
+    ProducerTrustClass, ReceiptAppendRequest, RecordId, ResponseCasRequest,
+    ResponseDispatchApproval, ResponseDispatchAuthorization, ResponseDispatchAuthorizationBody,
+    ResponseDispatchCommitMode, ResponseDispatchCommitOutcome, ResponseDispatchCommitRequest,
+    ResponseDispatchKey, ResponseDispatchLease, ResponseDispatchLoadOutcome,
+    ResponseDispatchRecord, ResponseDispatchRecoveryOutcome, ResponseDispatchRecoveryRequest,
+    ResponseDispatchStore, ResponseEffectCasRequest, ResponseEffectKey, ResponseEffectRecord,
+    ResponsePlanKey, ResponsePlanRecord, ResponseReceiptCursor, ResponseReceiptCursorCasRequest,
+    ResponseScheduledMutationCasRequest, ResponseSchedulerStore, ResponseStore, RuleId,
+    ScheduledWork, SchedulerClaimRequest, SchedulerHealthAckRequest, SchedulerLeaseReleaseRequest,
     SchedulerLeaseRenewRequest, SchedulerRetryRequest, SchedulerRetryState, SchedulerWorkKey,
     SecurityEventStore, SessionThrottleApplyRequest, SessionThrottleCommand,
     SessionThrottleConsumeRequest, SessionThrottleContribution, SessionThrottleContributions,
     SessionThrottleDecision, SessionThrottleKey, SessionThrottleLimits,
     SessionThrottleRemoveRequest, SessionThrottleSnapshot, SessionThrottleStore,
     SessionThrottleWindowUsage, SessionThrottleWindowUsages, TenantId, TenantScopedId,
-    UnverifiedEventBatch, UnverifiedSecurityEvent, VerifiedEventBatch,
-    VerifiedIsolationEvidence, VerifiedSecurityEvent,
-    ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION, LINEAGE_FENCE_RENEWAL_MARGIN_MS,
-    MAX_ATTESTED_FINDING_RESPONSE_OUTBOX_SCAN, MAX_DECLASSIFICATION_EVIDENCE_BATCH,
-    PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
+    UnverifiedEventBatch, UnverifiedSecurityEvent, VerifiedEventBatch, VerifiedIsolationEvidence,
+    VerifiedSecurityEvent, ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION,
+    LINEAGE_FENCE_RENEWAL_MARGIN_MS, MAX_ATTESTED_FINDING_RESPONSE_OUTBOX_SCAN,
+    MAX_DECLASSIFICATION_EVIDENCE_BATCH, PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
     RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION,
 };
 use chio_security_types::{
@@ -506,7 +500,7 @@ CREATE TABLE security_attested_finding_response_outbox (
         admission_state IN ('pending', 'prepared', 'rejected', 'expired')
     ),
     completion_state TEXT NOT NULL CHECK (
-        completion_state IN ('not_started', 'pending', 'outcome_unknown_after_dispatch', 'completed')
+        completion_state IN ('not_started', 'pending', 'outcome_unknown_after_dispatch', 'completed', 'simulated')
     ),
     execution_dispatch_id TEXT CHECK (
         execution_dispatch_id IS NULL OR trim(execution_dispatch_id, '0') != ''
@@ -559,7 +553,7 @@ CREATE TABLE security_attested_finding_response_outbox (
     ),
     CHECK (
         (admission_state = 'pending' AND execution_dispatch_id IS NULL
-            AND prepared_dispatch_binding IS NULL AND completion_state = 'not_started')
+            AND prepared_dispatch_binding IS NULL AND completion_state IN ('not_started', 'simulated'))
         OR (admission_state = 'prepared' AND execution_dispatch_id IS NOT NULL
             AND prepared_dispatch_binding IS NOT NULL AND admission_artifact_digest IS NOT NULL
             AND completion_state IN ('pending', 'outcome_unknown_after_dispatch', 'completed'))
@@ -579,7 +573,10 @@ CREATE TABLE security_attested_finding_response_outbox (
         (completion_state = 'completed' AND completion_outcome IS NOT NULL
             AND completion_evidence_id IS NOT NULL
             AND completion_evidence_body_hash IS NOT NULL)
-        OR (completion_state != 'completed' AND completion_outcome IS NULL
+        OR (completion_state = 'simulated' AND completion_outcome IS NULL
+            AND completion_evidence_id IS NOT NULL AND completion_evidence_body_hash IS NOT NULL
+            AND admission_artifact_digest IS NOT NULL AND planning_state = 'planned')
+        OR (completion_state NOT IN ('completed', 'simulated') AND completion_outcome IS NULL
             AND completion_evidence_id IS NULL
             AND completion_evidence_body_hash IS NULL)
     ),
@@ -642,6 +639,7 @@ WHEN NEW.tenant_id IS NOT OLD.tenant_id
   OR (OLD.completion_state = 'outcome_unknown_after_dispatch'
       AND NEW.completion_state NOT IN ('outcome_unknown_after_dispatch', 'completed')
       AND NOT (NEW.admission_state = 'expired' AND NEW.completion_state = 'not_started'))
+  OR (OLD.completion_state = 'simulated' AND NEW.completion_state != 'simulated')
   OR (OLD.completion_state = 'completed'
       AND NEW.completion_state != 'completed')
 BEGIN
@@ -831,8 +829,7 @@ impl SqliteSecurityStateStore {
         #[cfg(target_os = "macos")]
         let lifecycle_lock_path = security_state_lifecycle_lock_path(&self.database_path)?;
         #[cfg(target_os = "macos")]
-        let lifecycle_lock_identity =
-            security_state_database_path_identity(&lifecycle_lock_path)?;
+        let lifecycle_lock_identity = security_state_database_path_identity(&lifecycle_lock_path)?;
         #[cfg(target_os = "macos")]
         validate_security_state_database_binding(
             &lifecycle_lock_path,
@@ -918,7 +915,10 @@ impl SqliteSecurityStateStore {
     }
 
     fn connection(&self) -> PortResult<MutexGuard<'_, Connection>> {
-        let connection = self.connection.lock().map_err(|_| PortError::unavailable())?;
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| PortError::unavailable())?;
         participant_source::ensure_legacy_writable(&connection)?;
         Ok(connection)
     }

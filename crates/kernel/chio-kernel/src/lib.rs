@@ -106,7 +106,6 @@ pub mod provider_verdict;
 pub mod receipt_analytics;
 #[cfg(not(loom))]
 pub mod receipt_query;
-#[cfg(not(loom))]
 pub mod receipt_store;
 #[cfg(not(loom))]
 mod receipt_support;
@@ -114,6 +113,8 @@ mod receipt_support;
 mod replay_retention;
 #[cfg(not(loom))]
 mod request_matching;
+#[cfg(not(loom))]
+pub mod response_simulation_report;
 #[cfg(not(loom))]
 pub mod revocation_runtime;
 #[cfg(not(loom))]
@@ -652,27 +653,28 @@ pub use kernel::{
     ActiveResponseFindingAuthority, ActiveResponseFindingAuthorityError,
     ActiveResponsePolicyRequest, ActiveResponsePolicyResolutionError,
     ActiveResponseReceiptProofSource, ActiveResponseRequirement, ActiveResponseRequirementResolver,
-    ActiveResponseSubmissionProof, ActiveResponseSubmissionProofBody,
-    ActiveResponseSubmissionProofError, AgentId, AuthoritativeCorrelatedFindingEvidence,
-    AutomaticActiveResponseDispatchFenceOutcome, AutomaticActiveResponsePermit, CapabilityId,
-    CapabilityIssuanceAdmissionAuthority, ChildReceiptLog, ChioKernel,
-    DispatchCommittedActiveResponseResume, FederationTreatyAdmissionBinding,
-    FederationTreatyVerification, GovernedActiveResponseReservation,
-    GovernedSecurityRuntimePublication, GovernedSecurityRuntimeStatus, Guard, GuardContext,
-    GuardDecision, HotPathDeadlineConfig, HotPathStage, HybridSigningConfig, KernelBuildError,
-    KernelConfig, KernelError, MemoryBudgetConfig, NativeSecurityAdmissionContext,
-    NativeSecurityFlowJoinAuthority, NativeSecurityNoncePreflightJoinAuthority,
-    NestedToolCallProofs, OverloadResource, PreDispatchActiveResponseReconstruction,
-    PreparedActiveResponseAdmission, PreparedNativeSecurityEgress, PromptProvider, ReceiptLog,
-    ReplayClockDirection, ResourceProvider, ResponseDispatchPreparationRequest,
-    RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
-    RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext,
-    RuntimeParticipantClaimAuthority, SecurityDispatchOutcome, SecurityDispatchOutcomeHandle,
-    SecurityDispatchOutcomeRecorder, SecurityInvocationContext, SecurityInvocationContextAuthority,
-    SecurityInvocationContextV1, SecurityPreDispatchContext, SecurityPreDispatchHook,
-    SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ServerId,
+    ActiveResponseSimulationRequest, ActiveResponseSubmissionProof,
+    ActiveResponseSubmissionProofBody, ActiveResponseSubmissionProofError, AgentId,
+    AuthoritativeCorrelatedFindingEvidence, AutomaticActiveResponseDispatchFenceOutcome,
+    AutomaticActiveResponsePermit, CapabilityId, CapabilityIssuanceAdmissionAuthority,
+    ChildReceiptLog, ChioKernel, DispatchCommittedActiveResponseResume,
+    FederationTreatyAdmissionBinding, FederationTreatyVerification,
+    GovernedActiveResponseReservation, GovernedSecurityRuntimePublication,
+    GovernedSecurityRuntimeStatus, Guard, GuardContext, GuardDecision, HotPathDeadlineConfig,
+    HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
+    MemoryBudgetConfig, NativeSecurityAdmissionContext, NativeSecurityFlowJoinAuthority,
+    NativeSecurityNoncePreflightJoinAuthority, NestedToolCallProofs, OverloadResource,
+    PreDispatchActiveResponseReconstruction, PreparedActiveResponseAdmission,
+    PreparedNativeSecurityEgress, PromptProvider, ReceiptLog, ReplayClockDirection,
+    ResourceProvider, ResponseDispatchPreparationRequest, RuntimeAdmissionContext,
+    RuntimeAdmissionDecision, RuntimeAdmissionHook, RuntimeAdmissionReadinessToken,
+    RuntimeAdmissionRevalidationContext, RuntimeParticipantClaimAuthority, SecurityDispatchOutcome,
+    SecurityDispatchOutcomeHandle, SecurityDispatchOutcomeRecorder, SecurityInvocationContext,
+    SecurityInvocationContextAuthority, SecurityInvocationContextV1, SecurityPreDispatchContext,
+    SecurityPreDispatchHook, SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ServerId,
     SettlementRuntimeConfigError, StructuredErrorReport, VerifiedActiveResponseBindings,
-    VerifiedFederationTreatyMaterial, ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,
+    VerifiedFederationTreatyMaterial, VerifiedResponseSimulationAuthorization,
+    ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,
     ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA, ACTIVE_RESPONSE_SUBMISSION_SCHEMA,
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RECEIPT_APPEND_BUDGET_MS,

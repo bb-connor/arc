@@ -1169,56 +1169,14 @@ fn decode_issuance_freeze_spec(
             .map_err(|_| PortError::invalid_data())?;
     let canonical =
         chio_core::canonical_json_bytes(&spec).map_err(|_| PortError::integrity_failure())?;
-    if canonical.as_slice() != request.canonical_contribution.as_bytes()
-        || spec.lineage_id != key.lineage_id
-        || spec.acquisition.request.tenant_id != request.tenant_id
-        || spec.acquisition.request.action_id != request.action_id
-        || spec.acquisition.expires_at_unix_ms == 0
-        || spec.acquisition.expires_at_unix_ms > request.plan_expires_at_unix_ms
-    {
+    if canonical.as_slice() != request.canonical_contribution.as_bytes() {
         return Err(PortError::invalid_data());
     }
-    let root = RecordId::new(key.lineage_id.as_str()).map_err(PortError::from)?;
-    if spec.acquisition.request.seed_ids.len() != 1
-        || spec.acquisition.request.seed_ids.as_slice().first() != Some(&root)
-    {
-        return Err(PortError::invalid_data());
-    }
-    let BlastRadiusResult::Exact {
-        metadata,
-        sorted_affected_ids,
-        affected_set_hash,
-        graph_slice_hash,
-    } = &spec.acquisition.approved_result
-    else {
-        return Err(PortError::invalid_data());
-    };
-    let bounds = &spec.acquisition.request.query_bounds;
-    if bounds.max_depth == 0
-        || bounds.max_nodes == 0
-        || bounds.max_edges == 0
-        || metadata.query_bounds != *bounds
-        || metadata.source_lineage_version == 0
-        || metadata.commit_index == 0
-        || metadata.commit_index != metadata.authoritative_commit_index
-        || metadata
-            .completeness_watermark
-            .is_none_or(|watermark| watermark < metadata.commit_index)
-        || sorted_affected_ids.as_slice().binary_search(&root).is_err()
-        || response_affected_set_hash(&request.tenant_id, sorted_affected_ids)?
-            != *affected_set_hash
-        || *graph_slice_hash == Digest32::new([0_u8; 32])
-    {
-        return Err(PortError::invalid_data());
-    }
+    spec.validate_for(key, &request.action_id, request.plan_expires_at_unix_ms)?;
     Ok(spec)
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-struct SessionSuspensionContribution {
-    posture_rank: u32,
-}
+use chio_security_types::response_simulation::SessionSuspensionSpec as SessionSuspensionContribution;
 
 /// Exact `SuspendSession` backend backed by the durable containment overlay.
 ///
@@ -1449,11 +1407,7 @@ impl ResponseEffectBackend for SessionSuspensionOverlayBackend {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-struct RestrictEgressContribution {
-    destinations: EgressDestinationSet,
-}
+use chio_security_types::response_simulation::EgressRestrictionSpec as RestrictEgressContribution;
 
 /// Exact destination-aware `RestrictEgress` backend.
 ///

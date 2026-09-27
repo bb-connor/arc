@@ -27,7 +27,10 @@
 
     impl EffectPort for RealAdapterEffects {
         fn ensure_effects_ready(&self) -> PortResult<()> {
-            self.state.lock().map(|_| ()).map_err(|_| PortError::unavailable())
+            self.state
+                .lock()
+                .map(|_| ())
+                .map_err(|_| PortError::unavailable())
         }
 
         fn execute(&self, request: &EffectRequest) -> PortResult<EffectResult> {
@@ -121,9 +124,7 @@
             self.calls.load(Ordering::Acquire)
         }
 
-        fn observed_commit_states(
-            &self,
-        ) -> Vec<(AdmissionOperationState, ReplayReservationState)> {
+        fn observed_commit_states(&self) -> Vec<(AdmissionOperationState, ReplayReservationState)> {
             self.observed_commit_states
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -153,7 +154,8 @@
             &self,
             response_plan: &chio_security_types::ResponsePlan,
             binding: &PreparedActiveResponseDispatchBinding,
-        ) -> Result<AutomaticActiveResponseDispatchFenceOutcome, ActiveResponseExecutorError> {
+        ) -> Result<AutomaticActiveResponseDispatchFenceOutcome, ActiveResponseExecutorError>
+        {
             self.inner
                 .fence_uncommitted_automatic_dispatch(response_plan, binding)
         }
@@ -283,10 +285,23 @@
         finding: AuthoritativeCorrelatedFindingEvidence,
         plan: ReservedAttestedFindingResponsePlan,
         artifacts: AttestedFindingAdmissionArtifacts,
-        native_request: chio_kernel::ActiveResponseAdmissionRequest,
-        governed_request: GovernedApprovalRequest,
+        native_request: Option<chio_kernel::ActiveResponseAdmissionRequest>,
+        governed_request: Option<GovernedApprovalRequest>,
         clock: Arc<FixedClock>,
         runtime: RealAdapterRuntime,
+    }
+
+    impl RealAdapterFixture {
+        fn native_request(&self) -> &chio_kernel::ActiveResponseAdmissionRequest {
+            self.native_request
+                .as_ref()
+                .unwrap_or_else(|| panic!("live request required"))
+        }
+        fn governed_request(&self) -> GovernedApprovalRequest {
+            self.governed_request
+                .clone()
+                .unwrap_or_else(|| panic!("governed live request required"))
+        }
     }
 
     fn real_adapter_now_unix_seconds() -> u64 {
@@ -296,9 +311,7 @@
             .as_secs()
     }
 
-    fn real_adapter_finding(
-        now_unix_ms: u64,
-    ) -> AuthoritativeCorrelatedFindingEvidence {
+    fn real_adapter_finding(now_unix_ms: u64) -> AuthoritativeCorrelatedFindingEvidence {
         let occurred_at_unix_ms = now_unix_ms.saturating_sub(1);
         let body: CorrelatedFindingReceiptBody = serde_json::from_value(json!({
             "header": {
@@ -377,10 +390,9 @@
         let plan_body = response_plan.authorization_body();
         let canonical_plan_body = serde_json::to_value(&plan_body)
             .unwrap_or_else(|error| panic!("real adapter plan body: {error}"));
-        let plan_body_hash = GovernedResponsePlanIntentBody::compute_plan_body_hash(
-            &canonical_plan_body,
-        )
-        .unwrap_or_else(|error| panic!("real adapter plan body hash: {error}"));
+        let plan_body_hash =
+            GovernedResponsePlanIntentBody::compute_plan_body_hash(&canonical_plan_body)
+                .unwrap_or_else(|error| panic!("real adapter plan body hash: {error}"));
         let governed_intent_hash = governed_intent
             .binding_hash()
             .unwrap_or_else(|error| panic!("real adapter governed intent hash: {error}"));
@@ -447,11 +459,9 @@
         ));
         let effects = Arc::new(RealAdapterEffects::default());
         let alerts = Arc::new(RealAdapterAlerts);
-        let executor_identity = ActiveResponseExecutorAuthorityIdentity::new(
-            executor_signer.public_key(),
-            1,
-        )
-        .unwrap_or_else(|error| panic!("real adapter executor identity: {error}"));
+        let executor_identity =
+            ActiveResponseExecutorAuthorityIdentity::new(executor_signer.public_key(), 1)
+                .unwrap_or_else(|error| panic!("real adapter executor identity: {error}"));
         let durable_executor = DurableActiveResponseExecutor::new(
             executor_identity.clone(),
             LeaseOwnerId::new("real-adapter-executor")
@@ -477,10 +487,12 @@
         let policy_version = response_plan.policy_version.clone();
         let approval_policy_id = match &response_plan.approval_requirement {
             ResponseApprovalRequirement::Governed { policy_id } => policy_id.clone(),
-            ResponseApprovalRequirement::Automatic => {
-                panic!("real adapter response plan must be governed")
-            }
+            ResponseApprovalRequirement::Automatic => record("unused-automatic-policy"),
         };
+        let automatic = matches!(
+            response_plan.approval_requirement,
+            ResponseApprovalRequirement::Automatic
+        );
         let active_response_policy_hash = policy_hash.clone();
         let active_response_requirement = Arc::new(
             move |_: &chio_kernel::ActiveResponsePolicyRequest, received: &str| {
@@ -489,6 +501,14 @@
                         expected: active_response_policy_hash.clone(),
                         received: received.to_string(),
                     });
+                }
+                if automatic {
+                    return Ok(ActiveResponseRequirement::automatic(
+                        active_response_policy_hash.clone(),
+                        policy_version.clone(),
+                        60_000,
+                        60_000,
+                    ));
                 }
                 Ok(ActiveResponseRequirement::governed(
                     active_response_policy_hash.clone(),
@@ -499,17 +519,15 @@
             },
         );
         let threshold_requirement = threshold_requirement.clone();
-        let threshold_resolver = Arc::new(
-            move |received: &str, _: &str, _: &str| {
-                if received != threshold_requirement.policy_hash {
-                    return Err(format!(
-                        "stale threshold policy: expected {}, received {received}",
-                        threshold_requirement.policy_hash
-                    ));
-                }
-                Ok(Some(threshold_requirement.clone()))
-            },
-        );
+        let threshold_resolver = Arc::new(move |received: &str, _: &str, _: &str| {
+            if received != threshold_requirement.policy_hash {
+                return Err(format!(
+                    "stale threshold policy: expected {}, received {received}",
+                    threshold_requirement.policy_hash
+                ));
+            }
+            Ok(Some(threshold_requirement.clone()))
+        });
 
         let mut kernel = ChioKernel::new(KernelConfig {
             keypair: operator_authority.clone(),
@@ -535,8 +553,7 @@
 
         let budget_authority: Arc<dyn chio_kernel::budget_store::BudgetStore> = budgets;
         let approval_authority: Arc<dyn ApprovalStore> = approvals.clone();
-        let operation_authority: Arc<dyn AdmissionOperationStore> =
-            admission_operations.clone();
+        let operation_authority: Arc<dyn AdmissionOperationStore> = admission_operations.clone();
         let executor_authority: Arc<dyn ActiveResponseExecutorAuthority> = executor.clone();
         kernel
             .publish_governed_security_runtime(GovernedSecurityRuntimePublication {
@@ -549,12 +566,8 @@
                     finding,
                 ))),
                 executor_authority,
-                capability_issuance_admission_authority: Arc::new(
-                    RealAdapterIssuanceAuthority,
-                ),
-                threshold_policy_authorities: vec![
-                    threshold_policy_authority.public_key(),
-                ],
+                capability_issuance_admission_authority: Arc::new(RealAdapterIssuanceAuthority),
+                threshold_policy_authorities: vec![threshold_policy_authority.public_key()],
                 guards: Vec::new(),
                 pre_dispatch_hook: Arc::new(RealAdapterPreDispatch),
                 post_invocation_pipeline: chio_kernel::PostInvocationPipeline::new(),
@@ -564,6 +577,7 @@
         let coordinator = Arc::new(KernelAttestedFindingResponseCoordinator::new_unbound(
             executor_identity,
             Arc::clone(&clock) as Arc<dyn SecurityClock>,
+            super::super::ActiveResponseExecutionProfile::Live,
         ));
         coordinator
             .bind_kernel(Arc::clone(&kernel))
@@ -579,6 +593,13 @@
     }
 
     fn real_adapter_fixture() -> RealAdapterFixture {
+        real_adapter_fixture_for_mode(chio_security_types::ResponseExecutionMode::Live, true)
+    }
+
+    fn real_adapter_fixture_for_mode(
+        mode: chio_security_types::ResponseExecutionMode,
+        governed: bool,
+    ) -> RealAdapterFixture {
         let directory = tempfile::tempdir()
             .unwrap_or_else(|error| panic!("create real adapter directory: {error}"));
         let paths = RealAdapterPaths::in_directory(directory.path());
@@ -613,16 +634,16 @@
             .cloned()
             .unwrap_or_else(|| panic!("real adapter binding missing"));
         let canonical_contribution = CanonicalBody::new(
-            canonical_json_bytes(&json!({ "maximum_invocations": 1 }))
+            canonical_json_bytes(&json!({ "window_ms": 1000, "max_invocations": 1 }))
                 .unwrap_or_else(|error| panic!("real adapter contribution: {error}")),
         )
         .unwrap_or_else(|error| panic!("real adapter canonical contribution: {error}"));
         let contribution_hash =
             Digest32::new(*chio_core::sha256(canonical_contribution.as_bytes()).as_bytes());
         let approval_policy_id = record("real-adapter-approval-policy");
-        let response_plan = chio_quarantine::build_response_plan(
-            chio_security_types::ResponsePlanInput {
-                execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
+        let response_plan =
+            chio_quarantine::build_response_plan(chio_security_types::ResponsePlanInput {
+                execution: chio_security_types::ResponseExecutionBinding::new(mode),
                 action_id: binding.action_id.clone(),
                 trigger_finding_id: binding.finding_id.clone(),
                 trigger_finding_hash: binding.finding_hash,
@@ -639,7 +660,18 @@
                     },
                     canonical_contribution,
                     contribution_hash,
-                    observed_base_version_hash: Digest32::new([0x44_u8; 32]),
+                    observed_base_version_hash:
+                        chio_security_types::ports::session_throttle_version_hash(
+                            &chio_security_types::ports::empty_session_throttle_snapshot(
+                                chio_security_types::ports::SessionThrottleKey {
+                                    tenant_id: binding.tenant_id.clone(),
+                                    session_id: SessionId::new("real-adapter-session")
+                                        .unwrap_or_else(|e| panic!("session: {e}")),
+                                },
+                            )
+                            .unwrap_or_else(|e| panic!("empty throttle: {e}")),
+                        )
+                        .unwrap_or_else(|e| panic!("throttle version: {e}")),
                 }],
                 ttl_ms: 60_000,
                 created_at_unix_ms: now_unix_ms,
@@ -652,22 +684,24 @@
                         .unwrap_or_else(|| panic!("real adapter capability expiry overflow")),
                     executor_subject: record(&capability.subject.to_hex()),
                 },
-                approval_requirement: ResponseApprovalRequirement::Governed {
-                    policy_id: approval_policy_id.clone(),
+                approval_requirement: if governed {
+                    ResponseApprovalRequirement::Governed {
+                        policy_id: approval_policy_id.clone(),
+                    }
+                } else {
+                    ResponseApprovalRequirement::Automatic
                 },
                 submitter: record(&submitter.public_key().to_hex()),
                 reason_hash: Digest32::new([0x45_u8; 32]),
-            },
-        )
-        .unwrap_or_else(|error| panic!("build real adapter response plan: {error}"));
+            })
+            .unwrap_or_else(|error| panic!("build real adapter response plan: {error}"));
 
         let plan_body = response_plan.authorization_body();
         let canonical_plan_body = serde_json::to_value(&plan_body)
             .unwrap_or_else(|error| panic!("real adapter canonical plan body: {error}"));
-        let plan_body_hash = GovernedResponsePlanIntentBody::compute_plan_body_hash(
-            &canonical_plan_body,
-        )
-        .unwrap_or_else(|error| panic!("real adapter governed plan hash: {error}"));
+        let plan_body_hash =
+            GovernedResponsePlanIntentBody::compute_plan_body_hash(&canonical_plan_body)
+                .unwrap_or_else(|error| panic!("real adapter governed plan hash: {error}"));
         assert_eq!(
             super::digest_from_canonical_hex(&plan_body_hash)
                 .unwrap_or_else(|error| panic!("real adapter plan digest: {error}")),
@@ -761,8 +795,12 @@
             &approver,
         )
         .unwrap_or_else(|error| panic!("sign real adapter approval: {error}"));
-        let approval_tokens = vec![approval_token];
-        let threshold_proposal = Some(proposal);
+        let approval_tokens = if governed {
+            vec![approval_token]
+        } else {
+            vec![]
+        };
+        let threshold_proposal = if governed { Some(proposal) } else { None };
         let artifact_ref = AdmissionArtifactRef::new("real-adapter-admission-artifacts")
             .unwrap_or_else(|error| panic!("real adapter artifact ref: {error}"));
         let payload_digest = chio_kernel::active_response_admission_artifact_payload_digest(
@@ -777,17 +815,14 @@
         let proof_digest = chio_kernel::active_response_submission_proof_digest(&submission_proof)
             .unwrap_or_else(|error| panic!("real adapter proof digest: {error}"));
         let attestation_body = ActiveResponseArtifactAuthorityAttestationBody {
-            schema: chio_kernel::ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA
-                .to_string(),
+            schema: chio_kernel::ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA.to_string(),
             artifact_ref: artifact_ref.clone(),
             action_id: response_plan.action_id.clone(),
             tenant_id: response_plan.tenant_id.clone(),
             artifact_payload_digest: payload_digest,
             submission_proof_digest: proof_digest,
-            plan_body_hash: super::digest_from_canonical_hex(
-                &submission_proof.body.plan_body_hash,
-            )
-            .unwrap_or_else(|error| panic!("real adapter proof plan hash: {error}")),
+            plan_body_hash: super::digest_from_canonical_hex(&submission_proof.body.plan_body_hash)
+                .unwrap_or_else(|error| panic!("real adapter proof plan hash: {error}")),
             governed_intent_hash: super::digest_from_canonical_hex(
                 &submission_proof.body.governed_intent_hash,
             )
@@ -797,22 +832,27 @@
             issued_at_unix_ms: submission_proof.body.issued_at_unix_ms,
             expires_at_unix_ms: submission_proof.body.expires_at_unix_ms,
         };
-        let authority_attestation =
-            ActiveResponseArtifactAuthorityAttestation::sign_with_backend(
-                attestation_body,
-                &Ed25519Backend::new(submission_authority.clone()),
-            )
-            .unwrap_or_else(|error| panic!("sign real adapter attestation: {error}"));
-        let native_request = chio_kernel::ActiveResponseAdmissionRequest::new(
-            chio_security_types::FreshLiveAdmission::new(response_plan.clone())
-                .unwrap_or_else(|error| panic!("real adapter fresh admission: {error}")),
-            authorization,
-            artifact_ref.clone(),
-            authority_attestation.clone(),
-            threshold_proposal.clone(),
-            approval_tokens.clone(),
+        let authority_attestation = ActiveResponseArtifactAuthorityAttestation::sign_with_backend(
+            attestation_body,
+            &Ed25519Backend::new(submission_authority.clone()),
         )
-        .unwrap_or_else(|error| panic!("real adapter native request: {error}"));
+        .unwrap_or_else(|error| panic!("sign real adapter attestation: {error}"));
+        let native_request = if mode == chio_security_types::ResponseExecutionMode::Live {
+            Some(
+                chio_kernel::ActiveResponseAdmissionRequest::new(
+                    chio_security_types::FreshLiveAdmission::new(response_plan.clone())
+                        .unwrap_or_else(|error| panic!("real adapter fresh admission: {error}")),
+                    authorization,
+                    artifact_ref.clone(),
+                    authority_attestation.clone(),
+                    threshold_proposal.clone(),
+                    approval_tokens.clone(),
+                )
+                .unwrap_or_else(|error| panic!("real adapter native request: {error}")),
+            )
+        } else {
+            None
+        };
         let artifacts = AttestedFindingAdmissionArtifacts::new(
             artifact_ref.clone(),
             capability,
@@ -834,8 +874,14 @@
             admission_artifact_ref: artifact_ref,
             admission_artifact_digest: Some(artifact_digest),
         };
-        let governed_request = governed_approval_request_from_native(&native_request)
-            .unwrap_or_else(|error| panic!("real adapter portable projection: {error}"));
+        let governed_request = if governed {
+            native_request.as_ref().map(|request| {
+                governed_approval_request_from_native(request)
+                    .unwrap_or_else(|error| panic!("real adapter portable projection: {error}"))
+            })
+        } else {
+            None
+        };
         let execution_now_unix_ms = plan
             .response_plan()
             .created_at_unix_ms
@@ -873,9 +919,7 @@
         }
     }
 
-    fn real_adapter_prepared_operation_id(
-        prepared: &PreparedAttestedFindingResponse,
-    ) -> String {
+    fn real_adapter_prepared_operation_id(prepared: &PreparedAttestedFindingResponse) -> String {
         let PreparedAttestedFindingResponse::Kernel(prepared) = prepared else {
             panic!("real adapter preparation must retain a kernel admission");
         };
@@ -889,7 +933,9 @@
         let connection = Connection::open(path)
             .unwrap_or_else(|error| panic!("open real adapter database: {error}"));
         let count: i64 = connection
-            .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0))
+            .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
             .unwrap_or_else(|error| panic!("count real adapter {table}: {error}"));
         checked_sqlite_count(count, table)
     }
@@ -897,14 +943,8 @@
     fn real_adapter_mutation_snapshot(paths: &RealAdapterPaths) -> [u64; 5] {
         [
             real_adapter_table_count(&paths.admission_operations, "admission_operations"),
-            real_adapter_table_count(
-                &paths.approvals,
-                "chio_hitl_operation_reservations",
-            ),
-            real_adapter_table_count(
-                &paths.approvals,
-                "chio_hitl_operation_reservation_tokens",
-            ),
+            real_adapter_table_count(&paths.approvals, "chio_hitl_operation_reservations"),
+            real_adapter_table_count(&paths.approvals, "chio_hitl_operation_reservation_tokens"),
             real_adapter_table_count(&paths.budgets, "budget_authorization_holds"),
             real_adapter_table_count(&paths.budgets, "budget_hold_quota_members"),
         ]
@@ -912,26 +952,14 @@
 
     fn real_adapter_budget_and_replay_snapshot(paths: &RealAdapterPaths) -> [u64; 9] {
         [
-            real_adapter_table_count(
-                &paths.approvals,
-                "chio_hitl_operation_reservations",
-            ),
-            real_adapter_table_count(
-                &paths.approvals,
-                "chio_hitl_operation_reservation_tokens",
-            ),
+            real_adapter_table_count(&paths.approvals, "chio_hitl_operation_reservations"),
+            real_adapter_table_count(&paths.approvals, "chio_hitl_operation_reservation_tokens"),
             real_adapter_table_count(&paths.approvals, "chio_hitl_consumed_tokens"),
             real_adapter_table_count(&paths.budgets, "budget_authorization_holds"),
-            real_adapter_table_count(
-                &paths.budgets,
-                "budget_hold_authorization_artifacts",
-            ),
+            real_adapter_table_count(&paths.budgets, "budget_hold_authorization_artifacts"),
             real_adapter_table_count(&paths.budgets, "budget_mutation_events"),
             real_adapter_table_count(&paths.budgets, "budget_invocation_quotas"),
-            real_adapter_table_count(
-                &paths.budgets,
-                "budget_event_authorization_artifacts",
-            ),
+            real_adapter_table_count(&paths.budgets, "budget_event_authorization_artifacts"),
             real_adapter_table_count(&paths.budgets, "budget_hold_quota_members"),
         ]
     }
@@ -1000,18 +1028,18 @@
             .unwrap_or_else(|| panic!("real adapter portable reservation missing"));
         assert_eq!(
             kernel_prepared.request.response_plan(),
-            fixture.native_request.response_plan()
+            fixture.native_request().response_plan()
         );
         assert_eq!(
             governed_approval_request_from_native(&kernel_prepared.request)
                 .unwrap_or_else(|error| panic!("project retained real adapter request: {error}")),
-            fixture.governed_request
+            fixture.governed_request()
         );
-        assert_eq!(portable_reservation.request, fixture.governed_request);
+        assert_eq!(portable_reservation.request, fixture.governed_request());
         assert_eq!(portable_reservation.prepared_dispatch_binding, binding);
         assert_eq!(
             portable_reservation.expires_at_unix_ms,
-            fixture.governed_request.proposal_expires_at_unix_ms
+            fixture.governed_request().proposal_expires_at_unix_ms
         );
         let reserved_operation = fixture
             .runtime
@@ -1030,23 +1058,23 @@
             .unwrap_or_else(|error| panic!("load reserved real adapter approval: {error}"))
             .unwrap_or_else(|| panic!("reserved real adapter approval missing"));
         assert_eq!(reserved_approval.state(), ReplayReservationState::Reserved);
-        assert_eq!(real_adapter_mutation_snapshot(&fixture.paths), [1, 1, 1, 0, 0]);
+        assert_eq!(
+            real_adapter_mutation_snapshot(&fixture.paths),
+            [1, 1, 1, 0, 0]
+        );
         assert_eq!(fixture.runtime.effects.executions(), 0);
         assert_eq!(fixture.runtime.executor.calls(), 0);
 
         let recreated = Arc::new(KernelAttestedFindingResponseCoordinator::new_unbound(
             fixture.runtime.executor.identity(),
             Arc::clone(&fixture.clock) as Arc<dyn SecurityClock>,
+            super::super::ActiveResponseExecutionProfile::Live,
         ));
         recreated
             .bind_kernel(Arc::clone(&fixture.runtime.kernel))
             .unwrap_or_else(|error| panic!("bind recreated real adapter: {error}"));
         let reconstructed = match recreated
-            .reconstruct_pre_dispatch(
-                &fixture.plan,
-                fixture.artifacts.clone(),
-                &binding,
-            )
+            .reconstruct_pre_dispatch(&fixture.plan, fixture.artifacts.clone(), &binding)
             .unwrap_or_else(|error| panic!("reconstruct real adapter preparation: {error}"))
         {
             AttestedFindingPreDispatchReconstruction::Prepared(prepared) => *prepared,
@@ -1088,7 +1116,10 @@
                 .state(),
             ReplayReservationState::Reserved
         );
-        assert_eq!(real_adapter_mutation_snapshot(&fixture.paths), [1, 1, 1, 0, 0]);
+        assert_eq!(
+            real_adapter_mutation_snapshot(&fixture.paths),
+            [1, 1, 1, 0, 0]
+        );
         assert_eq!(fixture.runtime.effects.executions(), 0);
         assert_eq!(fixture.runtime.executor.calls(), 0);
 
@@ -1122,8 +1153,14 @@
             .get_approval_reservation(&operation_id)
             .unwrap_or_else(|error| panic!("load committed real adapter approval: {error}"))
             .unwrap_or_else(|| panic!("committed real adapter approval missing"));
-        assert_eq!(committed_approval.state(), ReplayReservationState::Committed);
-        assert_eq!(real_adapter_mutation_snapshot(&fixture.paths), [1, 1, 1, 0, 0]);
+        assert_eq!(
+            committed_approval.state(),
+            ReplayReservationState::Committed
+        );
+        assert_eq!(
+            real_adapter_mutation_snapshot(&fixture.paths),
+            [1, 1, 1, 0, 0]
+        );
         let original_effects = Arc::clone(&fixture.runtime.effects);
         drop(recreated);
         drop(fixture.runtime);
@@ -1184,7 +1221,10 @@
                 .state(),
             ReplayReservationState::Committed
         );
-        assert_eq!(real_adapter_mutation_snapshot(&fixture.paths), [1, 1, 1, 0, 0]);
+        assert_eq!(
+            real_adapter_mutation_snapshot(&fixture.paths),
+            [1, 1, 1, 0, 0]
+        );
         let cold_effect_executions = cold.effects.executions();
         drop(cold);
 
@@ -1259,8 +1299,7 @@
     }
 
     fn mutate_real_adapter_proposal_deadline(request: &mut GovernedApprovalRequest) {
-        request.proposal_expires_at_unix_ms =
-            request.proposal_expires_at_unix_ms.saturating_sub(1);
+        request.proposal_expires_at_unix_ms = request.proposal_expires_at_unix_ms.saturating_sub(1);
     }
 
     fn mutate_real_adapter_capability_digest(request: &mut GovernedApprovalRequest) {
@@ -1298,12 +1337,12 @@
             ("artifact_digest", mutate_real_adapter_artifact_digest),
         ];
         for (name, mutate) in cases {
-            let mut substituted = fixture.governed_request.clone();
+            let mut substituted = fixture.governed_request().clone();
             mutate(&mut substituted);
             let verifier = KernelActiveResponseApprovalVerifier::for_prepare(
                 fixture.runtime.kernel.as_ref(),
                 &substituted,
-                &fixture.native_request,
+                fixture.native_request(),
             );
             let error = rejected(
                 verifier.verify_and_reserve(&substituted),
@@ -1351,23 +1390,21 @@
             .unwrap_or_else(|| panic!("scoped mutation fixture reservation missing"));
         let prepared_native = kernel_prepared.prepared.clone();
         let reserved_baseline = real_adapter_mutation_snapshot(&fixture.paths);
-        let reserved_budget_and_replay =
-            real_adapter_budget_and_replay_snapshot(&fixture.paths);
+        let reserved_budget_and_replay = real_adapter_budget_and_replay_snapshot(&fixture.paths);
         assert_eq!(reserved_baseline, [1, 1, 1, 0, 0]);
         assert_eq!(reserved_budget_and_replay, [1, 1, 0, 0, 0, 0, 0, 0, 0]);
 
         for (name, mutate) in cases {
-            let mut substituted = fixture.governed_request.clone();
+            let mut substituted = fixture.governed_request().clone();
             mutate(&mut substituted);
             let mut substituted_reservation = retained.clone();
             substituted_reservation.request = substituted.clone();
-            substituted_reservation.expires_at_unix_ms =
-                substituted.proposal_expires_at_unix_ms;
+            substituted_reservation.expires_at_unix_ms = substituted.proposal_expires_at_unix_ms;
 
             let reconstruct = KernelActiveResponseApprovalVerifier::for_reconstruction(
                 fixture.runtime.kernel.as_ref(),
                 &substituted,
-                &fixture.native_request,
+                fixture.native_request(),
             );
             let reconstruct_error = rejected(
                 reconstruct.reconstruct(&substituted, &substituted_reservation),
@@ -1385,7 +1422,7 @@
             let commit = KernelActiveResponseApprovalVerifier::for_commit(
                 fixture.runtime.kernel.as_ref(),
                 &substituted,
-                &fixture.native_request,
+                fixture.native_request(),
                 prepared_native.clone(),
             );
             let commit_error = rejected(
@@ -1401,7 +1438,7 @@
             let cancel = KernelActiveResponseApprovalVerifier::for_cancel(
                 fixture.runtime.kernel.as_ref(),
                 &substituted,
-                &fixture.native_request,
+                fixture.native_request(),
                 prepared_native.clone(),
             );
             let cancel_error = rejected(
@@ -1447,3 +1484,6 @@
         assert_eq!(fixture.runtime.effects.executions(), 0);
         assert_eq!(fixture.runtime.executor.calls(), 0);
     }
+
+    #[path = "tests/response_dry_run.rs"]
+    mod response_dry_run;

@@ -189,7 +189,7 @@ impl<
             let snapshot = decode_response_record(&current)?;
             snapshot
                 .plan
-                .require_live_or_legacy_execution()
+                .require_live_execution()
                 .map_err(StateMachineError::from)?;
             self.validate_work(&snapshot, work, now_unix_ms)?;
             self.reconcile_receipts(&current)?;

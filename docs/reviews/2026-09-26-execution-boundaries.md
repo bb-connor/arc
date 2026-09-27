@@ -1,5 +1,9 @@
 # Response and keyring execution checkpoint
 
+> Superseded response compatibility decision (September 27): execution bindings are
+> required for all plans and recovery. The unshipped legacy path and retirement
+> queue are removed. See [production response simulation](2026-09-27-production-response-simulation.md).
+
 This batch continues from `c7a20fe626` in the isolated
 `/tmp/arc-security-launch` worktree. Implementation was inline, with one
 independent reviewer reused for dependency and synchronization follow-ups. The

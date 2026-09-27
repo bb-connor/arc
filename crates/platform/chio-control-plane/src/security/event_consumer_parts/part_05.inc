@@ -921,4 +921,4 @@
         env!("CARGO_MANIFEST_DIR"),
         "/src/security/event_consumer_parts/part_06.inc"
     ));
-    include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/security/event_consumer_parts/legacy_recovery.inc"));
+    include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/security/event_consumer_parts/committed_recovery.inc"));

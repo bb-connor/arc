@@ -136,6 +136,30 @@ pub struct ActiveDefenseDeploymentConfig {
 }
 
 impl ActiveDefenseDeploymentConfig {
+    /// Select the host profile from the authenticated deployment. A simulator
+    /// must bind this exact deployment and its configured receipt signer.
+    pub fn response_execution_profile(
+        &self,
+        simulator: Option<
+            std::sync::Arc<chio_control_plane::security::ProductionResponseSimulator>,
+        >,
+    ) -> Result<chio_control_plane::security::ActiveResponseExecutionProfile> {
+        self.validate()?;
+        use chio_control_plane::security::ActiveResponseExecutionProfile;
+        match (self.response_authority.response_execution_mode, simulator) {
+            (ResponseExecutionMode::Live, None) => Ok(ActiveResponseExecutionProfile::Live),
+            (ResponseExecutionMode::DryRun, Some(simulator))
+                if simulator.configuration_digest() == self.deployment_digest
+                    && simulator.signing_identity() == self.secret_broker.receipt_signing_identity =>
+            {
+                Ok(ActiveResponseExecutionProfile::DryRun(simulator))
+            }
+            _ => Err(AuthorityError::InvalidConfig(
+                "response execution profile does not match the deployment mode, digest and receipt signer".to_owned(),
+            )),
+        }
+    }
+
     pub fn compute_deployment_digest(&self) -> Result<Digest32> {
         self.validate_structure(false)?;
         let mut normalized = self.clone();

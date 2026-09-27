@@ -55,13 +55,15 @@ Foundation integration retains the original steps 1-4 acceptance boundary. Once 
 
 **Contract:** The rollout requires real approval, capability, causal-scope, receipt and rollback checks without external effects. `SecretBrokerDeploymentBinding.stage` is not this execution-mode contract.
 
-- [ ] Bind an explicit response execution mode into authenticated deployment configuration and signed authorization/evidence. Update affected closed schema versions and readers together. Reject unknown modes and mode substitution; legacy records cannot acquire live authority through inferred defaults.
-- [ ] Share the existing plan/approval validators and pure transition rules. Keep the existing `ResponseApprovalCoordinator` boundary: quarantine does not become a second cryptographic approval verifier.
-- [ ] Evaluate apply, overlap, expiry and rollback against an immutable, version-bound snapshot using an isolated simulation state. The simulator must not own a live `EffectPort` or external alert-delivery capability. Reuse pure effect-composition rules instead of cloning their policy into a parallel engine.
-- [ ] Emit a distinct signed simulation report binding tenant, plan, configuration, authorization, snapshot versions and simulated outcomes. Persist the report through the real receipt path. Simulation never emits live `Applied` evidence, installs an overlay or populates recoverable live dispatch work.
-- [ ] Wire the real authority, kernel approval, scheduler/host lifecycle and receipt store through this profile. Preserve the existing live executor's behavior and admission requirements.
-- [ ] Add `response_dry_run.rs` owning tests in `chio-quarantine/tests/` and `chio-control-plane/tests/`. Cover all six effect kinds, both approval requirements, missing/expired approval, stale scope, overlap, both expiry orders, rollback conflict, receipt failure, restart and cross-mode replay. Assert zero live effect calls and unchanged live contributions, including denial and failure paths.
-- [ ] Run both new test targets plus the affected existing response recovery gate. Commit the behavior and its regressions as one reviewable packet.
+- [x] Bind an explicit response execution mode into authenticated deployment configuration and signed authorization/evidence. Update affected closed schema versions and readers together. Reject missing or unknown modes and mode substitution. The September 27 directive removes legacy response-plan decoding and all compatibility recovery paths.
+- [x] Share the existing plan/approval validators and pure transition rules. Keep the existing `ResponseApprovalCoordinator` boundary: quarantine does not become a second cryptographic approval verifier.
+- [x] Evaluate apply, overlap, expiry and rollback against an immutable, version-bound snapshot using an isolated simulation state. The simulator must not own a live `EffectPort` or external alert-delivery capability. Reuse pure effect-composition rules instead of cloning their policy into a parallel engine.
+- [x] Emit a distinct signed simulation report binding tenant, plan, configuration, authorization, snapshot versions and simulated outcomes. Persist the report through the real receipt path. Simulation never emits live `Applied` evidence, installs an overlay or populates recoverable live dispatch work.
+- [x] Wire the real authority, kernel approval, scheduler/host lifecycle and receipt store through this profile. Preserve the existing live executor's behavior and admission requirements.
+- [x] Add `response_dry_run.rs` owning tests in `chio-quarantine/tests/` and `chio-control-plane/tests/`. Cover all six effect kinds, both approval requirements, missing/expired approval, stale scope, overlap, both expiry orders, rollback conflict, receipt failure, restart and cross-mode replay. Assert zero live effect calls and unchanged live contributions, including denial and failure paths.
+- [x] Run both new test targets plus the affected existing response recovery gate. Commit the behavior and its regressions as one reviewable packet.
+
+**Local completion (2026-09-27):** [Implementation and focused verification](../../reviews/2026-09-27-production-response-simulation.md). The unshipped compatibility/inventory work is superseded by mandatory execution bindings. Hosted and rollout acceptance remain separate.
 
 **Exit:** A production-composed signed dry-run can be independently verified, models rollback truthfully and cannot authorize or perform a live effect. Simulation success does not establish that a future external effect will succeed.
 

@@ -12,10 +12,11 @@ pub mod response;
 pub mod response_dispatch;
 mod response_domains;
 pub mod response_execution;
+pub mod response_simulation;
 
 pub use response_dispatch::DispatchRejection;
 pub use response_execution::{
-    FreshLiveAdmission, PlanProvenance, ResponseExecutionBinding, ResponseExecutionBindingError,
+    FreshLiveAdmission, ResponseExecutionBinding, ResponseExecutionBindingError,
     ResponseExecutionMode, RESPONSE_EXECUTION_BINDING_SCHEMA_VERSION,
 };
 

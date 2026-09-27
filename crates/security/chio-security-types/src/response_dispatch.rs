@@ -10,9 +10,6 @@ use core::fmt;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DispatchRejection {
-    /// The plan predates execution bindings. Its historical evidence stays
-    /// decodable; it cannot enter live execution as new work.
-    LegacyPlanFreshDispatch,
     /// The plan is bound to a mode other than live execution.
     ExecutionMode { observed: ResponseExecutionMode },
     /// The plan carries a binding this reader does not understand.
@@ -52,9 +49,6 @@ pub enum DispatchRejection {
 impl fmt::Display for DispatchRejection {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::LegacyPlanFreshDispatch => formatter.write_str(
-                "response plan carries no execution binding and cannot enter live execution",
-            ),
             Self::ExecutionMode { observed } => write!(
                 formatter,
                 "response plan is bound to {} execution; live execution requires {}",
@@ -109,8 +103,7 @@ impl core::error::Error for DispatchRejection {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Self::ExecutionBinding(error) => Some(error),
-            Self::LegacyPlanFreshDispatch
-            | Self::ExecutionMode { .. }
+            Self::ExecutionMode { .. }
             | Self::CapabilityDigestMismatch
             | Self::ZeroExecutorGeneration
             | Self::AuthorizationOutsideWindow { .. }

@@ -765,12 +765,19 @@ fn validate_database_schema(connection: &Connection) -> Result<()> {
 
 pub struct PreAdmittedAuthorityHandler {
     store: Arc<AuthorityStore>,
+    execution_mode: chio_security_types::ResponseExecutionMode,
 }
 
 impl PreAdmittedAuthorityHandler {
     #[must_use]
-    pub const fn new(store: Arc<AuthorityStore>) -> Self {
-        Self { store }
+    pub const fn new(
+        store: Arc<AuthorityStore>,
+        execution_mode: chio_security_types::ResponseExecutionMode,
+    ) -> Self {
+        Self {
+            store,
+            execution_mode,
+        }
     }
 
     fn map_lookup<T>(result: Result<T>) -> ActiveResponseAuthorityHandlerResult<T> {
@@ -802,7 +809,11 @@ impl ActiveResponseAuthorityHandler for PreAdmittedAuthorityHandler {
         finding: &CorrelatedFindingReceiptBody,
         binding: &AttestedFindingBatchBinding,
     ) -> ActiveResponseAuthorityHandlerResult<ActiveResponsePolicySelectionWire> {
-        Self::map_lookup(self.store.select_policy(evidence_id, finding, binding))
+        let selection = Self::map_lookup(self.store.select_policy(evidence_id, finding, binding))?;
+        if selection.execution.mode() != self.execution_mode {
+            return Self::map_lookup(Err(AuthorityError::NotPreAdmitted));
+        }
+        Ok(selection)
     }
 
     fn load_artifacts(
@@ -810,6 +821,9 @@ impl ActiveResponseAuthorityHandler for PreAdmittedAuthorityHandler {
         response_plan: &ResponsePlan,
         admission_artifact_ref: &AdmissionArtifactRef,
     ) -> ActiveResponseAuthorityHandlerResult<ActiveResponseAdmissionArtifactsDraftWire> {
+        if response_plan.execution.mode() != self.execution_mode {
+            return Self::map_lookup(Err(AuthorityError::NotPreAdmitted));
+        }
         Self::map_lookup(
             self.store
                 .load_artifacts(response_plan, admission_artifact_ref),

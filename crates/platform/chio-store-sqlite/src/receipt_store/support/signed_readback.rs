@@ -7,7 +7,7 @@ use super::*;
 /// precision. This preserves the historical ordinary and canonical writers.
 /// Signature verification and row binding remain the caller's responsibility.
 fn decode_signed_json<T: DeserializeOwned>(raw: &str) -> Result<T, ReceiptStoreError> {
-    let value = chio_core::canonical::parse_legacy_signed_json(raw)
+    let value = chio_core::canonical::parse_signed_json(raw)
         .map_err(|error| ReceiptStoreError::Conflict(format!("signed JSON: {error}")))?;
     serde_json::from_value(value).map_err(ReceiptStoreError::from)
 }

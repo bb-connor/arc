@@ -1,4 +1,4 @@
-use chio_core_types::canonical::{canonical_json_bytes, parse_legacy_signed_json};
+use chio_core_types::canonical::{canonical_json_bytes, parse_signed_json};
 use chio_core_types::Error;
 
 #[test]
@@ -16,7 +16,7 @@ fn both_existing_writers_preserve_signed_values() -> Result<(), Box<dyn std::err
         serde_json::to_vec_pretty(&value)?,
         canonical.clone(),
     ] {
-        let parsed = parse_legacy_signed_json(std::str::from_utf8(&bytes)?)?;
+        let parsed = parse_signed_json(std::str::from_utf8(&bytes)?)?;
         assert_eq!(canonical_json_bytes(&parsed)?, canonical);
     }
     Ok(())
@@ -36,7 +36,7 @@ fn duplicate_and_lossy_tokens_reject_before_value_construction() {
     ] {
         assert!(
             matches!(
-                parse_legacy_signed_json(input),
+                parse_signed_json(input),
                 Err(Error::CanonicalJson(reason)) if reason.contains(cause)
             ),
             "accepted or misclassified {input}"

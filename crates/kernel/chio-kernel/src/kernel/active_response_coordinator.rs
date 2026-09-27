@@ -901,7 +901,7 @@ impl ChioKernel {
 
     pub(super) fn verify_active_response_threshold(
         &self,
-        request: &ActiveResponseAdmissionRequest,
+        request: &(impl super::active_response_simulation::ActiveResponseApprovalInputs + ?Sized),
         bindings: &VerifiedActiveResponseBindings,
         requirement: &VerifiedActiveResponseRequirement,
         now: u64,

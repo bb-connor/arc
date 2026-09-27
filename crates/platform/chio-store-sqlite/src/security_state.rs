@@ -6,6 +6,7 @@ mod flow_state;
 mod issuance_freeze;
 mod native_declassification;
 mod native_egress;
+mod response_simulation;
 pub(crate) use native_declassification::NativeDeclassificationOutcome;
 mod native_mutation;
 mod participant_source;

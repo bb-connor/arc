@@ -615,7 +615,7 @@ pub fn build_response_plan(input: ResponsePlanInput) -> Result<ResponsePlan, Sta
     }
     let effects = PlannedResponseEffects::new(effects).map_err(PlanDefect::EffectBound)?;
     let mut plan = ResponsePlan {
-        execution: chio_security_types::PlanProvenance::Bound(input.execution),
+        execution: input.execution,
         action_id: input.action_id,
         trigger_finding_id: input.trigger_finding_id,
         trigger_finding_hash: input.trigger_finding_hash,
@@ -696,7 +696,7 @@ fn encode_response_record_with_mode(
     })
 }
 
-fn validate_plan(plan: &ResponsePlan) -> Result<(), StateMachineError> {
+pub(crate) fn validate_plan(plan: &ResponsePlan) -> Result<(), StateMachineError> {
     plan.validate_shape()?;
     if plan.affected_set_hash
         != response_affected_set_hash(&plan.tenant_id, &plan.affected_ids)

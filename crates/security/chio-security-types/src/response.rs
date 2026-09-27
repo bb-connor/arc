@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::response_dispatch::DispatchRejection;
 use crate::response_execution::{
-    PlanProvenance, ResponseExecutionBinding, ResponseExecutionBindingError, ResponseExecutionMode,
+    ResponseExecutionBinding, ResponseExecutionBindingError, ResponseExecutionMode,
 };
 
 pub const RESPONSE_STATE_SCHEMA_VERSION: u8 = 1;
@@ -199,9 +199,8 @@ pub struct ResponsePlanInput {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResponsePlan {
-    /// Absent only in historical plans, which cannot authorize a fresh dispatch.
-    #[serde(default, skip_serializing_if = "PlanProvenance::is_legacy")]
-    pub execution: PlanProvenance,
+    /// Required signed execution mode. Missing or unknown bindings reject.
+    pub execution: ResponseExecutionBinding,
     pub action_id: ActionId,
     pub trigger_finding_id: RecordId,
     pub trigger_finding_hash: Digest32,
@@ -244,12 +243,11 @@ pub struct ResponsePlanAuthorizationEffect {
 /// become part of its own preimage. Every executable contribution remains
 /// bound by its validated canonical hash and derived effect identifier.
 /// `execution` is part of this signed commitment: stripping a dry-run binding
-/// to claim legacy provenance changes the body hash and invalidates authority.
+/// changes the body hash and invalidates authority; decoding also requires it.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResponsePlanAuthorizationBody {
-    #[serde(default, skip_serializing_if = "PlanProvenance::is_legacy")]
-    pub execution: PlanProvenance,
+    pub execution: ResponseExecutionBinding,
     pub action_id: ActionId,
     pub trigger_finding_id: RecordId,
     pub trigger_finding_hash: Digest32,
@@ -273,31 +271,13 @@ impl ResponsePlan {
     /// The rule that admits a plan to fresh live execution: the plan carries a
     /// binding, the binding is readable, and its mode is live.
     pub fn require_live_execution(&self) -> Result<ResponseExecutionBinding, DispatchRejection> {
-        let binding = match self.execution {
-            PlanProvenance::Legacy => return Err(DispatchRejection::LegacyPlanFreshDispatch),
-            PlanProvenance::Bound(binding) => binding,
-        };
+        let binding = self.execution;
         if binding.mode() != ResponseExecutionMode::Live {
             return Err(DispatchRejection::ExecutionMode {
                 observed: binding.mode(),
             });
         }
         Ok(binding)
-    }
-
-    /// The rule for work that is already committed or in flight: a plan bound
-    /// to simulation never continues as live work. A plan with no binding is
-    /// historical and is tolerated here only; fresh admission refuses it.
-    pub fn require_live_or_legacy_execution(&self) -> Result<(), DispatchRejection> {
-        match self.execution {
-            PlanProvenance::Legacy => Ok(()),
-            PlanProvenance::Bound(binding) if binding.mode() == ResponseExecutionMode::Live => {
-                Ok(())
-            }
-            PlanProvenance::Bound(binding) => Err(DispatchRejection::ExecutionMode {
-                observed: binding.mode(),
-            }),
-        }
     }
 
     #[must_use]
