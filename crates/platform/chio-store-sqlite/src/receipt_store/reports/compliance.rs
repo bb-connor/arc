@@ -78,6 +78,8 @@ impl SqliteReceiptStore {
             },
         )?;
 
+        // Both subtrahends count subsets of matching_receipts in the same SQL
+        // aggregate, so neither subtraction can underflow.
         let uncheckpointed_receipts = matching_receipts.saturating_sub(evidence_ready_receipts);
         let lineage_gap_receipts = matching_receipts.saturating_sub(lineage_covered_receipts);
         let export_query = query

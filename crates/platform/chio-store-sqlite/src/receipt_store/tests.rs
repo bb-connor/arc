@@ -1,3 +1,5 @@
+#[path = "tests/accounting_boundaries.rs"]
+mod accounting_boundaries;
 #[path = "tests/attempted_cost.rs"]
 mod attempted_cost;
 #[path = "tests/background_checkpoints.rs"]
@@ -14,6 +16,8 @@ mod errors;
 mod federated_lineage;
 #[path = "tests/head_property.rs"]
 mod head_property;
+#[path = "tests/indexed_retention.rs"]
+mod indexed_retention;
 #[path = "tests/insert.rs"]
 mod insert;
 #[path = "tests/liability.rs"]

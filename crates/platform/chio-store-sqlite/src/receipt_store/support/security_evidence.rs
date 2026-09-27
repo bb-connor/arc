@@ -104,6 +104,40 @@ const SECURITY_EVIDENCE_INDEX_SCHEMA: &str = r#"
         END;
         "#;
 
+#[derive(Clone, Copy)]
+enum EvidenceDatabase {
+    Main,
+    Archive,
+}
+
+impl EvidenceDatabase {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Main => "main",
+            Self::Archive => "archive",
+        }
+    }
+}
+
+/// Archive identities have the same immutable schema as live identities.
+/// The caller's transaction owns creation and validation before any payload copy.
+pub(crate) fn ensure_archive_security_evidence_schema(
+    connection: &Connection,
+) -> Result<(), ReceiptStoreError> {
+    connection.execute_batch(
+        &SECURITY_EVIDENCE_INDEX_SCHEMA
+            .replace(
+                "CREATE TABLE chio_",
+                "CREATE TABLE IF NOT EXISTS archive.chio_",
+            )
+            .replace(
+                "CREATE TRIGGER chio_",
+                "CREATE TRIGGER IF NOT EXISTS archive.chio_",
+            ),
+    )?;
+    validate_security_evidence_schema_in(connection, EvidenceDatabase::Archive)
+}
+
 pub(crate) fn migrate_indexed_security_evidence_schema(
     connection: &Connection,
 ) -> Result<(), ReceiptStoreError> {
@@ -112,8 +146,8 @@ pub(crate) fn migrate_indexed_security_evidence_schema(
         "receipt_id TEXT NOT NULL UNIQUE",
         "receipt_id TEXT NOT NULL UNIQUE REFERENCES chio_tool_receipts(receipt_id) ON DELETE RESTRICT",
     ))?;
-    let catalog = indexed_security_evidence_schema_catalog(connection)?;
-    if catalog == indexed_security_evidence_schema_catalog(&legacy)? {
+    let catalog = indexed_security_evidence_schema_catalog(connection, EvidenceDatabase::Main)?;
+    if catalog == indexed_security_evidence_schema_catalog(&legacy, EvidenceDatabase::Main)? {
         // The caller owns the schema migration transaction. Both identities
         // and immutable guards survive a failed or interrupted migration.
         connection.execute_batch(
@@ -135,10 +169,17 @@ pub(crate) fn migrate_indexed_security_evidence_schema(
 pub(crate) fn validate_indexed_security_evidence_schema(
     connection: &Connection,
 ) -> Result<(), ReceiptStoreError> {
+    validate_security_evidence_schema_in(connection, EvidenceDatabase::Main)
+}
+
+fn validate_security_evidence_schema_in(
+    connection: &Connection,
+    database: EvidenceDatabase,
+) -> Result<(), ReceiptStoreError> {
     let expected = Connection::open_in_memory()?;
     expected.execute_batch(SECURITY_EVIDENCE_INDEX_SCHEMA)?;
-    if indexed_security_evidence_schema_catalog(connection)?
-        != indexed_security_evidence_schema_catalog(&expected)?
+    if indexed_security_evidence_schema_catalog(connection, database)?
+        != indexed_security_evidence_schema_catalog(&expected, EvidenceDatabase::Main)?
     {
         return Err(ReceiptStoreError::Conflict(
             "security evidence index schema differs from the canonical definition".to_string(),
@@ -151,16 +192,18 @@ type SecurityEvidenceSchemaEntry = (String, String, String, Option<String>);
 
 fn indexed_security_evidence_schema_catalog(
     connection: &Connection,
+    database: EvidenceDatabase,
 ) -> Result<Vec<SecurityEvidenceSchemaEntry>, ReceiptStoreError> {
-    let mut statement = connection.prepare(
+    let mut statement = connection.prepare(&format!(
         r#"
         SELECT type, name, tbl_name, sql
-        FROM sqlite_schema
+        FROM {}.sqlite_schema
         WHERE name = 'chio_security_evidence_index'
            OR tbl_name = 'chio_security_evidence_index'
         ORDER BY type, name, tbl_name
         "#,
-    )?;
+        database.name()
+    ))?;
     let entries = statement
         .query_map([], |row| {
             let sql = row

@@ -22,6 +22,8 @@ impl<'connection> SqlWorkBudget<'connection> {
         connection.progress_handler(
             PROGRESS_INTERVAL,
             Some(move || {
+                // Exhaustion, including a partial final interval, must become
+                // zero so this callback interrupts the query immediately.
                 remaining = remaining.saturating_sub(PROGRESS_INTERVAL as u64);
                 let stop = remaining == 0;
                 if stop {

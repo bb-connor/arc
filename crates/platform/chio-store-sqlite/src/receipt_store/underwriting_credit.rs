@@ -343,7 +343,11 @@ impl SqliteReceiptStore {
                 let total = quoted_premium_totals_by_currency
                     .entry(quoted_amount.currency.clone())
                     .or_insert(0);
-                *total = total.saturating_add(quoted_amount.units);
+                *total = super::reports::checked_report_sum(
+                    *total,
+                    quoted_amount.units,
+                    "underwriting quoted-premium total",
+                )?;
             }
 
             if decisions.len() < normalized.limit_or_default() {
@@ -937,6 +941,8 @@ impl SqliteReceiptStore {
                 continue;
             }
 
+            // Event counters count subsets of the same SQLite row scan; the
+            // signed rowid domain is strictly smaller than u64::MAX.
             matching_events = matching_events.saturating_add(1);
             match body.event_kind {
                 CreditLossLifecycleEventKind::Delinquency => {

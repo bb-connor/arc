@@ -130,6 +130,8 @@ impl SqliteReceiptStore {
         let mut metering_evidence_missing_receipts = 0_u64;
         let mut metering_financial_mismatch_receipts = 0_u64;
 
+        // These counters count disjoint outcomes or subsets of one SQLite
+        // receipt scan, bounded by the table's signed rowid domain.
         for row in rows {
             let (
                 seq,

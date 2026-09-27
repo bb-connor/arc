@@ -93,6 +93,9 @@ impl SqliteReceiptStore {
         let mut max_delegation_depth = 0_u64;
         let mut lineage_gap_count = 0_u64;
 
+        // Count accumulators grow at most once per materialized row (or per
+        // root/leaf subset); that Vec cannot contain u64::MAX rows. Money below
+        // has no such bound and must use checked arithmetic.
         for (seq, raw_json) in rows {
             let receipt =
                 decode_verified_chio_receipt(&raw_json, "persisted tool receipt", Some(seq))?;
@@ -131,20 +134,32 @@ impl SqliteReceiptStore {
             let attempted_cost = financial.attempted_cost.unwrap_or(0);
             let decision = receipt_decision_kind(&receipt).to_string();
 
-            total_cost_charged = total_cost_charged.saturating_add(financial.cost_charged);
-            total_attempted_cost = total_attempted_cost.saturating_add(attempted_cost);
+            total_cost_charged = checked_report_sum(
+                total_cost_charged,
+                financial.cost_charged,
+                "cost attribution charged-cost total",
+            )?;
+            total_attempted_cost = checked_report_sum(
+                total_attempted_cost,
+                attempted_cost,
+                "cost attribution attempted-cost total",
+            )?;
             max_delegation_depth = max_delegation_depth.max(financial.delegation_depth as u64);
 
             if let Some(root_key) = root_subject_key.clone() {
                 distinct_roots.insert(root_key.clone());
                 let root_entry = by_root.entry(root_key.clone()).or_default();
                 root_entry.receipt_count = root_entry.receipt_count.saturating_add(1);
-                root_entry.total_cost_charged = root_entry
-                    .total_cost_charged
-                    .saturating_add(financial.cost_charged);
-                root_entry.total_attempted_cost = root_entry
-                    .total_attempted_cost
-                    .saturating_add(attempted_cost);
+                root_entry.total_cost_charged = checked_report_sum(
+                    root_entry.total_cost_charged,
+                    financial.cost_charged,
+                    "root charged-cost total",
+                )?;
+                root_entry.total_attempted_cost = checked_report_sum(
+                    root_entry.total_attempted_cost,
+                    attempted_cost,
+                    "root attempted-cost total",
+                )?;
                 root_entry.max_delegation_depth = root_entry
                     .max_delegation_depth
                     .max(financial.delegation_depth as u64);
@@ -153,12 +168,16 @@ impl SqliteReceiptStore {
                     root_entry.leaf_subjects.insert(leaf_key.clone());
                     let leaf_entry = by_leaf.entry((root_key, leaf_key)).or_default();
                     leaf_entry.receipt_count = leaf_entry.receipt_count.saturating_add(1);
-                    leaf_entry.total_cost_charged = leaf_entry
-                        .total_cost_charged
-                        .saturating_add(financial.cost_charged);
-                    leaf_entry.total_attempted_cost = leaf_entry
-                        .total_attempted_cost
-                        .saturating_add(attempted_cost);
+                    leaf_entry.total_cost_charged = checked_report_sum(
+                        leaf_entry.total_cost_charged,
+                        financial.cost_charged,
+                        "leaf charged-cost total",
+                    )?;
+                    leaf_entry.total_attempted_cost = checked_report_sum(
+                        leaf_entry.total_attempted_cost,
+                        attempted_cost,
+                        "leaf attempted-cost total",
+                    )?;
                     leaf_entry.max_delegation_depth = leaf_entry
                         .max_delegation_depth
                         .max(financial.delegation_depth as u64);

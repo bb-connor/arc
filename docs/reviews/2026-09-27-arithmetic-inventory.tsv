@@ -1,0 +1,639 @@
+path	base_line	classification	reason	source
+crates/kernel/chio-kernel-core/src/budget_split.rs	325	pending	Needs semantic review; no correctness claim	existing.holders = existing.holders.saturating_add(1);
+crates/kernel/chio-kernel-core/src/budget_split.rs	332	pending	Needs semantic review; no correctness claim	let proposed_total = running.saturating_add(u32::from(share_bps));
+crates/kernel/chio-kernel-core/src/budget_split.rs	383	pending	Needs semantic review; no correctness claim	admission.holders = admission.holders.saturating_sub(1);
+crates/kernel/chio-kernel-core/src/formal_aeneas.rs	322	pending	Needs semantic review; no correctness claim	issued_at <= now.saturating_add(max_skew_secs) && issued_at.saturating_add(ttl_secs) >= now
+crates/kernel/chio-kernel-core/src/formal_core.rs	165	pending	Needs semantic review; no correctness claim	u64::from(max.saturating_sub(invocation_count)),
+crates/kernel/chio-kernel-core/src/formal_core.rs	223	pending	Needs semantic review; no correctness claim	u64::from(max.saturating_sub(invocation_count)),
+crates/kernel/chio-kernel-core/src/formal_core.rs	240	pending	Needs semantic review; no correctness claim	max_total.saturating_sub(committed_cost_units),
+crates/kernel/chio-kernel-core/src/kani_harnesses.rs	304	pending	Needs semantic review; no correctness claim	issued_at <= now.saturating_add(max_skew_secs) && issued_at.saturating_add(ttl_secs) >= now;
+crates/kernel/chio-kernel-core/src/kani_harnesses.rs	512	pending	Needs semantic review; no correctness claim	let issued_at = now.saturating_add(skew).saturating_add(1);
+crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs	1358	pending	Needs semantic review; no correctness claim	assert!(after <= captured.saturating_add(1));
+crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs	1480	pending	Needs semantic review; no correctness claim	let parent_cap = u32::from(kani::any::<u8>()).saturating_add(1);
+crates/kernel/chio-kernel/benches/fixtures/dispatch_request_fixture.rs	226	pending	Needs semantic review; no correctness claim	let now = self.request.capability.issued_at.saturating_add(1);
+crates/kernel/chio-kernel/benches/fixtures/dispatch_request_fixture.rs	442	pending	Needs semantic review; no correctness claim	timestamp: capability.issued_at.saturating_add(1),
+crates/kernel/chio-kernel/benches/paper_security_components.rs	42	pending	Needs semantic review; no correctness claim	let next = sequence.get().saturating_add(1);
+crates/kernel/chio-kernel/benches/receipt_append.rs	27	pending	Needs semantic review; no correctness claim	let next = sequence.get().saturating_add(1);
+crates/kernel/chio-kernel/src/admission_operation/dpop_claim.rs	87	pending	Needs semantic review; no correctness claim	> seconds.saturating_add(self.authority.max_clock_skew_secs())
+crates/kernel/chio-kernel/src/approval.rs	1375	pending	Needs semantic review; no correctness claim	batch.used_calls = batch.used_calls.saturating_add(1);
+crates/kernel/chio-kernel/src/approval.rs	1377	pending	Needs semantic review; no correctness claim	batch.used_total_units = batch.used_total_units.saturating_add(amt.units);
+crates/kernel/chio-kernel/src/approval.rs	1426	pending	Needs semantic review; no correctness claim	|| batch.used_total_units.saturating_add(amt.units) > total.units
+crates/kernel/chio-kernel/src/approval.rs	240	pending	Needs semantic review; no correctness claim	.saturating_sub(self.governed_token.issued_at);
+crates/kernel/chio-kernel/src/approval.rs	959	pending	Needs semantic review; no correctness claim	let expires_at = now.saturating_add(self.default_ttl_secs);
+crates/kernel/chio-kernel/src/authority.rs	262	pending	Needs semantic review; no correctness claim	let latest_issued_at = now.saturating_add(allowed_clock_skew_seconds);
+crates/kernel/chio-kernel/src/authority.rs	276	pending	Needs semantic review; no correctness claim	.saturating_add(requested_ttl_seconds)
+crates/kernel/chio-kernel/src/authority.rs	277	pending	Needs semantic review; no correctness claim	.saturating_add(allowed_clock_skew_seconds);
+crates/kernel/chio-kernel/src/authority.rs	503	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(ttl_seconds),
+crates/kernel/chio-kernel/src/authority.rs	525	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(ttl_seconds),
+crates/kernel/chio-kernel/src/authority.rs	570	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(ttl_seconds),
+crates/kernel/chio-kernel/src/authority.rs	603	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(ttl_seconds),
+crates/kernel/chio-kernel/src/authority.rs	629	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(ttl_seconds),
+crates/kernel/chio-kernel/src/caller_delivery.rs	387	pending	Needs semantic review; no correctness claim	if bytes.len() > self.maximum.saturating_sub(self.bytes.len()) {
+crates/kernel/chio-kernel/src/checkpoint.rs	1017	pending	Needs semantic review; no correctness claim	count.set(count.get().saturating_add(1));
+crates/kernel/chio-kernel/src/checkpoint.rs	1770	pending	Needs semantic review; no correctness claim	count.set(count.get().saturating_add(1));
+crates/kernel/chio-kernel/src/checkpoint/tests.rs	1682	pending	Needs semantic review; no correctness claim	checkpoint.body.issued_at = checkpoint.body.issued_at.saturating_add(1);
+crates/kernel/chio-kernel/src/checkpoint/tests.rs	201	pending	Needs semantic review; no correctness claim	invalid_signature.body.issued_at = invalid_signature.body.issued_at.saturating_add(1);
+crates/kernel/chio-kernel/src/checkpoint/tests.rs	214	pending	Needs semantic review; no correctness claim	invalid_body.body.tree_size = invalid_body.body.tree_size.saturating_add(1);
+crates/kernel/chio-kernel/src/checkpoint/tests.rs	654	pending	Needs semantic review; no correctness claim	checkpoint.body.issued_at = checkpoint.body.issued_at.saturating_add(1);
+crates/kernel/chio-kernel/src/compliance_score.rs	132	pending	Needs semantic review; no correctness claim	let points = weight.saturating_sub(deduction);
+crates/kernel/chio-kernel/src/compliance_score.rs	251	pending	Needs semantic review; no correctness claim	let raw_score = COMPLIANCE_SCORE_MAX.saturating_sub(breakdown.total_deductions());
+crates/kernel/chio-kernel/src/dpop.rs	585	pending	Needs semantic review; no correctness claim	*count = count.saturating_sub(1);
+crates/kernel/chio-kernel/src/dpop.rs	592	pending	Needs semantic review; no correctness claim	let alert_threshold = capacity.saturating_sub(capacity / 5);
+crates/kernel/chio-kernel/src/dpop.rs	682	pending	Needs semantic review; no correctness claim	if proof.body.issued_at > now_secs.saturating_add(config.max_clock_skew_secs) {
+crates/kernel/chio-kernel/src/dpop.rs	747	pending	Needs semantic review; no correctness claim	let valid_through = proof.body.issued_at.saturating_add(config.proof_ttl_secs);
+crates/kernel/chio-kernel/src/execution_nonce.rs	360	pending	Needs semantic review; no correctness claim	let expires_at = now.saturating_add(ttl);
+crates/kernel/chio-kernel/src/execution_nonce.rs	783	pending	Needs semantic review; no correctness claim	.saturating_add(30);
+crates/kernel/chio-kernel/src/finding_pool.rs	907	pending	Needs semantic review; no correctness claim	.saturating_add(FINDING_POOL_CLAIM_WINDOW_MS)
+crates/kernel/chio-kernel/src/finding_pool_tests.rs	397	pending	Needs semantic review; no correctness claim	.saturating_add(pending.len());
+crates/kernel/chio-kernel/src/governed_approval_replay.rs	296	pending	Needs semantic review; no correctness claim	.saturating_add(60);
+crates/kernel/chio-kernel/src/governed_approval_replay.rs	318	pending	Needs semantic review; no correctness claim	.saturating_add(60);
+crates/kernel/chio-kernel/src/governed_approval_replay.rs	338	pending	Needs semantic review; no correctness claim	.saturating_add(60);
+crates/kernel/chio-kernel/src/governed_approval_replay.rs	371	pending	Needs semantic review; no correctness claim	.saturating_add(60);
+crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc	267	pending	Needs semantic review; no correctness claim	applied_count = applied_count.saturating_add(1);
+crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc	797	pending	Needs semantic review; no correctness claim	if bounded.len().saturating_add(character.len_utf8()) > 1_024 {
+crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs	1555	pending	Needs semantic review; no correctness claim	.saturating_sub(payment.reconcile.committed_cost_units_after),
+crates/kernel/chio-kernel/src/kernel/construction.rs	1577	pending	Needs semantic review; no correctness claim	let timestamp_unix_ms = current_unix_timestamp().saturating_mul(1000);
+crates/kernel/chio-kernel/src/kernel/credential_reservation/acquisition.rs	64	pending	Needs semantic review; no correctness claim	let valid_through = proof.body.issued_at.saturating_add(config.proof_ttl_secs);
+crates/kernel/chio-kernel/src/kernel/delegation.rs	100	pending	Needs semantic review; no correctness claim	let age_ms = now_unix_ms.saturating_sub(snapshot.issued_at_unix_ms);
+crates/kernel/chio-kernel/src/kernel/delegation.rs	50	pending	Needs semantic review; no correctness claim	let now_unix_ms = current_unix_timestamp().saturating_mul(1000);
+crates/kernel/chio-kernel/src/kernel/dispatch.rs	198	pending	Needs semantic review; no correctness claim	.wait_timeout(schedule, next_deadline.saturating_duration_since(now))
+crates/kernel/chio-kernel/src/kernel/governed_validation.rs	440	pending	Needs semantic review; no correctness claim	.saturating_sub(approval_token.issued_at);
+crates/kernel/chio-kernel/src/kernel/kernel_struct.rs	510	pending	Needs semantic review; no correctness claim	Some(resident_pages.saturating_mul(linux_page_size()))
+crates/kernel/chio-kernel/src/kernel/mod.rs	1798	pending	Needs semantic review; no correctness claim	return now.saturating_mul(1000);
+crates/kernel/chio-kernel/src/kernel/reconciliation.rs	394	pending	Needs semantic review; no correctness claim	budget_remaining: grant_budget_total.saturating_sub(committed_after),
+crates/kernel/chio-kernel/src/kernel/responses/deny_responses.rs	158	pending	Needs semantic review; no correctness claim	.saturating_sub(committed_cost_after_release);
+crates/kernel/chio-kernel/src/kernel/tests/approval_flow.rs	200	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(10),
+crates/kernel/chio-kernel/src/kernel/tests/approval_flow.rs	470	pending	Needs semantic review; no correctness claim	let proposal_created_at = now.saturating_sub(5);
+crates/kernel/chio-kernel/src/kernel/tests/approval_flow.rs	543	pending	Needs semantic review; no correctness claim	extended_proposal.proposal_deadline = extended_proposal.proposal_deadline.saturating_add(1);
+crates/kernel/chio-kernel/src/kernel/tests/approval_flow.rs	622	pending	Needs semantic review; no correctness claim	let now = current_unix_timestamp().saturating_add(60);
+crates/kernel/chio-kernel/src/kernel/tests/budget_cross_currency.rs	15	pending	Needs semantic review; no correctness claim	updated_at: now.saturating_sub(45),
+crates/kernel/chio-kernel/src/kernel/tests/budget_governed_assurance.rs	219	pending	Needs semantic review; no correctness claim	issued_at: current_unix_timestamp().saturating_sub(1),
+crates/kernel/chio-kernel/src/kernel/tests/budget_governed_assurance.rs	711	pending	Needs semantic review; no correctness claim	expires_at: current_unix_timestamp().saturating_sub(1),
+crates/kernel/chio-kernel/src/kernel/tests/capability_liveness.rs	106	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(1),
+crates/kernel/chio-kernel/src/kernel/tests/capability_liveness.rs	107	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(300),
+crates/kernel/chio-kernel/src/kernel/tests/capability_liveness.rs	130	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(200),
+crates/kernel/chio-kernel/src/kernel/tests/capability_liveness.rs	19	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(1),
+crates/kernel/chio-kernel/src/kernel/tests/capability_liveness.rs	20	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(300),
+crates/kernel/chio-kernel/src/kernel/tests/capability_liveness.rs	58	pending	Needs semantic review; no correctness claim	expired.issued_at = now.saturating_sub(200);
+crates/kernel/chio-kernel/src/kernel/tests/capability_liveness.rs	59	pending	Needs semantic review; no correctness claim	expired.expires_at = now.saturating_sub(100);
+crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs	196	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(1),
+crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs	197	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(300),
+crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs	231	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(200),
+crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs	251	pending	Needs semantic review; no correctness claim	established_at: now.saturating_sub(1),
+crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs	252	pending	Needs semantic review; no correctness claim	rotation_due: now.saturating_add(300),
+crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs	52	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(1),
+crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs	53	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(300),
+crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs	556	pending	Needs semantic review; no correctness claim	expires_at: 100_u64.saturating_add(ttl_seconds),
+crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs	77	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(200),
+crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs	98	pending	Needs semantic review; no correctness claim	established_at: now.saturating_sub(1),
+crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs	99	pending	Needs semantic review; no correctness claim	rotation_due: now.saturating_add(300),
+crates/kernel/chio-kernel/src/kernel/tests/sim_payment.rs	40	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(5),
+crates/kernel/chio-kernel/src/kernel/tests/support.rs	1046	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(60),
+crates/kernel/chio-kernel/src/kernel/tests/support.rs	1047	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(300),
+crates/kernel/chio-kernel/src/kernel/tests/support.rs	1259	pending	Needs semantic review; no correctness claim	expires_at: issued_at.saturating_add(120),
+crates/kernel/chio-kernel/src/kernel/tests/support.rs	1295	pending	Needs semantic review; no correctness claim	let expires_at = issued_at.saturating_add(300).min(input.parent.expires_at);
+crates/kernel/chio-kernel/src/kernel/tests/support.rs	258	pending	Needs semantic review; no correctness claim	batch_start_seq.saturating_add(max_batch.saturating_sub(1)),
+crates/kernel/chio-kernel/src/kernel/tests/support_delegation_plain.rs	16	pending	Needs semantic review; no correctness claim	expires_at: issued_at.saturating_add(120),
+crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs	1044	pending	Needs semantic review; no correctness claim	generated_at: now.saturating_sub(1),
+crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs	1104	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(5),
+crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs	1130	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(1),
+crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs	733	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(1),
+crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs	761	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(5),
+crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs	781	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(5),
+crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs	805	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(5),
+crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs	899	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(5),
+crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs	935	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(5),
+crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs	996	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(5),
+crates/kernel/chio-kernel/src/kernel/validation.rs	1865	pending	Needs semantic review; no correctness claim	.saturating_sub(reverse.committed_cost_units_after),
+crates/kernel/chio-kernel/src/kernel/validation.rs	2187	pending	Needs semantic review; no correctness claim	.saturating_sub(running_committed_cost_units);
+crates/kernel/chio-kernel/src/kernel/validation/cumulative.rs	237	pending	Needs semantic review; no correctness claim	let now = self.refresh_admission_trusted_time(now.saturating_mul(1_000))? / 1_000;
+crates/kernel/chio-kernel/src/observability/metrics.rs	182	pending	Needs semantic review; no correctness claim	(Some(start), Some(end)) => end.saturating_sub(start),
+crates/kernel/chio-kernel/src/observability/metrics.rs	253	pending	Needs semantic review; no correctness claim	.map(|prev| now_unix_ms.saturating_sub(prev.advanced_at_unix_ms) / 1000)
+crates/kernel/chio-kernel/src/operator_report/behavioral_analysis.rs	190	pending	Needs semantic review; no correctness claim	self.sample_count = self.sample_count.saturating_add(1);
+crates/kernel/chio-kernel/src/payment.rs	901	pending	Needs semantic review; no correctness claim	.take(MAX_PAYMENT_RESPONSE_BYTES.saturating_add(1));
+crates/kernel/chio-kernel/src/receipt_analytics.rs	100	pending	Needs semantic review; no correctness claim	let attempted_total = total_cost_charged.saturating_add(total_attempted_cost);
+crates/kernel/chio-kernel/src/receipt_analytics.rs	112	pending	Needs semantic review; no correctness claim	total_receipts.saturating_sub(deny_count),
+crates/kernel/chio-kernel/src/receipt_analytics.rs	98	pending	Needs semantic review; no correctness claim	.saturating_add(cancelled_count)
+crates/kernel/chio-kernel/src/receipt_analytics.rs	99	pending	Needs semantic review; no correctness claim	.saturating_add(incomplete_count);
+crates/kernel/chio-kernel/src/receipt_support/receipt_content.rs	125	pending	Needs semantic review; no correctness claim	&& total_bytes.saturating_add(chunk_bytes) > max_stream_total_bytes
+crates/kernel/chio-kernel/src/receipt_support/receipt_scopes.rs	183	pending	Needs semantic review; no correctness claim	fixed.counter = fixed.counter.saturating_add(1);
+crates/kernel/chio-kernel/src/replay_retention.rs	103	pending	Needs semantic review; no correctness claim	let monotonic_progress = now_monotonic.saturating_duration_since(pending.observed_monotonic);
+crates/kernel/chio-kernel/src/replay_retention.rs	123	pending	Needs semantic review; no correctness claim	left.saturating_sub(right) <= tolerance && right.saturating_sub(left) <= tolerance
+crates/kernel/chio-kernel/src/replay_retention.rs	35	pending	Needs semantic review; no correctness claim	let monotonic_progress = now_monotonic.saturating_duration_since(*monotonic_high_water);
+crates/kernel/chio-kernel/src/replay_retention.rs	36	pending	Needs semantic review; no correctness claim	let tolerated_forward = monotonic_progress.saturating_add(MAX_REPLAY_CLOCK_SKEW);
+crates/kernel/chio-kernel/src/replay_retention.rs	39	pending	Needs semantic review; no correctness claim	let unexplained_gap = wall_progress.saturating_sub(monotonic_progress);
+crates/kernel/chio-kernel/src/runtime.rs	249	pending	Needs semantic review; no correctness claim	total = total.saturating_add(bytes.len() as u64);
+crates/kernel/chio-kernel/src/runtime.rs	287	pending	Needs semantic review; no correctness claim	let next = running_bytes.saturating_add(chunk_bytes);
+crates/kernel/chio-kernel/src/session.rs	1102	pending	Needs semantic review; no correctness claim	let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
+crates/kernel/chio-kernel/src/session.rs	1155	pending	Needs semantic review; no correctness claim	let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
+crates/kernel/chio-kernel/src/session.rs	1240	pending	Needs semantic review; no correctness claim	let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
+crates/kernel/chio-kernel/src/session.rs	1284	pending	Needs semantic review; no correctness claim	let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);
+crates/kernel/chio-kernel/src/tool_outcome_tests.rs	1291	pending	Needs semantic review; no correctness claim	.saturating_sub(1);
+crates/kernel/chio-kernel/tests/dst/support.rs	1293	pending	Needs semantic review; no correctness claim	receipts_after_restart == receipts_before_restart.saturating_add(1),
+crates/kernel/chio-kernel/tests/dst/support.rs	1910	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	value = value.wrapping_add(0x9e37_79b9_7f4a_7c15);
+crates/kernel/chio-kernel/tests/dst/support.rs	1911	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+crates/kernel/chio-kernel/tests/dst/support.rs	1912	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+crates/kernel/chio-kernel/tests/property_budget_store.rs	44	pending	Needs semantic review; no correctness claim	let event_seq = self.next_seq.saturating_add(1);
+crates/kernel/chio-kernel/tests/property_budget_store.rs	81	pending	Needs semantic review; no correctness claim	self.invocation_count = self.invocation_count.saturating_add(1);
+crates/kernel/chio-kernel/tests/receipt_signing_async.rs	301	pending	Needs semantic review; no correctness claim	let target = chio_kernel::SIGNING_CHANNEL_DEFAULT_CAPACITY.saturating_mul(2);
+crates/kernel/chio-kernel/tests/replay_proptest.rs	642	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	.wrapping_mul(6364136223846793005)
+crates/kernel/chio-kernel/tests/replay_proptest.rs	643	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	.wrapping_add(1442695040888963407);
+crates/kernel/chio-kernel/tests/retention.rs	414	pending	Needs semantic review; no correctness claim	max_size_bytes: current_size.saturating_sub(1),
+crates/kernel/chio-process/src/lib.rs	404	pending	Needs semantic review; no correctness claim	for capability in lineage.iter().take(lineage.len().saturating_sub(1)) {
+crates/kernel/chio-process/src/mailboxes/mod.rs	220	pending	Needs semantic review; no correctness claim	let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+crates/kernel/chio-process/src/mailboxes/store.rs	122	pending	Needs semantic review; no correctness claim	|| bytes.saturating_add(size) > channel.limits.max_pending_bytes
+crates/kernel/chio-process/src/worker.rs	308	pending	Needs semantic review; no correctness claim	if bytes.len() >= MAX_RESPONSE_BYTES.saturating_sub(self.0.len()) {
+crates/kernel/chio-process/src/worker/unix.rs	118	pending	Needs semantic review; no correctness claim	if bytes.len() >= MAX_REQUEST_BYTES.saturating_sub(frame.len()) {
+crates/kernel/chio-process/tests/mailbox_effect_boundary.rs	264	pending	Needs semantic review; no correctness claim	tokio::time::sleep(Duration::from_millis(deadline.saturating_sub(now) + 5)).await;
+crates/kernel/chio-runtime-core/src/ops.rs	384	pending	Needs semantic review; no correctness claim	healthy_provider_count: checked_provider_count.saturating_sub(degraded_count),
+crates/kernel/chio-runtime-core/src/pheromone_policy.rs	135	pending	Needs semantic review; no correctness claim	.saturating_sub(advisory.evaluated_at_unix_ms)
+crates/kernel/chio-runtime-core/src/store/sqlite/health_summaries.rs	306	pending	Needs semantic review; no correctness claim	expected_index = expected_index.saturating_add(1);
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	116	pending	Needs semantic review; no correctness claim	now_unix_ms.saturating_add(ttl_ms),
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	183	pending	Needs semantic review; no correctness claim	expires_at_unix_ms: now_unix_ms.saturating_add(ttl_ms),
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	214	pending	Needs semantic review; no correctness claim	now_unix_ms.saturating_sub(profile.stale_run_after_ms),
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	243	pending	Needs semantic review; no correctness claim	.saturating_sub(active_lease_count);
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	247	pending	Needs semantic review; no correctness claim	.saturating_sub(usize::try_from(claim_limit).unwrap_or(usize::MAX))
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	261	pending	Needs semantic review; no correctness claim	Err(_) => skipped_run_count = skipped_run_count.saturating_add(1),
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	30	pending	Needs semantic review; no correctness claim	now_unix_ms.saturating_add(ttl_ms),
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	339	pending	Needs semantic review; no correctness claim	let stale_before = now_unix_ms.saturating_sub(stale_run_after_ms);
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	53	pending	Needs semantic review; no correctness claim	"sqlite_u64(existing_token, ""runtime run lease fencing token"")?.saturating_add(1)"
+crates/kernel/chio-runtime-core/src/store/sqlite/leases_scheduler.rs	63	pending	Needs semantic review; no correctness claim	expires_at_unix_ms: now_unix_ms.saturating_add(ttl_ms),
+crates/kernel/chio-runtime-core/src/validation/ops.rs	370	pending	Needs semantic review; no correctness claim	expected_checked_provider_count.saturating_sub(failed_provider_count);
+crates/kernel/chio-runtime-core/tests/runtime_buyer_review.rs	1259	pending	Needs semantic review; no correctness claim	.saturating_add(10_000);
+crates/kernel/chio-runtime-core/tests/runtime_buyer_review.rs	1399	pending	Needs semantic review; no correctness claim	.saturating_sub(1);
+crates/kernel/chio-runtime-core/tests/runtime_buyer_review.rs	1745	pending	Needs semantic review; no correctness claim	proof_entry.byte_count = proof_entry.byte_count.saturating_add(1);
+crates/kernel/chio-runtime-core/tests/runtime_buyer_review.rs	891	pending	Needs semantic review; no correctness claim	.saturating_add(10_000)
+crates/kernel/chio-runtime-core/tests/runtime_treaty.rs	417	pending	Needs semantic review; no correctness claim	scope.issued_at_unix_ms.saturating_sub(1),
+crates/kernel/chio-runtime-harness/src/evidence_io.rs	118	pending	Needs semantic review; no correctness claim	scenario_now_secs.saturating_sub(60),
+crates/kernel/chio-runtime-harness/src/evidence_io.rs	119	pending	Needs semantic review; no correctness claim	scenario_now_secs.saturating_add(157_680_000),
+crates/kernel/chio-runtime-harness/src/kernel.rs	246	pending	Needs semantic review; no correctness claim	"""evaluatedAtUnixMs"": evaluation_now_unix_ms.saturating_sub(2_000)"
+crates/platform/chio-store-sqlite/benches/store_authorization_path.rs	283	pending	Needs semantic review; no correctness claim	due_at_unix_ms: Some(now.saturating_sub(1)),
+crates/platform/chio-store-sqlite/benches/store_authorization_path.rs	310	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: claimed_at.saturating_add(3_600_000),
+crates/platform/chio-store-sqlite/benches/store_authorization_path.rs	370	pending	Needs semantic review; no correctness claim	let expires_at_unix_ms = now_unix_ms().saturating_add(600_000);
+crates/platform/chio-store-sqlite/src/admission_operation_store/credit_exposure.rs	982	pending	Needs semantic review; no correctness claim	let mut event_versions = Vec::with_capacity(rows.len().saturating_mul(2));
+crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs	787	pending	Needs semantic review; no correctness claim	let remaining = limit.saturating_sub(operations.len());
+crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	1035	pending	Needs semantic review; no correctness claim	let verifier_now = unix_now().saturating_sub(5);
+crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	1049	pending	Needs semantic review; no correctness claim	let verifier_now = unix_now().saturating_sub(5);
+crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	709	pending	Needs semantic review; no correctness claim	if live_global.saturating_add(batch_size) > global_capacity {
+crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	735	pending	Needs semantic review; no correctness claim	if live_for_scope.saturating_add(batch_count) > per_scope_capacity {
+crates/platform/chio-store-sqlite/src/authority.rs	118	pending	Needs semantic review; no correctness claim	let next_generation = status_before.generation.saturating_add(1);
+crates/platform/chio-store-sqlite/src/authority.rs	863	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(ttl_seconds),
+crates/platform/chio-store-sqlite/src/batch_approval_store.rs	168	pending	Needs semantic review; no correctness claim	|| batch.used_total_units.saturating_add(amt.units) > total.units
+crates/platform/chio-store-sqlite/src/budget_store/replication.rs	102	checked_storage_bound	Every iteration rejects at i64 storage limit before u64 can saturate	let next_seq = current.saturating_add(1);
+crates/platform/chio-store-sqlite/src/budget_store/replication.rs	37	checked_storage_bound	Every iteration rejects at i64 storage limit before u64 can saturate	next_seq = next_seq.saturating_add(1);
+crates/platform/chio-store-sqlite/src/budget_store/replication.rs	63	checked_storage_bound	Every iteration rejects at i64 storage limit before u64 can saturate	event_seq = event_seq.saturating_add(1);
+crates/platform/chio-store-sqlite/src/budget_store/replication.rs	84	checked_storage_bound	Every iteration rejects at i64 storage limit before u64 can saturate	next_seq = next_seq.saturating_add(1);
+crates/platform/chio-store-sqlite/src/budget_store/snapshot.rs	191	pending	Needs semantic review; no correctness claim	let floor = min_seq.saturating_sub(1);
+crates/platform/chio-store-sqlite/src/budget_store/snapshot.rs	958	pending	Needs semantic review; no correctness claim	let index = usize::try_from(local_sequence.saturating_sub(1)).map_err(|_| {
+crates/platform/chio-store-sqlite/src/budget_store/tests.rs	1264	pending	Needs semantic review; no correctness claim	replayed_event.recorded_at = replayed_event.recorded_at.saturating_add(30);
+crates/platform/chio-store-sqlite/src/budget_store/tests.rs	1265	pending	Needs semantic review; no correctness claim	replayed_event.event_seq = replayed_event.event_seq.saturating_add(5);
+crates/platform/chio-store-sqlite/src/budget_store/tests.rs	1266	pending	Needs semantic review; no correctness claim	replayed_event.usage_seq = replayed_event.usage_seq.map(|seq| seq.saturating_add(5));
+crates/platform/chio-store-sqlite/src/capability_lineage.rs	358	pending	Needs semantic review; no correctness claim	parent_depth.map(|d| d.saturating_add(1)).unwrap_or(1)
+crates/platform/chio-store-sqlite/src/capability_lineage_tests.rs	560	pending	Needs semantic review; no correctness claim	mismatched.expires_at = mismatched.expires_at.saturating_add(1);
+crates/platform/chio-store-sqlite/src/channel_lifecycle_store_tests/prepared.rs	33	pending	Needs semantic review; no correctness claim	let observed_at_unix_ms = now_ms()?.saturating_sub(1_000);
+crates/platform/chio-store-sqlite/src/channel_lifecycle_store_tests/prepared.rs	540	pending	Needs semantic review; no correctness claim	plan.observed_at_unix_ms.saturating_sub(1)
+crates/platform/chio-store-sqlite/src/enterprise_migration_state.rs	464	pending	Needs semantic review; no correctness claim	&& transition.body.generation == current.generation.saturating_add(1)
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1006	pending	Needs semantic review; no correctness claim	assert_eq!(high_water, base.saturating_add(1));
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1014	pending	Needs semantic review; no correctness claim	".reserve_for_dispatch(""dispatch-owned"", now.saturating_add(100), ""owner-a"")"
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1031	pending	Needs semantic review; no correctness claim	".try_reserve("" nonce"", now, now.saturating_add(100))"
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1044	pending	Needs semantic review; no correctness claim	"assert!(store.try_reserve(""a"", now, now.saturating_add(30)).unwrap());"
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1047	pending	Needs semantic review; no correctness claim	".try_reserve(""a"", now.saturating_add(60), now.saturating_add(90))"
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1062	pending	Needs semantic review; no correctness claim	base_time.saturating_add(10_000),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1063	pending	Needs semantic review; no correctness claim	base_time.saturating_add(10_060),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1080	pending	Needs semantic review; no correctness claim	base_time.saturating_add(MAX_EXECUTION_NONCE_CLOCK_SKEW_I64 + 1),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1081	pending	Needs semantic review; no correctness claim	base_time.saturating_add(20_000),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1102	pending	Needs semantic review; no correctness claim	let latched_high_water = base_time.saturating_add(1_000);
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1134	pending	Needs semantic review; no correctness claim	".try_reserve(""used"", now_secs(), base_time.saturating_add(10_060),)"
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1159	pending	Needs semantic review; no correctness claim	now.saturating_add(1_000),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1160	pending	Needs semantic review; no correctness claim	now.saturating_add(2_000),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1177	pending	Needs semantic review; no correctness claim	high_water <= now_secs().saturating_add(MAX_EXECUTION_NONCE_CLOCK_SKEW_I64),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1182	pending	Needs semantic review; no correctness claim	".try_reserve(""legacy-used"", now_secs(), now.saturating_add(2_000))"
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1188	pending	Needs semantic review; no correctness claim	".try_reserve(""legacy-used"", now_secs(), now.saturating_add(2_000))"
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1203	pending	Needs semantic review; no correctness claim	base.saturating_add(100),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1204	pending	Needs semantic review; no correctness claim	base.saturating_add(160),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1210	pending	Needs semantic review; no correctness claim	let jumped = base.saturating_add(1_000);
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1247	pending	Needs semantic review; no correctness claim	let expires_at = now.saturating_add(120);
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1276	pending	Needs semantic review; no correctness claim	now.saturating_sub(2),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1277	pending	Needs semantic review; no correctness claim	now.saturating_sub(1),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	306	pending	Needs semantic review; no correctness claim	let maximum_seed = migration_now.saturating_add(MAX_EXECUTION_NONCE_CLOCK_SKEW_I64);
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	450	pending	Needs semantic review; no correctness claim	let minimum_corrected = observed_now.saturating_sub(MAX_EXECUTION_NONCE_CLOCK_SKEW_I64);
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	451	pending	Needs semantic review; no correctness claim	let maximum_corrected = observed_now.saturating_add(MAX_EXECUTION_NONCE_CLOCK_SKEW_I64);
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	696	pending	Needs semantic review; no correctness claim	let estimated_nonce_expiry = now.saturating_add(
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	710	pending	Needs semantic review; no correctness claim	let retention = nonce_expires_at.saturating_add(RETENTION_GRACE_SECS);
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	711	pending	Needs semantic review; no correctness claim	let baseline = now.saturating_add(RETENTION_GRACE_SECS);
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	728	pending	Needs semantic review; no correctness claim	let retention = nonce_expires_at.saturating_add(RETENTION_GRACE_SECS);
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	729	pending	Needs semantic review; no correctness claim	let baseline = now.saturating_add(RETENTION_GRACE_SECS);
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	821	pending	Needs semantic review; no correctness claim	let expires_at = now.saturating_add(100);
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	836	pending	Needs semantic review; no correctness claim	now.saturating_add(200),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	837	pending	Needs semantic review; no correctness claim	now.saturating_add(300),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	856	pending	Needs semantic review; no correctness claim	store.try_reserve(nonce_id, now, now.saturating_add(300))
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	914	pending	Needs semantic review; no correctness claim	let expires_at = now_secs().saturating_add(300);
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	944	pending	Needs semantic review; no correctness claim	base.saturating_add(1),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	945	pending	Needs semantic review; no correctness claim	base.saturating_add(1),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	953	pending	Needs semantic review; no correctness claim	base.saturating_add(100),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	954	pending	Needs semantic review; no correctness claim	base.saturating_add(160),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	962	pending	Needs semantic review; no correctness claim	base.saturating_add(1),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	963	pending	Needs semantic review; no correctness claim	base.saturating_add(100),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	964	pending	Needs semantic review; no correctness claim	base.saturating_add(160),
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	978	pending	Needs semantic review; no correctness claim	".try_reserve(""a"", now, now.saturating_add(100))"
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	981	pending	Needs semantic review; no correctness claim	".try_reserve(""a"", now.saturating_add(1), now.saturating_add(100))"
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	990	pending	Needs semantic review; no correctness claim	".try_reserve(""newer"", base.saturating_add(1), base.saturating_add(100))"
+crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	993	pending	Needs semantic review; no correctness claim	".try_reserve(""lagged"", base, base.saturating_add(100))"
+crates/platform/chio-store-sqlite/src/finding_market_store_tests.rs	1677	pending	Needs semantic review; no correctness claim	admission.expires_at.saturating_add(1),
+crates/platform/chio-store-sqlite/src/finding_market_store_tests.rs	597	pending	Needs semantic review; no correctness claim	backing.issued_at = NOW.saturating_add(1);
+crates/platform/chio-store-sqlite/src/finding_pool_ledger/expiration.rs	51	pending	Needs semantic review; no correctness claim	let remaining = MAX_EXPIRED_RECLAMATIONS_PER_DEBIT.saturating_sub(expired.len());
+crates/platform/chio-store-sqlite/src/finding_pool_ledger/outbox.rs	38	pending	Needs semantic review; no correctness claim	let monotonic_now = origin_unix_ms.saturating_add(elapsed_ms);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	1039	pending	Needs semantic review; no correctness claim	let expiry = base.saturating_add(100);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	1057	pending	Needs semantic review; no correctness claim	let jumped = base.saturating_add(1_000);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	1099	pending	Needs semantic review; no correctness claim	let first_expiry = u64::try_from(base).unwrap().saturating_add(1);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	1100	pending	Needs semantic review; no correctness claim	let second_expiry = u64::try_from(base).unwrap().saturating_add(100);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	1141	pending	Needs semantic review; no correctness claim	base.saturating_add(1),
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	1150	pending	Needs semantic review; no correctness claim	let first_expiry = u64::try_from(base).unwrap().saturating_add(1);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	1151	pending	Needs semantic review; no correctness claim	let second_expiry = u64::try_from(base).unwrap().saturating_add(100);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	1181	pending	Needs semantic review; no correctness claim	base.saturating_add(1),
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	1197	pending	Needs semantic review; no correctness claim	let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	1221	pending	Needs semantic review; no correctness claim	let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	1242	pending	Needs semantic review; no correctness claim	let expires_at = now_secs().saturating_add(60);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	466	pending	Needs semantic review; no correctness claim	let minimum_corrected = observed_now.saturating_sub(MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	467	pending	Needs semantic review; no correctness claim	let maximum_corrected = observed_now.saturating_add(MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	811	pending	Needs semantic review; no correctness claim	let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	831	pending	Needs semantic review; no correctness claim	let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	848	pending	Needs semantic review; no correctness claim	let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	873	pending	Needs semantic review; no correctness claim	let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	891	pending	Needs semantic review; no correctness claim	u64::try_from(base).unwrap().saturating_add(100),
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	901	pending	Needs semantic review; no correctness claim	u64::try_from(base).unwrap().saturating_add(200),
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	903	pending	Needs semantic review; no correctness claim	base.saturating_sub(1),
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	935	pending	Needs semantic review; no correctness claim	u64::try_from(base).unwrap().saturating_add(200),
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	937	pending	Needs semantic review; no correctness claim	base.saturating_sub(MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64 + 1),
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	953	pending	Needs semantic review; no correctness claim	let expires_at = u64::try_from(before_open).unwrap().saturating_add(60);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	961	pending	Needs semantic review; no correctness claim	before_open.saturating_sub(MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64 + 1),
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	977	pending	Needs semantic review; no correctness claim	let expiry = u64::try_from(base).unwrap().saturating_add(10_000);
+crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs	992	pending	Needs semantic review; no correctness claim	let latched_high_water = base.saturating_add(1_000);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	1144	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	1333	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	1339	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	1664	pending	Needs semantic review; no correctness claim	// runs; `atomic_saturating_sub` keeps a rare overlap with the
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2316	pending	Needs semantic review; no correctness claim	.saturating_sub(head.checkpointed_entry_seq())
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2352	pending	Needs semantic review; no correctness claim	.saturating_sub(head.checkpointed_entry_seq())
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2355	pending	Needs semantic review; no correctness claim	let start_seq = head.checkpointed_entry_seq().saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2356	pending	Needs semantic review; no correctness claim	let end_seq = start_seq.saturating_add(signer.max_batch - 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2431	pending	Needs semantic review; no correctness claim	head.claim_log_count = head.claim_log_count.saturating_add(delta_count);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2527	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.inflight, results.len() as u64);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2555	pending	Needs semantic review; no correctness claim	fn atomic_saturating_sub(value: &AtomicU64, amount: u64) {
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2558	pending	Needs semantic review; no correctness claim	let next = current.saturating_sub(amount);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2609	pending	Needs semantic review; no correctness claim	.saturating_add(counters.failed_total);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2620	pending	Needs semantic review; no correctness claim	Some(reference) => now_unix_ms.saturating_sub(reference) >= stall_threshold_ms,
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2663	pending	Needs semantic review; no correctness claim	/// saturates at zero via `atomic_saturating_sub` rather than underflowing.
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2676	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(self.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	2956	pending	Needs semantic review; no correctness claim	let next_seq = cursor.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	3184	pending	Needs semantic review; no correctness claim	.saturating_add(pre_delta)
+crates/platform/chio-store-sqlite/src/receipt_store.rs	3185	pending	Needs semantic review; no correctness claim	.saturating_add(delta_count);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	3405	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.inflight, batch_len);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	362	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.queue_depth, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	366	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.queue_depth, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	3768	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	3784	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	4376	pending	Needs semantic review; no correctness claim	let end_seq = latest_committed.min(start_seq.saturating_add(max_batch - 1));
+crates/platform/chio-store-sqlite/src/receipt_store.rs	444	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.timed_out_inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	475	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.timed_out_inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	4923	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.timed_out_inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	5141	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	708	pending	Needs semantic review; no correctness claim	// `atomic_saturating_sub(&health.inflight, n)` (see
+crates/platform/chio-store-sqlite/src/receipt_store.rs	723	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	729	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	738	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	782	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	788	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store.rs	801	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&self.health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs	523	pending	Needs semantic review; no correctness claim	let time_cutoff = now.saturating_sub(config.retention_days.saturating_mul(86_400));
+crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs	571	pending	Needs semantic review; no correctness claim	let size_cutoff = (median_ts.max(0) as u64).saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention/dispatch.rs	39	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention/dispatch.rs	57	pending	Needs semantic review; no correctness claim	atomic_saturating_sub(&health.inflight, 1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics.rs	431	pending	Needs semantic review; no correctness claim	let ceiling = receipt_ceiling.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics.rs	480	pending	Needs semantic review; no correctness claim	.saturating_add(bucket_width.max(1) as u64)
+crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics.rs	481	pending	Needs semantic review; no correctness claim	.saturating_sub(1),
+crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics/work_budget.rs	25	intentional_exhaustion	Partial final interval clamps to zero and immediately interrupts SQL	remaining = remaining.saturating_sub(PROGRESS_INTERVAL as u64);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/compliance.rs	81	bounded_subset	Same SQL aggregate counts a subset of matching receipts	let uncheckpointed_receipts = matching_receipts.saturating_sub(evidence_ready_receipts);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/compliance.rs	82	bounded_subset	Same SQL aggregate counts a subset of matching receipts	let lineage_gap_receipts = matching_receipts.saturating_sub(lineage_covered_receipts);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/cost_attribution.rs	108	bounded_count	One increment per materialized receipt or root/leaf subset	lineage_gap_count = lineage_gap_count.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/cost_attribution.rs	134	fixed	Exact monetary totals now reject u64 overflow	total_cost_charged = total_cost_charged.saturating_add(financial.cost_charged);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/cost_attribution.rs	135	fixed	Exact monetary totals now reject u64 overflow	total_attempted_cost = total_attempted_cost.saturating_add(attempted_cost);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/cost_attribution.rs	141	bounded_count	One increment per materialized receipt or root/leaf subset	root_entry.receipt_count = root_entry.receipt_count.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/cost_attribution.rs	144	fixed	Exact monetary totals now reject u64 overflow	.saturating_add(financial.cost_charged);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/cost_attribution.rs	147	fixed	Exact monetary totals now reject u64 overflow	.saturating_add(attempted_cost);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/cost_attribution.rs	155	bounded_count	One increment per materialized receipt or root/leaf subset	leaf_entry.receipt_count = leaf_entry.receipt_count.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/cost_attribution.rs	158	fixed	Exact monetary totals now reject u64 overflow	.saturating_add(financial.cost_charged);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/cost_attribution.rs	161	fixed	Exact monetary totals now reject u64 overflow	.saturating_add(attempted_cost);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs	192	bounded_count	Counts outcomes or subsets once per persisted receipt	pending_settlement_receipts = pending_settlement_receipts.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs	195	bounded_count	Counts outcomes or subsets once per persisted receipt	failed_settlement_receipts = failed_settlement_receipts.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs	198	bounded_count	Counts outcomes or subsets once per persisted receipt	settlement_actionable_receipts = settlement_actionable_receipts.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs	202	bounded_count	Counts outcomes or subsets once per persisted receipt	metered_receipts = metered_receipts.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs	228	bounded_count	Counts outcomes or subsets once per persisted receipt	metering_actionable_receipts = metering_actionable_receipts.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs	232	bounded_count	Counts outcomes or subsets once per persisted receipt	metering_evidence_missing_receipts.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs	236	bounded_count	Counts outcomes or subsets once per persisted receipt	metering_financial_mismatch_receipts.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	133	pending	Needs semantic review; no correctness claim	entry.matched_local_receipts = entry.matched_local_receipts.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	145	pending	Needs semantic review; no correctness claim	"""allow"" => entry.allow_count = entry.allow_count.saturating_add(1),"
+crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	146	pending	Needs semantic review; no correctness claim	"""deny"" => entry.deny_count = entry.deny_count.saturating_add(1),"
+crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	147	pending	Needs semantic review; no correctness claim	"""cancelled"" => entry.cancelled_count = entry.cancelled_count.saturating_add(1),"
+crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	148	pending	Needs semantic review; no correctness claim	_ => entry.incomplete_count = entry.incomplete_count.saturating_add(1),
+crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs	605	pending	Needs semantic review; no correctness claim	let mut expected_seq = effective_floor.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs	612	pending	Needs semantic review; no correctness claim	expected_seq = expected_seq.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs	614	pending	Needs semantic review; no correctness claim	if expected_seq != max_entry_seq.saturating_add(1) {
+crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs	617	pending	Needs semantic review; no correctness claim	expected_seq.saturating_sub(1)
+crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs	833	pending	Needs semantic review; no correctness claim	.saturating_sub(staged_head.checkpointed_entry_seq())
+crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs	840	pending	Needs semantic review; no correctness claim	let start_seq = staged_head.checkpointed_entry_seq().saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs	841	pending	Needs semantic review; no correctness claim	let end_seq = start_seq.saturating_add(signer.max_batch - 1);
+crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/authorization.rs	581	pending	Needs semantic review; no correctness claim	if leaf.delegation_depth as usize != chain.len().saturating_sub(1) {
+crates/platform/chio-store-sqlite/src/receipt_store/tests/background_checkpoint_races.rs	764	pending	Needs semantic review; no correctness claim	winner.body.issued_at = loser.body.issued_at.saturating_add(1_000);
+crates/platform/chio-store-sqlite/src/receipt_store/tests/background_checkpoints.rs	388	pending	Needs semantic review; no correctness claim	external.body.issued_at = external.body.issued_at.saturating_add(1_000);
+crates/platform/chio-store-sqlite/src/receipt_store/tests/background_checkpoints.rs	863	pending	Needs semantic review; no correctness claim	loser.body.issued_at = winner.body.issued_at.saturating_add(1_000);
+crates/platform/chio-store-sqlite/src/receipt_store/tests/bootstrap.rs	147	pending	Needs semantic review; no correctness claim	let requested = u32::try_from(current_pages.saturating_sub(1)).test_unwrap();
+crates/platform/chio-store-sqlite/src/receipt_store/tests/insert.rs	637	pending	Needs semantic review; no correctness claim	if inflight > accepted.saturating_add(slack) {
+crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs	764	pending	Needs semantic review; no correctness claim	max_size_bytes: before.saturating_sub(1),
+crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs	817	pending	Needs semantic review; no correctness claim	max_size_bytes: before.saturating_sub(1),
+crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs	925	pending	Needs semantic review; no correctness claim	now.saturating_sub(500_000),
+crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs	926	pending	Needs semantic review; no correctness claim	now.saturating_sub(2_000_000),
+crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs	927	pending	Needs semantic review; no correctness claim	now.saturating_sub(100_000),
+crates/platform/chio-store-sqlite/src/receipt_store/tests/support.rs	1528	pending	Needs semantic review; no correctness claim	generated_at: issued_at.saturating_sub(10),
+crates/platform/chio-store-sqlite/src/receipt_store/tests/support.rs	1594	pending	Needs semantic review; no correctness claim	generated_at: issued_at.saturating_sub(1),
+crates/platform/chio-store-sqlite/src/receipt_store/tests/support.rs	1639	pending	Needs semantic review; no correctness claim	generated_at: issued_at.saturating_sub(10),
+crates/platform/chio-store-sqlite/src/receipt_store/tests/support.rs	1710	pending	Needs semantic review; no correctness claim	generated_at: issued_at.saturating_sub(1),
+crates/platform/chio-store-sqlite/src/receipt_store/underwriting_credit.rs	346	fixed	Per-currency premium sum now rejects u64 overflow	*total = total.saturating_add(quoted_amount.units);
+crates/platform/chio-store-sqlite/src/receipt_store/underwriting_credit.rs	940	bounded_count	Event counts and subsets grow once per persisted event	matching_events = matching_events.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/underwriting_credit.rs	943	bounded_count	Event counts and subsets grow once per persisted event	delinquency_events = delinquency_events.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/underwriting_credit.rs	946	bounded_count	Event counts and subsets grow once per persisted event	recovery_events = recovery_events.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/underwriting_credit.rs	949	bounded_count	Event counts and subsets grow once per persisted event	reserve_release_events = reserve_release_events.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/underwriting_credit.rs	952	bounded_count	Event counts and subsets grow once per persisted event	reserve_slash_events = reserve_slash_events.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/underwriting_credit.rs	955	bounded_count	Event counts and subsets grow once per persisted event	write_off_events = write_off_events.saturating_add(1);
+crates/platform/chio-store-sqlite/src/replay_clock.rs	100	pending	Needs semantic review; no correctness claim	if observed > expected.saturating_add(self.max_skew_secs) {
+crates/platform/chio-store-sqlite/src/replay_clock.rs	101	pending	Needs semantic review; no correctness claim	let unexplained_gap_secs = observed.saturating_sub(expected);
+crates/platform/chio-store-sqlite/src/replay_clock.rs	131	pending	Needs semantic review; no correctness claim	} else if observed < expected.saturating_sub(self.max_skew_secs) {
+crates/platform/chio-store-sqlite/src/replay_clock.rs	142	pending	Needs semantic review; no correctness claim	if observed < durable_high_water.saturating_sub(self.max_skew_secs) {
+crates/platform/chio-store-sqlite/src/replay_clock.rs	156	pending	Needs semantic review; no correctness claim	.saturating_duration_since(state.anchor_monotonic)
+crates/platform/chio-store-sqlite/src/replay_clock.rs	160	pending	Needs semantic review; no correctness claim	state.anchor_wall.saturating_add(elapsed)
+crates/platform/chio-store-sqlite/src/replay_clock.rs	170	pending	Needs semantic review; no correctness claim	observed_monotonic.saturating_duration_since(pending.observed_monotonic);
+crates/platform/chio-store-sqlite/src/replay_clock.rs	63	pending	Needs semantic review; no correctness claim	if high_water > expected.saturating_add(self.max_skew_secs) {
+crates/platform/chio-store-sqlite/src/security_state_parts/part_06.rs	1018	pending	Needs semantic review; no correctness claim	to_i64(trusted_now.saturating_add(LINEAGE_FENCE_RENEWAL_MARGIN_MS))?,
+crates/platform/chio-store-sqlite/src/security_state_parts/part_06.rs	283	pending	Needs semantic review; no correctness claim	i64::from(max_leases).saturating_add(1),
+crates/platform/chio-store-sqlite/src/security_state_parts/part_06.rs	989	pending	Needs semantic review; no correctness claim	to_i64(trusted_now.saturating_add(LINEAGE_FENCE_RENEWAL_MARGIN_MS))?,
+crates/platform/chio-store-sqlite/src/security_state_parts/part_09.rs	714	pending	Needs semantic review; no correctness claim	.saturating_add(1)
+crates/platform/chio-store-sqlite/tests/capability_set_suspensions.rs	120	pending	Needs semantic review; no correctness claim	let expires_at_unix_ms = now_unix_ms().saturating_add(120_000);
+crates/platform/chio-store-sqlite/tests/capability_set_suspensions.rs	373	pending	Needs semantic review; no correctness claim	stale.scheduler_fencing_token = stale.scheduler_fencing_token.saturating_add(1);
+crates/platform/chio-store-sqlite/tests/capability_set_suspensions.rs	80	pending	Needs semantic review; no correctness claim	due_at_unix_ms: Some(now.saturating_sub(1)),
+crates/platform/chio-store-sqlite/tests/capability_set_suspensions.rs	91	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: now.saturating_add(120_000),
+crates/platform/chio-store-sqlite/tests/containment_overlay_commands.rs	439	pending	Needs semantic review; no correctness claim	first_work.fencing_token.saturating_add(1),
+crates/platform/chio-store-sqlite/tests/containment_overlay_commands.rs	86	pending	Needs semantic review; no correctness claim	due_at_unix_ms: Some(now.saturating_sub(1)),
+crates/platform/chio-store-sqlite/tests/containment_overlay_commands.rs	97	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: now.saturating_add(120_000),
+crates/platform/chio-store-sqlite/tests/egress_restrictions.rs	165	pending	Needs semantic review; no correctness claim	due_at_unix_ms: Some(now.saturating_sub(1)),
+crates/platform/chio-store-sqlite/tests/egress_restrictions.rs	177	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: now.saturating_add(120_000),
+crates/platform/chio-store-sqlite/tests/egress_restrictions.rs	384	pending	Needs semantic review; no correctness claim	clock.set(work.lease_expires_at_unix_ms.saturating_add(1));
+crates/platform/chio-store-sqlite/tests/enterprise_migration_state.rs	80	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	digest(seed.wrapping_add(1)),
+crates/platform/chio-store-sqlite/tests/enterprise_migration_state.rs	81	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	digest(seed.wrapping_add(2)),
+crates/platform/chio-store-sqlite/tests/enterprise_migration_state.rs	82	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	digest(seed.wrapping_add(3)),
+crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/delegated_share.rs	259	pending	Needs semantic review; no correctness claim	.load_caller_budget_shares(&parent, 1, &fence, now.saturating_sub(1_000))
+crates/platform/chio-store-sqlite/tests/execution_nonce_store.rs	77	pending	Needs semantic review; no correctness claim	let expires_at = now.saturating_add(120);
+crates/platform/chio-store-sqlite/tests/execution_nonce_store.rs	99	pending	Needs semantic review; no correctness claim	".try_reserve(""expired-id"", now, now.saturating_sub(1))"
+crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs	553	pending	Needs semantic review; no correctness claim	expires_at_unix_ms: now_unix_ms.saturating_add(60_000).to_string(),
+crates/platform/chio-store-sqlite/tests/formal_projection.rs	63	pending	Needs semantic review; no correctness claim	body.issued_at = body.issued_at.saturating_add(1);
+crates/platform/chio-store-sqlite/tests/governed_approval_kernel_replay.rs	158	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(1),
+crates/platform/chio-store-sqlite/tests/governed_approval_kernel_replay.rs	159	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(300),
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	1094	pending	Needs semantic review; no correctness claim	<= trusted_now.saturating_add(20_000)
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	109	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: now.saturating_add(120_000),
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	1241	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: initial_work.lease_expires_at_unix_ms.saturating_add(1),
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	1284	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: initial_work.lease_expires_at_unix_ms.saturating_add(2),
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	134	pending	Needs semantic review; no correctness claim	.saturating_sub(now_unix_ms())
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	135	pending	Needs semantic review; no correctness claim	.saturating_add(25);
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	270	pending	Needs semantic review; no correctness claim	.saturating_add(ttl_ms)
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	271	pending	Needs semantic review; no correctness claim	.saturating_add(30_000),
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	301	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: authorized_at_unix_ms.saturating_add(5_000),
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	335	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: snapshot.plan.created_at_unix_ms.saturating_add(1),
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	354	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: snapshot.plan.created_at_unix_ms.saturating_add(2),
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	390	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: snapshot.plan.created_at_unix_ms.saturating_add(3),
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	420	pending	Needs semantic review; no correctness claim	let plan_expires_at_unix_ms = now_unix_ms().saturating_add(30_000);
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	421	pending	Needs semantic review; no correctness claim	let external_fence_expires_at_unix_ms = plan_expires_at_unix_ms.saturating_sub(10_000);
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	829	pending	Needs semantic review; no correctness claim	apply.scheduler_fencing_token.saturating_add(1),
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	920	pending	Needs semantic review; no correctness claim	renewed_fence.expires_at_unix_ms = apply.contribution.expires_at_unix_ms.saturating_add(10_000);
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	964	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: now.saturating_add(120_000),
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	973	pending	Needs semantic review; no correctness claim	taken_over_fence.fencing_token = renewed_fence.fencing_token.saturating_add(1);
+crates/platform/chio-store-sqlite/tests/issuance_freezes.rs	98	pending	Needs semantic review; no correctness claim	due_at_unix_ms: Some(now.saturating_sub(1)),
+crates/platform/chio-store-sqlite/tests/loom_receipt_writer.rs	48	pending	Needs semantic review; no correctness claim	let next = current.saturating_sub(1);
+crates/platform/chio-store-sqlite/tests/loom_receipt_writer.rs	74	pending	Needs semantic review; no correctness claim	let next = current.saturating_sub(1);
+crates/platform/chio-store-sqlite/tests/receipt_retention_liveness/sync_shim.rs	457	pending	Needs semantic review; no correctness claim	for slot in offset..offset.saturating_add(n) {
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	164	pending	Needs semantic review; no correctness claim	now_unix_ms.saturating_sub(10_000),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	178	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: now_unix_ms.saturating_add(TERMINAL_RENEWAL_TEST_LEASE_MS),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	218	pending	Needs semantic review; no correctness claim	created_at_unix_ms.saturating_add(1),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	232	pending	Needs semantic review; no correctness claim	created_at_unix_ms.saturating_add(1),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	243	pending	Needs semantic review; no correctness claim	created_at_unix_ms.saturating_add(1),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	244	pending	Needs semantic review; no correctness claim	Some(created_at_unix_ms.saturating_add(100)),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	254	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: created_at_unix_ms.saturating_add(2),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	265	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: created_at_unix_ms.saturating_add(3),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	275	pending	Needs semantic review; no correctness claim	created_at_unix_ms.saturating_add(4),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	282	pending	Needs semantic review; no correctness claim	created_at_unix_ms.saturating_add(5),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	292	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: created_at_unix_ms.saturating_add(6),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	303	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: created_at_unix_ms.saturating_add(7),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	313	pending	Needs semantic review; no correctness claim	created_at_unix_ms.saturating_add(8),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	621	pending	Needs semantic review; no correctness claim	.saturating_sub(now_unix_ms())
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	622	pending	Needs semantic review; no correctness claim	.saturating_add(50);
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	683	pending	Needs semantic review; no correctness claim	created_at_unix_ms.saturating_add(5_000),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	697	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: created_at_unix_ms.saturating_add(15_000),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	763	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: renewal_now.saturating_add(1),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	796	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: renewal_now.saturating_add(2),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	825	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: renewal_now.saturating_add(3),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	838	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: renewal_now.saturating_add(4),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	851	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: renewal_now.saturating_add(5),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	870	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: renewal_now.saturating_add(6),
+crates/platform/chio-store-sqlite/tests/response_dispatch.rs	891	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: renewal_now.saturating_add(7),
+crates/platform/chio-store-sqlite/tests/response_dispatch/scheduler_lease.rs	123	pending	Needs semantic review; no correctness claim	.saturating_add(TERMINAL_RENEWAL_TEST_LEASE_MS),
+crates/platform/chio-store-sqlite/tests/response_dispatch/scheduler_lease.rs	202	pending	Needs semantic review; no correctness claim	.saturating_add(TERMINAL_RENEWAL_TEST_LEASE_MS),
+crates/platform/chio-store-sqlite/tests/response_dispatch/scheduler_lease.rs	218	pending	Needs semantic review; no correctness claim	not_before_unix_ms: retry_now_unix_ms.saturating_add(60_000),
+crates/platform/chio-store-sqlite/tests/response_dispatch/scheduler_lease.rs	273	pending	Needs semantic review; no correctness claim	work.lease_expires_at_unix_ms.saturating_add(1)
+crates/platform/chio-store-sqlite/tests/response_dispatch/scheduler_lease.rs	307	pending	Needs semantic review; no correctness claim	.saturating_add(TERMINAL_RENEWAL_TEST_LEASE_MS),
+crates/platform/chio-store-sqlite/tests/response_dispatch/scheduler_lease.rs	390	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: claim_now_unix_ms.saturating_add(TERMINAL_RENEWAL_TEST_LEASE_MS),
+crates/platform/chio-store-sqlite/tests/response_dispatch/scheduler_lease.rs	46	pending	Needs semantic review; no correctness claim	.saturating_add(TERMINAL_RENEWAL_TEST_LEASE_MS),
+crates/platform/chio-store-sqlite/tests/response_dispatch/scheduler_lease.rs	88	pending	Needs semantic review; no correctness claim	.saturating_add(TERMINAL_RENEWAL_TEST_LEASE_MS),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	1004	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: recovery_now_unix_ms.saturating_add(5_000),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	1100	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: initial_work.lease_expires_at_unix_ms.saturating_add(250),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	1123	pending	Needs semantic review; no correctness claim	.saturating_sub(now_unix_ms())
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	1124	pending	Needs semantic review; no correctness claim	.saturating_add(50);
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	114	pending	Needs semantic review; no correctness claim	not_before_unix_ms: delayed_renewal_now_unix_ms.saturating_add(100),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	121	pending	Needs semantic review; no correctness claim	clock.set(retry_request.not_before_unix_ms.saturating_add(10_000));
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	16	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: claim_now_unix_ms.saturating_add(TERMINAL_RENEWAL_TEST_LEASE_MS),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	185	pending	Needs semantic review; no correctness claim	.saturating_add(TERMINAL_RENEWAL_TEST_LEASE_MS),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	189	pending	Needs semantic review; no correctness claim	clock.set(work.lease_expires_at_unix_ms.saturating_add(1));
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	224	pending	Needs semantic review; no correctness claim	.saturating_add(TERMINAL_RENEWAL_TEST_LEASE_MS),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	236	pending	Needs semantic review; no correctness claim	.saturating_add(TERMINAL_RENEWAL_TEST_LEASE_MS),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	276	pending	Needs semantic review; no correctness claim	not_before_unix_ms: initial_now_unix_ms.saturating_add(1_000),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	292	pending	Needs semantic review; no correctness claim	.saturating_add(TERMINAL_RENEWAL_TEST_LEASE_MS),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	307	pending	Needs semantic review; no correctness claim	not_before_unix_ms: second_now_unix_ms.saturating_add(1_000),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	745	pending	Needs semantic review; no correctness claim	let created_at_unix_ms = trusted_now.saturating_sub(10_000);
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	793	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: trusted_now.saturating_add(5_000),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	808	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: trusted_now.saturating_add(5_000),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	894	pending	Needs semantic review; no correctness claim	stale_fence.expected_fencing_token = Some(initial_work.fencing_token.saturating_add(1));
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	919	pending	Needs semantic review; no correctness claim	initial_now_unix_ms.saturating_add(10_000),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	92	pending	Needs semantic review; no correctness claim	.saturating_add(TERMINAL_RENEWAL_TEST_LEASE_MS),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	983	pending	Needs semantic review; no correctness claim	takeover_now_unix_ms.saturating_add(100),
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	98	pending	Needs semantic review; no correctness claim	let delayed_renewal_now_unix_ms = initial_now_unix_ms.saturating_add(10_000);
+crates/platform/chio-store-sqlite/tests/response_dispatch_tail.inc	994	pending	Needs semantic review; no correctness claim	let recovery_now_unix_ms = stale_work.lease_expires_at_unix_ms.saturating_add(1);
+crates/platform/chio-store-sqlite/tests/sealed_decoy_registry.rs	1108	pending	Needs semantic review; no correctness claim	value.payload_digest = token(60_u8.saturating_add(writer as u8));
+crates/platform/chio-store-sqlite/tests/sealed_decoy_registry.rs	1109	pending	Needs semantic review; no correctness claim	value.token_digest = token(80_u8.saturating_add(writer as u8));
+crates/platform/chio-store-sqlite/tests/sealed_decoy_registry.rs	461	pending	Needs semantic review; no correctness claim	30_u8.saturating_add(index as u8),
+crates/platform/chio-store-sqlite/tests/sealed_decoy_registry.rs	462	pending	Needs semantic review; no correctness claim	40_u8.saturating_add(index as u8),
+crates/platform/chio-store-sqlite/tests/sealed_decoy_registry.rs	707	pending	Needs semantic review; no correctness claim	artifact.saturating_add(10),
+crates/platform/chio-store-sqlite/tests/sealed_decoy_registry.rs	708	pending	Needs semantic review; no correctness claim	artifact.saturating_add(20),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_01.rs	1037	pending	Needs semantic review; no correctness claim	&& request.partial.generation == expected.saturating_add(1) => {}
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	1001	pending	Needs semantic review; no correctness claim	"let due_after = response_plan(""scheduler-after"", 0, Some(clock.saturating_sub(1)));"
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	1034	pending	Needs semantic review; no correctness claim	Some(clock.saturating_sub(1)),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	1340	pending	Needs semantic review; no correctness claim	expires_at_unix_ms: now_unix_ms().saturating_add(120_000),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	1406	pending	Needs semantic review; no correctness claim	"let plan = response_plan(""takeover-contract-action"", 0, Some(clock.saturating_sub(1)));"
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	1419	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: clock.saturating_add(200),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	1436	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: second_clock.saturating_add(120_000),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	1474	pending	Needs semantic review; no correctness claim	Some(clock.saturating_sub(1)),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	1498	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: clock.saturating_add(200),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	1540	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: second_clock.saturating_add(120_000),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	1614	pending	Needs semantic review; no correctness claim	.create(&response_plan(value, 0, Some(clock.saturating_sub(1))))
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	1623	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: clock.saturating_add(120_000),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	244	pending	Needs semantic review; no correctness claim	expires_at_unix_ms: expires_at_unix_ms.saturating_add(ttl_ms),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	265	pending	Needs semantic review; no correctness claim	occurred_at_unix_ms: created_at_unix_ms.saturating_add(1),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	316	pending	Needs semantic review; no correctness claim	let expiry = clock.saturating_add(120_000);
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	46	pending	Needs semantic review; no correctness claim	let expires_at_unix_ms = now_unix_ms().saturating_add(120_000);
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	501	pending	Needs semantic review; no correctness claim	expires_at_unix_ms: watermark.saturating_add(60_000),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	541	pending	Needs semantic review; no correctness claim	"let verified_after = verified_event(""verified-after"", clock.saturating_add(1));"
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	561	pending	Needs semantic review; no correctness claim	"let advisory_after = advisory_event(""advisory-after"", clock.saturating_add(1));"
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	580	pending	Needs semantic review; no correctness claim	.scan_partition(&scan_for(&before_key, clock.saturating_add(10)))
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	598	pending	Needs semantic review; no correctness claim	.scan_partition(&scan_for(&after_key, clock.saturating_add(10)))
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	629	pending	Needs semantic review; no correctness claim	scan: scan_for(&after_key, clock.saturating_add(1)),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	631	pending	Needs semantic review; no correctness claim	partial: partial(&after_key, 0, clock.saturating_add(1)),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	647	pending	Needs semantic review; no correctness claim	"let outcome_before_event = verified_event(""outcome-before"", clock.saturating_add(2));"
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	661	pending	Needs semantic review; no correctness claim	scan: scan_for(&outcome_before_key, clock.saturating_add(2)),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	663	pending	Needs semantic review; no correctness claim	partial: partial(&outcome_before_key, 0, clock.saturating_add(2)),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	703	pending	Needs semantic review; no correctness claim	"let outcome_after_event = verified_event(""outcome-after"", clock.saturating_add(3));"
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	717	pending	Needs semantic review; no correctness claim	scan: scan_for(&outcome_after_key, clock.saturating_add(3)),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	719	pending	Needs semantic review; no correctness claim	partial: partial(&outcome_after_key, 0, clock.saturating_add(3)),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	760	pending	Needs semantic review; no correctness claim	"let unindexed_late_event = verified_event(""outcome-unindexed-late"", clock.saturating_add(2));"
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	781	pending	Needs semantic review; no correctness claim	"verified_event(""outcome-unindexed-future"", clock.saturating_add(4));"
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	794	pending	Needs semantic review; no correctness claim	"verified_event(""outcome-unindexed-matched"", clock.saturating_add(2));"
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	807	pending	Needs semantic review; no correctness claim	"let stale_first = verified_event(""verified-stale-first"", clock.saturating_add(2));"
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	808	pending	Needs semantic review; no correctness claim	"let stale_second = verified_event(""verified-stale-second"", clock.saturating_add(3));"
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	820	pending	Needs semantic review; no correctness claim	.scan_partition(&scan_for(&stale_key, clock.saturating_add(3)))
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	834	pending	Needs semantic review; no correctness claim	scan: scan_for(&stale_key, clock.saturating_add(3)),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	836	pending	Needs semantic review; no correctness claim	partial: partial(&stale_key, 0, clock.saturating_add(3)),
+crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_02.rs	985	pending	Needs semantic review; no correctness claim	"let due_before = response_plan(""scheduler-before"", 0, Some(clock.saturating_sub(1)));"
+crates/platform/chio-store-sqlite/tests/security_state_parts/part_01.rs	1537	pending	Needs semantic review; no correctness claim	due_at_unix_ms: Some(now.saturating_sub(1)),
+crates/platform/chio-store-sqlite/tests/security_state_parts/part_01.rs	1549	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: now.saturating_add(60_000),
+crates/platform/chio-store-sqlite/tests/security_state_parts/part_01.rs	1566	pending	Needs semantic review; no correctness claim	not_before_unix_ms: now.saturating_add(1_000),
+crates/platform/chio-store-sqlite/tests/security_state_parts/part_01.rs	1621	pending	Needs semantic review; no correctness claim	due_at_unix_ms: Some(now.saturating_sub(1)),
+crates/platform/chio-store-sqlite/tests/security_state_parts/part_01.rs	1693	pending	Needs semantic review; no correctness claim	let takeover_now = first[0].lease_expires_at_unix_ms.saturating_add(1);
+crates/platform/chio-store-sqlite/tests/security_state_parts/part_01.rs	1704	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: takeover_now.saturating_add(60_000),
+crates/platform/chio-store-sqlite/tests/security_state_parts/part_01.rs	250	pending	Needs semantic review; no correctness claim	.unwrap_or_else(|| current_unix_ms().saturating_add(120_000));
+crates/platform/chio-store-sqlite/tests/security_state_parts/part_02.rs	102	pending	Needs semantic review; no correctness claim	due_at_unix_ms: Some(now.saturating_sub(1)),
+crates/platform/chio-store-sqlite/tests/security_state_parts/part_02.rs	19	pending	Needs semantic review; no correctness claim	due_at_unix_ms: Some(now.saturating_sub(1)),
+crates/platform/chio-store-sqlite/tests/security_state_parts/part_02.rs	215	pending	Needs semantic review; no correctness claim	due_at_unix_ms: Some(now.saturating_sub(1)),
+crates/platform/chio-store-sqlite/tests/session_throttles.rs	115	pending	Needs semantic review; no correctness claim	let expires_at_unix_ms = now_unix_ms().saturating_add(120_000);
+crates/platform/chio-store-sqlite/tests/session_throttles.rs	474	pending	Needs semantic review; no correctness claim	stale.scheduler_fencing_token = stale.scheduler_fencing_token.saturating_add(1);
+crates/platform/chio-store-sqlite/tests/session_throttles.rs	78	pending	Needs semantic review; no correctness claim	due_at_unix_ms: Some(now.saturating_sub(1)),
+crates/platform/chio-store-sqlite/tests/session_throttles.rs	89	pending	Needs semantic review; no correctness claim	lease_expires_at_unix_ms: now.saturating_add(120_000),
+crates/security/chio-active-response-authority/src/store.rs	229	pending	Needs semantic review; no correctness claim	.saturating_add(1),
+crates/security/chio-cage/src/launch.rs	1331	pending	Needs semantic review; no correctness claim	kill_attempts = kill_attempts.saturating_add(1);
+crates/security/chio-cage/src/launch.rs	743	pending	Needs semantic review; no correctness claim	let remaining = deadline.saturating_duration_since(Instant::now());
+crates/security/chio-cage/src/launch.rs	966	pending	Needs semantic review; no correctness claim	let remaining = deadline.saturating_duration_since(Instant::now());
+crates/security/chio-cage/src/launch/linux.rs	23	pending	Needs semantic review; no correctness claim	first = slot.saturating_add(1);
+crates/security/chio-cage/src/launch/linux_parts/part_01_sections/sandbox.inc	118	pending	Needs semantic review; no correctness claim	helper = helper.saturating_add(1);
+crates/security/chio-cage/src/launch/linux_parts/part_01_sections/sandbox.inc	127	pending	Needs semantic review; no correctness claim	target = target.saturating_add(1);
+crates/security/chio-cage/src/launch/linux_parts/part_01_sections/sandbox.inc	136	pending	Needs semantic review; no correctness claim	workdir = workdir.saturating_add(1);
+crates/security/chio-cage/src/launch/linux_parts/part_01_sections/sandbox.inc	163	pending	Needs semantic review; no correctness claim	broker = broker.saturating_add(1);
+crates/security/chio-cage/src/launch/linux_parts/part_01_sections/sandbox.inc	222	pending	Needs semantic review; no correctness claim	*count = (*count).saturating_add(1);
+crates/security/chio-cage/src/launch/linux_parts/part_01_sections/sandbox.inc	464	pending	Needs semantic review; no correctness claim	plan.fd_table[target_index].slot.saturating_sub(1);
+crates/security/chio-cage/src/launch/linux_parts/part_01_sections/sandbox.inc	484	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	.wrapping_add(1);
+crates/security/chio-cage/src/launch/linux_parts/part_02.rs	1200	pending	Needs semantic review; no correctness claim	offset = offset.saturating_add(read as u64);
+crates/security/chio-cage/src/launch/linux_parts/part_02.rs	426	pending	Needs semantic review; no correctness claim	count = count.saturating_add(1);
+crates/security/chio-cage/src/launch/linux_parts/part_02.rs	464	pending	Needs semantic review; no correctness claim	let remaining = deadline.saturating_duration_since(Instant::now());
+crates/security/chio-cage/src/launch/linux_parts/part_02.rs	963	pending	Needs semantic review; no correctness claim	control_headers = control_headers.saturating_add(1);
+crates/security/chio-cage/src/lib_parts/part_01.rs	1446	pending	Needs semantic review; no correctness claim	.checked_add(argument.len().saturating_add(1))
+crates/security/chio-decoy/src/watermark.rs	493	pending	Needs semantic review; no correctness claim	report.duplicate_candidates = report.duplicate_candidates.saturating_add(1);
+crates/security/chio-decoy/src/watermark.rs	500	pending	Needs semantic review; no correctness claim	report.detector_failures = report.detector_failures.saturating_add(1);
+crates/security/chio-decoy/src/watermark.rs	506	pending	Needs semantic review; no correctness claim	report.detector_failures = report.detector_failures.saturating_add(1);
+crates/security/chio-decoy/src/watermark.rs	510	pending	Needs semantic review; no correctness claim	report.invalid_candidates = report.invalid_candidates.saturating_add(1);
+crates/security/chio-decoy/src/watermark.rs	514	pending	Needs semantic review; no correctness claim	report.detector_failures = report.detector_failures.saturating_add(1);
+crates/security/chio-decoy/src/watermark.rs	742	pending	Needs semantic review; no correctness claim	count = count.saturating_add(1);
+crates/security/chio-decoy/src/watermark.rs	752	pending	Needs semantic review; no correctness claim	malformed = malformed.saturating_add(1);
+crates/security/chio-decoy/src/watermark.rs	757	pending	Needs semantic review; no correctness claim	malformed = malformed.saturating_add(1);
+crates/security/chio-decoy/src/watermark.rs	762	pending	Needs semantic review; no correctness claim	malformed = malformed.saturating_add(1);
+crates/security/chio-decoy/tests/registry_key_rotation.rs	168	pending	Needs semantic review; no correctness claim	&& request.record.generation == expected.saturating_add(1)
+crates/security/chio-keyring/src/service.rs	194	pending	Needs semantic review; no correctness claim	if line.len().saturating_add(take) > crate::MAX_CANONICAL_RECORD_BYTES {
+crates/security/chio-keyring/src/sqlite/synchronization.rs	177	pending	Needs semantic review; no correctness claim	upper = candidate_end.saturating_sub(1);
+crates/security/chio-keyring/src/sqlite_parts/part_01.rs	1312	pending	Needs semantic review; no correctness claim	.checked_add(page_end.saturating_sub(event_start))
+crates/security/chio-keyring/src/sqlite_parts/part_01.rs	1315	pending	Needs semantic review; no correctness claim	.get(checkpoint_end.saturating_sub(1))
+crates/security/chio-keyring/tests/enterprise_receipt.rs	389	pending	Needs semantic review; no correctness claim	Value::Number(number) => Value::from(number.as_u64().test_unwrap().saturating_add(1)),
+crates/security/chio-quarantine/src/blast.rs	462	pending	Needs semantic review; no correctness claim	*value = value.saturating_add(1);
+crates/security/chio-quarantine/src/blast.rs	474	pending	Needs semantic review; no correctness claim	visited = visited.saturating_add(1);
+crates/security/chio-quarantine/src/blast.rs	480	pending	Needs semantic review; no correctness claim	*degree = degree.saturating_sub(1);
+crates/security/chio-quarantine/src/blast.rs	558	pending	Needs semantic review; no correctness claim	let mut input = Vec::with_capacity(domain.len().saturating_add(canonical.len()));
+crates/security/chio-quarantine/src/blast.rs	685	pending	Needs semantic review; no correctness claim	*acquisitions = acquisitions.saturating_add(1);
+crates/security/chio-quarantine/src/blast.rs	762	pending	Needs semantic review; no correctness claim	*releases = releases.saturating_add(1);
+crates/security/chio-quarantine/src/correlation.rs	1386	pending	Needs semantic review; no correctness claim	.saturating_add(bounded_lateness_ms)
+crates/security/chio-quarantine/src/correlation.rs	1680	pending	Needs semantic review; no correctness claim	MAX_JSON_SAFE_INTEGER.saturating_add(1),
+crates/security/chio-quarantine/src/correlation.rs	1681	pending	Needs semantic review; no correctness claim	MAX_JSON_SAFE_INTEGER.saturating_add(1),
+crates/security/chio-quarantine/src/correlation.rs	1684	pending	Needs semantic review; no correctness claim	unix_ms: MAX_JSON_SAFE_INTEGER.saturating_add(1),
+crates/security/chio-quarantine/src/correlation.rs	254	pending	Needs semantic review; no correctness claim	observed_at_unix_ms.saturating_sub(self.policy.bounded_lateness_ms);
+crates/security/chio-quarantine/src/correlation.rs	589	pending	Needs semantic review; no correctness claim	.saturating_sub(self.policy.bounded_lateness_ms);
+crates/security/chio-quarantine/src/scheduler.rs	417	pending	Needs semantic review; no correctness claim	None if now_unix_ms.saturating_sub(first_failure_at_unix_ms)
+crates/security/chio-quarantine/src/scheduler.rs	537	pending	Needs semantic review; no correctness claim	.saturating_mul(multiplier)
+crates/security/chio-quarantine/tests/correlation.rs	70	pending	Needs semantic review; no correctness claim	ingest_time_unix_ms: time.saturating_add(100),
+crates/security/chio-quarantine/tests/response_executor.rs	640	pending	Needs semantic review; no correctness claim	state.apply_mutations = state.apply_mutations.saturating_add(1);
+crates/security/chio-quarantine/tests/response_executor.rs	662	pending	Needs semantic review; no correctness claim	state.remove_mutations = state.remove_mutations.saturating_add(1);
+crates/security/chio-quarantine/tests/response_scheduler.rs	297	pending	Needs semantic review; no correctness claim	.saturating_add(state.claim_expiry_extension_ms),
+crates/security/chio-quarantine/tests/response_scheduler.rs	449	pending	Needs semantic review; no correctness claim	*calls = calls.saturating_add(1);
+crates/security/chio-quarantine/tests/response_scheduler.rs	470	pending	Needs semantic review; no correctness claim	*calls = calls.saturating_add(1);
+crates/security/chio-quarantine/tests/response_scheduler.rs	588	pending	Needs semantic review; no correctness claim	state.calls = state.calls.saturating_add(1);
+crates/security/chio-quarantine/tests/response_support/mod.rs	65	pending	Needs semantic review; no correctness claim	|| request.record.generation != request.expected_generation.saturating_add(1)
+crates/security/chio-quarantine/tests/state_machine.rs	104	pending	Needs semantic review; no correctness claim	observed_base_version_hash: digest(index.saturating_add(20)),
+crates/security/chio-quarantine/tests/state_machine.rs	297	pending	Needs semantic review; no correctness claim	70_u8.saturating_add(u8::try_from(index).unwrap_or(0)),
+crates/security/chio-quarantine/tests/state_machine.rs	586	pending	Needs semantic review; no correctness claim	previous.saturating_add(1).max(minimum)
+crates/security/chio-quarantine/tests/state_machine.rs	94	pending	Needs semantic review; no correctness claim	"format!(""{{\""posture_rank\"":{}}}"", index.saturating_add(1)).into_bytes(),"
+crates/security/chio-quarantine/tests/support/mod.rs	168	pending	Needs semantic review; no correctness claim	&& request.partial.generation == expected.saturating_add(1)
+crates/security/chio-secret-broker/src/audit.rs	237	pending	Needs semantic review; no correctness claim	.saturating_sub(self.issued_at_unix_seconds)
+crates/security/chio-secret-broker/src/authority_ipc.rs	879	pending	Needs semantic review; no correctness claim	let earliest = issued_at_unix_seconds.saturating_sub(maximum_clock_skew_seconds);
+crates/security/chio-secret-broker/src/daemon_runtime.rs	1339	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	"validate_key_file_identity(key.as_file(), service_uid.wrapping_add(1), ""test key"")"
+crates/security/chio-secret-broker/src/generic_https/rustls_transport.rs	535	pending	Needs semantic review; no correctness claim	if line.len() > maximum.saturating_add(1) {
+crates/security/chio-secret-broker/src/migration.rs	313	pending	Needs semantic review; no correctness claim	Digest32::new([seed.saturating_add(1); 32]),
+crates/security/chio-secret-broker/src/migration.rs	314	pending	Needs semantic review; no correctness claim	Digest32::new([seed.saturating_add(2); 32]),
+crates/security/chio-secret-broker/src/migration.rs	362	pending	Needs semantic review; no correctness claim	Digest32::new([seed.saturating_add(1); 32]),
+crates/security/chio-secret-broker/src/migration.rs	363	pending	Needs semantic review; no correctness claim	Digest32::new([seed.saturating_add(2); 32]),
+crates/security/chio-secret-broker/src/migration.rs	399	pending	Needs semantic review; no correctness claim	seed.saturating_add(next_stage.generation() as u8 * 4),
+crates/security/chio-secret-broker/src/privileged_audit.rs	1578	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	assert!(validate_audit_peer(&client, uid.wrapping_add(1), gid).is_err());
+crates/security/chio-secret-broker/src/privileged_audit.rs	1579	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	assert!(validate_audit_peer(&client, uid, gid.wrapping_add(1)).is_err());
+crates/security/chio-secret-broker/src/privileged_audit.rs	215	pending	Needs semantic review; no correctness claim	.saturating_sub(self.issued_at_unix_seconds)
+crates/security/chio-secret-broker/src/process_boundary_tests/fixture.rs	246	pending	Needs semantic review; no correctness claim	Digest32::new([seed.saturating_add(1); 32]),
+crates/security/chio-secret-broker/src/process_boundary_tests/fixture.rs	247	pending	Needs semantic review; no correctness claim	Digest32::new([seed.saturating_add(2); 32]),
+crates/security/chio-secret-broker/src/process_boundary_tests/fixture.rs	273	pending	Needs semantic review; no correctness claim	Digest32::new([seed.saturating_add(generation as u8 * 3); 32]),
+crates/security/chio-secret-broker/src/process_boundary_tests/fixture.rs	274	pending	Needs semantic review; no correctness claim	Digest32::new([seed.saturating_add(generation as u8 * 3 + 1); 32]),
+crates/security/chio-secret-broker/src/process_boundary_tests/fixture.rs	275	pending	Needs semantic review; no correctness claim	Digest32::new([seed.saturating_add(generation as u8 * 3 + 2); 32]),
+crates/security/chio-secret-broker/src/process_boundary_tests/fixture.rs	434	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(1),
+crates/security/chio-secret-broker/src/process_boundary_tests/fixture.rs	497	pending	Needs semantic review; no correctness claim	issued_at_unix_seconds: now.saturating_sub(1),
+crates/security/chio-secret-broker/src/process_boundary_tests/fixture.rs	498	pending	Needs semantic review; no correctness claim	not_before_unix_seconds: now.saturating_sub(1),
+crates/security/chio-secret-broker/src/process_boundary_tests/native_host.rs	132	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(1),
+crates/security/chio-secret-broker/src/process_boundary_tests/roles.rs	540	pending	Needs semantic review; no correctness claim	request_head.len().saturating_add(content_length) <= MAX_WIRE_BYTES,
+crates/security/chio-secret-broker/src/provision.rs	1106	pending	Needs semantic review; no correctness claim	|| approval.expires_at.saturating_sub(approval.issued_at)
+crates/security/chio-secret-broker/src/registration.rs	239	pending	Needs semantic review; no correctness claim	.saturating_sub(maximum_clock_skew_seconds);
+crates/security/chio-secret-broker/src/service_parts/tests_01_sections/cases.inc	550	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	let error = validate_broker_peer_uid(&client, observed_uid.wrapping_add(1))
+crates/security/chio-secret-broker/src/service_parts/tests_01_sections/support.inc	824	pending	Needs semantic review; no correctness claim	now_unix_seconds.saturating_sub(1),
+crates/security/chio-secret-broker/tests/daemon_runtime.rs	207	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	untrusted.trusted_service_uid = current_uid().wrapping_add(1);
+crates/security/chio-secret-broker/tests/daemon_runtime.rs	236	intentional_fixture	Changes forged identity or advances deterministic test PRNG; no accounting authority	forged.trusted_service_uid = current_uid().wrapping_add(1);
+crates/security/chio-secret-broker/tests/no_secret_crossing.rs	376	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(1),
+crates/security/chio-secret-broker/tests/support/mod.rs	64	pending	Needs semantic review; no correctness claim	Digest32::new([seed.saturating_add(1); 32]),
+crates/security/chio-secret-broker/tests/support/mod.rs	65	pending	Needs semantic review; no correctness claim	Digest32::new([seed.saturating_add(2); 32]),
+crates/security/chio-secret-broker/tests/support/mod.rs	91	pending	Needs semantic review; no correctness claim	Digest32::new([seed.saturating_add(generation as u8 * 3); 32]),
+crates/security/chio-secret-broker/tests/support/mod.rs	92	pending	Needs semantic review; no correctness claim	Digest32::new([seed.saturating_add(generation as u8 * 3 + 1); 32]),
+crates/security/chio-secret-broker/tests/support/mod.rs	93	pending	Needs semantic review; no correctness claim	Digest32::new([seed.saturating_add(generation as u8 * 3 + 2); 32]),
+crates/security/chio-secure-ipc/src/tests.rs	79	pending	Needs semantic review; no correctness claim	process_id: std::process::id().saturating_add(1),
+crates/security/chio-security-kernel/src/session_throttle.rs	221	pending	Needs semantic review; no correctness claim	let mut encoded = String::with_capacity(bytes.len().saturating_mul(2));
+crates/security/chio-security-kernel/src/session_throttle.rs	86	pending	Needs semantic review; no correctness claim	Vec::with_capacity(INVOCATION_DOMAIN.len().saturating_add(canonical.len()));
+crates/security/chio-security-kernel/src/tripwire.rs	878	pending	Needs semantic review; no correctness claim	let mut preimage = Vec::with_capacity(domain.len().saturating_add(bytes.len()));
+crates/security/chio-security-kernel/tests/adapters.rs	678	pending	Needs semantic review; no correctness claim	expires_at: 1_u64.saturating_add(ttl_seconds),
+crates/security/chio-security-types/src/ports_parts/part_01.rs	1498	pending	Needs semantic review; no correctness claim	let exponent = attempts_after_failure.saturating_sub(1).min(63);
+crates/security/chio-security-types/src/ports_parts/part_01.rs	1766	pending	Needs semantic review; no correctness claim	let mut suffix = String::with_capacity(digest.len().saturating_mul(2));
+crates/security/chio-security-types/src/ports_parts/part_02.rs	1026	pending	Needs semantic review; no correctness claim	let mut encoded = String::with_capacity(bytes.len().saturating_mul(2));
+crates/security/chio-security-types/src/ports_parts/part_02.rs	476	pending	Needs semantic review; no correctness claim	let mut target_hex = String::with_capacity(digest.len().saturating_mul(2));
+crates/security/chio-security-types/tests/response.rs	515	pending	Needs semantic review; no correctness claim	authorization_before_plan.authorized_at_unix_ms = plan.created_at_unix_ms.saturating_sub(1);
+crates/security/chio-security-types/tests/session_throttle.rs	40	pending	Needs semantic review; no correctness claim	window_ms: SESSION_THROTTLE_MAX_WINDOW_MS.saturating_add(1),
+crates/security/chio-security-types/tests/session_throttle.rs	49	pending	Needs semantic review; no correctness claim	max_invocations: SESSION_THROTTLE_MAX_INVOCATIONS.saturating_add(1),

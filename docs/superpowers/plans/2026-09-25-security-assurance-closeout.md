@@ -88,9 +88,14 @@ Foundation integration retains the original steps 1-4 acceptance boundary. Once 
 **Owners:** `chio-store-sqlite/src/receipt_store.rs`, `receipt_store/tests/{retention.rs,retention_liveness.rs}`, writer/rotation ownership code, and existing scale gates.
 
 - [ ] Reproduce #1045 using its original workload under declared slow-sync/contention conditions. Capture blocked stacks and writer/rotation ownership at the stall. A passing diagnostic is not a root-cause finding.
-- [ ] Convert the observed ordering defect into a deterministic Rust regression, fix its owner and execute the unchanged original property. Remove its quarantine only when the failure condition is accounted for and its ordinary CI invocation runs it.
-- [ ] Verify that schema-v5 logical evidence identities survive retention, archive reopen, restart and migrations while corrupt or missing payloads fail closed. Include same-inode mutation and path replacement.
+- [ ] Convert the historical ordering defect, once reproduced, into a deterministic Rust regression and fix its owner. The current original property is already enabled with a direct 24-case runner; its earlier quarantine description is stale. A local passing property does not explain #1045.
+- [x] Bound the public rotation caller's wait while preserving writer ownership, unresolved-timeout liveness and exact late completion. Reject invalid deadlines before admission. This repairs a demonstrated unbounded wait without claiming it explains #1045.
+- [x] Repair full-verification receipt writes opening a nested transaction; retain the complete claim-log audit in the actor-owned transaction. Cover valid indexed writes and corrupted-projection refusals.
+- [x] Verify that schema-v5 logical evidence identities survive retention, archive reopen, restart and migration to current schema v6 while corrupt or missing payloads fail closed. Include same-inode mutation, path replacement, exact replay and immutable archive index guards.
+- [x] Execute the unchanged original property on the current implementation with the ordinary CI case-count environment, plus the existing archive race and writer-ownership regressions. The six-case run passed locally; no historical-stall closure follows from that result.
 - [ ] Repeat the original million-entry append and history-recovery gates once the owning source is stable. Preserve original inventories and measure hot-path/restart cost, memory and disk use against the retained baseline.
+
+**Implementation checkpoint (2026-09-27):** [Retention/accounting execution](../../reviews/2026-09-27-retention-accounting-execution.md) records the fixes, owning regressions, retained failures and partial arithmetic classification. Historical runner liveness and the original scale campaigns remain open.
 
 **Exit:** The original liveness issue has an evidence-backed disposition, the property executes in its intended lane, and current-source retention/recovery preserves the original signed evidence. A timeout remains incomplete evidence.
 

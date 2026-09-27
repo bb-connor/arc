@@ -51,6 +51,10 @@ pub struct RetentionConfig {
     /// How often the kernel maintenance task evaluates rotation, in seconds.
     /// Default: 3600 (one hour).
     pub check_interval_secs: u64,
+    /// Maximum time the caller waits for a rotation, including queueing.
+    /// The writer retains an accepted rotation after timeout; retry observes
+    /// its durable watermark instead of starting a second concurrent rotation.
+    pub rotation_timeout: std::time::Duration,
     /// Internal: set by `archive_receipts_before` to bypass the day/size
     /// threshold and rotate at an explicit cutoff. Not part of any wire form
     /// (no serialized representation of `RetentionConfig` exists).
@@ -65,6 +69,7 @@ impl Default for RetentionConfig {
             archive_path: "receipts-archive.sqlite3".to_string(),
             tenant_id: None,
             check_interval_secs: 3_600,
+            rotation_timeout: std::time::Duration::from_secs(300),
             explicit_cutoff_unix_secs: None,
         }
     }

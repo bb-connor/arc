@@ -446,14 +446,19 @@ launch regression typechecks there and requires x86_64 to execute.
 
 **Owner:** parent Packet 3's storage work.
 
-- [ ] Inventory the 632 `saturating_*` and `wrapping_*` occurrences in the security
-      crates, kernel and stores. Classify each as correct-by-intent or defect.
+- [x] Retain the `saturating_*` and `wrapping_*` inventory in the security crates,
+      kernel and stores: 638 source lines at `4c35ce7867`, including fixtures.
+- [ ] Finish classifying each site as correct-by-intent or defect. The retained
+      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 45
+      sites (seven fixed monetary sums); 593 remain explicitly pending.
 - [ ] A `wrapping_*` in an accounting, quota, counter or deadline path is a defect:
       fix it and add the regression.
 - [ ] A `saturating_sub` in an accounting path silently clamps to zero, hiding the
       underflow a guard should catch. Convert to `checked_*` with explicit handling,
       or annotate why clamping is the correct semantics there per standard rule 4.3.
-- [ ] Record the classification so the next reviewer does not redo the sweep.
+- [x] Record the completed classifications and pending entries so the next reviewer
+      can continue the sweep. [Execution evidence](../../reviews/2026-09-27-retention-accounting-execution.md)
+      describes the checked monetary sums and the bounds on retained clamps.
 
 **Exit:** Every clamping or wrapping operation in an accounting path is either
 fixed or justified in one line at the call site.

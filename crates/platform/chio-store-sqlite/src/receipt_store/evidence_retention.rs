@@ -1054,9 +1054,6 @@ pub(super) fn create_archive_schema(
             evidence_sha256 TEXT, recorded_at INTEGER NOT NULL,
             reconciliation_state TEXT NOT NULL, note TEXT, updated_at INTEGER NOT NULL
         );
-        CREATE TABLE IF NOT EXISTS archive.chio_security_evidence_index (
-            evidence_id TEXT NOT NULL PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE
-        );
         CREATE TABLE IF NOT EXISTS archive.chio_authorization_receipt_consumptions (
             authorization_receipt_id TEXT PRIMARY KEY, consumer_receipt_id TEXT NOT NULL,
             request_id TEXT NOT NULL, session_id TEXT NOT NULL, tool_call_id TEXT NOT NULL,
@@ -1100,6 +1097,7 @@ pub(super) fn create_archive_schema(
         ) STRICT;
         "#,
     )?;
+    super::support::ensure_archive_security_evidence_schema(&transaction)?;
     transaction.execute(
         "INSERT OR IGNORE INTO archive.chio_receipt_sink_identity (singleton, sink_id) \
          VALUES (1, ?1)",

@@ -576,6 +576,7 @@ enum ReceiptCommitCommand {
     Rotate {
         config: Box<RetentionConfig>,
         response: mpsc::SyncSender<Result<u64, ReceiptStoreError>>,
+        completion: WriterCommandCompletion,
     },
     /// Recover a store whose claim-log rows survived a source-row delete:
     /// remove the orphaned projection rows. Runs unconditionally regardless of
@@ -1886,7 +1887,13 @@ fn handle_non_append_command(
                 }
             }
         }
-        ReceiptCommitCommand::Rotate { config, response } => {
+        ReceiptCommitCommand::Rotate {
+            config,
+            response,
+            completion,
+        } => {
+            // Retain timeout ownership through every return and panic unwind.
+            let mut completion = completion;
             // Adopt the dispatcher's in-flight ownership until the response,
             // including pool acquisition, integrity checks and archive fsync.
             let inflight_guard = WriterInflightGuard::new(&health.inflight);
@@ -1895,6 +1902,7 @@ fn handle_non_append_command(
             // head (mirrors the Write arm) and point at the repair path.
             if let WriterHeadState::Poisoned(message) = head_state {
                 drop(inflight_guard);
+                completion.complete();
                 let _ = response.send(Err(poisoned_head_error(message)));
                 return None;
             }
@@ -1902,12 +1910,14 @@ fn handle_non_append_command(
                 Ok(connection) => connection,
                 Err(error) => {
                     drop(inflight_guard);
+                    completion.complete();
                     let _ = response.send(Err(error));
                     return None;
                 }
             };
             if let Err(error) = verify_rollback(&connection, rollback_anchor, false) {
                 drop(inflight_guard);
+                completion.complete();
                 let _ = response.send(Err(error));
                 return None;
             }
@@ -1930,6 +1940,7 @@ fn handle_non_append_command(
                 Ok(latest) => latest,
                 Err(error) => {
                     drop(inflight_guard);
+                    completion.complete();
                     let _ = response.send(Err(error));
                     return None;
                 }
@@ -1946,6 +1957,7 @@ fn handle_non_append_command(
             // evidence repair needs to recover. Refuse fail-closed instead.
             if let Err(error) = validate_claim_receipt_log_entries(&connection) {
                 drop(inflight_guard);
+                completion.complete();
                 let _ = response.send(Err(error));
                 return None;
             }
@@ -2003,6 +2015,7 @@ fn handle_non_append_command(
                 }
             }
             drop(inflight_guard);
+            completion.complete();
             let _ = response.send(outcome);
         }
         ReceiptCommitCommand::InstallSigner(signer) => {
@@ -3227,7 +3240,11 @@ fn execute_anchored_receipt_write(
             .and_then(|()| validate_writer_adopted_claim_log_baseline(&tx, head, true))
     } else {
         verify_latest_checkpoint_integrity(&tx)
-            .and_then(|()| validate_claim_receipt_log_entries(&tx))
+            // The actor already owns an IMMEDIATE transaction. Validate in
+            // that snapshot instead of trying to open a nested transaction.
+            .and_then(|()| {
+                validate_or_backfill_claim_receipt_log_entries_in_transaction(&tx, false)
+            })
     };
     let generation = match pre_check.and_then(|()| {
         rollback_anchor

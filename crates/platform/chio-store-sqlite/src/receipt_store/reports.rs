@@ -31,6 +31,17 @@ mod settlement;
 #[path = "reports/shared_evidence.rs"]
 mod shared_evidence;
 
+/// Reported money is exact. Clamping would publish a successful undercount.
+pub(super) fn checked_report_sum(
+    total: u64,
+    amount: u64,
+    field: &str,
+) -> Result<u64, ReceiptStoreError> {
+    total.checked_add(amount).ok_or_else(|| {
+        ReceiptStoreError::ReadBoundary(format!("{field} exceeds the reportable u64 range"))
+    })
+}
+
 #[derive(Debug, Clone)]
 struct GovernedTransactionProjection {
     strong: GovernedTransactionReceiptMetadata,
