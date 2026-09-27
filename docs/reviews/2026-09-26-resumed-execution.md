@@ -56,16 +56,23 @@ historical cause or establish million-entry acceptance.
 
 ## Remaining acceptance work
 
-1. Finish D/1B at lower boundaries: `prepare_response_dispatch` still takes a
-   bare plan and caller-selected commit mode, and state-machine creation uses a
-   runtime mode check. The complete compile-time contract is not yet achieved.
+1. The [next execution checkpoint](2026-09-26-execution-boundaries.md) replaces
+   bare-plan fresh preparation and creation with `FreshLiveAdmission`, and moves
+   recovery preparation behind the kernel's sealed request. The raw persistence
+   DTO remains a trusted store interface; the documented guarantee covers
+   high-level construction and admission.
 2. Finish D/1C's legacy obligation inventory and retirement condition, including
-   migration/restart after an admission commitment but before dispatch creation.
+   automatic discovery of commitments without a dispatch. The next checkpoint
+   covers migration/restart at that crash boundary with a retained plan/binding;
+   the complete inventory and retirement enforcement remain open.
 3. Complete the parent production dry-run: isolated version-bound simulation,
    shared transition rules, signed report persistence, real composition and the
    six-effect negative/recovery corpus. The simulator does not yet exist.
-4. Complete the remaining [signed JSON boundary inventory](../security/signed-json-boundaries.md).
-   The repaired receipt/manifest readers do not close every signed-payload path.
+4. The [signed readback batch](2026-09-27-signed-readback.md) extends the
+   [boundary inventory](../security/signed-json-boundaries.md) through checkpoint,
+   broker direct/prepared, lineage and economy readers. Signed simulation-report
+   parsing remains part of the unimplemented production simulator; the named
+   census does not establish workspace-wide decoder closure.
 5. Continue J with an evidence-backed disposition of #1045 and both original
    million-entry campaigns on stable source, followed by the real process and
    native boundary gates. This aarch64 development host does not substitute for
