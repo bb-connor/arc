@@ -111,6 +111,9 @@ pub fn ledger_apply(state: ReservationLedger, op: u8, amount: u64) -> (Reservati
         return (state, false);
     }
 
+    // Reviewed extraction boundary: the guard above proves this subtraction.
+    // accounting::proofs::checked_balance_refines_reservation_conservation
+    // checks the production ExposureUnits path against this full-u64 model.
     let outstanding = state.reserved - amount;
     let updated = match op {
         1 => match state.committed.checked_add(amount) {

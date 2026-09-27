@@ -64,17 +64,22 @@ impl SqliteBudgetStore {
         let cumulative = load_cumulative_snapshot(&transaction, &hold)?;
         let mut usage =
             load_usage_or_default(&transaction, &request.capability_id, request.grant_index)?;
+        let usage_before = usage.clone();
         if usage.total_cost_exposed < request.released_exposure_units {
             return Err(BudgetStoreError::Invariant(
                 "cannot release more than total budget exposure".to_string(),
             ));
         }
         let event_seq = allocate_budget_replication_seq(&transaction)?;
-        usage.total_cost_exposed -= request.released_exposure_units;
+        usage.total_cost_exposed = ExposureUnits::new(usage.total_cost_exposed)
+            .try_sub(ExposureUnits::new(request.released_exposure_units))?
+            .get();
         usage.seq = event_seq;
         usage.updated_at = unix_now();
-        write_usage(&transaction, &usage)?;
-        let remaining = hold.remaining_exposure - request.released_exposure_units;
+        write_usage(&transaction, &usage_before, &usage)?;
+        let remaining = ExposureUnits::new(hold.remaining_exposure)
+            .try_sub(ExposureUnits::new(request.released_exposure_units))?
+            .get();
         let monetary_after = if remaining == 0 {
             BudgetMonetaryState::Released
         } else {
@@ -89,6 +94,7 @@ impl SqliteBudgetStore {
                 lease_epoch = ?7, updated_at = ?8
             WHERE hold_id = ?1 AND invocation_state = 'authorized'
               AND monetary_state = 'exposed' AND remaining_exposure_units >= ?9
+              AND remaining_exposure_units - ?9 = ?2
             "#,
             params![
                 hold_id,
@@ -237,7 +243,9 @@ impl SqliteBudgetStore {
                     "invocation quota reservation is incomplete".to_string(),
                 ));
             }
-            state.reserved -= 1;
+            state.reserved = InvocationCount::new(state.reserved)
+                .try_sub(InvocationCount::new(1))?
+                .get();
             state.version = state.version.checked_add(1).ok_or_else(|| {
                 BudgetStoreError::Overflow("invocation quota version overflowed u64".to_string())
             })?;
@@ -265,7 +273,9 @@ impl SqliteBudgetStore {
                     ));
                 }
                 let mut account = account.clone();
-                account.reserved -= cumulative.requested_authorized.units;
+                account.reserved = ExposureUnits::new(account.reserved)
+                    .try_sub(ExposureUnits::new(cumulative.requested_authorized.units))?
+                    .get();
                 account.version = account.version.checked_add(1).ok_or_else(|| {
                     BudgetStoreError::Overflow(
                         "cumulative approval version overflowed u64".to_string(),
@@ -286,6 +296,7 @@ impl SqliteBudgetStore {
         }
         let mut usage =
             load_usage_or_default(&transaction, &request.capability_id, request.grant_index)?;
+        let usage_before = usage.clone();
         if usage.invocation_count == 0 || usage.total_cost_exposed < request.reversed_exposure_units
         {
             return Err(BudgetStoreError::Invariant(
@@ -293,11 +304,15 @@ impl SqliteBudgetStore {
             ));
         }
         let event_seq = allocate_budget_replication_seq(&transaction)?;
-        usage.invocation_count -= 1;
-        usage.total_cost_exposed -= request.reversed_exposure_units;
+        usage.invocation_count = InvocationCount::new(usage.invocation_count)
+            .try_sub(InvocationCount::new(1))?
+            .get();
+        usage.total_cost_exposed = ExposureUnits::new(usage.total_cost_exposed)
+            .try_sub(ExposureUnits::new(request.reversed_exposure_units))?
+            .get();
         usage.seq = event_seq;
         usage.updated_at = unix_now();
-        write_usage(&transaction, &usage)?;
+        write_usage(&transaction, &usage_before, &usage)?;
         for state in &quota_after {
             write_quota_state(&transaction, state)?;
         }
@@ -337,6 +352,7 @@ impl SqliteBudgetStore {
                 disposition = 'reversed', authority_id = ?3, lease_id = ?4,
                 lease_epoch = ?5, updated_at = ?6
             WHERE hold_id = ?1 AND invocation_state = 'authorized'
+              AND remaining_exposure_units = ?7
             "#,
             params![
                 hold_id,
@@ -347,6 +363,7 @@ impl SqliteBudgetStore {
                     .map(|value| budget_u64_to_sqlite(value.lease_epoch, "lease_epoch"))
                     .transpose()?,
                 unix_now(),
+                budget_u64_to_sqlite(hold.remaining_exposure, "previous_hold_exposure")?,
             ],
         )?;
         if changed != 1 {
@@ -475,7 +492,9 @@ impl SqliteBudgetStore {
                     "captured invocation quota is incomplete".to_string(),
                 ));
             }
-            state.captured -= 1;
+            state.captured = InvocationCount::new(state.captured)
+                .try_sub(InvocationCount::new(1))?
+                .get();
             state.version = state.version.checked_add(1).ok_or_else(|| {
                 BudgetStoreError::Overflow("invocation quota version overflowed u64".to_string())
             })?;
@@ -492,7 +511,9 @@ impl SqliteBudgetStore {
                     ));
                 }
                 let mut account = account.clone();
-                account.captured -= cumulative.requested_authorized.units;
+                account.captured = ExposureUnits::new(account.captured)
+                    .try_sub(ExposureUnits::new(cumulative.requested_authorized.units))?
+                    .get();
                 account.version = account.version.checked_add(1).ok_or_else(|| {
                     BudgetStoreError::Overflow(
                         "cumulative approval version overflowed u64".to_string(),
@@ -513,17 +534,22 @@ impl SqliteBudgetStore {
             })?;
         let mut usage =
             load_usage_or_default(&transaction, &request.capability_id, request.grant_index)?;
+        let usage_before = usage.clone();
         if usage.invocation_count == 0 || usage.total_cost_exposed < hold.remaining_exposure {
             return Err(BudgetStoreError::Invariant(
                 "budget usage has no captured reservation to cancel".to_string(),
             ));
         }
         let event_seq = allocate_budget_replication_seq(&transaction)?;
-        usage.invocation_count -= 1;
-        usage.total_cost_exposed -= hold.remaining_exposure;
+        usage.invocation_count = InvocationCount::new(usage.invocation_count)
+            .try_sub(InvocationCount::new(1))?
+            .get();
+        usage.total_cost_exposed = ExposureUnits::new(usage.total_cost_exposed)
+            .try_sub(ExposureUnits::new(hold.remaining_exposure))?
+            .get();
         usage.seq = event_seq;
         usage.updated_at = unix_now();
-        write_usage(&transaction, &usage)?;
+        write_usage(&transaction, &usage_before, &usage)?;
         for state in &quota_after {
             write_quota_state(&transaction, state)?;
         }
@@ -559,6 +585,7 @@ impl SqliteBudgetStore {
                 disposition = 'reversed', authority_id = ?3, lease_id = ?4,
                 lease_epoch = ?5, updated_at = ?6
             WHERE hold_id = ?1 AND invocation_state = 'captured'
+              AND remaining_exposure_units = ?7
             "#,
             params![
                 &request.hold_id,
@@ -569,6 +596,7 @@ impl SqliteBudgetStore {
                     .map(|value| budget_u64_to_sqlite(value.lease_epoch, "lease_epoch"))
                     .transpose()?,
                 unix_now(),
+                budget_u64_to_sqlite(hold.remaining_exposure, "previous_hold_exposure")?,
             ],
         )?;
         if changed != 1 {
@@ -733,22 +761,24 @@ impl SqliteBudgetStore {
         let quota_states = load_quota_states(transaction, &hold)?;
         let cumulative = load_cumulative_snapshot(transaction, &hold)?;
         let mut usage = load_usage_or_default(transaction, capability_id, grant_index)?;
+        let usage_before = usage.clone();
         if usage.total_cost_exposed < exposed_units {
             return Err(BudgetStoreError::Invariant(
                 "settlement exceeds total budget exposure".to_string(),
             ));
         }
         let event_seq = allocate_budget_replication_seq(transaction)?;
-        usage.total_cost_exposed -= exposed_units;
-        usage.total_cost_realized_spend = usage
-            .total_cost_realized_spend
-            .checked_add(realized_units)
-            .ok_or_else(|| {
-                BudgetStoreError::Overflow("realized budget spend overflowed u64".to_string())
-            })?;
+        let balance =
+            ExposureBalance::new(usage.total_cost_exposed, usage.total_cost_realized_spend)?
+                .settle(
+                    ExposureUnits::new(exposed_units),
+                    ExposureUnits::new(realized_units),
+                )?;
+        usage.total_cost_exposed = balance.exposed();
+        usage.total_cost_realized_spend = balance.spent();
         usage.seq = event_seq;
         usage.updated_at = unix_now();
-        write_usage(transaction, &usage)?;
+        write_usage(transaction, &usage_before, &usage)?;
         let next_authority = authority.or(hold.authority.as_ref());
         let changed = transaction.execute(
             r#"
@@ -758,6 +788,7 @@ impl SqliteBudgetStore {
                 lease_epoch = ?5, updated_at = ?6
             WHERE hold_id = ?1 AND invocation_state = 'captured'
               AND monetary_state = 'exposed'
+              AND remaining_exposure_units = ?7
             "#,
             params![
                 hold_id,
@@ -768,6 +799,7 @@ impl SqliteBudgetStore {
                     .map(|value| budget_u64_to_sqlite(value.lease_epoch, "lease_epoch"))
                     .transpose()?,
                 unix_now(),
+                budget_u64_to_sqlite(hold.remaining_exposure, "previous_hold_exposure")?,
             ],
         )?;
         if changed != 1 {

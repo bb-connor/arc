@@ -22,6 +22,7 @@ use chio_kernel::budget_store::{
     BudgetReleaseHoldDecision, BudgetReleaseHoldRequest, BudgetReverseHoldDecision,
     BudgetReverseHoldRequest, DeniedBudgetHold, ReservedHoldEnvelope, RevocationCommitMetadata,
 };
+use chio_kernel::budget_store::{ExposureBalance, ExposureUnits, InvocationCount};
 use chio_kernel::payment::{
     PaymentJournalRecord, PaymentJournalState, PaymentJournalTransition, PaymentRailMode,
     PaymentReleaseAuthorityBinding, PaymentReleaseAuthorityKind, PaymentSettleAction,
@@ -77,6 +78,10 @@ mod tests;
 #[cfg(test)]
 #[path = "budget_store/tests/import_boundaries.rs"]
 mod import_boundaries;
+
+#[cfg(test)]
+#[path = "budget_store/tests/checked_accounting.rs"]
+mod checked_accounting;
 
 use composite_schema::*;
 use model::{HoldDisposition, SqliteBudgetHold};

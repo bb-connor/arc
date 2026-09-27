@@ -326,13 +326,9 @@ impl SqliteBudgetStore {
             current.total_cost_exposed,
             current.total_cost_realized_spend,
         )?;
-        let requested_total = committed
-            .checked_add(request.requested_exposure_units)
-            .ok_or_else(|| {
-                BudgetStoreError::Overflow(
-                    "committed cost + requested exposure overflowed u64".to_string(),
-                )
-            })?;
+        let requested_total = ExposureUnits::new(committed)
+            .try_add(ExposureUnits::new(request.requested_exposure_units))?
+            .get();
         let mut allowed = !revoked_member
             && request
                 .max_cost_per_invocation
@@ -351,11 +347,14 @@ impl SqliteBudgetStore {
                             quota.key.owner_id, state.maximum, quota.max_invocations
                         )));
                     }
-                    let used = state.reserved.checked_add(state.captured).ok_or_else(|| {
-                        BudgetStoreError::Overflow(
-                            "reserved + captured quota count overflowed u32".to_string(),
-                        )
-                    })?;
+                    let used = InvocationCount::new(state.reserved)
+                        .try_add(InvocationCount::new(state.captured))
+                        .map(InvocationCount::get)
+                        .map_err(|_| {
+                            BudgetStoreError::Overflow(
+                                "reserved + captured quota count overflowed u32".to_string(),
+                            )
+                        })?;
                     allowed &= used < state.maximum;
                     quota_before.push(state);
                 }
@@ -394,15 +393,10 @@ impl SqliteBudgetStore {
             .as_ref()
             .zip(cumulative_before.as_ref())
             .map(|(cumulative, account)| {
-                let prospective = account
-                    .reserved
-                    .checked_add(account.captured)
-                    .and_then(|used| used.checked_add(cumulative.requested_authorized.units))
-                    .ok_or_else(|| {
-                        BudgetStoreError::Overflow(
-                            "cumulative authorized units overflowed u64".to_string(),
-                        )
-                    })?;
+                let prospective = ExposureUnits::new(account.reserved)
+                    .try_add(ExposureUnits::new(account.captured))?
+                    .try_add(ExposureUnits::new(cumulative.requested_authorized.units))?
+                    .get();
                 Ok::<_, BudgetStoreError>(if prospective >= cumulative.effective_threshold.units {
                     BudgetCumulativeApprovalState::PendingApproval
                 } else {
@@ -417,19 +411,21 @@ impl SqliteBudgetStore {
         let mut quota_after = quota_before.clone();
         let mut cumulative_after = cumulative_before.clone();
         if allowed {
-            usage_after.invocation_count =
-                usage_after.invocation_count.checked_add(1).ok_or_else(|| {
+            usage_after.invocation_count = InvocationCount::new(usage_after.invocation_count)
+                .try_add(InvocationCount::new(1))
+                .map(InvocationCount::get)
+                .map_err(|_| {
                     BudgetStoreError::Overflow("invocation count overflowed u32".to_string())
                 })?;
-            usage_after.total_cost_exposed = usage_after
-                .total_cost_exposed
-                .checked_add(request.requested_exposure_units)
-                .ok_or_else(|| {
+            usage_after.total_cost_exposed = ExposureUnits::new(usage_after.total_cost_exposed)
+                .try_add(ExposureUnits::new(request.requested_exposure_units))
+                .map(ExposureUnits::get)
+                .map_err(|_| {
                     BudgetStoreError::Overflow("total cost exposure overflowed u64".to_string())
                 })?;
             usage_after.updated_at = recorded_at;
             usage_after.seq = event_seq;
-            write_usage(&transaction, &usage_after)?;
+            write_usage(&transaction, &current, &usage_after)?;
 
             Self::create_hold(
                 &transaction,
@@ -448,11 +444,14 @@ impl SqliteBudgetStore {
                 request.requested_exposure_units,
             )?;
             for (quota, state) in quotas.iter().zip(&mut quota_after) {
-                state.reserved = state.reserved.checked_add(1).ok_or_else(|| {
-                    BudgetStoreError::Overflow(
-                        "reserved invocation quota overflowed u32".to_string(),
-                    )
-                })?;
+                state.reserved = InvocationCount::new(state.reserved)
+                    .try_add(InvocationCount::new(1))
+                    .map(InvocationCount::get)
+                    .map_err(|_| {
+                        BudgetStoreError::Overflow(
+                            "reserved invocation quota overflowed u32".to_string(),
+                        )
+                    })?;
                 state.version = state.version.checked_add(1).ok_or_else(|| {
                     BudgetStoreError::Overflow(
                         "invocation quota version overflowed u64".to_string(),
@@ -467,10 +466,10 @@ impl SqliteBudgetStore {
                 cumulative_state,
                 cumulative_after.as_mut(),
             ) {
-                account.reserved = account
-                    .reserved
-                    .checked_add(cumulative.requested_authorized.units)
-                    .ok_or_else(|| {
+                account.reserved = ExposureUnits::new(account.reserved)
+                    .try_add(ExposureUnits::new(cumulative.requested_authorized.units))
+                    .map(ExposureUnits::get)
+                    .map_err(|_| {
                         BudgetStoreError::Overflow(
                             "reserved cumulative approval overflowed u64".to_string(),
                         )

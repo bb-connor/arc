@@ -5,6 +5,7 @@ strict_smoke_command = "./scripts/check-kani-smoke.sh"
 strict_core_command = "./scripts/check-kani-core.sh"
 
 harness_groups = [
+  "checked_accounting|Full-width exposure and count arithmetic plus production balance refinement against the reservation ledger",
   "capability_time_window_edges|Kani verifies the time-window classifier used by verify_capability",
   "scope_subset_state_space|Kani verifies subset cap and requirement helpers used by normalized scope checks",
   "portable_evaluate_fail_closed|Kani verifies deny-dominant guard composition used by evaluate",
@@ -13,6 +14,9 @@ harness_groups = [
 ]
 
 covered_symbols = [
+  "chio_kernel_core::accounting::ExposureUnits",
+  "chio_kernel_core::accounting::InvocationCount",
+  "chio_kernel_core::accounting::ExposureBalance",
   "chio_kernel_core::capability_verify::verify_capability",
   "chio_kernel_core::scope::resolve_matching_grants",
   "chio_kernel_core::evaluate::evaluate",

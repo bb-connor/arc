@@ -1,3 +1,4 @@
+use super::{ExposureBalance, ExposureUnits, InvocationCount};
 use std::collections::HashMap;
 use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -204,6 +205,8 @@ struct InMemoryBudgetStoreInner {
         HashMap<BudgetCumulativeApprovalAccountKey, BudgetCumulativeApprovalAccountState>,
     next_seq: u64,
 }
+
+mod accounting;
 
 include!("in_memory/composite.rs");
 include!("in_memory/admission.rs");

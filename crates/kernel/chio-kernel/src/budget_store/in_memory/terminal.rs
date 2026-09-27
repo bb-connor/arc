@@ -209,13 +209,12 @@ impl InMemoryBudgetStoreInner {
                             "missing cumulative approval account".to_string(),
                         )
                     })?;
-                let reversible_authorized_units = if participant.state
-                    == BudgetCumulativeApprovalState::Captured
-                {
-                    account.captured_authorized_units
-                } else {
-                    account.reserved_authorized_units
-                };
+                let reversible_authorized_units =
+                    if participant.state == BudgetCumulativeApprovalState::Captured {
+                        account.captured_authorized_units
+                    } else {
+                        account.reserved_authorized_units
+                    };
                 if reversible_authorized_units < participant.request.requested_authorized.units {
                     return Err(BudgetStoreError::Invariant(
                         "cumulative approval reservation is incomplete".to_string(),
@@ -315,26 +314,11 @@ impl InMemoryBudgetStoreInner {
         let next_seq = self.next_seq.checked_add(1).ok_or_else(|| {
             BudgetStoreError::Overflow("budget event sequence overflowed u64".to_string())
         })?;
-        for quota in &affected_quotas {
-            let state = self.invocation_quotas.get(&quota.key).ok_or_else(|| {
-                BudgetStoreError::Invariant("affected invocation quota is missing".to_string())
-            })?;
-            let captured_reversal = hold_snapshot
-                .as_ref()
-                .is_some_and(|hold| hold.legacy_captured_invocation_quota.as_ref() == Some(quota))
-                || hold_snapshot.is_none()
-                || cancels_captured_before_dispatch;
-            let available = if captured_reversal {
-                state.captured_invocations
-            } else {
-                state.reserved_invocations
-            };
-            if available == 0 {
-                return Err(BudgetStoreError::Invariant(
-                    "affected invocation quota has no reversible reservation".to_string(),
-                ));
-            }
-        }
+        let accounting = self.prepare_reversal_accounting(
+            &affected_quotas,
+            hold_snapshot.as_ref(),
+            cancels_captured_before_dispatch,
+        )?;
         {
             let entry = self.counts.get_mut(&key).ok_or_else(|| {
                 BudgetStoreError::Invariant("missing charged budget row".to_string())
@@ -349,9 +333,14 @@ impl InMemoryBudgetStoreInner {
                     "cannot reverse charge larger than total_cost_exposed".to_string(),
                 ));
             }
+            let next_count =
+                InvocationCount::new(entry.invocation_count).try_sub(InvocationCount::ONE)?;
+            let next_balance =
+                ExposureBalance::new(entry.total_cost_exposed, entry.total_cost_realized_spend)?
+                    .release(ExposureUnits::new(cost_units))?;
             self.next_seq = next_seq;
-            entry.invocation_count -= 1;
-            entry.total_cost_exposed -= cost_units;
+            entry.invocation_count = next_count.get();
+            entry.total_cost_exposed = next_balance.exposed();
             entry.updated_at = unix_now();
             entry.seq = next_seq;
             invocation_count_after = entry.invocation_count;
@@ -363,42 +352,8 @@ impl InMemoryBudgetStoreInner {
         let invocation_quota_mutations;
         let mut cumulative_approval = None;
         let mut cumulative_approval_mutation = None;
+        accounting.apply(self);
         if let Some((hold_id, hold_snapshot)) = hold_id.zip(hold_snapshot.as_ref()) {
-            for quota in &hold_snapshot.invocation_quotas {
-                let state = self.invocation_quotas.get_mut(&quota.key).ok_or_else(|| {
-                    BudgetStoreError::Invariant(
-                        "validated invocation quota disappeared".to_string(),
-                    )
-                })?;
-                if cancels_captured_before_dispatch {
-                    state.captured_invocations -= 1;
-                } else {
-                    state.reserved_invocations -= 1;
-                }
-            }
-            if let Some(quota) = &hold_snapshot.legacy_captured_invocation_quota {
-                if let Some(state) = self.invocation_quotas.get_mut(&quota.key) {
-                    state.captured_invocations -= 1;
-                }
-            }
-            if let Some(participant) = &hold_snapshot.cumulative_approval {
-                let account = self
-                    .cumulative_approval_accounts
-                    .get_mut(&participant.request.account_key)
-                    .ok_or_else(|| {
-                        BudgetStoreError::Invariant(
-                            "validated cumulative approval account disappeared".to_string(),
-                        )
-                    })?;
-                if participant.state == BudgetCumulativeApprovalState::Captured {
-                    account.captured_authorized_units -=
-                        participant.request.requested_authorized.units;
-                } else {
-                    account.reserved_authorized_units -=
-                        participant.request.requested_authorized.units;
-                }
-                account.version += 1;
-            }
             invocation_quota_usages = self.invocation_quota_usages(&affected_quotas)?;
             invocation_quota_mutations = Self::invocation_quota_mutations(
                 &invocation_quota_usages_before,
@@ -440,11 +395,6 @@ impl InMemoryBudgetStoreInner {
             }
             hold.authority = authority.cloned().or_else(|| hold.authority.clone());
         } else {
-            for quota in &affected_quotas {
-                if let Some(state) = self.invocation_quotas.get_mut(&quota.key) {
-                    state.captured_invocations -= 1;
-                }
-            }
             let legacy_reversible = self
                 .legacy_reversible_invocations
                 .get_mut(&(capability_id.to_string(), grant_index))
@@ -453,7 +403,9 @@ impl InMemoryBudgetStoreInner {
                         "validated reversible invocation disappeared".to_string(),
                     )
                 })?;
-            *legacy_reversible -= 1;
+            *legacy_reversible = InvocationCount::new(*legacy_reversible)
+                .try_sub(InvocationCount::new(1))?
+                .get();
             invocation_quota_usages = self.invocation_quota_usages(&affected_quotas)?;
             invocation_quota_mutations = Self::invocation_quota_mutations(
                 &invocation_quota_usages_before,
@@ -665,8 +617,7 @@ impl InMemoryBudgetStoreInner {
         } else {
             if self.has_composite_history(capability_id, grant_index) {
                 return Err(BudgetStoreError::Invariant(
-                    "cannot release unheld exposure after structured admission history"
-                        .to_string(),
+                    "cannot release unheld exposure after structured admission history".to_string(),
                 ));
             }
             if self.holds.values().any(|hold| {
@@ -715,8 +666,11 @@ impl InMemoryBudgetStoreInner {
             let next_seq = self.next_seq.checked_add(1).ok_or_else(|| {
                 BudgetStoreError::Overflow("budget event sequence overflowed u64".to_string())
             })?;
+            let next_balance =
+                ExposureBalance::new(entry.total_cost_exposed, entry.total_cost_realized_spend)?
+                    .release(ExposureUnits::new(cost_units))?;
             self.next_seq = next_seq;
-            entry.total_cost_exposed -= cost_units;
+            entry.total_cost_exposed = next_balance.exposed();
             entry.updated_at = unix_now();
             entry.seq = next_seq;
             invocation_count_after = entry.invocation_count;
@@ -730,7 +684,9 @@ impl InMemoryBudgetStoreInner {
                     "validated hold missing during release_charge_cost".to_string(),
                 ));
             };
-            hold.remaining_exposure_units -= cost_units;
+            hold.remaining_exposure_units = ExposureUnits::new(hold.remaining_exposure_units)
+                .try_sub(ExposureUnits::new(cost_units))?
+                .get();
             if hold.remaining_exposure_units == 0 {
                 hold.monetary_state = BudgetMonetaryState::Released;
             }
@@ -941,8 +897,7 @@ impl InMemoryBudgetStoreInner {
         } else {
             if self.has_composite_history(capability_id, grant_index) {
                 return Err(BudgetStoreError::Invariant(
-                    "cannot settle unheld exposure after structured admission history"
-                        .to_string(),
+                    "cannot settle unheld exposure after structured admission history".to_string(),
                 ));
             }
             if self.holds.values().any(|hold| {
@@ -996,17 +951,14 @@ impl InMemoryBudgetStoreInner {
                 ));
             }
 
-            let next_realized_spend = entry
-                .total_cost_realized_spend
-                .checked_add(realized_cost_units)
-                .ok_or_else(|| {
-                    BudgetStoreError::Overflow(
-                        "total_cost_realized_spend + realized_cost_units overflowed u64"
-                            .to_string(),
-                    )
-                })?;
-            entry.total_cost_realized_spend = next_realized_spend;
-            entry.total_cost_exposed -= exposed_cost_units;
+            let next_balance =
+                ExposureBalance::new(entry.total_cost_exposed, entry.total_cost_realized_spend)?
+                    .settle(
+                        ExposureUnits::new(exposed_cost_units),
+                        ExposureUnits::new(realized_cost_units),
+                    )?;
+            entry.total_cost_realized_spend = next_balance.spent();
+            entry.total_cost_exposed = next_balance.exposed();
             self.next_seq = next_seq;
             entry.updated_at = unix_now();
             entry.seq = next_seq;
@@ -1028,7 +980,9 @@ impl InMemoryBudgetStoreInner {
             .legacy_reversible_invocations
             .get_mut(&(capability_id.to_string(), grant_index))
         {
-            *legacy_reversible -= 1;
+            *legacy_reversible = InvocationCount::new(*legacy_reversible)
+                .try_sub(InvocationCount::new(1))?
+                .get();
         }
         self.append_mutation(
             event_id,

@@ -450,13 +450,11 @@ pub(super) fn checked_committed_cost_units(
     total_cost_exposed: u64,
     total_cost_realized_spend: u64,
 ) -> Result<u64, BudgetStoreError> {
-    total_cost_exposed
-        .checked_add(total_cost_realized_spend)
-        .ok_or_else(|| {
-            BudgetStoreError::Overflow(
-                "total_cost_exposed + total_cost_realized_spend overflowed u64".to_string(),
-            )
-        })
+    Ok(
+        ExposureBalance::new(total_cost_exposed, total_cost_realized_spend)?
+            .committed()?
+            .get(),
+    )
 }
 
 pub(super) fn budget_u64_to_sqlite(

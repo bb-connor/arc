@@ -276,10 +276,17 @@ impl SqliteBudgetStore {
                     request.hold_id
                 )));
             }
-            state.reserved -= 1;
-            state.captured = state.captured.checked_add(1).ok_or_else(|| {
-                BudgetStoreError::Overflow("captured invocation quota overflowed u32".to_string())
-            })?;
+            state.reserved = InvocationCount::new(state.reserved)
+                .try_sub(InvocationCount::new(1))?
+                .get();
+            state.captured = InvocationCount::new(state.captured)
+                .try_add(InvocationCount::new(1))
+                .map(InvocationCount::get)
+                .map_err(|_| {
+                    BudgetStoreError::Overflow(
+                        "captured invocation quota overflowed u32".to_string(),
+                    )
+                })?;
             state.version = state.version.checked_add(1).ok_or_else(|| {
                 BudgetStoreError::Overflow("invocation quota version overflowed u64".to_string())
             })?;
@@ -301,11 +308,13 @@ impl SqliteBudgetStore {
                     ));
                 }
                 let mut account = account.clone();
-                account.reserved -= cumulative.requested_authorized.units;
-                account.captured = account
-                    .captured
-                    .checked_add(cumulative.requested_authorized.units)
-                    .ok_or_else(|| {
+                account.reserved = ExposureUnits::new(account.reserved)
+                    .try_sub(ExposureUnits::new(cumulative.requested_authorized.units))?
+                    .get();
+                account.captured = ExposureUnits::new(account.captured)
+                    .try_add(ExposureUnits::new(cumulative.requested_authorized.units))
+                    .map(ExposureUnits::get)
+                    .map_err(|_| {
                         BudgetStoreError::Overflow(
                             "captured cumulative approval overflowed u64".to_string(),
                         )

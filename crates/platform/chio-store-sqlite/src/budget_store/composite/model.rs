@@ -242,20 +242,39 @@ pub(super) fn load_usage_or_default(
 
 pub(super) fn write_usage(
     transaction: &Transaction<'_>,
+    before: &BudgetUsageRecord,
     usage: &BudgetUsageRecord,
 ) -> Result<(), BudgetStoreError> {
-    transaction.execute(
+    ExposureBalance::new(before.total_cost_exposed, before.total_cost_realized_spend)?;
+    ExposureBalance::new(usage.total_cost_exposed, usage.total_cost_realized_spend)?;
+    if before.capability_id != usage.capability_id
+        || before.grant_index != usage.grant_index
+        || usage.seq <= before.seq
+    {
+        return Err(BudgetStoreError::Invariant(
+            "invalid budget usage transition".into(),
+        ));
+    }
+    let changed = transaction.execute(
         r#"
         INSERT INTO capability_grant_budgets (
             capability_id, grant_index, invocation_count, updated_at, seq,
             total_cost_exposed, total_cost_realized_spend
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        ) SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
+          WHERE ?8 = 0 OR EXISTS (
+            SELECT 1 FROM capability_grant_budgets
+            WHERE capability_id = ?1 AND grant_index = ?2 AND seq = ?8
+          )
         ON CONFLICT(capability_id, grant_index) DO UPDATE SET
             invocation_count = excluded.invocation_count,
             updated_at = excluded.updated_at,
             seq = excluded.seq,
             total_cost_exposed = excluded.total_cost_exposed,
             total_cost_realized_spend = excluded.total_cost_realized_spend
+        WHERE capability_grant_budgets.seq = ?8
+          AND capability_grant_budgets.invocation_count = ?9
+          AND capability_grant_budgets.total_cost_exposed = ?10
+          AND capability_grant_budgets.total_cost_realized_spend = ?11
         "#,
         params![
             &usage.capability_id,
@@ -264,9 +283,18 @@ pub(super) fn write_usage(
             usage.updated_at,
             budget_u64_to_sqlite(usage.seq, "seq")?,
             budget_u64_to_sqlite(usage.total_cost_exposed, "total_cost_exposed")?,
-            budget_u64_to_sqlite(usage.total_cost_realized_spend, "total_cost_realized_spend",)?,
+            budget_u64_to_sqlite(usage.total_cost_realized_spend, "total_cost_realized_spend")?,
+            budget_u64_to_sqlite(before.seq, "previous_seq")?,
+            i64::from(before.invocation_count),
+            budget_u64_to_sqlite(before.total_cost_exposed, "previous_exposure")?,
+            budget_u64_to_sqlite(before.total_cost_realized_spend, "previous_spend")?,
         ],
     )?;
+    if changed != 1 {
+        return Err(BudgetStoreError::Invariant(
+            "budget usage compare-and-set failed".into(),
+        ));
+    }
     Ok(())
 }
 
@@ -351,6 +379,13 @@ pub(super) fn write_quota_state(
     transaction: &Transaction<'_>,
     state: &QuotaState,
 ) -> Result<(), BudgetStoreError> {
+    let used =
+        InvocationCount::new(state.reserved).try_add(InvocationCount::new(state.captured))?;
+    if used.get() > state.maximum || state.version == 0 {
+        return Err(BudgetStoreError::Invariant(
+            "invalid budget quota transition".into(),
+        ));
+    }
     let changed = transaction.execute(
         r#"
         INSERT INTO budget_invocation_quotas (
@@ -362,6 +397,10 @@ pub(super) fn write_quota_state(
             captured_invocations = excluded.captured_invocations,
             version = excluded.version
         WHERE budget_invocation_quotas.max_invocations = excluded.max_invocations
+          AND excluded.version > 0
+          AND budget_invocation_quotas.version = excluded.version - 1
+          AND excluded.captured_invocations <= excluded.max_invocations
+          AND excluded.reserved_invocations <= excluded.max_invocations - excluded.captured_invocations
         "#,
         params![
             state.quota.key.profile.as_str(),
@@ -479,6 +518,12 @@ pub(super) fn write_cumulative_account(
     transaction: &Transaction<'_>,
     account: &CumulativeAccount,
 ) -> Result<(), BudgetStoreError> {
+    ExposureUnits::new(account.reserved).try_add(ExposureUnits::new(account.captured))?;
+    if account.version == 0 {
+        return Err(BudgetStoreError::Invariant(
+            "invalid cumulative account version".into(),
+        ));
+    }
     let changed = transaction.execute(
         r#"
         INSERT INTO budget_cumulative_approval_accounts (
@@ -497,6 +542,7 @@ pub(super) fn write_cumulative_account(
           AND budget_cumulative_approval_accounts.root_binding_digest IS excluded.root_binding_digest
           AND budget_cumulative_approval_accounts.currency = excluded.currency
           AND budget_cumulative_approval_accounts.authority_threshold_units = excluded.authority_threshold_units
+          AND budget_cumulative_approval_accounts.version = excluded.version - 1
         "#,
         params![
             &account.key.authority_id,

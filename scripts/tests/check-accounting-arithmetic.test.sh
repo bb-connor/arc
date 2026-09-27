@@ -5,10 +5,22 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CHECKER="$REPO_ROOT/scripts/check-accounting-arithmetic.py"
-BASELINED="crates/kernel/chio-kernel/src/budget_store/in_memory/terminal.rs"
+BASELINED="crates/kernel/chio-kernel/src/budget_store/gate_fixture.rs"
 
 work="$(mktemp -d -t chio-accounting-arithmetic-XXXXXX)"
 trap 'rm -rf "$work"' EXIT
+
+# Keep the test independent of production debt, which should eventually vanish.
+python3 - "$CHECKER" "$work/check-accounting-arithmetic.py" "$BASELINED" <<'PYFIXTURE'
+from pathlib import Path
+import sys
+source = Path(sys.argv[1]).read_text(encoding="utf-8")
+marker = "\nBASELINE: dict[str, BaselineEntry] = {"
+assert source.count(marker) == 1
+entry = f'\n    "{sys.argv[3]}": allow("2099-01-01", "synthetic gate test", max_sites=2),'
+Path(sys.argv[2]).write_text(source.replace(marker, marker + entry), encoding="utf-8")
+PYFIXTURE
+CHECKER="$work/check-accounting-arithmetic.py"
 
 init_case() {
   mkdir -p "$1"

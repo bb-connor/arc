@@ -16,7 +16,15 @@ This document adds nothing to the packets. It assigns them to lanes, fixes the
 order and the ownership boundaries, and states the review gate every lane passes
 before its work reaches the integration branch.
 
-## Facts the dispatch is built on
+## Historical dispatch snapshot
+
+The facts and lane assignments below describe September 26. They are retained
+as history, not the current work queue or remote qualification status. Current
+execution is inline on `packet/3-retention-accounting` in `/tmp/arc-security-launch`;
+see the [engineering plan](2026-09-26-security-engineering-excellence.md) and
+[checked accounting record](../../reviews/2026-09-27-checked-budget-accounting.md).
+
+### Facts the original dispatch was built on
 
 - `integration/process-security-m4` is at `d115ff3636` (documents only) locally
   and on `origin`. PR #1160 is a draft, `BLOCKED`, with 101 green, 14 red and 15

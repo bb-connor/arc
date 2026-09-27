@@ -205,8 +205,9 @@ impl SqliteBudgetStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
         for (origin, min_seq) in min_by_origin {
-            // Every contributing sequence was validated positive above.
-            let floor = min_seq - 1;
+            let floor = min_seq.checked_sub(1).ok_or_else(|| {
+                BudgetStoreError::Invariant("budget import sequence must be positive".into())
+            })?;
             transaction.execute(
                 "INSERT INTO budget_import_floors (authority_id, floor_seq) VALUES (?1, ?2) \
                  ON CONFLICT(authority_id) DO UPDATE SET floor_seq = MAX(floor_seq, excluded.floor_seq)",
@@ -980,7 +981,10 @@ fn verify_local_anchor_provenance_continuity(
                 "persisted budget snapshot anchor provenance sequence is invalid".to_string(),
             )
         })?;
-    let index = usize::try_from(local_sequence - 1).map_err(|_| {
+    let predecessor = local_sequence.checked_sub(1).ok_or_else(|| {
+        BudgetStoreError::Invariant("budget snapshot sequence must be positive".into())
+    })?;
+    let index = usize::try_from(predecessor).map_err(|_| {
         BudgetStoreError::Invariant(
             "persisted budget snapshot anchor provenance sequence is invalid".to_string(),
         )

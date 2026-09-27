@@ -58,6 +58,7 @@
 
 extern crate alloc;
 
+pub mod accounting;
 pub mod budget_split;
 pub mod capability_verify;
 pub mod clock;

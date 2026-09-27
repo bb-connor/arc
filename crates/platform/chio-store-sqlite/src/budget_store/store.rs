@@ -1318,11 +1318,12 @@ impl SqliteBudgetStore {
     pub(super) fn update_hold(
         transaction: &rusqlite::Transaction<'_>,
         hold_id: &str,
+        consumed_exposure_units: u64,
         remaining_exposure_units: u64,
         disposition: HoldDisposition,
         authority: Option<&BudgetEventAuthority>,
     ) -> Result<(), BudgetStoreError> {
-        transaction.execute(
+        let changed = transaction.execute(
             r#"
             UPDATE budget_authorization_holds
             SET remaining_exposure_units = ?2,
@@ -1332,6 +1333,9 @@ impl SqliteBudgetStore {
                 lease_epoch = ?6,
                 updated_at = ?7
             WHERE hold_id = ?1
+              AND remaining_exposure_units >= ?8
+              AND remaining_exposure_units - ?8 = ?2
+              AND disposition IN ('open', 'reconciled')
             "#,
             params![
                 hold_id,
@@ -1343,8 +1347,14 @@ impl SqliteBudgetStore {
                     .map(|value| budget_u64_to_sqlite(value.lease_epoch, "lease_epoch"))
                     .transpose()?,
                 unix_now(),
+                budget_u64_to_sqlite(consumed_exposure_units, "consumed_exposure_units")?,
             ],
         )?;
+        if changed != 1 {
+            return Err(BudgetStoreError::Invariant(
+                "budget hold compare-and-set failed".into(),
+            ));
+        }
         Ok(())
     }
 

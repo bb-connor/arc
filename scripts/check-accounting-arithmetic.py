@@ -85,26 +85,6 @@ def allow(expires: str, rationale: str, *, max_sites: int) -> BaselineEntry:
 # first. One shared date would leave the only available response being to move
 # the date again.
 BASELINE: dict[str, BaselineEntry] = {
-    "crates/kernel/chio-kernel/src/budget_store/in_memory/terminal.rs": allow(
-        "2027-01-31",
-        "in-memory budget terminal transitions; subtraction guarded by hand today; capped until checked arithmetic or a quantity newtype replaces the operators",
-        max_sites=14,
-    ),
-    "crates/platform/chio-store-sqlite/src/budget_store/composite/transitions/terminal.rs": allow(
-        "2026-12-31",
-        "composite budget terminal transitions; guarded in Rust and by a SQL predicate; capped until checked arithmetic or a quantity newtype replaces the operators",
-        max_sites=11,
-    ),
-    "crates/platform/chio-store-sqlite/src/budget_store/trait_impl.rs": allow(
-        "2026-12-31",
-        "SQLite budget store transitions; subtraction guarded in the same transaction; capped until checked arithmetic or a quantity newtype replaces the operators",
-        max_sites=10,
-    ),
-    "crates/kernel/chio-kernel/src/budget_store/in_memory/admission.rs": allow(
-        "2026-12-31",
-        "in-memory budget admission capture counters; capped until checked arithmetic or a quantity newtype replaces the operators",
-        max_sites=5,
-    ),
     "crates/platform/chio-store-sqlite/src/budget_store/reaper.rs": allow(
         "2026-12-31",
         "budget lease reaper reconciliation counters; capped until checked arithmetic or a quantity newtype replaces the operators",
@@ -119,16 +99,6 @@ BASELINE: dict[str, BaselineEntry] = {
         "2026-11-30",
         "supplemental quota domain-separated message length; capped until checked arithmetic or a quantity newtype replaces the operators",
         max_sites=2,
-    ),
-    "crates/platform/chio-store-sqlite/src/budget_store/composite/transitions/capture.rs": allow(
-        "2026-11-30",
-        "composite budget capture transitions; capped until checked arithmetic or a quantity newtype replaces the operators",
-        max_sites=2,
-    ),
-    "crates/kernel/chio-kernel/src/budget_store/in_memory/composite.rs": allow(
-        "2026-10-31",
-        "in-memory composite budget account version counter; capped until checked arithmetic or a quantity newtype replaces the operators",
-        max_sites=1,
     ),
     "crates/platform/chio-store-sqlite/src/admission_operation_store/credit_exposure.rs": allow(
         "2026-10-31",

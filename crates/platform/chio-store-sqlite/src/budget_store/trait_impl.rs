@@ -404,9 +404,11 @@ impl BudgetStore for SqliteBudgetStore {
             )));
         }
 
-        let total_cost_exposed_after = current.1 - hold.authorized_exposure_units;
+        let total_cost_exposed_after = ExposureUnits::new(current.1)
+            .try_sub(ExposureUnits::new(hold.authorized_exposure_units))?
+            .get();
         let event_seq = allocate_budget_replication_seq(&transaction)?;
-        transaction.execute(
+        let changed = transaction.execute(
             r#"
             UPDATE capability_grant_budgets
             SET invocation_count = ?3,
@@ -414,19 +416,33 @@ impl BudgetStore for SqliteBudgetStore {
                 seq = ?5,
                 total_cost_exposed = ?6
             WHERE capability_id = ?1 AND grant_index = ?2
+              AND invocation_count = ?7
+              AND total_cost_exposed = ?8
+              AND total_cost_realized_spend = ?9
             "#,
             params![
                 &request.capability_id,
                 request.grant_index as i64,
-                current.0 - 1,
+                InvocationCount::new(current.0)
+                    .try_sub(InvocationCount::new(1))?
+                    .get(),
                 unix_now(),
                 budget_u64_to_sqlite(event_seq, "seq")?,
                 budget_u64_to_sqlite(total_cost_exposed_after, "total_cost_exposed")?,
+                i64::from(current.0),
+                budget_u64_to_sqlite(current.1, "previous_exposure")?,
+                budget_u64_to_sqlite(current.2, "previous_spend")?,
             ],
         )?;
+        if changed != 1 {
+            return Err(BudgetStoreError::Invariant(
+                "budget usage compare-and-set failed".into(),
+            ));
+        }
         SqliteBudgetStore::update_hold(
             &transaction,
             &request.hold_id,
+            hold.authorized_exposure_units,
             0,
             HoldDisposition::Reversed,
             request.authority.as_ref().or(hold.authority.as_ref()),
@@ -451,7 +467,9 @@ impl BudgetStore for SqliteBudgetStore {
             None,
             None,
             None,
-            current.0 - 1,
+            InvocationCount::new(current.0)
+                .try_sub(InvocationCount::new(1))?
+                .get(),
             total_cost_exposed_after,
             current.2,
         )?;
@@ -467,7 +485,9 @@ impl BudgetStore for SqliteBudgetStore {
                     total_cost_exposed_after,
                     current.2,
                 )?,
-                invocation_count_after: current.0 - 1,
+                invocation_count_after: InvocationCount::new(current.0)
+                    .try_sub(InvocationCount::new(1))?
+                    .get(),
                 invocation_quota_usages: Vec::new(),
                 cumulative_approval: None,
                 invocation_state: BudgetInvocationState::Reversed,
@@ -818,9 +838,11 @@ impl BudgetStore for SqliteBudgetStore {
             ));
         }
 
-        let new_total_cost_exposed = total_cost_exposed - cost_units;
+        let new_total_cost_exposed = ExposureUnits::new(total_cost_exposed)
+            .try_sub(ExposureUnits::new(cost_units))?
+            .get();
         let seq = allocate_budget_replication_seq(&transaction)?;
-        transaction.execute(
+        let changed = transaction.execute(
             r#"
             UPDATE capability_grant_budgets
             SET invocation_count = ?3,
@@ -828,16 +850,29 @@ impl BudgetStore for SqliteBudgetStore {
                 seq = ?5,
                 total_cost_exposed = ?6
             WHERE capability_id = ?1 AND grant_index = ?2
+              AND invocation_count = ?7
+              AND total_cost_exposed = ?8
+              AND total_cost_realized_spend = ?9
             "#,
             params![
                 capability_id,
                 grant_index as i64,
-                invocation_count - 1,
+                InvocationCount::new(invocation_count)
+                    .try_sub(InvocationCount::new(1))?
+                    .get(),
                 unix_now(),
                 budget_u64_to_sqlite(seq, "seq")?,
                 budget_u64_to_sqlite(new_total_cost_exposed, "total_cost_exposed")?,
+                i64::from(invocation_count),
+                budget_u64_to_sqlite(total_cost_exposed, "previous_exposure")?,
+                budget_u64_to_sqlite(total_cost_realized_spend, "previous_spend")?,
             ],
         )?;
+        if changed != 1 {
+            return Err(BudgetStoreError::Invariant(
+                "budget usage compare-and-set failed".into(),
+            ));
+        }
         if let Some(hold_id) = hold_id {
             let next_authority = SqliteBudgetStore::validate_hold_authority(
                 hold_id,
@@ -854,6 +889,7 @@ impl BudgetStore for SqliteBudgetStore {
             SqliteBudgetStore::update_hold(
                 &transaction,
                 hold_id,
+                cost_units,
                 0,
                 HoldDisposition::Reversed,
                 next_authority.as_ref(),
@@ -875,7 +911,9 @@ impl BudgetStore for SqliteBudgetStore {
             None,
             None,
             None,
-            invocation_count - 1,
+            InvocationCount::new(invocation_count)
+                .try_sub(InvocationCount::new(1))?
+                .get(),
             new_total_cost_exposed,
             total_cost_realized_spend,
         )?;
@@ -1015,15 +1053,20 @@ impl BudgetStore for SqliteBudgetStore {
             ));
         }
 
-        let new_total_cost_exposed = total_cost_exposed - cost_units;
+        let new_total_cost_exposed = ExposureUnits::new(total_cost_exposed)
+            .try_sub(ExposureUnits::new(cost_units))?
+            .get();
         let seq = allocate_budget_replication_seq(&transaction)?;
-        transaction.execute(
+        let changed = transaction.execute(
             r#"
             UPDATE capability_grant_budgets
             SET updated_at = ?3,
                 seq = ?4,
                 total_cost_exposed = ?5
             WHERE capability_id = ?1 AND grant_index = ?2
+              AND invocation_count = ?6
+              AND total_cost_exposed = ?7
+              AND total_cost_realized_spend = ?8
             "#,
             params![
                 capability_id,
@@ -1031,8 +1074,16 @@ impl BudgetStore for SqliteBudgetStore {
                 unix_now(),
                 budget_u64_to_sqlite(seq, "seq")?,
                 budget_u64_to_sqlite(new_total_cost_exposed, "total_cost_exposed")?,
+                i64::from(invocation_count),
+                budget_u64_to_sqlite(total_cost_exposed, "previous_exposure")?,
+                budget_u64_to_sqlite(total_cost_realized_spend, "previous_spend")?,
             ],
         )?;
+        if changed != 1 {
+            return Err(BudgetStoreError::Invariant(
+                "budget usage compare-and-set failed".into(),
+            ));
+        }
         if let Some(hold_id) = hold_id {
             let hold = SqliteBudgetStore::ensure_open_hold(
                 &transaction,
@@ -1045,7 +1096,9 @@ impl BudgetStore for SqliteBudgetStore {
                 hold.authority.as_ref(),
                 authority,
             )?;
-            let remaining = hold.remaining_exposure_units - cost_units;
+            let remaining = ExposureUnits::new(hold.remaining_exposure_units)
+                .try_sub(ExposureUnits::new(cost_units))?
+                .get();
             let disposition = if remaining == 0 {
                 HoldDisposition::Released
             } else {
@@ -1054,6 +1107,7 @@ impl BudgetStore for SqliteBudgetStore {
             SqliteBudgetStore::update_hold(
                 &transaction,
                 hold_id,
+                cost_units,
                 remaining,
                 disposition,
                 next_authority.as_ref(),
@@ -1243,18 +1297,16 @@ impl BudgetStore for SqliteBudgetStore {
             ));
         }
 
-        let new_total_cost_exposed = total_cost_exposed - exposed_cost_units;
-        let new_total_cost_realized_spend = total_cost_realized_spend
-            .checked_add(realized_cost_units)
-            .ok_or_else(|| {
-                BudgetStoreError::Overflow(
-                    "total_cost_realized_spend + realized_cost_units overflowed u64".to_string(),
-                )
-            })?;
+        let balance = ExposureBalance::new(total_cost_exposed, total_cost_realized_spend)?.settle(
+            ExposureUnits::new(exposed_cost_units),
+            ExposureUnits::new(realized_cost_units),
+        )?;
+        let new_total_cost_exposed = balance.exposed();
+        let new_total_cost_realized_spend = balance.spent();
         budget_u64_to_sqlite(new_total_cost_realized_spend, "total_cost_realized_spend")?;
 
         let seq = allocate_budget_replication_seq(&transaction)?;
-        transaction.execute(
+        let changed = transaction.execute(
             r#"
             UPDATE capability_grant_budgets
             SET updated_at = ?3,
@@ -1262,6 +1314,9 @@ impl BudgetStore for SqliteBudgetStore {
                 total_cost_exposed = ?5,
                 total_cost_realized_spend = ?6
             WHERE capability_id = ?1 AND grant_index = ?2
+              AND invocation_count = ?7
+              AND total_cost_exposed = ?8
+              AND total_cost_realized_spend = ?9
             "#,
             params![
                 capability_id,
@@ -1270,8 +1325,16 @@ impl BudgetStore for SqliteBudgetStore {
                 budget_u64_to_sqlite(seq, "seq")?,
                 budget_u64_to_sqlite(new_total_cost_exposed, "total_cost_exposed")?,
                 budget_u64_to_sqlite(new_total_cost_realized_spend, "total_cost_realized_spend",)?,
+                i64::from(invocation_count),
+                budget_u64_to_sqlite(total_cost_exposed, "previous_exposure")?,
+                budget_u64_to_sqlite(total_cost_realized_spend, "previous_spend")?,
             ],
         )?;
+        if changed != 1 {
+            return Err(BudgetStoreError::Invariant(
+                "budget usage compare-and-set failed".into(),
+            ));
+        }
         if let Some(hold_id) = hold_id {
             let next_authority = SqliteBudgetStore::validate_hold_authority(
                 hold_id,
@@ -1288,6 +1351,7 @@ impl BudgetStore for SqliteBudgetStore {
             SqliteBudgetStore::update_hold(
                 &transaction,
                 hold_id,
+                exposed_cost_units,
                 0,
                 HoldDisposition::Reconciled,
                 next_authority.as_ref(),

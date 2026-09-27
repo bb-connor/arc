@@ -132,17 +132,20 @@ impl SqliteBudgetStore {
 
         let allowed = Self::authorize_limits_allow(request, current.1, current.2, current.3)?;
         let authorized_usage = if allowed {
-            let exposed_after = current
-                .2
-                .checked_add(request.requested_exposure_units)
-                .ok_or_else(|| {
+            let exposed_after = ExposureUnits::new(current.2)
+                .try_add(ExposureUnits::new(request.requested_exposure_units))
+                .map(ExposureUnits::get)
+                .map_err(|_| {
                     BudgetStoreError::Overflow(
                         "total_cost_exposed + requested exposure overflowed u64".to_string(),
                     )
                 })?;
-            let invocation_count_after = current.1.checked_add(1).ok_or_else(|| {
-                BudgetStoreError::Overflow("invocation count overflowed u32".to_string())
-            })?;
+            let invocation_count_after = InvocationCount::new(current.1)
+                .try_add(InvocationCount::new(1))
+                .map(InvocationCount::get)
+                .map_err(|_| {
+                    BudgetStoreError::Overflow("invocation count overflowed u32".to_string())
+                })?;
             budget_u64_to_sqlite(exposed_after, "total_cost_exposed")?;
             Some((invocation_count_after, exposed_after))
         } else {
@@ -151,7 +154,7 @@ impl SqliteBudgetStore {
         let event_seq = allocate_budget_replication_seq(&transaction)?;
         let (usage_seq, invocation_count_after, exposed_after, realized_after) =
             if let Some((invocation_count_after, exposed_after)) = authorized_usage {
-                transaction.execute(
+                let changed = transaction.execute(
                     r#"
                 INSERT INTO capability_grant_budgets (
                     capability_id, grant_index, invocation_count, updated_at, seq,
@@ -163,6 +166,10 @@ impl SqliteBudgetStore {
                     seq = excluded.seq,
                     total_cost_exposed = excluded.total_cost_exposed,
                     total_cost_realized_spend = excluded.total_cost_realized_spend
+                WHERE capability_grant_budgets.seq = ?8
+                  AND capability_grant_budgets.invocation_count = ?9
+                  AND capability_grant_budgets.total_cost_exposed = ?10
+                  AND capability_grant_budgets.total_cost_realized_spend = ?7
                 "#,
                     params![
                         &request.capability_id,
@@ -172,8 +179,16 @@ impl SqliteBudgetStore {
                         budget_u64_to_sqlite(event_seq, "seq")?,
                         budget_u64_to_sqlite(exposed_after, "total_cost_exposed")?,
                         budget_u64_to_sqlite(current.3, "total_cost_realized_spend")?,
+                        budget_u64_to_sqlite(current.0, "previous_seq")?,
+                        i64::from(current.1),
+                        budget_u64_to_sqlite(current.2, "previous_exposure")?,
                     ],
                 )?;
+                if changed != 1 {
+                    return Err(BudgetStoreError::Invariant(
+                        "budget authorization compare-and-set failed".into(),
+                    ));
+                }
                 if let Some(hold_id) = request.hold_id.as_deref() {
                     Self::create_hold(
                         &transaction,
@@ -326,13 +341,9 @@ impl SqliteBudgetStore {
             return Ok(false);
         }
         let committed = checked_committed_cost_units(exposed, realized)?;
-        let requested = committed
-            .checked_add(request.requested_exposure_units)
-            .ok_or_else(|| {
-                BudgetStoreError::Overflow(
-                    "committed cost + requested exposure overflowed u64".to_string(),
-                )
-            })?;
+        let requested = ExposureUnits::new(committed)
+            .try_add(ExposureUnits::new(request.requested_exposure_units))?
+            .get();
         Ok(request
             .max_total_cost_units
             .is_none_or(|max| requested <= max))

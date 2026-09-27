@@ -23,6 +23,22 @@ and [pass 7](../../reviews/2026-09-26-review-validation-pass-7.md) validations,
 against `3cd73631a1` plus the uncommitted Packet 1 tree. Standing rules live in the
 [security engineering standard](../../security/engineering-standard.md).
 
+## Current execution status (September 27)
+
+The original sequencing and checkboxes below have been reconciled with the local
+implementation records. Gate/configuration delivery, response authority types,
+signed simulation, exact analytics and phase-aware connection recovery are in the
+candidate. This does not establish hosted, release, native x86_64 or operational
+acceptance. Packet 3 remains partial: arithmetic classifications, the historical
+retention stall, and stable-candidate scale evidence are still open.
+
+The current accounting batch and its remaining boundaries are recorded in
+[checked budget accounting](../../reviews/2026-09-27-checked-budget-accounting.md).
+The next implementation batch is the shared clock port and response lifecycle
+verification. Broad module/pool migrations and operational pilot observation
+remain separate work. The user's no-compatibility instruction supersedes the
+original 1C migration proposal; inline execution supersedes the lane dispatch.
+
 ## Revised execution order
 
 ```
@@ -31,7 +47,7 @@ Packet 1   production signed response dry-run        (parent)
              + 1D  error taxonomy          <- FIRST, gates Packet 1's own test corpus
              + 1A  binding unconstructible
              + 1B  fresh and resume authority types
-             + 1C  legacy provenance, obligation-inventory retirement
+             + 1C  mandatory execution binding (no legacy mode)
              + 1E  domain constants
 Packet 2   prove repaired boundaries                 (parent) + 2A arch probe
                                                               + 2B syscall key validation
@@ -98,29 +114,29 @@ production code changes in this packet.
 
 #### 0.1 Hygiene gate measures assembled modules (Q1)
 
-- [ ] Resolve `include!` transitively and attribute fragment lines to the
+- [x] Resolve `include!` transitively and attribute fragment lines to the
       including module. Measure the assembled total against `PRODUCTION_LIMIT`.
       Fail loudly on an unresolvable `concat!`/`env!` include rather than skipping
       it silently.
-- [ ] Add `.inc` to `TEXT_HYGIENE_SUFFIXES` and `TEXT_HYGIENE_PATTERNS`. Expect
+- [x] Add `.inc` to `TEXT_HYGIENE_SUFFIXES` and `TEXT_HYGIENE_PATTERNS`. Expect
       zero new violations: the em-dash scan is currently clean across all 79
       fragments, so this converts discipline into enforcement at no cost.
-- [ ] Extend the self-test with a deliberately violating fixture: a parent plus a
+- [x] Extend the self-test with a deliberately violating fixture: a parent plus a
       fragment that together exceed the cap, and a fragment containing an em dash.
       The self-test must fail without the fix.
-- [ ] Make `cargo fmt --check` reach fragments, or record in the gate that
+- [x] Make `cargo fmt --check` reach fragments, or record in the gate that
       fragments are unformatted and fail on any new `.inc` file. Do not leave the
       format gate silently blind.
-- [ ] Run the gate, capture the expected red across the 46 over-cap logical
+- [x] Run the gate, capture the expected red across the 46 over-cap logical
       modules, and allowlist each at its measured size through `--ratchet`. Commit
       the baseline as debt with expiries, not as configuration.
-- [ ] Record the measured baseline (logical size, fragment count, gate-visible
+- [x] Record the measured baseline (logical size, fragment count, gate-visible
       size) in the ledger so Packet 7 can be sequenced against real numbers.
 
 #### 0.2 Release profile keeps overflow checks (R1)
 
-- [ ] `overflow-checks = true` in `[profile.release]` and
-      `[profile.docker-release]`. Justify it in the manifest comment with the same
+- [x] `overflow-checks = true` in `[profile.release]` and
+      `[profile.release-lto]`. Justify it in the manifest comment with the same
       reasoning already given for `unwrap_used`: in a fail-closed kernel an
       overflow panic is an availability fault, and a silent wrap is an authority
       grant.
@@ -129,9 +145,9 @@ production code changes in this packet.
 - [ ] Measure the cost on the existing release benchmark and record the delta. If
       it is material on a specific hot path, fix that path with a newtype per
       Packet 8, do not turn the check back off.
-- [ ] Add one check that runs under the release profile and asserts an overflow
+- [x] Add one check that runs under the release profile and asserts an overflow
       aborts rather than wraps, since no ordinary test can observe this (R6).
-- [ ] **Land Packet 10.1 in the same packet.** Enabling overflow checks adds panic
+- [x] **Land Packet 10.1 in the same packet.** Enabling overflow checks adds panic
       sites to arithmetic inside store critical sections, and four stores currently
       poison their connection mutex permanently on a panic (finding S1). Shipping
       0.2 alone trades a silent budget wrap for a permanently unavailable money
@@ -139,29 +155,33 @@ production code changes in this packet.
 
 #### 0.3 Accounting arithmetic lint (R1)
 
+The lexical gate is implemented and its baseline now has 12 sites in seven
+modules. The six migrated budget transition files have no unchecked operators.
+The scoped compiler lint below remains a separate requirement.
+
 - [ ] `arithmetic_side_effects = "deny"` scoped to the budget, quota, counter and
       lease modules. Reviewed `#[allow]` at sites where the bound is proved; a Kani
       harness under a proved precondition qualifies, a store path does not.
-- [ ] Leave the workspace-wide policy unchanged in this packet. Widening it is a
+- [x] Leave the workspace-wide policy unchanged in this packet. Widening it is a
       separate, larger decision.
 
 #### 0.4 Domain-separation gate (R4)
 
-- [ ] New gate that extracts every domain byte string in the workspace and fails
+- [x] New gate that extracts every domain byte string in the workspace and fails
       on: a value declared in more than one place, a value not matching
       `chio.<area>.<payload>.v<N>\0`, or a placeholder domain reachable outside
       `#[cfg(any(test, feature = "test-support"))]`.
-- [ ] Self-test with a duplicate and a malformed fixture.
-- [ ] Expect red on the 8 duplicates and 14 unterminated values. Allowlist the
-      unterminated ones with expiries; fix the 8 duplicates in correction 1E and in
-      follow-ups for the non-response families.
+- [x] Self-test with a duplicate and a malformed fixture.
+- [ ] Retire the remaining duplicate and unterminated domain debt outside the
+      response family. The gate and dated baseline are implemented; correction
+      1E completed the response declarations, while other families remain open.
 
 #### 0.5 Assertion-strength gate (R3)
 
-- [ ] New gate that fails on a *newly added* bare `assert!(..is_err())` in the
-      security crates, with the existing 213 recorded as a shrinking baseline.
+- [x] New gate that fails on a *newly added* bare `assert!(..is_err())` in the
+      security crates, with a shrinking baseline (currently 1,287 assertions).
       Ratchet only downward, same discipline as the hygiene allowlist.
-- [ ] Do not attempt to convert the existing 213 in this packet. They depend on
+- [x] Do not attempt to convert the existing 213 in this packet. They depend on
       correction 1D and on per-boundary work in 4B.
 
 **Exit:** The hygiene gate measures assembled modules; release builds keep
@@ -216,16 +236,16 @@ become demonstrable rather than nominal.
 
 Addresses Q2.
 
-- [ ] Private fields with accessors on `ResponseExecutionBinding`. Add
+- [x] Private fields with accessors on `ResponseExecutionBinding`. Add
       `ResponseExecutionBindingWire` with `deny_unknown_fields`, and
       `#[serde(try_from = "ResponseExecutionBindingWire")]` on the domain type, so
       deserialization is the validation point.
-- [ ] Delete the detached `validate()` from the public surface once nothing can
+- [x] Delete the detached `validate()` from the public surface once nothing can
       construct an unvalidated value.
-- [ ] Carry expected and observed schema versions in the rejection, per correction
+- [x] Carry expected and observed schema versions in the rejection, per correction
       1D's discriminant. Do not echo attacker-supplied bytes beyond the version
       number.
-- [ ] Add a `compile_fail` or trybuild case asserting the invalid literal does not
+- [x] Add a `compile_fail` or trybuild case asserting the invalid literal does not
       compile, and a test asserting an invalid payload fails to deserialize with
       the specific error.
 
@@ -244,7 +264,7 @@ Addresses Q3. Land before the dry-run evaluator is wired, while the surface is s
 call sites (`state_machine.rs:118`, `:684`, `:1000`;
 `active_response_coordinator.rs:269`, `:281`).
 
-- [ ] Introduce three types. `FreshLiveAdmission`, whose only constructor
+- [x] Introduce three types. `FreshLiveAdmission`, whose only constructor
       requires provenance bound to the live mode. `CommittedDispatchAuthority`,
       constructible only inside the durable recovery verification for an exact
       executor-committed dispatch, binding tenant, dispatch, plan body hash,
@@ -257,25 +277,25 @@ call sites (`state_machine.rs:118`, `:684`, `:1000`;
       the external review's R1; a single resume token with a mandatory governed
       operation identifier was rejected by the follow-up review's F2, because
       automatic execution has no admission operation.
-- [ ] Fresh dispatch and both kernel admission entry points accept
+- [x] Fresh dispatch and both kernel admission entry points accept
       `FreshLiveAdmission` only; the committed-dispatch resume path accepts
       `CommittedDispatchAuthority` only; the pre-dispatch governed resume accepts
       `CommittedAdmissionAuthority` only. Fresh admission must not accept either
       recovery type, as a compile error.
       Remove the duplicated inverse condition at `state_machine.rs:686-687`; each
       type carries its own rule exactly once.
-- [ ] Confirm by construction that no live path accepts a bare `ResponsePlan`.
+- [x] Confirm by construction that no live path accepts a bare `ResponsePlan`.
       Grep for remaining `require_execution_mode` callers and expect only the
       constructor.
 - [ ] Negative tests, each asserting its `DispatchRejection` variant: a `DryRun`
-      plan at every fresh entry point; a legacy plan at every fresh entry point; a
-      legacy plan plus a caller-selected resume mode with no durable commitment;
+      plan at every fresh entry point; a serialized plan without the mandatory binding;
+      a caller-selected resume mode with no durable commitment;
       an automatic committed dispatch that resumes with no admission operation;
       a governed commitment with no dispatch row that cannot be executed as a
       dispatch; and a simulated plan that cannot populate recoverable live
       dispatch work.
-- [ ] Record in the module docs that signature coverage of `execution` via
-      `authorization_body()` is what blocks strip-to-legacy laundering, so a future
+- [x] Record in the module docs that signature coverage of `execution` via
+      `authorization_body()` is what blocks execution-binding removal, so a future
       change to the signed body does not silently remove that property.
 
 **Exit:** Omitting the mode check is a compile error, fresh and resume authority
@@ -285,33 +305,18 @@ where the signed body is defined.
 
 ---
 
-### Correction 1C: Give legacy tolerance a named variant and a sunset
+### Correction 1C: Mandatory execution binding (supersedes the migration proposal)
 
-**Owners:** `chio-security-types/src/response.rs`, the receipt schema v5 migration
-note, `chio-store-sqlite` response dispatch readback.
+The user explicitly rejected backward compatibility for unshipped Chio. The
+original `PlanProvenance::Legacy` and obligation-retirement proposal is withdrawn.
 
-Addresses Q4.
+- [x] Require the signed execution binding on every response plan, including
+      durable recovery. Missing binding data is rejected at decoding.
+- [x] Remove legacy-mode constructors, switches and recovery fixtures.
+- [x] Preserve distinct verified committed-dispatch and committed-admission
+      recovery authority for current-format plans.
 
-- [ ] Replace `Option<ResponseExecutionBinding>` with
-      `PlanProvenance::{Legacy, Bound(ResponseExecutionBinding)}`. Matches become
-      exhaustive and the three cases are named at every site.
-- [ ] Separate two switches. Stopping new legacy admissions is one and may happen
-      early. Retiring historical reconciliation is the other and requires an
-      inventory of every unresolved obligation: admission commitments without a
-      dispatch row (the kernel explicitly recovers a crash at that point,
-      `active_response_committed_recovery.rs:365` and `:509`), dispatches in
-      flight, retained preparations and cleanup obligations. A count of dispatch
-      rows is not that inventory.
-- [ ] Encode the retirement condition as: every inventoried obligation is
-      terminal or explicitly migrated. Neither a zero row count nor an elapsed
-      horizon is sufficient, per the external review's finding R2. Acceptance
-      includes the exact case: crash after admission commitment and before the
-      dispatch row, then migration, then restart, and the owed recovery completes.
-- [ ] Record the inventory and the condition in the schema v5 migration note
-      beside the existing forward-migration warning.
-
-**Exit:** Legacy tolerance is named, new admissions can be stopped independently,
-and reconciliation retires only when the obligation inventory is terminal.
+Evidence: [production response simulation](../../reviews/2026-09-27-production-response-simulation.md).
 
 ---
 
@@ -324,25 +329,25 @@ and reconciliation retires only when the obligation inventory is terminal.
 
 Addresses R4 for the `chio.response-*` family, which Packet 1 is already editing.
 
-- [ ] Import `RESPONSE_AFFECTED_SET_DOMAIN` from `chio-security-types` and delete
+- [x] Import `RESPONSE_AFFECTED_SET_DOMAIN` from `chio-security-types` and delete
       the three private copies. It is already a `pub const` at
       `ports_parts/part_01.rs:38`; the kernel declaring its own copies is the
       clearest instance of the problem.
-- [ ] Promote `chio.response-effect.v1`, `chio.response-request.v1` and
+- [x] Promote `chio.response-effect.v1`, `chio.response-request.v1` and
       `chio.response-transition.v1` to the same module and import them in
       `chio-quarantine`, the kernel coordinator and `chio-core-types`' receipt
       projection. Keep the byte values identical; this is a no-behavior-change
       commit and must be verified as one.
-- [ ] Give the constants one name each. Four different names currently carry the
+- [x] Give the constants one name each. Four different names currently carry the
       same bytes (`EFFECT_ID_DOMAIN` versus `RESPONSE_EFFECT_ID_DOMAIN`,
       `TRANSITION_ID_DOMAIN` versus `RESPONSE_MUTATION_ID_DOMAIN`), which is why a
       grep by name missed the duplication.
-- [ ] Production shares one declaration per value. Tests do **not** reference it:
+- [x] Production shares one declaration per value. Tests do **not** reference it:
       a test that reads the constant it exists to pin asserts nothing about its
       value and cannot detect a compatibility break (the external review's R10).
       Tests keep independent literal known-answer fixtures for the domain bytes and
       for digests computed over them.
-- [ ] Leave the `chio.fincred.*` and `chio.runtime-replay-source-seal.*` families
+- [x] Leave the `chio.fincred.*` and `chio.runtime-replay-source-seal.*` families
       to follow-ups outside this packet; they are not on the response path.
 
 **Exit:** The response-family domains have one declaration and one name each, the
@@ -449,8 +454,8 @@ launch regression typechecks there and requires x86_64 to execute.
 - [x] Retain the `saturating_*` and `wrapping_*` inventory in the security crates,
       kernel and stores: 638 source lines at `4c35ce7867`, including fixtures.
 - [ ] Finish classifying each site as correct-by-intent or defect. The retained
-      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 123
-      sites (66 repaired sites); 515 remain explicitly pending.
+      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 130
+      sites (66 repaired sites); 508 remain explicitly pending.
 - [ ] A `wrapping_*` in an accounting, quota, counter or deadline path is a defect:
       fix it and add the regression.
 - [ ] A `saturating_sub` in an accounting path silently clamps to zero, hiding the
@@ -587,25 +592,36 @@ mistake this packet exists to undo.
 enforced by the type system. Packet 0.2's `overflow-checks` is the backstop; this
 is the durable fix.
 
-- [ ] Introduce `ExposureUnits` (and siblings for quota and lease counts) as
-      newtypes whose only subtraction is `try_sub(self, other) -> Result<Self, _>`
-      and whose construction validates range once.
-- [ ] Migrate the four existing implementations of the release invariant onto it:
+- [x] Introduce private-field `ExposureUnits` and `InvocationCount` with checked
+      addition and subtraction returning specific errors. Their input domains are
+      all of `u64` and `u32`; SQLite applies its existing narrower storage bound.
+- [ ] Extend the shared count types to remaining quota/lease owners after their
+      arithmetic inventory entries are classified. This is separate from the
+      budget invocation and cumulative-approval transitions delivered here.
+- [x] Migrate the four existing implementations of the release invariant onto it:
       `chio-kernel/src/budget_store/in_memory/terminal.rs` (guards at `:649`,
       `:709`), `chio-store-sqlite/src/budget_store/trait_impl.rs` (`:972`),
       `chio-store-sqlite/src/budget_store/composite/transitions/terminal.rs`
       (`:57`, `:67`), and the formal models in `kani_harnesses.rs` /
       `formal_aeneas.rs`, which may keep proved-precondition subtraction under a
       reviewed allow.
-- [ ] Carry the SQL-level predicate into every store's UPDATE, not only the
+- [x] Carry the SQL-level predicate into every store's UPDATE, not only the
       composite path. `AND remaining_exposure_units >= ?` at
       `composite/transitions/terminal.rs:91` is the reference shape: the database
       refuses the write even if the Rust check is bypassed.
-- [ ] Add property tests over the newtype: subtraction below zero returns the
+- [x] Add property tests over the newtype: subtraction below zero returns the
       specific error, addition at the `u64` ceiling returns the specific error, and
       no arithmetic path can produce a value the constructor would have rejected.
-- [ ] Extend the existing Kani conservation harnesses to the newtype so the
+- [x] Extend the existing Kani conservation harnesses to the newtype so the
       proof and the production type share one definition of the bound.
+
+The budget transition batch is locally verified in the
+[checked accounting record](../../reviews/2026-09-27-checked-budget-accounting.md).
+Primitive DTOs remain serialization/storage boundaries. Live arithmetic enters
+checked types; in-memory capture/reversal stage every participant before
+publication. The extracted scalar model retains its proved-precondition
+subtraction, with a full-width Kani refinement against the production type.
+Broader quota/lease type adoption above remains open.
 
 **Exit:** The exposure invariant has one implementation, enforced by a type, with a
 database predicate underneath it and a proof above it. A fifth store cannot get it
@@ -628,20 +644,20 @@ before-and-after number (standard rule 13.9).
 
 #### 9.1 Close the measurement gap (P2) - start first, no production change
 
-- [ ] Add benchmarks for the per-authorization composite operation (admission check
-      plus budget charge plus security-state read plus receipt append), the budget
+- [x] Add benchmarks for the per-authorization composite operation (admission check
+      plus budget charge plus suspension-state read plus receipt append), the budget
       charge/release pair, and the security-state read on the denial path.
-- [ ] Populate to a realistic row count before measuring. A benchmark over an empty
+- [x] Populate to a realistic row count before measuring. A benchmark over an empty
       table measures the wrong thing whatever path it covers, and the existing
       receipt benchmark should be re-checked for this too.
-- [ ] Record the baselines in the ledger. These numbers are what justifies or
+- [x] Record the baselines in the ledger. These numbers are what justifies or
       cancels 9.3 to 9.5.
-- [ ] State plainly in the ledger that the retained million-receipt campaign proves
+- [x] State plainly in the ledger that the retained million-receipt campaign proves
       receipt append scales and not that authorization scales (standard rule 13.10).
 
 #### 9.2 Fix the analytics aggregate (P1) - independent of 9.1
 
-- [ ] Aggregate over the existing typed `cost_charged_be` column
+- [x] Aggregate over the existing typed `cost_charged_be` column
       (`receipt_store/bootstrap/open.rs:569`) instead of
       `json_extract(r.raw_json, '$.metadata.financial.cost_charged')`. The column
       is the eight big-endian bytes of a `u64` (`to_be_bytes()`), so SQL `SUM` or
@@ -649,20 +665,27 @@ before-and-after number (standard rule 13.9).
       contract is exact: decode each row through a registered scalar function or
       in Rust after a typed fetch, accumulate in `u128` or checked `u64`, and give
       overflow a named error rather than a saturated value.
-- [ ] Do the same for `attempted_cost`, adding a typed column if one does not exist.
-- [ ] Replace the `(?N IS NULL OR col = ?N)` optional-filter shape so the six
+- [x] Do the same for `attempted_cost`, adding a typed column if one does not exist.
+- [x] Replace the `(?N IS NULL OR col = ?N)` optional-filter shape so the six
       existing indexes on `timestamp`, `capability`, `subject`, `grant`, `tool` and
       `decision` become usable.
-- [ ] Add a test that runs `EXPLAIN QUERY PLAN` and fails on a `SCAN` where an index
+- [x] Add a test that runs `EXPLAIN QUERY PLAN` and fails on a `SCAN` where an index
       is expected, so the shape cannot silently regress (standard rule 13.3).
-- [ ] Bound the unfiltered case with a required time window or a rollup table.
-- [ ] Do not require byte-identical output: the current JSON path saturates any
+- [x] Bound all queries with matched-row and shared SQLite-instruction budgets,
+      including sparse scans. This is the implemented work bound; a window/rollup
+      is not required by the current API.
+- [x] Do not require byte-identical output: the current JSON path saturates any
       value at or above 2^63 to 2^63 minus 1, a latent defect that "unchanged"
       would preserve. Confirm equality against a populated fixture for every value
       below 2^63, and add edge fixtures at 2^63 minus 1, 2^63, 2^64 minus 1 and a
       sum that overflows `u64`, each asserting the exact decoded result or the
       named overflow error. This is a financial report; the contract must be exact
       and stated.
+
+[Measurement evidence](../../security/store-measurements-2026-09-26.md):
+20,000-row store composition and verified analytics results are local baselines,
+not an end-to-end kernel latency or scaling claim. Signature verification remains
+required despite its measured cost.
 
 #### 9.3 Statement caching on per-operation reads (P3)
 
@@ -720,18 +743,18 @@ the 64 tenant-scoped tables, `receipt_store/bootstrap/open.rs` triggers.
 
 #### 10.1 Phase-aware lock-poison recovery (S1, corrected by the external review's R3) - COUPLED to Packet 0.2
 
-- [ ] Do not recover blindly. The first version of this item said "recover with
+- [x] Do not recover blindly. The first version of this item said "recover with
       `into_inner()`, because an aborted transaction rolls back." `Transaction::drop`
       discards the rollback result, an independent probe showed the recovered
       connection still inside a transaction with the uncommitted row readable, and
       every one of the 18 stores pairs commits with external anchors or filesystem
       state (`fiscal_store.rs:338` commits before its anchor sync).
-- [ ] One shared helper that, on a poisoned lock, establishes state before returning
+- [x] One shared helper that, on a poisoned lock, establishes state before returning
       the guard: `is_autocommit()`, an explicit `ROLLBACK` if a transaction is open,
       then the store's owner and anchor consistency check against the database head.
       Where any step fails or cannot be verified, the helper returns a named fenced
       error and the store stays fenced until reopened. Fail closed with a reason.
-- [ ] Per-store classification, recorded at the call sites, across all 18
+- [x] Per-store classification, recorded at the call sites, across all 18
       mutex-guarded stores (22 files, 26 connection lock sites; the 13 pooled stores
       including the receipt store are not exposed): which stores pair a commit with
       an external artifact and what the consistency check is; which have no external
@@ -744,12 +767,15 @@ the 64 tenant-scoped tables, `receipt_store/bootstrap/open.rs` triggers.
       reconcile per the store's contract, assert which); panic after anchor before
       acknowledgement (the store's prescribed recovery). Mutation check: blind
       recovery in place of the fence must fail the rollback-failure test.
-- [ ] The coupling to Packet 0.2 stands with a changed argument: with fencing, a new
+- [x] The coupling to Packet 0.2 stands with a changed argument: with fencing, a new
       arithmetic panic becomes a named fenced store instead of an anonymous permanent
       "unavailable", and that is the improvement the two changes deliver together.
       Decide with Packet 9.4 which stores move to the pool shape instead; where one
       does, the fence is removed in the same change.
 - [ ] Do not reach for `parking_lot`: a non-poisoning mutex hides the panic.
+
+Implementation and local tests: [resumed execution](../../reviews/2026-09-26-resumed-execution.md).
+The per-store, four-cutpoint mutation campaign above is a separate acceptance item.
 
 #### 10.2 Type the untrusted-serialization boundary (S2)
 

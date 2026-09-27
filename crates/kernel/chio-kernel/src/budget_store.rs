@@ -1,4 +1,7 @@
 use chio_core::capability::scope::MonetaryAmount;
+pub use chio_kernel_core::accounting::{
+    AccountingError, ExposureBalance, ExposureUnits, InvocationCount,
+};
 
 use crate::supplemental_quota::CanonicalRevocationSet;
 
@@ -26,6 +29,25 @@ pub enum BudgetStoreError {
 
     #[error("budget mutation durable outcome is unknown: {0}")]
     OutcomeUnknown(String),
+}
+
+impl From<AccountingError> for BudgetStoreError {
+    fn from(error: AccountingError) -> Self {
+        match error {
+            AccountingError::ExposureOverflow => {
+                Self::Overflow("exposure units overflowed u64".into())
+            }
+            AccountingError::ExposureUnderflow => {
+                Self::Invariant("insufficient exposure units".into())
+            }
+            AccountingError::InvocationOverflow => {
+                Self::Overflow("invocation count overflowed u32".into())
+            }
+            AccountingError::InvocationUnderflow => {
+                Self::Invariant("insufficient invocation count".into())
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1093,13 +1115,11 @@ fn checked_committed_cost_units(
     total_cost_exposed: u64,
     total_cost_realized_spend: u64,
 ) -> Result<u64, BudgetStoreError> {
-    total_cost_exposed
-        .checked_add(total_cost_realized_spend)
-        .ok_or_else(|| {
-            BudgetStoreError::Overflow(
-                "total_cost_exposed + total_cost_realized_spend overflowed u64".to_string(),
-            )
-        })
+    Ok(
+        ExposureBalance::new(total_cost_exposed, total_cost_realized_spend)?
+            .committed()?
+            .get(),
+    )
 }
 
 mod in_memory;
