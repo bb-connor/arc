@@ -340,6 +340,8 @@ pub fn run_conformance_harness(
         Some(listen) => listen,
         None => reserve_listen_addr()?,
     };
+    // Keep executable discovery here so callers reuse an existing external
+    // CARGO_TARGET_DIR binary instead of launching a redundant CLI build.
     let chio_executable = ensure_chio_executable(&options.repo_root, &options.cargo_binary)?;
     let runtime_state = ConformanceRuntimeState::create()?;
     let provision_log_path = logs_dir.join("chio-native-mcp-provision.log");
