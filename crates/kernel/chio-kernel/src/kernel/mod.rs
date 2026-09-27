@@ -11,7 +11,9 @@ mod active_response_admission;
 mod active_response_artifact;
 mod active_response_committed_recovery;
 mod active_response_coordinator;
+mod active_response_dispatch;
 mod active_response_executor;
+pub use active_response_dispatch::{prepare_response_dispatch, ResponseDispatchPreparationRequest};
 mod active_response_operation_binding;
 mod active_response_policy;
 mod active_response_proof;
@@ -1858,3 +1860,6 @@ mod receipt_writer_watchdog;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+#[cfg(feature = "admission-test-support")]
+pub use active_response_executor::test_support as active_response_test_support;

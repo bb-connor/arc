@@ -10,14 +10,14 @@ use chio_core::canonical_json_bytes;
 use chio_core::capability::scope::ChioScope;
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::crypto::Keypair;
+use chio_kernel::{prepare_response_dispatch, ResponseDispatchPreparationRequest};
 use chio_kernel::{
     Guard, GuardContext, SecurityInvocationContext, SecurityInvocationContextV1, ToolCallRequest,
     Verdict,
 };
 use chio_quarantine::{
-    build_response_plan, decode_response_record, prepare_response_dispatch, EffectMutation,
-    EffectMutationRequest, EffectReceiptContext, ResponseDispatchPreparationRequest,
-    ResponseStateMachine, ResponseTransitionRequest,
+    build_response_plan, decode_response_record, EffectMutation, EffectMutationRequest,
+    EffectReceiptContext, ResponseStateMachine, ResponseTransitionRequest,
 };
 use chio_security_kernel::{ContainmentGuard, MissingContextPolicy};
 use chio_security_types::ports::{
@@ -345,7 +345,8 @@ fn normal_to_quarantined_to_rollback_partial_remains_denied() {
     .unwrap_or_else(|error| panic!("build response plan: {error}"));
     let dispatch = prepare_response_dispatch(ResponseDispatchPreparationRequest {
         authorization_capability_hash: plan.operator_capability.capability_digest,
-        plan: plan.clone(),
+        plan: chio_security_types::FreshLiveAdmission::new(plan.clone())
+            .unwrap_or_else(|error| panic!("live fixture plan: {error}")),
         dispatch_id: record("rollback-partial-dispatch"),
         governed_intent_hash: digest(b"rollback-partial-intent"),
         policy_decision_hash: digest(b"rollback-partial-decision"),
@@ -358,7 +359,6 @@ fn normal_to_quarantined_to_rollback_partial_remains_denied() {
                 .unwrap_or_else(|error| panic!("lease owner: {error}")),
             lease_expires_at_unix_ms: now.saturating_add(60_000),
         },
-        commit_mode: chio_security_types::ports::ResponseDispatchCommitMode::Fresh,
     })
     .unwrap_or_else(|error| panic!("prepare response dispatch: {error}"));
     let outcome = store

@@ -14,24 +14,22 @@ use chio_security_types::{
     is_legal_response_transition, PlannedResponseEffect, PlannedResponseEffects,
     ResponseApprovalRequirement, ResponseEffectAppliedRecord, ResponseEffectFailedRecord,
     ResponseEffectProgress, ResponseEffectRequestedRecord, ResponseEffectSpec,
-    ResponseFailureRecord, ResponseFinalRecord, ResponseMutationLog, ResponseMutationRecord,
-    ResponsePlan, ResponsePlanInput, ResponseRequestedRecord, ResponseRollbackOutcome,
-    ResponseRollbackRecord, ResponseSnapshot, ResponseState, ResponseTransitionCause,
-    ResponseTransitionRecord, MAX_RESPONSE_EFFECTS, RESPONSE_STATE_SCHEMA_VERSION,
+    ResponseFailureRecord, ResponseFinalRecord, ResponseMutationRecord, ResponsePlan,
+    ResponsePlanInput, ResponseRollbackOutcome, ResponseRollbackRecord, ResponseSnapshot,
+    ResponseState, ResponseTransitionCause, ResponseTransitionRecord, MAX_RESPONSE_EFFECTS,
 };
 use serde::Serialize;
 use std::sync::Arc;
 
 use crate::native_receipts::response_receipt_for_mutation;
 
-mod dispatch;
 mod error;
+pub mod projection;
 
-pub(crate) use dispatch::encode_normalized_dispatch_response_record;
-pub use dispatch::{prepare_response_dispatch, ResponseDispatchPreparationRequest};
 pub use error::{
     CanonicalFailure, FreezeBindingField, PlanDefect, RecordDefect, StateMachineError,
 };
+pub(crate) use projection::encode_normalized_dispatch_response_record;
 
 const DISPATCH_COMMITTED_RESUME_EXPIRED_ERROR: &str =
     "active_response.dispatch_committed_resume_expired";
@@ -100,31 +98,20 @@ impl<S: ResponseStore + ?Sized> ResponseStateMachine<S> {
         Self { store }
     }
 
-    pub fn create(&self, plan: ResponsePlan) -> Result<ResponsePlanRecord, StateMachineError> {
-        validate_plan(&plan)?;
-        plan.require_live_execution()?;
-        let request_id = request_id(&plan)?;
-        let mutations = ResponseMutationLog::new(vec![ResponseMutationRecord::Requested(
-            ResponseRequestedRecord {
-                transition_id: request_id,
-                generation: 0,
-                prior_receipt_id: plan.trigger_finding_receipt_id.clone(),
-                occurred_at_unix_ms: plan.created_at_unix_ms,
-            },
-        )])
-        .map_err(StateMachineError::MutationLimit)?;
-        let snapshot = ResponseSnapshot {
-            schema_version: RESPONSE_STATE_SCHEMA_VERSION,
-            execution_dispatch: None,
-            dispatch_authorization_hash: None,
-            state: ResponseState::Planned,
-            generation: 0,
-            applying_lease_expires_at_unix_ms: None,
-            due_at_unix_ms: Some(plan.expires_at_unix_ms),
-            operator_page_required: false,
-            plan,
-            mutations,
-        };
+    /// Create fresh state only from a plan whose execution provenance is live.
+    ///
+    /// ```compile_fail
+    /// use chio_quarantine::ResponseStateMachine;
+    /// use chio_security_types::{ResponsePlan, ports::ResponseStore};
+    /// fn bypass<S: ResponseStore>(machine: &ResponseStateMachine<S>, plan: ResponsePlan) {
+    ///     let _ = machine.create(plan);
+    /// }
+    /// ```
+    pub fn create(
+        &self,
+        admission: chio_security_types::FreshLiveAdmission,
+    ) -> Result<ResponsePlanRecord, StateMachineError> {
+        let snapshot = projection::initial_response_snapshot(admission.plan().clone())?;
         let record = encode_response_record(&snapshot)?;
         match self.store.create(&record)? {
             CreateOutcome::Created | CreateOutcome::Existing => Ok(record),
@@ -365,6 +352,12 @@ fn transition_candidate(
     };
     if !is_legal_response_transition(from_state, actual_target) {
         return Err(StateMachineError::InvalidTransition);
+    }
+    // A direct store transition cannot create historical execution authority.
+    // The kernel projects verified committed admissions separately, then commits
+    // their exact dispatch and initial Applying snapshot atomically.
+    if actual_target == ResponseState::Applying && from_state != ResponseState::Applying {
+        snapshot.plan.require_live_execution()?;
     }
     validate_transition_request(&snapshot, request, actual_target)?;
 
@@ -678,7 +671,7 @@ pub fn decode_response_record(
     Ok(snapshot)
 }
 
-pub(crate) fn encode_response_record(
+pub fn encode_response_record(
     snapshot: &ResponseSnapshot,
 ) -> Result<ResponsePlanRecord, StateMachineError> {
     encode_response_record_with_mode(snapshot, false)
@@ -810,9 +803,6 @@ fn validate_transition_request(
         return Err(StateMachineError::InvalidTransition);
     }
     if actual_target == ResponseState::Applying {
-        if snapshot.state != ResponseState::Applying {
-            snapshot.plan.require_live_execution()?;
-        }
         let lease = request
             .applying_lease_expires_at_unix_ms
             .ok_or(StateMachineError::InvalidTiming)?;

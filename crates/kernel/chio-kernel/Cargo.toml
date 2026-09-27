@@ -76,6 +76,7 @@ chio-bounded = { workspace = true }
 chio-supervisor = { workspace = true }
 chio-core-types = { workspace = true }
 chio-security-types = { workspace = true }
+chio-quarantine = { workspace = true }
 # The kernel verifies signed custody envelopes; it does not run the WebAuthn
 # issuer or its stores. Inherit the workspace's disabled defaults. Issuer
 # applications select passkey and sqlite-store on their own custody dependency.

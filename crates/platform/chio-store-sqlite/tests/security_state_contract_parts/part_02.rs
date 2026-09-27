@@ -252,7 +252,7 @@ fn response_plan_for_tenant(
     let store = Arc::new(ModelStore::default());
     let machine = ResponseStateMachine::new(Arc::clone(&store));
     let planned = machine
-        .create(plan)
+        .create(chio_security_types::FreshLiveAdmission::new(plan).unwrap_or_else(|error| panic!("live fixture plan: {error}")))
         .unwrap_or_else(|error| panic!("planned response: {error}"));
     match generation {
         0 => planned,

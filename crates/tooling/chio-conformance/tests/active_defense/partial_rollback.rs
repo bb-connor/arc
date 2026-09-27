@@ -206,7 +206,8 @@ fn partial_rollback_truth() {
     let expires_at_unix_ms = plan.expires_at_unix_ms;
     let dispatch = prepare_response_dispatch(ResponseDispatchPreparationRequest {
         authorization_capability_hash: plan.operator_capability.capability_digest,
-        plan,
+        plan: chio_security_types::FreshLiveAdmission::new(plan)
+            .unwrap_or_else(|error| panic!("live fixture plan: {error}")),
         dispatch_id: record("partial-rollback-dispatch"),
         governed_intent_hash: digest(b"partial-rollback-intent"),
         policy_decision_hash: digest(b"partial-rollback-decision"),
@@ -219,7 +220,6 @@ fn partial_rollback_truth() {
                 .test_expect("response lease owner"),
             lease_expires_at_unix_ms: expires_at_unix_ms,
         },
-        commit_mode: chio_security_types::ports::ResponseDispatchCommitMode::Fresh,
     })
     .test_expect("prepare partial rollback dispatch");
     let committed = match store

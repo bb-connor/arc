@@ -77,7 +77,10 @@ fn plan_with_action(store: Arc<SchedulerStore>, action_id: &str) -> ResponsePlan
     })
     .unwrap_or_else(|error| panic!("build plan: {error}"));
     ResponseStateMachine::new(store)
-        .create(plan)
+        .create(
+            chio_security_types::FreshLiveAdmission::new(plan)
+                .unwrap_or_else(|error| panic!("live fixture plan: {error}")),
+        )
         .unwrap_or_else(|error| panic!("create plan: {error}"))
 }
 

@@ -1,3 +1,7 @@
+#[cfg(feature = "admission-test-support")]
+#[path = "active_response_executor/test_support.rs"]
+pub mod test_support;
+
 use super::active_response_committed_recovery::{
     CommittedAdmissionAuthority, CommittedDispatchAuthority,
 };
@@ -252,6 +256,20 @@ pub(crate) struct ActiveResponseExecutionRequestParts {
 }
 
 impl ActiveResponseExecutionRequest {
+    /// Prepare fresh work or the first dispatch owed by a verified admission.
+    /// Already-committed dispatch authority permits only exact durable readback.
+    /// Recovery mode follows the private origin minted by the kernel verifier.
+    pub fn prepare_dispatch(
+        &self,
+        initial_lease: chio_security_types::ports::ResponseDispatchLease,
+        now_unix_ms: u64,
+    ) -> Result<
+        chio_security_types::ports::ResponseDispatchCommitRequest,
+        ActiveResponseExecutorError,
+    > {
+        super::active_response_dispatch::prepare_kernel_dispatch(self, initial_lease, now_unix_ms)
+    }
+
     pub(super) fn from_fresh(
         admission: &FreshLiveAdmission,
         parts: ActiveResponseExecutionRequestParts,

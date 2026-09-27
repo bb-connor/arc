@@ -86,7 +86,7 @@ assert_rc "$(run_checker "$CHECKER" "$compliant" "$work/compliant.out" "$work/co
   "a graph under its ceiling with every pending package present and nothing denied passes"
 grep -F "chio-cage (chio-cage-init) on x86_64-unknown-linux-musl: 12 packages, ceiling 260" "$work/compliant.out" >/dev/null
 grep -F "0 denied, 11 pending" "$work/compliant.out" >/dev/null
-grep -F "chio-secret-broker (chio-secret-brokerd) on x86_64-unknown-linux-musl: 2 packages, ceiling 478" "$work/compliant.out" >/dev/null
+grep -F "chio-secret-broker (chio-secret-brokerd) on x86_64-unknown-linux-musl: 2 packages, ceiling 479" "$work/compliant.out" >/dev/null
 
 denied="$work/denied"
 write_workspace "$denied" "openssl" ""

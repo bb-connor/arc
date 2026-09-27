@@ -1,15 +1,15 @@
 mod response_support;
 
+use chio_kernel::{prepare_response_dispatch, ResponseDispatchPreparationRequest};
 use chio_quarantine::{
-    build_response_plan, decode_response_record, prepare_response_dispatch, EffectMutation,
-    EffectMutationRequest, EffectReceiptContext, ResponseDispatchPreparationRequest,
-    ResponseStateMachine, ResponseTransitionRequest, StateMachineError,
+    build_response_plan, decode_response_record, EffectMutation, EffectMutationRequest,
+    EffectReceiptContext, ResponseStateMachine, ResponseTransitionRequest, StateMachineError,
 };
 use chio_security_types::ports::{
     ActionId, BoundedVec, CanonicalBody, CreateOutcome, Digest32, ErrorCode, LeaseOwnerId,
     RecordId, ResponseDispatchApproval, ResponseDispatchAuthorizationBody,
-    ResponseDispatchCommitMode, ResponseDispatchCommitRequest, ResponseDispatchLease,
-    ResponsePlanRecord, ResponseStore, SessionId, TenantId,
+    ResponseDispatchCommitRequest, ResponseDispatchLease, ResponsePlanRecord, ResponseStore,
+    SessionId, TenantId,
 };
 use chio_security_types::{
     DispatchRejection, OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind,
@@ -100,7 +100,8 @@ fn preparation(
     approval: ResponseDispatchApproval,
 ) -> ResponseDispatchPreparationRequest {
     ResponseDispatchPreparationRequest {
-        plan,
+        plan: chio_security_types::FreshLiveAdmission::new(plan)
+            .unwrap_or_else(|error| panic!("live fixture plan: {error}")),
         dispatch_id: record_id("active-response-dispatch"),
         authorization_capability_hash: digest(30),
         governed_intent_hash: digest(32),
@@ -114,7 +115,6 @@ fn preparation(
                 .unwrap_or_else(|error| panic!("invalid lease owner: {error}")),
             lease_expires_at_unix_ms: 42_000,
         },
-        commit_mode: ResponseDispatchCommitMode::Fresh,
     }
 }
 
@@ -163,11 +163,6 @@ fn dispatch_rejection(
         Ok(_) => panic!("dispatch was accepted"),
     }
 }
-
-const RESUME_MODES: [ResponseDispatchCommitMode; 2] = [
-    ResponseDispatchCommitMode::GovernedCommittedResume,
-    ResponseDispatchCommitMode::GovernedCommittedExpiredResume,
-];
 
 #[test]
 fn automatic_dispatch_prepares_one_atomic_applying_transition() {
@@ -270,60 +265,52 @@ fn fresh_live_dispatch_rejects_simulation_and_legacy_authority() {
         ),
     ] {
         let response_plan = plan_with_execution(ResponseApprovalRequirement::Automatic, execution);
-        assert_eq!(
-            dispatch_rejection(prepare_response_dispatch(preparation(
-                response_plan.clone(),
-                ResponseDispatchApproval::Automatic,
-            ))),
-            expected,
-            "fresh dispatch of {execution:?}"
-        );
-        let state = ResponseStateMachine::new(Arc::new(TestResponseStore::default()));
-        assert!(
-            matches!(
-                state.create(response_plan),
-                Err(StateMachineError::InvalidDispatch(rejection)) if rejection == expected
-            ),
-            "live state creation of {execution:?}"
-        );
+        let observed = match chio_security_types::FreshLiveAdmission::new(response_plan) {
+            Err(rejection) => rejection,
+            Ok(_) => panic!("fresh authority accepted {execution:?}"),
+        };
+        assert_eq!(observed, expected, "fresh authority for {execution:?}");
     }
 }
 
 #[test]
-fn committed_resume_refuses_simulation_and_unbound_plans_by_name() {
-    for commit_mode in RESUME_MODES {
-        let mut simulated = preparation(
-            plan_with_execution(
-                ResponseApprovalRequirement::Governed {
-                    policy_id: record_id("response-policy"),
-                },
-                Some(ResponseExecutionBinding::new(ResponseExecutionMode::DryRun)),
-            ),
-            governed_approval(2),
-        );
-        simulated.commit_mode = commit_mode;
-        assert_eq!(
-            dispatch_rejection(prepare_response_dispatch(simulated)),
+fn direct_state_transition_cannot_activate_a_retained_legacy_or_simulated_plan() {
+    for (execution, expected) in [
+        (None, DispatchRejection::LegacyPlanFreshDispatch),
+        (
+            Some(ResponseExecutionBinding::new(ResponseExecutionMode::DryRun)),
             DispatchRejection::ExecutionMode {
                 observed: ResponseExecutionMode::DryRun,
             },
-            "{commit_mode:?}"
+        ),
+    ] {
+        let store = Arc::new(TestResponseStore::default());
+        let snapshot = chio_quarantine::state_machine::projection::initial_response_snapshot(
+            plan_with_execution(ResponseApprovalRequirement::Automatic, execution),
+        )
+        .unwrap_or_else(|error| panic!("retained snapshot: {error}"));
+        let current = response_record(&snapshot);
+        store
+            .create(&current)
+            .unwrap_or_else(|error| panic!("seed retained record: {error}"));
+        let machine = ResponseStateMachine::new(Arc::clone(&store));
+        assert!(
+            matches!(machine.transition(&current, &ResponseTransitionRequest {
+            expected_generation: 0,
+            target_state: ResponseState::Applying,
+            occurred_at_unix_ms: 41_000,
+            applying_lease_expires_at_unix_ms: Some(42_000),
+            error_code: None,
+        }), Err(StateMachineError::InvalidDispatch(observed)) if observed == expected)
         );
-
-        let mut legacy = preparation(
-            plan_with_execution(
-                ResponseApprovalRequirement::Governed {
-                    policy_id: record_id("response-policy"),
-                },
-                None,
-            ),
-            governed_approval(2),
-        );
-        legacy.commit_mode = commit_mode;
         assert_eq!(
-            dispatch_rejection(prepare_response_dispatch(legacy)),
-            DispatchRejection::LegacyPlanFreshDispatch,
-            "{commit_mode:?}"
+            store
+                .load_plan(&chio_security_types::ports::ResponsePlanKey {
+                    tenant_id: current.tenant_id.clone(),
+                    action_id: current.action_id.clone(),
+                })
+                .unwrap_or_else(|error| panic!("load retained plan: {error}")),
+            Some(current)
         );
     }
 }
@@ -397,15 +384,6 @@ fn dispatch_preparation_names_the_rule_that_refused_it() {
         ))),
         DispatchRejection::ZeroAdmissionOperationVersion
     );
-
-    for commit_mode in RESUME_MODES {
-        let mut automatic_resume = automatic();
-        automatic_resume.commit_mode = commit_mode;
-        assert_eq!(
-            dispatch_rejection(prepare_response_dispatch(automatic_resume)),
-            DispatchRejection::ResumeRequiresGovernedApproval { commit_mode }
-        );
-    }
 }
 
 #[test]

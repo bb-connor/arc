@@ -1,8 +1,9 @@
+use chio_kernel::ActiveResponseExecutorError;
 use chio_kernel::{
     ActiveResponseExecutionApproval, ActiveResponseExecutionOrigin, ActiveResponseExecutionRequest,
     ActiveResponseExecutorAuthorityIdentity,
 };
-use chio_security_types::ports::RecordId;
+use chio_security_types::ports::{RecordId, ResponseDispatchCommitRequest, ResponseDispatchLease};
 use chio_security_types::ResponsePlan;
 
 #[derive(Clone)]
@@ -23,9 +24,21 @@ pub(super) struct RawActiveResponseExecutionRequest {
 
 pub(super) trait ActiveResponseRequestSource {
     fn raw_request(&self) -> RawActiveResponseExecutionRequest;
+    fn prepare_dispatch(
+        &self,
+        lease: ResponseDispatchLease,
+        now: u64,
+    ) -> Result<ResponseDispatchCommitRequest, ActiveResponseExecutorError>;
 }
 
 impl ActiveResponseRequestSource for ActiveResponseExecutionRequest {
+    fn prepare_dispatch(
+        &self,
+        lease: ResponseDispatchLease,
+        now: u64,
+    ) -> Result<ResponseDispatchCommitRequest, ActiveResponseExecutorError> {
+        self.prepare_dispatch(lease, now)
+    }
     fn raw_request(&self) -> RawActiveResponseExecutionRequest {
         RawActiveResponseExecutionRequest {
             response_plan: self.response_plan().clone(),
@@ -46,6 +59,31 @@ impl ActiveResponseRequestSource for ActiveResponseExecutionRequest {
 
 #[cfg(test)]
 impl ActiveResponseRequestSource for RawActiveResponseExecutionRequest {
+    fn prepare_dispatch(
+        &self,
+        lease: ResponseDispatchLease,
+        now: u64,
+    ) -> Result<ResponseDispatchCommitRequest, ActiveResponseExecutorError> {
+        use chio_kernel::active_response_test_support::{
+            execution_request, ExecutionRequestFixture,
+        };
+        execution_request(ExecutionRequestFixture {
+            response_plan: self.response_plan.clone(),
+            dispatch_id: self.dispatch_id.clone(),
+            executor_authority: self.executor_authority.clone(),
+            request_id: self.request_id.clone(),
+            plan_body_hash: self.plan_body_hash.clone(),
+            authorization_capability_hash: self.authorization_capability_hash.clone(),
+            governed_intent_hash: self.governed_intent_hash.clone(),
+            policy_decision_hash: self.policy_decision_hash.clone(),
+            approval: self.approval.clone(),
+            authorized_at_unix_ms: self.authorized_at_unix_ms,
+            expires_at_unix_ms: self.expires_at_unix_ms,
+            origin: self.origin,
+        })
+        .prepare_dispatch(lease, now)
+    }
+
     fn raw_request(&self) -> RawActiveResponseExecutionRequest {
         self.clone()
     }

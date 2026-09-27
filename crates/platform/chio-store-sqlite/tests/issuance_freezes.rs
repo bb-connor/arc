@@ -3,11 +3,11 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
+use chio_kernel::{prepare_response_dispatch, ResponseDispatchPreparationRequest};
 use chio_quarantine::{
-    build_response_plan, prepare_response_dispatch, EffectMutation, EffectMutationRequest,
-    EffectReceiptContext, ExecutorError, ResponseDispatchPreparationRequest, ResponseScheduler,
-    ResponseStateMachine, ResponseTransitionRequest, ScheduledResponseExecutor, SchedulerPolicy,
-    SchedulerTickRequest,
+    build_response_plan, EffectMutation, EffectMutationRequest, EffectReceiptContext,
+    ExecutorError, ResponseScheduler, ResponseStateMachine, ResponseTransitionRequest,
+    ScheduledResponseExecutor, SchedulerPolicy, SchedulerTickRequest,
 };
 use chio_security_types::ports::{
     empty_issuance_freeze_snapshot, issuance_freeze_installed_version_hash,
@@ -286,7 +286,8 @@ fn commit_applying_plan(
     let authorized_at_unix_ms = plan.created_at_unix_ms;
     let request = prepare_response_dispatch(ResponseDispatchPreparationRequest {
         authorization_capability_hash: plan.operator_capability.capability_digest,
-        plan,
+        plan: chio_security_types::FreshLiveAdmission::new(plan)
+            .unwrap_or_else(|error| panic!("live fixture plan: {error}")),
         dispatch_id: record(dispatch_id),
         governed_intent_hash: digest(format!("intent:{dispatch_id}").as_bytes()),
         policy_decision_hash: digest(format!("decision:{dispatch_id}").as_bytes()),
@@ -299,7 +300,6 @@ fn commit_applying_plan(
                 .unwrap_or_else(|error| panic!("initial lease owner: {error}")),
             lease_expires_at_unix_ms: authorized_at_unix_ms.saturating_add(5_000),
         },
-        commit_mode: chio_security_types::ports::ResponseDispatchCommitMode::Fresh,
     })
     .unwrap_or_else(|error| panic!("prepare response dispatch: {error}"));
     let outcome = store

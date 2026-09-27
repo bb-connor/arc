@@ -637,7 +637,7 @@ pub(crate) use kernel::{current_unix_timestamp, MatchingGrant, ReceiptContent};
 pub use kernel::{
     active_response_admission_artifact_payload_digest,
     active_response_artifact_authority_signing_bytes, active_response_submission_proof_digest,
-    derive_active_response_dispatch_id, AcquiredNativeSecurityEgress,
+    derive_active_response_dispatch_id, prepare_response_dispatch, AcquiredNativeSecurityEgress,
     ActiveResponseAdmissionRequest, ActiveResponseArtifactAuthorityAttestation,
     ActiveResponseArtifactAuthorityAttestationBody,
     ActiveResponseArtifactAuthorityAttestationError,
@@ -664,8 +664,9 @@ pub use kernel::{
     NativeSecurityFlowJoinAuthority, NativeSecurityNoncePreflightJoinAuthority,
     NestedToolCallProofs, OverloadResource, PreDispatchActiveResponseReconstruction,
     PreparedActiveResponseAdmission, PreparedNativeSecurityEgress, PromptProvider, ReceiptLog,
-    ReplayClockDirection, ResourceProvider, RuntimeAdmissionContext, RuntimeAdmissionDecision,
-    RuntimeAdmissionHook, RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext,
+    ReplayClockDirection, ResourceProvider, ResponseDispatchPreparationRequest,
+    RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
+    RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext,
     RuntimeParticipantClaimAuthority, SecurityDispatchOutcome, SecurityDispatchOutcomeHandle,
     SecurityDispatchOutcomeRecorder, SecurityInvocationContext, SecurityInvocationContextAuthority,
     SecurityInvocationContextV1, SecurityPreDispatchContext, SecurityPreDispatchHook,
@@ -718,3 +719,6 @@ pub const SIGNING_CHANNEL_DEFAULT_CAPACITY: usize =
 /// Prometheus counter name emitted when the bounded receipt-signing channel
 /// blocks under backpressure.
 pub use kernel::signing_task::METRIC_CHIO_SIGNING_QUEUE_BLOCK_TOTAL;
+
+#[cfg(feature = "admission-test-support")]
+pub use kernel::active_response_test_support;

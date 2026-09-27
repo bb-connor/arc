@@ -1,7 +1,7 @@
+use chio_kernel::{prepare_response_dispatch, ResponseDispatchPreparationRequest};
 use chio_quarantine::{
-    build_response_plan, decode_response_record, prepare_response_dispatch, EffectMutation,
-    EffectMutationRequest, EffectReceiptContext, ResponseDispatchPreparationRequest,
-    ResponseStateMachine, ResponseTransitionRequest,
+    build_response_plan, decode_response_record, EffectMutation, EffectMutationRequest,
+    EffectReceiptContext, ResponseStateMachine, ResponseTransitionRequest,
 };
 use chio_security_types::ports::{
     ActionId, AutomaticResponseDispatchFenceOutcome, AutomaticResponseDispatchFenceRequest,
@@ -158,12 +158,15 @@ fn claim_due_planned_response(
     now_unix_ms: u64,
 ) -> (ResponsePlanRecord, ScheduledWork) {
     let planned = ResponseStateMachine::new(Arc::clone(store))
-        .create(response_plan_with_approval(
-            action_id,
-            now_unix_ms.saturating_sub(10_000),
-            5_000,
-            ResponseApprovalRequirement::Automatic,
-        ))
+        .create(
+            chio_security_types::FreshLiveAdmission::new(response_plan_with_approval(
+                action_id,
+                now_unix_ms.saturating_sub(10_000),
+                5_000,
+                ResponseApprovalRequirement::Automatic,
+            ))
+            .unwrap_or_else(|error| panic!("live fixture plan: {error}")),
+        )
         .unwrap_or_else(|error| panic!("response creation failed: {error}"));
     let work = store
         .claim_due(&SchedulerClaimRequest {
@@ -395,13 +398,14 @@ fn dispatch_request_for_tenant(
     lease_expires_at_unix_ms: u64,
 ) -> chio_security_types::ports::ResponseDispatchCommitRequest {
     prepare_response_dispatch(ResponseDispatchPreparationRequest {
-        plan: response_plan_for_tenant_with_approval(
+        plan: chio_security_types::FreshLiveAdmission::new(response_plan_for_tenant_with_approval(
             tenant,
             action,
             created_at_unix_ms,
             20_000,
             ResponseApprovalRequirement::Automatic,
-        ),
+        ))
+        .unwrap_or_else(|error| panic!("live fixture plan: {error}")),
         dispatch_id: record_id(dispatch_id),
         authorization_capability_hash: digest(30),
         governed_intent_hash: digest(32),
@@ -415,7 +419,6 @@ fn dispatch_request_for_tenant(
                 .unwrap_or_else(|error| panic!("invalid lease owner: {error}")),
             lease_expires_at_unix_ms,
         },
-        commit_mode: chio_security_types::ports::ResponseDispatchCommitMode::Fresh,
     })
     .unwrap_or_else(|error| panic!("response dispatch preparation failed: {error}"))
 }

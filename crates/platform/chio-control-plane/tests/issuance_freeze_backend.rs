@@ -6,10 +6,10 @@ use chio_control_plane::security::adapters::effect_port::{
     IssuanceFreezeBackend, LineageFenceMaintenanceResult, ResponseEffectBackend,
 };
 use chio_core::canonical::canonical_json_bytes;
+use chio_kernel::{prepare_response_dispatch, ResponseDispatchPreparationRequest};
 use chio_quarantine::{
-    build_response_plan, prepare_response_dispatch, EffectMutation, EffectMutationRequest,
-    EffectReceiptContext, ResponseDispatchPreparationRequest, ResponseStateMachine,
-    ResponseTransitionRequest,
+    build_response_plan, EffectMutation, EffectMutationRequest, EffectReceiptContext,
+    ResponseStateMachine, ResponseTransitionRequest,
 };
 use chio_security_types::ports::{
     empty_issuance_freeze_snapshot, issuance_freeze_version_hash, response_affected_set_hash,
@@ -1075,7 +1075,8 @@ fn scheduler_work(apply: &EffectRequest) -> ScheduledWork {
 
 fn response_plan_record(plan: &ResponsePlan, work: &ScheduledWork) -> ResponsePlanRecord {
     prepare_response_dispatch(ResponseDispatchPreparationRequest {
-        plan: plan.clone(),
+        plan: chio_security_types::FreshLiveAdmission::new(plan.clone())
+            .unwrap_or_else(|error| panic!("live fixture plan: {error}")),
         dispatch_id: record("freeze-backend-dispatch"),
         authorization_capability_hash: plan.operator_capability.capability_digest,
         governed_intent_hash: digest(b"freeze-backend-governed-intent"),
@@ -1088,7 +1089,6 @@ fn response_plan_record(plan: &ResponsePlan, work: &ScheduledWork) -> ResponsePl
             lease_owner_id: work.lease_owner_id.clone(),
             lease_expires_at_unix_ms: work.lease_expires_at_unix_ms,
         },
-        commit_mode: chio_security_types::ports::ResponseDispatchCommitMode::Fresh,
     })
     .unwrap_or_else(|error| panic!("prepare freeze response dispatch: {error}"))
     .response_plan

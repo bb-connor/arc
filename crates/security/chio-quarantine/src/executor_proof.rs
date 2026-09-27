@@ -172,11 +172,9 @@ fn applying_response_record(
 #[cfg(test)]
 mod tests {
     use super::validate_dispatch_authorization;
-    use crate::state_machine::{
-        build_response_plan, decode_response_record, prepare_response_dispatch,
-        ResponseDispatchPreparationRequest,
-    };
+    use crate::state_machine::{build_response_plan, decode_response_record};
     use chio_core_types::{canonical_json_bytes, sha256};
+    use chio_kernel::{prepare_response_dispatch, ResponseDispatchPreparationRequest};
     use chio_security_types::ports::{
         ActionId, CanonicalBody, Digest32, LeaseOwnerId, OpaqueReceiptRef, RecordId,
         ResponseDispatchApproval, ResponseDispatchAuthorization, ResponseDispatchCommitRequest,
@@ -239,7 +237,8 @@ mod tests {
         })
         .unwrap_or_else(|error| panic!("response plan build failed: {error}"));
         prepare_response_dispatch(ResponseDispatchPreparationRequest {
-            plan,
+            plan: chio_security_types::FreshLiveAdmission::new(plan)
+                .unwrap_or_else(|error| panic!("live fixture plan: {error}")),
             dispatch_id: record_id("active-response-dispatch-proof"),
             authorization_capability_hash: digest(24),
             governed_intent_hash: digest(26),
@@ -253,7 +252,6 @@ mod tests {
                     .unwrap_or_else(|error| panic!("invalid lease owner: {error}")),
                 lease_expires_at_unix_ms: 42_000,
             },
-            commit_mode: chio_security_types::ports::ResponseDispatchCommitMode::Fresh,
         })
         .unwrap_or_else(|error| panic!("dispatch preparation failed: {error}"))
     }

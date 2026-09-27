@@ -751,8 +751,8 @@ fn historical_governed_commit_is_unclaimable_until_zero_effect_terminalization()
             policy_id: record_id("historical-dispatch-policy"),
         },
     );
-    let request = prepare_response_dispatch(ResponseDispatchPreparationRequest {
-        plan: plan.clone(),
+    let mut request = prepare_response_dispatch(ResponseDispatchPreparationRequest {
+        plan: chio_security_types::FreshLiveAdmission::new(plan.clone()).unwrap_or_else(|error| panic!("live fixture plan: {error}")),
         dispatch_id: record_id("historical-governed-dispatch"),
         authorization_capability_hash: digest(30),
         governed_intent_hash: digest(32),
@@ -770,9 +770,9 @@ fn historical_governed_commit_is_unclaimable_until_zero_effect_terminalization()
                 .unwrap_or_else(|error| panic!("invalid lease owner: {error}")),
             lease_expires_at_unix_ms: plan.expires_at_unix_ms,
         },
-        commit_mode: ResponseDispatchCommitMode::GovernedCommittedExpiredResume,
     })
     .unwrap_or_else(|error| panic!("historical dispatch preparation failed: {error}"));
+    request.mode = ResponseDispatchCommitMode::GovernedCommittedExpiredResume;
     let committed = store
         .commit_dispatch(&request)
         .unwrap_or_else(|error| panic!("historical dispatch commit failed: {error}"));

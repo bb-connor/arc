@@ -4154,6 +4154,7 @@ dependencies = [
  "chio-log-redact",
  "chio-manifest",
  "chio-metrics-spec",
+ "chio-quarantine",
  "chio-security-types",
  "chio-settle",
  "chio-store-sqlite",
@@ -4780,6 +4781,7 @@ name = "chio-quarantine"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-kernel",
  "chio-security-types",
  "hex",
  "proptest",

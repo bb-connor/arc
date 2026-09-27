@@ -160,7 +160,7 @@ impl<
                     "previously committed dispatch is missing during recovery".to_owned(),
                 ))
             }
-            Ok(ResponseDispatchLoadOutcome::Missing) => self.commit_fresh_dispatch(request),
+            Ok(ResponseDispatchLoadOutcome::Missing) => self.commit_fresh_dispatch(request, source),
             Err(error) => Err(ActiveResponseExecutorError::OutcomeUnknown(format!(
                 "dispatch lookup failed before idempotency could be established: {error}"
             ))),
@@ -274,9 +274,10 @@ impl<
         })
     }
 
-    fn commit_fresh_dispatch(
+    fn commit_fresh_dispatch<Q: ActiveResponseRequestSource + ?Sized>(
         &self,
         request: ValidatedExecutionRequest,
+        source: &Q,
     ) -> Result<ActiveResponseExecutionEvidence, ActiveResponseExecutorError> {
         let now_unix_ms = self.execution_time_before_commit()?;
         let resumed_after_expiry = now_unix_ms >= request.raw.response_plan.expires_at_unix_ms;
@@ -303,38 +304,10 @@ impl<
                     "active-response execution lease is invalid".to_string(),
                 )
             })?;
-        let executor_authority_id = RecordId::new(self.identity.authority_id()).map_err(|_| {
-            ActiveResponseExecutorError::RejectedBeforeCommit(
-                "active-response executor authority id is invalid".to_string(),
-            )
-        })?;
-        let prepared = prepare_response_dispatch(ResponseDispatchPreparationRequest {
-            plan: request.raw.response_plan.clone(),
-            dispatch_id: request.raw.dispatch_id.clone(),
-            authorization_capability_hash: request.authorization_capability_hash,
-            governed_intent_hash: request.governed_intent_hash,
-            policy_decision_hash: request.policy_decision_hash,
-            executor_authority_id,
-            executor_authority_generation: self.identity.generation(),
-            approval: request.approval.clone(),
-            authorized_at_unix_ms: request.raw.authorized_at_unix_ms,
-            initial_lease: ResponseDispatchLease {
-                lease_owner_id: self.lease_owner_id.clone(),
-                lease_expires_at_unix_ms,
-            },
-            commit_mode: if resumed_after_expiry {
-                ResponseDispatchCommitMode::GovernedCommittedExpiredResume
-            } else if request.raw.origin == ActiveResponseExecutionOrigin::CommittedAdmission {
-                ResponseDispatchCommitMode::GovernedCommittedResume
-            } else {
-                ResponseDispatchCommitMode::Fresh
-            },
-        })
-        .map_err(|error| {
-            ActiveResponseExecutorError::RejectedBeforeCommit(format!(
-                "active-response dispatch preparation failed: {error}"
-            ))
-        })?;
+        let prepared = source.prepare_dispatch(ResponseDispatchLease {
+            lease_owner_id: self.lease_owner_id.clone(),
+            lease_expires_at_unix_ms,
+        }, now_unix_ms)?;
 
         match self.store.commit_dispatch(&prepared) {
             Ok(ResponseDispatchCommitOutcome::Committed(record)) => {

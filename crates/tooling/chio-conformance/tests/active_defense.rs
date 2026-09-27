@@ -38,6 +38,7 @@ use chio_flow::{
     information_label_hash, verify_declassification, DeclassificationVerificationRequest,
     FlowDenial, ResolvedFlowRequest,
 };
+use chio_kernel::{prepare_response_dispatch, ResponseDispatchPreparationRequest};
 use chio_kernel::{
     ChioKernel, Guard, GuardContext, KernelConfig, KernelError, MemoryBudgetConfig,
     NestedFlowBridge, SecurityInvocationContext, SecurityInvocationContextV1, ToolCallRequest,
@@ -45,9 +46,8 @@ use chio_kernel::{
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_quarantine::{
-    build_response_plan, decode_response_record, prepare_response_dispatch,
-    CausalBlastRadiusResolver, CorrelationPolicy, CorrelationStatus, FenceValidationOutcome,
-    ResponseDispatchPreparationRequest, ResponseExecutor, RuleLimits, TemporalCorrelator,
+    build_response_plan, decode_response_record, CausalBlastRadiusResolver, CorrelationPolicy,
+    CorrelationStatus, FenceValidationOutcome, ResponseExecutor, RuleLimits, TemporalCorrelator,
     TemporalRule,
 };
 use chio_security_kernel::{

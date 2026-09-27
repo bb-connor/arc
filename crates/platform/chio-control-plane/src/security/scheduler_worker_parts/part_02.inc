@@ -774,7 +774,7 @@ mod tests {
         })
         .unwrap_or_else(|error| panic!("response plan: {error}"));
         ResponseStateMachine::new(Arc::clone(store))
-            .create(plan)
+            .create(chio_security_types::FreshLiveAdmission::new(plan).unwrap_or_else(|error| panic!("live fixture plan: {error}")))
             .unwrap_or_else(|error| panic!("create plan: {error}"))
     }
 
