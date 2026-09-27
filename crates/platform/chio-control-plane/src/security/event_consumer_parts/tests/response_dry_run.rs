@@ -2,7 +2,7 @@ use super::*;
 use chio_core::PublicKey;
 use chio_security_types::ports::{LineageFenceMaintenanceRequest, ScheduledWork};
 use chio_security_types::ResponsePlan;
-struct DryRunStateSource(Arc<SqliteSecurityStateStore>);
+pub(super) struct DryRunStateSource(pub(super) Arc<SqliteSecurityStateStore>);
 impl chio_security_types::response_simulation::ResponseSimulationSnapshotSource
     for DryRunStateSource
 {
@@ -42,7 +42,7 @@ impl chio_kernel::IndexedSecurityEvidenceStore for DryRunReceiptFailure {
     }
 }
 
-fn dry_run_service(
+pub(super) fn dry_run_service(
     fixture: &RealAdapterFixture,
     failure: Option<bool>,
 ) -> Arc<crate::security::ProductionResponseSimulator> {
@@ -72,7 +72,7 @@ fn dry_run_service(
     )
 }
 
-fn assert_dry_run_untouched(fixture: &RealAdapterFixture) {
+pub(super) fn assert_dry_run_untouched(fixture: &RealAdapterFixture) {
     assert_eq!(fixture.runtime.effects.executions(), 0);
     assert_eq!(real_adapter_mutation_snapshot(&fixture.paths), [0; 5]);
     assert_eq!(
@@ -255,9 +255,9 @@ fn response_dry_run_profile_cannot_prepare_live_dispatch() {
     assert_dry_run_untouched(&fixture);
 }
 
-struct DryRunFixturePolicy {
-    artifacts: AttestedFindingAdmissionArtifacts,
-    authority: PublicKey,
+pub(super) struct DryRunFixturePolicy {
+    pub(super) artifacts: AttestedFindingAdmissionArtifacts,
+    pub(super) authority: PublicKey,
 }
 impl AttestedFindingResponsePolicyPlanner for DryRunFixturePolicy {
     fn ensure_ready(&self) -> PortResult<()> {

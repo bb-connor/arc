@@ -72,62 +72,67 @@ fn build_seccomp_plan(
     architecture: SandboxArchitecture,
     profile: NativeSyscallProfile,
 ) -> Result<SeccompProfilePlan, CageError> {
-    const BASE: &[&str] = &[
-        "brk",
-        "clock_gettime",
-        "close",
-        "execveat",
-        "exit",
-        "exit_group",
-        "faccessat2",
-        "fcntl",
-        "fstat",
-        "futex",
-        "getpid",
-        "getrandom",
-        "gettid",
-        "ioctl",
-        "lseek",
-        "madvise",
-        "mmap",
-        "mprotect",
-        "munmap",
-        "newfstatat",
-        "openat",
-        "openat2",
-        "ppoll",
-        "pread64",
-        "prlimit64",
-        "read",
-        "readlinkat",
-        "rseq",
-        "rt_sigaction",
-        "rt_sigprocmask",
-        "rt_sigreturn",
-        "sched_getaffinity",
-        "sched_yield",
-        "set_robust_list",
-        "set_tid_address",
-        "sigaltstack",
-        "statx",
-        "write",
-        "writev",
+    const BASE: &[Syscall] = &[
+        Syscall::Brk,
+        Syscall::ClockGettime,
+        Syscall::Close,
+        Syscall::Execveat,
+        Syscall::Exit,
+        Syscall::ExitGroup,
+        Syscall::Faccessat2,
+        Syscall::Fcntl,
+        Syscall::Fstat,
+        Syscall::Futex,
+        Syscall::Getpid,
+        Syscall::Getrandom,
+        Syscall::Gettid,
+        Syscall::Ioctl,
+        Syscall::Lseek,
+        Syscall::Madvise,
+        Syscall::Mmap,
+        Syscall::Mprotect,
+        Syscall::Munmap,
+        Syscall::Newfstatat,
+        Syscall::Openat,
+        Syscall::Openat2,
+        Syscall::Ppoll,
+        Syscall::Pread64,
+        Syscall::Prlimit64,
+        Syscall::Read,
+        Syscall::Readlinkat,
+        Syscall::Rseq,
+        Syscall::RtSigaction,
+        Syscall::RtSigprocmask,
+        Syscall::RtSigreturn,
+        Syscall::SchedGetaffinity,
+        Syscall::SchedYield,
+        Syscall::SetRobustList,
+        Syscall::SetTidAddress,
+        Syscall::Sigaltstack,
+        Syscall::Statx,
+        Syscall::Write,
+        Syscall::Writev,
     ];
-    const STANDARD: &[&str] = &[
-        "epoll_create1",
-        "epoll_ctl",
-        "epoll_pwait",
-        "eventfd2",
-        "getcwd",
-        "getdents64",
-        "mremap",
-        "nanosleep",
-        "pipe2",
-        "readv",
-        "restart_syscall",
-        "setitimer",
+    const STANDARD: &[Syscall] = &[
+        Syscall::EpollCreate1,
+        Syscall::EpollCtl,
+        Syscall::EpollPwait,
+        Syscall::Eventfd2,
+        Syscall::Getcwd,
+        Syscall::Getdents64,
+        Syscall::Mremap,
+        Syscall::Nanosleep,
+        Syscall::Pipe2,
+        Syscall::Readv,
+        Syscall::RestartSyscall,
+        Syscall::Setitimer,
     ];
-    const BROKERED: &[&str] = &["recvfrom", "recvmsg", "sendmsg", "sendto"];
+    const BROKERED: &[Syscall] = &[
+        Syscall::Recvfrom,
+        Syscall::Recvmsg,
+        Syscall::Sendmsg,
+        Syscall::Sendto,
+    ];
 
     let mut allowed = BASE.iter().copied().collect::<BTreeSet<_>>();
     if architecture == SandboxArchitecture::X86_64 {
@@ -139,13 +144,13 @@ fn build_seccomp_plan(
         // the same path authority as the allowed *at variants; Landlock
         // continues to enforce every file open against the retained grants.
         allowed.extend([
-            "access",
-            "arch_prctl",
-            "lstat",
-            "open",
-            "poll",
-            "readlink",
-            "stat",
+            Syscall::Access,
+            Syscall::ArchPrctl,
+            Syscall::Lstat,
+            Syscall::Open,
+            Syscall::Poll,
+            Syscall::Readlink,
+            Syscall::Stat,
         ]);
     }
     match profile {
@@ -156,20 +161,8 @@ fn build_seccomp_plan(
             allowed.extend(BROKERED.iter().copied());
         }
     }
-    for forbidden in [
-        "socket",
-        "socketpair",
-        "connect",
-        "bind",
-        "listen",
-        "accept",
-    ] {
-        if allowed.contains(forbidden) {
-            return Err(CageError::UnsafeSyscallProfile(forbidden));
-        }
-    }
     let mut argument_constraints = BTreeMap::from([(
-        "execveat".to_string(),
+        Syscall::Execveat,
         vec![
             SyscallArgumentConstraint {
                 argument_index: 0,
@@ -186,7 +179,7 @@ fn build_seccomp_plan(
     // PID zero selects the calling process. A same-UID peer must never be
     // able to change the kernel's limits through this otherwise useful call.
     argument_constraints.insert(
-        "prlimit64".to_string(),
+        Syscall::Prlimit64,
         vec![SyscallArgumentConstraint {
             argument_index: 0,
             comparison: SeccompArgumentComparison::Equal,
@@ -198,7 +191,7 @@ fn build_seccomp_plan(
         // Permit that one tightening operation, without duplication or clearing
         // flags. The broker profile retains its separate F_GETFD-only contract.
         argument_constraints.insert(
-            "fcntl".to_string(),
+            Syscall::Fcntl,
             vec![
                 SyscallArgumentConstraint {
                     argument_index: 1,
@@ -216,7 +209,7 @@ fn build_seccomp_plan(
     if profile == NativeSyscallProfile::BrokeredNativeV1 {
         for syscall in BROKERED {
             argument_constraints.insert(
-                (*syscall).to_string(),
+                *syscall,
                 vec![SyscallArgumentConstraint {
                     argument_index: 0,
                     comparison: SeccompArgumentComparison::Equal,
@@ -228,7 +221,7 @@ fn build_seccomp_plan(
         // Permit only F_GETFD on the retained broker slot. Duplication, flag
         // mutation, and inspection of every other descriptor remain denied.
         argument_constraints.insert(
-            "fcntl".to_string(),
+            Syscall::Fcntl,
             vec![
                 SyscallArgumentConstraint {
                     argument_index: 0,
@@ -243,13 +236,12 @@ fn build_seccomp_plan(
             ],
         );
     }
-    Ok(SeccompProfilePlan {
+    Ok(SeccompProfilePlan::new(
         architecture,
         profile,
-        default_action: SeccompDefaultAction::KillProcess,
-        allowed_syscalls: allowed.into_iter().map(str::to_string).collect(),
+        allowed.into_iter().collect(),
         argument_constraints,
-    })
+    )?)
 }
 
 fn validate_sha256_hex(value: &str, field: &'static str) -> Result<(), CageError> {
@@ -388,8 +380,8 @@ pub enum CageError {
     DuplicateFdSlot,
     #[error("invalid target executable descriptor binding: {0}")]
     InvalidTargetFdBinding(&'static str),
-    #[error("reviewed seccomp profile unexpectedly allows {0}")]
-    UnsafeSyscallProfile(&'static str),
+    #[error("invalid seccomp plan: {0}")]
+    InvalidSeccompPlan(#[from] SeccompPlanError),
 }
 
 #[cfg(test)]
@@ -566,11 +558,14 @@ mod tests {
                 "listen",
                 "accept",
             ] {
-                assert!(!plan.allowed_syscalls.iter().any(|name| name == forbidden));
+                assert!(!plan
+                    .allowed_syscalls
+                    .iter()
+                    .any(|name| name.as_str() == forbidden));
             }
             assert_eq!(
                 plan.argument_constraints
-                    .get("execveat")
+                    .get(&crate::Syscall::Execveat)
                     .and_then(|constraints| constraints.first())
                     .map(|constraint| constraint.value),
                 Some(u64::from(TARGET_FD_SLOT))

@@ -648,17 +648,6 @@ pub enum SeccompDefaultAction {
     KillProcess,
 }
 
-/// Reviewed architecture-specific syscall plan.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct SeccompProfilePlan {
-    pub architecture: SandboxArchitecture,
-    pub profile: NativeSyscallProfile,
-    pub default_action: SeccompDefaultAction,
-    pub allowed_syscalls: Vec<String>,
-    pub argument_constraints: BTreeMap<String, Vec<SyscallArgumentConstraint>>,
-}
-
 /// Comparison applied to a seccomp syscall argument.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -771,7 +760,7 @@ pub fn validate_cage_target_fd_binding(
     let mut execveat_target_constraints = plan
         .seccomp
         .argument_constraints
-        .get("execveat")
+        .get(&crate::Syscall::Execveat)
         .into_iter()
         .flatten()
         .filter(|constraint| constraint.argument_index == 0);
@@ -1619,7 +1608,6 @@ fn build_environment(
     }
     Ok(environment)
 }
-
 
 fn build_fd_table(
     admitted: &AdmittedManifest,

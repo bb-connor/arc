@@ -66,12 +66,14 @@ async fn serve_async_inner(
         config.authority_keyring_receipt_anchor_root.as_deref(),
     ) {
         (Some(keyring_config), Some(seed_path), Some(receipt_path), Some(anchor_root)) => {
-            let (_, composition) =
-                crate::load_keyring_runtime_from_authority_seed(keyring_config, seed_path)?;
             let receipt_store =
                 SqliteReceiptStore::open_for_finding_pool(receipt_path, anchor_root)?;
             receipt_store.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
-            composition.attach_receipt_store(Arc::new(receipt_store))?;
+            let (_, composition) = crate::load_keyring_runtime_from_authority_seed(
+                keyring_config,
+                seed_path,
+                Arc::new(receipt_store),
+            )?;
             Some(composition)
         }
         (None, None, _, None) => None,
@@ -81,7 +83,7 @@ async fn serve_async_inner(
             ));
         }
     };
-    // A configured keyring becomes the sole seed signing owner. Every legacy
+    // A configured keyring becomes the sole seed signing owner. Every
     // config-only signing helper sees no seed and therefore fails closed.
     let mut config = config;
     if authority_keyring.is_some() {

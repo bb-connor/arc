@@ -357,18 +357,20 @@ fn compile_is_deterministic_and_starts_from_deny_all() {
     assert!(first.plan().landlock.default_filesystem_deny);
     assert_eq!(first.plan().landlock.network_mode, NetworkMode::Blocked);
     assert_eq!(
-        first.plan().seccomp.default_action,
+        first.plan().seccomp.default_action(),
         SeccompDefaultAction::KillProcess
     );
-    let allowed = &first.plan().seccomp.allowed_syscalls;
-    assert!(allowed.iter().any(|name| name == "sched_getaffinity"));
-    assert!(allowed.iter().any(|name| name == "readlinkat"));
+    let allowed = &first.plan().seccomp.allowed_syscalls();
+    assert!(allowed
+        .iter()
+        .any(|name| name.as_str() == "sched_getaffinity"));
+    assert!(allowed.iter().any(|name| name.as_str() == "readlinkat"));
     assert_eq!(
-        allowed.iter().any(|name| name == "readlink"),
-        first.plan().seccomp.architecture == SandboxArchitecture::X86_64
+        allowed.iter().any(|name| name.as_str() == "readlink"),
+        first.plan().seccomp.architecture() == SandboxArchitecture::X86_64
     );
     for denied in ["socket", "connect", "clone", "execve", "getdents64"] {
-        assert!(!allowed.iter().any(|name| name == denied));
+        assert!(!allowed.iter().any(|name| name.as_str() == denied));
     }
     assert_eq!(first.plan().resource_limits.nofile_hard, 192);
     assert_eq!(first.plan().target_fd_slot, 255);
@@ -934,9 +936,9 @@ fn directory_read_grant_is_bounded_to_its_admitted_descendant_inode_closure() {
     assert!(!compiled
         .plan()
         .seccomp
-        .allowed_syscalls
+        .allowed_syscalls()
         .iter()
-        .any(|name| name == "link" || name == "linkat"));
+        .any(|name| name.as_str() == "link" || name.as_str() == "linkat"));
 
     let overflow_tree = TestTree::new();
     let overflow_directory = overflow_tree.root.join("overflow-directory");

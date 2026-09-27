@@ -11,6 +11,8 @@ use chio_store_sqlite::SqliteReceiptStore;
 #[path = "native_keyring_services.rs"]
 mod services;
 use services::{backend, KeyServices};
+#[path = "native_keyring_recovery.rs"]
+mod recovery;
 
 type TestResult<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -29,6 +31,14 @@ pub(super) struct KeyringDelivery {
 
 impl KeyringDelivery {
     pub fn new(directory: &Path, caller: &PublicKey) -> TestResult<Self> {
+        Self::new_with_interruption(directory, caller, false)
+    }
+
+    fn new_with_interruption(
+        directory: &Path,
+        caller: &PublicKey,
+        interrupted: bool,
+    ) -> TestResult<Self> {
         let directory = fs::canonicalize(directory)?.join("keyring");
         fs::create_dir(&directory)?;
         fs::set_permissions(&directory, fs::Permissions::from_mode(0o700))?;
@@ -105,7 +115,7 @@ impl KeyringDelivery {
         let config_path = directory.join("runtime.json");
         write_private(&config_path, &canonical_json_bytes(&config)?);
         let started = Instant::now();
-        let runtime = loop {
+        let mut runtime = loop {
             match chio_control_plane::load_keyring_runtime_composition(&active, &config_path) {
                 Ok(runtime) => break runtime,
                 Err(error) if started.elapsed() >= Duration::from_secs(10) => {
@@ -114,8 +124,16 @@ impl KeyringDelivery {
                 Err(_) => thread::sleep(Duration::from_millis(20)),
             }
         };
-        let readiness = runtime.startup_readiness()?;
-        assert_eq!(readiness.durable_storage_identities.len(), 5);
+        let not_ready = runtime
+            .startup_readiness()
+            .err()
+            .ok_or("startup accepted an absent receipt sink")?;
+        assert!(
+            not_ready
+                .to_string()
+                .contains("readiness requires an attached normal receipt store"),
+            "{not_ready}"
+        );
         let receipt_anchors = tempfile::Builder::new()
             .prefix("chio-native-keyring-anchors-")
             .tempdir_in("/dev/shm")?;
@@ -124,7 +142,18 @@ impl KeyringDelivery {
             receipt_anchors.path(),
         )?);
         receipts.wait_for_writer_ready(Duration::from_secs(30))?;
+        let receipts = Arc::new(recovery::ReceiptFailure {
+            inner: receipts,
+            fail_active: AtomicBool::new(interrupted),
+        });
         runtime.attach_receipt_store(receipts.clone())?;
+        assert_eq!(
+            runtime
+                .startup_readiness()?
+                .durable_storage_identities
+                .len(),
+            5
+        );
         let issuer = runtime.capability_authority()?;
         let parent =
             issuer.issue_capability_with_aggregate_budget(caller, host::parent_scope(), 300, 1)?;
@@ -140,19 +169,54 @@ impl KeyringDelivery {
             .time_anchor
             .as_ref()
             .ok_or("parent issuance has no trusted time")?;
-        assert!(verifier
+        let rejection = verifier
             .verify_artifact_signing_evidence(&bytes, &evidence.evidence, anchor)
-            .is_err());
+            .err()
+            .ok_or("invalid signing evidence accepted")?;
+        assert!(
+            matches!(
+                rejection,
+                chio_keyring::KeyringError::InvalidCheckpoint(
+                    "synchronization ranges are not contiguous"
+                )
+            ),
+            "{rejection}"
+        );
         verifier.apply_sync(&runtime.key_log_synchronization_response(None)?)?;
         verifier.verify_artifact_signing_evidence(&bytes, &evidence.evidence, anchor)?;
         let base = verifier.pin()?.ok_or("receiver genesis pin absent")?;
-        let (rotated, rotation) = runtime.rotate_remote_authority_seed(&seed_path)?;
+        drop(issuer);
+        let (rotated, rotation) = if interrupted {
+            runtime = recovery::interrupt_and_resume(
+                runtime,
+                &mut services,
+                &directory,
+                &config_path,
+                &seed_path,
+                receipts.clone(),
+            )?;
+            // Completion is read back from the same already activated rotation.
+            let status = runtime.authority_status()?;
+            let outcome = chio_keyring::WitnessedRotationOutcome {
+                checkpoint_hash: status
+                    .operator_head
+                    .as_ref()
+                    .ok_or("recovered head missing")?
+                    .checkpoint_hash,
+                signing_epoch: status.signing_epoch,
+                audit_pin: status.operator_head.ok_or("recovered pin missing")?,
+            };
+            (status.public_key, outcome)
+        } else {
+            runtime.rotate_remote_authority_seed(&seed_path)?
+        };
         assert_ne!(rotated, parent.issuer);
         assert_eq!(rotation.signing_epoch, 1);
         let sync = runtime.key_log_synchronization_response(Some(&base))?;
         verifier.apply_sync(&sync)?;
         assert_eq!(verifier.pin()?, Some(rotation.audit_pin));
         verifier.verify_artifact_signing_evidence(&bytes, &evidence.evidence, anchor)?;
+        let issuer = runtime.capability_authority()?;
         let new_capability =
             issuer.issue_capability_with_aggregate_budget(caller, host::parent_scope(), 300, 1)?;
         assert_eq!(new_capability.issuer, rotated);
@@ -166,17 +230,42 @@ impl KeyringDelivery {
             &new_evidence.evidence,
             new_anchor,
         )?;
-        assert!(verifier
+        let rejection = verifier
             .verify_artifact_signing_evidence(&bytes, &evidence.evidence, new_anchor)
-            .is_err());
+            .err()
+            .ok_or("invalid signing evidence accepted")?;
+        assert!(
+            matches!(
+                rejection,
+                chio_keyring::KeyringError::InvalidArtifactTimeEvidence
+            ),
+            "{rejection}"
+        );
         let mut forged = evidence.evidence.clone();
         forged.signing_epoch = 1;
-        assert!(verifier
+        let rejection = verifier
             .verify_artifact_signing_evidence(&bytes, &forged, anchor)
-            .is_err());
+            .err()
+            .ok_or("invalid signing evidence accepted")?;
+        assert!(
+            matches!(
+                rejection,
+                chio_keyring::KeyringError::InvalidArtifactTimeEvidence
+            ),
+            "{rejection}"
+        );
         let mut missing = parent.clone();
         missing.id.push_str("-without-issuance-evidence");
-        assert!(runtime.capability_signing_evidence(&missing).is_err());
+        let rejection = runtime
+            .capability_signing_evidence(&missing)
+            .err()
+            .ok_or("missing signing evidence accepted")?;
+        assert!(
+            rejection
+                .to_string()
+                .contains("trusted artifact-time evidence is invalid"),
+            "{rejection}"
+        );
         drop(issuer);
         drop(runtime);
         let stale = chio_control_plane::load_keyring_runtime_composition(&active, &config_path);
@@ -190,10 +279,12 @@ impl KeyringDelivery {
                 .contains("active backend does not match durable key selector"),
             "{error}"
         );
-        let (recovered, runtime) =
-            chio_control_plane::load_keyring_runtime_from_authority_seed(&config_path, &seed_path)?;
+        let (recovered, runtime) = chio_control_plane::load_keyring_runtime_from_authority_seed(
+            &config_path,
+            &seed_path,
+            receipts,
+        )?;
         assert_eq!(recovered.public_key(), rotated);
-        runtime.attach_receipt_store(receipts)?;
         Ok(Self {
             parent,
             runtime: Some(runtime),
@@ -254,16 +345,16 @@ impl KeyringDelivery {
 
     pub fn rotate_process_host_authority(&self, original: &CapabilityToken) -> TestResult {
         assert!(self.runtime.is_none(), "the host must own the selector");
-        let (_, runtime) = chio_control_plane::load_keyring_runtime_from_authority_seed(
-            &self.config_path,
-            &self.seed_path,
-        )?;
         let receipts = Arc::new(SqliteReceiptStore::open_for_finding_pool(
             self.config_path.with_file_name("key-receipts.sqlite3"),
             self._receipt_anchors.path(),
         )?);
         receipts.wait_for_writer_ready(Duration::from_secs(30))?;
-        runtime.attach_receipt_store(receipts)?;
+        let (_, runtime) = chio_control_plane::load_keyring_runtime_from_authority_seed(
+            &self.config_path,
+            &self.seed_path,
+            receipts,
+        )?;
         let (rotated, _) = runtime.rotate_remote_authority_seed(&self.seed_path)?;
         assert_ne!(rotated, original.issuer);
         let verifier = SqlitePinnedKeyLogVerifier::open(

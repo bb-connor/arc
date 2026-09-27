@@ -5,19 +5,14 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
-const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_RESPONSE_LINE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_STDERR_BYTES: usize = 64 * 1024;
 
-pub(super) fn exchange(stdin: File, stdout: File, stderr: File) -> Result<Value, String> {
-    exchange_with_timeout(stdin, stdout, stderr, DISCOVERY_TIMEOUT)
-}
-
-fn exchange_with_timeout(
+pub(super) fn exchange_until(
     mut stdin: File,
     mut stdout: File,
     mut stderr: File,
-    timeout: Duration,
+    deadline: Instant,
 ) -> Result<Value, String> {
     for pipe in [&stdin, &stdout, &stderr] {
         // SAFETY: each borrowed FD remains open and owned by this function.
@@ -51,12 +46,11 @@ fn exchange_with_timeout(
     let mut sent = 0;
     let mut line = Vec::new();
     let mut diagnostic = Vec::new();
-    let deadline = Instant::now() + timeout;
     let outcome = loop {
         if Instant::now() >= deadline {
-            break Err(format!(
-                "the target did not answer tools/list within {timeout:?}"
-            ));
+            break Err(
+                "the target did not answer tools/list before the discovery deadline".to_string(),
+            );
         }
         if sent < request.len() {
             match stdin.write(&request[sent..]) {
@@ -114,7 +108,7 @@ fn exchange_with_timeout(
                 }
             }
             Err(error) if retryable(&error) => {
-                // No reader thread can outlive the deadline, even if a legacy
+                // No reader thread can outlive the deadline, even if a demo
                 // descendant retains a pipe after its parent exits.
                 std::thread::sleep(Duration::from_millis(5));
             }
@@ -186,14 +180,34 @@ mod tests {
         let (stdout, _descendant_stdout) = UnixStream::pair()?;
         let (stderr, _descendant_stderr) = UnixStream::pair()?;
         let started = Instant::now();
-        let outcome = exchange_with_timeout(
+        let outcome = exchange_until(
             File::from(OwnedFd::from(stdin)),
             File::from(OwnedFd::from(stdout)),
             File::from(OwnedFd::from(stderr)),
-            Duration::from_millis(20),
+            started + Duration::from_millis(20),
         );
-        assert!(outcome.is_err());
+        assert!(
+            matches!(outcome, Err(ref error) if error.contains("discovery deadline")),
+            "{outcome:?}"
+        );
         assert!(started.elapsed() < Duration::from_secs(2));
+        Ok(())
+    }
+    #[test]
+    fn expired_launch_deadline_is_not_reset_for_the_mcp_handshake() -> std::io::Result<()> {
+        let (stdin, _input) = UnixStream::pair()?;
+        let (stdout, _output) = UnixStream::pair()?;
+        let (stderr, _error) = UnixStream::pair()?;
+        let outcome = exchange_until(
+            File::from(OwnedFd::from(stdin)),
+            File::from(OwnedFd::from(stdout)),
+            File::from(OwnedFd::from(stderr)),
+            Instant::now(),
+        );
+        assert!(
+            matches!(outcome, Err(ref error) if error.contains("discovery deadline")),
+            "{outcome:?}"
+        );
         Ok(())
     }
 }

@@ -224,6 +224,8 @@ if [[ "$args" == *" --all-targets "* ]] ||
     landlock_denies_symlink_traversal_escape
     default_deny_blocks_ipv4_and_ipv6_connect_and_bind
     default_deny_blocks_unreviewed_syscall
+    seccomp_kills_x32_syscall_alias
+    seccomp_kills_foreign_architecture_syscall
     target_receives_no_parent_secret_or_loader_injection_environment
     default_deny_blocks_undeclared_executable_path
   )
@@ -255,6 +257,10 @@ if [[ "$args" == *" --all-targets "* ]] ||
       child_reaper_start_failure_reaps_synchronously
       child_supervisor_retries_sigkill_until_reaped
       constrained_exec_filter_fails_closed
+      construction_rejects_constraints_for_unlisted_syscalls
+      construction_rejects_unconfined_limits_and_invalid_arguments
+      launch_revalidates_unlisted_constraint_keys
+      wire_decode_uses_the_same_plan_validator_and_closed_syscall_keys
       descriptor_purpose_rejects_unknown_nested_fields
       environment_is_minimal_and_credentials_fail_closed
       every_syscall_profile_is_default_deny_and_has_no_network_creation
@@ -383,7 +389,7 @@ if [[ "$status" -ne 0 ]]; then
   cat "$work/1-success.out" >&2
   exit "$status"
 fi
-grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=72 probes=27 mutations=10$' \
+grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=78 probes=29 mutations=10$' \
   "$work/1-success.out"
 
 python3 scripts/tests/check-cage-all-target-inventory.test.py

@@ -19,6 +19,8 @@ mod launch;
 #[cfg(target_os = "linux")]
 mod linux;
 mod receipt;
+mod seccomp_plan;
+pub use seccomp_plan::{SeccompPlanError, SeccompProfilePlan, Syscall};
 
 pub use execution_identity::{
     validate_cage_execution_identity_binding, ExecutionIdentity, MAX_SUPPLEMENTARY_GIDS,

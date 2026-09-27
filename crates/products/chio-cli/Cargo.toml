@@ -142,6 +142,7 @@ tempfile = "3"
 wiremock = "0.6"
 
 [features]
+real-linux-enforcement = ["chio-cage/real-linux-enforcement"]
 tee-quotes = ["chio-attest-verify/tee-quotes"]
 # Default-OFF. Gating iroh out of the shipped `chio` binary shrinks its size and
 # supply-chain surface (for example the iroh -> netwatch -> netdev -> plist -> quick-xml
@@ -152,3 +153,8 @@ tee-quotes = ["chio-attest-verify/tee-quotes"]
 iroh = ["dep:chio-federation-transport-iroh", "dep:iroh"]
 [lints]
 workspace = true
+
+[[test]]
+name = "enforced_discovery"
+path = "tests/enforced_discovery.rs"
+required-features = ["real-linux-enforcement"]

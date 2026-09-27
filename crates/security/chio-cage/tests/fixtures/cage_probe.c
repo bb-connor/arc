@@ -407,6 +407,24 @@ __attribute__((noreturn, used)) void probe_start(long *initial_stack) {
     invoke(SYS_TGKILL, peer, peer, 0, 0);
 #endif
     terminate(135);
+#elif PROBE_MODE == 32
+#if defined(__x86_64__)
+    // The low syscall number (read) is allowed. The x32 ABI bit must kill it.
+    invoke(0x40000000L | SYS_READ, -1, 0, 0, 0);
+    terminate(136);
+#else
+#error x32 probe requires x86_64
+#endif
+#elif PROBE_MODE == 33
+#if defined(__x86_64__)
+    // int 0x80 enters the i386 ABI. Syscall 3 is read there and close in x86_64;
+    // both low numbers are allowed, so only the architecture guard denies it.
+    long result;
+    __asm__ volatile("int $0x80" : "=a"(result) : "a"(3), "b"(-1), "c"(0), "d"(0) : "memory");
+    terminate(137);
+#else
+#error foreign architecture probe requires x86_64
+#endif
 #else
 #error invalid probe mode
 #endif

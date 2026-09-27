@@ -67,13 +67,22 @@ impl HostKeyring {
 
     pub fn open(config: &Config, directory: &Path, initializing: bool) -> Result<Self, CliError> {
         config.validate()?;
+        // Preserve the original audit signer. These authority receipts cannot
+        // enter the kernel's single-signer call checkpoint stream.
+        let receipts = Arc::new(
+            chio_store_sqlite::SqliteReceiptStore::open_for_finding_pool(
+                directory.join("keyring-receipts.db"),
+                &config.receipt_anchor_directory,
+            )?,
+        );
+        receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
         // This loader completes an existing rotation handoff or refuses a stale
         // seed. Never replace governed signing with the host's receipt key.
         let (_, runtime) = chio_control_plane::load_keyring_runtime_from_authority_seed(
             &config.runtime_config,
             &config.authority_seed_file,
+            receipts,
         )?;
-        runtime.startup_readiness()?;
         let path = directory.join("keylog-verifier.db");
         let verifier = if initializing {
             SqlitePinnedKeyLogVerifier::provision(
@@ -93,16 +102,6 @@ impl HostKeyring {
         verifier
             .apply_sync(&runtime.key_log_synchronization_response(base.as_ref())?)
             .map_err(error)?;
-        // Preserve the original audit signer. These authority receipts cannot
-        // enter the kernel's single-signer call checkpoint stream.
-        let receipts = Arc::new(
-            chio_store_sqlite::SqliteReceiptStore::open_for_finding_pool(
-                directory.join("keyring-receipts.db"),
-                &config.receipt_anchor_directory,
-            )?,
-        );
-        receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
-        runtime.attach_receipt_store(receipts)?;
         Ok(Self { runtime, verifier })
     }
 

@@ -131,9 +131,12 @@ fn close_unnamed_descriptors(plan: &CageInitPlan) -> Result<(), BootstrapFault> 
 }
 
 fn seccomp_profile_is_fail_closed(plan: &crate::SeccompProfilePlan) -> bool {
-    plan.default_action == SeccompDefaultAction::KillProcess
-        && !plan.allowed_syscalls.iter().any(|name| name == "socket")
+    plan.validate().is_ok()
 }
+
+#[cfg(test)]
+#[path = "linux_parts/seccomp_validation_tests.rs"]
+mod seccomp_validation_tests;
 '''
     if entrypoint and entrypoint != expected_entrypoint:
         errors.append("chio-cage Linux launcher module inventory is invalid")
@@ -161,6 +164,7 @@ include!(concat!(
         for path in section_paths
     ]
     expected_files = {path.relative_to(launcher_root) for path in [*part_paths, *section_paths]}
+    expected_files.add(Path("linux_parts/seccomp_validation_tests.rs"))
     actual_files = {
         path.relative_to(launcher_root)
         for path in (launcher_root / "linux_parts").rglob("*")

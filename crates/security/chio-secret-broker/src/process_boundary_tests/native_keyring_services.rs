@@ -110,6 +110,22 @@ impl KeyServices {
         Ok(services)
     }
 
+    pub(super) fn stop_auditor(&mut self, index: usize) {
+        self._children[3 + index].kill_and_output();
+    }
+
+    pub(super) fn restart_auditor(&mut self, directory: &Path, index: usize) -> TestResult {
+        let socket = directory.join(format!("audit-{index}.sock"));
+        if socket.try_exists()? {
+            fs::remove_file(socket)?;
+        }
+        self._children[3 + index] = spawn_service(
+            "CHIO_KEYLOG_AUDIT",
+            &directory.join(format!("audit-{index}.json")),
+        )?;
+        Ok(())
+    }
+
     pub fn start_auditors(&mut self, directory: &Path) -> TestResult {
         for index in 0..2_u8 {
             let identifier = format!("audit.{index}");

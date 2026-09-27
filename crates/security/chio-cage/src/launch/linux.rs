@@ -26,22 +26,9 @@ fn close_unnamed_descriptors(plan: &CageInitPlan) -> Result<(), BootstrapFault> 
 }
 
 fn seccomp_profile_is_fail_closed(plan: &crate::SeccompProfilePlan) -> bool {
-    plan.default_action == SeccompDefaultAction::KillProcess
-        && !plan.allowed_syscalls.iter().any(|name| {
-            matches!(
-                name.as_str(),
-                "socket" | "kill" | "tkill" | "tgkill" | "pidfd_send_signal"
-            )
-        })
-        && (!plan.allowed_syscalls.iter().any(|name| name == "prlimit64")
-            || plan
-                .argument_constraints
-                .get("prlimit64")
-                .is_some_and(|constraints| {
-                    constraints.iter().any(|constraint| {
-                        constraint.argument_index == 0
-                            && constraint.comparison == SeccompArgumentComparison::Equal
-                            && constraint.value == 0
-                    })
-                }))
+    plan.validate().is_ok()
 }
+
+#[cfg(test)]
+#[path = "linux_parts/seccomp_validation_tests.rs"]
+mod seccomp_validation_tests;

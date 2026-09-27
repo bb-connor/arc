@@ -487,7 +487,7 @@ pub(super) fn validate_cage_target_fd_binding_production_paths(
             let constraint = plan
                 .seccomp
                 .argument_constraints
-                .get_mut("execveat")
+                .get_mut(&crate::Syscall::Execveat)
                 .and_then(|constraints| {
                     constraints
                         .iter_mut()
@@ -1065,7 +1065,7 @@ fn compile_seccomp_filter(
                 "seccomp_duplicate",
             ));
         }
-        let number = i64::from(syscall_number(current, name).ok_or_else(|| {
+        let number = i64::from(syscall_number(current, name.as_str()).ok_or_else(|| {
             CageLaunchError::bootstrap_failed(
                 CageEnforcementFailureCode::SeccompArchitectureMismatch,
                 "seccomp_syscall",

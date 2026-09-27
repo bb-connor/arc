@@ -43,6 +43,7 @@ make_fixture() {
     "$root/crates/security/chio-cage/src/launch/"
   cp "$REPO_ROOT/crates/security/chio-cage/src/launch/linux_parts/part_01.rs" \
     "$REPO_ROOT/crates/security/chio-cage/src/launch/linux_parts/part_02.rs" \
+    "$REPO_ROOT/crates/security/chio-cage/src/launch/linux_parts/seccomp_validation_tests.rs" \
     "$root/crates/security/chio-cage/src/launch/linux_parts/"
   cp "$REPO_ROOT/crates/security/chio-cage/src/launch/linux_parts/part_01_sections/bootstrap.inc" \
     "$REPO_ROOT/crates/security/chio-cage/src/launch/linux_parts/part_01_sections/sandbox.inc" \

@@ -30,7 +30,6 @@ pub struct KeyringRuntimeComposition {
     store: Arc<chio_keyring::SqliteKeyLogStore>,
     independent_services: Arc<chio_keyring::IndependentKeyLogServices>,
     rotation_runtime: Arc<chio_keyring::WitnessedRotationRuntime>,
-    startup_readiness: chio_keyring::IndependentOperationReadiness,
     migration_binding: KeyLogMigrationBinding,
     authority_backend: Arc<MigrationGuardedSigningBackend>,
     operator_backend: Arc<dyn SigningBackend>,
@@ -250,11 +249,76 @@ impl KeyringRuntimeComposition {
         })
     }
 
+    /// Revalidate the current durable head, independent services and receipt completion.
     pub fn startup_readiness(
         &self,
-    ) -> Result<&chio_keyring::IndependentOperationReadiness, CliError> {
+    ) -> Result<chio_keyring::IndependentOperationReadiness, CliError> {
+        let _rotation = self.authority_rotation_lock.lock().map_err(|_| {
+            CliError::cli_other_error("authority rotation lock is unavailable".to_string())
+        })?;
         self.require_key_log_verification()?;
-        Ok(&self.startup_readiness)
+        let receipts = self
+            .receipt_store
+            .lock()
+            .map_err(|_| {
+                CliError::cli_other_error(
+                    "keyring receipt-store attachment lock is unavailable".to_string(),
+                )
+            })?
+            .clone()
+            .ok_or_else(|| {
+                CliError::cli_other_error(
+                    "keyring readiness requires an attached normal receipt store".to_string(),
+                )
+            })?;
+        let head = self
+            .store
+            .head_pin()
+            .map_err(|e| CliError::cli_other_error(e.to_string()))?
+            .ok_or_else(|| CliError::cli_other_error("keyring has no durable head".to_string()))?;
+        match self
+            .store
+            .head_stage()
+            .map_err(|e| CliError::cli_other_error(e.to_string()))?
+        {
+            Some(chio_keyring::CheckpointStage::Activated) => {
+                self.current_rotation_outcome()?;
+            }
+            Some(chio_keyring::CheckpointStage::Witnessed)
+                if head.signing_epoch == 0 && head.checkpoint_sequence == 0 => {}
+            _ => {
+                return Err(CliError::cli_other_error(
+                    "keyring rotation is not complete".to_string(),
+                ))
+            }
+        }
+        self.forward_enterprise_receipts(receipts.store.as_ref())?;
+        let readiness = self
+            .independent_services
+            .refresh_readiness(&self.store.policy_clone(), &head, &head)
+            .map_err(|e| CliError::cli_other_error(e.to_string()))?;
+        if readiness
+            .durable_storage_identities
+            .contains(&self.store.storage_identity())
+        {
+            return Err(CliError::cli_other_error(
+                "operator, witnesses, and auditors must use independently durable storage"
+                    .to_string(),
+            ));
+        }
+        if self
+            .store
+            .head_pin()
+            .map_err(|e| CliError::cli_other_error(e.to_string()))?
+            .as_ref()
+            != Some(&head)
+        {
+            return Err(CliError::cli_other_error(
+                "key log changed during readiness verification".to_string(),
+            ));
+        }
+        self.require_key_log_verification()?;
+        Ok(readiness)
     }
 
     pub fn attach_receipt_store(
@@ -985,7 +1049,6 @@ pub fn load_keyring_runtime_composition(
         store,
         independent_services,
         rotation_runtime,
-        startup_readiness,
         migration_binding,
         authority_backend,
         operator_backend,
@@ -1143,12 +1206,26 @@ pub fn keyring_pending_authority_seed_path(active_seed_path: &Path) -> PathBuf {
 pub fn load_keyring_runtime_from_authority_seed(
     config_path: &Path,
     active_seed_path: &Path,
+    receipt_store: Arc<dyn chio_kernel::ReceiptStore>,
 ) -> Result<(Keypair, KeyringRuntimeComposition), CliError> {
     let (active, active_identity) =
         load_existing_authority_keypair_with_identity(active_seed_path)?;
     match load_keyring_runtime_composition(&active, config_path) {
         Ok(composition) => {
+            composition.attach_receipt_store(Arc::clone(&receipt_store))?;
             cleanup_completed_authority_seed_handoff(active_seed_path, &active, &composition)?;
+            // Resume only the already persisted handoff. Startup never invents a rotation.
+            let active = if load_optional_authority_seed_handoff(
+                &keyring_pending_authority_seed_path(active_seed_path),
+            )?
+            .is_some()
+            {
+                composition.rotate_remote_authority_seed(active_seed_path)?;
+                load_existing_authority_keypair_with_identity(active_seed_path)?.0
+            } else {
+                active
+            };
+            composition.startup_readiness()?;
             Ok((active, composition))
         }
         Err(active_error) => {
@@ -1161,6 +1238,7 @@ pub fn load_keyring_runtime_from_authority_seed(
             handoff.validate_keypair(&recovered)?;
             match load_keyring_runtime_composition(&recovered, config_path) {
                 Ok(composition) => {
+                    composition.attach_receipt_store(receipt_store)?;
                     composition.require_key_log_verification()?;
                     let state = composition
                         .store
@@ -1183,7 +1261,7 @@ pub fn load_keyring_runtime_from_authority_seed(
                         return Err(active_error);
                     }
                     composition.require_key_log_verification()?;
-                    composition.current_rotation_outcome()?;
+                    composition.startup_readiness()?;
                     write_authority_seed_file_bound(
                         active_seed_path,
                         &recovered,

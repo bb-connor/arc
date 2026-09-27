@@ -1487,3 +1487,6 @@
 
     #[path = "tests/response_dry_run.rs"]
     mod response_dry_run;
+    #[cfg(unix)]
+    #[path = "tests/response_process_recovery.rs"]
+    mod response_process_recovery;

@@ -383,13 +383,18 @@ and a recorded reason, and the new simulation report is not the first exception.
 
 **Owner:** the native x86_64 enforcement lane in parent Packet 2.
 
-- [ ] Add one native probe asserting that a syscall issued under a foreign
+- [x] Add one native probe asserting that a syscall issued under a foreign
       architecture or with the `__X32_SYSCALL_BIT` set is killed, not permitted.
       Architecture validation is currently delegated entirely to `seccompiler`'s
       BPF prologue and is untested locally, so a dependency upgrade that changed
       prologue behavior would pass CI.
-- [ ] Add the probe to the mandatory native inventory count so it cannot be
+- [x] Add the probe to the mandatory native inventory count so it cannot be
       silently dropped.
+
+**Implementation checkpoint (2026-09-27):** Separate x32 and i386-ABI probes are in
+the mandatory 78-case cage inventory (29 real enforcement cases). Both compile
+for x86_64; privileged native execution remains pending. See the
+[Packet 2 execution record](../../reviews/2026-09-27-runtime-boundary-execution.md).
 
 **Exit:** The arch boundary is asserted by this repository, not assumed from a
 dependency.
@@ -408,26 +413,32 @@ compile time or construction time, and remove the test helper's string drift. Be
 with the cage work in parent Packet 2. The map is built once per launch, so it must
 not be justified as an optimization either.
 
-- [ ] Key `argument_constraints` by a closed `Syscall` type or the numeric syscall
+- [x] Key `argument_constraints` by a closed `Syscall` type or the numeric syscall
       id so a nonexistent name cannot be expressed. If the string key must persist
       for serialization, keep it only at the wire boundary.
-- [ ] Keep the launch-time subset check at `sandbox.inc:1086-1094` exactly as it
+- [x] Keep the launch-time subset check at `sandbox.inc:1086-1094` exactly as it
       is. Add the same check at plan construction so a bad plan fails when built,
       not when launched, and so one validator owns both that rule and the
       `prlimit64` constraint-removal refusal.
-- [ ] Replace the literal `argument_constraints.remove("prlimit64")` at
+- [x] Replace the literal `argument_constraints.remove("prlimit64")` at
       `launch/linux_parts/part_02.rs:1398` with the same typed key, so an insertion
       and a removal cannot drift and silently no-op.
-- [ ] Add the negative test: a plan carrying a constraint for a syscall that is not
+- [x] Add the negative test: a plan carrying a constraint for a syscall that is not
       in the allowed set is refused, asserting the specific rejection variant from
       correction 1D.
-- [ ] Add the construction-time negative test: a plan with a constraint for an
+- [x] Add the construction-time negative test: a plan with a constraint for an
       unlisted syscall is refused at build. The launch-time refusal already exists;
       `sandbox.inc:1077` compiling absent constraints as an unconditional allowance
       is unreachable for a misspelled key because `:1086` refuses the plan first.
 
 **Exit:** A misspelled or stale constraint key is a compile error or a
 construction-time rejection. (It is already a launch-time rejection.)
+
+**Implementation checkpoint (2026-09-27):** `SeccompProfilePlan` has validating
+construction and deserialization, a closed syscall vocabulary and private
+external fields. Construction and launch share validation; launch retains its
+additional subset check. The construction tests execute on aarch64; the added
+launch regression typechecks there and requires x86_64 to execute.
 
 ---
 

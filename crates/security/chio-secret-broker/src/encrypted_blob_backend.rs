@@ -601,3 +601,7 @@ mod tests {
         .is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "credential_dispatch_tests.rs"]
+mod dispatch_tests;

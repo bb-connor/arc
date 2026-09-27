@@ -60,7 +60,7 @@ else
 fi
 crate="$root/crates/security/chio-cage"
 
-for mode in $(seq 1 31); do
+for mode in $(seq 1 33); do
   if [[ "$mode" == 10 ]]; then
     continue
   fi
@@ -139,6 +139,8 @@ export CHIO_CAGE_TEST_CONNECT_IPV4="$probe_dir/probe-18"
 export CHIO_CAGE_TEST_BIND_IPV4="$probe_dir/probe-19"
 export CHIO_CAGE_TEST_CONNECT_IPV6="$probe_dir/probe-20"
 export CHIO_CAGE_TEST_BIND_IPV6="$probe_dir/probe-21"
+export CHIO_CAGE_TEST_X32="$probe_dir/probe-32"
+export CHIO_CAGE_TEST_FOREIGN_ARCH="$probe_dir/probe-33"
 export CHIO_CAGE_TEST_FORBIDDEN_SYSCALL="$probe_dir/probe-22"
 export CHIO_CAGE_TEST_ENVIRONMENT="$probe_dir/probe-23"
 export CHIO_CAGE_TEST_UNDECLARED_EXEC="$probe_dir/probe-24"
@@ -227,8 +229,8 @@ python3 -I "$inventory_checker" \
   --root "$root" \
   --run-output "$all_targets_output"
 all_targets_passed="$(passed_total "$all_targets_output")"
-if [[ "$all_targets_passed" -ne 72 ]]; then
-  echo "real-Linux all-target cage lane did not execute exactly 72 tests" >&2
+if [[ "$all_targets_passed" -ne 78 ]]; then
+  echo "real-Linux all-target cage lane did not execute exactly 78 tests" >&2
   exit 1
 fi
 
@@ -272,6 +274,8 @@ expected_probes=(
   landlock_denies_symlink_traversal_escape
   default_deny_blocks_ipv4_and_ipv6_connect_and_bind
   default_deny_blocks_unreviewed_syscall
+  seccomp_kills_x32_syscall_alias
+  seccomp_kills_foreign_architecture_syscall
   target_receives_no_parent_secret_or_loader_injection_environment
   default_deny_blocks_undeclared_executable_path
 )

@@ -627,7 +627,11 @@ mod stdio_tests {
                 architecture: SandboxArchitecture::X86_64,
                 profile: chio_manifest::NativeSyscallProfile::NativeMinimalV1,
                 default_action: SeccompDefaultAction::KillProcess,
-                allowed_syscalls: vec!["read".into(), "write".into(), "exit".into()],
+                allowed_syscalls: vec![
+                    crate::Syscall::Read,
+                    crate::Syscall::Write,
+                    crate::Syscall::Exit,
+                ],
                 argument_constraints: std::collections::BTreeMap::new(),
             },
             resource_limits: crate::ResourceLimitPlan {
@@ -1329,12 +1333,12 @@ mod tests {
             architecture: SandboxArchitecture::X86_64,
             profile: chio_manifest::NativeSyscallProfile::NativeMinimalV1,
             default_action: SeccompDefaultAction::KillProcess,
-            allowed_syscalls: vec!["socket".to_string()],
+            allowed_syscalls: vec![crate::Syscall::Socket],
             argument_constraints: BTreeMap::new(),
         };
 
         assert!(!seccomp_profile_is_fail_closed(&plan));
-        plan.allowed_syscalls = vec!["read".to_string()];
+        plan.allowed_syscalls = vec![crate::Syscall::Read];
         assert!(seccomp_profile_is_fail_closed(&plan));
     }
 
@@ -1343,7 +1347,7 @@ mod tests {
     fn constrained_exec_filter_fails_closed() {
         let mut argument_constraints = BTreeMap::new();
         argument_constraints.insert(
-            "execveat".to_string(),
+            crate::Syscall::Execveat,
             vec![
                 SyscallArgumentConstraint {
                     argument_index: 0,
@@ -1361,7 +1365,7 @@ mod tests {
             architecture: SandboxArchitecture::current().test_expect("supported test architecture"),
             profile: chio_manifest::NativeSyscallProfile::NativeMinimalV1,
             default_action: SeccompDefaultAction::KillProcess,
-            allowed_syscalls: vec!["execveat".to_string()],
+            allowed_syscalls: vec![crate::Syscall::Execveat],
             argument_constraints,
         };
         let constrained = compile_seccomp_filter(&plan).test_expect("valid constrained filter");
@@ -1369,7 +1373,7 @@ mod tests {
         let constrained_digest = filter_digest(&constrained).test_expect("filter digest");
 
         plan.argument_constraints
-            .get_mut("execveat")
+            .get_mut(&crate::Syscall::Execveat)
             .test_expect("execveat constraint")[0]
             .value = (TARGET_FD - 1) as u64;
         let mutated = compile_seccomp_filter(&plan).test_expect("valid mutated filter");
@@ -1395,17 +1399,24 @@ mod tests {
             compile_seccomp_filter(&plan).test_expect("self-only profile compiles");
 
             let mut unconfined_limits = plan.clone();
-            unconfined_limits.argument_constraints.remove("prlimit64");
+            unconfined_limits
+                .argument_constraints
+                .remove(&crate::Syscall::Prlimit64);
             assert!(!seccomp_profile_is_fail_closed(&unconfined_limits));
-            for signal in ["kill", "tkill", "tgkill", "pidfd_send_signal"] {
+            for signal in [
+                crate::Syscall::Kill,
+                crate::Syscall::Tkill,
+                crate::Syscall::Tgkill,
+                crate::Syscall::PidfdSendSignal,
+            ] {
                 let mut peer_signals = plan.clone();
-                peer_signals.allowed_syscalls.push(signal.to_string());
+                peer_signals.allowed_syscalls.push(signal);
                 assert!(!seccomp_profile_is_fail_closed(&peer_signals));
             }
             let mut peer_limits = plan;
             peer_limits
                 .argument_constraints
-                .get_mut("prlimit64")
+                .get_mut(&crate::Syscall::Prlimit64)
                 .test_unwrap()[0]
                 .value = 1;
             assert!(!seccomp_profile_is_fail_closed(&peer_limits));

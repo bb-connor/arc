@@ -7,7 +7,7 @@ use super::{CliError, ProvisionInputs};
 
 pub(super) enum DiscoveryChild {
     Enforced(Box<chio_cage::EnforcedChild>),
-    Legacy(Child),
+    UnconfinedDemo(Child),
 }
 
 impl Drop for DiscoveryChild {
@@ -16,7 +16,7 @@ impl Drop for DiscoveryChild {
             Self::Enforced(child) => {
                 let _ = child.signal(chio_cage::TerminationSignal::Terminate);
             }
-            Self::Legacy(child) => {
+            Self::UnconfinedDemo(child) => {
                 if let Ok(pid) = i32::try_from(child.id()) {
                     // SAFETY: the unreaped child owns a new process group with
                     // this ID. No other process group can reuse it yet.
@@ -37,9 +37,10 @@ impl Drop for DiscoveryChild {
 
 pub(super) fn start(
     inputs: &ProvisionInputs,
+    deadline: std::time::Instant,
 ) -> Result<(DiscoveryChild, File, File, File), CliError> {
     if inputs.profile.containment_enforced() {
-        return start_cage(inputs);
+        return start_cage(inputs, deadline);
     }
     // Disabled/Shadow demos are explicitly unconfined. Never let that opt-in
     // turn privileged provisioning into an unconfined root execution path.
@@ -47,7 +48,7 @@ pub(super) fn start(
     let privileged = unsafe { libc::getuid() == 0 || libc::geteuid() == 0 };
     if privileged {
         return Err(CliError::cli_other_error(
-            "privileged discovery requires an Enforced cage; supply --tools-fixture for legacy provisioning",
+            "privileged discovery requires an Enforced cage; supply --tools-fixture for unconfined demo provisioning",
         ));
     }
     let child = Command::new(&inputs.target_path)
@@ -60,10 +61,13 @@ pub(super) fn start(
         .stderr(Stdio::piped())
         .spawn()
         .map_err(failure)?;
-    with_stdio(DiscoveryChild::Legacy(child))
+    with_stdio(DiscoveryChild::UnconfinedDemo(child))
 }
 
-fn start_cage(inputs: &ProvisionInputs) -> Result<(DiscoveryChild, File, File, File), CliError> {
+fn start_cage(
+    inputs: &ProvisionInputs,
+    deadline: std::time::Instant,
+) -> Result<(DiscoveryChild, File, File, File), CliError> {
     use chio_manifest::{
         NativeSyscallProfile, RequiredPermissions, RuntimeToolTopology, ToolAnnotations,
         ToolDefinition, ToolManifest, VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
@@ -143,8 +147,9 @@ fn start_cage(inputs: &ProvisionInputs) -> Result<(DiscoveryChild, File, File, F
             "discovery executable changed after input validation",
         ));
     }
-    let child =
-        chio_cage::launch(compiled, chio_cage::CageLaunchOptions::default()).map_err(failure)?;
+    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+    let options = chio_cage::CageLaunchOptions::new(remaining).map_err(failure)?;
+    let child = chio_cage::launch(compiled, options).map_err(failure)?;
     with_stdio(DiscoveryChild::Enforced(Box::new(child)))
 }
 
@@ -155,7 +160,7 @@ fn with_stdio(mut child: DiscoveryChild) -> Result<(DiscoveryChild, File, File, 
             .take_stdio()
             .ok_or_else(|| failure("missing cage stdio"))?
             .into_parts(),
-        DiscoveryChild::Legacy(child) => (
+        DiscoveryChild::UnconfinedDemo(child) => (
             File::from(std::os::fd::OwnedFd::from(
                 child.stdin.take().ok_or_else(|| failure("missing stdin"))?,
             )),

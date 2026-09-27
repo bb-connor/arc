@@ -1312,3 +1312,13 @@ fn bootstrap_mutation_skipped_execution_identity_denies_launch() {
         CageEnforcementFailureCode::ExecutionIdentityMismatch,
     );
 }
+
+#[test]
+fn seccomp_kills_x32_syscall_alias() {
+    assert_probe_sigsys("CHIO_CAGE_TEST_X32");
+}
+
+#[test]
+fn seccomp_kills_foreign_architecture_syscall() {
+    assert_probe_sigsys("CHIO_CAGE_TEST_FOREIGN_ARCH");
+}

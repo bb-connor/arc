@@ -295,12 +295,16 @@ if [[ "${mode}" == "--release" ]]; then
   run_tests "confined native broker MCP, process death and terminal cage receipts" yes "$(cat <<'EOF'
 process_boundary_tests::native::confined::native_kernel_confined_broker_mcp_preserves_capture_and_terminal_receipts
 process_boundary_tests::native::cutpoints::confined_broker_process_cutpoints_preserve_provider_and_quota_observations
+process_boundary_tests::native::keyring::recovery::confined_broker_public_keyring_startup_recovers_exact_activation_after_auditor_and_receipt_loss
 process_boundary_tests::native::process_host::confined_broker_process_host_exports_original_call_and_replays_after_restart
 process_boundary_tests::native::process_host::governed_broker_process_host_verifies_original_keyring_authority
 EOF
 )" \
     cargo test --locked -p chio-secret-broker --features real-linux-enforcement --lib \
     confined_broker_
+  run_tests "privileged enforced CLI discovery" no \
+    "privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup" \
+    cargo test --locked -p chio-cli --features real-linux-enforcement --test enforced_discovery
 fi
 
 echo "Secret broker boundary gate passed"
