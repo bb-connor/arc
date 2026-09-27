@@ -95,7 +95,7 @@ Foundation integration retains the original steps 1-4 acceptance boundary. Once 
 - [x] Execute the unchanged original property on the current implementation with the ordinary CI case-count environment, plus the existing archive race and writer-ownership regressions. The six-case run passed locally; no historical-stall closure follows from that result.
 - [ ] Repeat the original million-entry append and history-recovery gates once the owning source is stable. Preserve original inventories and measure hot-path/restart cost, memory and disk use against the retained baseline.
 
-**Implementation checkpoint (2026-09-27):** [Retention/accounting execution](../../reviews/2026-09-27-retention-accounting-execution.md) records the fixes, owning regressions, retained failures and partial arithmetic classification. Historical runner liveness and the original scale campaigns remain open.
+**Implementation checkpoint (2026-09-27):** [Retention/accounting execution](../../reviews/2026-09-27-retention-accounting-execution.md) records the storage fixes and original property run. The [authority/accounting continuation](../../reviews/2026-09-27-authority-accounting-execution.md) adds atomic rotation/import/fencing, checked expiry and budget arithmetic, and validated replication sequences. Arithmetic classification is 60 of 638 sites. Historical runner liveness and the original scale campaigns remain open.
 
 **Exit:** The original liveness issue has an evidence-backed disposition, the property executes in its intended lane, and current-source retention/recovery preserves the original signed evidence. A timeout remains incomplete evidence.
 

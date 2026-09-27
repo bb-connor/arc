@@ -2123,7 +2123,7 @@ fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
     Ok(())
 }
 
-fn ack_head_event(seq: u64, event_id: &str, origin: &str) -> BudgetMutationRecord {
+pub(super) fn ack_head_event(seq: u64, event_id: &str, origin: &str) -> BudgetMutationRecord {
     BudgetMutationRecord {
         event_id: event_id.to_string(),
         hold_id: None,

@@ -449,8 +449,8 @@ launch regression typechecks there and requires x86_64 to execute.
 - [x] Retain the `saturating_*` and `wrapping_*` inventory in the security crates,
       kernel and stores: 638 source lines at `4c35ce7867`, including fixtures.
 - [ ] Finish classifying each site as correct-by-intent or defect. The retained
-      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 45
-      sites (seven fixed monetary sums); 593 remain explicitly pending.
+      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 60
+      sites (19 repaired sites); 578 remain explicitly pending.
 - [ ] A `wrapping_*` in an accounting, quota, counter or deadline path is a defect:
       fix it and add the regression.
 - [ ] A `saturating_sub` in an accounting path silently clamps to zero, hiding the
@@ -459,6 +459,9 @@ launch regression typechecks there and requires x86_64 to execute.
 - [x] Record the completed classifications and pending entries so the next reviewer
       can continue the sweep. [Execution evidence](../../reviews/2026-09-27-retention-accounting-execution.md)
       describes the checked monetary sums and the bounds on retained clamps.
+      [Authority/accounting continuation](../../reviews/2026-09-27-authority-accounting-execution.md)
+      records atomic authority updates, checked expiry and holder/share arithmetic,
+      and exact replication floors with rollback and contention regressions.
 
 **Exit:** Every clamping or wrapping operation in an accounting path is either
 fixed or justified in one line at the call site.

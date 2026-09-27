@@ -1,7 +1,7 @@
 path	base_line	classification	reason	source
-crates/kernel/chio-kernel-core/src/budget_split.rs	325	pending	Needs semantic review; no correctness claim	existing.holders = existing.holders.saturating_add(1);
-crates/kernel/chio-kernel-core/src/budget_split.rs	332	pending	Needs semantic review; no correctness claim	let proposed_total = running.saturating_add(u32::from(share_bps));
-crates/kernel/chio-kernel-core/src/budget_split.rs	383	pending	Needs semantic review; no correctness claim	admission.holders = admission.holders.saturating_sub(1);
+crates/kernel/chio-kernel-core/src/budget_split.rs	325	fixed	Checked holder increment refuses a lease without changing the existing count	existing.holders = existing.holders.saturating_add(1);
+crates/kernel/chio-kernel-core/src/budget_split.rs	332	fixed	Checked sibling sum and proposed share return ShareTotalOverflow; public total API is fallible	let proposed_total = running.saturating_add(u32::from(share_bps));
+crates/kernel/chio-kernel-core/src/budget_split.rs	383	intentional_exhaustion	Zero-holder VerifyOnly edges and the last real holder both intentionally remove the edge	admission.holders = admission.holders.saturating_sub(1);
 crates/kernel/chio-kernel-core/src/formal_aeneas.rs	322	pending	Needs semantic review; no correctness claim	issued_at <= now.saturating_add(max_skew_secs) && issued_at.saturating_add(ttl_secs) >= now
 crates/kernel/chio-kernel-core/src/formal_core.rs	165	pending	Needs semantic review; no correctness claim	u64::from(max.saturating_sub(invocation_count)),
 crates/kernel/chio-kernel-core/src/formal_core.rs	223	pending	Needs semantic review; no correctness claim	u64::from(max.saturating_sub(invocation_count)),
@@ -20,14 +20,14 @@ crates/kernel/chio-kernel/src/approval.rs	1377	pending	Needs semantic review; no
 crates/kernel/chio-kernel/src/approval.rs	1426	pending	Needs semantic review; no correctness claim	|| batch.used_total_units.saturating_add(amt.units) > total.units
 crates/kernel/chio-kernel/src/approval.rs	240	pending	Needs semantic review; no correctness claim	.saturating_sub(self.governed_token.issued_at);
 crates/kernel/chio-kernel/src/approval.rs	959	pending	Needs semantic review; no correctness claim	let expires_at = now.saturating_add(self.default_ttl_secs);
-crates/kernel/chio-kernel/src/authority.rs	262	pending	Needs semantic review; no correctness claim	let latest_issued_at = now.saturating_add(allowed_clock_skew_seconds);
-crates/kernel/chio-kernel/src/authority.rs	276	pending	Needs semantic review; no correctness claim	.saturating_add(requested_ttl_seconds)
-crates/kernel/chio-kernel/src/authority.rs	277	pending	Needs semantic review; no correctness claim	.saturating_add(allowed_clock_skew_seconds);
-crates/kernel/chio-kernel/src/authority.rs	503	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(ttl_seconds),
-crates/kernel/chio-kernel/src/authority.rs	525	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(ttl_seconds),
-crates/kernel/chio-kernel/src/authority.rs	570	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(ttl_seconds),
-crates/kernel/chio-kernel/src/authority.rs	603	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(ttl_seconds),
-crates/kernel/chio-kernel/src/authority.rs	629	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(ttl_seconds),
+crates/kernel/chio-kernel/src/authority.rs	262	intentional_bound	Clock skew widens an upper comparison bound; no timestamp exists beyond u64 MAX	let latest_issued_at = now.saturating_add(allowed_clock_skew_seconds);
+crates/kernel/chio-kernel/src/authority.rs	276	fixed	Response validation rejects an unrepresentable requested lifetime before widening the skew bound	.saturating_add(requested_ttl_seconds)
+crates/kernel/chio-kernel/src/authority.rs	277	intentional_bound	Only the extra skew allowance clamps after checked requested expiry	.saturating_add(allowed_clock_skew_seconds);
+crates/kernel/chio-kernel/src/authority.rs	503	fixed	Shared checked expiry refuses an unrepresentable lifetime before authority signing	expires_at: now.saturating_add(ttl_seconds),
+crates/kernel/chio-kernel/src/authority.rs	525	fixed	Shared checked expiry refuses an unrepresentable lifetime before authority signing	expires_at: now.saturating_add(ttl_seconds),
+crates/kernel/chio-kernel/src/authority.rs	570	fixed	Shared checked expiry refuses an unrepresentable lifetime before authority signing	expires_at: now.saturating_add(ttl_seconds),
+crates/kernel/chio-kernel/src/authority.rs	603	fixed	Shared checked expiry refuses an unrepresentable lifetime before authority signing	expires_at: now.saturating_add(ttl_seconds),
+crates/kernel/chio-kernel/src/authority.rs	629	fixed	Shared checked expiry refuses an unrepresentable lifetime before authority signing	expires_at: now.saturating_add(ttl_seconds),
 crates/kernel/chio-kernel/src/caller_delivery.rs	387	pending	Needs semantic review; no correctness claim	if bytes.len() > self.maximum.saturating_sub(self.bytes.len()) {
 crates/kernel/chio-kernel/src/checkpoint.rs	1017	pending	Needs semantic review; no correctness claim	count.set(count.get().saturating_add(1));
 crates/kernel/chio-kernel/src/checkpoint.rs	1770	pending	Needs semantic review; no correctness claim	count.set(count.get().saturating_add(1));
@@ -176,15 +176,15 @@ crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	1035	pending	Nee
 crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	1049	pending	Needs semantic review; no correctness claim	let verifier_now = unix_now().saturating_sub(5);
 crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	709	pending	Needs semantic review; no correctness claim	if live_global.saturating_add(batch_size) > global_capacity {
 crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs	735	pending	Needs semantic review; no correctness claim	if live_for_scope.saturating_add(batch_count) > per_scope_capacity {
-crates/platform/chio-store-sqlite/src/authority.rs	118	pending	Needs semantic review; no correctness claim	let next_generation = status_before.generation.saturating_add(1);
-crates/platform/chio-store-sqlite/src/authority.rs	863	pending	Needs semantic review; no correctness claim	expires_at: now.saturating_add(ttl_seconds),
+crates/platform/chio-store-sqlite/src/authority.rs	118	fixed	IMMEDIATE rotation checks generation increment and SQLite integer range before atomically publishing seed and history	let next_generation = status_before.generation.saturating_add(1);
+crates/platform/chio-store-sqlite/src/authority.rs	863	fixed	Shared checked expiry rejects unrepresentable TTL before signing	expires_at: now.saturating_add(ttl_seconds),
 crates/platform/chio-store-sqlite/src/batch_approval_store.rs	168	pending	Needs semantic review; no correctness claim	|| batch.used_total_units.saturating_add(amt.units) > total.units
 crates/platform/chio-store-sqlite/src/budget_store/replication.rs	102	checked_storage_bound	Every iteration rejects at i64 storage limit before u64 can saturate	let next_seq = current.saturating_add(1);
 crates/platform/chio-store-sqlite/src/budget_store/replication.rs	37	checked_storage_bound	Every iteration rejects at i64 storage limit before u64 can saturate	next_seq = next_seq.saturating_add(1);
 crates/platform/chio-store-sqlite/src/budget_store/replication.rs	63	checked_storage_bound	Every iteration rejects at i64 storage limit before u64 can saturate	event_seq = event_seq.saturating_add(1);
 crates/platform/chio-store-sqlite/src/budget_store/replication.rs	84	checked_storage_bound	Every iteration rejects at i64 storage limit before u64 can saturate	next_seq = next_seq.saturating_add(1);
-crates/platform/chio-store-sqlite/src/budget_store/snapshot.rs	191	pending	Needs semantic review; no correctness claim	let floor = min_seq.saturating_sub(1);
-crates/platform/chio-store-sqlite/src/budget_store/snapshot.rs	958	pending	Needs semantic review; no correctness claim	let index = usize::try_from(local_sequence.saturating_sub(1)).map_err(|_| {
+crates/platform/chio-store-sqlite/src/budget_store/snapshot.rs	191	fixed	Validate positive event sequence and SQLite range before exact predecessor floor; reject malformed batch before writes	let floor = min_seq.saturating_sub(1);
+crates/platform/chio-store-sqlite/src/budget_store/snapshot.rs	958	fixed	Refuse nonpositive persisted sequence before exact predecessor index; checked usize conversion retained	let index = usize::try_from(local_sequence.saturating_sub(1)).map_err(|_| {
 crates/platform/chio-store-sqlite/src/budget_store/tests.rs	1264	pending	Needs semantic review; no correctness claim	replayed_event.recorded_at = replayed_event.recorded_at.saturating_add(30);
 crates/platform/chio-store-sqlite/src/budget_store/tests.rs	1265	pending	Needs semantic review; no correctness claim	replayed_event.event_seq = replayed_event.event_seq.saturating_add(5);
 crates/platform/chio-store-sqlite/src/budget_store/tests.rs	1266	pending	Needs semantic review; no correctness claim	replayed_event.usage_seq = replayed_event.usage_seq.map(|seq| seq.saturating_add(5));

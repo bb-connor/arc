@@ -74,6 +74,10 @@ mod connection_recovery;
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests;
 
+#[cfg(test)]
+#[path = "budget_store/tests/import_boundaries.rs"]
+mod import_boundaries;
+
 use composite_schema::*;
 use model::{HoldDisposition, SqliteBudgetHold};
 use replication::*;

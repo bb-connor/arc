@@ -59,14 +59,16 @@ rg -n 'saturating_|wrapping_' crates/security crates/kernel \
   crates/platform/chio-store-sqlite -g '*.rs' -g '*.inc'
 ```
 
-The recorded classifications cover 45 sites: seven repaired monetary additions,
+This first batch classified 45 sites: seven repaired monetary additions,
 16 receipt/event counters, two SQL subset subtractions, four replication sequence
 increments protected by checked `i64` storage conversion, one intentional SQL
 work-budget exhaustion clamp, and 15 forged-identity/PRNG test or conformance
 mutations. The retained production clamps have bounds or exhaustion semantics
-documented at their owning call sites. The other **593 sites remain pending**;
-this is not a completed accounting audit. Snapshot import floors, writer counter
-ownership and kernel quota/deadline paths still need individual dispositions.
+documented at their owning call sites. At that checkpoint **593 sites remained
+pending**. The [authority/accounting continuation](2026-09-27-authority-accounting-execution.md)
+updates the cumulative count to 60 classified and 578 pending, including snapshot
+import floors. Writer counter ownership and kernel quota/deadline paths still
+need individual dispositions.
 
 ## Historical liveness boundary
 

@@ -15,8 +15,14 @@ use chio_kernel::{
     ensure_capability_issuance_supported, AuthoritySnapshot, AuthorityStatus, AuthorityStoreError,
     AuthorityTrustedKeySnapshot, CapabilityAuthority, KernelError,
 };
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use uuid::Uuid;
+
+mod boundaries;
+use boundaries::*;
+
+#[cfg(test)]
+mod transaction_tests;
 
 pub struct SqliteCapabilityAuthority {
     path: PathBuf,
@@ -53,8 +59,9 @@ impl SqliteCapabilityAuthority {
         }
 
         let bootstrap = Keypair::generate();
-        let connection = Self::open_connection(&path)?;
-        connection.execute(
+        let mut connection = Self::open_connection(&path)?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        transaction.execute(
             r#"
             INSERT INTO authority_state (singleton_id, seed_hex, public_key_hex, generation, rotated_at)
             VALUES (1, ?1, ?2, 1, ?3)
@@ -63,10 +70,10 @@ impl SqliteCapabilityAuthority {
             params![
                 bootstrap.seed_hex(),
                 bootstrap.public_key().to_hex(),
-                unix_now() as i64
+                authority_sqlite_integer(unix_now(), "rotation time")?
             ],
         )?;
-        let current_public_key = connection
+        let current_public_key = transaction
             .query_row(
                 r#"
                 SELECT seed_hex
@@ -78,7 +85,7 @@ impl SqliteCapabilityAuthority {
             )
             .map(|seed_hex| Keypair::from_seed_hex(seed_hex.trim()))
             .map_err(AuthorityStoreError::from)??;
-        connection.execute(
+        transaction.execute(
             r#"
             UPDATE authority_state
             SET public_key_hex = COALESCE(NULLIF(public_key_hex, ''), ?1)
@@ -86,15 +93,19 @@ impl SqliteCapabilityAuthority {
             "#,
             params![current_public_key.public_key().to_hex()],
         )?;
-        connection.execute(
+        transaction.execute(
             r#"
             INSERT INTO authority_trusted_keys (public_key_hex, generation, activated_at)
             VALUES (?1, 1, ?2)
             ON CONFLICT(public_key_hex) DO NOTHING
             "#,
-            params![current_public_key.public_key().to_hex(), unix_now() as i64],
+            params![
+                current_public_key.public_key().to_hex(),
+                authority_sqlite_integer(unix_now(), "rotation time")?
+            ],
         )?;
-        let status = Self::read_status_from_connection(&connection)?;
+        let status = Self::read_status_from_connection(&transaction)?;
+        transaction.commit()?;
         Ok(Self {
             path,
             cached_public_key: Mutex::new(status.public_key),
@@ -103,126 +114,106 @@ impl SqliteCapabilityAuthority {
     }
 
     pub fn status(&self) -> Result<AuthorityStatus, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
-        let status = Self::read_status_from_connection(&connection)?;
+        let mut connection = Self::open_connection(&self.path)?;
+        let transaction = connection.transaction()?;
+        let status = Self::read_status_from_connection(&transaction)?;
+        transaction.commit()?;
         self.update_cached_public_key(status.public_key.clone());
         self.update_cached_trusted_public_keys(status.trusted_public_keys.clone());
         Ok(status)
     }
 
     pub fn rotate(&self) -> Result<AuthorityStatus, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
-        let status_before = Self::read_status_from_connection(&connection)?;
+        let mut connection = Self::open_connection(&self.path)?;
+        // Serialize the read/advance and publish seed, public key and trust
+        // history together. A failed history write must roll back the seed.
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let status_before = Self::read_status_from_connection(&transaction)?;
+        let next_generation = status_before.generation.checked_add(1).ok_or_else(|| {
+            AuthorityStoreError::Fence("authority generation exhausted".to_owned())
+        })?;
+        let generation = authority_generation(next_generation)?;
         let keypair = Keypair::generate();
         let rotated_at = unix_now();
-        let next_generation = status_before.generation.saturating_add(1);
-
-        connection.execute(
-            r#"
-            UPDATE authority_state
-            SET seed_hex = ?1, public_key_hex = ?2, generation = ?3, rotated_at = ?4
-            WHERE singleton_id = 1
-            "#,
+        transaction.execute(
+            "UPDATE authority_state SET seed_hex = ?1, public_key_hex = ?2,
+             generation = ?3, rotated_at = ?4 WHERE singleton_id = 1",
             params![
                 keypair.seed_hex(),
                 keypair.public_key().to_hex(),
-                next_generation as i64,
-                rotated_at as i64,
+                generation,
+                authority_sqlite_integer(rotated_at, "rotation time")?
             ],
         )?;
-        connection.execute(
-            r#"
-            INSERT INTO authority_trusted_keys (public_key_hex, generation, activated_at)
-            VALUES (?1, ?2, ?3)
-            ON CONFLICT(public_key_hex) DO NOTHING
-            "#,
-            params![
-                keypair.public_key().to_hex(),
-                next_generation as i64,
-                rotated_at as i64
-            ],
+        persist_trusted_key(
+            &transaction,
+            &keypair.public_key().to_hex(),
+            next_generation,
+            rotated_at,
         )?;
-
-        let status = Self::read_status_from_connection(&connection)?;
+        let status = Self::read_status_from_connection(&transaction)?;
+        transaction.commit()?;
         self.update_cached_public_key(status.public_key.clone());
         self.update_cached_trusted_public_keys(status.trusted_public_keys.clone());
         Ok(status)
     }
 
     pub fn snapshot(&self) -> Result<AuthoritySnapshot, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
-        let status = Self::read_status_from_connection(&connection)?;
-        Ok(AuthoritySnapshot {
-            public_key_hex: status.public_key.to_hex(),
-            generation: status.generation,
-            rotated_at: status.rotated_at,
-            trusted_keys: Self::read_trusted_key_snapshots(&connection)?,
-        })
+        let mut connection = Self::open_connection(&self.path)?;
+        let transaction = connection.transaction()?;
+        let (public_key, generation, rotated_at) =
+            Self::read_public_state_from_connection(&transaction)?;
+        let snapshot = AuthoritySnapshot {
+            public_key_hex: public_key.to_hex(),
+            generation,
+            rotated_at,
+            trusted_keys: Self::read_trusted_key_snapshots(&transaction)?,
+        };
+        transaction.commit()?;
+        Ok(snapshot)
     }
 
     pub fn apply_snapshot(
         &self,
         snapshot: &AuthoritySnapshot,
     ) -> Result<bool, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
-        let local_snapshot = self.snapshot()?;
-        let remote_public_key = PublicKey::from_hex(snapshot.public_key_hex.trim())?;
-
-        // Cluster snapshots replicate verification history, not signing custody.
-        connection.execute(
-            r#"
-            INSERT INTO authority_trusted_keys (public_key_hex, generation, activated_at)
-            VALUES (?1, ?2, ?3)
-            ON CONFLICT(public_key_hex) DO UPDATE SET
-                generation = MAX(generation, excluded.generation),
-                activated_at = MIN(activated_at, excluded.activated_at)
-            "#,
-            params![
-                remote_public_key.to_hex(),
-                snapshot.generation as i64,
-                snapshot.rotated_at as i64
-            ],
+        let mut connection = Self::open_connection(&self.path)?;
+        // Compare and replace under one write lock; history validation belongs
+        // to that transaction so a bad later row cannot leave partial trust.
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let (local_key, local_generation, local_rotated_at) =
+            Self::read_public_state_from_connection(&transaction)?;
+        let remote_public_key = persist_trusted_key(
+            &transaction,
+            &snapshot.public_key_hex,
+            snapshot.generation,
+            snapshot.rotated_at,
         )?;
-        for trusted_key in &snapshot.trusted_keys {
-            connection.execute(
-                r#"
-                INSERT INTO authority_trusted_keys (public_key_hex, generation, activated_at)
-                VALUES (?1, ?2, ?3)
-                ON CONFLICT(public_key_hex) DO UPDATE SET
-                    generation = MAX(generation, excluded.generation),
-                    activated_at = MIN(activated_at, excluded.activated_at)
-                "#,
-                params![
-                    trusted_key.public_key_hex,
-                    trusted_key.generation as i64,
-                    trusted_key.activated_at as i64
-                ],
+        for key in &snapshot.trusted_keys {
+            persist_trusted_key(
+                &transaction,
+                &key.public_key_hex,
+                key.generation,
+                key.activated_at,
             )?;
         }
-
-        let should_replace = snapshot.generation > local_snapshot.generation
-            || (snapshot.generation == local_snapshot.generation
-                && (snapshot.rotated_at, snapshot.public_key_hex.as_str())
-                    > (
-                        local_snapshot.rotated_at,
-                        local_snapshot.public_key_hex.as_str(),
-                    ));
+        let remote_hex = remote_public_key.to_hex();
+        let local_hex = local_key.to_hex();
+        let should_replace = (
+            snapshot.generation,
+            snapshot.rotated_at,
+            remote_hex.as_str(),
+        ) > (local_generation, local_rotated_at, local_hex.as_str());
         if should_replace {
-            connection.execute(
-                r#"
-                UPDATE authority_state
-                SET public_key_hex = ?1, generation = ?2, rotated_at = ?3
-                WHERE singleton_id = 1
-                "#,
-                params![
-                    remote_public_key.to_hex(),
-                    snapshot.generation as i64,
-                    snapshot.rotated_at as i64,
-                ],
+            // Replicate verification identity only. Local signing custody stays
+            // local and read_current_keypair refuses a mismatched public head.
+            transaction.execute(
+                "UPDATE authority_state SET public_key_hex = ?1, generation = ?2, rotated_at = ?3 WHERE singleton_id = 1",
+                params![remote_hex, authority_generation(snapshot.generation)?, authority_sqlite_integer(snapshot.rotated_at, "rotation time")?],
             )?;
         }
-
-        let status = Self::read_status_from_connection(&connection)?;
+        let status = Self::read_status_from_connection(&transaction)?;
+        transaction.commit()?;
         self.update_cached_public_key(status.public_key);
         self.update_cached_trusted_public_keys(status.trusted_public_keys);
         Ok(should_replace)
@@ -379,10 +370,12 @@ impl SqliteCapabilityAuthority {
         leader_url: Option<&str>,
         election_term: u64,
     ) -> Result<bool, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
-        let current = Self::read_cluster_fence_from_connection(&connection)?;
+        authority_sqlite_integer(election_term, "election term")?;
+        let mut connection = Self::open_connection(&self.path)?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let current = Self::read_cluster_fence_from_connection(&transaction)?;
         let (_, authority_generation, authority_rotated_at) =
-            Self::read_public_state_from_connection(&connection)?;
+            Self::read_public_state_from_connection(&transaction)?;
         let next_leader = leader_url.map(ToOwned::to_owned);
         let same_term_same_leader = election_term == current.election_term
             && current.leader_url.as_deref() == next_leader.as_deref();
@@ -396,8 +389,9 @@ impl SqliteCapabilityAuthority {
                 && next_leader.is_some())
             || (same_term_same_leader && fence_authority_state_is_stale);
         if should_update {
-            Self::write_cluster_fence_to_connection(&connection, next_leader, election_term)?;
+            Self::write_cluster_fence_to_connection(&transaction, next_leader, election_term)?;
         }
+        transaction.commit()?;
         Ok(should_update)
     }
 
@@ -406,10 +400,12 @@ impl SqliteCapabilityAuthority {
         leader_url: &str,
         election_term: u64,
     ) -> Result<(), AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
-        let current = Self::read_cluster_fence_from_connection(&connection)?;
+        authority_sqlite_integer(election_term, "election term")?;
+        let mut connection = Self::open_connection(&self.path)?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let current = Self::read_cluster_fence_from_connection(&transaction)?;
         let (_, authority_generation, authority_rotated_at) =
-            Self::read_public_state_from_connection(&connection)?;
+            Self::read_public_state_from_connection(&transaction)?;
         if (current.election_term > 0 || current.leader_url.is_some())
             && (current.authority_generation != authority_generation
                 || current.authority_rotated_at != authority_rotated_at)
@@ -437,10 +433,12 @@ impl SqliteCapabilityAuthority {
             )));
         }
         Self::write_cluster_fence_to_connection(
-            &connection,
+            &transaction,
             Some(leader_url.to_string()),
             election_term,
-        )
+        )?;
+        transaction.commit()?;
+        Ok(())
     }
 
     fn open_connection(path: &Path) -> Result<Connection, AuthorityStoreError> {
@@ -603,13 +601,13 @@ impl SqliteCapabilityAuthority {
             Ok(SignedBudgetSnapshotAnchorCommitment {
                 body: BudgetSnapshotAnchorCommitment {
                     schema: "chio.budget-snapshot-anchor-commitment.v1".to_string(),
-                    commit_sequence: sequence.max(0) as u64,
+                    commit_sequence: authority_unsigned(sequence, "anchor sequence")?,
                     previous_chain_digest: previous,
                     chain_digest: chain,
                     anchor_set_digest: anchors,
                     leader_url: leader,
-                    election_term: term.max(0) as u64,
-                    committed_at: at.max(0) as u64,
+                    election_term: authority_unsigned(term, "anchor election term")?,
+                    committed_at: authority_unsigned(at, "anchor commit time")?,
                     signer_public_key: signer,
                 },
                 signature: Signature::from_hex(&signature)?,
@@ -647,17 +645,16 @@ impl SqliteCapabilityAuthority {
         };
         Ok((
             public_key,
-            generation.max(0) as u64,
-            rotated_at.max(0) as u64,
+            authority_generation(authority_unsigned(generation, "generation")?)? as u64,
+            authority_unsigned(rotated_at, "rotation time")?,
         ))
     }
 
     fn read_current_keypair(&self) -> Result<Keypair, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
-        let keypair = Self::read_keypair_from_connection(&connection)?;
-        let status = Self::read_status_from_connection(&connection)?;
-        self.update_cached_public_key(status.public_key.clone());
-        self.update_cached_trusted_public_keys(status.trusted_public_keys.clone());
+        let mut connection = Self::open_connection(&self.path)?;
+        let transaction = connection.transaction()?;
+        let keypair = Self::read_keypair_from_connection(&transaction)?;
+        let status = Self::read_status_from_connection(&transaction)?;
         if keypair.public_key() != status.public_key {
             return Err(AuthorityStoreError::Fence(format!(
                 "local signing seed public key {} does not match replicated authority public key {}",
@@ -665,6 +662,9 @@ impl SqliteCapabilityAuthority {
                 status.public_key.to_hex(),
             )));
         }
+        transaction.commit()?;
+        self.update_cached_public_key(status.public_key);
+        self.update_cached_trusted_public_keys(status.trusted_public_keys);
         Ok(keypair)
     }
 
@@ -735,19 +735,10 @@ impl SqliteCapabilityAuthority {
     fn read_trusted_public_keys(
         connection: &Connection,
     ) -> Result<Vec<PublicKey>, AuthorityStoreError> {
-        let mut statement = connection.prepare(
-            r#"
-            SELECT public_key_hex
-            FROM authority_trusted_keys
-            ORDER BY generation ASC, activated_at ASC
-            "#,
-        )?;
-        let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
-        rows.map(|row| {
-            let public_key_hex = row?;
-            PublicKey::from_hex(public_key_hex.trim()).map_err(AuthorityStoreError::from)
-        })
-        .collect()
+        Self::read_trusted_key_snapshots(connection)?
+            .into_iter()
+            .map(|key| PublicKey::from_hex(&key.public_key_hex).map_err(AuthorityStoreError::from))
+            .collect()
     }
 
     fn read_trusted_key_snapshots(
@@ -761,13 +752,24 @@ impl SqliteCapabilityAuthority {
             "#,
         )?;
         let rows = statement.query_map([], |row| {
-            Ok(AuthorityTrustedKeySnapshot {
-                public_key_hex: row.get(0)?,
-                generation: row.get::<_, i64>(1)?.max(0) as u64,
-                activated_at: row.get::<_, i64>(2)?.max(0) as u64,
-            })
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
         })?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+        rows.map(|row| {
+            let (key, generation, at) = row?;
+            Ok(AuthorityTrustedKeySnapshot {
+                public_key_hex: PublicKey::from_hex(key.trim())?.to_hex(),
+                generation: authority_generation(authority_unsigned(
+                    generation,
+                    "trusted-key generation",
+                )?)? as u64,
+                activated_at: authority_unsigned(at, "trusted-key activation time")?,
+            })
+        })
+        .collect()
     }
 
     fn read_cluster_fence_from_connection(
@@ -793,10 +795,10 @@ impl SqliteCapabilityAuthority {
             )?;
         Ok(AuthorityClusterFence {
             leader_url,
-            election_term: election_term.max(0) as u64,
-            updated_at: updated_at.max(0) as u64,
-            authority_generation: authority_generation.max(0) as u64,
-            authority_rotated_at: authority_rotated_at.max(0) as u64,
+            election_term: authority_unsigned(election_term, "election term")?,
+            updated_at: authority_unsigned(updated_at, "fence update time")?,
+            authority_generation: authority_unsigned(authority_generation, "fence generation")?,
+            authority_rotated_at: authority_unsigned(authority_rotated_at, "fence rotation time")?,
         })
     }
 
@@ -820,10 +822,10 @@ impl SqliteCapabilityAuthority {
             "#,
             params![
                 leader_url,
-                election_term as i64,
-                unix_now() as i64,
-                authority_generation as i64,
-                authority_rotated_at as i64,
+                authority_sqlite_integer(election_term, "election term")?,
+                authority_sqlite_integer(unix_now(), "fence update time")?,
+                authority_sqlite_integer(authority_generation, "fence generation")?,
+                authority_sqlite_integer(authority_rotated_at, "fence rotation time")?,
             ],
         )?;
         Ok(())
@@ -860,7 +862,7 @@ impl CapabilityAuthority for SqliteCapabilityAuthority {
             subject: subject.clone(),
             scope,
             issued_at: now,
-            expires_at: now.saturating_add(ttl_seconds),
+            expires_at: chio_kernel::authority::checked_capability_expiry(now, ttl_seconds)?,
             delegation_chain: vec![],
             aggregate_invocation_budget: None,
         };

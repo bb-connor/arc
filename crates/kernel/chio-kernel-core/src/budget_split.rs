@@ -21,15 +21,19 @@
 //!
 //! ## Overflow safety
 //!
-//! [`BudgetSplit::current_total_child_bps`] returns a `u32` and the admit
-//! check uses `u32` arithmetic so two `u16::MAX` siblings cannot overflow
-//! into a wraparound that silently passes the cap. The parent share itself
-//! is bounded by [`MAX_BUDGET_SHARE_BPS`] which the per-token validator
-//! enforces at load time.
+//! [`BudgetSplit::current_total_child_bps`] returns a checked `u32` sum or
+//! [`BudgetSplitError::ShareTotalOverflow`]. Admission also checks holder and
+//! proposed-share additions, so numeric exhaustion grants no new lease. The
+//! parent share is bounded by [`MAX_BUDGET_SHARE_BPS`] which the per-token
+//! validator enforces at load time.
 
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use core::fmt;
+
+#[cfg(test)]
+#[path = "budget_split/boundary_tests.rs"]
+mod boundary_tests;
 
 /// Hard ceiling on any single token's budget share in basis points.
 ///
@@ -95,6 +99,16 @@ pub struct BudgetSplit {
 /// Errors raised by [`BudgetSplit`] admission and release operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BudgetSplitError {
+    /// Another lease cannot be represented; the existing holders stay owned.
+    HolderCountOverflow {
+        /// Child whose holder count is exhausted.
+        child_id: String,
+    },
+    /// The supplied split cannot represent its exact sibling-share sum.
+    ShareTotalOverflow {
+        /// Parent whose accounting is invalid.
+        parent_token_id: String,
+    },
     /// The proposed child share alone exceeds the per-token cap of
     /// [`MAX_BUDGET_SHARE_BPS`]. Per-token validation usually catches this
     /// first; the registry repeats the check so a bypass cannot widen the
@@ -150,6 +164,10 @@ pub enum BudgetSplitError {
 impl fmt::Display for BudgetSplitError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            BudgetSplitError::HolderCountOverflow { child_id } =>
+                write!(f, "child {child_id} holder count is exhausted"),
+            BudgetSplitError::ShareTotalOverflow { parent_token_id } =>
+                write!(f, "parent {parent_token_id} sibling-share sum overflows u32"),
             BudgetSplitError::ChildShareExceedsCap {
                 child_id,
                 share_bps,
@@ -226,18 +244,20 @@ impl BudgetSplit {
         }
     }
 
-    /// Return the running sum of admitted sibling shares as a `u32` to avoid
-    /// overflow even on a maximally adversarial set of admitted children.
+    /// Return the exact running sum, refusing an unrepresentable public split.
     ///
     /// Each present edge counts its share exactly once regardless of how many
     /// overlapping evaluations hold it: the share is charged against the parent
     /// per edge, not per holder.
-    #[must_use]
-    pub fn current_total_child_bps(&self) -> u32 {
+    pub fn current_total_child_bps(&self) -> Result<u32, BudgetSplitError> {
         self.children
             .values()
-            .map(|admission| u32::from(admission.share_bps))
-            .sum()
+            .try_fold(0_u32, |sum, admission| {
+                sum.checked_add(u32::from(admission.share_bps))
+            })
+            .ok_or_else(|| BudgetSplitError::ShareTotalOverflow {
+                parent_token_id: self.parent_token_id.clone(),
+            })
     }
 
     /// Return the share currently recorded for `child_id`, if this child has
@@ -271,7 +291,8 @@ impl BudgetSplit {
     /// Returns [`BudgetSplitError`] - acquiring NO lease - when the child share
     /// alone exceeds the per-token cap, when the proposed share would
     /// oversubscribe the parent, or when a different share has already been
-    /// recorded for this child id.
+    /// recorded for this child id. Numeric exhaustion of the holder count or
+    /// sibling total also refuses admission without changing the split.
     pub fn try_admit_child(
         &mut self,
         child_id: String,
@@ -322,14 +343,24 @@ impl BudgetSplit {
                 // holder count untouched: it never releases, so incrementing
                 // here would pin the edge upward forever.
                 if let AdmitMode::Lease = mode {
-                    existing.holders = existing.holders.saturating_add(1);
+                    existing.holders = existing.holders.checked_add(1).ok_or_else(|| {
+                        BudgetSplitError::HolderCountOverflow {
+                            child_id: child_id.clone(),
+                        }
+                    })?;
                 }
                 return Ok(());
             }
             return Err(BudgetSplitError::DuplicateChild { child_id });
         }
-        let running = self.current_total_child_bps();
-        let proposed_total = running.saturating_add(u32::from(share_bps));
+        // Existing leases do not alter the share sum and retain their O(log n)
+        // lookup path. Only a new edge needs the sibling scan.
+        let running = self.current_total_child_bps()?;
+        let proposed_total = running.checked_add(u32::from(share_bps)).ok_or_else(|| {
+            BudgetSplitError::ShareTotalOverflow {
+                parent_token_id: self.parent_token_id.clone(),
+            }
+        })?;
         if proposed_total > u32::from(self.parent_share_bps) {
             return Err(BudgetSplitError::OversubscribedSiblings {
                 child_id,
@@ -380,6 +411,8 @@ impl BudgetSplit {
                 actual_share_bps: admission.share_bps,
             });
         }
+        // VerifyOnly edges legitimately have zero holders; cleanup removes
+        // those as well as an edge whose last real holder is being released.
         admission.holders = admission.holders.saturating_sub(1);
         if admission.holders == 0 {
             let _ = self.children.remove(child_id);
@@ -613,7 +646,7 @@ mod tests {
     #[test]
     fn empty_split_total_is_zero() {
         let split = BudgetSplit::new("parent".to_string(), 5_000);
-        assert_eq!(split.current_total_child_bps(), 0);
+        assert_eq!(split.current_total_child_bps(), Ok(0));
     }
 
     #[test]
@@ -622,7 +655,7 @@ mod tests {
         split
             .try_admit_child("child-a".to_string(), 4_000)
             .expect("first child fits");
-        assert_eq!(split.current_total_child_bps(), 4_000);
+        assert_eq!(split.current_total_child_bps(), Ok(4_000));
     }
 
     #[test]
@@ -649,7 +682,7 @@ mod tests {
             other => panic!("unexpected error: {other:?}"),
         }
         // Failed child must not be recorded.
-        assert_eq!(split.current_total_child_bps(), 4_000);
+        assert_eq!(split.current_total_child_bps(), Ok(4_000));
     }
 
     #[test]
@@ -670,7 +703,7 @@ mod tests {
         split
             .try_admit_child("child-a".to_string(), 4_000)
             .expect("idempotent re-admit");
-        assert_eq!(split.current_total_child_bps(), 4_000);
+        assert_eq!(split.current_total_child_bps(), Ok(4_000));
     }
 
     #[test]
@@ -684,7 +717,7 @@ mod tests {
             .expect_err("different share must fail");
         assert!(matches!(err, BudgetSplitError::DuplicateChild { .. }));
         // Original share is preserved.
-        assert_eq!(split.current_total_child_bps(), 2_000);
+        assert_eq!(split.current_total_child_bps(), Ok(2_000));
     }
 
     #[test]
@@ -693,12 +726,12 @@ mod tests {
         split
             .try_admit_child("child-a".to_string(), 4_000)
             .expect("child admits");
-        assert_eq!(split.current_total_child_bps(), 4_000);
+        assert_eq!(split.current_total_child_bps(), Ok(4_000));
 
         split
             .release_child("child-a", 4_000)
             .expect("matching release succeeds");
-        assert_eq!(split.current_total_child_bps(), 0);
+        assert_eq!(split.current_total_child_bps(), Ok(0));
 
         split
             .try_admit_child("child-b".to_string(), 5_000)
@@ -719,7 +752,7 @@ mod tests {
             error,
             BudgetSplitError::ReleaseShareMismatch { .. }
         ));
-        assert_eq!(split.current_total_child_bps(), 4_000);
+        assert_eq!(split.current_total_child_bps(), Ok(4_000));
     }
 
     #[test]
@@ -1081,7 +1114,7 @@ mod tests {
         );
         assert_eq!(
             split.current_total_child_bps(),
-            u32::from(MAX_BUDGET_SHARE_BPS) * 2
+            Ok(u32::from(MAX_BUDGET_SHARE_BPS) * 2)
         );
     }
 }

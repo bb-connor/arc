@@ -749,7 +749,7 @@ mod tests {
             Some(split) => split,
             None => panic!("registered parent budget split was missing"),
         };
-        assert_eq!(split.current_total_child_bps(), 0);
+        assert_eq!(split.current_total_child_bps(), Ok(0));
         assert!(split.children.is_empty());
     }
 
@@ -794,7 +794,7 @@ mod tests {
             Some(split) => split,
             None => panic!("registered parent budget split was missing"),
         };
-        assert_eq!(split.current_total_child_bps(), 0);
+        assert_eq!(split.current_total_child_bps(), Ok(0));
         assert!(split.children.is_empty());
     }
 

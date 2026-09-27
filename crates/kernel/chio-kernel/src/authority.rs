@@ -16,6 +16,18 @@ use chio_security_types::PrincipalId;
 mod aggregate;
 pub use aggregate::validate_issued_aggregate_family_root_response;
 
+#[cfg(test)]
+mod expiry_tests;
+
+/// Compute an exact signed expiry before asking any backend to mint authority.
+pub fn checked_capability_expiry(issued_at: u64, ttl_seconds: u64) -> Result<u64, KernelError> {
+    issued_at.checked_add(ttl_seconds).ok_or_else(|| {
+        KernelError::CapabilityIssuanceFailed(
+            "capability expiry overflows the timestamp domain".to_owned(),
+        )
+    })
+}
+
 const DEFAULT_CAPABILITY_ISSUANCE_CLOCK_SKEW_SECONDS: u64 = 30;
 
 /// Fallible wall-clock port used only for capability authority issuance.
@@ -259,6 +271,8 @@ fn validate_issued_response_at(
             "issued capability must be direct".to_string(),
         ));
     }
+    // Skew widens a comparison bound within the timestamp domain. Clamping
+    // that upper bound admits no representable time beyond the allowed skew.
     let latest_issued_at = now.saturating_add(allowed_clock_skew_seconds);
     if capability.issued_at > latest_issued_at {
         return Err(KernelError::CapabilityIssuanceFailed(format!(
@@ -272,8 +286,9 @@ fn validate_issued_response_at(
             capability.expires_at
         )));
     }
-    let latest_expires_at = now
-        .saturating_add(requested_ttl_seconds)
+    // Only the skew allowance clamps; an unrepresentable requested lifetime
+    // is rejected just as it is by the issuing authorities.
+    let latest_expires_at = checked_capability_expiry(now, requested_ttl_seconds)?
         .saturating_add(allowed_clock_skew_seconds);
     if capability.expires_at > latest_expires_at {
         return Err(KernelError::CapabilityIssuanceFailed(format!(
@@ -500,7 +515,7 @@ impl CapabilityAuthority for LocalCapabilityAuthority {
             subject: subject.clone(),
             scope,
             issued_at: now,
-            expires_at: now.saturating_add(ttl_seconds),
+            expires_at: checked_capability_expiry(now, ttl_seconds)?,
             delegation_chain: vec![],
             aggregate_invocation_budget: None,
         };
@@ -522,7 +537,7 @@ impl CapabilityAuthority for LocalCapabilityAuthority {
             subject: subject.clone(),
             scope,
             issued_at: now,
-            expires_at: now.saturating_add(ttl_seconds),
+            expires_at: checked_capability_expiry(now, ttl_seconds)?,
             delegation_chain: vec![],
             aggregate_invocation_budget: None,
         };
@@ -567,7 +582,7 @@ impl GovernedCapabilityAuthority {
             subject: subject.clone(),
             scope,
             issued_at: now,
-            expires_at: now.saturating_add(ttl_seconds),
+            expires_at: checked_capability_expiry(now, ttl_seconds)?,
             delegation_chain: vec![],
             aggregate_invocation_budget: Some(AggregateInvocationBudget {
                 scope: AggregateInvocationScope::Capability,
@@ -600,7 +615,7 @@ impl CapabilityAuthority for GovernedCapabilityAuthority {
             subject: subject.clone(),
             scope,
             issued_at: now,
-            expires_at: now.saturating_add(ttl_seconds),
+            expires_at: checked_capability_expiry(now, ttl_seconds)?,
             delegation_chain: vec![],
             aggregate_invocation_budget: None,
         };
@@ -626,7 +641,7 @@ impl CapabilityAuthority for GovernedCapabilityAuthority {
             subject: subject.clone(),
             scope,
             issued_at: now,
-            expires_at: now.saturating_add(ttl_seconds),
+            expires_at: checked_capability_expiry(now, ttl_seconds)?,
             delegation_chain: vec![],
             aggregate_invocation_budget: None,
         };
