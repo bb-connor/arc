@@ -37,6 +37,7 @@ pub const CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_V1_SCHEMA: &str =
     "chio.frost.authorization-slot-checkpoint.v1";
 pub const CHIO_FROST_AUTHORIZATION_V1_SCHEMA: &str = "chio.frost.authorization.v1";
 pub const CHIO_FROST_EPOCH_CHECKPOINT_V1_SCHEMA: &str = "chio.frost.epoch-checkpoint.v1";
+pub const CHIO_FROST_DKG_ROUND2_SEALED_V1_SCHEMA: &str = "chio.frost.dkg-round2-sealed.v1";
 pub const CHIO_FROST_ROSTER_V1_SCHEMA: &str = "chio.frost.roster.v1";
 pub const CHIO_CLEARING_PARTICIPANT_SNAPSHOT_V1_SCHEMA: &str =
     "chio.clearing.participant-snapshot.v1";
@@ -390,6 +391,10 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_FROST_EPOCH_CHECKPOINT_V1_SCHEMA,
         Some(("frost_epoch_checkpoint", "frost-quorum-substrate-v1")),
+    ),
+    (
+        CHIO_FROST_DKG_ROUND2_SEALED_V1_SCHEMA,
+        Some(("frost_dkg_round2_sealed", "frost-sealed-ceremony-v1")),
     ),
     (
         CHIO_FROST_ROSTER_V1_SCHEMA,

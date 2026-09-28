@@ -1195,3 +1195,123 @@ target = "response_lifecycle"
 path = "fuzz/corpus/response_lifecycle/unresolved-owner-loss"
 sha256 = "724b65c3dd83889ba04458fd08d3a4b772196ecf5e7d0e299d56840e1b4d2139"
 source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-00.json"
+sha256 = "267c773fc273d0d1c9d28d5b04059af52fab91e276012a28b68f8dd17e90225f"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-01.json"
+sha256 = "41ed1ab91fcd4486cee34ad36b93a0fef927b206cbbd8706333e0f45d600e971"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-02.json"
+sha256 = "e3df57349e26df46ae1f968fb525a603ddad31867b26344d92fa385f020e0f3c"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-03.json"
+sha256 = "179bf2e78a2d22b7b930cb838d6ada6abb754dc0ef203b18e5514bb0351a6287"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-04.json"
+sha256 = "794ed811ace180a3da3d3b2fbb603d1af501752b042e6def967d03f8d4fd2870"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-05.json"
+sha256 = "8ff46bce6be5af5ebd82a1fe546e0089c01ca4686fd9cc9aa621a57efa238f50"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-06.json"
+sha256 = "4a371c40417cf879dc62225f35c29620803b8325a73ec95ebd62629c171178ea"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-07.json"
+sha256 = "1292ef8d5496ce87f4f08bda18d93cf39426b036be01e8fc29c5e4af3f052fb2"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-08.json"
+sha256 = "868259d4dd95c940321dd79128b9e3ba9ffaca920e79e1bc60a7faa57ba9c1c8"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-09.json"
+sha256 = "7fcc050fbab3f483b786afa9a4bc6cae94ea31881b9d057064760d6da146d2fd"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-10.json"
+sha256 = "7f4037fb27f9bed6d93895c0ae0d1247f4f681948a40bde151e37578b6636692"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-11.json"
+sha256 = "d77cf3435e78ff1f5d1355ffbf655bb0dddb7c5714bed295d7cabd4b3eb23d8d"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-12.json"
+sha256 = "207d8cb1366797c95bd293610f4887547c3c9be448ec75dd3087c65d01113f2c"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-13.json"
+sha256 = "2c9ca1ea6ded00c3c6ae158e4b6562fc0fa7a46a4422c6bde38f05fd426a5062"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-14.json"
+sha256 = "cd2ee590464c1e63a676d4e3ef0bb4aef2cf65e54a81b66ff83e7f1097a33b42"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-15.json"
+sha256 = "68097c0451b4bd4107ad8afa8ce70cf70244415f89bb5e3754e72ceee2da5358"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-16.json"
+sha256 = "58ce5b8243097f8938d8ad628ae601c1d4cb02ab769b8d3ecdf3637c1fcdae13"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-17.json"
+sha256 = "e05ed841a8ff24b14eaa297b9e93c357a2d41eeabe6c392b5abb879d67ffeba6"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-18.json"
+sha256 = "39e2a9889bf52f2c6c62da91134f894be59b9abe0115a1d2cae98903f06d16a0"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "frost_round2_envelope"
+path = "fuzz/corpus/frost_round2_envelope/pair-19.json"
+sha256 = "a369b9c2f76f2ee9667c0d623818158adee3119713fd9010eefad5f3061fd19f"
+source = "hand_curated_coverage"

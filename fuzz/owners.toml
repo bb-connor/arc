@@ -131,3 +131,7 @@ path  = "crates/tooling/chio-conformance"
 [targets.fuzz_tool_action]
 crate = "chio-guards"
 path  = "crates/guards/chio-guards"
+
+[targets.frost_round2_envelope]
+crate = "chio-federation-authority"
+path = "crates/trust/chio-federation-authority"

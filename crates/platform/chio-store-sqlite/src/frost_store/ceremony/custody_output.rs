@@ -1,21 +1,17 @@
-//! The sole plaintext round-two serialization boundary. The DTOs never leave
-//! this module, and encoding returns authenticated ciphertext immediately.
+//! Authenticated custody of public outgoing envelopes. No plaintext share DTO.
 use super::*;
-use chio_federation_authority::FrostRound2Metadata;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-#[serde(tag = "state", content = "output", rename_all = "snake_case")]
+#[serde(
+    tag = "state",
+    content = "output",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
 enum CustodyOutput {
     Round1(Box<FrostRound1Package>),
-    Round2(Vec<CustodyRound2>),
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct CustodyRound2 {
-    metadata: FrostRound2Metadata,
-    secret_bytes: Zeroizing<Vec<u8>>,
+    Round2(Vec<SealedFrostRound2Package>),
 }
 
 pub(super) fn encrypt(
@@ -25,21 +21,12 @@ pub(super) fn encrypt(
 ) -> Result<EncryptedBlob, FrostStoreError> {
     let wire = match output {
         StoredCeremonyOutput::Round1(package) => CustodyOutput::Round1(package),
-        StoredCeremonyOutput::Round2(packages) => CustodyOutput::Round2(
-            packages
-                .iter()
-                .map(|package| CustodyRound2 {
-                    metadata: package.metadata(),
-                    secret_bytes: package.secret_bytes(),
-                })
-                .collect(),
-        ),
+        StoredCeremonyOutput::Round2(packages) => CustodyOutput::Round2(packages),
     };
-    // Write directly into zeroizing storage. A serde_json::Value or canonical
-    // JSON intermediate would retain additional nonzeroizing secret copies.
-    let mut plaintext = Zeroizing::new(Vec::new());
-    serde_json::to_writer(&mut *plaintext, &wire)
-        .map_err(|_| FrostStoreError::Custody("ceremony output encoding failed"))?;
+    let plaintext = Zeroizing::new(
+        canonical_json_bytes(&wire)
+            .map_err(|_| FrostStoreError::Custody("output encoding failed"))?,
+    );
     encrypt_material(&plaintext, custody, aad)
 }
 
@@ -53,35 +40,32 @@ pub(super) fn decrypt(
         decrypt_blob_with_aad(custody.key(), ciphertext, aad)
             .map_err(|_| FrostStoreError::Custody("ceremony output authentication failed"))?,
     );
-    // Only authenticated plaintext can reach this private decoder. Each
-    // round-two package must also reestablish its signed ceremony binding.
-    let wire: CustodyOutput = serde_json::from_slice(&plaintext)
-        .map_err(|_| FrostStoreError::Custody("ceremony output decoding failed"))?;
+    let wire: CustodyOutput =
+        chio_core::canonical::UntrustedJsonText::from_wire(&plaintext, 32 * 1024 * 1024)
+            .and_then(|text| text.decode_canonical())
+            .map_err(|_| FrostStoreError::Custody("ceremony output decoding failed"))?;
     match wire {
         CustodyOutput::Round1(package) => Ok(StoredCeremonyOutput::Round1(package)),
         CustodyOutput::Round2(packages) => {
-            let packages = packages
-                .into_iter()
-                .map(|package| {
-                    FrostRound2Package::from_custody(config, package.metadata, package.secret_bytes)
-                        .map_err(FrostStoreError::from)
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let expected =
-                config
-                    .participants
-                    .len()
-                    .checked_sub(1)
-                    .ok_or(FrostStoreError::Custody(
-                        "ceremony participant set is empty",
-                    ))?;
-            let recipients = packages
-                .iter()
-                .map(FrostRound2Package::recipient_participant_id)
-                .collect::<std::collections::BTreeSet<_>>();
-            if packages.len() != expected || recipients.len() != expected {
+            let expected = config
+                .participants
+                .len()
+                .checked_sub(1)
+                .ok_or(FrostStoreError::Custody("empty roster"))?;
+            let mut recipients = std::collections::BTreeSet::new();
+            for package in &packages {
+                package.verify(config)?;
+                if package.sender_participant_id() != config.local_participant_id
+                    || !recipients.insert(package.recipient_participant_id())
+                {
+                    return Err(FrostStoreError::Custody(
+                        "outbound package sender or recipient mismatch",
+                    ));
+                }
+            }
+            if packages.len() != expected {
                 return Err(FrostStoreError::Custody(
-                    "ceremony output recipient set is incomplete or duplicated",
+                    "outbound recipient set incomplete",
                 ));
             }
             Ok(StoredCeremonyOutput::Round2(packages))

@@ -3,7 +3,7 @@
 September 27, 2026. Base `00536cc90225bfa707cb64e344effc1f4cdcd2e4`, branch
 `packet/3-retention-accounting`, isolated checkout `/tmp/arc-security-launch`.
 This batch implements the approved signed-input, verification-result, tenant-read
-and FROST plaintext boundaries. Full FROST transport sealing is a separate step.
+and FROST plaintext boundaries. The subsequent [sealed ceremony batch](2026-09-27-frost-sealed-ceremony-execution.md) implements FROST transport sealing.
 
 ## Implemented boundaries
 
@@ -107,8 +107,8 @@ Earlier failures remain evidence, not passing checks:
 
 The broader signed-reader census and full negative runtime matrix across every
 tenant table remain open. PostgreSQL is outside this SQLite inventory. The
-record classification does not certify all workspace verifiers. FROST step 2
-still needs separate sealing keys, encrypted transport envelopes and replay
-handling. Native qualification, sustained fuzzing, scale, independent final
+record classification does not certify all workspace verifiers. FROST step 2 is now implemented in the subsequent
+[sealed ceremony batch](2026-09-27-frost-sealed-ceremony-execution.md), with separate
+sealing keys, encrypted transport and durable replay handling. Native qualification, sustained fuzzing, scale, independent final
 review, hosted CI, integration and release acceptance retain their existing
 gates. This is a local implementation checkpoint.

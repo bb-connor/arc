@@ -151,8 +151,8 @@ def check(root, catalog):
             errors.append(f"removed shared FROST package reintroduced: {path}")
         if "with_strict_tenant_isolation" in text or "include_null_tenant" in text:
             errors.append(f"tenant compatibility fallback reintroduced: {path}")
-    if len(re.findall(r"\.secret_bytes\s*\(", files[catalog["frost_secret_owner"]])) != 1:
-        errors.append("encrypted custody must have exactly one FROST plaintext extraction site")
+    if len(re.findall(r"\.secret_bytes\s*\(", files[catalog["frost_secret_owner"]])) != catalog["frost_secret_extraction_sites"]:
+        errors.append("encrypted custody FROST plaintext extraction inventory changed")
     return errors, found
 
 

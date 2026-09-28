@@ -46,7 +46,8 @@ pub use frost_ceremony::{
     verify_frost_ceremony_round1_transcript, verify_frost_ceremony_transcript,
     FrostCeremonyCompletion, FrostCeremonyConfig, FrostCeremonyError, FrostCeremonyParticipant,
     FrostCeremonySecret, FrostCeremonySecretKind, FrostDkgRound, FrostRound1Package,
-    FrostRound1Transition, FrostRound2Metadata, FrostRound2Package, FrostRound2Transition,
+    FrostRound1Transition, FrostRound2Package, FrostRound2Transition, FrostSealingError,
+    FrostSealingKey, SealedFrostRound2Package, X25519PublicKey,
 };
 pub use frost_coordinator::{
     aggregate_frost_authorization, build_frost_signing_package, frost_participant_identifier_bytes,

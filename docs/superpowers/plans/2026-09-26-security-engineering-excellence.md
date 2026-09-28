@@ -807,6 +807,9 @@ The per-store, four-cutpoint mutation campaign above is a separate acceptance it
 - [ ] Complete the broader wire/file/database reader census and migration.
 
 Implementation and focused evidence: [trust-boundary execution](../../reviews/2026-09-27-trust-boundary-execution.md).
+The subsequent [sealed ceremony batch](../../reviews/2026-09-27-frost-sealed-ceremony-execution.md)
+adds constrained canonical readers for every FROST store record. Broader census
+closure remains open.
 
 #### 10.3 Classify tenant scoping by the enforcing principal (S3, corrected by the external review's R4)
 

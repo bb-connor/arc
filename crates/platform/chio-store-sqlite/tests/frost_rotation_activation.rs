@@ -414,6 +414,10 @@ fn complete_target_ceremony(
             participant_id: format!("operator-{}", index + 1),
             transport_key_id: format!("operator-{}.dkg.v1", index + 1),
             transport_public_key: key.public_key(),
+            sealing_key_id: format!("operator-{}.sealing.v1", index + 1),
+            sealing_public_key: test_sealing_key_for(index)
+                .public_key()
+                .unwrap_or_else(|e| panic!("fixture sealing key: {e}")),
         })
         .collect::<Vec<_>>();
     let configs = (0..3)
@@ -433,6 +437,7 @@ fn complete_target_ceremony(
         .begin_ceremony(
             &configs[0],
             &transport_keys[0],
+            &test_sealing_key(&configs[0]),
             &custody,
             &mut local_rng,
             &authority.mutation_fence(),
@@ -443,8 +448,13 @@ fn complete_target_ceremony(
     let mut peer_secrets = Vec::new();
     for index in 1..3 {
         let mut rng = ChaCha20Rng::from_seed([0x51 + index as u8; 32]);
-        let transition = begin_frost_ceremony(&configs[index], &transport_keys[index], &mut rng)
-            .unwrap_or_else(|error| panic!("peer round one: {error}"));
+        let transition = begin_frost_ceremony(
+            &configs[index],
+            &transport_keys[index],
+            &test_sealing_key(&configs[index]),
+            &mut rng,
+        )
+        .unwrap_or_else(|error| panic!("peer round one: {error}"));
         round1.push(transition.package);
         peer_secrets.push(transition.secret);
     }
@@ -468,6 +478,20 @@ fn complete_target_ceremony(
         )
         .unwrap_or_else(|error| panic!("peer round two: {error}"));
         round2.extend(transition.packages);
+    }
+    for package in round2
+        .iter()
+        .filter(|p| p.recipient_participant_id() == configs[0].local_participant_id)
+    {
+        frost
+            .accept_round2_package(
+                &configs[0],
+                &custody,
+                package,
+                &authority.mutation_fence(),
+                2_500,
+            )
+            .unwrap_or_else(|e| panic!("accept local input: {e}"));
     }
     frost
         .complete_ceremony(
@@ -810,4 +834,19 @@ fn frost_unanchored_rotation_is_discarded_after_restart() {
         .unwrap_or_else(|error| panic!("load active roster: {error}"))
         .unwrap_or_else(|| panic!("active roster must exist"));
     assert_eq!(active.roster_digest, current_roster.roster_digest);
+}
+
+fn test_sealing_key_for(index: usize) -> chio_federation_authority::FrostSealingKey {
+    let byte = u8::try_from(index).unwrap_or_else(|_| panic!("fixture index"));
+    chio_federation_authority::FrostSealingKey::from_custody_bytes(zeroize::Zeroizing::new(
+        [0x80 + byte; 32],
+    ))
+}
+fn test_sealing_key(config: &FrostCeremonyConfig) -> chio_federation_authority::FrostSealingKey {
+    let index = config
+        .participants
+        .iter()
+        .position(|p| p.participant_id == config.local_participant_id)
+        .unwrap_or_else(|| panic!("local fixture participant"));
+    test_sealing_key_for(index)
 }

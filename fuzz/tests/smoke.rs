@@ -31,6 +31,7 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "eval_receipt_bundle",
     "federation_trust_establishment",
     "finding_worker_protocol",
+    "frost_round2_envelope",
     "jwt_vc_verify",
     "mcp_envelope_decode",
     "oid4vp_presentation",
@@ -342,4 +343,12 @@ fn finding_worker_protocol_smoke() {
 fn underwriting_policy_input_smoke() {
     use chio_fuzz::entries::underwriting_policy_input;
     assert_seed_floor("underwriting_policy_input", underwriting_policy_input);
+}
+
+#[test]
+fn frost_round2_envelope_smoke() {
+    assert_seed_floor(
+        "frost_round2_envelope",
+        chio_fuzz::entries::frost_round2_envelope,
+    );
 }

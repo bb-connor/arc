@@ -977,20 +977,18 @@ fn advance_record(
 fn stored_bound_checkpoint(
     stored: &StoredCoordinator,
 ) -> Result<FrostAuthorizationSlotCheckpointV1, FrostStoreError> {
-    serde_json::from_slice(&stored.bound_checkpoint_json)
-        .map_err(|error| invalid(error.to_string()))
+    crate::frost_store::decode_record(&stored.bound_checkpoint_json)
 }
 
 fn stored_authorization(
     stored: &StoredCoordinator,
 ) -> Result<FrostAuthorizationV1, FrostStoreError> {
-    serde_json::from_slice(
+    crate::frost_store::decode_record(
         stored
             .authorization_blob
             .as_deref()
             .ok_or_else(|| invalid("coordinator authorization bytes are absent"))?,
     )
-    .map_err(|error| invalid(error.to_string()))
 }
 
 fn public_record(stored: &StoredCoordinator) -> FrostCoordinatorSessionRecord {

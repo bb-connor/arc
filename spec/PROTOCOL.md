@@ -330,12 +330,37 @@ Verifier builds also expose the same IDs through
 `KNOWN_SIGNED_ARTIFACT_SCHEMAS`. Unknown signed-artifact schemas are rejected at
 load time and again at signature verification time.
 
-The FROST quorum substrate registers four signed artifact schemas:
+The FROST quorum substrate and sealed ceremony register five signed artifact schemas:
 
+- `chio.frost.dkg-round2-sealed.v1`
 - `chio.frost.roster.v1`
 - `chio.frost.epoch-checkpoint.v1`
 - `chio.frost.authorization-slot-checkpoint.v1`
 - `chio.frost.authorization.v1`
+
+Round-two DKG shares MUST be transported only as recipient-bound sealed packages.
+Every participant registers a separate X25519 sealing key and Ed25519 signing key;
+the ceremony roster digest covers both. The v1 suite is
+`X25519HkdfSha256ChaCha20Poly1305`: HKDF-SHA256 uses the decoded roster digest
+as salt and canonical metadata as info, producing 32 key bytes and 12 nonce
+bytes. Metadata contains every field except `ciphertext` and
+`transportSignature`, including `round: 2`. It is also the AEAD associated data.
+The sender signs the concatenation of canonical metadata and raw ciphertext.
+
+Receivers MUST compare the ceremony, epoch, roster, round, recipient and key id
+with their validated local configuration before opening. They MUST authenticate
+the sender against that roster before decrypting. Accepting an envelope and
+persisting its opened share under encrypted custody MUST be atomic and durable.
+The acceptance key is `(ceremony_id, key_epoch, round, sender, recipient)`.
+An identical envelope digest is an idempotent retry; a different authenticated,
+decryptable envelope for an accepted key MUST durably fail the ceremony before
+returning the conflict. Failed configurations cannot restart. A fresh epoch is
+required. Invalid unauthenticated input MUST NOT fail an otherwise valid ceremony.
+
+Completion authenticates the full public ciphertext transcript and consumes only
+recipient-local accepted shares. It MUST NOT request other participants' plaintext
+shares. The transcript digest commits the round-one digest and the canonically
+sorted sealed envelopes under `chio.frost.sealed-transcript.digest.v1\0`.
 
 The parametric-insurance contract registers one signed artifact schema:
 

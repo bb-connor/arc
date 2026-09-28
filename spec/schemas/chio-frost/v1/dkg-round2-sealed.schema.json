@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-frost/v1/dkg-round2-sealed.schema.json",
+  "title": "FROST recipient-bound sealed round-two package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "suite",
+    "ceremonyId",
+    "participantSetDigest",
+    "keyEpoch",
+    "round",
+    "senderParticipantId",
+    "recipientParticipantId",
+    "recipientSealingKeyId",
+    "senderEphemeralPublicKey",
+    "ciphertext",
+    "transportKeyId",
+    "transportSignature"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.frost.dkg-round2-sealed.v1"
+    },
+    "suite": {
+      "const": "X25519HkdfSha256ChaCha20Poly1305"
+    },
+    "ceremonyId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "participantSetDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "keyEpoch": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 18446744073709551615
+    },
+    "round": {
+      "const": 2
+    },
+    "senderParticipantId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "recipientParticipantId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "recipientSealingKeyId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "senderEphemeralPublicKey": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "minItems": 32,
+      "maxItems": 32
+    },
+    "ciphertext": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "minItems": 17,
+      "maxItems": 4096
+    },
+    "transportKeyId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "transportSignature": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{128}$"
+    }
+  }
+}

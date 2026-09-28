@@ -3320,6 +3320,8 @@ dependencies = [
 name = "chio-federation-authority"
 version = "0.1.0"
 dependencies = [
+ "aws-lc-rs",
+ "chacha20poly1305",
  "chio-attest-buyer-core",
  "chio-core-types",
  "chio-federation",

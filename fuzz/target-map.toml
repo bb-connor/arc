@@ -424,3 +424,10 @@ path = "fuzz/fuzz_targets/response_lifecycle.rs"
 triggers = ["crates/security/chio-quarantine/**", "crates/security/chio-security-types/src/response*", "crates/security/chio-security-types/src/clock*", "fuzz/fuzz_targets/response_lifecycle.rs", "fuzz/corpus/response_lifecycle/**"]
 seeds = "fuzz/corpus/response_lifecycle"
 notes = "Production response state machine and overlap simulator, with apply, retry, reconstruction, expiry and rollback seeds."
+
+[targets.frost_round2_envelope]
+crate = "chio-federation-authority"
+path = "fuzz/fuzz_targets/frost_round2_envelope.rs"
+triggers = ["crates/trust/chio-federation-authority/src/frost_ceremony.rs", "crates/trust/chio-federation-authority/src/frost_ceremony/**", "crates/platform/chio-store-sqlite/src/frost_store/ceremony/**", "fuzz/fuzz_targets/frost_round2_envelope.rs", "fuzz/src/entries.rs", "fuzz/src/entries/frost_round2_envelope.rs", "fuzz/corpus/frost_round2_envelope/**"]
+seeds = "fuzz/corpus/frost_round2_envelope"
+notes = "Bounded signed input, context, roster, signature and recipient decryption against the three-of-five fixture."

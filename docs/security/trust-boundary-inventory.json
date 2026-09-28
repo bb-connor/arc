@@ -5,6 +5,20 @@
     "crates/platform/chio-control-plane/src/security/active_response_authority/client.rs",
     "crates/platform/chio-control-plane/src/security/active_response_authority/validation.rs",
     "crates/platform/chio-manifest/src/admission.rs",
+    "crates/platform/chio-store-sqlite/src/frost_store/ceremony.rs",
+    "crates/platform/chio-store-sqlite/src/frost_store/ceremony/custody_output.rs",
+    "crates/platform/chio-store-sqlite/src/frost_store/ceremony/inbox.rs",
+    "crates/platform/chio-store-sqlite/src/frost_store/commit.rs",
+    "crates/platform/chio-store-sqlite/src/frost_store/coordinator.rs",
+    "crates/platform/chio-store-sqlite/src/frost_store/coordinator/persistence.rs",
+    "crates/platform/chio-store-sqlite/src/frost_store/coordinator/validation.rs",
+    "crates/platform/chio-store-sqlite/src/frost_store/input.rs",
+    "crates/platform/chio-store-sqlite/src/frost_store/mod.rs",
+    "crates/platform/chio-store-sqlite/src/frost_store/rotation.rs",
+    "crates/platform/chio-store-sqlite/src/frost_store/rotation_validation.rs",
+    "crates/platform/chio-store-sqlite/src/frost_store/schema.rs",
+    "crates/platform/chio-store-sqlite/src/frost_store/signer.rs",
+    "crates/platform/chio-store-sqlite/src/frost_store/signer/persistence.rs",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs",
     "crates/security/chio-active-response-authority/src/config.rs",
@@ -16,7 +30,8 @@
     "crates/security/chio-secret-broker/src/authority_ipc.rs",
     "crates/security/chio-secret-broker/src/daemon.rs",
     "crates/security/chio-secret-broker/src/daemon_runtime.rs",
-    "crates/security/chio-secret-broker/src/ipc_client.rs"
+    "crates/security/chio-secret-broker/src/ipc_client.rs",
+    "crates/trust/chio-federation-authority/src/frost_ceremony/sealing.rs"
   ],
   "tables": {
     "admission_operation_authorization_consumptions": {
@@ -460,6 +475,9 @@
     "crates/platform/chio-control-plane/src/security/active_response_authority/client.rs::call::from_wire",
     "crates/platform/chio-control-plane/src/security/active_response_authority/validation.rs::decode_authority_request::from_wire",
     "crates/platform/chio-manifest/src/admission.rs::read_existing_signed_manifest::new",
+    "crates/platform/chio-store-sqlite/src/frost_store/ceremony.rs::decode_config::from_wire",
+    "crates/platform/chio-store-sqlite/src/frost_store/ceremony/custody_output.rs::decrypt::from_wire",
+    "crates/platform/chio-store-sqlite/src/frost_store/input.rs::decode_record::from_wire",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_stored_json::new",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs::decode_signed_json::new",
     "crates/security/chio-active-response-authority/src/config.rs::load_runtime_config::from_wire",
@@ -474,7 +492,8 @@
     "crates/security/chio-secret-broker/src/authority_ipc.rs::serve_stream::from_wire",
     "crates/security/chio-secret-broker/src/daemon.rs::decode_canonical_payload::from_wire",
     "crates/security/chio-secret-broker/src/daemon_runtime.rs::load::from_wire",
-    "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response::from_wire"
+    "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response::from_wire",
+    "crates/trust/chio-federation-authority/src/frost_ceremony/sealing.rs::from_wire::from_wire"
   ],
   "raw_decoders": [
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_child_receipt::from_value",
@@ -483,7 +502,8 @@
     "crates/security/chio-active-response-authority/src/store.rs::validate_artifact_records::from_value",
     "crates/security/chio-active-response-authority/src/store.rs::validate_policy_records::from_value",
     "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response::from_value",
-    "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice"
+    "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice",
+    "crates/trust/chio-federation-authority/src/frost_ceremony/sealing.rs::deserialize::from_slice"
   ],
   "schemas": {
     "security_participant_egress_events": [
@@ -2639,7 +2659,8 @@
     "crates/security/chio-active-response-authority/src/store.rs::validate_artifact_records::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
     "crates/security/chio-active-response-authority/src/store.rs::validate_policy_records::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
     "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
-    "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice": "This-process canonical serialization replay; no external raw bytes."
+    "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice": "This-process canonical serialization replay; no external raw bytes.",
+    "crates/trust/chio-federation-authority/src/frost_ceremony/sealing.rs::deserialize::from_slice": "Public verification-share projection; load_ceremony verifies the complete canonical row digest and committed projection before completion_from_row decodes this field."
   },
   "proofs": [
     {
@@ -2659,5 +2680,6 @@
       "path": "crates/kernel/chio-kernel/src/receipt_query.rs"
     }
   ],
-  "frost_secret_owner": "crates/platform/chio-store-sqlite/src/frost_store/ceremony/custody_output.rs"
+  "frost_secret_owner": "crates/platform/chio-store-sqlite/src/frost_store/ceremony/inbox.rs",
+  "frost_secret_extraction_sites": 2
 }

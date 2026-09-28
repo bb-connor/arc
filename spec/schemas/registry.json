@@ -516,6 +516,12 @@
       "schemaFile": "spec/schemas/chio-frost/v1/authorization.schema.json"
     },
     {
+      "schema": "chio.frost.dkg-round2-sealed.v1",
+      "artifactKind": "frost_dkg_round2_sealed",
+      "introducedBy": "frost-sealed-ceremony-v1",
+      "schemaFile": "spec/schemas/chio-frost/v1/dkg-round2-sealed.schema.json"
+    },
+    {
       "schema": "chio.frost.epoch-checkpoint.v1",
       "artifactKind": "frost_epoch_checkpoint",
       "introducedBy": "frost-quorum-substrate-v1",

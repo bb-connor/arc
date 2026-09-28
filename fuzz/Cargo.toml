@@ -42,6 +42,7 @@ response_authority_protocol = ["dep:chio-control-plane"]
 response_lifecycle = ["dep:chio-quarantine"]
 
 [dependencies]
+zeroize = "1.8"
 chio-control-plane = { path = "../crates/platform/chio-control-plane", features = ["fuzz"], optional = true }
 chio-quarantine = { path = "../crates/security/chio-quarantine", features = ["fuzz"], optional = true }
 chio-a2a-adapter = { path = "../crates/protocol/chio-a2a-adapter", features = ["fuzz"] }
@@ -56,6 +57,7 @@ chio-core = { path = "../crates/core/chio-core" }
 chio-core-types = { path = "../crates/core/chio-core-types" }
 chio-data-guards = { path = "../crates/guards/chio-data-guards" }
 chio-eval-receipt = { path = "../crates/sdk/chio-eval-receipt" }
+chio-federation-authority = { path = "../crates/trust/chio-federation-authority" }
 chio-federation = { path = "../crates/trust/chio-federation" }
 chio-finding-worker = { path = "../crates/platform/chio-finding-worker" }
 chio-guards = { path = "../crates/guards/chio-guards" }
@@ -316,6 +318,13 @@ bench = false
 name = "response_lifecycle"
 required-features = ["response_lifecycle"]
 path = "fuzz_targets/response_lifecycle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "frost_round2_envelope"
+path = "fuzz_targets/frost_round2_envelope.rs"
 test = false
 doc = false
 bench = false

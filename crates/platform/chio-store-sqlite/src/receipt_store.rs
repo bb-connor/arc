@@ -1402,8 +1402,8 @@ fn receipt_commit_actor_loop(
                         commit_receipt_batch_with_completions(
                             &pool,
                             &mut head_state,
-                            incremental_verification,
-                            ReceiptBatchDurability {
+                            ReceiptWriterQualification {
+                                incremental_verification,
                                 rollback_anchor: rollback_anchor.as_deref(),
                                 sink_qualification: sink_qualification.as_deref(),
                             },
@@ -1485,8 +1485,7 @@ fn receipt_commit_actor_loop(
                         &health,
                         checkpoint_signer,
                         &mut pending_flush_error,
-                        command,
-                        permit,
+                        (command, permit),
                     ) {
                         return outcome;
                     }
@@ -1511,8 +1510,7 @@ fn receipt_commit_actor_loop(
                     &health,
                     checkpoint_signer,
                     &mut pending_flush_error,
-                    other,
-                    permit,
+                    (other, permit),
                 ) {
                     return outcome;
                 }
@@ -1529,8 +1527,7 @@ fn handle_non_append_command(
     health: &ReceiptCommitWriterHealth,
     checkpoint_signer: &mut Option<BackgroundCheckpointSigner>,
     pending_flush_error: &mut Option<ReceiptStoreError>,
-    command: ReceiptCommitCommand,
-    mut permit: WriterCommandPermit,
+    (command, mut permit): (ReceiptCommitCommand, WriterCommandPermit),
 ) -> Option<SupervisedOutcome> {
     let ReceiptWriterQualification {
         incremental_verification,
@@ -2337,8 +2334,8 @@ fn commit_receipt_batch(
     commit_receipt_batch_with_completions(
         pool,
         head_state,
-        incremental_verification,
-        ReceiptBatchDurability {
+        ReceiptWriterQualification {
+            incremental_verification,
             rollback_anchor,
             sink_qualification: None,
         },
@@ -2349,16 +2346,10 @@ fn commit_receipt_batch(
     )
 }
 
-struct ReceiptBatchDurability<'a> {
-    rollback_anchor: Option<&'a crate::rollback_generation::RollbackGenerationAnchor>,
-    sink_qualification: Option<&'a ReceiptSinkQualification>,
-}
-
 fn commit_receipt_batch_with_completions(
     pool: &Pool<SqliteConnectionManager>,
     head_state: &mut WriterHeadState,
-    incremental_verification: bool,
-    durability: ReceiptBatchDurability<'_>,
+    qualification: ReceiptWriterQualification<'_>,
     requests: Vec<ReceiptCommitRequest>,
     health: &ReceiptCommitWriterHealth,
     mut completions: Vec<WriterCommandCompletion>,
@@ -2369,9 +2360,9 @@ fn commit_receipt_batch_with_completions(
             match append_receipt_batch(
                 pool,
                 head,
-                incremental_verification,
-                durability.rollback_anchor,
-                durability.sink_qualification,
+                qualification.incremental_verification,
+                qualification.rollback_anchor,
+                qualification.sink_qualification,
                 &requests,
             ) {
                 Ok(results) => {

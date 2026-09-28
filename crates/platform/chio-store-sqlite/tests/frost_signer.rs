@@ -67,6 +67,8 @@ fn create_private_directory(path: &Path) {
 }
 
 struct CompletedCeremony {
+    config: FrostCeremonyConfig,
+    conflicting_envelope: chio_federation_authority::SealedFrostRound2Package,
     stored: StoredFrostCeremonyCompletion,
     peer_key_package: FrostCeremonySecret,
     public_key_package: Vec<u8>,
@@ -158,6 +160,10 @@ fn complete_ceremony(
             participant_id: format!("operator-{}", index + 1),
             transport_key_id: format!("operator-{}.dkg.v1", index + 1),
             transport_public_key: key.public_key(),
+            sealing_key_id: format!("operator-{}.sealing.v1", index + 1),
+            sealing_public_key: test_sealing_key_for(index)
+                .public_key()
+                .unwrap_or_else(|e| panic!("fixture sealing key: {e}")),
         })
         .collect::<Vec<_>>();
     let configs = (0..3)
@@ -175,6 +181,7 @@ fn complete_ceremony(
         .begin_ceremony(
             &configs[0],
             &transport_keys[0],
+            &test_sealing_key(&configs[0]),
             &custody(),
             &mut local_rng,
             &authority.mutation_fence(),
@@ -185,8 +192,13 @@ fn complete_ceremony(
     let mut peer_secrets = Vec::new();
     for index in 1..3 {
         let mut rng = ChaCha20Rng::from_seed([0xc1 + index as u8; 32]);
-        let transition = begin_frost_ceremony(&configs[index], &transport_keys[index], &mut rng)
-            .unwrap_or_else(|error| panic!("peer round one: {error}"));
+        let transition = begin_frost_ceremony(
+            &configs[index],
+            &transport_keys[index],
+            &test_sealing_key(&configs[index]),
+            &mut rng,
+        )
+        .unwrap_or_else(|error| panic!("peer round one: {error}"));
         round1.push(transition.package);
         peer_secrets.push(transition.secret);
     }
@@ -200,6 +212,18 @@ fn complete_ceremony(
             2_000,
         )
         .unwrap_or_else(|error| panic!("local round two: {error}"));
+    let repeated = FrostCeremonySecret::from_custody_bytes(
+        chio_federation_authority::FrostCeremonySecretKind::Round1,
+        zeroize::Zeroizing::new(peer_secrets[0].custody_bytes().to_vec()),
+    )
+    .unwrap_or_else(|e| panic!("repeat fixture: {e}"));
+    let conflicting_envelope =
+        advance_frost_ceremony(&configs[1], &transport_keys[1], repeated, &round1)
+            .unwrap_or_else(|e| panic!("equivocation fixture: {e}"))
+            .packages
+            .into_iter()
+            .find(|p| p.recipient_participant_id() == configs[0].local_participant_id)
+            .unwrap_or_else(|| panic!("local recipient"));
     let mut round2 = local_round2.packages;
     let mut peer_round2_secrets = Vec::new();
     for index in 1..3 {
@@ -213,6 +237,20 @@ fn complete_ceremony(
         peer_round2_secrets.push(transition.secret);
         round2.extend(transition.packages);
     }
+    for package in round2
+        .iter()
+        .filter(|p| p.recipient_participant_id() == configs[0].local_participant_id)
+    {
+        frost
+            .accept_round2_package(
+                &configs[0],
+                &custody(),
+                package,
+                &authority.mutation_fence(),
+                2_500,
+            )
+            .unwrap_or_else(|e| panic!("accept local input: {e}"));
+    }
     let stored = frost
         .complete_ceremony(
             &configs[0],
@@ -223,10 +261,17 @@ fn complete_ceremony(
             3_000,
         )
         .unwrap_or_else(|error| panic!("complete ceremony: {error}"));
-    let peer =
-        complete_frost_ceremony(&configs[1], peer_round2_secrets.remove(0), &round1, &round2)
-            .unwrap_or_else(|error| panic!("complete peer ceremony: {error}"));
+    let peer = complete_frost_ceremony(
+        &configs[1],
+        peer_round2_secrets.remove(0),
+        &round1,
+        &round2,
+        opened_packages(&configs[1], &round2),
+    )
+    .unwrap_or_else(|error| panic!("complete peer ceremony: {error}"));
     CompletedCeremony {
+        config: configs[0].clone(),
+        conflicting_envelope,
         stored,
         peer_key_package: peer.key_package,
         public_key_package: peer.public_key_package,
@@ -1236,3 +1281,34 @@ fn frost_restored_pre_transition_signer_snapshot_is_rejected_by_global_anchor() 
     restore_database_in_place(&fixture.database, &snapshot);
     assert!(SqliteAuthorityStore::open_serving(&fixture.database, &fixture.lock_root).is_err());
 }
+
+fn test_sealing_key_for(index: usize) -> chio_federation_authority::FrostSealingKey {
+    let byte = u8::try_from(index).unwrap_or_else(|_| panic!("fixture index"));
+    chio_federation_authority::FrostSealingKey::from_custody_bytes(zeroize::Zeroizing::new(
+        [0x80 + byte; 32],
+    ))
+}
+fn test_sealing_key(config: &FrostCeremonyConfig) -> chio_federation_authority::FrostSealingKey {
+    let index = config
+        .participants
+        .iter()
+        .position(|p| p.participant_id == config.local_participant_id)
+        .unwrap_or_else(|| panic!("local fixture participant"));
+    test_sealing_key_for(index)
+}
+fn opened_packages(
+    config: &FrostCeremonyConfig,
+    packages: &[chio_federation_authority::SealedFrostRound2Package],
+) -> Vec<chio_federation_authority::FrostRound2Package> {
+    packages
+        .iter()
+        .filter(|p| p.recipient_participant_id() == config.local_participant_id)
+        .map(|p| {
+            p.open(config, &test_sealing_key(config))
+                .unwrap_or_else(|e| panic!("open fixture: {e}"))
+        })
+        .collect()
+}
+
+#[path = "support/frost_failed_signer.rs"]
+mod failed_ceremony;

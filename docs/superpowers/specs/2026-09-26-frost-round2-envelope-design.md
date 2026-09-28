@@ -1,8 +1,9 @@
 # FROST DKG round-2 packages: sealing design
 
-Status: step 1 implemented locally on 2026-09-27; step 2 sealing remains open.
-The type split, private encrypted custody representation, restart/binding tests
-and extraction-site gate are recorded in
+Status: both steps implemented locally on 2026-09-28. The sealed transport,
+durable inbox and focused verification are recorded in
+[sealed ceremony execution](../../reviews/2026-09-27-frost-sealed-ceremony-execution.md).
+The earlier type split is recorded in
 [trust-boundary execution](../../reviews/2026-09-27-trust-boundary-execution.md).
 This design is the precondition for the Wave 3 lane named in the hardening
 spec (H7) and the dispatch plan. Its original review was against
@@ -102,6 +103,27 @@ form today. The schema string `chio.frost.dkg-package.v1` (`DKG_PACKAGE_SCHEMA`,
 `frost_ceremony.rs:12`) stays with round 1.
 
 ## Step 2: sealing
+
+### Implemented custody and transcript contract
+
+The local sealing seed is encrypted beside the DKG secret under version-two
+custody associated data. Every transition moves that bundle atomically. All
+participants verify the same complete public ciphertext transcript; completion
+consumes only recipient-local opened packages from the durable inbox. It also
+requires the exact previously recorded round-one transcript and local outbound
+envelopes, so re-encryption cannot substitute another delivery transcript.
+
+Inbox acceptance commits the encrypted share, envelope identity and anchored
+projection together. Exact retries are idempotent. A different authenticated,
+decryptable message for the same directed pair commits terminal failure before
+returning an error. Failure also blocks already cached signer material after
+completion and survives restart. A fresh epoch is required to retry the ceremony.
+
+Plaintext has no serde implementation. Its two explicitly inventoried byte
+borrows are owned by encrypted inbox custody (encrypt and compare). Completion
+consumes the opened values and their drop path wipes initialized bytes. The
+unshipped SQLite schema is replaced without a compatibility decoder or migration;
+an older FROST database fails canonical schema validation.
 
 ### Key material
 
@@ -286,7 +308,7 @@ confirms the plaintext is zeroized after the share is installed.
 ## Exit for the lane
 
 Step 1 is one commit and may land as soon as it is reviewed and Lane B has merged. Step 2 is a
-separate commit series: roster change with migration and validation, the
+separate commit series: roster change with validation, the
 sealing primitive with vectors, the transition and verifier changes, the
 negative suite. The hardening spec's H7 acceptance (no secret-bearing struct
 derives `Debug` or `Serialize` on the secret field; `expose_secret()` sites are

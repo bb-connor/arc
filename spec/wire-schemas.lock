@@ -2720,14 +2720,19 @@ files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/trust/chi
 first_seen = "51e46336b1"
 
 [[schema]]
-value = "chio.frost.ceremony-custody-aad.v1"
+value = "chio.frost.ceremony-custody-aad.v2"
 files = ["crates/platform/chio-store-sqlite/src/frost_store/ceremony.rs"]
-first_seen = "51e46336b1"
+first_seen = "21c831d396"
 
 [[schema]]
 value = "chio.frost.dkg-package.v1"
 files = ["crates/trust/chio-federation-authority/src/frost_ceremony.rs"]
 first_seen = "51e46336b1"
+
+[[schema]]
+value = "chio.frost.dkg-round2-sealed.v1"
+files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
+first_seen = "21c831d396"
 
 [[schema]]
 value = "chio.frost.epoch-checkpoint.v1"

@@ -40,7 +40,7 @@ pub(super) fn append_projection_commit(
 ) -> Result<(), FrostStoreError> {
     if !matches!(
         mutation.projection_type,
-        "ceremony" | "rotation" | "signer" | "coordinator"
+        "ceremony" | "ceremony_inbox" | "rotation" | "signer" | "coordinator"
     ) {
         return Err(invalid("unknown FROST projection type"));
     }
@@ -154,7 +154,7 @@ pub(super) fn verify_projection_commit_chains(
             .ok_or_else(|| invalid("projection sequence overflowed"))?;
         if !matches!(
             projection_type.as_str(),
-            "ceremony" | "rotation" | "signer" | "coordinator"
+            "ceremony" | "ceremony_inbox" | "rotation" | "signer" | "coordinator"
         ) || sequence != expected_sequence
             || committed_previous != previous
         {

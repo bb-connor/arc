@@ -1,4 +1,4 @@
-use chio_federation_authority::FrostRound2Package;
+use chio_federation_authority::SealedFrostRound2Package;
 use std::sync::{Arc, MutexGuard};
 
 use chio_core::StoreMutationFence;
@@ -12,6 +12,8 @@ use crate::serving_owner::SqliteServingOwner;
 use crate::store_connection::StoreConnection;
 
 mod ceremony;
+mod input;
+use input::decode_record;
 mod commit;
 mod coordinator;
 mod rotation;
@@ -31,8 +33,14 @@ const FROST_STORE_SCHEMA_ANCHORS: &[&str] = &[
 
 #[derive(Debug, thiserror::Error)]
 pub enum FrostStoreError {
+    #[error(transparent)]
+    SignedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("sqlite FROST store is fenced")]
     Fenced,
+    #[error("FROST ceremony failed after a conflicting authenticated round-two delivery")]
+    CeremonyFailed,
+    #[error("round-two input has not been durably accepted")]
+    Round2NotAccepted,
     #[error("sqlite FROST store conflict: {0}")]
     Conflict(&'static str),
     #[error("sqlite FROST store state is invalid: {0}")]
@@ -97,6 +105,7 @@ pub enum FrostCeremonyState {
     Round1Ready,
     Round2Ready,
     Completed,
+    Failed,
 }
 
 impl FrostCeremonyState {
@@ -105,6 +114,7 @@ impl FrostCeremonyState {
             Self::Round1Ready => "round1_ready",
             Self::Round2Ready => "round2_ready",
             Self::Completed => "completed",
+            Self::Failed => "failed",
         }
     }
 
@@ -113,6 +123,7 @@ impl FrostCeremonyState {
             "round1_ready" => Ok(Self::Round1Ready),
             "round2_ready" => Ok(Self::Round2Ready),
             "completed" => Ok(Self::Completed),
+            "failed" => Ok(Self::Failed),
             _ => Err(FrostStoreError::InvalidState(
                 "unknown ceremony state".to_string(),
             )),
@@ -145,7 +156,7 @@ pub struct FrostCeremonyRound2Record {
     pub ceremony_id: String,
     pub state: FrostCeremonyState,
     pub state_version: u64,
-    pub packages: Vec<FrostRound2Package>,
+    pub packages: Vec<SealedFrostRound2Package>,
     pub round1_transcript_digest: String,
 }
 
@@ -557,7 +568,7 @@ fn owner_error(
 
 enum StoredCeremonyOutput {
     Round1(Box<FrostRound1Package>),
-    Round2(Vec<FrostRound2Package>),
+    Round2(Vec<SealedFrostRound2Package>),
 }
 
 pub(super) fn secret_kind_name(secret: &FrostCeremonySecret) -> &'static str {
