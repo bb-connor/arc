@@ -93,8 +93,11 @@ fn attempted_migration_rolls_back_on_invalid_signed_body_or_charged_projection(
             ReceiptStoreError::Conflict(message) if !invalid_body => {
                 assert!(message.contains("already exists with different cost projection"));
             }
-            ReceiptStoreError::Conflict(message) => {
-                assert!(message.contains("failed to decode"), "{message}");
+            ReceiptStoreError::UntrustedInput(source) if invalid_body => {
+                assert!(matches!(
+                    source.as_ref(),
+                    chio_core::canonical::UntrustedJsonError::SignedInput(_)
+                ));
             }
             other => panic!("wrong migration error: {other}"),
         }

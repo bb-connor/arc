@@ -276,7 +276,7 @@ impl ChioKernel {
             unsafe_ephemeral_financial_dispatch: false,
             guards: std::sync::Arc::new(Vec::new()),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
-            budget_store: Arc::new(InMemoryBudgetStore::with_clock(clock)),
+            budget_store: Arc::new(InMemoryBudgetStore::with_clock(clock.clone())),
             budget_store_lock: Mutex::new(()),
             admission_operation_store: None,
             approval_store: None,
@@ -352,7 +352,10 @@ impl ChioKernel {
             execution_nonce_store: None,
             governed_approval_authority: None,
             approval_replay_store: Some(Box::new(
-                crate::governed_approval_replay::InMemoryGovernedApprovalReplayStore::default(),
+                crate::governed_approval_replay::InMemoryGovernedApprovalReplayStore::with_clock(
+                    crate::governed_approval_replay::DEFAULT_GOVERNED_APPROVAL_REPLAY_CAPACITY,
+                    clock.clone(),
+                ),
             )),
             threshold_approval_requirement_resolver: None,
             signing_authority,
@@ -1768,9 +1771,17 @@ impl ChioKernel {
     /// Once installed, any invocation whose matched grant has `dpop_required == Some(true)`
     /// must carry a valid `DpopProof` on the `ToolCallRequest`. Requests that lack a proof
     /// or whose proof fails verification are denied fail-closed.
-    pub fn set_dpop_store(&mut self, nonce_store: dpop::DpopNonceStore, config: dpop::DpopConfig) {
+    /// The store must be pristine so its clock can be bound to the kernel without
+    /// replacing an observed replay history or its time domain.
+    pub fn set_dpop_store(
+        &mut self,
+        mut nonce_store: dpop::DpopNonceStore,
+        config: dpop::DpopConfig,
+    ) -> Result<(), KernelError> {
+        nonce_store.bind_clock(self.clock.clone())?;
         self.dpop_nonce_store = Some(nonce_store);
         self.dpop_config = Some(config);
+        Ok(())
     }
 
     /// Access the actual configured volatile source for explicit retirement.
@@ -1784,11 +1795,7 @@ impl ChioKernel {
         self.dpop_nonce_store
             .as_ref()
             .map(|store| store as &dyn dpop::replay_source::DpopReplaySourcePort)
-            .ok_or_else(|| {
-                KernelError::DpopVerificationFailed(
-                    "kernel DPoP nonce store not configured".to_owned(),
-                )
-            })
+            .ok_or_else(|| KernelError::Dpop(crate::dpop::DpopError::MissingStore))
     }
 
     pub fn requires_web3_evidence(&self) -> bool {

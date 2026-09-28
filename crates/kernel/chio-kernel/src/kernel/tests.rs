@@ -79,4 +79,9 @@ include!("tests/formal_closure.rs");
 
 #[path = "tests/automatic_active_response_fence.rs"]
 mod automatic_active_response_fence;
-include!("tests/sim_payment.rs");
+#[path = "tests/sim_payment.rs"]
+mod sim_payment;
+use sim_payment::{make_mustprepay_intent, make_no_ceiling_mustprepay_grant};
+
+#[path = "tests/financial_accounting.rs"]
+mod financial_accounting;

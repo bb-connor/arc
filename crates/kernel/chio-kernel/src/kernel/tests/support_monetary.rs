@@ -1262,7 +1262,9 @@ fn make_dpop_kernel_and_cap(
     kernel.register_tool_server(Box::new(EchoServer::new(server, vec![tool])));
 
     let nonce_store = dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300));
-    kernel.set_dpop_store(nonce_store, dpop::DpopConfig::default());
+    kernel
+        .set_dpop_store(nonce_store, dpop::DpopConfig::default())
+        .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
 
     let grant = make_dpop_grant(server, tool);
     let cap = kernel

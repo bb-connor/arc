@@ -429,9 +429,9 @@ impl FindingChallengeCoordinator {
                         )
                         .min(self.status_feed_service_bond.valid_until),
                 },
-                || self.status_commit_clock.now_unix_secs(now),
+                || self.status_commit_now(),
             )
-            .map_err(|error| ChallengeCoordinatorError::ChallengeStore(error.to_string()))?;
+            .map_err(ChallengeCoordinatorError::StatusStore)?;
 
         Ok(AppealResolution::Finalizing(Box::new(authorized)))
     }

@@ -19,7 +19,7 @@ fn finding_challenge_an_appeal_case_id_cannot_be_substituted() -> TestResult {
             &case.upheld.sanction_case_id,
             &case.upheld.hold,
             &hex64('7'),
-            NOW + 20,
+            fixture_commit_time(NOW + 20),
         )
         .expect_err("an unsigned appeal case id can supersede nothing");
     assert!(matches!(
@@ -74,7 +74,7 @@ fn finding_challenge_an_unauthenticated_appeal_supersedes_nothing() -> TestResul
             &case.upheld.sanction_case_id,
             &case.upheld.hold,
             &hex64('7'),
-            NOW + 20,
+            fixture_commit_time(NOW + 20),
         )
         .expect_err("an appeal no pinned authority signed reverses nothing");
     assert!(matches!(
@@ -112,7 +112,7 @@ fn finding_challenge_an_unauthenticated_appeal_supersedes_nothing() -> TestResul
         &case.upheld.sanction_case_id,
         &case.upheld.hold,
         &hex64('7'),
-        NOW + 40,
+        fixture_commit_time(NOW + 40),
     )?;
     assert!(matches!(
         resolution,
@@ -142,7 +142,7 @@ fn finding_challenge_appeal_finality_impairs_and_fences_every_effect_intent() ->
         &case.upheld.sanction_case_id,
         &case.upheld.hold,
         &hex64('7'),
-        APPEAL_FINAL_AT,
+        fixture_commit_time(APPEAL_FINAL_AT),
     )?;
     let AppealResolution::Finalizing(authorized) = resolution else {
         return Err("appeal finality with no reversal authorizes the impairment".into());
@@ -267,7 +267,7 @@ fn finding_challenge_final_penalty_uses_the_rotated_authority_window() -> TestRe
         &case.upheld.sanction_case_id,
         &case.upheld.hold,
         &hex64('7'),
-        resolved_at,
+        fixture_commit_time(resolved_at),
     )?;
     let AppealResolution::Finalizing(authorized) = resolution else {
         return Err("appeal finality under the rotated penalty key must authorize".into());
@@ -314,7 +314,7 @@ fn finding_challenge_final_penalty_requires_current_authority_standing() -> Test
         &case.upheld.sanction_case_id,
         &case.upheld.hold,
         &hex64('7'),
-        deadline.saturating_add(10),
+        fixture_commit_time(deadline.saturating_add(10)),
     );
     assert!(matches!(
         refused,
@@ -355,7 +355,7 @@ fn finding_challenge_appeal_finality_uses_the_sanctions_retained_governance_poli
         &case.upheld.sanction_case_id,
         &case.upheld.hold,
         &hex64('7'),
-        APPEAL_FINAL_AT,
+        fixture_commit_time(APPEAL_FINAL_AT),
     )?;
     assert!(matches!(resolution, AppealResolution::Finalizing(_)));
     Ok(())
@@ -446,7 +446,7 @@ fn finding_challenge_snapshot_refresh_stops_once_exact_enforcement_is_anchored()
 fn finding_challenge_failed_impairment_renews_snapshot_and_retains_root_lineage() -> TestResult {
     let case = finalizing_liability()?;
     let publisher = MiningPublisher::new();
-    case.finalize(&publisher, SETTLEMENT_NOW)?;
+    case.finalize(&publisher, fixture_commit_time(SETTLEMENT_NOW))?;
     assert_eq!(case.intent_state()?, FindingEffectIntentState::Failed);
     let original_binding = case
         .deployment
@@ -478,7 +478,7 @@ fn finding_challenge_failed_impairment_renews_snapshot_and_retains_root_lineage(
         &enforcement_anchor_proof(&refreshed.enforcement)?,
         &ScriptedObservations::qualified(),
         &publisher,
-        refresh_at + 1,
+        fixture_commit_time(refresh_at + 1),
     )?;
     assert!(matches!(
         completed,
@@ -523,7 +523,7 @@ fn finding_challenge_appeal_finality_refuses_a_window_that_has_not_closed() -> T
             &case.upheld.sanction_case_id,
             &case.upheld.hold,
             &hex64('7'),
-            now,
+            fixture_commit_time(now),
         )
     };
 
@@ -617,7 +617,7 @@ fn finding_challenge_unresolved_appeal_quarantines_rather_than_impairing() -> Te
         &case.upheld.sanction_case_id,
         &case.upheld.hold,
         &hex64('7'),
-        NOW + 20,
+        fixture_commit_time(NOW + 20),
     )?;
     assert!(matches!(resolution, AppealResolution::Quarantined { .. }));
     let liability = case
@@ -662,7 +662,7 @@ fn finding_challenge_sealed_accounting_cannot_be_substituted_at_appeal_finality(
             &case.upheld.sanction_case_id,
             &case.upheld.hold,
             &hex64('7'),
-            APPEAL_FINAL_AT,
+            fixture_commit_time(APPEAL_FINAL_AT),
         )
         .expect_err("a substituted distribution must not authorize an impairment");
     assert!(matches!(
@@ -769,7 +769,7 @@ fn finding_challenge_a_second_appeal_finality_mints_no_new_root_intent() -> Test
         &case.upheld.sanction_case_id,
         &case.upheld.hold,
         &hex64('7'),
-        APPEAL_FINAL_AT + 20,
+        fixture_commit_time(APPEAL_FINAL_AT + 20),
     )?
     else {
         return Err("finalizing recovery returns the retained authorization".into());
@@ -803,7 +803,7 @@ fn finding_challenge_a_second_appeal_finality_mints_no_new_root_intent() -> Test
 #[test]
 fn finding_challenge_quarantined_reconciliation_leaves_purchases_blocked() -> TestResult {
     let case = finalizing_liability()?;
-    let outcome = case.finalize(&AmbiguousPublisher, SETTLEMENT_NOW)?;
+    let outcome = case.finalize(&AmbiguousPublisher, fixture_commit_time(SETTLEMENT_NOW))?;
     assert_eq!(
         outcome,
         FindingFinalization::Reconciled(FindingImpairmentOutcome::Quarantined {

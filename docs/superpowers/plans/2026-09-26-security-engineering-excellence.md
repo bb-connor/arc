@@ -45,8 +45,13 @@ The September 28 replay/expiry batch is recorded in
 [replay, expiry and lease accounting](../../reviews/2026-09-28-replay-expiry-execution.md).
 It injects replay/outbox/kernel/serving clocks, removes the expiry-free nonce
 interface and deferred consumption, checks deadline arithmetic, and preserves
-rejection provenance in signed evidence. The arithmetic census now has 238
-classified sites (107 repaired, 400 pending); the ambient-clock gate pins 198
+rejection provenance in signed evidence. The next batch is recorded in
+[replay and commit clock completion](../../reviews/2026-09-28-replay-clock-completion.md).
+It moves process-local DPoP, governed approval, source sealing and Finding commit
+time onto the shared fallible clock; preserves precise DPoP denial codes; and
+replaces receipt accounting clamps and uncapped sentinels with checked arithmetic
+and explicit nullable grant ceilings. The arithmetic census now has 252
+classified sites (117 repaired, 386 pending); the ambient-clock gate pins 179
 remaining sites. These are bounded advances in 3A/4A/4B and Packet 8.
 
 ## Revised execution order
@@ -470,8 +475,8 @@ launch regression typechecks there and requires x86_64 to execute.
 - [x] Retain the `saturating_*` and `wrapping_*` inventory in the security crates,
       kernel and stores: 638 source lines at `4c35ce7867`, including fixtures.
 - [ ] Finish classifying each site as correct-by-intent or defect. The retained
-      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 238
-      sites (107 repaired sites); 400 remain explicitly pending.
+      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 252
+      sites (117 repaired sites); 386 remain explicitly pending.
 - [ ] A `wrapping_*` in an accounting, quota, counter or deadline path is a defect:
       fix it and add the regression.
 - [ ] A `saturating_sub` in an accounting path silently clamps to zero, hiding the
@@ -524,13 +529,17 @@ depend on a deterministically drivable time source.
 
 **Checkpoint (September 27):** The shared contract, three original trait
 migrations, response deadlines, regression gate and bounded proofs are delivered.
-The September 28 gate pins 198 remaining sites including fixtures and the independent Finding
-commit clock. The [execution record](../../reviews/2026-09-27-shared-clock-response-assurance.md)
+The September 28 gate pins 179 remaining sites including fixtures. The independent
+Finding commit clock has been removed; its shared fallible replacement samples
+inside the durable transaction and propagates clock faults without publishing a row. The [execution record](../../reviews/2026-09-27-shared-clock-response-assurance.md)
 records the migrated consumers and deadline classification. Repository-wide
 ambient-time replacement and classification remain open; this does not close Q5.
 The [replay/expiry continuation](../../reviews/2026-09-28-replay-expiry-execution.md)
 adds durable replay and outbox clocks plus the kernel and serving-owner clock
 bindings. Every budget handle derived from one serving owner shares its fence.
+The [completion batch](../../reviews/2026-09-28-replay-clock-completion.md) also binds
+process-local DPoP and default approval custody to the kernel clock. Source seals
+refuse clock faults, and committed replay markers cannot regain rollback ownership.
 
 **Exit:** One clock port, units in the type, skew policy stated once, no direct
 `SystemTime::now()` in the TCB, deadline logic driven deterministically.
@@ -650,6 +659,11 @@ Primitive DTOs remain serialization/storage boundaries. Live arithmetic enters
 checked types; in-memory capture/reversal stage every participant before
 publication. The extracted scalar model retains its proved-precondition
 subtraction, with a full-width Kani refinement against the production type.
+Financial receipt signing now checks ceiling-minus-committed arithmetic across
+inline, denial, reconciliation and durable-terminal paths. Uncapped grant totals
+and remaining balances are explicit nulls; full-width `u64::MAX` remains an actual
+ceiling. Missing budget fields are rejected. Reconciliation requires the lineage
+captured at authorization, with no fallback for older holds.
 Broader quota/lease type adoption above remains open.
 
 **Exit:** The exposure invariant has one implementation, enforced by a type, with a

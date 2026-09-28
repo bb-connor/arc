@@ -297,7 +297,7 @@ fn governed_economic_authorization_metadata(
             .max_amount
             .clone()
             .unwrap_or(chio_core::capability::scope::MonetaryAmount {
-                units: financial.budget_total,
+                units: financial.budget_total.unwrap_or(financial.cost_charged),
                 currency: financial.currency.clone(),
             });
     let hold_amount_units = financial.attempted_cost.or_else(|| {

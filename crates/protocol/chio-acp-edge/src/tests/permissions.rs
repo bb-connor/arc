@@ -1,3 +1,5 @@
+use super::*;
+
 // ---- Category inference tests ----
 
 #[test]
@@ -192,10 +194,12 @@ fn permission_preview_accepts_valid_dpop_without_consuming_invocation_nonce() {
     let issuer = config.keypair.clone();
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(test_server()));
-    kernel.set_dpop_store(
-        dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)),
-        dpop::DpopConfig::default(),
-    );
+    kernel
+        .set_dpop_store(
+            dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)),
+            dpop::DpopConfig::default(),
+        )
+        .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
     let subject = Keypair::generate();
     let capability = capability_for_tool_with_dpop_requirement(
         &issuer,
@@ -246,14 +250,16 @@ fn jsonrpc_permission_preview_uses_kernel_dpop_config() {
     let config = test_kernel_config();
     let issuer = config.keypair.clone();
     let mut kernel = ChioKernel::new(config);
-    kernel.set_dpop_store(
-        dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)),
-        dpop::DpopConfig {
-            proof_ttl_secs: 5,
-            max_clock_skew_secs: 0,
-            nonce_store_capacity: 1024,
-        },
-    );
+    kernel
+        .set_dpop_store(
+            dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)),
+            dpop::DpopConfig {
+                proof_ttl_secs: 5,
+                max_clock_skew_secs: 0,
+                nonce_store_capacity: 1024,
+            },
+        )
+        .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
     let subject = Keypair::generate();
     let capability = capability_for_tool_with_dpop_requirement(
         &issuer,

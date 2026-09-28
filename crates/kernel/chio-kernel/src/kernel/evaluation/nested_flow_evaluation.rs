@@ -281,11 +281,7 @@ impl ChioKernel {
             .any(|matching| matching.grant.dpop_required == Some(true));
         if dpop_required {
             let verification = request.dpop_proof.as_ref().map_or_else(
-                || {
-                    Err(KernelError::DpopVerificationFailed(
-                        "grant requires DPoP proof but none was provided".to_string(),
-                    ))
-                },
+                || Err(KernelError::Dpop(crate::dpop::DpopError::MissingProof)),
                 |proof| {
                     self.verify_dpop_for_permission_preview(
                         proof,
@@ -297,9 +293,7 @@ impl ChioKernel {
                 },
             );
             if let Err(e) = verification {
-                let msg = e.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "DPoP verification failed");
-                return self.build_deny_response(request, &msg, now, None);
+                return self.deny_admission_error(request, &e, now, None);
             }
         }
 

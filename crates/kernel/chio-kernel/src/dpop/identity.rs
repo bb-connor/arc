@@ -17,9 +17,7 @@ pub fn validate_dpop_replay_identity(nonce: &str, capability_id: &str) -> Result
 
 pub(super) fn validate_part(value: &str) -> Result<(), KernelError> {
     if value.len() > MAX_DPOP_REPLAY_IDENTITY_PART_BYTES {
-        return Err(KernelError::DpopVerificationFailed(
-            "replay identity exceeds the 4096-byte limit".to_owned(),
-        ));
+        return Err(KernelError::Dpop(super::DpopError::IdentityLimit));
     }
     Ok(())
 }
@@ -36,15 +34,11 @@ pub(super) fn retained_bytes(
         .checked_add(capability_id.len())
         .and_then(|bytes| bytes.checked_add(capability_id.len()))
         .and_then(|bytes| bytes.checked_add(owner.map_or(0, str::len)))
-        .ok_or_else(|| {
-            KernelError::DpopVerificationFailed("replay identity byte count overflow".to_owned())
-        })
+        .ok_or_else(|| KernelError::Dpop(super::DpopError::IdentityOverflow))
 }
 
 pub(super) fn byte_budget_error() -> KernelError {
-    KernelError::DpopVerificationFailed(
-        "nonce store identity byte capacity exhausted; denying replay admission".to_owned(),
-    )
+    KernelError::Dpop(super::DpopError::IdentityCapacity)
 }
 
 #[cfg(test)]

@@ -5,6 +5,10 @@ use serde::{Deserialize, Serialize};
 use crate::capability::scope::MonetaryAmount;
 use crate::oracle::OracleConversionEvidence;
 
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests;
+
 pub const CHIO_CHANNEL_RECEIPT_METADATA_SCHEMA: &str = "chio.channel.receipt-metadata.v1";
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -61,18 +65,14 @@ impl ChannelReceiptMetadataV1 {
 ///
 /// Callers constructing this struct must uphold the following invariants:
 ///
-/// - `cost_charged <= budget_total`: the amount charged for a single invocation
-///   must not exceed the total budget allocation.
-/// - `budget_remaining == budget_total - cost_charged` (approximately): the
-///   remaining budget field should reflect the post-charge balance. Due to HA
-///   split-brain scenarios, `budget_remaining` may be a best-effort snapshot
-///   rather than a strict invariant at read time, but callers must ensure it is
-///   computed correctly at write time.
-/// - For denial receipts, `cost_charged` should be 0 and `attempted_cost`
-///   should hold the cost that was rejected.
+/// - A capped grant has both `budget_total` and `budget_remaining`. Remaining
+///   equals its ceiling minus cumulative committed usage at the recorded transition.
+/// - An uncapped grant has null for both fields. Invocation exposure is not a
+///   cumulative grant ceiling, and no numeric sentinel means unlimited.
+/// - Denials charge zero; `attempted_cost` records the refused cost. A reported
+///   overrun can exceed authorization only with failed settlement evidence.
 ///
-/// These invariants are not enforced by the type system and must be upheld by
-/// the kernel when constructing financial metadata.
+/// The kernel checks subtraction before signing; consumers must preserve nulls.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FinancialReceiptMetadata {
     /// Index of the matching grant in the capability token's scope.
@@ -81,10 +81,12 @@ pub struct FinancialReceiptMetadata {
     pub cost_charged: u64,
     /// ISO 4217 currency code (e.g. "USD").
     pub currency: String,
-    /// Remaining budget after this charge, in currency minor units.
-    pub budget_remaining: u64,
-    /// Total budget for this grant, in currency minor units.
-    pub budget_total: u64,
+    /// Remaining grant budget at the accounting transition; null for an uncapped grant.
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub budget_remaining: Option<u64>,
+    /// Signed grant ceiling; null for an uncapped grant. u64::MAX is a real ceiling.
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub budget_total: Option<u64>,
     /// Depth of the delegation chain at the time of invocation.
     pub delegation_depth: u32,
     /// Identifier of the root budget holder in the delegation chain.
@@ -271,8 +273,10 @@ pub struct EconomicBudgetReceiptMetadata {
     pub grant_index: u32,
     pub cost_charged: u64,
     pub currency: String,
-    pub budget_remaining: u64,
-    pub budget_total: u64,
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub budget_remaining: Option<u64>,
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub budget_total: Option<u64>,
     pub delegation_depth: u32,
     pub root_budget_holder: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

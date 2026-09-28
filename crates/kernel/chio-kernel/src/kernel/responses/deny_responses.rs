@@ -23,11 +23,7 @@ impl ChioKernel {
                 .map(|m| m.currency.clone())
                 .or_else(|| grant.max_total_cost.as_ref().map(|m| m.currency.clone()))
                 .unwrap_or_else(|| "USD".to_string());
-            let budget_total = grant
-                .max_total_cost
-                .as_ref()
-                .map(|m| m.units)
-                .unwrap_or(u64::MAX);
+            let budget_total = grant.max_total_cost.as_ref().map(|m| m.units);
             let attempted_cost = grant
                 .max_cost_per_invocation
                 .as_ref()
@@ -38,11 +34,17 @@ impl ChioKernel {
             let (payment_reference, settlement_status) =
                 ReceiptSettlement::not_applicable().into_receipt_parts();
 
+            let usage = self.with_budget_store(|store| Ok(store.get_usage(&cap.id, mg.index)?))?;
+            let committed = usage
+                .map(|usage| usage.committed_cost_units())
+                .transpose()?
+                .unwrap_or(0);
+            let budget_remaining = financial_budget_remaining(budget_total, committed)?;
             let financial_meta = FinancialReceiptMetadata {
                 grant_index: mg.index as u32,
                 cost_charged: 0,
                 currency,
-                budget_remaining: budget_total,
+                budget_remaining,
                 budget_total,
                 delegation_depth,
                 root_budget_holder,
@@ -153,9 +155,8 @@ impl ChioKernel {
         let root_budget_holder = cap.issuer.to_hex();
         let (payment_reference, settlement_status) =
             ReceiptSettlement::not_applicable().into_receipt_parts();
-        let budget_remaining = charge
-            .budget_total
-            .saturating_sub(committed_cost_after_release);
+        let budget_remaining =
+            financial_budget_remaining(charge.budget_total, committed_cost_after_release)?;
 
         let financial_meta = FinancialReceiptMetadata {
             grant_index: charge.grant_index as u32,

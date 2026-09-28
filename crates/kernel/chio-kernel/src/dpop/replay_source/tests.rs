@@ -242,7 +242,7 @@ fn unrepresentable_inventory_is_refused_without_reset_or_retirement() {
         state.cache.put(
             (oversized.clone(), "cap".to_owned()),
             DpopNonceEntry {
-                retention: ReplayRetention::signed_through_unix_secs(u64::MAX),
+                retention: ReplayHorizon::Through(u64::MAX).project(SystemClock.read().unwrap()),
                 dispatch_reservation_id: Some("owner".to_owned()),
             },
         );
@@ -264,7 +264,18 @@ fn source_clock_anomaly_and_poisoned_mutex_refuse_without_repair() {
     let snapshot = preview(&store);
     {
         let mut state = store.inner.lock().unwrap();
-        state.wall_clock_high_water = SystemTime::now() + Duration::from_secs(3600);
+        let now = SystemClock.read().unwrap();
+        state.replay_clock = ReplayClock::default();
+        state
+            .replay_clock
+            .observe(
+                "dpop_nonce",
+                ClockReading::new(
+                    now.unix_millis().checked_add(3_600_000).unwrap(),
+                    now.monotonic(),
+                ),
+            )
+            .unwrap();
     }
     assert!(store.preview_unsealed(&binding("destination")).is_err());
     assert!(store.seal_exact(&snapshot).is_err());

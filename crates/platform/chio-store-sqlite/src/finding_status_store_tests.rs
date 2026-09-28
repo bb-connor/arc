@@ -1103,7 +1103,7 @@ fn new_retraction_intent_checks_liveness_inside_the_write_transaction() {
         valid_until: NOW + 1_000,
     };
     assert!(matches!(
-        store.issue_retraction_intent_with_commit_clock(&input, liveness, || NOW + 500),
+        store.issue_retraction_intent_with_commit_clock(&input, liveness, || Ok(NOW + 500)),
         Err(FindingStatusStoreError::Conflict(_))
     ));
     assert!(store
@@ -1113,7 +1113,7 @@ fn new_retraction_intent_checks_liveness_inside_the_write_transaction() {
 
     assert_eq!(
         store
-            .issue_retraction_intent_with_commit_clock(&input, liveness, || NOW + 2)
+            .issue_retraction_intent_with_commit_clock(&input, liveness, || Ok(NOW + 2))
             .expect("commit while every liveness bound still holds"),
         FindingStatusWriteOutcome::Inserted
     );
@@ -1175,7 +1175,7 @@ fn voluntary_intent_commit_advances_and_obeys_the_durable_clock_floor() {
         valid_until: NOW + 1_000,
     };
     let rollback = store
-        .issue_retraction_intent_with_commit_clock(&input, liveness, || NOW + 40)
+        .issue_retraction_intent_with_commit_clock(&input, liveness, || Ok(NOW + 40))
         .expect_err("regressed voluntary commit time must reject");
     assert!(matches!(
         rollback,
@@ -1191,7 +1191,7 @@ fn voluntary_intent_commit_advances_and_obeys_the_durable_clock_floor() {
         .is_none());
 
     store
-        .issue_retraction_intent_with_commit_clock(&input, liveness, || NOW + 60)
+        .issue_retraction_intent_with_commit_clock(&input, liveness, || Ok(NOW + 60))
         .expect("commit at advancing trusted time");
     assert_eq!(
         store
@@ -1227,7 +1227,7 @@ fn first_epoch_retains_the_pre_epoch_intent_clock() {
                 valid_from: NOW,
                 valid_until: NOW + 1_000,
             },
-            || NOW + 100,
+            || Ok(NOW + 100),
         )
         .expect("commit the intent before any epoch exists");
 
@@ -1296,7 +1296,7 @@ fn dispatch_eligibility_replay_retains_the_original_authorization_time() {
                     valid_from: NOW,
                     valid_until: NOW + 1_000,
                 },
-                || NOW + 3,
+                || Ok(NOW + 3),
             )
             .expect("authorize dispatch"),
         FindingStatusWriteOutcome::Inserted
@@ -1355,7 +1355,7 @@ fn dispatch_eligibility_rechecks_liveness_inside_the_write_transaction() {
                 valid_from: NOW,
                 valid_until: NOW + 100,
             },
-            || NOW + 50,
+            || Ok(NOW + 50),
         )
         .expect_err("an inclusion deadline at authority expiry must reject");
     assert!(matches!(refused, FindingStatusStoreError::Conflict(_)));
@@ -1415,7 +1415,7 @@ fn dispatch_eligibility_rejects_commit_clock_rollback_inside_the_transaction() {
                 valid_from: NOW,
                 valid_until: NOW + 1_000,
             },
-            || NOW + 40,
+            || Ok(NOW + 40),
         )
         .expect_err("a regressed commit clock must reject");
     assert!(matches!(
@@ -1494,7 +1494,7 @@ fn schema_v1_migration_moves_the_inclusion_window_to_finality() {
                 valid_from: NOW,
                 valid_until: NOW + 1_000,
             },
-            || NOW + 40,
+            || Ok(NOW + 40),
         )
         .expect("start inclusion window at finality");
 
@@ -1887,3 +1887,49 @@ fn same_key_authorization_state_update_is_rejected() {
 
 #[path = "finding_status_store_tests/connection_recovery.rs"]
 mod connection_recovery;
+
+#[test]
+fn commit_clock_errors_leave_no_retraction_and_survive_restart() {
+    use chio_security_types::clock::ClockError;
+    let fixture = DurableFixture::new();
+    let authority = fixture.open();
+    let store = authority.finding_status_store();
+    let finding_id = hex64('6');
+    let intent_id = hex64('7');
+    let input = FindingRetractionIntentInput {
+        intent_id: &intent_id,
+        feed_id: FEED,
+        operator_id: OPERATOR,
+        finding_id: &finding_id,
+        source: FindingRetractionIntentSource::Voluntary,
+        intent_bytes: b"signed-clock-failure",
+        issued_at: NOW + 1,
+        inclusion_deadline: NOW + 500,
+        created_at: NOW + 1,
+    };
+    let liveness = FindingRetractionIntentCommitLiveness {
+        valid_from: NOW,
+        valid_until: NOW + 1000,
+    };
+    for fault in [
+        ClockError::Unavailable,
+        ClockError::Overflow,
+        ClockError::WallClockRegression,
+    ] {
+        assert!(
+            matches!(store.issue_retraction_intent_with_commit_clock(&input, liveness, || Err(fault)), Err(FindingStatusStoreError::Clock(actual)) if actual == fault)
+        );
+        assert!(store.get_retraction_intent(&intent_id).unwrap().is_none());
+    }
+    drop(store);
+    drop(authority);
+    let authority = fixture.open();
+    let store = authority.finding_status_store();
+    assert!(store.get_retraction_intent(&intent_id).unwrap().is_none());
+    assert_eq!(
+        store
+            .issue_retraction_intent_with_commit_clock(&input, liveness, || Ok(NOW + 2))
+            .unwrap(),
+        FindingStatusWriteOutcome::Inserted
+    );
+}

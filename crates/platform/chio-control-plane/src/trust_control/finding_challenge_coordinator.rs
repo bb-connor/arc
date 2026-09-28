@@ -44,7 +44,6 @@
 //!
 use std::collections::BTreeSet;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::{canonical_json_bytes, canonical_json_bytes_from_str};
 use chio_core::capability::scope::MonetaryAmount;
@@ -521,6 +520,8 @@ pub enum ChallengeCoordinatorError {
     ArtifactValidation(String),
     #[error("durable challenge store rejected the transition: {0}")]
     ChallengeStore(String),
+    #[error("finding status transition failed: {0}")]
+    StatusStore(#[source] chio_store_sqlite::FindingStatusStoreError),
     #[error("durable purchase store rejected the transition: {0}")]
     PurchaseStore(String),
     #[error("artifact signing failed")]
@@ -913,25 +914,6 @@ pub enum FindingFinalization {
     AwaitingStatusPublication,
 }
 
-/// Clock sampled while the status outbox write transaction is held.
-///
-/// The caller's earlier venue timestamp is supplied only so deterministic
-/// test clocks can model the same instant. Production clocks independently
-/// sample wall time at the durable transition.
-pub trait FindingStatusCommitClock: Send + Sync {
-    fn now_unix_secs(&self, venue_now: u64) -> u64;
-}
-
-struct SystemFindingStatusCommitClock;
-
-impl FindingStatusCommitClock for SystemFindingStatusCommitClock {
-    fn now_unix_secs(&self, _venue_now: u64) -> u64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(0, |duration| duration.as_secs())
-    }
-}
-
 /// The authoritative single-operator challenge coordinator.
 pub struct FindingChallengeCoordinator {
     challenges: SqliteFindingChallengeStore,
@@ -956,13 +938,25 @@ pub struct FindingChallengeCoordinator {
     status_feed_operator_ref: String,
     status_feed_operator: FindingStatusOperatorPin,
     status_feed_service_bond: FindingStatusServiceBond,
-    status_commit_clock: Arc<dyn FindingStatusCommitClock>,
+    status_commit_clock: Arc<dyn chio_security_types::clock::Clock>,
+    status_commit_fence: std::sync::Mutex<chio_security_types::clock::ClockFence>,
     /// Disposition a rejected challenge's bond takes, predeclared by the
     /// admitted market terms rather than chosen per case.
     failed_challenge_disposition: FindingDisputeLockDisposition,
 }
 
 impl FindingChallengeCoordinator {
+    fn status_commit_now(&self) -> Result<u64, chio_security_types::clock::ClockError> {
+        let mut fence = self
+            .status_commit_fence
+            .lock()
+            .map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+        Ok(fence
+            .observe(self.status_commit_clock.read()?)?
+            .unix_millis()
+            .as_secs())
+    }
+
     /// Build with custody-backed signers and an injected commit clock.
     #[allow(clippy::too_many_arguments)]
     pub fn new_with_signing_backends_and_status_commit_clock(
@@ -977,7 +971,7 @@ impl FindingChallengeCoordinator {
         rail: Arc<dyn FindingRailObserver>,
         filings: Arc<dyn FindingFilingResolver>,
         failed_challenge_disposition: FindingDisputeLockDisposition,
-        status_commit_clock: Arc<dyn FindingStatusCommitClock>,
+        status_commit_clock: Arc<dyn chio_security_types::clock::Clock>,
     ) -> Result<Self, ChallengeCoordinatorError> {
         config
             .validate()
@@ -1048,6 +1042,7 @@ impl FindingChallengeCoordinator {
             status_feed_operator: config.status_feed_operator.clone(),
             status_feed_service_bond: config.status_feed_service_bond.clone(),
             status_commit_clock,
+            status_commit_fence: std::sync::Mutex::new(Default::default()),
             failed_challenge_disposition,
         })
     }

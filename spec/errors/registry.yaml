@@ -2884,3 +2884,322 @@ codes:
     stability: stable
     consumed_by:
       - chio-kernel
+
+  - urn: "urn:chio:error:kernel:approval-replay-capacity"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: approval-replay-capacity."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-CAPACITY"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:approval-replay-expired"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: approval-replay-expired."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-EXPIRED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:approval-replay-identity"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: approval-replay-identity."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-IDENTITY"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:approval-replay-unavailable"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: approval-replay-unavailable."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-UNAVAILABLE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-accounting"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-accounting."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-ACCOUNTING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-action"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-action."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-ACTION"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-capability"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-capability."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-CAPABILITY"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-capability-capacity"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-capability-capacity."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-CAPABILITY-CAPACITY"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-capacity"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-capacity."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-CAPACITY"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-encoding"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-encoding."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-ENCODING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-expired"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-expired."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-EXPIRED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-identity-capacity"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-identity-capacity."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-IDENTITY-CAPACITY"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-identity-limit"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-identity-limit."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-IDENTITY-LIMIT"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-identity-overflow"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-identity-overflow."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-IDENTITY-OVERFLOW"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-missing-configuration"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-missing-configuration."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-MISSING-CONFIGURATION"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-missing-proof"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-missing-proof."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-MISSING-PROOF"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-missing-store"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-missing-store."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-MISSING-STORE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-not-yet-valid"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-not-yet-valid."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-NOT-YET-VALID"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-replayed"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-replayed."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-REPLAYED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-schema"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-schema."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-SCHEMA"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-sender"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-sender."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-SENDER"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-server"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-server."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-SERVER"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-signature"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-signature."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-SIGNATURE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-signing"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-signing."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-SIGNING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-tool"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-tool."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-TOOL"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-unavailable"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-unavailable."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-UNAVAILABLE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-window-overflow"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: dpop-window-overflow."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-DPOP-WINDOW-OVERFLOW"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:financial-budget-exceeded"
+    domain: kernel
+    severity: error
+    summary: "Security boundary refused: financial-budget-exceeded."
+    help: "Restore the named invariant and present fresh evidence for the exact request."
+    string_code: "CHIO-KERNEL-FINANCIAL-BUDGET-EXCEEDED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-reservation-ownership"
+    domain: kernel
+    severity: error
+    summary: "DPoP reservation ownership was not confirmed at commit."
+    help: "Retain the marker and reconcile the original operation before retrying."
+    string_code: "CHIO-KERNEL-DPOP-RESERVATION-OWNERSHIP"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel

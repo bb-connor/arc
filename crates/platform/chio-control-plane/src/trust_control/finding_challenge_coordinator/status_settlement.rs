@@ -146,11 +146,9 @@ impl FindingChallengeCoordinator {
                         &evidence,
                         self.status_feed_service_bond.inclusion_sla_secs,
                         commit_liveness,
-                        || self.status_commit_clock.now_unix_secs(now),
+                        || self.status_commit_now(),
                     )
-                    .map_err(|error| {
-                        ChallengeCoordinatorError::ChallengeStore(error.to_string())
-                    })?;
+                    .map_err(ChallengeCoordinatorError::StatusStore)?;
             }
             (
                 FindingRetractionIntentSource::Enforcement,
@@ -193,9 +191,7 @@ impl FindingChallengeCoordinator {
             Some(
                 self.challenges
                     .get_effect_root_binding(intent_key)
-                    .map_err(|error| {
-                        ChallengeCoordinatorError::ChallengeStore(error.to_string())
-                    })?
+                    .map_err(|error| ChallengeCoordinatorError::ChallengeStore(error.to_string()))?
                     .ok_or(ChallengeCoordinatorError::EffectIntentUnfenced)?,
             )
         } else {
@@ -315,11 +311,12 @@ impl FindingChallengeCoordinator {
                 recheck_finding_bond_observation(verified, &observed)
             }
             RecoveryObservationAuthority::Reconciled(reconciled) => {
-                let observed = observations
-                    .observe_reconciliation(reconciled)
-                    .map_err(|error| {
-                        ChallengeCoordinatorError::BondObservation(error.to_string())
-                    })?;
+                let observed =
+                    observations
+                        .observe_reconciliation(reconciled)
+                        .map_err(|error| {
+                            ChallengeCoordinatorError::BondObservation(error.to_string())
+                        })?;
                 recheck_reconciled_finding_bond_observation(reconciled, &observed)
             }
         };
@@ -387,17 +384,11 @@ impl FindingChallengeCoordinator {
                 finality_requirement: self.pins.settlement_finality_requirement,
                 max_snapshot_age_secs: self.market_config.max_snapshot_age_secs,
             };
-            verify_finding_enforcement_for_reconciliation(
-                enforcement,
-                bond_snapshot,
-                &pins,
-                now,
-            )
-            .map_err(|error| ChallengeCoordinatorError::Settlement(error.to_string()))?;
+            verify_finding_enforcement_for_reconciliation(enforcement, bond_snapshot, &pins, now)
+                .map_err(|error| ChallengeCoordinatorError::Settlement(error.to_string()))?;
             self.require_canonical_recovery_observation(observation_authority, observations)?;
         }
-        self
-            .challenges
+        self.challenges
             .reconcile_seller_impairment_quarantine(reconciliation, now)
             .map_err(|error| ChallengeCoordinatorError::ChallengeStore(error.to_string()))?;
         self.confirm_fenced_anchor_effect(liability_key, now)?;

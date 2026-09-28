@@ -45,13 +45,13 @@ crates/kernel/chio-kernel/src/execution_nonce.rs	360	fixed	Nonce minting rejects
 crates/kernel/chio-kernel/src/execution_nonce.rs	783	intentional_fixture	Removed ambient TTL fixture; deterministic store tests assert exact signed expiry, ownership and no live-marker eviction	.saturating_add(30);
 crates/kernel/chio-kernel/src/finding_pool.rs	907	fixed	Checked claim deadline refuses expired allocations and overflow, then caps the original 30-second window by allocation expiry	.saturating_add(FINDING_POOL_CLAIM_WINDOW_MS)
 crates/kernel/chio-kernel/src/finding_pool_tests.rs	397	pending	Needs semantic review; no correctness claim	.saturating_add(pending.len());
-crates/kernel/chio-kernel/src/governed_approval_replay.rs	296	pending	Needs semantic review; no correctness claim	.saturating_add(60);
-crates/kernel/chio-kernel/src/governed_approval_replay.rs	318	pending	Needs semantic review; no correctness claim	.saturating_add(60);
-crates/kernel/chio-kernel/src/governed_approval_replay.rs	338	pending	Needs semantic review; no correctness claim	.saturating_add(60);
-crates/kernel/chio-kernel/src/governed_approval_replay.rs	371	pending	Needs semantic review; no correctness claim	.saturating_add(60);
+crates/kernel/chio-kernel/src/governed_approval_replay.rs	296	intentional_fixture	Original inline fixture timestamp arithmetic removed; deterministic shared-clock fixture uses an explicit deadline	.saturating_add(60);
+crates/kernel/chio-kernel/src/governed_approval_replay.rs	318	intentional_fixture	Original inline fixture timestamp arithmetic removed; deterministic shared-clock fixture uses an explicit deadline	.saturating_add(60);
+crates/kernel/chio-kernel/src/governed_approval_replay.rs	338	intentional_fixture	Original inline fixture timestamp arithmetic removed; deterministic shared-clock fixture uses an explicit deadline	.saturating_add(60);
+crates/kernel/chio-kernel/src/governed_approval_replay.rs	371	intentional_fixture	Original inline fixture timestamp arithmetic removed; deterministic shared-clock fixture uses an explicit deadline	.saturating_add(60);
 crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc	267	pending	Needs semantic review; no correctness claim	applied_count = applied_count.saturating_add(1);
 crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc	797	pending	Needs semantic review; no correctness claim	if bounded.len().saturating_add(character.len_utf8()) > 1_024 {
-crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs	1555	pending	Needs semantic review; no correctness claim	.saturating_sub(payment.reconcile.committed_cost_units_after),
+crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs	1555	fixed	Optional grant ceiling preserves uncapped authority; checked cumulative subtraction returns FinancialBudgetExceeded before signing	.saturating_sub(payment.reconcile.committed_cost_units_after),
 crates/kernel/chio-kernel/src/kernel/construction.rs	1577	pending	Needs semantic review; no correctness claim	let timestamp_unix_ms = current_unix_timestamp().saturating_mul(1000);
 crates/kernel/chio-kernel/src/kernel/credential_reservation/acquisition.rs	64	fixed	Checked DPoP horizon refuses overflow before reserving replay state	let valid_through = proof.body.issued_at.saturating_add(config.proof_ttl_secs);
 crates/kernel/chio-kernel/src/kernel/delegation.rs	100	fixed	Shared injected UnixMillis and checked snapshot age distinguish future and stale revocation evidence	let age_ms = now_unix_ms.saturating_sub(snapshot.issued_at_unix_ms);
@@ -60,8 +60,8 @@ crates/kernel/chio-kernel/src/kernel/dispatch.rs	198	pending	Needs semantic revi
 crates/kernel/chio-kernel/src/kernel/governed_validation.rs	440	fixed	Checked positive approval lifetime rejects empty and reversed windows with precise clock provenance before replay custody	.saturating_sub(approval_token.issued_at);
 crates/kernel/chio-kernel/src/kernel/kernel_struct.rs	510	pending	Needs semantic review; no correctness claim	Some(resident_pages.saturating_mul(linux_page_size()))
 crates/kernel/chio-kernel/src/kernel/mod.rs	1798	pending	Needs semantic review; no correctness claim	return now.saturating_mul(1000);
-crates/kernel/chio-kernel/src/kernel/reconciliation.rs	394	pending	Needs semantic review; no correctness claim	budget_remaining: grant_budget_total.saturating_sub(committed_after),
-crates/kernel/chio-kernel/src/kernel/responses/deny_responses.rs	158	pending	Needs semantic review; no correctness claim	.saturating_sub(committed_cost_after_release);
+crates/kernel/chio-kernel/src/kernel/reconciliation.rs	394	fixed	Optional grant ceiling preserves uncapped authority; checked cumulative subtraction returns FinancialBudgetExceeded before signing	budget_remaining: grant_budget_total.saturating_sub(committed_after),
+crates/kernel/chio-kernel/src/kernel/responses/deny_responses.rs	158	fixed	Optional grant ceiling preserves uncapped authority; checked cumulative subtraction returns FinancialBudgetExceeded before signing	.saturating_sub(committed_cost_after_release);
 crates/kernel/chio-kernel/src/kernel/tests/approval_flow.rs	200	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(10),
 crates/kernel/chio-kernel/src/kernel/tests/approval_flow.rs	470	pending	Needs semantic review; no correctness claim	let proposal_created_at = now.saturating_sub(5);
 crates/kernel/chio-kernel/src/kernel/tests/approval_flow.rs	543	pending	Needs semantic review; no correctness claim	extended_proposal.proposal_deadline = extended_proposal.proposal_deadline.saturating_add(1);
@@ -104,8 +104,8 @@ crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs	805	pending	Needs
 crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs	899	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(5),
 crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs	935	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(5),
 crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs	996	pending	Needs semantic review; no correctness claim	issued_at: now.saturating_sub(5),
-crates/kernel/chio-kernel/src/kernel/validation.rs	1865	pending	Needs semantic review; no correctness claim	.saturating_sub(reverse.committed_cost_units_after),
-crates/kernel/chio-kernel/src/kernel/validation.rs	2187	pending	Needs semantic review; no correctness claim	.saturating_sub(running_committed_cost_units);
+crates/kernel/chio-kernel/src/kernel/validation.rs	1865	fixed	Optional grant ceiling preserves uncapped authority; checked cumulative subtraction returns FinancialBudgetExceeded before signing	.saturating_sub(reverse.committed_cost_units_after),
+crates/kernel/chio-kernel/src/kernel/validation.rs	2187	fixed	Optional grant ceiling preserves uncapped authority; checked cumulative subtraction returns FinancialBudgetExceeded before signing	.saturating_sub(running_committed_cost_units);
 crates/kernel/chio-kernel/src/kernel/validation/cumulative.rs	237	fixed	UnixMillis::from_secs checks epoch conversion before refreshing cumulative admission time	let now = self.refresh_admission_trusted_time(now.saturating_mul(1_000))? / 1_000;
 crates/kernel/chio-kernel/src/observability/metrics.rs	182	pending	Needs semantic review; no correctness claim	(Some(start), Some(end)) => end.saturating_sub(start),
 crates/kernel/chio-kernel/src/observability/metrics.rs	253	pending	Needs semantic review; no correctness claim	.map(|prev| now_unix_ms.saturating_sub(prev.advanced_at_unix_ms) / 1000)
@@ -117,11 +117,11 @@ crates/kernel/chio-kernel/src/receipt_analytics.rs	98	pending	Needs semantic rev
 crates/kernel/chio-kernel/src/receipt_analytics.rs	99	pending	Needs semantic review; no correctness claim	.saturating_add(incomplete_count);
 crates/kernel/chio-kernel/src/receipt_support/receipt_content.rs	125	pending	Needs semantic review; no correctness claim	&& total_bytes.saturating_add(chunk_bytes) > max_stream_total_bytes
 crates/kernel/chio-kernel/src/receipt_support/receipt_scopes.rs	183	pending	Needs semantic review; no correctness claim	fixed.counter = fixed.counter.saturating_add(1);
-crates/kernel/chio-kernel/src/replay_retention.rs	103	pending	Needs semantic review; no correctness claim	let monotonic_progress = now_monotonic.saturating_duration_since(pending.observed_monotonic);
-crates/kernel/chio-kernel/src/replay_retention.rs	123	pending	Needs semantic review; no correctness claim	left.saturating_sub(right) <= tolerance && right.saturating_sub(left) <= tolerance
-crates/kernel/chio-kernel/src/replay_retention.rs	35	pending	Needs semantic review; no correctness claim	let monotonic_progress = now_monotonic.saturating_duration_since(*monotonic_high_water);
-crates/kernel/chio-kernel/src/replay_retention.rs	36	pending	Needs semantic review; no correctness claim	let tolerated_forward = monotonic_progress.saturating_add(MAX_REPLAY_CLOCK_SKEW);
-crates/kernel/chio-kernel/src/replay_retention.rs	39	pending	Needs semantic review; no correctness claim	let unexplained_gap = wall_progress.saturating_sub(monotonic_progress);
+crates/kernel/chio-kernel/src/replay_retention.rs	103	fixed	Shared typed replay clock rejects regression and checks progress bounds; duration gaps use exact absolute difference	let monotonic_progress = now_monotonic.saturating_duration_since(pending.observed_monotonic);
+crates/kernel/chio-kernel/src/replay_retention.rs	123	fixed	Shared typed replay clock rejects regression and checks progress bounds; duration gaps use exact absolute difference	left.saturating_sub(right) <= tolerance && right.saturating_sub(left) <= tolerance
+crates/kernel/chio-kernel/src/replay_retention.rs	35	fixed	Shared typed replay clock rejects regression and checks progress bounds; duration gaps use exact absolute difference	let monotonic_progress = now_monotonic.saturating_duration_since(*monotonic_high_water);
+crates/kernel/chio-kernel/src/replay_retention.rs	36	fixed	Shared typed replay clock rejects regression and checks progress bounds; duration gaps use exact absolute difference	let tolerated_forward = monotonic_progress.saturating_add(MAX_REPLAY_CLOCK_SKEW);
+crates/kernel/chio-kernel/src/replay_retention.rs	39	fixed	Shared typed replay clock rejects regression and checks progress bounds; duration gaps use exact absolute difference	let unexplained_gap = wall_progress.saturating_sub(monotonic_progress);
 crates/kernel/chio-kernel/src/runtime.rs	249	pending	Needs semantic review; no correctness claim	total = total.saturating_add(bytes.len() as u64);
 crates/kernel/chio-kernel/src/runtime.rs	287	pending	Needs semantic review; no correctness claim	let next = running_bytes.saturating_add(chunk_bytes);
 crates/kernel/chio-kernel/src/session.rs	1102	fixed	Checked auth epoch successor with reserved terminal epoch; shared fallible transitions persist before publication	let next_epoch = current.session_anchor.auth_epoch.saturating_add(1);

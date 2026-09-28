@@ -926,6 +926,15 @@ impl ChioKernel {
                 .transaction_id
                 .as_ref()
                 .or(journal.authorization_id.as_ref());
+            let grant = request
+                .capability
+                .scope
+                .grants
+                .get(journal.grant_index as usize)
+                .ok_or_else(|| {
+                    KernelError::DurableAdmission("payment journal names a missing grant".into())
+                })?;
+            let expected_ceiling = grant.max_total_cost.as_ref().map(|amount| amount.units);
             if journal.state != crate::payment::PaymentJournalState::Settled
                 || financial.grant_index != journal.grant_index
                 || financial.cost_charged != expected_cost
@@ -935,6 +944,8 @@ impl ChioKernel {
                 || financial.delegation_depth
                     != u32::try_from(request.capability.delegation_chain.len()).unwrap_or(u32::MAX)
                 || financial.root_budget_holder != request.capability.issuer.to_hex()
+                || financial.budget_total != expected_ceiling
+                || financial.budget_remaining.is_some() != financial.budget_total.is_some()
                 || financial.budget_remaining > financial.budget_total
                 || financial.attempted_cost.is_some()
             {
@@ -1534,26 +1545,25 @@ impl ChioKernel {
             &request.arguments,
         );
         let timestamp = trusted_now_unix_ms / 1_000;
-        let financial_metadata = payment_terminal.as_ref().map(|payment| {
+        let financial_metadata = payment_terminal.as_ref().map(|payment| -> Result<_, KernelError> {
             let budget_total = request
                 .capability
                 .scope
                 .grants
                 .get(matched_grant_index)
                 .and_then(|grant| grant.max_total_cost.as_ref())
-                .map_or(payment.journal.amount_units, |amount| amount.units);
+                .map(|amount| amount.units);
             let payment_reference = payment
                 .journal
                 .transaction_id
                 .clone()
                 .or_else(|| payment.journal.authorization_id.clone());
-            serde_json::json!({
+            Ok(serde_json::json!({
                 "financial": FinancialReceiptMetadata {
                     grant_index: payment.journal.grant_index,
                     cost_charged: payment.amount_units,
                     currency: payment.journal.currency.clone(),
-                    budget_remaining: budget_total
-                        .saturating_sub(payment.reconcile.committed_cost_units_after),
+                    budget_remaining: financial_budget_remaining(budget_total, payment.reconcile.committed_cost_units_after)?,
                     budget_total,
                     delegation_depth: request.capability.delegation_chain.len() as u32,
                     root_budget_holder: request.capability.issuer.to_hex(),
@@ -1572,8 +1582,8 @@ impl ChioKernel {
                     oracle_evidence: None,
                     attempted_cost: None,
                 }
-            })
-        });
+            }))
+        }).transpose()?;
         let metadata = merge_metadata_objects(
             merge_metadata_objects(
                 merge_metadata_objects(

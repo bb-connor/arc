@@ -1,7 +1,7 @@
 use super::*;
 
 pub(super) fn accounting_error() -> KernelError {
-    KernelError::DpopVerificationFailed("nonce store accounting invariant failed".into())
+    KernelError::Dpop(super::DpopError::Accounting)
 }
 
 #[cfg(test)]

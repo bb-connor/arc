@@ -684,10 +684,12 @@ fn committed_dispatch_credential_retains_replay_marker_under_capacity_pressure(
     let tool = "execute";
     let agent = make_keypair();
     let (mut kernel, capability) = make_dpop_kernel_and_cap(&agent, server, tool);
-    kernel.set_dpop_store(
-        dpop::DpopNonceStore::new(1, Duration::from_secs(60)),
-        dpop::DpopConfig::default(),
-    );
+    kernel
+        .set_dpop_store(
+            dpop::DpopNonceStore::new(1, Duration::from_secs(60)),
+            dpop::DpopConfig::default(),
+        )
+        .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
 
     let arguments = serde_json::json!({"operation": "settle"});
     let mut committed_request = make_request_with_arguments(

@@ -172,11 +172,10 @@ impl ChioKernel {
         } = input;
         let mut dpop_credential = None;
         let dpop_proof = if dpop_required {
-            let proof = request.dpop_proof.as_ref().ok_or_else(|| {
-                KernelError::DpopVerificationFailed(
-                    "grant requires DPoP proof but none was provided".to_string(),
-                )
-            })?;
+            let proof = request
+                .dpop_proof
+                .as_ref()
+                .ok_or(KernelError::Dpop(crate::dpop::DpopError::MissingProof))?;
             if self.dpop_authority.is_some() {
                 dpop_credential = Some(DpopReplayCredentialV1::from_verified(
                     self.verify_operation_owned_dpop(

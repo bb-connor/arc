@@ -3,28 +3,26 @@ use crate::admission_operation::AdmissionIdentifier;
 use crate::dpop::replay_source::{DpopReplaySourceBinding, DpopReplaySourcePort};
 use chio_core::capability::{scope::ChioScope, token::CapabilityTokenBody};
 
+use crate::replay_retention::tests::TestClock;
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 fn assert_accounting_error<T: std::fmt::Debug>(result: Result<T, KernelError>) {
     assert!(
-        matches!(result, Err(KernelError::DpopVerificationFailed(ref reason)) if reason == "nonce store accounting invariant failed"),
+        matches!(result, Err(KernelError::Dpop(DpopError::Accounting))),
         "{result:?}"
     );
 }
 
 #[test]
 fn prune_checks_the_entire_release_before_deleting_any_marker() -> TestResult {
-    let store = DpopNonceStore::new(8, Duration::from_secs(10));
-    let wall = SystemTime::now();
-    let mono = Instant::now();
+    let clock = Arc::new(TestClock::new(100));
+    let store = clock_tests::store(clock.clone(), 8);
     for nonce in ["a", "b"] {
-        assert!(store.check_and_insert_entry_at(
+        assert!(store.check_and_insert_entry(
             nonce,
             "cap",
-            ReplayRetention::local(Duration::from_secs(10)),
+            ReplayHorizon::Local(Duration::from_secs(10)),
             None,
-            wall,
-            mono
         )?);
     }
     let charged = store.identity_byte_utilization()?.0;
@@ -35,13 +33,12 @@ fn prune_checks_the_entire_release_before_deleting_any_marker() -> TestResult {
         .map_err(|_| "lock poisoned")?
         .capability_counts
         .insert("cap".into(), 1);
-    assert_accounting_error(store.check_and_insert_entry_at(
+    clock.set(111, 11);
+    assert_accounting_error(store.check_and_insert_entry(
         "new",
         "cap",
-        ReplayRetention::local(Duration::from_secs(10)),
+        ReplayHorizon::Local(Duration::from_secs(10)),
         None,
-        wall + Duration::from_secs(11),
-        mono + Duration::from_secs(11),
     ));
     assert_eq!(store.utilization()?.0, 2);
     assert_eq!(store.identity_byte_utilization()?.0, charged);
@@ -83,44 +80,34 @@ fn owned_rollback_preserves_marker_on_byte_underflow_and_latches_refusal() -> Te
 
 #[test]
 fn successful_prune_and_cancel_leave_exact_capacity_for_live_replay_markers() -> TestResult {
-    let store = DpopNonceStore::new(3, Duration::from_secs(10));
-    let wall = SystemTime::now();
-    let mono = Instant::now();
+    let clock = Arc::new(TestClock::new(100));
+    let store = clock_tests::store(clock.clone(), 3);
     for nonce in ["a", "b"] {
-        assert!(store.check_and_insert_entry_at(
+        assert!(store.check_and_insert_entry(
             nonce,
             "expired",
-            ReplayRetention::local(Duration::from_secs(10)),
+            ReplayHorizon::Local(Duration::from_secs(10)),
             None,
-            wall,
-            mono
         )?);
     }
-    assert!(store.check_and_insert_entry_at(
+    assert!(store.check_and_insert_entry(
         "live",
         "live-cap",
-        ReplayRetention::local(Duration::from_secs(100)),
+        ReplayHorizon::Local(Duration::from_secs(100)),
         Some("owner"),
-        wall,
-        mono
     )?);
-    let later_wall = wall + Duration::from_secs(11);
-    let later_mono = mono + Duration::from_secs(11);
-    assert!(store.check_and_insert_entry_at(
+    clock.set(111, 11);
+    assert!(store.check_and_insert_entry(
         "fresh",
         "fresh-cap",
-        ReplayRetention::local(Duration::from_secs(100)),
+        ReplayHorizon::Local(Duration::from_secs(100)),
         None,
-        later_wall,
-        later_mono
     )?);
-    assert!(!store.check_and_insert_entry_at(
+    assert!(!store.check_and_insert_entry(
         "live",
         "live-cap",
-        ReplayRetention::local(Duration::from_secs(100)),
+        ReplayHorizon::Local(Duration::from_secs(100)),
         None,
-        later_wall,
-        later_mono
     )?);
     assert!(!store.rollback_dispatch_reservation("live", "live-cap", "wrong-owner")?);
     assert!(store.rollback_dispatch_reservation("live", "live-cap", "owner")?);
@@ -173,11 +160,19 @@ fn proof_deadline_overflow_is_rejected_before_nonce_reservation() -> TestResult 
     };
     let store = DpopNonceStore::new(8, Duration::from_secs(60));
     for result in [
-        verify_dpop_proof_stateless(&proof, &cap, "server", "tool", "hash", &config),
+        verify_dpop_proof_stateless(
+            &proof,
+            &cap,
+            "server",
+            "tool",
+            "hash",
+            &config,
+            store.trusted_now()?,
+        ),
         verify_dpop_proof(&proof, &cap, "server", "tool", "hash", &store, &config),
     ] {
         assert!(
-            matches!(result, Err(KernelError::DpopVerificationFailed(ref reason)) if reason == "proof validity window overflows Unix seconds"),
+            matches!(result, Err(KernelError::Dpop(DpopError::WindowOverflow))),
             "{result:?}"
         );
     }

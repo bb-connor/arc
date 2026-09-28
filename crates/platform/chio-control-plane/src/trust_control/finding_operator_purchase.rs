@@ -508,13 +508,15 @@ impl FindingOperatorPurchaseExecutor {
             Arc::new(resolver),
         )));
         let dpop = DpopConfig::default();
-        kernel.set_dpop_store(
-            DpopNonceStore::new(
-                dpop.nonce_store_capacity,
-                std::time::Duration::from_secs(dpop.proof_ttl_secs),
-            ),
-            dpop,
-        );
+        kernel
+            .set_dpop_store(
+                DpopNonceStore::new(
+                    dpop.nonce_store_capacity,
+                    std::time::Duration::from_secs(dpop.proof_ttl_secs),
+                ),
+                dpop,
+            )
+            .map_err(execution_internal)?;
         kernel.set_finding_purchase_verifier(Arc::new(MarketFindingPurchaseVerifier::new(
             PurchaseVerificationAuthorities {
                 venue_authority: self.market.venue.key().map_err(execution_internal)?,

@@ -2665,11 +2665,13 @@ fn reconcile_by_nonce_stamps_grant_budget_not_reservation_exposure() {
         .clone();
     let parsed: crate::FinancialReceiptMetadata = serde_json::from_value(financial).unwrap();
     assert_eq!(
-        parsed.budget_total, 150,
+        parsed.budget_total,
+        Some(150),
         "budget_total must reflect the grant ceiling, not the reservation exposure"
     );
     assert_eq!(
-        parsed.budget_remaining, 120,
+        parsed.budget_remaining,
+        Some(120),
         "budget_remaining must be the grant ceiling minus the grant's committed spend \
          after settle (a single reservation settled at 30 leaves 150 - 30)"
     );
@@ -2732,9 +2734,10 @@ fn reconcile_by_nonce_budget_remaining_accounts_for_other_committed_spend() {
         .expect("reconciled receipt carries financial metadata")
         .clone();
     let parsed: crate::FinancialReceiptMetadata = serde_json::from_value(financial).unwrap();
-    assert_eq!(parsed.budget_total, 150);
+    assert_eq!(parsed.budget_total, Some(150));
     assert_eq!(
-        parsed.budget_remaining, 100,
+        parsed.budget_remaining,
+        Some(100),
         "budget_remaining must subtract the grant's total committed spend after \
          settle (50), not just this reconcile's realized cost (10)"
     );
@@ -2795,20 +2798,9 @@ fn reconcile_by_nonce_no_total_cap_grant_does_not_stamp_sentinel() {
         .expect("reconciled receipt carries financial metadata")
         .clone();
     let parsed: crate::FinancialReceiptMetadata = serde_json::from_value(financial).unwrap();
-    assert_ne!(
-        parsed.budget_total,
-        u64::MAX,
-        "a no-total-cap grant must not stamp the u64::MAX sentinel as budget_total"
-    );
-    assert_ne!(
-        parsed.budget_remaining,
-        u64::MAX,
-        "budget_remaining must not carry the u64::MAX sentinel"
-    );
-    // With no real ceiling the receipt falls back to this reservation's bounded
-    // exposure (100), settled at realized 30.
-    assert_eq!(parsed.budget_total, 100);
-    assert_eq!(parsed.budget_remaining, 70);
+    // No grant ceiling exists. Invocation exposure cannot stand in for one.
+    assert_eq!(parsed.budget_total, None);
+    assert_eq!(parsed.budget_remaining, None);
     assert_eq!(parsed.cost_charged, 30);
 }
 

@@ -320,8 +320,17 @@ pub enum KernelError {
     #[error("trusted time rejected: {0}")]
     Clock(#[from] chio_security_types::clock::ClockError),
 
+    #[error("financial receipt accounting exceeds grant ceiling: committed {committed}, ceiling {total}")]
+    FinancialBudgetExceeded { total: u64, committed: u64 },
+
     #[error("internal error: {0}")]
     Internal(String),
+
+    #[error("{0}")]
+    ApprovalReplay(#[from] crate::governed_approval_replay::ApprovalReplayError),
+
+    #[error("{0}")]
+    Dpop(#[from] crate::dpop::DpopError),
 
     #[error("DPoP proof verification failed: {0}")]
     DpopVerificationFailed(String),
@@ -717,10 +726,22 @@ impl KernelError {
                 serde_json::json!({ "kind": error.as_str() }),
                 "Install a receipt store and outcome store backed by the same atomic settlement writer, then correct the retry policy or backend capability before startup.",
             ),
+            Self::FinancialBudgetExceeded { total, committed } => self.report_with_context(
+                "urn:chio:error:kernel:financial-budget-exceeded", serde_json::json!({"total": total, "committed": committed}),
+                "Reconcile the grant accounting invariant before signing financial evidence.",
+            ),
             Self::Internal(reason) => self.report_with_context(
                 "CHIO-KERNEL-INTERNAL",
                 serde_json::json!({ "reason": reason }),
                 "Capture the error report and kernel logs, then treat this as a reproducible kernel bug if it persists.",
+            ),
+            Self::ApprovalReplay(error) => self.report_with_context(
+                error.code(), serde_json::json!({"rejection": error.code()}),
+                "Restore approval custody and present an approval within its original signed window.",
+            ),
+            Self::Dpop(error) => self.report_with_context(
+                error.code(), serde_json::json!({ "rejection": error.code() }),
+                "Present a fresh proof for the exact invocation and restore replay custody before retrying.",
             ),
             Self::DpopVerificationFailed(reason) => self.report_with_context(
                 "CHIO-KERNEL-DPOP-VERIFICATION-FAILED",

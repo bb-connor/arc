@@ -1177,7 +1177,7 @@ pub(crate) struct BudgetChargeResult {
     grant_index: usize,
     cost_charged: u64,
     currency: String,
-    budget_total: u64,
+    budget_total: Option<u64>,
     /// Running committed cost after this charge (used to compute budget_remaining).
     new_committed_cost_units: u64,
     budget_hold_id: String,
@@ -1880,3 +1880,6 @@ impl ChioKernel {
         Ok(fence.observe(self.clock.read()?)?.unix_millis())
     }
 }
+
+mod financial_accounting;
+use financial_accounting::financial_budget_remaining;

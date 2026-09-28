@@ -12,8 +12,8 @@ export interface FinancialMetadata {
   grant_index: number
   cost_charged: number
   currency: string
-  budget_remaining: number
-  budget_total: number
+  budget_remaining: number | null
+  budget_total: number | null
   delegation_depth: number
   root_budget_holder: string
   settlement_status: string

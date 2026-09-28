@@ -3144,6 +3144,383 @@ pub const KERNEL_GOVERNED_APPROVAL_LIFETIME: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-kernel"],
 };
 
+pub const KERNEL_APPROVAL_REPLAY_CAPACITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:approval-replay-capacity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: approval-replay-capacity.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_APPROVAL_REPLAY_EXPIRED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:approval-replay-expired",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: approval-replay-expired.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-EXPIRED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_APPROVAL_REPLAY_IDENTITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:approval-replay-identity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: approval-replay-identity.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-IDENTITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_APPROVAL_REPLAY_UNAVAILABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:approval-replay-unavailable",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: approval-replay-unavailable.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-UNAVAILABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_ACCOUNTING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-accounting",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-accounting.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-ACCOUNTING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_ACTION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-action",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-action.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-ACTION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_CAPABILITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-capability",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-capability.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-CAPABILITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_CAPABILITY_CAPACITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-capability-capacity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-capability-capacity.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-CAPABILITY-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_CAPACITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-capacity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-capacity.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_ENCODING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-encoding",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-encoding.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-ENCODING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_EXPIRED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-expired",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-expired.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-EXPIRED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_IDENTITY_CAPACITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-identity-capacity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-identity-capacity.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-IDENTITY-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_IDENTITY_LIMIT: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-identity-limit",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-identity-limit.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-IDENTITY-LIMIT",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_IDENTITY_OVERFLOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-identity-overflow",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-identity-overflow.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-IDENTITY-OVERFLOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_MISSING_CONFIGURATION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-missing-configuration",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-missing-configuration.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-MISSING-CONFIGURATION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_MISSING_PROOF: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-missing-proof",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-missing-proof.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-MISSING-PROOF",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_MISSING_STORE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-missing-store",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-missing-store.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-MISSING-STORE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_NOT_YET_VALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-not-yet-valid",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-not-yet-valid.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-NOT-YET-VALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_REPLAYED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-replayed",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-replayed.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-REPLAYED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_SCHEMA: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-schema",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-schema.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-SCHEMA",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_SENDER: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-sender",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-sender.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-SENDER",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_SERVER: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-server",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-server.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-SERVER",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_SIGNATURE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-signature",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-signature.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-SIGNATURE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_SIGNING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-signing",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-signing.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-SIGNING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_TOOL: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-tool",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-tool.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-TOOL",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_UNAVAILABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-unavailable",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-unavailable.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-UNAVAILABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_WINDOW_OVERFLOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-window-overflow",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: dpop-window-overflow.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-DPOP-WINDOW-OVERFLOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_FINANCIAL_BUDGET_EXCEEDED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:financial-budget-exceeded",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Security boundary refused: financial-budget-exceeded.",
+    help: "Restore the named invariant and present fresh evidence for the exact request.",
+    string_code: "CHIO-KERNEL-FINANCIAL-BUDGET-EXCEEDED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_RESERVATION_OWNERSHIP: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-reservation-ownership",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "DPoP reservation ownership was not confirmed at commit.",
+    help: "Retain the marker and reconcile the original operation before retrying.",
+    string_code: "CHIO-KERNEL-DPOP-RESERVATION-OWNERSHIP",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
 pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED,
     TRANSACTION_PASSPORT_HASH_MISMATCH,
@@ -3378,6 +3755,35 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_REVOCATION_SNAPSHOT_FUTURE,
     KERNEL_REVOCATION_SNAPSHOT_STALE,
     KERNEL_GOVERNED_APPROVAL_LIFETIME,
+    KERNEL_APPROVAL_REPLAY_CAPACITY,
+    KERNEL_APPROVAL_REPLAY_EXPIRED,
+    KERNEL_APPROVAL_REPLAY_IDENTITY,
+    KERNEL_APPROVAL_REPLAY_UNAVAILABLE,
+    KERNEL_DPOP_ACCOUNTING,
+    KERNEL_DPOP_ACTION,
+    KERNEL_DPOP_CAPABILITY,
+    KERNEL_DPOP_CAPABILITY_CAPACITY,
+    KERNEL_DPOP_CAPACITY,
+    KERNEL_DPOP_ENCODING,
+    KERNEL_DPOP_EXPIRED,
+    KERNEL_DPOP_IDENTITY_CAPACITY,
+    KERNEL_DPOP_IDENTITY_LIMIT,
+    KERNEL_DPOP_IDENTITY_OVERFLOW,
+    KERNEL_DPOP_MISSING_CONFIGURATION,
+    KERNEL_DPOP_MISSING_PROOF,
+    KERNEL_DPOP_MISSING_STORE,
+    KERNEL_DPOP_NOT_YET_VALID,
+    KERNEL_DPOP_REPLAYED,
+    KERNEL_DPOP_SCHEMA,
+    KERNEL_DPOP_SENDER,
+    KERNEL_DPOP_SERVER,
+    KERNEL_DPOP_SIGNATURE,
+    KERNEL_DPOP_SIGNING,
+    KERNEL_DPOP_TOOL,
+    KERNEL_DPOP_UNAVAILABLE,
+    KERNEL_DPOP_WINDOW_OVERFLOW,
+    KERNEL_FINANCIAL_BUDGET_EXCEEDED,
+    KERNEL_DPOP_RESERVATION_OWNERSHIP,
 ];
 
 #[must_use]

@@ -1291,7 +1291,7 @@ impl ChioKernel {
                     .unwrap_or_else(|| "USD".to_string());
                 let max_total = grant.max_total_cost.as_ref().map(|m| m.units);
                 let max_per = grant.max_cost_per_invocation.as_ref().map(|m| m.units);
-                let budget_total = max_total.unwrap_or(u64::MAX);
+                let budget_total = max_total;
                 let (budget_hold_id, authorize_event_id, admission_binding, authority) =
                     if let Some(admission) = durable_admission.as_deref() {
                         let (mut binding, authority) =
@@ -1760,9 +1760,10 @@ impl ChioKernel {
             grant_index: charge.grant_index as u32,
             cost_charged: 0,
             currency: charge.currency.clone(),
-            budget_remaining: charge
-                .budget_total
-                .saturating_sub(reverse.committed_cost_units_after),
+            budget_remaining: financial_budget_remaining(
+                charge.budget_total,
+                reverse.committed_cost_units_after,
+            )?,
             budget_total: charge.budget_total,
             delegation_depth: cap.delegation_chain.len() as u32,
             root_budget_holder: cap.issuer.to_hex(),
@@ -1888,8 +1889,8 @@ impl ChioKernel {
                     grant_index: matched_grant_index as u32,
                     cost_charged: quoted_units,
                     currency: quoted_currency,
-                    budget_remaining: 0,
-                    budget_total: quoted_units,
+                    budget_remaining: None,
+                    budget_total: None,
                     delegation_depth: cap.delegation_chain.len() as u32,
                     root_budget_holder: cap.issuer.to_hex(),
                     payment_reference,
@@ -2082,9 +2083,8 @@ impl ChioKernel {
             actual_cost
         };
 
-        let budget_remaining = charge
-            .budget_total
-            .saturating_sub(running_committed_cost_units);
+        let budget_remaining =
+            financial_budget_remaining(charge.budget_total, running_committed_cost_units)?;
         let delegation_depth = cap.delegation_chain.len() as u32;
         let root_budget_holder = cap.issuer.to_hex();
         let (payment_reference, settlement_status) = settlement.into_receipt_parts();

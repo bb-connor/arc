@@ -2008,13 +2008,15 @@ fn build_reveal_kernel(inputs: &RevealKernelInputs<'_>) -> Result<ChioKernel, An
         invocations: inputs.invocations.clone(),
     }));
     let dpop_config = DpopConfig::default();
-    kernel.set_dpop_store(
-        DpopNonceStore::new(
-            dpop_config.nonce_store_capacity,
-            std::time::Duration::from_secs(dpop_config.proof_ttl_secs),
-        ),
-        dpop_config,
-    );
+    kernel
+        .set_dpop_store(
+            DpopNonceStore::new(
+                dpop_config.nonce_store_capacity,
+                std::time::Duration::from_secs(dpop_config.proof_ttl_secs),
+            ),
+            dpop_config,
+        )
+        .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
     if inputs.install_verifier {
         kernel.set_finding_purchase_verifier(Arc::new(MarketFindingPurchaseVerifier::new(
             purchase_authorities(inputs.web),

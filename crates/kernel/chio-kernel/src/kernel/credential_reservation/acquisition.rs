@@ -47,25 +47,20 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
 
         let result = (|| {
             if let Some(proof) = dpop_proof {
-                let store = kernel.dpop_nonce_store.as_ref().ok_or_else(|| {
-                    KernelError::DpopVerificationFailed(
-                        "kernel DPoP nonce store not configured".to_string(),
-                    )
-                })?;
-                let config = kernel.dpop_config.as_ref().ok_or_else(|| {
-                    KernelError::DpopVerificationFailed(
-                        "kernel DPoP configuration not installed".to_string(),
-                    )
-                })?;
+                let store = kernel
+                    .dpop_nonce_store
+                    .as_ref()
+                    .ok_or(KernelError::Dpop(crate::dpop::DpopError::MissingStore))?;
+                let config = kernel.dpop_config.as_ref().ok_or(KernelError::Dpop(
+                    crate::dpop::DpopError::MissingConfiguration,
+                ))?;
                 reservation.dpop_key =
                     Some((proof.body.nonce.clone(), proof.body.capability_id.clone()));
                 let valid_through = proof
                     .body
                     .issued_at
                     .checked_add(config.proof_ttl_secs)
-                    .ok_or_else(|| {
-                        KernelError::DpopVerificationFailed("DPoP proof horizon overflow".into())
-                    })?;
+                    .ok_or(KernelError::Dpop(crate::dpop::DpopError::WindowOverflow))?;
                 match run_credential_store_operation(
                     &reservation.reservation_id,
                     "DPoP nonce reservation",
@@ -81,10 +76,7 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
                     Ok(true) => {}
                     Ok(false) => {
                         reservation.dpop_key = None;
-                        return Err(KernelError::DpopVerificationFailed(
-                            "nonce replayed: this nonce has already been used during the proof validity window"
-                                .to_string(),
-                        ));
+                        return Err(crate::dpop::DpopError::Replayed.into());
                     }
                     Err(error) => return Err(error),
                 }

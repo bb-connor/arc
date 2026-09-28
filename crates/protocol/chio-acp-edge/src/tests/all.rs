@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[path = "."]
 mod tests {
     mod authorization_projection {
         include!(concat!(
@@ -1157,7 +1158,8 @@ mod tests {
         );
     }
 
-    include!("permissions.rs");
+    #[path = "permissions.rs"]
+    mod permissions;
 
     // ---- Invocation tests ----
 

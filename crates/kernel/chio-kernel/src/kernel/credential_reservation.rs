@@ -81,8 +81,8 @@ impl DispatchCredentialReservation<'_> {
         // Keep owned reservations reversible until dispatch starts. Once the
         // server is polled, neither a dropped future nor a server-controlled
         // URL-elicitation result can prove that no side effect occurred. Drop
-        // therefore promotes the governed approval marker and leaves owned
-        // nonce reservations in their fail-closed state.
+        // therefore promotes approval and DPoP markers and leaves owned
+        // execution nonce reservations in their fail-closed state.
         self.rollback_on_drop = false;
         self.retain_on_drop = true;
         Ok(self.retention_disposition())
@@ -98,6 +98,7 @@ impl DispatchCredentialReservation<'_> {
         self.rollback_on_drop = false;
         self.retain_on_drop = true;
         self.commit_approval_marker()?;
+        self.commit_dpop_marker()?;
         Ok(self.retention_disposition())
     }
 
@@ -115,6 +116,7 @@ impl DispatchCredentialReservation<'_> {
         self.rollback_on_drop = false;
         self.retain_on_drop = false;
         self.commit_approval_marker()?;
+        self.commit_dpop_marker()?;
         Ok(self.retention_disposition())
     }
 
@@ -126,6 +128,27 @@ impl DispatchCredentialReservation<'_> {
         } else {
             PaymentCredentialDisposition::NonePresent
         }
+    }
+
+    fn commit_dpop_marker(&mut self) -> Result<(), KernelError> {
+        let Some((nonce, capability_id)) = self.dpop_key.as_ref() else {
+            return Ok(());
+        };
+        let store = self
+            .kernel
+            .dpop_nonce_store
+            .as_ref()
+            .ok_or(crate::dpop::DpopError::MissingStore)?;
+        let committed = run_credential_store_operation(
+            &self.reservation_id,
+            "DPoP reservation commit",
+            || store.commit_dispatch_reservation(nonce, capability_id, &self.reservation_id),
+        )?;
+        if !committed {
+            return Err(crate::dpop::DpopError::ReservationOwnership.into());
+        }
+        self.dpop_key = None;
+        Ok(())
     }
 
     fn commit_approval_marker(&mut self) -> Result<(), KernelError> {
@@ -264,9 +287,7 @@ impl DispatchCredentialReservation<'_> {
                         )
                     },
                 ),
-                None => Err(KernelError::DpopVerificationFailed(
-                    "DPoP nonce store disappeared during dispatch rollback".to_string(),
-                )),
+                None => Err(KernelError::Dpop(crate::dpop::DpopError::MissingStore)),
             };
             match result {
                 Ok(true) => {}
@@ -294,6 +315,13 @@ impl Drop for DispatchCredentialReservation<'_> {
                 tracing::warn!(
                     reason = %redacted!(&error),
                     "governed dispatch credential retention failed while dropping an evaluation"
+                );
+            }
+            if let Err(error) = self.commit_dpop_marker() {
+                tracing::warn!(
+                    rejection_code = %error.report().code,
+                    reason = %redacted!(&error),
+                    "DPoP credential retention failed while dropping an evaluation"
                 );
             }
             return;

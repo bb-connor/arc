@@ -403,7 +403,7 @@ fn require_proof_sticky_state(
 fn observe_status_route_time(
     store: &SqliteFindingStatusStore,
     feed_id: &str,
-    read_now: impl FnOnce() -> u64,
+    read_now: impl FnOnce() -> Result<u64, chio_security_types::clock::ClockError>,
 ) -> Result<u64, Response> {
     store
         .observe_trusted_time_with_clock(feed_id, read_now)
@@ -522,9 +522,10 @@ fn intent_persistence_time(
     operator: &FindingStatusOperatorPin,
     service_bond: &FindingStatusServiceBond,
     feed_id: &str,
-    read_now: impl FnOnce() -> u64,
+    read_now: impl FnOnce() -> Result<u64, chio_security_types::clock::ClockError>,
 ) -> Result<u64, Response> {
-    let persistence_now = read_now();
+    let persistence_now = read_now()
+        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()))?;
     validate_intent_submission(signed, operator, service_bond, feed_id, persistence_now)?;
     Ok(persistence_now)
 }
@@ -615,7 +616,8 @@ fn status_write_error(error: FindingStatusStoreError) -> Response {
         | FindingStatusStoreError::Equivocation { .. }
         | FindingStatusStoreError::ContradictoryNonInclusion { .. } => StatusCode::CONFLICT,
         FindingStatusStoreError::Fenced => StatusCode::FORBIDDEN,
-        FindingStatusStoreError::Unavailable(_)
+        FindingStatusStoreError::Clock(_)
+        | FindingStatusStoreError::Unavailable(_)
         | FindingStatusStoreError::Invariant(_)
         | FindingStatusStoreError::OutcomeUnknown(_)
         | FindingStatusStoreError::MissingFloor { .. }
@@ -640,7 +642,7 @@ pub(crate) async fn handle_get_finding_status_root(
         Ok(epoch) => epoch,
         Err(error) => return status_read_error(error),
     };
-    let verification_now = match observe_status_route_time(&store, &feed_id, unix_timestamp_now) {
+    let verification_now = match observe_status_route_time(&store, &feed_id, status_clock_now) {
         Ok(now) => now,
         Err(response) => return response,
     };
@@ -694,7 +696,7 @@ pub(crate) async fn handle_get_finding_status_proof(
         }
         Err(error) => return status_read_error(error),
     };
-    let verification_now = match observe_status_route_time(&store, &feed_id, unix_timestamp_now) {
+    let verification_now = match observe_status_route_time(&store, &feed_id, status_clock_now) {
         Ok(now) => now,
         Err(response) => return response,
     };
@@ -724,7 +726,7 @@ pub(crate) async fn handle_get_finding_status_proof(
     if let Err(response) = require_proof_sticky_state(&store, &proof) {
         return response;
     }
-    let final_now = match observe_status_route_time(&store, &feed_id, unix_timestamp_now) {
+    let final_now = match observe_status_route_time(&store, &feed_id, status_clock_now) {
         Ok(now) => now,
         Err(response) => return response,
     };
@@ -834,7 +836,10 @@ pub(crate) async fn handle_submit_finding_status_intent(
         &config.status_feed_operator,
         &config.status_feed_service_bond,
         &feed_id,
-        unix_timestamp_now,
+        || {
+            chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
+                .map(|now| now.as_secs())
+        },
     ) {
         Ok(now) => now,
         Err(response) => return response,
@@ -865,7 +870,10 @@ pub(crate) async fn handle_submit_finding_status_intent(
             created_at: persistence_now,
         },
         commit_liveness,
-        unix_timestamp_now,
+        || {
+            chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
+                .map(|now| now.as_secs())
+        },
     ) {
         Ok(outcome) => outcome,
         Err(error) => return status_write_error(error),
@@ -1237,7 +1245,7 @@ mod tests {
         let signed = SignedExportEnvelope::sign(submission(), &operator_key())
             .test_expect("signed status intent");
         let response = intent_persistence_time(&signed, &operator, &bond, FEED_ID, || {
-            signed.body.inclusion_deadline
+            Ok(signed.body.inclusion_deadline)
         })
         .test_expect_err("intent expiring during validation must not be persisted");
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -1649,7 +1657,7 @@ mod tests {
         publisher.publish_non_inclusion(&sha256_hex(b"clock-fenced-route"), &[], NOW)?;
         store.observe_trusted_time(FEED_ID, NOW + 100)?;
 
-        let response = observe_status_route_time(&store, FEED_ID, || NOW + 50)
+        let response = observe_status_route_time(&store, FEED_ID, || Ok(NOW + 50))
             .test_expect_err("route time below the durable floor must reject");
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
         Ok(())
@@ -1963,4 +1971,9 @@ mod tests {
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         Ok(())
     }
+}
+
+fn status_clock_now() -> Result<u64, chio_security_types::clock::ClockError> {
+    chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
+        .map(|now| now.as_secs())
 }

@@ -329,15 +329,7 @@ impl ChioKernel {
         if dpop_required {
             let verification = self.verify_required_dpop_preview(request, cap);
             if let Err(e) = verification {
-                let msg = e.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "DPoP verification failed");
-                return self.build_deny_response_with_metadata(
-                    request,
-                    &msg,
-                    now,
-                    None,
-                    extra_metadata.clone(),
-                );
+                return self.deny_admission_error(request, &e, now, extra_metadata.clone());
             }
         }
 

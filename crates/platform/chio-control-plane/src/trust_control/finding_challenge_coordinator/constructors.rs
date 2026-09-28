@@ -28,11 +28,11 @@ impl FindingChallengeCoordinator {
             rail,
             filings,
             failed_challenge_disposition,
-            Arc::new(SystemFindingStatusCommitClock),
+            Arc::new(chio_security_types::clock::SystemClock),
         )
     }
 
-    /// Build with local compatibility keys and an injected clock.
+    /// Build with local signing keys and an injected clock.
     #[allow(clippy::too_many_arguments)]
     pub fn new_with_status_commit_clock(
         challenges: SqliteFindingChallengeStore,
@@ -46,7 +46,7 @@ impl FindingChallengeCoordinator {
         rail: Arc<dyn FindingRailObserver>,
         filings: Arc<dyn FindingFilingResolver>,
         failed_challenge_disposition: FindingDisputeLockDisposition,
-        status_commit_clock: Arc<dyn FindingStatusCommitClock>,
+        status_commit_clock: Arc<dyn chio_security_types::clock::Clock>,
     ) -> Result<Self, ChallengeCoordinatorError> {
         Self::new_with_signing_backends_and_status_commit_clock(
             challenges,
@@ -91,7 +91,7 @@ impl FindingChallengeCoordinator {
             rail,
             filings,
             failed_challenge_disposition,
-            Arc::new(SystemFindingStatusCommitClock),
+            Arc::new(chio_security_types::clock::SystemClock),
         )
     }
 }

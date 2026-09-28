@@ -2,7 +2,7 @@ use super::*;
 use crate::dpop::{DpopNonceStore, DpopProofBody, DPOP_SCHEMA};
 use chio_core::capability::{scope::ChioScope, token::CapabilityTokenBody};
 use chio_core::crypto::Keypair;
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::Duration;
 
 const NOW: u64 = 1_800_000_000;
 
@@ -97,15 +97,19 @@ fn exact_authority_signature_yields_only_non_consuming_bounded_evidence() {
 fn legacy_consuming_and_preview_ports_refuse_v2_without_burning_a_nonce() {
     let (_, cap, proof) = fixture();
     let store = DpopNonceStore::new(8, Duration::from_secs(300));
-    assert!(crate::dpop::verify_dpop_proof_stateless(
-        &proof,
-        &cap,
-        "server",
-        "tool",
-        &sha256_hex(b"{}"),
-        &DpopConfig::default()
-    )
-    .is_err());
+    assert!(matches!(
+        crate::dpop::verify_dpop_proof_stateless(
+            &proof,
+            &cap,
+            "server",
+            "tool",
+            &sha256_hex(b"{}"),
+            &DpopConfig::default(),
+            chio_security_types::clock::Clock::read(&chio_security_types::clock::SystemClock)
+                .unwrap_or_else(|error| panic!("fixture clock: {error}"))
+        ),
+        Err(KernelError::Dpop(crate::dpop::DpopError::Schema))
+    ));
     assert!(crate::dpop::verify_dpop_proof(
         &proof,
         &cap,
@@ -132,15 +136,21 @@ fn old_proofs_and_schema_downgrades_never_enter_the_durable_domain() {
         let legacy = DpopProof::sign(body, &key).unwrap();
         assert!(verify(&legacy, &cap, &authority(), NOW).is_err());
         if retain_authority {
-            assert!(crate::dpop::verify_dpop_proof_stateless(
-                &legacy,
-                &cap,
-                "server",
-                "tool",
-                &sha256_hex(b"{}"),
-                &DpopConfig::default()
-            )
-            .is_err());
+            assert!(matches!(
+                crate::dpop::verify_dpop_proof_stateless(
+                    &legacy,
+                    &cap,
+                    "server",
+                    "tool",
+                    &sha256_hex(b"{}"),
+                    &DpopConfig::default(),
+                    chio_security_types::clock::Clock::read(
+                        &chio_security_types::clock::SystemClock
+                    )
+                    .unwrap_or_else(|error| panic!("fixture clock: {error}"))
+                ),
+                Err(KernelError::Dpop(crate::dpop::DpopError::Schema))
+            ));
         }
     }
     let mut downgraded = proof.clone();
@@ -309,8 +319,25 @@ fn oversized_replay_keys_fail_before_signature_or_evidence_allocation() {
 
 #[test]
 fn invalid_system_clock_is_not_reinterpreted_as_epoch_zero() {
-    assert!(crate::dpop::system_unix_secs(UNIX_EPOCH - Duration::from_secs(1)).is_err());
-    assert_eq!(crate::dpop::system_unix_secs(UNIX_EPOCH).unwrap(), 0);
+    use chio_security_types::clock::{Clock, ClockError, ClockReading};
+    struct BeforeEpoch;
+    impl Clock for BeforeEpoch {
+        fn read(&self) -> Result<ClockReading, ClockError> {
+            Err(ClockError::BeforeEpoch)
+        }
+    }
+    let store = DpopNonceStore::with_clock(
+        8,
+        8,
+        4096,
+        Duration::from_secs(60),
+        std::sync::Arc::new(BeforeEpoch),
+    );
+    assert!(matches!(
+        store.check_and_insert("nonce", "cap"),
+        Err(KernelError::Clock(ClockError::BeforeEpoch))
+    ));
+    assert_eq!(store.utilization().unwrap().0, 0);
 }
 
 #[test]

@@ -459,3 +459,7 @@ chio receipt list \
 ```
 
 To paginate programmatically, capture `nextCursor` from the HTTP response and pass it as `--cursor` on the next invocation.
+
+Financial `budget_total` and `budget_remaining` are both `null` for uncapped
+grants. Capped values describe the cumulative grant balance, including on denial
+and reconciliation receipts. Consumers must preserve this distinction.

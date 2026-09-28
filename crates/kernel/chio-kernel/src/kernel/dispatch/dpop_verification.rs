@@ -1,5 +1,5 @@
 //! Non-consuming permission preview selects only the independently configured
-//! replay profile. Legacy test helpers cannot bypass operation-owned custody.
+//! replay profile. Test helpers cannot bypass operation-owned custody.
 use super::*;
 
 impl ChioKernel {
@@ -10,11 +10,10 @@ impl ChioKernel {
         request: &ToolCallRequest,
         cap: &CapabilityToken,
     ) -> Result<(), KernelError> {
-        let proof = request.dpop_proof.as_ref().ok_or_else(|| {
-            KernelError::DpopVerificationFailed(
-                "grant requires DPoP proof but none was provided".to_string(),
-            )
-        })?;
+        let proof = request
+            .dpop_proof
+            .as_ref()
+            .ok_or(KernelError::Dpop(crate::dpop::DpopError::MissingProof))?;
         self.verify_dpop_for_permission_preview(
             proof,
             cap,
@@ -39,27 +38,22 @@ impl ChioKernel {
                 "operation-owned DPoP requires admitted credential custody".into(),
             ));
         }
-        let proof = request.dpop_proof.as_ref().ok_or_else(|| {
-            KernelError::DpopVerificationFailed(
-                "grant requires DPoP proof but none was provided".to_string(),
-            )
-        })?;
+        let proof = request
+            .dpop_proof
+            .as_ref()
+            .ok_or(KernelError::Dpop(crate::dpop::DpopError::MissingProof))?;
 
-        let nonce_store = self.dpop_nonce_store.as_ref().ok_or_else(|| {
-            KernelError::DpopVerificationFailed(
-                "kernel DPoP nonce store not configured".to_string(),
-            )
-        })?;
+        let nonce_store = self
+            .dpop_nonce_store
+            .as_ref()
+            .ok_or(KernelError::Dpop(crate::dpop::DpopError::MissingStore))?;
 
-        let config = self.dpop_config.as_ref().ok_or_else(|| {
-            KernelError::DpopVerificationFailed("kernel DPoP config not configured".to_string())
-        })?;
+        let config = self.dpop_config.as_ref().ok_or(KernelError::Dpop(
+            crate::dpop::DpopError::MissingConfiguration,
+        ))?;
 
-        let args_bytes = canonical_json_bytes(&request.arguments).map_err(|e| {
-            KernelError::DpopVerificationFailed(format!(
-                "failed to serialize arguments for action hash: {e}"
-            ))
-        })?;
+        let args_bytes = canonical_json_bytes(&request.arguments)
+            .map_err(|e| crate::dpop::DpopError::Encoding(Box::new(e)))?;
         let action_hash = sha256_hex(&args_bytes);
 
         dpop::verify_dpop_proof(
@@ -75,7 +69,7 @@ impl ChioKernel {
 
     /// Verify a DPoP proof for non-mutating permission preview.
     ///
-    /// Check the explicitly configured durable domain, or the live legacy
+    /// Check the explicitly configured durable domain, or the live process-local
     /// cache and policy when no durable domain is selected. This does not
     /// claim a nonce; authoritative invocation still requires replay custody.
     pub fn verify_dpop_for_permission_preview(
@@ -99,22 +93,15 @@ impl ChioKernel {
         }
         self.dpop_nonce_store
             .as_ref()
-            .ok_or_else(|| {
-                KernelError::DpopVerificationFailed(
-                    "kernel DPoP nonce store not configured".to_string(),
-                )
-            })?
+            .ok_or(KernelError::Dpop(crate::dpop::DpopError::MissingStore))?
             .ensure_accepting_proofs()?;
 
-        let config = self.dpop_config.as_ref().ok_or_else(|| {
-            KernelError::DpopVerificationFailed("kernel DPoP config not configured".to_string())
-        })?;
+        let config = self.dpop_config.as_ref().ok_or(KernelError::Dpop(
+            crate::dpop::DpopError::MissingConfiguration,
+        ))?;
 
-        let args_bytes = canonical_json_bytes(arguments).map_err(|e| {
-            KernelError::DpopVerificationFailed(format!(
-                "failed to serialize arguments for action hash: {e}"
-            ))
-        })?;
+        let args_bytes = canonical_json_bytes(arguments)
+            .map_err(|e| crate::dpop::DpopError::Encoding(Box::new(e)))?;
         let action_hash = sha256_hex(&args_bytes);
 
         dpop::verify_dpop_proof_stateless(
@@ -124,6 +111,10 @@ impl ChioKernel {
             expected_tool_name,
             &action_hash,
             config,
+            self.dpop_nonce_store
+                .as_ref()
+                .ok_or(crate::dpop::DpopError::MissingStore)?
+                .trusted_now()?,
         )
     }
 }

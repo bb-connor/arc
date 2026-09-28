@@ -27,10 +27,13 @@
 //!    and the proof's `signature` field
 //! 6. Nonce replay -- nonce must not have been seen during the proof's signed validity window
 
+use chio_security_types::clock::{Clock, ClockReading, SystemClock};
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
-use std::sync::Mutex;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+#[cfg(test)]
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::capability::token::CapabilityToken;
@@ -42,12 +45,12 @@ use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 
-use crate::replay_retention::{
-    advance_replay_clock, PendingReplayClockRebaseline, ReplayRetention,
-};
+use crate::replay_retention::{ReplayClock, ReplayHorizon, ReplayRetention};
 use crate::KernelError;
 
 mod accounting;
+mod error;
+pub use error::DpopError;
 pub mod authority;
 mod identity;
 pub mod replay_source;
@@ -127,9 +130,8 @@ impl DpopProof {
     /// The `keypair` must be the one corresponding to `body.agent_key`.
     /// The signature covers the canonical JSON of the body.
     pub fn sign(body: DpopProofBody, keypair: &Keypair) -> Result<DpopProof, KernelError> {
-        let body_bytes = canonical_json_bytes(&body).map_err(|e| {
-            KernelError::DpopVerificationFailed(format!("failed to serialize proof body: {e}"))
-        })?;
+        let body_bytes =
+            canonical_json_bytes(&body).map_err(|e| DpopError::Encoding(Box::new(e)))?;
         let signature = keypair.sign(&body_bytes);
         Ok(DpopProof { body, signature })
     }
@@ -143,9 +145,8 @@ impl DpopProof {
         body: DpopProofBody,
         backend: &dyn SigningBackend,
     ) -> Result<DpopProof, KernelError> {
-        let (signature, _bytes) = sign_canonical_with_backend(backend, &body).map_err(|e| {
-            KernelError::DpopVerificationFailed(format!("failed to sign proof body: {e}"))
-        })?;
+        let (signature, _bytes) = sign_canonical_with_backend(backend, &body)
+            .map_err(|e| DpopError::Signing(Box::new(e)))?;
         Ok(DpopProof { body, signature })
     }
 }
@@ -191,6 +192,7 @@ impl Default for DpopConfig {
 pub struct DpopNonceStore {
     inner: Mutex<DpopNonceState>,
     ttl: Duration,
+    clock: Arc<dyn Clock>,
 }
 
 struct DpopNonceState {
@@ -201,9 +203,7 @@ struct DpopNonceState {
     identity_byte_capacity: usize,
     identity_bytes: usize,
     accounting_failed: bool,
-    wall_clock_high_water: SystemTime,
-    monotonic_high_water: Instant,
-    pending_clock_rebaseline: Option<PendingReplayClockRebaseline>,
+    replay_clock: ReplayClock,
 }
 
 struct DpopNonceEntry {
@@ -275,6 +275,23 @@ impl DpopNonceStore {
         identity_byte_capacity: usize,
         ttl: Duration,
     ) -> Self {
+        Self::with_clock(
+            capacity,
+            per_capability_capacity,
+            identity_byte_capacity,
+            ttl,
+            Arc::new(SystemClock),
+        )
+    }
+
+    /// All sampling, projection and pruning use this clock under the cache lock.
+    pub fn with_clock(
+        capacity: usize,
+        per_capability_capacity: usize,
+        identity_byte_capacity: usize,
+        ttl: Duration,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
         let nz = match NonZeroUsize::new(capacity) {
             Some(capacity) => capacity,
             None => panic!("DPoP nonce store capacity must be greater than zero"),
@@ -296,31 +313,45 @@ impl DpopNonceStore {
                 identity_byte_capacity,
                 identity_bytes: 0,
                 accounting_failed: false,
-                wall_clock_high_water: SystemTime::now(),
-                monotonic_high_water: Instant::now(),
-                pending_clock_rebaseline: None,
+                replay_clock: ReplayClock::default(),
             }),
             ttl,
+            clock,
         }
+    }
+
+    pub(crate) fn bind_clock(&mut self, clock: Arc<dyn Clock>) -> Result<(), KernelError> {
+        let state = self.inner.get_mut().map_err(|_| DpopError::Unavailable)?;
+        state.source.require_pristine()?;
+        self.clock = clock;
+        Ok(())
+    }
+
+    pub(crate) fn trusted_now(&self) -> Result<ClockReading, KernelError> {
+        let mut state = self.inner.lock().map_err(|_| DpopError::Unavailable)?;
+        state.source.ensure_unsealed()?;
+        let now = state
+            .replay_clock
+            .observe("dpop_nonce", self.clock.read()?)?;
+        state.source.observe_creation(now);
+        Ok(now)
     }
 
     /// Return `(occupied_entries, capacity)` for local utilization monitoring.
     pub fn utilization(&self) -> Result<(usize, usize), KernelError> {
-        let state = self.inner.lock().map_err(|_| {
-            KernelError::DpopVerificationFailed(
-                "nonce store mutex poisoned; cannot report utilization".to_string(),
-            )
-        })?;
+        let state = self
+            .inner
+            .lock()
+            .map_err(|_| KernelError::Dpop(DpopError::Unavailable))?;
         Ok((state.cache.len(), state.cache.cap().get()))
     }
 
     /// Return `(charged_identity_bytes, identity_byte_capacity)` without pruning.
     pub fn identity_byte_utilization(&self) -> Result<(usize, usize), KernelError> {
-        let state = self.inner.lock().map_err(|_| {
-            KernelError::DpopVerificationFailed(
-                "nonce store mutex poisoned; cannot report byte utilization".to_owned(),
-            )
-        })?;
+        let state = self
+            .inner
+            .lock()
+            .map_err(|_| KernelError::Dpop(DpopError::Unavailable))?;
         Ok((state.identity_bytes, state.identity_byte_capacity))
     }
 
@@ -334,7 +365,7 @@ impl DpopNonceStore {
     /// (rejected -- replay detected).
     /// Returns `Err` if the internal mutex is poisoned (fail-closed: deny).
     pub fn check_and_insert(&self, nonce: &str, capability_id: &str) -> Result<bool, KernelError> {
-        self.check_and_insert_entry(nonce, capability_id, ReplayRetention::local(self.ttl), None)
+        self.check_and_insert_entry(nonce, capability_id, ReplayHorizon::Local(self.ttl), None)
     }
 
     /// Check and retain a nonce until an exclusive signed Unix-second expiry.
@@ -344,12 +375,7 @@ impl DpopNonceStore {
         capability_id: &str,
         expires_at: u64,
     ) -> Result<bool, KernelError> {
-        self.check_and_insert_entry(
-            nonce,
-            capability_id,
-            ReplayRetention::signed_until_unix_secs(expires_at),
-            None,
-        )
+        self.check_and_insert_entry(nonce, capability_id, ReplayHorizon::Until(expires_at), None)
     }
 
     /// Check and retain a DPoP nonce through its inclusive freshness horizon.
@@ -362,7 +388,7 @@ impl DpopNonceStore {
         self.check_and_insert_entry(
             nonce,
             capability_id,
-            ReplayRetention::signed_through_unix_secs(valid_through),
+            ReplayHorizon::Through(valid_through),
             None,
         )
     }
@@ -371,27 +397,8 @@ impl DpopNonceStore {
         &self,
         nonce: &str,
         capability_id: &str,
-        retention: ReplayRetention,
+        horizon: ReplayHorizon,
         dispatch_reservation_id: Option<&str>,
-    ) -> Result<bool, KernelError> {
-        self.check_and_insert_entry_at(
-            nonce,
-            capability_id,
-            retention,
-            dispatch_reservation_id,
-            SystemTime::now(),
-            Instant::now(),
-        )
-    }
-
-    fn check_and_insert_entry_at(
-        &self,
-        nonce: &str,
-        capability_id: &str,
-        retention: ReplayRetention,
-        dispatch_reservation_id: Option<&str>,
-        now_wall: SystemTime,
-        now_monotonic: Instant,
     ) -> Result<bool, KernelError> {
         validate_dpop_replay_identity(nonce, capability_id)?;
         if let Some(owner) = dispatch_reservation_id {
@@ -402,33 +409,19 @@ impl DpopNonceStore {
         let key = (nonce.to_string(), capability_id.to_string());
         let mut state = self.inner.lock().map_err(|_| {
             error!("DPoP nonce store mutex is poisoned; denying proof as fail-closed");
-            KernelError::DpopVerificationFailed(
-                "nonce store mutex poisoned; cannot verify replay safety".to_string(),
-            )
+            KernelError::Dpop(DpopError::Unavailable)
         })?;
         state.ensure_accounting()?;
+        let now = self.clock.read()?;
         state.source.begin_mutation()?;
-        let mut wall_clock_high_water = state.wall_clock_high_water;
-        let mut monotonic_high_water = state.monotonic_high_water;
-        let mut pending_clock_rebaseline = state.pending_clock_rebaseline;
-        let clock_result = advance_replay_clock(
-            "dpop_nonce",
-            &mut wall_clock_high_water,
-            &mut monotonic_high_water,
-            &mut pending_clock_rebaseline,
-            now_wall,
-            now_monotonic,
-        );
-        state.wall_clock_high_water = wall_clock_high_water;
-        state.monotonic_high_water = monotonic_high_water;
-        state.pending_clock_rebaseline = pending_clock_rebaseline;
-        let validated_high_water = clock_result?;
+        let now = state.replay_clock.observe("dpop_nonce", now)?;
+        state.source.observe_creation(now);
+        let retention = horizon.project(now);
 
-        let already_live = state.cache.peek(&key).is_some_and(|entry| {
-            !entry
-                .retention
-                .is_expired_at(validated_high_water, now_monotonic)
-        });
+        let already_live = state
+            .cache
+            .peek(&key)
+            .is_some_and(|entry| !entry.retention.is_expired_at(now));
         if !nonce_admits(already_live) {
             return Ok(false);
         }
@@ -436,11 +429,7 @@ impl DpopNonceStore {
         let expired_keys = state
             .cache
             .iter()
-            .filter(|(_, entry)| {
-                entry
-                    .retention
-                    .is_expired_at(validated_high_water, now_monotonic)
-            })
+            .filter(|(_, entry)| entry.retention.is_expired_at(now))
             .map(|(expired_key, entry)| {
                 identity::retained_bytes(
                     &expired_key.0,
@@ -452,20 +441,18 @@ impl DpopNonceStore {
             .collect::<Result<Vec<_>, _>>()?;
         state.release_accounted_entries(&expired_keys)?;
         if !expired_keys.is_empty() {
-            state.source.note_pruned(validated_high_water);
+            state.source.note_pruned(now.unix_millis());
         }
-        if retention.is_signed() && retention.signed_horizon_elapsed_at(validated_high_water) {
+        if retention.signed_horizon_elapsed_at(now.unix_millis()) {
             error!("elapsed signed horizon; denying replay reservation");
-            return Ok(false);
+            return Err(DpopError::Expired.into());
         }
         if state.cache.len() >= state.cache.cap().get() {
             error!(
                 capacity = state.cache.cap().get(),
                 "DPoP nonce store capacity exhausted; denying proof as fail-closed"
             );
-            return Err(KernelError::DpopVerificationFailed(
-                "nonce store capacity exhausted; cannot verify replay safety".to_string(),
-            ));
+            return Err(KernelError::Dpop(DpopError::Capacity));
         }
 
         let capability_entries = state
@@ -480,10 +467,7 @@ impl DpopNonceStore {
                 per_capability_capacity = state.per_capability_capacity,
                 "DPoP nonce store capability quota exhausted; preserving capacity for other capabilities"
             );
-            return Err(KernelError::DpopVerificationFailed(
-                "nonce store per-capability quota exhausted; cannot verify replay safety"
-                    .to_string(),
-            ));
+            return Err(KernelError::Dpop(DpopError::CapabilityCapacity));
         }
 
         let retained_bytes = state
@@ -521,7 +505,7 @@ impl DpopNonceStore {
         self.check_and_insert_entry(
             nonce,
             capability_id,
-            ReplayRetention::signed_through_unix_secs(valid_through),
+            ReplayHorizon::Through(valid_through),
             Some(reservation_id),
         )
     }
@@ -538,9 +522,37 @@ impl DpopNonceStore {
         self.check_and_insert_entry(
             nonce,
             capability_id,
-            ReplayRetention::signed_until_unix_secs(expires_at),
+            ReplayHorizon::Until(expires_at),
             Some(reservation_id),
         )
+    }
+
+    /// Disable owner rollback once dispatch or external authorization commits.
+    /// This operation retains custody even when the clock is unavailable.
+    pub(crate) fn commit_dispatch_reservation(
+        &self,
+        nonce: &str,
+        capability_id: &str,
+        reservation_id: &str,
+    ) -> Result<bool, KernelError> {
+        let key = (nonce.to_owned(), capability_id.to_owned());
+        let mut state = self.inner.lock().map_err(|_| DpopError::Unavailable)?;
+        state.ensure_accounting()?;
+        let Some(entry) = state.cache.peek(&key) else {
+            return Ok(false);
+        };
+        if entry.dispatch_reservation_id.as_deref() != Some(reservation_id) {
+            return Ok(false);
+        }
+        let Some(bytes) = state.identity_bytes.checked_sub(reservation_id.len()) else {
+            state.accounting_failed = true;
+            return Err(DpopError::Accounting.into());
+        };
+        state.source.begin_mutation()?;
+        let entry = state.cache.peek_mut(&key).ok_or(DpopError::Accounting)?;
+        entry.dispatch_reservation_id = None;
+        state.identity_bytes = bytes;
+        Ok(true)
     }
 
     pub(crate) fn rollback_dispatch_reservation(
@@ -555,9 +567,7 @@ impl DpopNonceStore {
         let key = (nonce.to_string(), capability_id.to_string());
         let mut state = self.inner.lock().map_err(|_| {
             error!("DPoP nonce store mutex is poisoned; dispatch reservation rollback failed");
-            KernelError::DpopVerificationFailed(
-                "nonce store mutex poisoned; cannot roll back dispatch reservation".to_string(),
-            )
+            KernelError::Dpop(DpopError::Unavailable)
         })?;
         state.ensure_accounting()?;
         state.source.begin_mutation()?;
@@ -609,14 +619,12 @@ pub fn verify_dpop_proof_stateless(
     expected_tool_name: &str,
     expected_action_hash: &str,
     config: &DpopConfig,
+    now: ClockReading,
 ) -> Result<(), KernelError> {
     validate_dpop_replay_identity(&proof.body.nonce, &proof.body.capability_id)?;
     // Step 1: Schema check.
     if !is_supported_dpop_schema(&proof.body.schema) || proof.body.replay_authority.is_some() {
-        return Err(KernelError::DpopVerificationFailed(format!(
-            "unknown DPoP schema: expected {DPOP_SCHEMA}, got {}",
-            proof.body.schema
-        )));
+        return Err(DpopError::Schema.into());
     }
 
     verify_dpop_bindings_at(
@@ -626,14 +634,14 @@ pub fn verify_dpop_proof_stateless(
         expected_tool_name,
         expected_action_hash,
         config,
-        system_unix_secs(SystemTime::now())?,
+        now.unix_millis().as_secs(),
     )
 }
 
 fn checked_dpop_valid_through(issued_at: u64, ttl_secs: u64) -> Result<u64, KernelError> {
-    issued_at.checked_add(ttl_secs).ok_or_else(|| {
-        KernelError::DpopVerificationFailed("proof validity window overflows Unix seconds".into())
-    })
+    issued_at
+        .checked_add(ttl_secs)
+        .ok_or_else(|| DpopError::WindowOverflow.into())
 }
 
 /// Shared cryptographic checks only. The caller must first enforce its exact
@@ -649,20 +657,26 @@ fn verify_dpop_bindings_at(
 ) -> Result<(), KernelError> {
     // Step 2: Sender constraint -- agent_key must equal capability.subject.
     if proof.body.agent_key != capability.subject {
-        return Err(KernelError::DpopVerificationFailed(
-            "agent_key does not match capability subject (sender constraint violated)".to_string(),
-        ));
+        return Err(DpopError::Sender.into());
     }
-
-    // Step 3: Binding fields.
-    if proof.body.capability_id != capability.id
-        || proof.body.tool_server != expected_tool_server
-        || proof.body.tool_name != expected_tool_name
-        || proof.body.action_hash != expected_action_hash
-    {
-        return Err(KernelError::DpopVerificationFailed(
-            "binding fields do not match: capability_id, tool_server, tool_name, or action_hash mismatch".to_string(),
-        ));
+    for (matches, reason) in [
+        (
+            proof.body.capability_id == capability.id,
+            DpopError::Capability,
+        ),
+        (
+            proof.body.tool_server == expected_tool_server,
+            DpopError::Server,
+        ),
+        (proof.body.tool_name == expected_tool_name, DpopError::Tool),
+        (
+            proof.body.action_hash == expected_action_hash,
+            DpopError::Action,
+        ),
+    ] {
+        if !matches {
+            return Err(reason.into());
+        }
     }
 
     // Step 4: Refuse an unrepresentable validity window before either the
@@ -671,36 +685,19 @@ fn verify_dpop_bindings_at(
     // Saturation of now + skew is an intentional upper comparison bound.
     if !dpop_freshness_admits(now_secs, proof.body.issued_at, config) {
         if proof.body.issued_at > now_secs.saturating_add(config.max_clock_skew_secs) {
-            return Err(KernelError::DpopVerificationFailed(format!(
-                "proof issued_at={} is too far in the future (now={}, skew={})",
-                proof.body.issued_at, now_secs, config.max_clock_skew_secs
-            )));
+            return Err(DpopError::NotYetValid.into());
         }
-        return Err(KernelError::DpopVerificationFailed(format!(
-            "proof expired: issued_at={} ttl={} now={}",
-            proof.body.issued_at, config.proof_ttl_secs, now_secs
-        )));
+        return Err(DpopError::Expired.into());
     }
 
     // Step 5: Signature verification.
-    let body_bytes = canonical_json_bytes(&proof.body).map_err(|e| {
-        KernelError::DpopVerificationFailed(format!("failed to serialize proof body: {e}"))
-    })?;
+    let body_bytes =
+        canonical_json_bytes(&proof.body).map_err(|e| DpopError::Encoding(Box::new(e)))?;
     if !proof.body.agent_key.verify(&body_bytes, &proof.signature) {
-        return Err(KernelError::DpopVerificationFailed(
-            "proof signature verification failed".to_string(),
-        ));
+        return Err(KernelError::Dpop(DpopError::Signature));
     }
 
     Ok(())
-}
-
-fn system_unix_secs(now: SystemTime) -> Result<u64, KernelError> {
-    now.duration_since(UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs())
-        .map_err(|_| {
-            KernelError::DpopVerificationFailed("system clock precedes the Unix epoch".into())
-        })
 }
 
 /// Verify a DPoP proof against the given capability and invocation context.
@@ -732,6 +729,7 @@ pub fn verify_dpop_proof(
         expected_tool_name,
         expected_action_hash,
         config,
+        nonce_store.trusted_now()?,
     )?;
 
     // Step 6: Nonce replay check.
@@ -741,10 +739,7 @@ pub fn verify_dpop_proof(
         &proof.body.capability_id,
         valid_through,
     )? {
-        return Err(KernelError::DpopVerificationFailed(
-            "nonce replayed: this nonce has already been used during the proof validity window"
-                .to_string(),
-        ));
+        return Err(KernelError::Dpop(DpopError::Replayed));
     }
 
     Ok(())
@@ -904,201 +899,11 @@ mod backend_tests {
             .is_err());
 
         let expired_store = DpopNonceStore::new(1, Duration::from_secs(60));
-        assert!(!expired_store.check_and_insert_until("approval-a", "intent", 0)?);
+        assert!(matches!(
+            expired_store.check_and_insert_until("approval-a", "intent", 0),
+            Err(KernelError::Dpop(DpopError::Expired))
+        ));
         assert!(expired_store.check_and_insert_until("approval-b", "intent", now + 60)?);
-        Ok(())
-    }
-
-    #[test]
-    fn signed_replay_stays_closed_after_reclamation_and_tolerated_clock_skew(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let start_wall = UNIX_EPOCH.checked_add(Duration::from_secs(10_000)).unwrap();
-        let start_monotonic = Instant::now();
-        let store = DpopNonceStore::new(3, Duration::from_secs(60));
-        {
-            let mut state = store.inner.lock().unwrap();
-            state.wall_clock_high_water = start_wall;
-            state.monotonic_high_water = start_monotonic;
-        }
-
-        let used_deadline = start_wall.checked_add(Duration::from_secs(10)).unwrap();
-        let used_retention =
-            ReplayRetention::signed_until_at(Some(used_deadline), start_wall, start_monotonic);
-        assert!(store.check_and_insert_entry_at(
-            "used",
-            "intent",
-            used_retention,
-            None,
-            start_wall,
-            start_monotonic,
-        )?);
-
-        let forward_wall = start_wall.checked_add(Duration::from_secs(20)).unwrap();
-        let forward_monotonic = start_monotonic
-            .checked_add(Duration::from_secs(20))
-            .unwrap();
-        let other_retention = ReplayRetention::signed_until_at(
-            start_wall.checked_add(Duration::from_secs(40)),
-            forward_wall,
-            forward_monotonic,
-        );
-        assert!(store.check_and_insert_entry_at(
-            "other",
-            "other-intent",
-            other_retention,
-            None,
-            forward_wall,
-            forward_monotonic,
-        )?);
-        assert!(store
-            .inner
-            .lock()
-            .unwrap()
-            .cache
-            .peek(&("used".to_string(), "intent".to_string()))
-            .is_none());
-
-        let rollback_wall = start_wall.checked_add(Duration::from_secs(5)).unwrap();
-        let rollback_monotonic = forward_monotonic
-            .checked_add(Duration::from_secs(1))
-            .unwrap();
-        assert!(!store.check_and_insert_entry_at(
-            "used",
-            "intent",
-            used_retention,
-            None,
-            rollback_wall,
-            rollback_monotonic,
-        )?);
-
-        let later_horizon = ReplayRetention::signed_until_at(
-            start_wall.checked_add(Duration::from_secs(60)),
-            rollback_wall,
-            rollback_monotonic,
-        );
-        assert!(store.check_and_insert_entry_at(
-            "new-signed",
-            "new-intent",
-            later_horizon,
-            None,
-            rollback_wall,
-            rollback_monotonic,
-        )?);
-        assert!(store.check_and_insert_entry_at(
-            "local-only",
-            "local-intent",
-            ReplayRetention::local(Duration::from_secs(60)),
-            None,
-            rollback_wall,
-            rollback_monotonic,
-        )?);
-        Ok(())
-    }
-
-    #[test]
-    fn suspicious_forward_clock_jump_is_rejected_without_latching_dpop_store(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let start_wall = UNIX_EPOCH.checked_add(Duration::from_secs(10_000)).unwrap();
-        let start_monotonic = Instant::now();
-        let store = DpopNonceStore::new(2, Duration::from_secs(60));
-        {
-            let mut state = store.inner.lock().unwrap();
-            state.wall_clock_high_water = start_wall;
-            state.monotonic_high_water = start_monotonic;
-        }
-        let retention = ReplayRetention::signed_until_at(
-            start_wall.checked_add(Duration::from_secs(1_000)),
-            start_wall,
-            start_monotonic,
-        );
-        let error = store
-            .check_and_insert_entry_at(
-                "jumped",
-                "capability",
-                retention,
-                None,
-                start_wall.checked_add(Duration::from_secs(302)).unwrap(),
-                start_monotonic.checked_add(Duration::from_secs(1)).unwrap(),
-            )
-            .unwrap_err();
-        assert!(matches!(
-            error,
-            KernelError::ReplayClockAnomaly {
-                direction: crate::ReplayClockDirection::ForwardJump,
-                ..
-            }
-        ));
-
-        assert!(store.check_and_insert_entry_at(
-            "recovered",
-            "capability",
-            retention,
-            None,
-            start_wall.checked_add(Duration::from_secs(2)).unwrap(),
-            start_monotonic.checked_add(Duration::from_secs(2)).unwrap(),
-        )?);
-        Ok(())
-    }
-
-    #[test]
-    fn confirmed_suspend_gap_does_not_reopen_a_live_dpop_marker(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let start_wall = UNIX_EPOCH.checked_add(Duration::from_secs(10_000)).unwrap();
-        let start_monotonic = Instant::now();
-        let store = DpopNonceStore::new(4, Duration::from_secs(60));
-        {
-            let mut state = store.inner.lock().unwrap();
-            state.wall_clock_high_water = start_wall;
-            state.monotonic_high_water = start_monotonic;
-        }
-        let used_retention = ReplayRetention::signed_until_at(
-            start_wall.checked_add(Duration::from_secs(10_000)),
-            start_wall,
-            start_monotonic,
-        );
-        assert!(store.check_and_insert_entry_at(
-            "used",
-            "capability",
-            used_retention,
-            None,
-            start_wall,
-            start_monotonic,
-        )?);
-
-        let resumed_wall = start_wall.checked_add(Duration::from_secs(3_600)).unwrap();
-        assert!(matches!(
-            store.check_and_insert_entry_at(
-                "first-probe",
-                "capability",
-                used_retention,
-                None,
-                resumed_wall,
-                start_monotonic.checked_add(Duration::from_secs(1)).unwrap(),
-            ),
-            Err(KernelError::ReplayClockAnomaly {
-                direction: crate::ReplayClockDirection::ForwardJump,
-                ..
-            })
-        ));
-
-        let confirmed_wall = resumed_wall.checked_add(Duration::from_secs(2)).unwrap();
-        let confirmed_monotonic = start_monotonic.checked_add(Duration::from_secs(3)).unwrap();
-        assert!(store.check_and_insert_entry_at(
-            "second-probe",
-            "probe-capability",
-            used_retention,
-            None,
-            confirmed_wall,
-            confirmed_monotonic,
-        )?);
-        assert!(!store.check_and_insert_entry_at(
-            "used",
-            "capability",
-            used_retention,
-            None,
-            confirmed_wall,
-            confirmed_monotonic,
-        )?);
         Ok(())
     }
 
@@ -1107,3 +912,8 @@ mod backend_tests {
     // (see `capability.rs` tests). The DPoP verifier path ultimately calls
     // `PublicKey::verify`, so algorithm dispatch is fully covered there.
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[path = "dpop/clock_tests.rs"]
+mod clock_tests;

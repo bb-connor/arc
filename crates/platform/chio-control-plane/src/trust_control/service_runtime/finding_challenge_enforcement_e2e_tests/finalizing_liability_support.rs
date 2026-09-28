@@ -130,12 +130,16 @@ fn finalizing_liability_with_options(
         NOW + 2 + CLAIM_WINDOW_SECS,
         NOW + 2,
     )?;
-    deployment
-        .purchases
-        .register_community_fund_destination(&allocation_id, EVM_COMMUNITY_FUND, NOW + 2)?;
-    deployment
-        .purchases
-        .admit_payout_destination(&allocation_id, EVM_BUYER_DESTINATION, NOW + 2)?;
+    deployment.purchases.register_community_fund_destination(
+        &allocation_id,
+        EVM_COMMUNITY_FUND,
+        NOW + 2,
+    )?;
+    deployment.purchases.admit_payout_destination(
+        &allocation_id,
+        EVM_BUYER_DESTINATION,
+        NOW + 2,
+    )?;
     // The sanction the impairment settles under. Dispatch requires it to
     // still be the live case head, exactly as the coordinator records it
     // when it upholds a liability.
@@ -237,13 +241,14 @@ fn finalizing_liability_with_options(
         )?;
         if prior_retraction == PriorVoluntaryRetraction::Published {
             let config = market_config();
-            let publisher = crate::trust_control::finding_status_publisher::FindingStatusEpochPublisher::new(
-                deployment.status.clone(),
-                config.status_feed_operator,
-                config.status_feed_service_bond,
-                keypair(36),
-                config.status_max_epoch_age_secs,
-            )?;
+            let publisher =
+                crate::trust_control::finding_status_publisher::FindingStatusEpochPublisher::new(
+                    deployment.status.clone(),
+                    config.status_feed_operator,
+                    config.status_feed_service_bond,
+                    keypair(36),
+                    config.status_max_epoch_age_secs,
+                )?;
             publisher.publish_retraction(&voluntary_intent_id, &[], NOW + 4)?;
         }
         voluntary_intent_id
@@ -323,9 +328,7 @@ fn finalizing_liability_with_options(
             )?;
         }
     }
-    if root == EnforcementRoot::Confirmed
-        && prior_retraction != PriorVoluntaryRetraction::None
-    {
+    if root == EnforcementRoot::Confirmed && prior_retraction != PriorVoluntaryRetraction::None {
         deployment.challenges.bind_effect_root(
             &enforcement_root_intent_key(),
             &liability_key,
@@ -404,7 +407,7 @@ fn finalizing_liability_with_options(
             valid_from: NOW.saturating_sub(60),
             valid_until: NOW + 7_200,
         },
-        || NOW + 5,
+        || Ok(NOW + 5),
     )?;
     let case = FinalizingLiability {
         deployment,
@@ -509,7 +512,7 @@ impl FinalizingLiability {
             &enforcement_anchor_proof(&self.enforcement)?,
             observations,
             publisher,
-            now,
+            fixture_commit_time(now),
         ))
     }
 
@@ -530,8 +533,8 @@ impl FinalizingLiability {
     /// transaction evidence.
     fn confirm_impairment(&self, now: u64) -> Result<(), AnyError> {
         let publisher = MiningPublisher::new();
-        let _pending = self.finalize(&publisher, now)?;
-        let _confirmed = self.finalize(&publisher, now + 1)?;
+        let _pending = self.finalize(&publisher, fixture_commit_time(now))?;
+        let _confirmed = self.finalize(&publisher, fixture_commit_time(now + 1))?;
         if self.intent_state()? != FindingEffectIntentState::Confirmed {
             return Err("the fixture impairment reaches confirmed".into());
         }
@@ -572,7 +575,7 @@ impl FinalizingLiability {
                     .max(config.status_feed_service_bond.valid_from),
                 valid_until: operator_valid_until.min(config.status_feed_service_bond.valid_until),
             },
-            || now,
+            || Ok(now),
         )?;
         Ok(())
     }
@@ -769,7 +772,7 @@ fn finding_challenge_confirmed_impairment_keeps_reorged_snapshot_quarantined() -
     let case = finalizing_liability()?;
     let publisher = MiningPublisher::new();
 
-    case.finalize(&publisher, SETTLEMENT_NOW)?;
+    case.finalize(&publisher, fixture_commit_time(SETTLEMENT_NOW))?;
     assert_eq!(case.intent_state()?, FindingEffectIntentState::Failed);
 
     let reorged = FindingBondObservationRecheck {
@@ -817,7 +820,7 @@ fn finding_challenge_confirmed_impairment_keeps_inactive_operator_quarantined() 
     let case = finalizing_liability()?;
     let publisher = MiningPublisher::new();
 
-    case.finalize(&publisher, SETTLEMENT_NOW)?;
+    case.finalize(&publisher, fixture_commit_time(SETTLEMENT_NOW))?;
     assert_eq!(case.intent_state()?, FindingEffectIntentState::Failed);
 
     let inactive = FindingBondObservationRecheck {

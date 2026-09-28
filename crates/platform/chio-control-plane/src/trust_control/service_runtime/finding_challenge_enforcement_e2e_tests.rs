@@ -202,15 +202,9 @@ use super::build_router;
 type AnyError = Box<dyn std::error::Error>;
 type TestResult = Result<(), AnyError>;
 
-struct FixtureStatusCommitClock;
-
-impl crate::trust_control::finding_challenge_coordinator::FindingStatusCommitClock
-    for FixtureStatusCommitClock
-{
-    fn now_unix_secs(&self, venue_now: u64) -> u64 {
-        venue_now
-    }
-}
+#[path = "finding_challenge_enforcement_e2e_tests/fixture_clock.rs"]
+mod fixture_clock;
+use fixture_clock::{fixture_commit_time, FixtureStatusCommitClock};
 
 const VENUE_ID: &str = "venue-challenge";
 const LISTING_ID: &str = "listing-42";
@@ -3655,7 +3649,7 @@ fn impair_after_appeal(
         &upheld.sanction_case_id,
         &upheld.hold,
         &hex64('7'),
-        now,
+        fixture_commit_time(now),
     )?;
     match resolution {
         AppealResolution::Finalizing(authorized) => Ok(authorized),
@@ -6628,7 +6622,7 @@ fn finding_challenge_successful_appeal_reverses_before_impairment() -> TestResul
         &case.upheld.sanction_case_id,
         &case.upheld.hold,
         &hex64('7'),
-        NOW + 20,
+        fixture_commit_time(NOW + 20),
     )?;
     let AppealResolution::ReversedBeforeImpairment { reversal } = resolution else {
         return Err("a timely successful appeal reverses the hold".into());
@@ -6690,7 +6684,7 @@ fn finding_challenge_appeal_accepts_a_retained_activation_across_governance_rota
         &case.upheld.sanction_case_id,
         &case.upheld.hold,
         &hex64('7'),
-        NOW + 20,
+        fixture_commit_time(NOW + 20),
     )?;
     assert!(matches!(
         resolution,
@@ -6733,7 +6727,7 @@ fn finding_challenge_appeal_accepts_a_prior_hold_across_penalty_rotation() -> Te
         &case.upheld.sanction_case_id,
         &case.upheld.hold,
         &hex64('7'),
-        NOW + 20,
+        fixture_commit_time(NOW + 20),
     )?;
     assert!(matches!(
         resolution,
@@ -6779,7 +6773,7 @@ fn finding_challenge_an_appeal_opened_after_the_durable_deadline_reverses_nothin
             &case.upheld.sanction_case_id,
             &case.upheld.hold,
             &hex64('7'),
-            deadline + 2,
+            fixture_commit_time(deadline + 2),
         )
         .expect_err("a late signed filing cannot reverse the sanction");
     assert!(matches!(
@@ -6822,7 +6816,7 @@ fn resolve_final(
         &case.upheld.sanction_case_id,
         &case.upheld.hold,
         &hex64('7'),
-        now,
+        fixture_commit_time(now),
     )
 }
 
@@ -6950,7 +6944,7 @@ pub(super) fn run_enforced_challenge_status_retraction() -> TestResult {
 
     // The first attempt reports exactly what a durable publisher holds
     // before its transaction is mined.
-    let first = case.finalize(&publisher, SETTLEMENT_NOW)?;
+    let first = case.finalize(&publisher, fixture_commit_time(SETTLEMENT_NOW))?;
     assert_eq!(
         first,
         FindingFinalization::Reconciled(FindingImpairmentOutcome::Quarantined {
@@ -6969,7 +6963,7 @@ pub(super) fn run_enforced_challenge_status_retraction() -> TestResult {
     // The same transaction then mines and finalizes. This only makes the
     // retraction outbox eligible: the liability remains publication-pending
     // until a signed status epoch includes the exact intent.
-    let second = case.finalize(&publisher, SETTLEMENT_NOW + 60)?;
+    let second = case.finalize(&publisher, fixture_commit_time(SETTLEMENT_NOW + 60))?;
     let FindingFinalization::Reconciled(FindingImpairmentOutcome::Confirmed { reconciliation }) =
         second
     else {
@@ -6993,7 +6987,10 @@ pub(super) fn run_enforced_challenge_status_retraction() -> TestResult {
     assert!(pending.publication_pending);
 
     case.publish_status(SETTLEMENT_NOW + 61)?;
-    let resumed = case.finalize(&UnreachablePublisher, SETTLEMENT_NOW + 62)?;
+    let resumed = case.finalize(
+        &UnreachablePublisher,
+        fixture_commit_time(SETTLEMENT_NOW + 62),
+    )?;
     assert_eq!(resumed, FindingFinalization::AlreadyConfirmed);
     let settled = case.head()?;
     assert_eq!(settled.state, FindingLiabilityState::Settled);

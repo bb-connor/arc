@@ -685,10 +685,12 @@ async fn non_strict_dpop_only_payment_requests_reach_the_external_rail(
         mode: PaymentAmbiguityMode::AuthorizeDeclined,
         counters: counters.clone(),
     }));
-    kernel.set_dpop_store(
-        dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)),
-        dpop::DpopConfig::default(),
-    );
+    kernel
+        .set_dpop_store(
+            dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)),
+            dpop::DpopConfig::default(),
+        )
+        .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
 
     let agent = make_keypair();
     let mut grant = make_monetary_grant("dpop-only-payment-server", "compute", 100, 500, "USD");
@@ -910,9 +912,13 @@ async fn nested_governed_commit_error_during_ambiguous_authorization_is_signed_u
         .ok_or_else(|| std::io::Error::other("commit-error receipt metadata missing"))?
         ["chio_runtime"];
     assert_eq!(
-        response.receipt.metadata.as_ref().and_then(|metadata| metadata
-            ["financial"]["payment_authorization_ambiguous"]
-            .as_bool()),
+        response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(
+                |metadata| metadata["financial"]["payment_authorization_ambiguous"].as_bool()
+            ),
         Some(true)
     );
     assert_eq!(
@@ -1099,9 +1105,8 @@ fn assert_payment_ambiguity_retained(
             assert_eq!(budget["pre_dispatch_cleanup_unconfirmed"], true);
             let financial = &metadata["financial"];
             assert_eq!(financial["payment_unwind_unconfirmed"], true);
-            let (authorization_id, _) = expected_authorization.ok_or_else(|| {
-                std::io::Error::other("payment unwind omitted its authorization")
-            })?;
+            let (authorization_id, _) = expected_authorization
+                .ok_or_else(|| std::io::Error::other("payment unwind omitted its authorization"))?;
             assert_eq!(financial["payment_reference"], authorization_id);
         }
         "budget_reversal_outcome_unknown" => {
@@ -1124,14 +1129,11 @@ fn assert_payment_ambiguity_retained(
 fn assert_payment_retry_blocked(fixture: &PaymentAmbiguityFixture, response: &ToolCallResponse) {
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(
-        response
-            .reason
-            .as_deref()
-            .is_some_and(|reason| {
-                reason.contains("execution nonce")
-                    || reason.contains("pre-dispatch cleanup")
-                    || reason.contains("budget")
-            }),
+        response.reason.as_deref().is_some_and(|reason| {
+            reason.contains("execution nonce")
+                || reason.contains("pre-dispatch cleanup")
+                || reason.contains("budget")
+        }),
         "expected retained authority to block retry, got: {:?}",
         response.reason
     );

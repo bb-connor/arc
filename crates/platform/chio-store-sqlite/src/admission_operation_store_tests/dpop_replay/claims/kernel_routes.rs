@@ -92,10 +92,12 @@ impl Route {
         kernel.set_operation_owned_dpop_authority(domain.clone())?;
         // An independently retired legacy cache is deliberately installed
         // afterwards. Neither its config nor its availability can downgrade v2.
-        kernel.set_dpop_store(
-            DpopNonceStore::new(8, Duration::from_secs(60)),
-            chio_kernel::dpop::DpopConfig::default(),
-        );
+        kernel
+            .set_dpop_store(
+                DpopNonceStore::new(8, Duration::from_secs(60)),
+                chio_kernel::dpop::DpopConfig::default(),
+            )
+            .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
         let legacy = kernel.dpop_replay_source()?;
         let snapshot = legacy.preview_unsealed(&DpopReplaySourceBinding {
             dpop_authority_id: identifier("unused_legacy", "unused-retired-cache"),

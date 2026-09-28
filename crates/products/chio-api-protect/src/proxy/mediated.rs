@@ -178,13 +178,15 @@ pub(crate) fn build_mediation_kernel(
     // Install DPoP verification state so a grant with `dpop_required` can verify
     // a presented proof. Without it every dpop_required capability denies
     // fail-closed with no way to present a proof.
-    kernel.set_dpop_store(
-        DpopNonceStore::new(
-            DpopConfig::default().nonce_store_capacity,
-            std::time::Duration::from_secs(DpopConfig::default().proof_ttl_secs),
-        ),
-        DpopConfig::default(),
-    );
+    kernel
+        .set_dpop_store(
+            DpopNonceStore::new(
+                DpopConfig::default().nonce_store_capacity,
+                std::time::Duration::from_secs(DpopConfig::default().proof_ttl_secs),
+            ),
+            DpopConfig::default(),
+        )
+        .map_err(|error| ProtectError::Config(error.to_string()))?;
     // Install the operator's payment rail so the governed prepayment gate can
     // authorize and capture a MustPrepay (x402/ACP) quote before the
     // reserve-for-caller path mints a nonce. Absent an adapter the gate denies

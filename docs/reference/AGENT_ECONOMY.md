@@ -478,9 +478,9 @@ pub struct FinancialReceiptMetadata {
     /// Currency code.
     pub currency: String,
     /// Budget remaining after this invocation.
-    pub budget_remaining: u64,
+    pub budget_remaining: Option<u64>,
     /// Total budget for this grant.
-    pub budget_total: u64,
+    pub budget_total: Option<u64>,
     /// Delegation depth (0 = root capability, 1 = first delegate, etc.).
     pub delegation_depth: u32,
     /// Public key (hex) of the root budget holder.
@@ -495,6 +495,13 @@ pub struct FinancialReceiptMetadata {
     pub cost_breakdown: Option<serde_json::Value>,
 }
 ```
+
+Both budget fields are `null` for a grant without a total spending ceiling. For a
+capped grant, remaining budget is the signed ceiling minus cumulative committed
+usage at the accounting transition. `u64::MAX` is a real ceiling, never an
+unlimited-budget sentinel. A reservation's exposure does not substitute for the
+grant ceiling. An inconsistent subtraction refuses receipt construction.
+
 
 This struct is serialized into `receipt.metadata` as a nested object under the key `"financial"`:
 

@@ -7,6 +7,7 @@
 //! refusal or an independently authenticated authority transition, never an
 //! empty replacement cache. No durable import or operation custody is granted.
 
+use chio_security_types::clock::{ClockReading, MonotonicInstant, UnixMillis};
 use std::sync::MutexGuard;
 
 use super::*;
@@ -40,10 +41,9 @@ pub trait DpopReplaySourcePort: Send + Sync {
 
 pub(super) struct SourceState {
     instance_id: uuid::Uuid,
-    created_wall: SystemTime,
-    monotonic_origin: Instant,
+    created: Option<ClockReading>,
     revision: u64,
-    pruned_through: Option<SystemTime>,
+    pruned_through: Option<UnixMillis>,
     sealed: Option<DpopReplaySourceSnapshot>,
 }
 
@@ -51,12 +51,23 @@ impl SourceState {
     pub(super) fn new() -> Self {
         Self {
             instance_id: uuid::Uuid::now_v7(),
-            created_wall: SystemTime::now(),
-            monotonic_origin: Instant::now(),
+            created: None,
             revision: 0,
             pruned_through: None,
             sealed: None,
         }
+    }
+
+    pub(super) fn observe_creation(&mut self, now: ClockReading) {
+        self.created.get_or_insert(now);
+    }
+    pub(super) fn require_pristine(&self) -> Result<(), KernelError> {
+        if self.created.is_some() || self.revision != 0 || self.sealed.is_some() {
+            return Err(invalid(
+                "cannot replace the clock of an observed replay source",
+            ));
+        }
+        Ok(())
     }
 
     pub(super) fn begin_mutation(&mut self) -> Result<(), KernelError> {
@@ -70,16 +81,14 @@ impl SourceState {
         Ok(())
     }
 
-    fn ensure_unsealed(&self) -> Result<(), KernelError> {
+    pub(super) fn ensure_unsealed(&self) -> Result<(), KernelError> {
         if self.sealed.is_some() {
-            return Err(invalid(
-                "source is retired; legacy replay mutations are forbidden",
-            ));
+            return Err(invalid("source is retired; replay mutations are forbidden"));
         }
         Ok(())
     }
 
-    pub(super) fn note_pruned(&mut self, high_water: SystemTime) {
+    pub(super) fn note_pruned(&mut self, high_water: UnixMillis) {
         self.pruned_through = Some(
             self.pruned_through
                 .map_or(high_water, |old| old.max(high_water)),
@@ -109,6 +118,11 @@ impl DpopNonceStore {
         state: &DpopNonceState,
         binding: &DpopReplaySourceBinding,
     ) -> Result<DpopReplaySourceSnapshot, KernelError> {
+        let created = state
+            .source
+            .created
+            .ok_or_else(|| invalid("source clock is unobserved"))?;
+        let high_water = state.replay_clock.high_water()?;
         if state.cache.len() > MAX_DPOP_REPLAY_SOURCE_MARKERS {
             return Err(invalid("source exceeds migration marker bound"));
         }
@@ -127,9 +141,9 @@ impl DpopNonceStore {
                     return Err(invalid("marker identity exceeds migration byte bound"));
                 }
             }
-            let deadline = |value: Option<Instant>| {
+            let deadline = |value: Option<MonotonicInstant>| {
                 value
-                    .map(|value| relative_ns(value, state.source.monotonic_origin))
+                    .map(|value| relative_ns(value, created.monotonic()))
                     .transpose()
             };
             let retention = match entry.retention {
@@ -168,12 +182,12 @@ impl DpopNonceStore {
             binding: binding.clone(),
             instance_id: state.source.instance_id.to_string(),
             inventory: Inventory {
-                created_unix_ns: unix_ns(state.source.created_wall)?,
+                created_unix_ns: unix_ns(created.unix_millis())?,
                 revision: state.source.revision.to_string(),
-                wall_clock_high_water_unix_ns: unix_ns(state.wall_clock_high_water)?,
+                wall_clock_high_water_unix_ns: unix_ns(high_water.unix_millis())?,
                 monotonic_high_water_offset_ns: relative_ns(
-                    state.monotonic_high_water,
-                    state.source.monotonic_origin,
+                    high_water.monotonic(),
+                    created.monotonic(),
                 )?,
                 pruned_through_unix_ns: state.source.pruned_through.map(unix_ns).transpose()?,
                 capacity: state.cache.cap().get().to_string(),
@@ -192,9 +206,14 @@ impl DpopReplaySourcePort for DpopNonceStore {
         &self,
         binding: &DpopReplaySourceBinding,
     ) -> Result<DpopReplaySourceSnapshot, KernelError> {
-        let state = self.source_lock()?;
+        let mut state = self.source_lock()?;
         state.source.ensure_unsealed()?;
-        validate_clock(&state)?;
+        let now = self.clock.read()?;
+        state.replay_clock.validate("dpop_nonce", now)?;
+        if state.source.created.is_none() {
+            state.replay_clock.observe("dpop_nonce", now)?;
+            state.source.observe_creation(now);
+        }
         self.source_snapshot(&state, binding)
     }
 
@@ -215,8 +234,10 @@ impl DpopReplaySourcePort for DpopNonceStore {
                 ))
             };
         }
-        validate_clock(&state)?;
-        // The same mutex protects every legacy insertion, reservation and
+        state
+            .replay_clock
+            .validate("dpop_nonce", self.clock.read()?)?;
+        // The same mutex protects every insertion, reservation and
         // rollback. No mutation can cross the exact comparison/seal boundary.
         state.source.sealed = Some(expected.clone());
         Ok(())
@@ -235,40 +256,15 @@ impl DpopReplaySourcePort for DpopNonceStore {
     }
 }
 
-fn validate_clock(state: &DpopNonceState) -> Result<(), KernelError> {
-    if state.pending_clock_rebaseline.is_some() {
-        return Err(invalid("source replay clock is awaiting rebaseline"));
-    }
-    // Preview and seal are not replay-clock maintenance. Validate a copy and
-    // refuse anomalies without pruning, advancing or repairing the source.
-    let (mut wall, mut monotonic, mut pending) = (
-        state.wall_clock_high_water,
-        state.monotonic_high_water,
-        None,
-    );
-    advance_replay_clock(
-        "dpop_nonce",
-        &mut wall,
-        &mut monotonic,
-        &mut pending,
-        SystemTime::now(),
-        Instant::now(),
-    )?;
-    Ok(())
+fn unix_ns(value: UnixMillis) -> Result<String, KernelError> {
+    Ok((u128::from(value.get()) * 1_000_000).to_string())
 }
 
-fn unix_ns(value: SystemTime) -> Result<String, KernelError> {
-    value
-        .duration_since(UNIX_EPOCH)
-        .map(|value| value.as_nanos().to_string())
-        .map_err(|_| invalid("source contains a pre-epoch replay deadline"))
-}
-
-fn relative_ns(value: Instant, origin: Instant) -> Result<String, KernelError> {
+fn relative_ns(value: MonotonicInstant, origin: MonotonicInstant) -> Result<String, KernelError> {
     let (duration, negative) = if value >= origin {
-        (value.duration_since(origin), false)
+        (value.duration_since(origin)?, false)
     } else {
-        (origin.duration_since(value), true)
+        (origin.duration_since(value)?, true)
     };
     let offset = i128::try_from(duration.as_nanos())
         .map_err(|_| invalid("source monotonic offset overflow"))?;

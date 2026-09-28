@@ -12,6 +12,8 @@ use chio_core::capability::{
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::{sha256_hex, Keypair};
+use chio_kernel::dpop::DpopError;
+use chio_kernel::KernelError;
 use chio_kernel::{
     verify_dpop_proof, DpopConfig, DpopNonceStore, DpopProof, DpopProofBody, DPOP_SCHEMA,
 };
@@ -92,6 +94,8 @@ fn dpop_identity_byte_limit_is_shared_by_stateless_and_consuming_verification() 
             "read_file",
             &proof.body.action_hash,
             &config,
+            chio_security_types::clock::Clock::read(&chio_security_types::clock::SystemClock)
+                .unwrap(),
         );
         assert_eq!(preview.is_ok(), admitted);
         let execution = verify_dpop_proof(
@@ -125,6 +129,7 @@ fn dpop_oversized_identity_is_refused_before_signature_canonicalization() {
         "read_file",
         &proof.body.action_hash,
         &config,
+        chio_security_types::clock::Clock::read(&chio_security_types::clock::SystemClock).unwrap(),
     )
     .unwrap_err();
     assert!(error.to_string().contains("4096-byte limit"));
@@ -183,11 +188,9 @@ fn dpop_wrong_action_hash_rejected() {
         &config,
     );
 
-    assert!(result.is_err(), "wrong action_hash should be rejected");
-    let err_msg = result.unwrap_err().to_string();
     assert!(
-        err_msg.contains("binding fields do not match"),
-        "unexpected error message: {err_msg}"
+        matches!(result, Err(KernelError::Dpop(DpopError::Action))),
+        "{result:?}"
     );
 }
 
@@ -195,6 +198,7 @@ fn assert_dpop_binding_mismatch_rejected(
     body: DpopProofBody,
     agent_kp: &Keypair,
     cap: &CapabilityToken,
+    expected: DpopError,
 ) {
     let proof = DpopProof::sign(body, agent_kp).expect("sign proof");
     let config = default_config();
@@ -210,12 +214,9 @@ fn assert_dpop_binding_mismatch_rejected(
         &config,
     );
 
-    assert!(result.is_err(), "binding mismatch should be rejected");
-    let err_msg = result.unwrap_err().to_string();
-    assert!(
-        err_msg.contains("binding fields do not match"),
-        "unexpected error message: {err_msg}"
-    );
+    let error = result.expect_err("binding mismatch");
+    assert!(matches!(error, KernelError::Dpop(_)));
+    assert_eq!(error.report().code, expected.code());
 }
 
 #[test]
@@ -225,7 +226,7 @@ fn dpop_wrong_capability_id_rejected() {
     let mut body = make_proof_body(&cap, &agent_kp);
     body.capability_id = "cap-other".to_string();
 
-    assert_dpop_binding_mismatch_rejected(body, &agent_kp, &cap);
+    assert_dpop_binding_mismatch_rejected(body, &agent_kp, &cap, DpopError::Capability);
 }
 
 #[test]
@@ -235,7 +236,7 @@ fn dpop_wrong_tool_server_rejected() {
     let mut body = make_proof_body(&cap, &agent_kp);
     body.tool_server = "srv-b".to_string();
 
-    assert_dpop_binding_mismatch_rejected(body, &agent_kp, &cap);
+    assert_dpop_binding_mismatch_rejected(body, &agent_kp, &cap, DpopError::Server);
 }
 
 #[test]
@@ -245,7 +246,7 @@ fn dpop_wrong_tool_name_rejected() {
     let mut body = make_proof_body(&cap, &agent_kp);
     body.tool_name = "write_file".to_string();
 
-    assert_dpop_binding_mismatch_rejected(body, &agent_kp, &cap);
+    assert_dpop_binding_mismatch_rejected(body, &agent_kp, &cap, DpopError::Tool);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,11 +291,9 @@ fn dpop_wrong_agent_key_rejected() {
         &config,
     );
 
-    assert!(result.is_err(), "wrong agent key should be rejected");
-    let err_msg = result.unwrap_err().to_string();
     assert!(
-        err_msg.contains("agent_key does not match"),
-        "unexpected error message: {err_msg}"
+        matches!(result, Err(KernelError::Dpop(DpopError::Sender))),
+        "{result:?}"
     );
 }
 
@@ -334,11 +333,9 @@ fn dpop_expired_proof_rejected() {
         &config,
     );
 
-    assert!(result.is_err(), "expired proof should be rejected");
-    let err_msg = result.unwrap_err().to_string();
     assert!(
-        err_msg.contains("proof expired"),
-        "unexpected error message: {err_msg}"
+        matches!(result, Err(KernelError::Dpop(DpopError::Expired))),
+        "{result:?}"
     );
 }
 
@@ -576,10 +573,8 @@ fn dpop_issued_at_u64_max_rejected_as_future_dated() {
         &config,
     );
 
-    assert!(result.is_err(), "issued_at=u64::MAX should be rejected");
-    let err_msg = result.unwrap_err().to_string();
     assert!(
-        err_msg.contains("too far in the future"),
-        "unexpected error message: {err_msg}"
+        matches!(result, Err(KernelError::Dpop(DpopError::WindowOverflow))),
+        "{result:?}"
     );
 }

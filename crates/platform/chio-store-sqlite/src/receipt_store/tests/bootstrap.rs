@@ -589,7 +589,8 @@ fn receipt_cost_projection_migration_rolls_back_malformed_receipt(
         }
         Err(error) => error,
     };
-    assert!(error.to_string().contains("failed to decode"));
+    assert!(matches!(error, ReceiptStoreError::UntrustedInput(source)
+        if matches!(source.as_ref(), chio_core::canonical::UntrustedJsonError::SignedInput(_))));
     migration.rollback()?;
     let projected_columns: i64 = connection.query_row(
         "SELECT COUNT(*) FROM pragma_table_info('chio_tool_receipts') \

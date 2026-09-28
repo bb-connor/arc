@@ -1,388 +1,175 @@
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-
+//! Replay retention in the shared clock's epoch and monotonic domains.
 use crate::{KernelError, ReplayClockDirection};
+use chio_security_types::clock::{
+    ClockError, ClockReading, MonotonicInstant, UnixMillis, MAX_REPLAY_WALL_SKEW_SECS,
+};
+use std::time::Duration;
 
-/// Maximum unexplained difference between wall-clock and monotonic progress.
-/// Larger jumps fail closed on first observation. A later stable sample can
-/// confirm a suspend gap and rebaseline the clock without pruning live replay
-/// markers; inconsistent jumps and rollbacks remain denied.
-pub(crate) const MAX_REPLAY_CLOCK_SKEW: Duration =
-    Duration::from_secs(chio_security_types::clock::MAX_REPLAY_WALL_SKEW_SECS as u64);
-
-const MIN_REBASELINE_CONFIRMATION: Duration = Duration::from_secs(1);
-const MAX_REBASELINE_DRIFT: Duration = Duration::from_secs(1);
+const MAX_REPLAY_CLOCK_SKEW: Duration = Duration::from_secs(MAX_REPLAY_WALL_SKEW_SECS as u64);
+const REBASELINE_CONFIRMATION: Duration = Duration::from_secs(1);
 
 #[derive(Clone, Copy)]
-pub(crate) struct PendingReplayClockRebaseline {
-    observed_wall: SystemTime,
-    observed_monotonic: Instant,
+struct PendingRebaseline {
+    observed: ClockReading,
     unexplained_gap: Duration,
 }
 
-enum RebaselineConfirmation {
-    Confirmed,
-    Waiting,
-    Inconsistent,
+/// Each owner samples under its mutation lock. A refused jump may record a
+/// pending observation, but cannot advance the pruning horizon.
+#[derive(Clone, Default)]
+pub(crate) struct ReplayClock {
+    high_water: Option<ClockReading>,
+    pending: Option<PendingRebaseline>,
 }
-
-pub(crate) fn advance_replay_clock(
-    store: &'static str,
-    wall_clock_high_water: &mut SystemTime,
-    monotonic_high_water: &mut Instant,
-    pending_rebaseline: &mut Option<PendingReplayClockRebaseline>,
-    now_wall: SystemTime,
-    now_monotonic: Instant,
-) -> Result<SystemTime, KernelError> {
-    let monotonic_progress = now_monotonic.saturating_duration_since(*monotonic_high_water);
-    let tolerated_forward = monotonic_progress.saturating_add(MAX_REPLAY_CLOCK_SKEW);
-    if let Ok(wall_progress) = now_wall.duration_since(*wall_clock_high_water) {
-        if wall_progress > tolerated_forward {
-            let unexplained_gap = wall_progress.saturating_sub(monotonic_progress);
-            if let Some(pending) = *pending_rebaseline {
-                match rebaseline_confirmation(pending, now_wall, now_monotonic, unexplained_gap) {
-                    RebaselineConfirmation::Confirmed => {
-                        *wall_clock_high_water = now_wall;
-                        *monotonic_high_water = now_monotonic;
-                        *pending_rebaseline = None;
-                        return Ok(now_wall);
-                    }
-                    RebaselineConfirmation::Waiting => {
-                        return Err(clock_anomaly(
-                            store,
-                            ReplayClockDirection::ForwardJump,
-                            now_wall,
-                            *wall_clock_high_water,
-                        ));
-                    }
-                    RebaselineConfirmation::Inconsistent => {}
-                }
-            }
-
-            *pending_rebaseline = Some(PendingReplayClockRebaseline {
-                observed_wall: now_wall,
-                observed_monotonic: now_monotonic,
-                unexplained_gap,
-            });
-            return Err(clock_anomaly(
-                store,
-                ReplayClockDirection::ForwardJump,
-                now_wall,
-                *wall_clock_high_water,
-            ));
+impl ReplayClock {
+    pub(crate) fn high_water(&self) -> Result<ClockReading, KernelError> {
+        self.high_water.ok_or(ClockError::Unavailable.into())
+    }
+    pub(crate) fn validate(
+        &self,
+        store: &'static str,
+        now: ClockReading,
+    ) -> Result<(), KernelError> {
+        if let Some(pending) = self.pending {
+            return Err(jump(store, pending.observed, self.high_water()?));
         }
+        self.clone().observe(store, now).map(|_| ())
     }
-    if wall_clock_high_water
-        .duration_since(now_wall)
-        .is_ok_and(|rollback| rollback > MAX_REPLAY_CLOCK_SKEW)
-    {
-        *pending_rebaseline = None;
-        return Err(clock_anomaly(
-            store,
-            ReplayClockDirection::Rollback,
-            now_wall,
-            *wall_clock_high_water,
-        ));
+    pub(crate) fn observe(
+        &mut self,
+        store: &'static str,
+        now: ClockReading,
+    ) -> Result<ClockReading, KernelError> {
+        if let Some(previous) = self.high_water {
+            let monotonic_progress = now.monotonic().duration_since(previous.monotonic())?;
+            let wall_progress =
+                Duration::from_millis(now.unix_millis().duration_since(previous.unix_millis())?);
+            let tolerated = monotonic_progress
+                .checked_add(MAX_REPLAY_CLOCK_SKEW)
+                .ok_or(ClockError::Overflow)?;
+            if wall_progress > tolerated {
+                let gap = wall_progress
+                    .checked_sub(monotonic_progress)
+                    .ok_or(ClockError::Overflow)?;
+                if let Some(pending) = self.pending {
+                    let mono = now
+                        .monotonic()
+                        .duration_since(pending.observed.monotonic())?;
+                    if let Ok(wall) = now
+                        .unix_millis()
+                        .duration_since(pending.observed.unix_millis())
+                    {
+                        let wall = Duration::from_millis(wall);
+                        if wall.abs_diff(mono) <= REBASELINE_CONFIRMATION
+                            && gap.abs_diff(pending.unexplained_gap) <= REBASELINE_CONFIRMATION
+                        {
+                            if mono >= REBASELINE_CONFIRMATION {
+                                self.high_water = Some(now);
+                                self.pending = None;
+                                return Ok(now);
+                            }
+                            return Err(jump(store, now, previous));
+                        }
+                    }
+                }
+                self.pending = Some(PendingRebaseline {
+                    observed: now,
+                    unexplained_gap: gap,
+                });
+                return Err(jump(store, now, previous));
+            }
+        }
+        self.pending = None;
+        self.high_water = Some(now);
+        Ok(now)
     }
-
-    *pending_rebaseline = None;
-
-    if now_wall > *wall_clock_high_water {
-        *wall_clock_high_water = now_wall;
-    }
-    if now_monotonic > *monotonic_high_water {
-        *monotonic_high_water = now_monotonic;
-    }
-    Ok(*wall_clock_high_water)
 }
-
-fn rebaseline_confirmation(
-    pending: PendingReplayClockRebaseline,
-    now_wall: SystemTime,
-    now_monotonic: Instant,
-    unexplained_gap: Duration,
-) -> RebaselineConfirmation {
-    let monotonic_progress = now_monotonic.saturating_duration_since(pending.observed_monotonic);
-    let Ok(wall_progress) = now_wall.duration_since(pending.observed_wall) else {
-        return RebaselineConfirmation::Inconsistent;
-    };
-    if !durations_within(wall_progress, monotonic_progress, MAX_REBASELINE_DRIFT)
-        || !durations_within(
-            unexplained_gap,
-            pending.unexplained_gap,
-            MAX_REBASELINE_DRIFT,
-        )
-    {
-        return RebaselineConfirmation::Inconsistent;
-    }
-    if monotonic_progress < MIN_REBASELINE_CONFIRMATION {
-        return RebaselineConfirmation::Waiting;
-    }
-    RebaselineConfirmation::Confirmed
-}
-
-fn durations_within(left: Duration, right: Duration, tolerance: Duration) -> bool {
-    left.saturating_sub(right) <= tolerance && right.saturating_sub(left) <= tolerance
-}
-
-fn clock_anomaly(
-    store: &'static str,
-    direction: ReplayClockDirection,
-    observed: SystemTime,
-    high_water: SystemTime,
-) -> KernelError {
+fn jump(store: &'static str, now: ClockReading, previous: ClockReading) -> KernelError {
     KernelError::ReplayClockAnomaly {
         store,
-        direction,
-        observed_unix_secs: unix_seconds_i64(observed),
-        high_water_unix_secs: unix_seconds_i64(high_water),
-        max_tolerated_skew_secs: MAX_REPLAY_CLOCK_SKEW.as_secs(),
+        direction: ReplayClockDirection::ForwardJump,
+        // UnixMillis::as_secs fits i64 for its full u64 millisecond domain.
+        observed_unix_secs: now.unix_millis().as_secs() as i64,
+        high_water_unix_secs: previous.unix_millis().as_secs() as i64,
+        max_tolerated_skew_secs: u64::from(MAX_REPLAY_WALL_SKEW_SECS),
     }
 }
 
-fn unix_seconds_i64(value: SystemTime) -> i64 {
-    match value.duration_since(UNIX_EPOCH) {
-        Ok(duration) => i64::try_from(duration.as_secs()).unwrap_or(i64::MAX),
-        Err(error) => -i64::try_from(error.duration().as_secs()).unwrap_or(i64::MAX),
-    }
+/// Input horizon. Projection is performed once, under the reservation lock.
+#[derive(Clone, Copy)]
+pub(crate) enum ReplayHorizon {
+    Local(Duration),
+    Until(u64),
+    Through(u64),
 }
 
-/// Retention deadline for an in-memory replay marker.
-///
-/// Signed artifacts use both their absolute validity boundary and a monotonic
-/// projection of that boundary. Reclamation requires both clocks to pass the
-/// deadline so a wall-clock jump cannot shorten or reopen the replay window.
+/// A signed marker is reclaimable only after BOTH original deadlines. An
+/// unrepresentable retention horizon is indefinite custody, never permission.
 #[derive(Clone, Copy)]
 pub(crate) enum ReplayRetention {
     Local {
-        monotonic_deadline: Option<Instant>,
+        monotonic_deadline: Option<MonotonicInstant>,
     },
     Signed {
-        absolute_deadline: Option<SystemTime>,
-        monotonic_deadline: Option<Instant>,
+        absolute_deadline: Option<UnixMillis>,
+        monotonic_deadline: Option<MonotonicInstant>,
     },
 }
-
-impl ReplayRetention {
-    pub(crate) fn local(ttl: Duration) -> Self {
-        let now = Instant::now();
-        Self::Local {
-            monotonic_deadline: now.checked_add(ttl),
+impl ReplayHorizon {
+    pub(crate) fn project(self, now: ClockReading) -> ReplayRetention {
+        match self {
+            Self::Local(ttl) => ReplayRetention::Local {
+                monotonic_deadline: now.monotonic().checked_add(ttl).ok(),
+            },
+            Self::Until(secs) => {
+                ReplayRetention::signed_until_at(UnixMillis::from_secs(secs).ok(), now)
+            }
+            Self::Through(secs) => ReplayRetention::signed_until_at(
+                secs.checked_add(1)
+                    .and_then(|s| UnixMillis::from_secs(s).ok()),
+                now,
+            ),
         }
     }
-
-    /// Retain through an inclusive Unix-second validity horizon.
-    pub(crate) fn signed_through_unix_secs(valid_through: u64) -> Self {
-        let Some(exclusive_deadline) = valid_through.checked_add(1) else {
-            return Self::indefinite_signed();
-        };
-        Self::signed_until_unix_secs(exclusive_deadline)
-    }
-
-    /// Retain until an exclusive Unix-second validity boundary.
-    pub(crate) fn signed_until_unix_secs(expires_at: u64) -> Self {
-        Self::signed_until_at(
-            UNIX_EPOCH.checked_add(Duration::from_secs(expires_at)),
-            SystemTime::now(),
-            Instant::now(),
-        )
-    }
-
-    /// Retain until an exclusive signed Unix-second validity boundary.
-    #[allow(dead_code)]
-    pub(crate) fn signed_until_unix_i64(expires_at: i64) -> Self {
-        let absolute_deadline = if let Ok(seconds) = u64::try_from(expires_at) {
-            UNIX_EPOCH.checked_add(Duration::from_secs(seconds))
-        } else {
-            UNIX_EPOCH.checked_sub(Duration::from_secs(expires_at.unsigned_abs()))
-        };
-        Self::signed_until_at(absolute_deadline, SystemTime::now(), Instant::now())
-    }
-
+}
+impl ReplayRetention {
     pub(crate) fn signed_until_at(
-        absolute_deadline: Option<SystemTime>,
-        now_wall: SystemTime,
-        now_monotonic: Instant,
+        absolute_deadline: Option<UnixMillis>,
+        now: ClockReading,
     ) -> Self {
         let monotonic_deadline = absolute_deadline.and_then(|deadline| {
-            let remaining = deadline.duration_since(now_wall).unwrap_or(Duration::ZERO);
-            now_monotonic.checked_add(remaining)
+            // Already elapsed authority gets a zero remaining retention span.
+            let remaining = if deadline <= now.unix_millis() {
+                0
+            } else {
+                deadline.get() - now.unix_millis().get()
+            };
+            now.monotonic().checked_add_millis(remaining).ok()
         });
         Self::Signed {
             absolute_deadline,
             monotonic_deadline,
         }
     }
-
-    fn indefinite_signed() -> Self {
-        Self::Signed {
-            absolute_deadline: None,
-            monotonic_deadline: None,
-        }
+    pub(crate) fn signed_horizon_elapsed_at(&self, now: UnixMillis) -> bool {
+        matches!(self, Self::Signed { absolute_deadline: Some(deadline), .. } if now >= *deadline)
     }
-
-    pub(crate) fn signed_horizon_elapsed_at(&self, wall_clock_high_water: SystemTime) -> bool {
-        match self {
-            Self::Local { .. } => false,
-            Self::Signed {
-                absolute_deadline, ..
-            } => absolute_deadline.is_some_and(|deadline| wall_clock_high_water >= deadline),
-        }
-    }
-
-    pub(crate) fn is_signed(&self) -> bool {
-        matches!(self, Self::Signed { .. })
-    }
-
-    pub(crate) fn is_expired_at(
-        &self,
-        wall_clock_high_water: SystemTime,
-        now_monotonic: Instant,
-    ) -> bool {
+    pub(crate) fn is_expired_at(&self, now: ClockReading) -> bool {
         match self {
             Self::Local { monotonic_deadline } => {
-                monotonic_deadline.is_some_and(|deadline| now_monotonic >= deadline)
+                monotonic_deadline.is_some_and(|deadline| now.monotonic() >= deadline)
             }
             Self::Signed {
                 absolute_deadline,
                 monotonic_deadline,
             } => {
-                absolute_deadline.is_some_and(|deadline| wall_clock_high_water >= deadline)
-                    && monotonic_deadline.is_some_and(|deadline| now_monotonic >= deadline)
+                absolute_deadline.is_some_and(|deadline| now.unix_millis() >= deadline)
+                    && monotonic_deadline.is_some_and(|deadline| now.monotonic() >= deadline)
             }
         }
     }
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn signed_retention_requires_both_deadlines_to_elapse() {
-        let start_wall = UNIX_EPOCH.checked_add(Duration::from_secs(1_000)).unwrap();
-        let start_monotonic = Instant::now();
-        let retention = ReplayRetention::signed_until_at(
-            UNIX_EPOCH.checked_add(Duration::from_secs(1_010)),
-            start_wall,
-            start_monotonic,
-        );
-
-        assert!(!retention.is_expired_at(
-            start_wall.checked_add(Duration::from_secs(20)).unwrap(),
-            start_monotonic.checked_add(Duration::from_secs(5)).unwrap(),
-        ));
-        assert!(!retention.is_expired_at(
-            start_wall.checked_add(Duration::from_secs(5)).unwrap(),
-            start_monotonic
-                .checked_add(Duration::from_secs(20))
-                .unwrap(),
-        ));
-        assert!(retention.is_expired_at(
-            start_wall.checked_add(Duration::from_secs(10)).unwrap(),
-            start_monotonic
-                .checked_add(Duration::from_secs(10))
-                .unwrap(),
-        ));
-    }
-
-    #[test]
-    fn inclusive_horizon_overflow_is_retained_indefinitely() {
-        let retention = ReplayRetention::signed_through_unix_secs(u64::MAX);
-        assert!(!retention.is_expired_at(SystemTime::now(), Instant::now()));
-    }
-
-    #[test]
-    fn stable_suspend_gap_is_rebaselined_after_one_failed_sample() {
-        let start_wall = UNIX_EPOCH.checked_add(Duration::from_secs(10_000)).unwrap();
-        let start_monotonic = Instant::now();
-        let mut wall_high_water = start_wall;
-        let mut monotonic_high_water = start_monotonic;
-        let mut pending = None;
-
-        let suspended_wall = start_wall.checked_add(Duration::from_secs(3_600)).unwrap();
-        let first = advance_replay_clock(
-            "test",
-            &mut wall_high_water,
-            &mut monotonic_high_water,
-            &mut pending,
-            suspended_wall,
-            start_monotonic.checked_add(Duration::from_secs(1)).unwrap(),
-        );
-        assert!(matches!(
-            first,
-            Err(KernelError::ReplayClockAnomaly {
-                direction: ReplayClockDirection::ForwardJump,
-                ..
-            })
-        ));
-
-        let early = advance_replay_clock(
-            "test",
-            &mut wall_high_water,
-            &mut monotonic_high_water,
-            &mut pending,
-            suspended_wall
-                .checked_add(Duration::from_millis(100))
-                .unwrap(),
-            start_monotonic
-                .checked_add(Duration::from_millis(1_100))
-                .unwrap(),
-        );
-        assert!(matches!(
-            early,
-            Err(KernelError::ReplayClockAnomaly {
-                direction: ReplayClockDirection::ForwardJump,
-                ..
-            })
-        ));
-
-        let confirmed_wall = suspended_wall.checked_add(Duration::from_secs(2)).unwrap();
-        assert_eq!(
-            advance_replay_clock(
-                "test",
-                &mut wall_high_water,
-                &mut monotonic_high_water,
-                &mut pending,
-                confirmed_wall,
-                start_monotonic.checked_add(Duration::from_secs(3)).unwrap(),
-            )
-            .unwrap(),
-            confirmed_wall
-        );
-        assert!(pending.is_none());
-    }
-
-    #[test]
-    fn changing_forward_jump_never_rebaselines() {
-        let start_wall = UNIX_EPOCH.checked_add(Duration::from_secs(10_000)).unwrap();
-        let start_monotonic = Instant::now();
-        let mut wall_high_water = start_wall;
-        let mut monotonic_high_water = start_monotonic;
-        let mut pending = None;
-
-        for (wall_advance, monotonic_advance) in [(1_000, 1), (1_500, 3), (2_000, 5)] {
-            let result = advance_replay_clock(
-                "test",
-                &mut wall_high_water,
-                &mut monotonic_high_water,
-                &mut pending,
-                start_wall
-                    .checked_add(Duration::from_secs(wall_advance))
-                    .unwrap(),
-                start_monotonic
-                    .checked_add(Duration::from_secs(monotonic_advance))
-                    .unwrap(),
-            );
-            assert!(matches!(
-                result,
-                Err(KernelError::ReplayClockAnomaly {
-                    direction: ReplayClockDirection::ForwardJump,
-                    ..
-                })
-            ));
-            assert_eq!(wall_high_water, start_wall);
-            assert_eq!(monotonic_high_water, start_monotonic);
-        }
-    }
-}
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+pub(crate) mod tests;

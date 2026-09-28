@@ -1919,8 +1919,7 @@ fn chio_runtime_release_failure_surfaces_cleanup_failure_on_pending_approval() {
 #[test]
 fn nested_runtime_release_failure_denies_pending_approval() {
     let request_id = "req-chio-runtime-nested-release-failure-pending";
-    let (mut kernel, mut request, _store, invocations) =
-        durable_admission_fixture(request_id);
+    let (mut kernel, mut request, _store, invocations) = durable_admission_fixture(request_id);
     let approver_a = CoreKeypair::generate();
     let approver_b = CoreKeypair::generate();
     let requirement = ThresholdApprovalRequirement::new(
@@ -1986,10 +1985,7 @@ fn nested_runtime_release_failure_denies_pending_approval() {
     }));
 
     let session_id = kernel
-        .open_session(
-            request.agent_id.clone(),
-            vec![request.capability.clone()],
-        )
+        .open_session(request.agent_id.clone(), vec![request.capability.clone()])
         .expect("nested session should open");
     kernel
         .activate_session(&session_id)
@@ -2215,7 +2211,7 @@ fn make_fabricated_drop_charge() -> BudgetChargeResult {
         grant_index: 0,
         cost_charged: 5,
         currency: "USD".to_string(),
-        budget_total: 100,
+        budget_total: Some(100),
         new_committed_cost_units: 5,
         budget_hold_id: "hold-drop-guard-tests".to_string(),
         authorize_metadata: BudgetCommitMetadata {

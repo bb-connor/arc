@@ -226,7 +226,7 @@ impl ChioKernel {
                     payment_reference,
                 } => {
                     let envelope = crate::budget_store::ReservedHoldEnvelope {
-                        budget_total: Some(charge.budget_total),
+                        budget_total: charge.budget_total,
                         delegation_depth: cap.delegation_chain.len() as u32,
                         root_budget_holder: cap.issuer.to_hex(),
                     };

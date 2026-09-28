@@ -722,12 +722,10 @@ impl ChioKernel {
         self.check_revocation(&request.capability)?;
         self.validate_delegation_admission(&request.capability)?;
         if dpop_required {
-            let proof = request.dpop_proof.as_ref().ok_or_else(|| {
-                KernelError::DpopVerificationFailed(
-                    "grant requires DPoP proof but none was provided during dispatch revalidation"
-                        .to_string(),
-                )
-            })?;
+            let proof = request
+                .dpop_proof
+                .as_ref()
+                .ok_or(crate::dpop::DpopError::MissingProof)?;
             self.verify_dpop_for_permission_preview(
                 proof,
                 &request.capability,
