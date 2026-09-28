@@ -7,7 +7,7 @@ use std::time::Duration;
 use rusqlite::OpenFlags;
 
 use super::super::{
-    configure_pooled_connection, now_secs, StableReplayClock, MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64,
+    configure_pooled_connection, StableReplayClock, MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64,
 };
 use super::*;
 
@@ -22,6 +22,16 @@ impl SqliteGovernedApprovalReplaySource {
     /// advancement, capacity changes or file creation. This is required when
     /// resuming a pinned but not yet sealed source after process loss.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
+        Self::open_with_clock(
+            path,
+            std::sync::Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_with_clock(
+        path: impl AsRef<Path>,
+        clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, Error> {
         let path = path.as_ref();
         let filesystem_path = path
             .to_str()
@@ -48,7 +58,7 @@ impl SqliteGovernedApprovalReplaySource {
             pool,
             path: Some(filesystem_path),
             capacity: 1,
-            clock: StableReplayClock::new(now_secs(), MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64),
+            clock: StableReplayClock::new(clock, MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64)?,
         };
         let mut connection = store.pool.get()?;
         require_durability(&connection)?;

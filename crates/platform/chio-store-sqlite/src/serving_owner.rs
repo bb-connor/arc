@@ -3,8 +3,7 @@ use std::collections::VecDeque;
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Mutex};
 
 use chio_core::StoreMutationFence;
 use chio_kernel::budget_store::{
@@ -140,6 +139,8 @@ type SchemaCatalogEntry = (String, String, String, Option<String>);
 
 #[derive(Debug, thiserror::Error)]
 pub enum SqliteServingOwnerError {
+    #[error("authority clock rejected: {0}")]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
     #[error("filesystem error: {0}")]
@@ -159,6 +160,8 @@ pub enum SqliteServingOwnerError {
 }
 
 pub(crate) struct SqliteServingOwner {
+    pub(crate) clock: Arc<dyn chio_security_types::clock::Clock>,
+    pub(crate) clock_fence: Arc<Mutex<chio_security_types::clock::ClockFence>>,
     rollback_anchor: RollbackAnchor,
     pub(crate) fence: StoreMutationFence,
     poisoned: AtomicBool,
@@ -568,6 +571,18 @@ impl SqliteAuthorityStore {
         database_path: impl AsRef<Path>,
         lock_root: impl AsRef<Path>,
     ) -> Result<Self, SqliteServingOwnerError> {
+        Self::open_serving_with_clock(
+            database_path,
+            lock_root,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_serving_with_clock(
+        database_path: impl AsRef<Path>,
+        lock_root: impl AsRef<Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, SqliteServingOwnerError> {
         Self::ensure_serving_supported()?;
         let database_path = database_path.as_ref();
         validate_database_path_component(database_path)?;
@@ -737,7 +752,10 @@ impl SqliteAuthorityStore {
                 ));
             }
         }
-        let opened_at_ms = now_ms()?;
+        let mut clock_fence = chio_security_types::clock::ClockFence::default();
+        let opened_at = clock_fence.observe(clock.read()?)?;
+        let opened_at_ms = i64::try_from(opened_at.unix_millis().get())
+            .map_err(|_| chio_security_types::clock::ClockError::Overflow)?;
         let changed = transaction.execute(
             r#"
             UPDATE chio_serving_owner
@@ -789,6 +807,8 @@ impl SqliteAuthorityStore {
             ));
         }
         let owner = Arc::new(SqliteServingOwner {
+            clock,
+            clock_fence: Arc::new(Mutex::new(clock_fence)),
             rollback_anchor,
             fence: StoreMutationFence {
                 store_uuid: record.store_uuid,
@@ -1633,15 +1653,6 @@ fn path_text(path: &Path) -> Result<String, SqliteServingOwnerError> {
         .ok_or_else(|| SqliteServingOwnerError::Invalid("path is not valid UTF-8".to_string()))
 }
 
-fn now_ms() -> Result<i64, SqliteServingOwnerError> {
-    let millis = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?
-        .as_millis();
-    i64::try_from(millis)
-        .map_err(|_| SqliteServingOwnerError::Invalid("wall clock overflowed i64".to_string()))
-}
-
 fn authority_data_version(connection: &Connection) -> Result<u64, SqliteServingOwnerError> {
     let version = connection.query_row("PRAGMA data_version", [], |row| row.get::<_, i64>(0))?;
     read_u64(version, "sqlite data_version")
@@ -1760,4 +1771,9 @@ mod windows_platform_tests {
         assert!(!lock_root.exists());
         Ok(())
     }
+}
+
+fn now_ms() -> Result<i64, SqliteServingOwnerError> {
+    use chio_security_types::clock::{Clock, ClockError, SystemClock};
+    Ok(i64::try_from(SystemClock.unix_millis()?.get()).map_err(|_| ClockError::Overflow)?)
 }

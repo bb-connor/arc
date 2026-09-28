@@ -76,7 +76,9 @@ pub(super) fn configure_original_selection(
                 nonce_ttl_secs: 120,
                 ..Default::default()
             },
-            Box::new(nonce::NoLegacyNonce(Arc::new(AtomicUsize::new(0)))),
+            Box::new(nonce::OperationOwnedNonceOnly(Arc::new(AtomicUsize::new(
+                0,
+            )))),
         );
     }
     Ok(())

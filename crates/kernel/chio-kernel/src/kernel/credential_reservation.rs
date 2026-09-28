@@ -3,8 +3,6 @@ use chio_log_redact::redacted;
 
 #[path = "credential_reservation/acquisition.rs"]
 mod acquisition;
-#[path = "credential_reservation/legacy_nonce.rs"]
-mod legacy_nonce;
 mod native_dispatch;
 #[path = "credential_reservation/operation_owned.rs"]
 mod operation_owned;
@@ -13,7 +11,6 @@ mod preparation;
 
 pub use native_dispatch::VerifiedNativeDispatchCredentials;
 
-use legacy_nonce::LegacyExecutionNonce;
 use preparation::CredentialPreparationInput;
 pub(crate) use preparation::PreparedDispatchCredentials;
 
@@ -40,8 +37,8 @@ fn run_credential_store_operation<T>(
 /// How a presented execution nonce participates in dispatch credentials.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ExecutionNonceCredential {
-    /// Validate and reserve the nonce in the legacy replay store.
-    LegacyReplayStore,
+    /// Validate and reserve the nonce in the standalone replay store.
+    ReplayStore,
     /// The durable admission operation owns the nonce; the store already
     /// verified it and reserves it atomically with the operation.
     DurableParticipant,
@@ -54,7 +51,7 @@ impl ExecutionNonceCredential {
         if durable_execution_nonce {
             Self::DurableParticipant
         } else {
-            Self::LegacyReplayStore
+            Self::ReplayStore
         }
     }
 }
@@ -65,7 +62,6 @@ pub(crate) struct DispatchCredentialReservation<'a> {
     dpop_key: Option<(String, String)>,
     owned_dpop: Option<crate::admission_operation::dpop_claim::DpopReplayClaimReferenceV1>,
     execution_nonce_id: Option<String>,
-    legacy_execution_nonce: LegacyExecutionNonce,
     execution_nonce_present: bool,
     approval_key: Option<(String, String, String)>,
     owned_approval: Option<
@@ -89,10 +85,6 @@ impl DispatchCredentialReservation<'_> {
         // nonce reservations in their fail-closed state.
         self.rollback_on_drop = false;
         self.retain_on_drop = true;
-        // A legacy execution nonce store has no owned reservation state. Its
-        // marker must be consumed before entering the effect boundary and
-        // cannot participate in pre-effect rollback.
-        self.reserve_legacy_execution_nonce_at_effect_boundary()?;
         Ok(self.retention_disposition())
     }
 
@@ -105,7 +97,6 @@ impl DispatchCredentialReservation<'_> {
     ) -> Result<PaymentCredentialDisposition, KernelError> {
         self.rollback_on_drop = false;
         self.retain_on_drop = true;
-        self.reserve_legacy_execution_nonce_at_effect_boundary()?;
         self.commit_approval_marker()?;
         Ok(self.retention_disposition())
     }
@@ -123,7 +114,6 @@ impl DispatchCredentialReservation<'_> {
         // uncertain failure, keeping every owned marker is the safe direction.
         self.rollback_on_drop = false;
         self.retain_on_drop = false;
-        self.reserve_legacy_execution_nonce_at_effect_boundary()?;
         self.commit_approval_marker()?;
         Ok(self.retention_disposition())
     }
@@ -177,7 +167,7 @@ impl DispatchCredentialReservation<'_> {
         match self.rollback_before_dispatch_with_disposition()? {
             PaymentCredentialDisposition::NonePresent => Ok(()),
             _ => Err(KernelError::Internal(
-                "irreversible legacy nonce retention remains after credential rollback".into(),
+                "credential retention remains after dispatch commitment".into(),
             )),
         }
     }
@@ -185,18 +175,17 @@ impl DispatchCredentialReservation<'_> {
     pub(crate) fn rollback_before_dispatch_with_disposition(
         mut self,
     ) -> Result<PaymentCredentialDisposition, KernelError> {
+        if !self.rollback_on_drop {
+            return Ok(self.retention_disposition());
+        }
         self.rollback_on_drop = false;
         self.retain_on_drop = false;
         self.rollback_entries()?;
-        Ok(self.legacy_execution_nonce.disposition())
+        Ok(PaymentCredentialDisposition::NonePresent)
     }
 
     fn rollback_entries(&mut self) -> Result<(), KernelError> {
         let mut failures = Vec::new();
-
-        // Only a pending legacy nonce is discardable. Confirmed consumption or
-        // a lost acknowledgement remains explicit: this API has no owned undo.
-        self.legacy_execution_nonce.discard_unconsumed();
 
         if let Some(reference) = self.owned_approval.take() {
             if let Err(error) = self
@@ -301,12 +290,6 @@ impl DispatchCredentialReservation<'_> {
 impl Drop for DispatchCredentialReservation<'_> {
     fn drop(&mut self) {
         if self.retain_on_drop {
-            if let Err(error) = self.reserve_legacy_execution_nonce_at_effect_boundary() {
-                tracing::warn!(
-                    reason = %redacted!(&error),
-                    "legacy dispatch credential retention failed while dropping an evaluation"
-                );
-            }
             if let Err(error) = self.commit_approval_marker() {
                 tracing::warn!(
                     reason = %redacted!(&error),
@@ -330,7 +313,7 @@ impl Drop for DispatchCredentialReservation<'_> {
 impl ChioKernel {
     /// `durable_execution_nonce` marks a request whose nonce is owned by the
     /// durable admission operation. The store verified it before any mutation
-    /// and reserves it atomically with `ReadyToDispatch`, so the legacy replay
+    /// and reserves it atomically with `ReadyToDispatch`, so the standalone replay
     /// store must not consume or roll back that nonce.
     #[cfg(test)]
     pub(crate) fn reserve_dispatch_credentials(

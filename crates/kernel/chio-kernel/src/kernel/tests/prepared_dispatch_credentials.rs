@@ -186,14 +186,19 @@ fn prepared_credentials_reject_expiry_before_the_first_store_write() -> TestResu
         };
         let prepared = fixture.prepare()?;
         fixture.assert_no_writes()?;
-        let _clock = crate::scope_fixed_runtime_for_current_thread(expiry, []);
+        fixture.clock.set(expiry);
         let refused = prepared.reserve();
         assert!(
             refused.as_ref().is_err_and(|error| {
                 matches!(
                     (nonce_expiry, error),
-                    (true, KernelError::Internal(_))
-                        | (false, KernelError::GovernedTransactionDenied(_))
+                    (
+                        true,
+                        KernelError::ExecutionNonce(ExecutionNonceError::Expired { .. })
+                    ) | (
+                        false,
+                        KernelError::Clock(chio_security_types::clock::ClockError::Expired)
+                    )
                 ) && error.to_string().to_lowercase().contains("expired")
             }),
             "credential did not reject at its expiry boundary"
@@ -204,42 +209,22 @@ fn prepared_credentials_reject_expiry_before_the_first_store_write() -> TestResu
 }
 
 #[test]
-fn prepared_credentials_contain_capability_probe_panics_without_partial_reservation() -> TestResult
-{
-    for after_preparation in [false, true] {
-        let fixture = Fixture::new()?;
-        if after_preparation {
-            let prepared = fixture.prepare()?;
-            fixture.nonce.mode.store(2, Ordering::SeqCst);
-            let refused = prepared.reserve();
-            assert!(refused
-                .as_ref()
-                .is_err_and(|error| error.to_string().contains("capability panicked")));
-        } else {
-            fixture.nonce.mode.store(2, Ordering::SeqCst);
-            let refused = fixture.prepare();
-            assert!(refused
-                .as_ref()
-                .is_err_and(|error| error.to_string().contains("capability panicked")));
-        }
-        fixture.assert_no_writes()?;
-    }
-    Ok(())
-}
-
-#[test]
-fn prepared_credentials_reject_changed_nonce_backend_semantics_before_mutation() -> TestResult {
-    for initial in [0, 1] {
-        let fixture = Fixture::new()?;
-        fixture.nonce.mode.store(initial, Ordering::SeqCst);
-        let prepared = fixture.prepare()?;
-        fixture.nonce.mode.store(1 - initial, Ordering::SeqCst);
-        let refused = prepared.reserve();
-        assert!(refused.as_ref().is_err_and(|error| error
-            .to_string()
-            .contains("capability changed after preparation")));
-        fixture.assert_no_writes()?;
-    }
+fn prepared_credentials_contain_reservation_panics_and_release_earlier_markers() -> TestResult {
+    let fixture = Fixture::new()?;
+    let prepared = fixture.prepare()?;
+    fixture.assert_no_writes()?;
+    fixture.nonce.mode.store(2, Ordering::SeqCst);
+    let refused = prepared.reserve();
+    assert!(matches!(refused,
+        Err(KernelError::CredentialReservationCleanup { cause, cleanup })
+        if matches!(*cause, KernelError::Internal(ref reason)
+            if reason.contains("execution nonce reservation panicked"))
+        && matches!(*cleanup, KernelError::Internal(ref reason)
+            if reason.contains("execution nonce dispatch reservation was not owned during rollback"))
+    ));
+    assert_eq!(fixture.dpop_occupancy()?, 0);
+    assert!(!fixture.nonce_consumed()?);
+    assert_eq!(fixture.writes(), (1, 1, 0, 0, 0));
     Ok(())
 }
 

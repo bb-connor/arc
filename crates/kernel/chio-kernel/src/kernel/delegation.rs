@@ -29,7 +29,8 @@ use std::sync::Arc;
 use chio_core_types::capability::token::CapabilityToken;
 use chio_kernel_core::{RevocationSnapshot, RevocationView, RevocationViewSubject};
 
-use crate::kernel::{current_unix_timestamp, KernelError};
+use crate::kernel::KernelError;
+use chio_security_types::clock::UnixMillis;
 
 const DEFAULT_REVOCATION_VIEW_MAX_STALENESS_MS: u64 = 500;
 
@@ -46,8 +47,9 @@ const DEFAULT_REVOCATION_VIEW_MAX_STALENESS_MS: u64 = 500;
 pub(crate) fn consult_revocation_view(
     cap: &CapabilityToken,
     view: Option<&Arc<RevocationView>>,
+    now: UnixMillis,
 ) -> Result<(), KernelError> {
-    let now_unix_ms = current_unix_timestamp().saturating_mul(1000);
+    let now_unix_ms = now.get();
     consult_revocation_view_at(
         cap,
         view,
@@ -91,18 +93,11 @@ fn verify_snapshot_freshness(
     now_unix_ms: u64,
     max_staleness_ms: u64,
 ) -> Result<(), KernelError> {
-    if now_unix_ms < snapshot.issued_at_unix_ms {
-        return Err(KernelError::DelegationInvalid(format!(
-            "revocation view snapshot epoch {} is issued in the future",
-            snapshot.epoch
-        )));
-    }
-    let age_ms = now_unix_ms.saturating_sub(snapshot.issued_at_unix_ms);
+    let age_ms = now_unix_ms
+        .checked_sub(snapshot.issued_at_unix_ms)
+        .ok_or(KernelError::RevocationSnapshotFuture)?;
     if age_ms > max_staleness_ms {
-        return Err(KernelError::DelegationInvalid(format!(
-            "revocation view snapshot epoch {} is stale: age {} ms exceeds {} ms",
-            snapshot.epoch, age_ms, max_staleness_ms
-        )));
+        return Err(KernelError::RevocationSnapshotStale);
     }
     Ok(())
 }
@@ -202,7 +197,7 @@ mod tests {
     #[test]
     fn no_view_installed_returns_ok() {
         let token = build_token("cap-leaf", &["cap-root"]);
-        assert!(consult_revocation_view(&token, None).is_ok());
+        assert!(consult_revocation_view(&token, None, UnixMillis::new(1_000)).is_ok());
     }
 
     #[test]
@@ -211,7 +206,7 @@ mod tests {
         let view = Arc::new(RevocationView::new());
         let err =
             consult_revocation_view_at(&token, Some(&view), NOW_MS, MAX_STALENESS_MS).unwrap_err();
-        assert!(matches!(err, KernelError::DelegationInvalid(_)));
+        assert!(matches!(err, KernelError::RevocationSnapshotStale));
     }
 
     #[test]
@@ -253,7 +248,7 @@ mod tests {
         let err =
             consult_revocation_view_at(&token, Some(&view), NOW_MS, MAX_STALENESS_MS).unwrap_err();
 
-        assert!(matches!(err, KernelError::DelegationInvalid(_)));
+        assert!(matches!(err, KernelError::RevocationSnapshotStale));
     }
 
     #[test]
@@ -264,6 +259,6 @@ mod tests {
         let err =
             consult_revocation_view_at(&token, Some(&view), NOW_MS, MAX_STALENESS_MS).unwrap_err();
 
-        assert!(matches!(err, KernelError::DelegationInvalid(_)));
+        assert!(matches!(err, KernelError::RevocationSnapshotFuture));
     }
 }

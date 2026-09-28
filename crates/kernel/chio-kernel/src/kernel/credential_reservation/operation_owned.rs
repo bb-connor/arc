@@ -17,7 +17,10 @@ impl ChioKernel {
         mut admission: Option<&mut DurableToolAdmission>,
     ) -> RuntimeAdmissionDecision {
         if let Err(error) = self.validate_live_admission_authority_profile(admission.as_deref()) {
-            return RuntimeAdmissionDecision::deny(error.to_string(), None);
+            return RuntimeAdmissionDecision::deny(
+                error.to_string(),
+                error.rejection_metadata(None),
+            );
         }
         let prepared = if (self.governed_approval_authority.is_some()
             && request.approval_token.is_some())
@@ -39,7 +42,12 @@ impl ChioKernel {
                 operation.requires_execution_nonce(),
             ) {
                 Ok(prepared) => Some(prepared),
-                Err(error) => return RuntimeAdmissionDecision::deny(error.to_string(), None),
+                Err(error) => {
+                    return RuntimeAdmissionDecision::deny(
+                        error.to_string(),
+                        error.rejection_metadata(None),
+                    )
+                }
             }
         } else {
             None
@@ -64,7 +72,10 @@ impl ChioKernel {
             )
         };
         if let Err(error) = native_preparation {
-            return RuntimeAdmissionDecision::deny(error.to_string(), None);
+            return RuntimeAdmissionDecision::deny(
+                error.to_string(),
+                error.rejection_metadata(None),
+            );
         }
         let decision = self.run_runtime_admission_hook(
             request,

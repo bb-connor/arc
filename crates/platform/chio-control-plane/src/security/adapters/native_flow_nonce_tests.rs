@@ -2,32 +2,54 @@
 use super::*;
 use chio_kernel::execution_nonce::{ExecutionNonceConfig, ExecutionNonceStore};
 
-pub(super) mod execution {
-    include!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/src/security/adapters/native_flow_nonce_execution_tests.rs"
-    ));
-}
+#[path = "native_flow_nonce_execution_tests.rs"]
+pub(super) mod execution;
 
-pub(super) struct NoLegacyNonce(pub(super) Arc<AtomicUsize>);
+pub(super) struct OperationOwnedNonceOnly(pub(super) Arc<AtomicUsize>);
 
-impl ExecutionNonceStore for NoLegacyNonce {
-    fn reserve(&self, _: &str) -> Result<bool, KernelError> {
+impl ExecutionNonceStore for OperationOwnedNonceOnly {
+    fn reserve_until(&self, _: &str, _: i64) -> Result<bool, chio_kernel::KernelError> {
         self.0.fetch_add(1, Ordering::SeqCst);
-        Err(KernelError::Internal("legacy nonce store reached".into()))
+        Err(chio_kernel::KernelError::DurableAdmission(
+            "operation-owned nonce custody is required".into(),
+        ))
+    }
+    fn reserve_for_dispatch(
+        &self,
+        id: &str,
+        expiry: i64,
+        _: &str,
+    ) -> Result<bool, chio_kernel::KernelError> {
+        self.reserve_until(id, expiry)
+    }
+    fn rollback_dispatch_reservation(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<bool, chio_kernel::KernelError> {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        Err(chio_kernel::KernelError::DurableAdmission(
+            "operation-owned nonce custody is required".into(),
+        ))
+    }
+    fn is_consumed(&self, _: &str) -> Result<bool, chio_kernel::KernelError> {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        Err(chio_kernel::KernelError::DurableAdmission(
+            "operation-owned nonce custody is required".into(),
+        ))
     }
 }
 
 #[test]
-fn native_nonce_preflight_issues_without_dispatch_or_legacy_nonce_custody() -> TestResult {
+fn native_nonce_preflight_issues_without_dispatch_or_standalone_nonce_custody() -> TestResult {
     let mut fixture = super::super::public_fixture()?;
-    let legacy = Arc::new(AtomicUsize::new(0));
+    let standalone_calls = Arc::new(AtomicUsize::new(0));
     fixture.kernel.set_execution_nonce_store(
         ExecutionNonceConfig {
             require_nonce: true,
             ..ExecutionNonceConfig::default()
         },
-        Box::new(NoLegacyNonce(legacy.clone())),
+        Box::new(OperationOwnedNonceOnly(standalone_calls.clone())),
     );
     let resolver = NativeFlowResolver::new(
         fixture.binding.clone(),
@@ -48,7 +70,7 @@ fn native_nonce_preflight_issues_without_dispatch_or_legacy_nonce_custody() -> T
     assert!(response.output.is_none());
     assert!(response.receipt.verify_signature()?);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
-    assert_eq!(legacy.load(Ordering::SeqCst), 0);
+    assert_eq!(standalone_calls.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.budget_observer()()?, 0);
     let store = fixture.authority.admission_operation_store();
     let fence = fixture.authority.mutation_fence();
@@ -128,7 +150,7 @@ impl SecurityPreDispatchHook for PreflightJoinFaultHook {
         &self,
         _: &SecurityPreDispatchContext<'_>,
     ) -> Result<Option<SecurityDispatchOutcomeHandle>, KernelError> {
-        panic!("preflight must not enter legacy dispatch");
+        panic!("preflight must not enter standalone dispatch");
     }
 }
 
@@ -142,13 +164,13 @@ fn native_nonce_preflight_callback_faults_deny_issuance_but_preserve_committed_t
         PreflightJoinFault::SuppressSecond,
     ] {
         let mut fixture = super::super::public_fixture()?;
-        let legacy = Arc::new(AtomicUsize::new(0));
+        let standalone_calls = Arc::new(AtomicUsize::new(0));
         fixture.kernel.set_execution_nonce_store(
             ExecutionNonceConfig {
                 require_nonce: true,
                 ..ExecutionNonceConfig::default()
             },
-            Box::new(NoLegacyNonce(legacy.clone())),
+            Box::new(OperationOwnedNonceOnly(standalone_calls.clone())),
         );
         let resolver = NativeFlowResolver::new(
             fixture.binding.clone(),
@@ -171,7 +193,7 @@ fn native_nonce_preflight_callback_faults_deny_issuance_but_preserve_committed_t
         assert!(response.output.is_none());
         assert!(response.receipt.verify_signature()?);
         assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
-        assert_eq!(legacy.load(Ordering::SeqCst), 0);
+        assert_eq!(standalone_calls.load(Ordering::SeqCst), 0);
         assert_eq!(fixture.budget_observer()()?, 0);
         let store = fixture.authority.admission_operation_store();
         let fence = fixture.authority.mutation_fence();

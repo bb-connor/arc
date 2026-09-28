@@ -22,6 +22,8 @@ use crate::ChioKernel;
 /// Maximum time a pool reservation may remain unclaimed before a durable
 /// purchase admission must take ownership of it.
 pub const FINDING_POOL_CLAIM_WINDOW_MS: u64 = 30_000;
+#[path = "finding_pool_clock.rs"]
+mod clock;
 pub const FINDING_POOL_MUTATION_SCHEMA_V1: &str = "chio.finding.pool-mutation.v1";
 pub const FINDING_POOL_DEBIT_AUTHORIZATION_SCHEMA_V1: &str =
     "chio.finding.pool-debit-authorization.v1";
@@ -903,9 +905,10 @@ impl ChioKernel {
             allocation_issued_at_unix_ms: allocation.issued_at_unix_ms,
             allocation_expires_at_unix_ms: verified.expires_at_unix_ms,
             debit_requested_at_unix_ms: trusted_now_unix_ms,
-            claim_deadline_unix_ms: trusted_now_unix_ms
-                .saturating_add(FINDING_POOL_CLAIM_WINDOW_MS)
-                .min(verified.expires_at_unix_ms),
+            claim_deadline_unix_ms: clock::claim_deadline(
+                trusted_now_unix_ms,
+                verified.expires_at_unix_ms,
+            )?,
         };
         if !allocation_is_live {
             return Err(FindingPoolLedgerError::AllocationNotLive.into());

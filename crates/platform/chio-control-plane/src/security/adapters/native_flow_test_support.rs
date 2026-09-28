@@ -29,12 +29,8 @@ mod lifecycle {
     ));
 }
 
-mod nonce {
-    include!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/src/security/adapters/native_flow_nonce_tests.rs"
-    ));
-}
+#[path = "native_flow_nonce_tests.rs"]
+mod nonce;
 
 mod caller {
     include!(concat!(

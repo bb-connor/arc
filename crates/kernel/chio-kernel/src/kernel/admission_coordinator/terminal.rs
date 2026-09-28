@@ -163,6 +163,7 @@ impl ChioKernel {
             super::super::delegation::consult_revocation_view(
                 &request.capability,
                 self.revocation_view.as_ref(),
+                self.trusted_now_millis()?,
             )?;
         }
         Ok(())

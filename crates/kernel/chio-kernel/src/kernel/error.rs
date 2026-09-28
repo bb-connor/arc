@@ -165,6 +165,13 @@ pub enum KernelError {
     #[error("delegation chain revoked at ancestor {0}")]
     DelegationChainRevoked(CapabilityId),
 
+    #[error("revocation view snapshot is issued in the future")]
+    RevocationSnapshotFuture,
+    #[error("revocation view snapshot is stale")]
+    RevocationSnapshotStale,
+    #[error("governed approval token lifetime exceeds the maximum")]
+    GovernedApprovalLifetimeExceeded,
+
     #[error("delegation admission failed: {0}")]
     DelegationInvalid(String),
 
@@ -296,6 +303,22 @@ pub enum KernelError {
 
     #[error("settlement runtime configuration failed: {0}")]
     SettlementConfiguration(#[from] SettlementRuntimeConfigError),
+
+    #[error("execution nonce verification failed: {0}")]
+    ExecutionNonce(#[source] crate::execution_nonce::ExecutionNonceError),
+
+    #[error("execution nonce store capacity exhausted")]
+    ExecutionNonceCapacity,
+
+    #[error("dispatch credential reservation failed: {cause}; {cleanup}")]
+    CredentialReservationCleanup {
+        #[source]
+        cause: Box<KernelError>,
+        cleanup: Box<KernelError>,
+    },
+
+    #[error("trusted time rejected: {0}")]
+    Clock(#[from] chio_security_types::clock::ClockError),
 
     #[error("internal error: {0}")]
     Internal(String),
@@ -476,6 +499,18 @@ impl KernelError {
                 "CHIO-KERNEL-DELEGATION-CHAIN-REVOKED",
                 serde_json::json!({ "capability_id": capability_id }),
                 "Inspect the capability lineage and reissue the chain from a non-revoked ancestor.",
+            ),
+            Self::RevocationSnapshotFuture => self.report_with_context(
+                "urn:chio:error:kernel:revocation-snapshot-future", serde_json::json!({}),
+                "Restore trusted time and obtain a current revocation snapshot.",
+            ),
+            Self::RevocationSnapshotStale => self.report_with_context(
+                "urn:chio:error:kernel:revocation-snapshot-stale", serde_json::json!({}),
+                "Refresh the revocation snapshot before admitting delegation.",
+            ),
+            Self::GovernedApprovalLifetimeExceeded => self.report_with_context(
+                "urn:chio:error:kernel:governed-approval-lifetime", serde_json::json!({}),
+                "Issue an approval whose signed lifetime is within the configured maximum.",
             ),
             Self::DelegationInvalid(reason) => self.report_with_context(
                 "CHIO-KERNEL-DELEGATION-INVALID",
@@ -696,6 +731,27 @@ impl KernelError {
                 "CHIO-KERNEL-RUNTIME-ADMISSION-READINESS-TIMEOUT",
                 serde_json::json!({ "timeout_ms": timeout_ms }),
                 "Restore the runtime admission dependency or increase the bounded readiness timeout before retrying.",
+            ),
+            Self::ExecutionNonce(error) => self.report_with_context(
+                error.code().as_ref(),
+                serde_json::json!({ "rejection": error.code() }),
+                "Present a fresh signed nonce bound to the exact authorized request.",
+            ),
+            Self::ExecutionNonceCapacity => self.report_with_context(
+                "urn:chio:error:kernel:execution-nonce-capacity",
+                serde_json::json!({}),
+                "Wait for signed nonce windows to expire or increase replay custody capacity.",
+            ),
+            Self::CredentialReservationCleanup { cause, .. } => {
+                let mut report = cause.report();
+                report.context["cleanup_failed"] = serde_json::json!(true);
+                report.message = self.to_string();
+                report
+            }
+            Self::Clock(error) => self.report_with_context(
+                error.code(),
+                serde_json::json!({ "rejection": error.code() }),
+                "Restore a valid trusted clock or authority window before retrying.",
             ),
             Self::ReplayClockAnomaly {
                 store,

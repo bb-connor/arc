@@ -95,7 +95,7 @@ pub(super) fn evaluate(
 
 fn security_rejection(nested: bool, fault: Fault, rollback: Rollback) -> TestResult {
     let (mut kernel, _, mut request, nonce_reserves) =
-        request_with_legacy_execution_nonce_store("security-credential-rejection")?;
+        request_with_recording_execution_nonce_store("security-credential-rejection")?;
     let invocations = Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(CountingDispatchServer {
         id: request.server_id.clone(),
@@ -147,9 +147,14 @@ fn security_rejection(nested: bool, fault: Fault, rollback: Rollback) -> TestRes
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     assert_eq!(
         nonce_reserves.load(Ordering::SeqCst),
-        0,
-        "security denial consumed a legacy nonce"
+        1,
+        "owned nonce must be reserved before the security callback"
     );
+    assert!(!kernel
+        .execution_nonce_store
+        .as_ref()
+        .ok_or("nonce store")?
+        .is_consumed(request.execution_nonce.as_ref().ok_or("nonce")?.nonce_id())?);
     assert_eq!(
         counts.each_ref().map(|count| count.load(Ordering::SeqCst)),
         [1, 0, 1]
@@ -166,7 +171,7 @@ fn security_rejection(nested: bool, fault: Fault, rollback: Rollback) -> TestRes
         let accepted = evaluate(&kernel, &request, nested)?;
         assert_eq!(accepted.verdict, Verdict::Allow, "{accepted:?}");
         assert_eq!(invocations.load(Ordering::SeqCst), 1);
-        assert_eq!(nonce_reserves.load(Ordering::SeqCst), 1);
+        assert_eq!(nonce_reserves.load(Ordering::SeqCst), 2);
         assert_eq!(
             counts.each_ref().map(|count| count.load(Ordering::SeqCst)),
             [2, 1, 1]

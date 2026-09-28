@@ -659,16 +659,13 @@ fn kernel_ttl_enforces_30s_default() {
 }
 
 #[test]
-fn in_memory_store_ttl_grace_period_does_not_regress() {
-    // Round-trip: a short TTL expires entries but the signed body still
-    // blocks a real replay because expires_at was already checked.
-    let store = InMemoryExecutionNonceStore::new(1024, std::time::Duration::from_millis(1));
-    use crate::execution_nonce::ExecutionNonceStore;
-    assert!(store.reserve("a").unwrap());
-    std::thread::sleep(Duration::from_millis(5));
-    // After TTL the slot is reclaimed; that is intentional. The signed
-    // body's `expires_at` is what prevents the actual replay.
-    assert!(store.reserve("a").unwrap());
+fn in_memory_store_retains_the_exact_signed_window_without_a_local_ttl() {
+    use chio_security_types::clock::FixedClock;
+    let store =
+        InMemoryExecutionNonceStore::with_clock(1024, std::sync::Arc::new(FixedClock::new(1_000)));
+    assert!(store.reserve_until("a", 1_030).unwrap());
+    assert!(!store.reserve_until("a", 1_060).unwrap());
+    assert!(store.is_consumed("a").unwrap());
 }
 
 #[test]

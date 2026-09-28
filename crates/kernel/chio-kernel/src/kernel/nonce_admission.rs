@@ -14,8 +14,7 @@ impl ChioKernel {
     /// Set `config.require_nonce = true` to put the kernel into strict mode:
     /// any call that reaches `require_presented_execution_nonce` without a
     /// nonce is denied. When `require_nonce == false` the feature is opt-in
-    /// per tool server and non-nonce callers continue to work (backward
-    /// compatibility).
+    /// per tool server.
     pub fn set_execution_nonce_store(
         &mut self,
         config: crate::execution_nonce::ExecutionNonceConfig,
@@ -69,7 +68,8 @@ impl ChioKernel {
         let Some(config) = self.execution_nonce_config.as_ref() else {
             return Ok(None);
         };
-        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
+        let now = i64::try_from(self.trusted_now_millis()?.as_secs())
+            .map_err(|_| chio_security_types::clock::ClockError::Overflow)?;
         let binding = crate::execution_nonce::NonceBinding {
             subject_id: cap.subject.to_hex(),
             request_id: request.request_id.clone(),
@@ -103,11 +103,22 @@ impl ChioKernel {
         expected: &crate::execution_nonce::NonceBinding,
     ) -> Result<(), crate::execution_nonce::ExecutionNonceError> {
         let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
-            crate::execution_nonce::ExecutionNonceError::Store(
-                "execution nonce store is not installed".to_string(),
+            crate::execution_nonce::ExecutionNonceError::Store(Box::new(
+                KernelError::InvalidConstraint(
+                    "execution nonce store is not installed".to_string(),
+                ),
+            ))
+        })?;
+        let now = i64::try_from(
+            self.trusted_now_millis()
+                .map_err(crate::execution_nonce::ExecutionNonceError::from_store)?
+                .as_secs(),
+        )
+        .map_err(|_| {
+            crate::execution_nonce::ExecutionNonceError::Clock(
+                chio_security_types::clock::ClockError::Overflow,
             )
         })?;
-        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
         crate::execution_nonce::verify_execution_nonce(
             presented,
             &self.config.keypair.public_key(),
@@ -120,8 +131,8 @@ impl ChioKernel {
     /// Execution-nonce dispatch gate.
     ///
     /// Denies fail-closed when strict mode is configured and the request
-    /// lacks a nonce. When strict mode is disabled, a request with no
-    /// nonce remains backward-compatible. Any presented nonce is still
+    /// lacks a nonce. When strict mode is disabled, nonce presentation follows the configured
+    /// tool-server policy. Any presented nonce is still
     /// verified and consumed so opt-in callers cannot bypass binding,
     /// expiry, signature, or replay checks.
     ///
@@ -130,7 +141,7 @@ impl ChioKernel {
     /// * a nonce is presented, signed by this kernel, correctly bound,
     ///   non-expired, and has not been consumed.
     ///
-    /// Returns `Err(KernelError::Internal(...))` fail-closed otherwise.
+    /// Returns `Err(KernelError::ExecutionNonce(...))` fail-closed otherwise.
     pub fn require_presented_execution_nonce(
         &self,
         request: &ToolCallRequest,
@@ -144,13 +155,17 @@ impl ChioKernel {
         request: &ToolCallRequest,
         cap: &CapabilityToken,
     ) -> Result<(), KernelError> {
-        self.validate_execution_nonce_non_consuming(request, cap, current_unix_timestamp())
-            .map(|_| ())
+        self.validate_execution_nonce_non_consuming(
+            request,
+            cap,
+            self.trusted_now_millis()?.as_secs(),
+        )
+        .map(|_| ())
     }
 
     /// Strict-mode gate that knows which profile owns the presented nonce. A
     /// durable nonce operation bound its nonce to the retained issuance before
-    /// any mutation, so only that verification counts; the legacy validator
+    /// any mutation, so only that verification counts; the standalone validator
     /// judges every other request.
     pub(crate) fn validate_required_execution_nonce_for_admission(
         &self,
@@ -178,17 +193,21 @@ impl ChioKernel {
         request: &ToolCallRequest,
         cap: &CapabilityToken,
     ) -> Result<(), KernelError> {
-        let Some(validated) =
-            self.validate_execution_nonce_non_consuming(request, cap, current_unix_timestamp())?
+        let Some(validated) = self.validate_execution_nonce_non_consuming(
+            request,
+            cap,
+            self.trusted_now_millis()?.as_secs(),
+        )?
         else {
             return Ok(());
         };
         let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
             KernelError::Internal("execution nonce store is not installed".to_string())
         })?;
-        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
+        let now = i64::try_from(self.trusted_now_millis()?.as_secs())
+            .map_err(|_| chio_security_types::clock::ClockError::Overflow)?;
         crate::execution_nonce::reserve_execution_nonce(&validated, store, now)
-            .map_err(|e| KernelError::Internal(format!("{e}")))
+            .map_err(KernelError::from)
     }
 
     /// Strict-mode nonce issuance gate.
@@ -238,9 +257,9 @@ impl ChioKernel {
             presented,
             &self.config.keypair.public_key(),
             &expected,
-            i64::try_from(now).unwrap_or(i64::MAX),
+            i64::try_from(now).map_err(|_| chio_security_types::clock::ClockError::Overflow)?,
         )
         .map(Some)
-        .map_err(|error| KernelError::Internal(error.to_string()))
+        .map_err(KernelError::from)
     }
 }

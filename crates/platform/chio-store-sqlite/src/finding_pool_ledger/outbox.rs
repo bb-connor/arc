@@ -1,8 +1,7 @@
 //! Durable delivery leases for signed finding-pool mutation receipts.
 
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
-use std::time::Instant;
+use chio_security_types::clock::{Clock, ClockError, ClockFence, MonotonicInstant};
+use std::sync::{Arc, Mutex};
 
 use chio_core::receipt::body::ChioReceipt;
 use chio_kernel::finding_pool::FindingPoolLedgerError;
@@ -12,35 +11,55 @@ use super::{invariant, SqliteFindingPoolLedger};
 
 pub(super) struct OutboxLeaseClock {
     pub(super) epoch: u64,
-    origin: Mutex<Option<(u64, Instant)>>,
-    high_water_unix_ms: AtomicU64,
+    clock: Arc<dyn Clock>,
+    state: Mutex<OutboxLeaseClockState>,
 }
-
+#[derive(Default)]
+struct OutboxLeaseClockState {
+    origin: Option<(u64, MonotonicInstant)>,
+    fence: ClockFence,
+    high_water_unix_ms: u64,
+}
 impl OutboxLeaseClock {
-    pub(super) fn new(epoch: u64) -> Self {
+    pub(super) fn new(epoch: u64, clock: Arc<dyn Clock>) -> Self {
         Self {
             epoch,
-            origin: Mutex::new(None),
-            high_water_unix_ms: AtomicU64::new(0),
+            clock,
+            state: Mutex::new(OutboxLeaseClockState::default()),
         }
     }
 
+    /// The epoch sample comes from the qualified ledger caller. Local elapsed
+    /// time can advance a lease despite a stalled caller sample, but a broken
+    /// clock never becomes a fabricated timestamp. High-water is process-local;
+    /// the durable lease epoch fences old workers after restart.
     pub(super) fn nondecreasing_now(
         &self,
         observed_unix_ms: u64,
     ) -> Result<u64, FindingPoolLedgerError> {
-        let mut origin = self.origin.lock().map_err(|_| {
-            FindingPoolLedgerError::Receipt("mutation receipt lease clock is poisoned".to_owned())
-        })?;
-        let (origin_unix_ms, origin_instant) =
-            origin.get_or_insert_with(|| (observed_unix_ms, Instant::now()));
-        let elapsed_ms = u64::try_from(origin_instant.elapsed().as_millis()).unwrap_or(u64::MAX);
-        let monotonic_now = origin_unix_ms.saturating_add(elapsed_ms);
-        let candidate = observed_unix_ms.max(monotonic_now);
-        let previous = self
-            .high_water_unix_ms
-            .fetch_max(candidate, Ordering::SeqCst);
-        Ok(candidate.max(previous))
+        let mut state = self.state.lock().map_err(|_| ClockError::Unavailable)?;
+        let reading = state.fence.observe(self.clock.read()?)?;
+        let (origin_unix_ms, origin_monotonic) = state
+            .origin
+            .unwrap_or((observed_unix_ms, reading.monotonic()));
+        let elapsed_ms = u64::try_from(
+            reading
+                .monotonic()
+                .duration_since(origin_monotonic)?
+                .as_millis(),
+        )
+        .map_err(|_| ClockError::Overflow)?;
+        let monotonic_now = origin_unix_ms
+            .checked_add(elapsed_ms)
+            .ok_or(ClockError::Overflow)?;
+        // Retaining a high-water when a trusted caller repeats an older sample
+        // cannot extend an existing lease. Lease expiry is never recalculated.
+        let candidate = observed_unix_ms
+            .max(monotonic_now)
+            .max(state.high_water_unix_ms);
+        state.origin = Some((origin_unix_ms, origin_monotonic));
+        state.high_water_unix_ms = candidate;
+        Ok(candidate)
     }
 }
 
@@ -94,9 +113,7 @@ pub(super) fn claim_pending_mutation_receipts(
     let claim_expires = claimed_at_unix_ms
         .checked_add(lease_ms)
         .and_then(|value| i64::try_from(value).ok())
-        .ok_or_else(|| {
-            FindingPoolLedgerError::Receipt("mutation receipt delivery lease overflowed".to_owned())
-        })?;
+        .ok_or(ClockError::Overflow)?;
     let limit = i64::try_from(limit).map_err(|_| {
         FindingPoolLedgerError::Receipt("mutation receipt claim limit is invalid".to_owned())
     })?;

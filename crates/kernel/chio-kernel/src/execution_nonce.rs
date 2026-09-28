@@ -17,27 +17,18 @@
 //!   with its receipt-signing key, so downstream tool servers can
 //!   cryptographically verify authenticity without a round trip.
 //! * Replay is prevented by an `ExecutionNonceStore`: the first
-//!   `reserve(nonce_id)` returns true and consumes the nonce; any
+//!   `reserve_until(nonce_id, signed_expiry)` returns true and consumes the nonce; any
 //!   subsequent reservation returns false and the verify path rejects.
 //!
-//! # Backward compatibility
+//! # Deployment policy
 //!
-//! The whole feature is opt-in by installing an `ExecutionNonceConfig`.
-//! With no config installed, no nonce is minted and non-nonce callers keep
-//! working. With a config installed and `require_nonce == false`, allow
-//! responses carry nonces and dispatch verifies any nonce that is presented,
-//! but callers that omit the nonce remain backward-compatible. New strict
-//! deployments flip `require_nonce` to make every execution-bound dispatch
-//! present a fresh nonce.
-
-use std::num::NonZeroUsize;
-use std::sync::Mutex;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+//! Install `ExecutionNonceConfig` to mint and validate execution nonces.
+//! Set `require_nonce` when every execution-bound call must present one.
+//! Every installed replay store enforces signed expiry and owned rollback.
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::{Keypair, PublicKey};
-use lru::LruCache;
-use tracing::{error, warn};
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::KernelError;
@@ -50,7 +41,7 @@ pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v1";
 /// Default TTL for a freshly minted execution nonce.
 pub const DEFAULT_EXECUTION_NONCE_TTL_SECS: u64 = 30;
 
-/// Default capacity for the in-memory replay-prevention LRU cache.
+/// Default capacity for the in-memory replay store.
 pub const DEFAULT_EXECUTION_NONCE_STORE_CAPACITY: usize = 16_384;
 
 /// Supported by the legacy replay-store verifier, not every admission profile.
@@ -68,7 +59,7 @@ pub fn is_supported_execution_nonce_schema(schema: &str) -> bool {
 pub struct ExecutionNonceConfig {
     /// How many seconds a nonce is valid after issuance. Default: 30.
     pub nonce_ttl_secs: u64,
-    /// Maximum entries in the replay-prevention LRU cache. Default: 16_384.
+    /// Maximum retained replay markers. Default: 16_384; zero refuses reservations.
     pub nonce_store_capacity: usize,
     /// When `true`, the kernel's strict-mode verify paths reject any call
     /// that does not present a signed nonce. Default: `false` (opt-in).
@@ -89,245 +80,27 @@ impl Default for ExecutionNonceConfig {
 // ExecutionNonceStore trait
 // ---------------------------------------------------------------------------
 
-/// Persistence boundary for replay-prevention of execution nonces.
-///
-/// Implementations MUST ensure that `reserve(nonce_id)` returns `true`
-/// exactly once per nonce identifier. All subsequent calls for the same
-/// identifier return `false`. Fail-closed: any internal error is returned
-/// via `KernelError` so the caller can deny the request.
+/// Single-use replay custody. Every implementation retains the signed validity
+/// window and supports exact-owner rollback before dispatch effects begin.
+/// No method may infer expiry or report an unimplemented lookup as unconsumed.
 pub trait ExecutionNonceStore: Send + Sync {
-    /// Attempt to reserve (consume) the given nonce identifier.
-    ///
-    /// * `Ok(true)`  -- nonce was fresh; it is now marked consumed.
-    /// * `Ok(false)` -- nonce has already been consumed (replay detected).
-    /// * `Err(_)`    -- the store is unreachable or corrupted; fail-closed.
-    ///
-    /// Prefer [`Self::reserve_until`] when the caller knows the signed
-    /// expiry of the nonce: durable stores need to retain the consumed
-    /// marker at least as long as the signed nonce is valid, otherwise
-    /// the row may be pruned and the nonce can be replayed within its
-    /// remaining validity window.
-    fn reserve(&self, nonce_id: &str) -> Result<bool, KernelError>;
-
-    /// Reserve a nonce while telling the store when the nonce stops
-    /// being cryptographically valid. Durable implementations (SQLite,
-    /// remote KV stores) MUST retain the consumed marker until at least
-    /// `nonce_expires_at` so replay protection covers the nonce's full
-    /// validity window.
-    ///
-    /// The default implementation falls back to [`Self::reserve`] for
-    /// in-memory / best-effort stores that already track retention
-    /// internally. `nonce_expires_at` is wall-clock unix seconds.
-    fn reserve_until(&self, nonce_id: &str, _nonce_expires_at: i64) -> Result<bool, KernelError> {
-        self.reserve(nonce_id)
-    }
-
-    /// Whether this store can create and conditionally roll back an owned
-    /// reservation before tool dispatch begins.
-    fn supports_dispatch_reservations(&self) -> bool {
-        false
-    }
-
-    /// Reserve a nonce for one dispatch attempt. Stores advertising dispatch
-    /// reservation support must retain the owner and permit only that owner to
-    /// roll the reservation back.
-    fn reserve_for_dispatch(
-        &self,
-        nonce_id: &str,
-        nonce_expires_at: i64,
-        _reservation_id: &str,
-    ) -> Result<bool, KernelError> {
-        self.reserve_until(nonce_id, nonce_expires_at)
-    }
-
-    /// Remove an owned reservation after a failure known to precede any tool
-    /// side effect.
-    fn rollback_dispatch_reservation(
-        &self,
-        _nonce_id: &str,
-        _reservation_id: &str,
-    ) -> Result<bool, KernelError> {
-        Err(KernelError::Internal(
-            "execution nonce store does not support dispatch reservation rollback".to_string(),
-        ))
-    }
-
-    fn is_consumed(&self, _nonce_id: &str) -> Result<bool, KernelError> {
-        Ok(false)
-    }
-}
-
-// ---------------------------------------------------------------------------
-// InMemoryExecutionNonceStore
-// ---------------------------------------------------------------------------
-
-/// In-memory LRU-backed execution nonce store.
-///
-/// Mirrors the shape of `dpop::DpopNonceStore` but keys on the nonce_id
-/// alone because the full binding lives inside the signed body and is
-/// checked separately by `verify_execution_nonce`.
-pub struct InMemoryExecutionNonceStore {
-    inner: Mutex<LruCache<String, InMemoryExecutionNonceEntry>>,
-    ttl: Duration,
-}
-
-struct InMemoryExecutionNonceEntry {
-    retain_until: Instant,
-    reservation_id: Option<String>,
-}
-
-impl InMemoryExecutionNonceStore {
-    /// Create a new in-memory store.
-    ///
-    /// `capacity` is the maximum number of recently consumed nonces to
-    /// remember. `ttl` is how long a nonce entry is retained when callers use
-    /// the legacy `reserve` path. `reserve_until` extends retention to cover
-    /// the signed nonce validity window.
-    #[must_use]
-    pub fn new(capacity: usize, ttl: Duration) -> Self {
-        let nz = NonZeroUsize::new(capacity).unwrap_or_else(|| {
-            NonZeroUsize::new(DEFAULT_EXECUTION_NONCE_STORE_CAPACITY).unwrap_or(NonZeroUsize::MIN)
-        });
-        Self {
-            inner: Mutex::new(LruCache::new(nz)),
-            ttl,
-        }
-    }
-
-    /// Build a store with the TTL and capacity from `config`.
-    #[must_use]
-    pub fn from_config(config: &ExecutionNonceConfig) -> Self {
-        Self::new(
-            config.nonce_store_capacity,
-            Duration::from_secs(config.nonce_ttl_secs),
-        )
-    }
-}
-
-impl Default for InMemoryExecutionNonceStore {
-    fn default() -> Self {
-        Self::new(
-            DEFAULT_EXECUTION_NONCE_STORE_CAPACITY,
-            Duration::from_secs(DEFAULT_EXECUTION_NONCE_TTL_SECS),
-        )
-    }
-}
-
-impl ExecutionNonceStore for InMemoryExecutionNonceStore {
-    fn reserve(&self, nonce_id: &str) -> Result<bool, KernelError> {
-        self.reserve_with_retention(nonce_id, self.ttl, None)
-    }
-
-    fn reserve_until(&self, nonce_id: &str, nonce_expires_at: i64) -> Result<bool, KernelError> {
-        let retention = duration_until_unix_secs(nonce_expires_at)
-            .map_or(self.ttl, |remaining| remaining.max(self.ttl));
-        self.reserve_with_retention(nonce_id, retention, None)
-    }
-
-    fn supports_dispatch_reservations(&self) -> bool {
-        true
-    }
-
+    fn reserve_until(&self, nonce_id: &str, nonce_expires_at: i64) -> Result<bool, KernelError>;
     fn reserve_for_dispatch(
         &self,
         nonce_id: &str,
         nonce_expires_at: i64,
         reservation_id: &str,
-    ) -> Result<bool, KernelError> {
-        let retention = duration_until_unix_secs(nonce_expires_at)
-            .map_or(self.ttl, |remaining| remaining.max(self.ttl));
-        self.reserve_with_retention(nonce_id, retention, Some(reservation_id))
-    }
-
+    ) -> Result<bool, KernelError>;
     fn rollback_dispatch_reservation(
         &self,
         nonce_id: &str,
         reservation_id: &str,
-    ) -> Result<bool, KernelError> {
-        let mut cache = self.inner.lock().map_err(|_| {
-            error!("execution nonce store mutex poisoned; denying fail-closed");
-            KernelError::Internal("execution nonce store mutex poisoned; fail-closed".to_string())
-        })?;
-        let owned = cache
-            .peek(nonce_id)
-            .is_some_and(|entry| entry.reservation_id.as_deref() == Some(reservation_id));
-        if owned {
-            cache.pop(nonce_id);
-        }
-        Ok(owned)
-    }
-
-    fn is_consumed(&self, nonce_id: &str) -> Result<bool, KernelError> {
-        let cache = self.inner.lock().map_err(|_| {
-            error!("execution nonce store mutex poisoned; denying fail-closed");
-            KernelError::Internal("execution nonce store mutex poisoned; fail-closed".to_string())
-        })?;
-        let now = Instant::now();
-        Ok(cache
-            .peek(nonce_id)
-            .is_some_and(|entry| entry.retain_until > now))
-    }
+    ) -> Result<bool, KernelError>;
+    fn is_consumed(&self, nonce_id: &str) -> Result<bool, KernelError>;
 }
 
-impl InMemoryExecutionNonceStore {
-    fn reserve_with_retention(
-        &self,
-        nonce_id: &str,
-        retention: Duration,
-        reservation_id: Option<&str>,
-    ) -> Result<bool, KernelError> {
-        let mut cache = self.inner.lock().map_err(|_| {
-            error!("execution nonce store mutex poisoned; denying fail-closed");
-            KernelError::Internal("execution nonce store mutex poisoned; fail-closed".to_string())
-        })?;
-
-        let key = nonce_id.to_string();
-        let now = Instant::now();
-        if let Some(entry) = cache.peek(&key) {
-            if entry.retain_until > now {
-                return Ok(false);
-            }
-            cache.pop(&key);
-        }
-        let expired: Vec<String> = cache
-            .iter()
-            .filter(|(_, entry)| entry.retain_until <= now)
-            .map(|(nonce_id, _)| nonce_id.clone())
-            .collect();
-        for nonce_id in expired {
-            cache.pop(&nonce_id);
-        }
-        if cache.len() >= cache.cap().get() {
-            error!("execution nonce store capacity exhausted; denying fail-closed");
-            return Err(KernelError::Internal(
-                "execution nonce store capacity exhausted; fail-closed".to_string(),
-            ));
-        }
-        let Some(retain_until) = now.checked_add(retention) else {
-            error!("execution nonce retention overflow; denying fail-closed");
-            return Err(KernelError::Internal(
-                "execution nonce retention overflow; fail-closed".to_string(),
-            ));
-        };
-        cache.put(
-            key,
-            InMemoryExecutionNonceEntry {
-                retain_until,
-                reservation_id: reservation_id.map(str::to_owned),
-            },
-        );
-        Ok(true)
-    }
-}
-
-fn duration_until_unix_secs(expires_at: i64) -> Option<Duration> {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0);
-    let expires_at = u64::try_from(expires_at).ok()?;
-    expires_at.checked_sub(now).map(Duration::from_secs)
-}
+mod store;
+pub use store::InMemoryExecutionNonceStore;
 
 // ---------------------------------------------------------------------------
 // Minting
@@ -391,10 +164,14 @@ pub fn mint_execution_nonce_with_reservation(
 /// Every variant is a hard deny on the kernel side. The nonce flow is
 /// fail-closed: schema, expiry, binding, signature, and replay checks all
 /// execute on every presented nonce and any failure short-circuits.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum ExecutionNonceError {
     /// Schema did not equal `EXECUTION_NONCE_SCHEMA`.
     BadSchema { got: String },
+    /// Signed epoch window is empty, reversed or negative.
+    InvalidWindow,
+    /// Signed nonce has not reached its issuance epoch.
+    NotYetValid,
     /// Nonce has expired (now >= expires_at).
     Expired { now: i64, expires_at: i64 },
     /// Binding fields did not match the presented invocation.
@@ -406,7 +183,9 @@ pub enum ExecutionNonceError {
     /// Canonical JSON serialization failed during verification.
     Encoding(String),
     /// Replay store was unreachable; fail-closed.
-    Store(String),
+    Store(Box<KernelError>),
+    /// Exact trusted-time failure from replay custody.
+    Clock(chio_security_types::clock::ClockError),
 }
 
 impl std::fmt::Display for ExecutionNonceError {
@@ -416,6 +195,8 @@ impl std::fmt::Display for ExecutionNonceError {
                 f,
                 "execution nonce has unsupported schema: expected {EXECUTION_NONCE_SCHEMA}, got {got}"
             ),
+            Self::InvalidWindow => write!(f, "execution nonce validity window is invalid"),
+            Self::NotYetValid => write!(f, "execution nonce is not yet valid"),
             Self::Expired { now, expires_at } => write!(
                 f,
                 "execution nonce expired (now={now}, expires_at={expires_at})"
@@ -427,15 +208,52 @@ impl std::fmt::Display for ExecutionNonceError {
             Self::Replayed => write!(f, "execution nonce has already been consumed"),
             Self::Encoding(e) => write!(f, "execution nonce canonical encoding failed: {e}"),
             Self::Store(e) => write!(f, "execution nonce store error: {e}"),
+            Self::Clock(e) => write!(f, "execution nonce time rejected: {e}"),
         }
     }
 }
 
-impl std::error::Error for ExecutionNonceError {}
+impl std::error::Error for ExecutionNonceError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Clock(error) => Some(error),
+            Self::Store(error) => Some(error.as_ref()),
+            _ => None,
+        }
+    }
+}
+impl ExecutionNonceError {
+    /// Stable, input-independent rejection reason for receipts and operator logs.
+    pub fn code(&self) -> std::borrow::Cow<'static, str> {
+        let code = match self {
+            Self::BadSchema { .. } => "urn:chio:error:kernel:execution-nonce-schema",
+            Self::InvalidWindow => "urn:chio:error:kernel:execution-nonce-window",
+            Self::NotYetValid => "urn:chio:error:kernel:execution-nonce-not-yet-valid",
+            Self::Expired { .. } => "urn:chio:error:kernel:execution-nonce-expired",
+            Self::BindingMismatch { .. } => "urn:chio:error:kernel:execution-nonce-binding",
+            Self::InvalidSignature => "urn:chio:error:kernel:execution-nonce-signature",
+            Self::Replayed => "urn:chio:error:kernel:execution-nonce-replayed",
+            Self::Encoding(_) => "urn:chio:error:kernel:execution-nonce-encoding",
+            Self::Store(error) => return error.report().code.into(),
+            Self::Clock(error) => error.code(),
+        };
+        code.into()
+    }
+    pub(crate) fn from_store(error: KernelError) -> Self {
+        match error {
+            KernelError::Clock(error) => Self::Clock(error),
+            other => Self::Store(Box::new(other)),
+        }
+    }
+}
 
 impl From<ExecutionNonceError> for KernelError {
     fn from(err: ExecutionNonceError) -> Self {
-        KernelError::Internal(format!("execution nonce verification failed: {err}"))
+        match err {
+            ExecutionNonceError::Clock(error) => Self::Clock(error),
+            ExecutionNonceError::Store(error) => *error,
+            other => Self::ExecutionNonce(other),
+        }
     }
 }
 
@@ -446,7 +264,7 @@ impl From<ExecutionNonceError> for KernelError {
 /// 2. Expiry check -- `now < nonce.expires_at`.
 /// 3. Binding check -- subject, capability, server, tool, parameter_hash.
 /// 4. Signature check -- canonical JSON under the kernel's pubkey.
-/// 5. Replay check -- `nonce_store.reserve(nonce_id)` must return `true`.
+/// 5. Replay check -- `nonce_store.reserve_until(nonce_id, signed_expiry)` must return `true`.
 pub fn verify_execution_nonce(
     presented: &SignedExecutionNonce,
     kernel_pubkey: &PublicKey,
@@ -468,7 +286,7 @@ pub fn verify_execution_nonce_without_consume(
     validate_execution_nonce(presented, kernel_pubkey, expected, now)?;
     if nonce_store
         .is_consumed(&presented.nonce.nonce_id)
-        .map_err(|error| ExecutionNonceError::Store(error.to_string()))?
+        .map_err(ExecutionNonceError::from_store)?
     {
         return Err(ExecutionNonceError::Replayed);
     }
@@ -483,7 +301,7 @@ pub fn consume_execution_nonce(
     match nonce_store.reserve_until(nonce_id, nonce_expires_at) {
         Ok(true) => Ok(()),
         Ok(false) => Err(ExecutionNonceError::Replayed),
-        Err(error) => Err(ExecutionNonceError::Store(error.to_string())),
+        Err(error) => Err(ExecutionNonceError::from_store(error)),
     }
 }
 
@@ -546,6 +364,17 @@ pub(crate) fn validate_execution_nonce_binding_and_expiry(
     expected: &NonceBinding,
     now: i64,
 ) -> Result<(), ExecutionNonceError> {
+    if now < 0 {
+        return Err(ExecutionNonceError::Clock(
+            chio_security_types::clock::ClockError::BeforeEpoch,
+        ));
+    }
+    if presented.nonce.issued_at < 0 || presented.nonce.expires_at <= presented.nonce.issued_at {
+        return Err(ExecutionNonceError::InvalidWindow);
+    }
+    if now < presented.nonce.issued_at {
+        return Err(ExecutionNonceError::NotYetValid);
+    }
     if now >= presented.nonce.expires_at {
         warn!(
             nonce_id = %presented.nonce.nonce_id,
@@ -618,7 +447,7 @@ pub(crate) fn reserve_execution_nonce(
             );
             Err(ExecutionNonceError::Replayed)
         }
-        Err(e) => Err(ExecutionNonceError::Store(e.to_string())),
+        Err(e) => Err(ExecutionNonceError::from_store(e)),
     }
 }
 
@@ -626,7 +455,6 @@ pub(crate) fn reserve_execution_nonce(
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use std::thread;
 
     fn sample_binding() -> NonceBinding {
         NonceBinding {
@@ -641,9 +469,69 @@ mod tests {
     }
 
     #[test]
+    fn signed_window_boundaries_are_exact_and_do_not_consume_on_refusal() {
+        use chio_security_types::clock::{ClockError, FixedClock};
+        let kp = Keypair::from_seed(&[34; 32]);
+        let binding = sample_binding();
+        let mut signed =
+            mint_execution_nonce(&kp, binding.clone(), &ExecutionNonceConfig::default(), 100)
+                .unwrap();
+        let store =
+            InMemoryExecutionNonceStore::with_clock(4, std::sync::Arc::new(FixedClock::new(100)));
+        assert!(matches!(
+            verify_execution_nonce(&signed, &kp.public_key(), &binding, -1, &store),
+            Err(ExecutionNonceError::Clock(ClockError::BeforeEpoch))
+        ));
+        assert!(matches!(
+            verify_execution_nonce(&signed, &kp.public_key(), &binding, 99, &store),
+            Err(ExecutionNonceError::NotYetValid)
+        ));
+        assert!(matches!(
+            verify_execution_nonce(&signed, &kp.public_key(), &binding, 130, &store),
+            Err(ExecutionNonceError::Expired {
+                now: 130,
+                expires_at: 130
+            })
+        ));
+        assert!(!store.is_consumed(signed.nonce_id()).unwrap());
+        verify_execution_nonce(&signed, &kp.public_key(), &binding, 100, &store).unwrap();
+
+        for (issued_at, expires_at) in [(-1, 130), (100, 100), (101, 100)] {
+            signed.nonce.issued_at = issued_at;
+            signed.nonce.expires_at = expires_at;
+            signed.signature = kp.sign_canonical(&signed.nonce).unwrap().0;
+            assert!(matches!(
+                validate_execution_nonce(&signed, &kp.public_key(), &binding, 100),
+                Err(ExecutionNonceError::InvalidWindow)
+            ));
+        }
+    }
+
+    #[test]
+    fn replay_store_failure_keeps_its_source_and_rejection_code() {
+        use std::error::Error;
+        let error = ExecutionNonceError::from_store(KernelError::ExecutionNonceCapacity);
+        assert_eq!(
+            error.code(),
+            KernelError::ExecutionNonceCapacity.report().code
+        );
+        assert!(matches!(
+            error.source().unwrap().downcast_ref::<KernelError>(),
+            Some(KernelError::ExecutionNonceCapacity)
+        ));
+        assert!(matches!(
+            KernelError::from(error),
+            KernelError::ExecutionNonceCapacity
+        ));
+    }
+
+    #[test]
     fn mint_then_verify_roundtrip() {
         let kp = Keypair::generate();
-        let store = InMemoryExecutionNonceStore::default();
+        let store = InMemoryExecutionNonceStore::with_clock(
+            16,
+            std::sync::Arc::new(chio_security_types::clock::FixedClock::new(1_000_000)),
+        );
         let cfg = ExecutionNonceConfig::default();
         let binding = sample_binding();
         let now = 1_000_000;
@@ -680,7 +568,10 @@ mod tests {
     #[test]
     fn stale_nonce_is_rejected() {
         let kp = Keypair::generate();
-        let store = InMemoryExecutionNonceStore::default();
+        let store = InMemoryExecutionNonceStore::with_clock(
+            16,
+            std::sync::Arc::new(chio_security_types::clock::FixedClock::new(1_000_000)),
+        );
         let cfg = ExecutionNonceConfig::default();
         let binding = sample_binding();
 
@@ -700,7 +591,10 @@ mod tests {
     #[test]
     fn nonce_expiry_is_rechecked_when_reserved() {
         let kp = Keypair::generate();
-        let store = InMemoryExecutionNonceStore::default();
+        let store = InMemoryExecutionNonceStore::with_clock(
+            16,
+            std::sync::Arc::new(chio_security_types::clock::FixedClock::new(1_000_000)),
+        );
         let cfg = ExecutionNonceConfig::default();
         let binding = sample_binding();
         let now = 1_000_000;
@@ -718,7 +612,10 @@ mod tests {
     #[test]
     fn replayed_nonce_is_rejected() {
         let kp = Keypair::generate();
-        let store = InMemoryExecutionNonceStore::default();
+        let store = InMemoryExecutionNonceStore::with_clock(
+            16,
+            std::sync::Arc::new(chio_security_types::clock::FixedClock::new(1_000_000)),
+        );
         let cfg = ExecutionNonceConfig::default();
         let binding = sample_binding();
         let now = 1_000_000;
@@ -759,7 +656,10 @@ mod tests {
     #[test]
     fn mismatched_binding_is_rejected() {
         let kp = Keypair::generate();
-        let store = InMemoryExecutionNonceStore::default();
+        let store = InMemoryExecutionNonceStore::with_clock(
+            16,
+            std::sync::Arc::new(chio_security_types::clock::FixedClock::new(1_000_000)),
+        );
         let cfg = ExecutionNonceConfig::default();
         let minted_binding = sample_binding();
         let now = 1_000_000;
@@ -779,7 +679,10 @@ mod tests {
     #[test]
     fn tampered_signature_is_rejected() {
         let kp = Keypair::generate();
-        let store = InMemoryExecutionNonceStore::default();
+        let store = InMemoryExecutionNonceStore::with_clock(
+            16,
+            std::sync::Arc::new(chio_security_types::clock::FixedClock::new(1_000_000)),
+        );
         let cfg = ExecutionNonceConfig::default();
         let binding = sample_binding();
         let now = 1_000_000;
@@ -794,72 +697,5 @@ mod tests {
         let err = verify_execution_nonce(&signed, &kp.public_key(), &expected, now + 1, &store)
             .unwrap_err();
         assert!(matches!(err, ExecutionNonceError::InvalidSignature));
-    }
-
-    #[test]
-    fn store_reserves_each_nonce_exactly_once() {
-        let store = InMemoryExecutionNonceStore::default();
-        assert!(store.reserve("a").unwrap());
-        assert!(!store.reserve("a").unwrap());
-        assert!(store.reserve("b").unwrap());
-    }
-
-    #[test]
-    fn reserve_until_retains_nonce_after_local_ttl() {
-        let store = InMemoryExecutionNonceStore::new(16, Duration::from_millis(1));
-        let expires_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            .saturating_add(30);
-        let expires_at = i64::try_from(expires_at).unwrap();
-
-        assert!(store.reserve_until("long-lived", expires_at).unwrap());
-        thread::sleep(Duration::from_millis(5));
-        assert!(!store.reserve_until("long-lived", expires_at).unwrap());
-    }
-
-    #[test]
-    fn capacity_exhaustion_preserves_live_replay_markers() {
-        let store = InMemoryExecutionNonceStore::new(1, Duration::from_secs(30));
-
-        assert!(store.reserve("first").unwrap());
-        let error = store.reserve("second").unwrap_err();
-        assert!(matches!(
-            error,
-            KernelError::Internal(reason)
-                if reason.contains("execution nonce store capacity exhausted")
-        ));
-        assert!(!store.reserve("first").unwrap());
-    }
-
-    #[test]
-    fn reserve_with_retention_fails_closed_on_overflow() {
-        let store = InMemoryExecutionNonceStore::default();
-        let err = store
-            .reserve_with_retention("overflow", Duration::MAX, None)
-            .unwrap_err();
-
-        assert!(matches!(
-            err,
-            KernelError::Internal(reason)
-                if reason.contains("execution nonce retention overflow")
-        ));
-    }
-
-    #[test]
-    fn store_does_not_stall_between_threads() {
-        let store = std::sync::Arc::new(InMemoryExecutionNonceStore::default());
-        let mut handles = Vec::new();
-        for i in 0..4 {
-            let store = std::sync::Arc::clone(&store);
-            handles.push(thread::spawn(move || {
-                let id = format!("t-{i}");
-                store.reserve(&id).unwrap()
-            }));
-        }
-        for h in handles {
-            assert!(h.join().unwrap());
-        }
     }
 }

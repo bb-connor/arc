@@ -241,9 +241,7 @@ impl ChioKernel {
         }
 
         if let Err(e) = self.validate_delegation_admission(cap) {
-            let msg = e.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
-            return self.build_deny_response(request, &msg, now, None);
+            return self.deny_admission_error(request, &e, now, extra_metadata.clone());
         }
 
         if let Err(e) = check_subject_binding(cap, &request.agent_id) {
@@ -560,7 +558,7 @@ impl ChioKernel {
             durable_admission.as_ref(),
         ) {
             let msg = error.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "execution nonce denied");
+            warn!(request_id = %request.request_id, rejection_code = %error.report().code, reason = %redacted!(&msg), "execution nonce denied");
             return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
                 self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                     request,
@@ -573,7 +571,8 @@ impl ChioKernel {
                     durable_operation: durable_admission
                         .as_ref()
                         .map(DurableToolAdmission::operation),
-                    runtime_admission_metadata,
+                    runtime_admission_metadata: error
+                        .rejection_metadata(runtime_admission_metadata),
                     verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
                 })
@@ -774,7 +773,7 @@ impl ChioKernel {
             Ok(reservation) => reservation,
             Err(error) => {
                 let reason = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "dispatch credential reservation denied (nested flow)");
+                warn!(request_id = %request.request_id, rejection_code = %error.report().code, reason = %redacted!(&reason), "dispatch credential reservation denied (nested flow)");
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
@@ -789,7 +788,8 @@ impl ChioKernel {
                             durable_operation: durable_admission
                                 .as_ref()
                                 .map(DurableToolAdmission::operation),
-                            runtime_admission_metadata: runtime_admission_metadata.clone(),
+                            runtime_admission_metadata: error
+                                .rejection_metadata(runtime_admission_metadata.clone()),
                             verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
                         })

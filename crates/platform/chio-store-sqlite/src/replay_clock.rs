@@ -1,35 +1,45 @@
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex};
 
 use chio_kernel::ReplayClockDirection;
+use chio_security_types::clock::{Clock, ClockError, ClockFence, ClockReading, MonotonicInstant};
 
-const MIN_REBASELINE_CONFIRMATION: Duration = Duration::from_secs(1);
+const MIN_REBASELINE_CONFIRMATION_SECS: u64 = 1;
 const MAX_REBASELINE_DRIFT_SECS: u64 = 1;
 
+#[derive(Debug)]
 pub(crate) enum ReplayClockValidationError {
-    Poisoned,
+    Clock(ClockError),
     Anomaly {
         direction: ReplayClockDirection,
         observed: i64,
         high_water: i64,
     },
 }
+impl From<ClockError> for ReplayClockValidationError {
+    fn from(error: ClockError) -> Self {
+        Self::Clock(error)
+    }
+}
 
+/// Trusted clock plus the durable replay-retention skew policy. Caller-supplied
+/// observations may lag a serialized writer; the clock itself may not regress.
 pub(crate) struct StableReplayClock {
+    clock: Arc<dyn Clock>,
     state: Mutex<StableReplayClockState>,
     max_skew_secs: i64,
 }
 
 struct StableReplayClockState {
     anchor_wall: i64,
-    anchor_monotonic: Instant,
+    anchor_monotonic: MonotonicInstant,
+    fence: ClockFence,
     pending_rebaseline: Option<PendingReplayClockRebaseline>,
 }
 
 #[derive(Clone, Copy)]
 struct PendingReplayClockRebaseline {
     observed_wall: i64,
-    observed_monotonic: Instant,
+    observed_monotonic: MonotonicInstant,
     unexplained_gap_secs: i64,
 }
 
@@ -40,27 +50,45 @@ enum RebaselineConfirmation {
 }
 
 impl StableReplayClock {
-    pub(crate) fn new(anchor_wall: i64, max_skew_secs: i64) -> Self {
-        Self {
+    pub(crate) fn new(clock: Arc<dyn Clock>, max_skew_secs: i64) -> Result<Self, ClockError> {
+        if max_skew_secs < 0 {
+            return Err(ClockError::InvalidWindow);
+        }
+        let mut fence = ClockFence::default();
+        let reading = fence.observe(clock.read()?)?;
+        let anchor_wall = unix_seconds(reading)?;
+        anchor_wall
+            .checked_add(max_skew_secs)
+            .ok_or(ClockError::Overflow)?;
+        Ok(Self {
+            clock,
             state: Mutex::new(StableReplayClockState {
                 anchor_wall,
-                anchor_monotonic: Instant::now(),
+                anchor_monotonic: reading.monotonic(),
+                fence,
                 pending_rebaseline: None,
             }),
             max_skew_secs,
-        }
+        })
+    }
+
+    pub(crate) fn now_secs(&self) -> Result<i64, ClockError> {
+        let mut state = self.state.lock().map_err(|_| ClockError::Unavailable)?;
+        unix_seconds(state.fence.observe(self.clock.read()?)?)
     }
 
     pub(crate) fn validate_persisted(
         &self,
         high_water: i64,
     ) -> Result<(), ReplayClockValidationError> {
-        let state = self
-            .state
-            .lock()
-            .map_err(|_| ReplayClockValidationError::Poisoned)?;
-        let expected = expected_wall_now(&state, Instant::now());
-        if high_water > expected.saturating_add(self.max_skew_secs) {
+        let expected = self.expected_wall_now()?;
+        let maximum = expected
+            .checked_add(self.max_skew_secs)
+            .ok_or(ClockError::Overflow)?;
+        if high_water < 0 {
+            return Err(ClockError::BeforeEpoch.into());
+        }
+        if high_water > maximum {
             return Err(ReplayClockValidationError::Anomaly {
                 direction: ReplayClockDirection::Rollback,
                 observed: expected,
@@ -71,11 +99,9 @@ impl StableReplayClock {
     }
 
     pub(crate) fn expected_wall_now(&self) -> Result<i64, ReplayClockValidationError> {
-        let state = self
-            .state
-            .lock()
-            .map_err(|_| ReplayClockValidationError::Poisoned)?;
-        Ok(expected_wall_now(&state, Instant::now()))
+        let mut state = self.state.lock().map_err(|_| ClockError::Unavailable)?;
+        let reading = state.fence.observe(self.clock.read()?)?;
+        Ok(expected_wall_now(&state, reading.monotonic())?)
     }
 
     pub(crate) fn validate_observed(
@@ -83,25 +109,43 @@ impl StableReplayClock {
         observed: i64,
         durable_high_water: i64,
     ) -> Result<(), ReplayClockValidationError> {
-        self.validate_observed_at(observed, durable_high_water, Instant::now())
-    }
-
-    pub(crate) fn validate_observed_at(
-        &self,
-        observed: i64,
-        durable_high_water: i64,
-        sample_monotonic: Instant,
-    ) -> Result<(), ReplayClockValidationError> {
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| ReplayClockValidationError::Poisoned)?;
-        let expected = expected_wall_now(&state, sample_monotonic);
-        if observed > expected.saturating_add(self.max_skew_secs) {
-            let unexplained_gap_secs = observed.saturating_sub(expected);
-            let confirmation = state.pending_rebaseline.map(|pending| {
-                rebaseline_confirmation(pending, observed, sample_monotonic, unexplained_gap_secs)
+        let mut state = self.state.lock().map_err(|_| ClockError::Unavailable)?;
+        let reading = state.fence.observe(self.clock.read()?)?;
+        let sample_monotonic = reading.monotonic();
+        if observed < 0 || durable_high_water < 0 {
+            return Err(ClockError::BeforeEpoch.into());
+        }
+        let expected = expected_wall_now(&state, sample_monotonic)?;
+        let upper = expected
+            .checked_add(self.max_skew_secs)
+            .ok_or(ClockError::Overflow)?;
+        // Negative lower bounds are valid: Unix epoch observations within skew
+        // remain representable in the signed SQLite domain.
+        let lower = expected
+            .checked_sub(self.max_skew_secs)
+            .ok_or(ClockError::Overflow)?;
+        let durable_lower = durable_high_water
+            .checked_sub(self.max_skew_secs)
+            .ok_or(ClockError::Overflow)?;
+        // Do not publish a rebaseline before the durable bound also accepts it.
+        if observed < durable_lower || observed < lower {
+            state.pending_rebaseline = None;
+            return Err(ReplayClockValidationError::Anomaly {
+                direction: ReplayClockDirection::Rollback,
+                observed,
+                high_water: if observed < durable_lower {
+                    durable_high_water
+                } else {
+                    expected
+                },
             });
+        }
+        if observed > upper {
+            let gap = observed.checked_sub(expected).ok_or(ClockError::Overflow)?;
+            let confirmation = state
+                .pending_rebaseline
+                .map(|pending| rebaseline_confirmation(pending, observed, sample_monotonic, gap))
+                .transpose()?;
             match confirmation {
                 Some(RebaselineConfirmation::Confirmed) => {
                     state.anchor_wall = observed;
@@ -119,7 +163,7 @@ impl StableReplayClock {
                     state.pending_rebaseline = Some(PendingReplayClockRebaseline {
                         observed_wall: observed,
                         observed_monotonic: sample_monotonic,
-                        unexplained_gap_secs,
+                        unexplained_gap_secs: gap,
                     });
                     return Err(ReplayClockValidationError::Anomaly {
                         direction: ReplayClockDirection::ForwardJump,
@@ -128,130 +172,55 @@ impl StableReplayClock {
                     });
                 }
             }
-        } else if observed < expected.saturating_sub(self.max_skew_secs) {
-            state.pending_rebaseline = None;
-            return Err(ReplayClockValidationError::Anomaly {
-                direction: ReplayClockDirection::Rollback,
-                observed,
-                high_water: expected,
-            });
         } else {
             state.pending_rebaseline = None;
-        }
-
-        if observed < durable_high_water.saturating_sub(self.max_skew_secs) {
-            return Err(ReplayClockValidationError::Anomaly {
-                direction: ReplayClockDirection::Rollback,
-                observed,
-                high_water: durable_high_water,
-            });
         }
         Ok(())
     }
 }
 
-fn expected_wall_now(state: &StableReplayClockState, sample_monotonic: Instant) -> i64 {
-    let elapsed = i64::try_from(
-        sample_monotonic
-            .saturating_duration_since(state.anchor_monotonic)
-            .as_secs(),
-    )
-    .unwrap_or(i64::MAX);
-    state.anchor_wall.saturating_add(elapsed)
+fn unix_seconds(reading: ClockReading) -> Result<i64, ClockError> {
+    i64::try_from(reading.unix_millis().as_secs()).map_err(|_| ClockError::Overflow)
+}
+
+fn expected_wall_now(
+    state: &StableReplayClockState,
+    monotonic: MonotonicInstant,
+) -> Result<i64, ClockError> {
+    let elapsed = i64::try_from(monotonic.duration_since(state.anchor_monotonic)?.as_secs())
+        .map_err(|_| ClockError::Overflow)?;
+    state
+        .anchor_wall
+        .checked_add(elapsed)
+        .ok_or(ClockError::Overflow)
 }
 
 fn rebaseline_confirmation(
     pending: PendingReplayClockRebaseline,
     observed_wall: i64,
-    observed_monotonic: Instant,
-    unexplained_gap_secs: i64,
-) -> RebaselineConfirmation {
-    let monotonic_progress =
-        observed_monotonic.saturating_duration_since(pending.observed_monotonic);
+    monotonic: MonotonicInstant,
+    gap: i64,
+) -> Result<RebaselineConfirmation, ClockError> {
+    let monotonic_progress = monotonic
+        .duration_since(pending.observed_monotonic)?
+        .as_secs();
     let Some(wall_progress) = observed_wall
         .checked_sub(pending.observed_wall)
-        .and_then(|progress| u64::try_from(progress).ok())
+        .and_then(|p| u64::try_from(p).ok())
     else {
-        return RebaselineConfirmation::Inconsistent;
+        return Ok(RebaselineConfirmation::Inconsistent);
     };
-    let monotonic_progress_secs = i64::try_from(monotonic_progress.as_secs()).unwrap_or(i64::MAX);
-    let wall_progress_secs = i64::try_from(wall_progress).unwrap_or(i64::MAX);
-    if wall_progress_secs.abs_diff(monotonic_progress_secs) > MAX_REBASELINE_DRIFT_SECS
-        || unexplained_gap_secs.abs_diff(pending.unexplained_gap_secs) > MAX_REBASELINE_DRIFT_SECS
+    if wall_progress.abs_diff(monotonic_progress) > MAX_REBASELINE_DRIFT_SECS
+        || gap.abs_diff(pending.unexplained_gap_secs) > MAX_REBASELINE_DRIFT_SECS
     {
-        return RebaselineConfirmation::Inconsistent;
+        return Ok(RebaselineConfirmation::Inconsistent);
     }
-    if monotonic_progress < MIN_REBASELINE_CONFIRMATION {
-        return RebaselineConfirmation::Waiting;
-    }
-    RebaselineConfirmation::Confirmed
+    Ok(if monotonic_progress < MIN_REBASELINE_CONFIRMATION_SECS {
+        RebaselineConfirmation::Waiting
+    } else {
+        RebaselineConfirmation::Confirmed
+    })
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn stable_follow_up_sample_rebaselines_after_suspend_gap(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let anchor_wall = 10_000;
-        let clock = StableReplayClock::new(anchor_wall, 300);
-        let first_monotonic = {
-            let state = clock
-                .state
-                .lock()
-                .map_err(|_| std::io::Error::other("replay clock mutex poisoned"))?;
-            state
-                .anchor_monotonic
-                .checked_add(Duration::from_secs(1))
-                .ok_or_else(|| std::io::Error::other("monotonic test instant overflow"))?
-        };
-        let suspended_wall = anchor_wall + 3_600;
-        assert!(matches!(
-            clock.validate_observed_at(suspended_wall, anchor_wall, first_monotonic),
-            Err(ReplayClockValidationError::Anomaly {
-                direction: ReplayClockDirection::ForwardJump,
-                ..
-            })
-        ));
-        assert!(clock
-            .validate_observed_at(
-                suspended_wall + 2,
-                anchor_wall,
-                first_monotonic
-                    .checked_add(Duration::from_secs(2))
-                    .ok_or_else(|| std::io::Error::other("monotonic test instant overflow"))?,
-            )
-            .is_ok());
-        Ok(())
-    }
-
-    #[test]
-    fn inconsistent_follow_up_sample_remains_denied() -> Result<(), Box<dyn std::error::Error>> {
-        let anchor_wall = 10_000;
-        let clock = StableReplayClock::new(anchor_wall, 300);
-        let first_monotonic = {
-            let state = clock
-                .state
-                .lock()
-                .map_err(|_| std::io::Error::other("replay clock mutex poisoned"))?;
-            state
-                .anchor_monotonic
-                .checked_add(Duration::from_secs(1))
-                .ok_or_else(|| std::io::Error::other("monotonic test instant overflow"))?
-        };
-        assert!(clock
-            .validate_observed_at(anchor_wall + 3_600, anchor_wall, first_monotonic)
-            .is_err());
-        assert!(clock
-            .validate_observed_at(
-                anchor_wall + 7_200,
-                anchor_wall,
-                first_monotonic
-                    .checked_add(Duration::from_secs(2))
-                    .ok_or_else(|| std::io::Error::other("monotonic test instant overflow"))?,
-            )
-            .is_err());
-        Ok(())
-    }
-}
+pub(crate) mod tests;

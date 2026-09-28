@@ -399,7 +399,10 @@ impl ChioKernel {
                     matching_grants,
                     cap,
                     self.merge_budget_receipt_metadata(
-                        merge_metadata_objects(extra_metadata.clone(), budget_error_metadata),
+                        error.rejection_metadata(merge_metadata_objects(
+                            extra_metadata.clone(),
+                            budget_error_metadata,
+                        )),
                         self.budget_backend_receipt_metadata()?,
                     ),
                 )

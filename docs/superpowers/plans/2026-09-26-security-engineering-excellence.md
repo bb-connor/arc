@@ -41,6 +41,14 @@ place, while the remaining ambient-time inventory stays open. Broad module/pool
 migrations and operational pilot observation remain separate work. The user's no-compatibility instruction supersedes the
 original 1C migration proposal; inline execution supersedes the lane dispatch.
 
+The September 28 replay/expiry batch is recorded in
+[replay, expiry and lease accounting](../../reviews/2026-09-28-replay-expiry-execution.md).
+It injects replay/outbox/kernel/serving clocks, removes the expiry-free nonce
+interface and deferred consumption, checks deadline arithmetic, and preserves
+rejection provenance in signed evidence. The arithmetic census now has 238
+classified sites (107 repaired, 400 pending); the ambient-clock gate pins 198
+remaining sites. These are bounded advances in 3A/4A/4B and Packet 8.
+
 ## Revised execution order
 
 ```
@@ -462,8 +470,8 @@ launch regression typechecks there and requires x86_64 to execute.
 - [x] Retain the `saturating_*` and `wrapping_*` inventory in the security crates,
       kernel and stores: 638 source lines at `4c35ce7867`, including fixtures.
 - [ ] Finish classifying each site as correct-by-intent or defect. The retained
-      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 146
-      sites (82 repaired sites); 492 remain explicitly pending.
+      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 238
+      sites (107 repaired sites); 400 remain explicitly pending.
 - [ ] A `wrapping_*` in an accounting, quota, counter or deadline path is a defect:
       fix it and add the regression.
 - [ ] A `saturating_sub` in an accounting path silently clamps to zero, hiding the
@@ -481,6 +489,9 @@ launch regression typechecks there and requires x86_64 to execute.
       [Authentication/replay/lease continuation](../../reviews/2026-09-27-authentication-replay-leases-execution.md)
       records fallible session epochs, checked approval and proof deadlines,
       exact replay accounting and transactional lease/scheduler fencing.
+      [Replay/expiry continuation](../../reviews/2026-09-28-replay-expiry-execution.md)
+      records shared replay clocks, signed-expiry nonce custody, checked renewal
+      cutoffs, exact-window regressions and 92 additional census dispositions.
 
 **Exit:** Every clamping or wrapping operation in an accounting path is either
 fixed or justified in one line at the call site.
@@ -513,10 +524,13 @@ depend on a deterministically drivable time source.
 
 **Checkpoint (September 27):** The shared contract, three original trait
 migrations, response deadlines, regression gate and bounded proofs are delivered.
-The gate pins 206 remaining sites including fixtures and the independent Finding
+The September 28 gate pins 198 remaining sites including fixtures and the independent Finding
 commit clock. The [execution record](../../reviews/2026-09-27-shared-clock-response-assurance.md)
 records the migrated consumers and deadline classification. Repository-wide
 ambient-time replacement and classification remain open; this does not close Q5.
+The [replay/expiry continuation](../../reviews/2026-09-28-replay-expiry-execution.md)
+adds durable replay and outbox clocks plus the kernel and serving-owner clock
+bindings. Every budget handle derived from one serving owner shares its fence.
 
 **Exit:** One clock port, units in the type, skew policy stated once, no direct
 `SystemTime::now()` in the TCB, deadline logic driven deterministically.

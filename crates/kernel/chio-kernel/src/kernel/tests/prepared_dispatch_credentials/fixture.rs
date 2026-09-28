@@ -4,6 +4,7 @@ pub(super) struct Fixture {
     pub(super) kernel: ChioKernel,
     pub(super) request: ToolCallRequest,
     pub(super) nonce: Arc<NonceState>,
+    pub(super) clock: Arc<FixtureClock>,
     approval: Arc<ApprovalState>,
 }
 
@@ -11,6 +12,8 @@ impl Fixture {
     pub(super) fn new() -> TestResult<Self> {
         let (mut kernel, _, _, request, _) =
             request_with_replayed_approval("prepared-credentials")?;
+        let clock = Arc::new(FixtureClock(AtomicU64::new(current_unix_timestamp())));
+        kernel.clock = clock.clone();
         // Reuse the complete signed fixture, replacing its deliberately spent
         // approval backend and nonce backend with fresh, observable stores.
         let nonce = Arc::new(NonceState {
@@ -40,6 +43,7 @@ impl Fixture {
         kernel.set_governed_approval_replay_store(Box::new(ApprovalProbe(approval.clone())));
         Ok(Self {
             kernel,
+            clock,
             request,
             nonce,
             approval,
@@ -101,20 +105,9 @@ pub(super) struct NonceState {
 struct NonceProbe(Arc<NonceState>);
 
 impl ExecutionNonceStore for NonceProbe {
-    fn reserve(&self, nonce_id: &str) -> Result<bool, KernelError> {
-        self.0.reserves.fetch_add(1, Ordering::SeqCst);
-        self.0.store.reserve(nonce_id)
-    }
-
     fn reserve_until(&self, nonce_id: &str, expiry: i64) -> Result<bool, KernelError> {
         self.0.reserves.fetch_add(1, Ordering::SeqCst);
         self.0.store.reserve_until(nonce_id, expiry)
-    }
-
-    fn supports_dispatch_reservations(&self) -> bool {
-        let mode = self.0.mode.load(Ordering::SeqCst);
-        assert_ne!(mode, 2, "injected reservation capability panic");
-        mode == 1
     }
 
     fn reserve_for_dispatch(
@@ -124,12 +117,20 @@ impl ExecutionNonceStore for NonceProbe {
         owner: &str,
     ) -> Result<bool, KernelError> {
         self.0.reserves.fetch_add(1, Ordering::SeqCst);
+        assert_ne!(
+            self.0.mode.load(Ordering::SeqCst),
+            2,
+            "injected reservation panic"
+        );
         self.0.store.reserve_for_dispatch(nonce, expiry, owner)
     }
 
     fn rollback_dispatch_reservation(&self, nonce: &str, owner: &str) -> Result<bool, KernelError> {
         self.0.rollbacks.fetch_add(1, Ordering::SeqCst);
         self.0.store.rollback_dispatch_reservation(nonce, owner)
+    }
+    fn is_consumed(&self, id: &str) -> Result<bool, KernelError> {
+        self.0.store.is_consumed(id)
     }
 }
 
@@ -181,5 +182,24 @@ impl GovernedApprovalReplayStore for ApprovalProbe {
         self.0
             .store
             .rollback_dispatch_reservation(subject, request, intent, owner)
+    }
+}
+
+pub(super) struct FixtureClock(AtomicU64);
+impl FixtureClock {
+    pub(super) fn set(&self, seconds: u64) {
+        self.0.store(seconds, Ordering::SeqCst);
+    }
+}
+impl chio_security_types::clock::Clock for FixtureClock {
+    fn read(
+        &self,
+    ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>
+    {
+        use chio_security_types::clock::{ClockReading, MonotonicInstant, UnixMillis};
+        Ok(ClockReading::new(
+            UnixMillis::from_secs(self.0.load(Ordering::SeqCst))?,
+            MonotonicInstant::from_nanos(0),
+        ))
     }
 }

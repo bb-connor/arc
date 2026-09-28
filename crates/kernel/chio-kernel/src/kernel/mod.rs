@@ -33,6 +33,7 @@ mod kernel_scopes;
 mod kernel_struct;
 mod nonce_admission;
 mod output_guard;
+mod rejection_metadata;
 mod security_dispatch;
 mod security_runtime;
 mod signing_authority;
@@ -1867,3 +1868,15 @@ mod tests;
 
 #[cfg(feature = "admission-test-support")]
 pub use active_response_executor::test_support as active_response_test_support;
+
+impl ChioKernel {
+    pub(crate) fn trusted_now_millis(
+        &self,
+    ) -> Result<chio_security_types::clock::UnixMillis, KernelError> {
+        let mut fence = self
+            .clock_fence
+            .lock()
+            .map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+        Ok(fence.observe(self.clock.read()?)?.unix_millis())
+    }
+}

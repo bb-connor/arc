@@ -2733,3 +2733,154 @@ codes:
     consumed_by:
       - chio-kernel
       - chio-store-sqlite
+
+  - urn: "urn:chio:error:kernel:execution-nonce-schema"
+    domain: kernel
+    severity: error
+    summary: "Execution nonce refused: schema."
+    help: "Preserve replay custody and present a fresh nonce bound to the exact authorized request."
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-SCHEMA"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-store-sqlite
+
+  - urn: "urn:chio:error:kernel:execution-nonce-expired"
+    domain: kernel
+    severity: error
+    summary: "Execution nonce refused: expired."
+    help: "Preserve replay custody and present a fresh nonce bound to the exact authorized request."
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-EXPIRED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-store-sqlite
+
+  - urn: "urn:chio:error:kernel:execution-nonce-binding"
+    domain: kernel
+    severity: error
+    summary: "Execution nonce refused: binding."
+    help: "Preserve replay custody and present a fresh nonce bound to the exact authorized request."
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-BINDING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-store-sqlite
+
+  - urn: "urn:chio:error:kernel:execution-nonce-signature"
+    domain: kernel
+    severity: error
+    summary: "Execution nonce refused: signature."
+    help: "Preserve replay custody and present a fresh nonce bound to the exact authorized request."
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-SIGNATURE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-store-sqlite
+
+  - urn: "urn:chio:error:kernel:execution-nonce-replayed"
+    domain: kernel
+    severity: error
+    summary: "Execution nonce refused: replayed."
+    help: "Preserve replay custody and present a fresh nonce bound to the exact authorized request."
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-REPLAYED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-store-sqlite
+
+  - urn: "urn:chio:error:kernel:execution-nonce-encoding"
+    domain: kernel
+    severity: error
+    summary: "Execution nonce refused: encoding."
+    help: "Preserve replay custody and present a fresh nonce bound to the exact authorized request."
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-ENCODING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-store-sqlite
+
+  - urn: "urn:chio:error:kernel:execution-nonce-store"
+    domain: kernel
+    severity: error
+    summary: "Execution nonce refused: store."
+    help: "Preserve replay custody and present a fresh nonce bound to the exact authorized request."
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-STORE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-store-sqlite
+
+  - urn: "urn:chio:error:kernel:execution-nonce-capacity"
+    domain: kernel
+    severity: error
+    summary: "Execution nonce refused: capacity."
+    help: "Preserve replay custody and present a fresh nonce bound to the exact authorized request."
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-CAPACITY"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-store-sqlite
+
+  - urn: "urn:chio:error:kernel:execution-nonce-window"
+    domain: kernel
+    severity: error
+    summary: "Authority window refused: execution-nonce-window."
+    help: "Obtain fresh evidence within the original signed authority window."
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-WINDOW"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:execution-nonce-not-yet-valid"
+    domain: kernel
+    severity: error
+    summary: "Authority window refused: execution-nonce-not-yet-valid."
+    help: "Obtain fresh evidence within the original signed authority window."
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-NOT-YET-VALID"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:revocation-snapshot-future"
+    domain: kernel
+    severity: error
+    summary: "Authority window refused: revocation-snapshot-future."
+    help: "Obtain fresh evidence within the original signed authority window."
+    string_code: "CHIO-KERNEL-REVOCATION-SNAPSHOT-FUTURE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:revocation-snapshot-stale"
+    domain: kernel
+    severity: error
+    summary: "Authority window refused: revocation-snapshot-stale."
+    help: "Obtain fresh evidence within the original signed authority window."
+    string_code: "CHIO-KERNEL-REVOCATION-SNAPSHOT-STALE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:governed-approval-lifetime"
+    domain: kernel
+    severity: error
+    summary: "Authority window refused: governed-approval-lifetime."
+    help: "Obtain fresh evidence within the original signed authority window."
+    string_code: "CHIO-KERNEL-GOVERNED-APPROVAL-LIFETIME"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel

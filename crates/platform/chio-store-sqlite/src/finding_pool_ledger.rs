@@ -142,6 +142,22 @@ impl SqliteFindingPoolLedger {
         store_identity: &dyn chio_core::crypto::SigningBackend,
         rollback_anchor_root: impl AsRef<Path>,
     ) -> Result<Self, FindingPoolLedgerError> {
+        Self::open_qualified_with_clock(
+            path,
+            ledger_domain,
+            store_identity,
+            rollback_anchor_root,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_qualified_with_clock(
+        path: impl AsRef<Path>,
+        ledger_domain: impl Into<String>,
+        store_identity: &dyn chio_core::crypto::SigningBackend,
+        rollback_anchor_root: impl AsRef<Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, FindingPoolLedgerError> {
         let ledger_domain = ledger_domain.into();
         validate_ledger_domain(&ledger_domain)?;
         let path = path.as_ref();
@@ -263,7 +279,7 @@ impl SqliteFindingPoolLedger {
             ledger_store_binding_sha256,
             database_identity,
             rollback_anchor,
-            outbox_lease_clock: Arc::new(OutboxLeaseClock::new(outbox_lease_epoch)),
+            outbox_lease_clock: Arc::new(OutboxLeaseClock::new(outbox_lease_epoch, clock)),
             _domain_lease: domain_lease,
         })
     }

@@ -4,7 +4,7 @@ use super::*;
 #[test]
 fn native_nonce_expiry_at_final_commit_rolls_back_capture_without_reversing_taint() -> TestResult {
     let mut fixture = super::super::super::super::public_fixture()?;
-    let legacy = configure(&mut fixture, false)?;
+    let standalone_calls = configure(&mut fixture, false)?;
     let original_id = issue(&mut fixture)?;
     let resolver = Arc::new(NativeFlowResolver::new(
         fixture.binding.clone(),
@@ -47,7 +47,7 @@ fn native_nonce_expiry_at_final_commit_rolls_back_capture_without_reversing_tain
         response.reason
     );
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
-    assert_eq!(legacy.load(Ordering::SeqCst), 0);
+    assert_eq!(standalone_calls.load(Ordering::SeqCst), 0);
     let fence = fixture.authority.mutation_fence();
     let (operation, _) = store
         .load_retained_tool_request(&original_id, &fence, now_ms()?)?
@@ -79,7 +79,7 @@ fn native_nonce_expiry_at_final_commit_rolls_back_capture_without_reversing_tain
 #[test]
 fn native_nonce_completed_receipt_replay_survives_expiry_without_new_authority() -> TestResult {
     let mut fixture = super::super::super::super::public_fixture()?;
-    let legacy = configure(&mut fixture, false)?;
+    let standalone_calls = configure(&mut fixture, false)?;
     issue(&mut fixture)?;
     let response = fixture
         .kernel
@@ -114,6 +114,6 @@ fn native_nonce_completed_receipt_replay_survives_expiry_without_new_authority()
     );
     assert!(replay.receipt.verify_signature()?);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
-    assert_eq!(legacy.load(Ordering::SeqCst), 0);
+    assert_eq!(standalone_calls.load(Ordering::SeqCst), 0);
     Ok(())
 }

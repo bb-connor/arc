@@ -3,10 +3,10 @@ use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+#[path = "security_dispatch/clock.rs"]
+mod clock;
 #[path = "security_dispatch/credentials.rs"]
 mod credentials;
-#[path = "security_dispatch/legacy_nonce.rs"]
-mod legacy_nonce;
 
 #[derive(Clone, Copy, Debug)]
 enum Fault {

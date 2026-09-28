@@ -47,12 +47,34 @@ pub(super) struct Config {
     pub native_broker: Option<super::native_broker::Config>,
 }
 
-struct NoLegacyNonce;
+struct OperationOwnedNonceOnly;
 
-impl ExecutionNonceStore for NoLegacyNonce {
-    fn reserve(&self, _: &str) -> Result<bool, chio_kernel::KernelError> {
-        Err(chio_kernel::KernelError::Internal(
-            "process hosts require operation-owned execution nonce custody".into(),
+impl ExecutionNonceStore for OperationOwnedNonceOnly {
+    fn reserve_until(&self, _: &str, _: i64) -> Result<bool, chio_kernel::KernelError> {
+        Err(chio_kernel::KernelError::DurableAdmission(
+            "operation-owned nonce custody is required".into(),
+        ))
+    }
+    fn reserve_for_dispatch(
+        &self,
+        id: &str,
+        expiry: i64,
+        _: &str,
+    ) -> Result<bool, chio_kernel::KernelError> {
+        self.reserve_until(id, expiry)
+    }
+    fn rollback_dispatch_reservation(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<bool, chio_kernel::KernelError> {
+        Err(chio_kernel::KernelError::DurableAdmission(
+            "operation-owned nonce custody is required".into(),
+        ))
+    }
+    fn is_consumed(&self, _: &str) -> Result<bool, chio_kernel::KernelError> {
+        Err(chio_kernel::KernelError::DurableAdmission(
+            "operation-owned nonce custody is required".into(),
         ))
     }
 }
@@ -449,7 +471,7 @@ pub(super) fn kernel(
                 require_nonce: true,
                 ..ExecutionNonceConfig::default()
             },
-            Box::new(NoLegacyNonce),
+            Box::new(OperationOwnedNonceOnly),
         );
     }
     kernel.set_capability_trust_root(key.public_key(), scope_hash(&root_scope).map_err(error)?);

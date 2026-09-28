@@ -1,18 +1,14 @@
-// Two public requests, one original operation, no legacy nonce or capture hook.
+// Two public requests, one original operation, operation-owned nonce custody.
 use super::*;
 
-mod expiry {
-    include!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/src/security/adapters/native_flow_nonce_expiry_tests.rs"
-    ));
-}
+#[path = "native_flow_nonce_expiry_tests.rs"]
+mod expiry;
 
 pub(in crate::security::adapters::tests::native_flow::support) fn configure(
     fixture: &mut Fixture,
     egress: bool,
 ) -> TestResult<Arc<AtomicUsize>> {
-    let legacy = install_nonce(fixture, ExecutionNonceConfig::default().nonce_ttl_secs);
+    let standalone_calls = install_nonce(fixture, ExecutionNonceConfig::default().nonce_ttl_secs);
     // Combined participant histories take longer to verify in debug builds.
     // Expiry tests still exercise the real, shorter signed nonce deadline.
     let mut config = flow_config();
@@ -27,23 +23,23 @@ pub(in crate::security::adapters::tests::native_flow::support) fn configure(
         )?
         .with_captured_lifecycle(),
     ));
-    Ok(legacy)
+    Ok(standalone_calls)
 }
 
 pub(in crate::security::adapters::tests::native_flow::support) fn install_nonce(
     fixture: &mut Fixture,
     nonce_ttl_secs: u64,
 ) -> Arc<AtomicUsize> {
-    let legacy = Arc::new(AtomicUsize::new(0));
+    let standalone_calls = Arc::new(AtomicUsize::new(0));
     fixture.kernel.set_execution_nonce_store(
         ExecutionNonceConfig {
             require_nonce: true,
             nonce_ttl_secs,
             ..ExecutionNonceConfig::default()
         },
-        Box::new(NoLegacyNonce(legacy.clone())),
+        Box::new(OperationOwnedNonceOnly(standalone_calls.clone())),
     );
-    legacy
+    standalone_calls
 }
 
 pub(in crate::security::adapters::tests::native_flow::support) fn issue(
@@ -85,7 +81,7 @@ fn native_nonce_executes_once_and_replays_its_receipt_for_local_and_egress() -> 
                 } else {
                     super::super::super::public_fixture()?
                 };
-                let legacy = configure(&mut fixture, egress)?;
+                let standalone_calls = configure(&mut fixture, egress)?;
                 let operation_id = issue(&mut fixture)?;
                 let response = if asynchronous {
                     tokio::runtime::Builder::new_current_thread()
@@ -114,7 +110,7 @@ fn native_nonce_executes_once_and_replays_its_receipt_for_local_and_egress() -> 
                 );
                 assert!(response.receipt.verify_signature()?);
                 assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
-                assert_eq!(legacy.load(Ordering::SeqCst), 0);
+                assert_eq!(standalone_calls.load(Ordering::SeqCst), 0);
                 let replay = fixture
                     .kernel
                     .evaluate_tool_call_blocking_with_security_context(
@@ -177,7 +173,7 @@ fn native_nonce_mutations_and_missing_credentials_never_reach_the_connector() ->
             super::super::super::public_fixture()?
         };
         let stale_context = fixture.context.clone();
-        let legacy = configure(&mut fixture, true)?;
+        let standalone_calls = configure(&mut fixture, true)?;
         let original = issue(&mut fixture)?;
         match mutation {
             "arguments" => fixture.request.arguments = serde_json::json!({"changed": true}),
@@ -213,7 +209,7 @@ fn native_nonce_mutations_and_missing_credentials_never_reach_the_connector() ->
             0,
             "mutation={mutation}"
         );
-        assert_eq!(legacy.load(Ordering::SeqCst), 0);
+        assert_eq!(standalone_calls.load(Ordering::SeqCst), 0);
         let (operation, _) = fixture
             .authority
             .admission_operation_store()
@@ -227,7 +223,7 @@ fn native_nonce_mutations_and_missing_credentials_never_reach_the_connector() ->
 #[test]
 fn native_nonce_omission_cannot_reopen_an_issued_preflight_or_dispatch() -> TestResult {
     let mut fixture = super::super::super::public_fixture()?;
-    let legacy = configure(&mut fixture, false)?;
+    let standalone_calls = configure(&mut fixture, false)?;
     let original = issue(&mut fixture)?;
     fixture
         .request
@@ -242,7 +238,7 @@ fn native_nonce_omission_cannot_reopen_an_issued_preflight_or_dispatch() -> Test
     assert!(response.output.is_none());
     assert!(response.receipt.verify_signature()?);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
-    assert_eq!(legacy.load(Ordering::SeqCst), 0);
+    assert_eq!(standalone_calls.load(Ordering::SeqCst), 0);
     let (operation, _) = fixture
         .authority
         .admission_operation_store()

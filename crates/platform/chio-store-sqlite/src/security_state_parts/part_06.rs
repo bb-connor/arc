@@ -280,7 +280,9 @@ impl SqliteSecurityStateStore {
                 params![
                     tenant_id.as_str(),
                     to_i64(trusted_now)?,
-                    i64::from(max_leases).saturating_add(1),
+                    i64::from(max_leases)
+                        .checked_add(1)
+                        .ok_or_else(PortError::invalid_data)?,
                 ],
                 |row| row.get::<_, String>(0),
             )
@@ -919,6 +921,10 @@ impl ResponseStore for SqliteSecurityStateStore {
             return Err(PortError::invalid_data());
         }
         let trusted_now_sql = to_i64(trusted_now)?;
+        let renewal_cutoff = trusted_now
+            .checked_add(LINEAGE_FENCE_RENEWAL_MARGIN_MS)
+            .and_then(|value| i64::try_from(value).ok())
+            .ok_or(chio_security_types::clock::ClockError::Overflow)?;
         let mut statement = transaction
             .prepare(
                 r#"
@@ -986,7 +992,7 @@ impl ResponseStore for SqliteSecurityStateStore {
                     request.tenant_id.as_str(),
                     trusted_now_sql,
                     i64::from(request.max_claims),
-                    to_i64(trusted_now.saturating_add(LINEAGE_FENCE_RENEWAL_MARGIN_MS))?,
+                    renewal_cutoff,
                     to_i64(LINEAGE_FENCE_RENEWAL_MARGIN_MS)?
                 ],
                 |row| row.get::<_, String>(0),
@@ -1015,7 +1021,7 @@ impl ResponseStore for SqliteSecurityStateStore {
                     params![
                         request.tenant_id.as_str(),
                         action_id.as_str(),
-                        to_i64(trusted_now.saturating_add(LINEAGE_FENCE_RENEWAL_MARGIN_MS))?,
+                        renewal_cutoff,
                         trusted_now_sql,
                     ],
                     |row| row.get::<_, bool>(0),

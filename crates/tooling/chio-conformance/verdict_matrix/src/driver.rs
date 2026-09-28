@@ -867,6 +867,9 @@ fn nonce_binding(
 fn replay_reason_code(error: &ExecutionNonceError) -> &'static str {
     match error {
         ExecutionNonceError::Expired { .. }
+        | ExecutionNonceError::InvalidWindow
+        | ExecutionNonceError::NotYetValid
+        | ExecutionNonceError::Clock(_)
         | ExecutionNonceError::Replayed
         | ExecutionNonceError::BindingMismatch { .. }
         | ExecutionNonceError::InvalidSignature

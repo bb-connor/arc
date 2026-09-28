@@ -2967,6 +2967,183 @@ pub const KERNEL_RECEIPT_READ_PROJECTION_MISMATCH: ErrorCodeSpec = ErrorCodeSpec
     consumed_by: &["chio-kernel", "chio-store-sqlite"],
 };
 
+pub const KERNEL_EXECUTION_NONCE_SCHEMA: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-schema",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: schema.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-SCHEMA",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_EXPIRED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-expired",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: expired.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-EXPIRED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_BINDING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-binding",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: binding.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-BINDING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_SIGNATURE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-signature",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: signature.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-SIGNATURE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_REPLAYED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-replayed",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: replayed.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-REPLAYED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_ENCODING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-encoding",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: encoding.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-ENCODING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_STORE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-store",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: store.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-STORE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_CAPACITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-capacity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: capacity.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_WINDOW: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-window",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Authority window refused: execution-nonce-window.",
+    help: "Obtain fresh evidence within the original signed authority window.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-WINDOW",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_EXECUTION_NONCE_NOT_YET_VALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-not-yet-valid",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Authority window refused: execution-nonce-not-yet-valid.",
+    help: "Obtain fresh evidence within the original signed authority window.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-NOT-YET-VALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_REVOCATION_SNAPSHOT_FUTURE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:revocation-snapshot-future",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Authority window refused: revocation-snapshot-future.",
+    help: "Obtain fresh evidence within the original signed authority window.",
+    string_code: "CHIO-KERNEL-REVOCATION-SNAPSHOT-FUTURE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_REVOCATION_SNAPSHOT_STALE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:revocation-snapshot-stale",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Authority window refused: revocation-snapshot-stale.",
+    help: "Obtain fresh evidence within the original signed authority window.",
+    string_code: "CHIO-KERNEL-REVOCATION-SNAPSHOT-STALE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_GOVERNED_APPROVAL_LIFETIME: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:governed-approval-lifetime",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Authority window refused: governed-approval-lifetime.",
+    help: "Obtain fresh evidence within the original signed authority window.",
+    string_code: "CHIO-KERNEL-GOVERNED-APPROVAL-LIFETIME",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
 pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED,
     TRANSACTION_PASSPORT_HASH_MISMATCH,
@@ -3188,6 +3365,19 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_RECEIPT_READ_SCOPE_MISMATCH,
     KERNEL_RECEIPT_READ_QUERY_INVALID,
     KERNEL_RECEIPT_READ_PROJECTION_MISMATCH,
+    KERNEL_EXECUTION_NONCE_SCHEMA,
+    KERNEL_EXECUTION_NONCE_EXPIRED,
+    KERNEL_EXECUTION_NONCE_BINDING,
+    KERNEL_EXECUTION_NONCE_SIGNATURE,
+    KERNEL_EXECUTION_NONCE_REPLAYED,
+    KERNEL_EXECUTION_NONCE_ENCODING,
+    KERNEL_EXECUTION_NONCE_STORE,
+    KERNEL_EXECUTION_NONCE_CAPACITY,
+    KERNEL_EXECUTION_NONCE_WINDOW,
+    KERNEL_EXECUTION_NONCE_NOT_YET_VALID,
+    KERNEL_REVOCATION_SNAPSHOT_FUTURE,
+    KERNEL_REVOCATION_SNAPSHOT_STALE,
+    KERNEL_GOVERNED_APPROVAL_LIFETIME,
 ];
 
 #[must_use]

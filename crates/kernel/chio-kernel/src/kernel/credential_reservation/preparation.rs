@@ -22,7 +22,6 @@ pub(crate) struct PreparedDispatchCredentials<'kernel, 'request> {
     pub(super) dpop_proof: Option<&'request crate::dpop::DpopProof>,
     pub(super) dpop_credential: Option<DpopReplayCredentialV1>,
     pub(super) execution_nonce: Option<crate::execution_nonce::ValidatedExecutionNonce<'request>>,
-    pub(super) execution_nonce_reservable: bool,
     pub(super) durable_nonce_presented: bool,
     pub(super) approval_intent_hash: Option<String>,
 }
@@ -46,18 +45,16 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
     }
 
     pub(crate) fn refresh(self) -> Result<Self, KernelError> {
-        let execution_nonce_reservable = self.execution_nonce_reservable;
         let refreshed = self
             .kernel
             .prepare_credentials(CredentialPreparationInput {
-                now: current_unix_timestamp().max(self.input.now),
+                now: self
+                    .kernel
+                    .trusted_now_millis()?
+                    .as_secs()
+                    .max(self.input.now),
                 ..self.input
             })?;
-        if refreshed.execution_nonce_reservable != execution_nonce_reservable {
-            return Err(KernelError::Internal(
-                "execution nonce reservation capability changed after preparation".into(),
-            ));
-        }
         Ok(refreshed)
     }
 
@@ -206,7 +203,7 @@ impl ChioKernel {
         };
 
         let execution_nonce = match execution_nonce_credential {
-            ExecutionNonceCredential::LegacyReplayStore => {
+            ExecutionNonceCredential::ReplayStore => {
                 self.validate_execution_nonce_non_consuming(request, cap, now)?
             }
             ExecutionNonceCredential::DurableParticipant
@@ -231,27 +228,12 @@ impl ChioKernel {
             ));
         }
 
-        // This capability query is read-only but remains a host callback. It
-        // must not unwind after an earlier credential has been reserved.
-        let execution_nonce_reservable = if execution_nonce.is_some() {
-            let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
-                KernelError::Internal("execution nonce store is not installed".into())
-            })?;
-            run_credential_store_operation(
-                "unreserved",
-                "execution nonce reservation capability",
-                || Ok(store.supports_dispatch_reservations()),
-            )?
-        } else {
-            false
-        };
         Ok(PreparedDispatchCredentials {
             kernel: self,
             input,
             dpop_proof,
             dpop_credential,
             execution_nonce,
-            execution_nonce_reservable,
             durable_nonce_presented,
             approval_intent_hash,
         })

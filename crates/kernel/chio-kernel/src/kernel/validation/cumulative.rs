@@ -234,7 +234,9 @@ impl ChioKernel {
         };
         // Budget persistence and policy lookup may cross a clock boundary.
         // Refresh from the trusted runtime, never from the proposal's timestamps.
-        let now = self.refresh_admission_trusted_time(now.saturating_mul(1_000))? / 1_000;
+        let now = self.refresh_admission_trusted_time(
+            chio_security_types::clock::UnixMillis::from_secs(now)?.get(),
+        )? / 1_000;
         let intent = request.governed_intent.as_ref().ok_or_else(|| {
             KernelError::GovernedTransactionDenied(
                 "cumulative approval requires a governed transaction intent".into(),

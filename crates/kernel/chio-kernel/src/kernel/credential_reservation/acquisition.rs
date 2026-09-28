@@ -23,7 +23,6 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
             dpop_proof,
             dpop_credential,
             execution_nonce,
-            execution_nonce_reservable,
             durable_nonce_presented,
             approval_intent_hash,
         } = self;
@@ -33,7 +32,6 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
             reservation_id: uuid::Uuid::now_v7().as_hyphenated().to_string(),
             dpop_key: None,
             execution_nonce_id: None,
-            legacy_execution_nonce: LegacyExecutionNonce::NotPresented,
             execution_nonce_present: execution_nonce.is_some() || durable_nonce_presented,
             approval_key: None,
             owned_approval,
@@ -97,33 +95,24 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
                 let store = kernel.execution_nonce_store.as_deref().ok_or_else(|| {
                     KernelError::Internal("execution nonce store is not installed".to_string())
                 })?;
-                if execution_nonce_reservable {
-                    reservation.execution_nonce_id = Some(presented.nonce.nonce_id.clone());
-                    match run_credential_store_operation(
-                        &reservation.reservation_id,
-                        "execution nonce reservation",
-                        || {
-                            store.reserve_for_dispatch(
-                                &presented.nonce.nonce_id,
-                                presented.nonce.expires_at,
-                                &reservation.reservation_id,
-                            )
-                        },
-                    ) {
-                        Ok(true) => {}
-                        Ok(false) => {
-                            reservation.execution_nonce_id = None;
-                            return Err(KernelError::Internal(
-                                "execution nonce has already been consumed".to_string(),
-                            ));
-                        }
-                        Err(error) => return Err(error),
+                reservation.execution_nonce_id = Some(presented.nonce.nonce_id.clone());
+                match run_credential_store_operation(
+                    &reservation.reservation_id,
+                    "execution nonce reservation",
+                    || {
+                        store.reserve_for_dispatch(
+                            &presented.nonce.nonce_id,
+                            presented.nonce.expires_at,
+                            &reservation.reservation_id,
+                        )
+                    },
+                ) {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        reservation.execution_nonce_id = None;
+                        return Err(crate::execution_nonce::ExecutionNonceError::Replayed.into());
                     }
-                } else {
-                    reservation.legacy_execution_nonce = LegacyExecutionNonce::Pending {
-                        nonce_id: presented.nonce.nonce_id.clone(),
-                        expires_at: presented.nonce.expires_at,
-                    };
+                    Err(error) => return Err(error),
                 }
             }
 
@@ -175,9 +164,10 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
             Ok(()) => Ok(reservation),
             Err(error) => match reservation.rollback_before_dispatch() {
                 Ok(()) => Err(error),
-                Err(rollback_error) => Err(KernelError::Internal(format!(
-                    "dispatch credential reservation failed: {error}; {rollback_error}"
-                ))),
+                Err(rollback_error) => Err(KernelError::CredentialReservationCleanup {
+                    cause: Box::new(error),
+                    cleanup: Box::new(rollback_error),
+                }),
             },
         }
     }

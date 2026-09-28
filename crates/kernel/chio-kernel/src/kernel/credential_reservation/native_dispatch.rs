@@ -90,10 +90,6 @@ impl DispatchCredentialReservation<'_> {
         if original.native_security_authority_binding().is_none()
             || admission.operation().state() != AdmissionOperationState::CapturePending
             || self.execution_nonce_id.is_some()
-            || !matches!(
-                self.legacy_execution_nonce,
-                LegacyExecutionNonce::NotPresented
-            )
             || self.dpop_key.is_some()
             || self.approval_key.is_some()
             || (selection.runtime_hook_installed && selection.runtime.is_none())

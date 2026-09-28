@@ -2,6 +2,31 @@ use super::*;
 use chio_security_types::ports::PortErrorKind;
 
 #[test]
+fn lineage_renewal_cutoff_overflow_preserves_scheduler_rows() -> TestResult {
+    let fixture = Fixture::new()?;
+    let mut request = fixture.scheduler_request()?;
+    let now = i64::MAX as u64 - 1;
+    fixture.clock.0.store(now, Ordering::Release);
+    request.now_unix_ms = now;
+    request.lease_expires_at_unix_ms = now + 1;
+    let error = fixture.store.claim_due(&request).unwrap_err();
+    assert_eq!(error.kind(), PortErrorKind::Unavailable);
+    assert_eq!(
+        error.code().as_str(),
+        chio_security_types::clock::ClockError::Overflow.code()
+    );
+    let counts: (i64, i64, i64) = fixture.store.connection()?.query_row(
+        "SELECT (SELECT count(*) FROM security_scheduler_leases),
+                (SELECT count(*) FROM security_scheduler_claims),
+                (SELECT count(*) FROM security_response_plans)",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    )?;
+    assert_eq!(counts, (0, 0, 1));
+    Ok(())
+}
+
+#[test]
 fn scheduler_identity_denies_expiry_during_read_wait() -> TestResult {
     let fixture = Fixture::new()?;
     let work = fixture

@@ -6,7 +6,8 @@ use crate::{KernelError, ReplayClockDirection};
 /// Larger jumps fail closed on first observation. A later stable sample can
 /// confirm a suspend gap and rebaseline the clock without pruning live replay
 /// markers; inconsistent jumps and rollbacks remain denied.
-pub(crate) const MAX_REPLAY_CLOCK_SKEW: Duration = Duration::from_secs(300);
+pub(crate) const MAX_REPLAY_CLOCK_SKEW: Duration =
+    Duration::from_secs(chio_security_types::clock::MAX_REPLAY_WALL_SKEW_SECS as u64);
 
 const MIN_REBASELINE_CONFIRMATION: Duration = Duration::from_secs(1);
 const MAX_REBASELINE_DRIFT: Duration = Duration::from_secs(1);

@@ -770,7 +770,11 @@ impl ChioKernel {
         // dispatch even if the chain is otherwise valid. This is a
         // no-op (`Ok(())`) when no view is installed.
         #[cfg(feature = "delegation")]
-        delegation::consult_revocation_view(cap, self.revocation_view.as_ref())?;
+        delegation::consult_revocation_view(
+            cap,
+            self.revocation_view.as_ref(),
+            self.trusted_now_millis()?,
+        )?;
 
         if cap.delegation_chain.is_empty() {
             return Ok(());
@@ -2136,7 +2140,8 @@ impl ChioKernel {
                         ))
                     },
                 )?;
-                let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
+                let now = i64::try_from(self.trusted_now_millis()?.as_secs())
+                    .map_err(|_| chio_security_types::clock::ClockError::Overflow)?;
                 let binding = crate::execution_nonce::NonceBinding {
                     subject_id: cap.subject.to_hex(),
                     request_id: request.request_id.clone(),

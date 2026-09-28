@@ -182,3 +182,104 @@ fn sqlite_clock_failure_denies_cached_mutation_replay() {
         1
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn serving_owner_injects_one_clock_and_fence_into_every_budget_handle() {
+    use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+    let directory = tempfile::tempdir().test_expect("directory");
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+        .test_expect("private authority directory");
+    let path = directory.path().join("authority.sqlite");
+    let locks = directory.path().join("locks");
+    std::fs::DirBuilder::new()
+        .mode(0o700)
+        .create(&locks)
+        .test_expect("lock directory");
+    chio_store_sqlite::SqliteAuthorityStore::provision(&path, &locks).test_expect("provision");
+    let clock = Arc::new(TestClock::new());
+    let owner = chio_store_sqlite::SqliteAuthorityStore::open_serving_with_clock(
+        &path,
+        &locks,
+        clock.clone(),
+    )
+    .test_expect("serving owner");
+    use chio_kernel::budget_store::{
+        BudgetAdmissionBinding, BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
+        BudgetEventAuthority, BudgetInvocationQuota, BudgetQuotaKey,
+    };
+    use chio_kernel::CanonicalRevocationSet;
+    let fence = owner.mutation_fence();
+    let request = BudgetAuthorizeHoldRequest {
+        capability_id: "clocked".into(),
+        grant_index: 0,
+        max_invocations: Some(10),
+        invocation_quotas: vec![BudgetInvocationQuota {
+            key: BudgetQuotaKey::grant("clocked", 0),
+            max_invocations: 10,
+        }],
+        cumulative_approval: None,
+        admission_binding: Some(BudgetAdmissionBinding {
+            operation_id: "clocked-operation".into(),
+            revocation_set: CanonicalRevocationSet::canonicalize(vec!["clocked".into()])
+                .test_expect("revocation set"),
+            authorization_artifact_digests: vec!["a".repeat(64)],
+            last_observed_revocation: None,
+            supplemental_verifier_id: None,
+            supplemental_verifier_config_digest: None,
+            supplemental_authorization_artifact_digest: None,
+            supplemental_authorization_expires_at: None,
+        }),
+        requested_exposure_units: 10,
+        max_cost_per_invocation: Some(10),
+        max_total_cost_units: Some(100),
+        hold_id: Some("clocked-hold".into()),
+        event_id: Some("clocked-event".into()),
+        authority: Some(BudgetEventAuthority {
+            authority_id: fence.store_uuid,
+            lease_id: fence.lease_id,
+            lease_epoch: fence.owner_epoch,
+        }),
+    };
+    let first = owner.budget_store();
+    let second = owner.budget_store();
+    clock.wall.store(9_999, Ordering::SeqCst);
+    let refused = first.authorize_budget_hold(request.clone());
+    assert!(
+        matches!(
+            &refused,
+            Err(BudgetStoreError::Clock(ClockError::WallClockRegression))
+        ),
+        "{refused:?}"
+    );
+    clock.recover();
+    assert!(first.get_usage("clocked", 0).test_expect("usage").is_none());
+    assert!(matches!(
+        first
+            .authorize_budget_hold(request.clone())
+            .test_expect("authorize"),
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+    let before = first.get_usage("clocked", 0).test_expect("usage");
+    assert_eq!(before.as_ref().test_expect("usage present").updated_at, 10);
+    clock.wall.store(9_999, Ordering::SeqCst);
+    let refused = second.authorize_budget_hold(request.clone());
+    assert!(
+        matches!(
+            &refused,
+            Err(BudgetStoreError::Clock(ClockError::WallClockRegression))
+        ),
+        "{refused:?}"
+    );
+    clock.recover();
+    assert_eq!(second.get_usage("clocked", 0).test_expect("usage"), before);
+    clock.fail_after(0);
+    let refused = owner.budget_store().authorize_budget_hold(request);
+    assert!(
+        matches!(
+            &refused,
+            Err(BudgetStoreError::Clock(ClockError::Unavailable))
+        ),
+        "{refused:?}"
+    );
+}

@@ -5,6 +5,8 @@
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum FindingPoolLedgerError {
+    #[error("finding pool trusted time rejected: {0}")]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("finding pool debit conflicts with a prior purchase id")]
     ReplayConflict,
     #[error("finding pool signed amount is exhausted")]

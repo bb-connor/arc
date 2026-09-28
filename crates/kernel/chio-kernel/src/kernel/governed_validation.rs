@@ -396,9 +396,17 @@ impl ChioKernel {
         now: u64,
     ) -> Result<(), KernelError> {
         Self::validate_bound_tool_invocation(request, cap)?;
-        approval_token
-            .validate_time(now)
-            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+        let token_lifetime = approval_token
+            .expires_at
+            .checked_sub(approval_token.issued_at)
+            .filter(|lifetime| *lifetime > 0)
+            .ok_or(chio_security_types::clock::ClockError::InvalidWindow)?;
+        if now < approval_token.issued_at {
+            return Err(chio_security_types::clock::ClockError::NotYetValid.into());
+        }
+        if now >= approval_token.expires_at {
+            return Err(chio_security_types::clock::ClockError::Expired.into());
+        }
 
         if approval_token.request_id != request.request_id {
             return Err(KernelError::GovernedTransactionDenied(
@@ -435,13 +443,8 @@ impl ChioKernel {
         // than MAX_APPROVAL_TTL_SECS beyond issued_at are rejected to prevent
         // long-lived tokens from outliving the replay store's eviction window.
         const MAX_APPROVAL_TTL_SECS: u64 = 3600; // 1 hour max
-        let token_lifetime = approval_token
-            .expires_at
-            .saturating_sub(approval_token.issued_at);
         if token_lifetime > MAX_APPROVAL_TTL_SECS {
-            return Err(KernelError::GovernedTransactionDenied(format!(
-                "approval token lifetime ({token_lifetime}s) exceeds maximum ({MAX_APPROVAL_TTL_SECS}s)"
-            )));
+            return Err(KernelError::GovernedApprovalLifetimeExceeded);
         }
 
         Ok(())

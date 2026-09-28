@@ -52,8 +52,8 @@ struct PanickingDispatchExecutionNonceStore {
     rollback_calls: std::sync::Arc<AtomicU64>,
 }
 
-struct LegacyExecutionNonceStore {
-    consumed: std::sync::Arc<Mutex<std::collections::HashSet<String>>>,
+struct RecordingExecutionNonceStore {
+    inner: InMemoryExecutionNonceStore,
     reserve_calls: std::sync::Arc<AtomicU64>,
 }
 
@@ -149,9 +149,9 @@ fn post_dispatch_approval_commit_fixture(
     let server = "post-dispatch-approval-commit-server";
     let tool = "execute";
     let mut kernel = make_kernel(make_config());
-    kernel.set_governed_approval_replay_store(Box::new(
-        PostDispatchFailingApprovalReplayStore { failure },
-    ));
+    kernel.set_governed_approval_replay_store(Box::new(PostDispatchFailingApprovalReplayStore {
+        failure,
+    }));
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(CountingDispatchServer {
         id: server.to_string(),
@@ -190,13 +190,25 @@ fn post_dispatch_approval_commit_fixture(
     }
 }
 
-impl ExecutionNonceStore for LegacyExecutionNonceStore {
-    fn reserve(&self, nonce_id: &str) -> Result<bool, KernelError> {
+impl ExecutionNonceStore for RecordingExecutionNonceStore {
+    fn reserve_until(&self, id: &str, expiry: i64) -> Result<bool, KernelError> {
         self.reserve_calls.fetch_add(1, Ordering::SeqCst);
-        let mut consumed = self.consumed.lock().map_err(|_| {
-            KernelError::Internal("legacy execution nonce store lock poisoned".to_string())
-        })?;
-        Ok(consumed.insert(nonce_id.to_string()))
+        self.inner.reserve_until(id, expiry)
+    }
+    fn reserve_for_dispatch(
+        &self,
+        id: &str,
+        expiry: i64,
+        owner: &str,
+    ) -> Result<bool, KernelError> {
+        self.reserve_calls.fetch_add(1, Ordering::SeqCst);
+        self.inner.reserve_for_dispatch(id, expiry, owner)
+    }
+    fn rollback_dispatch_reservation(&self, id: &str, owner: &str) -> Result<bool, KernelError> {
+        self.inner.rollback_dispatch_reservation(id, owner)
+    }
+    fn is_consumed(&self, id: &str) -> Result<bool, KernelError> {
+        self.inner.is_consumed(id)
     }
 }
 
@@ -209,12 +221,8 @@ struct PanickingDispatchCredentialFixture {
 }
 
 impl ExecutionNonceStore for PanickingDispatchExecutionNonceStore {
-    fn reserve(&self, _nonce_id: &str) -> Result<bool, KernelError> {
+    fn reserve_until(&self, _nonce_id: &str, _expiry: i64) -> Result<bool, KernelError> {
         Ok(true)
-    }
-
-    fn supports_dispatch_reservations(&self) -> bool {
-        true
     }
 
     fn reserve_for_dispatch(
@@ -240,6 +248,9 @@ impl ExecutionNonceStore for PanickingDispatchExecutionNonceStore {
             panic!("sensitive execution nonce rollback panic payload");
         }
         Ok(true)
+    }
+    fn is_consumed(&self, _: &str) -> Result<bool, KernelError> {
+        Ok(false)
     }
 }
 
@@ -451,7 +462,7 @@ fn request_with_panicking_execution_nonce_store(
     })
 }
 
-fn request_with_legacy_execution_nonce_store(
+fn request_with_recording_execution_nonce_store(
     request_id: &str,
 ) -> Result<
     (
@@ -462,7 +473,7 @@ fn request_with_legacy_execution_nonce_store(
     ),
     KernelError,
 > {
-    let server = "legacy-execution-nonce-server";
+    let server = "owned-execution-nonce-server";
     let tool = "execute";
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new(server, vec![tool])));
@@ -481,8 +492,8 @@ fn request_with_legacy_execution_nonce_store(
     let reserve_calls = std::sync::Arc::new(AtomicU64::new(0));
     kernel.set_execution_nonce_store(
         nonce_config.clone(),
-        Box::new(LegacyExecutionNonceStore {
-            consumed: std::sync::Arc::new(Mutex::new(std::collections::HashSet::new())),
+        Box::new(RecordingExecutionNonceStore {
+            inner: InMemoryExecutionNonceStore::default(),
             reserve_calls: std::sync::Arc::clone(&reserve_calls),
         }),
     );
@@ -492,7 +503,7 @@ fn request_with_legacy_execution_nonce_store(
         &capability,
         tool,
         server,
-        serde_json::json!({"operation": "legacy"}),
+        serde_json::json!({"operation": "owned"}),
     );
     let binding = binding_for_request(&capability, &request);
     request.execution_nonce = Some(mint_execution_nonce(
@@ -506,72 +517,59 @@ fn request_with_legacy_execution_nonce_store(
 }
 
 #[test]
-fn legacy_execution_nonce_is_deferred_until_effect_boundary_and_consumed_once(
+fn execution_nonce_is_owned_before_dispatch_and_retained_after_commit(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (kernel, capability, request, reserve_calls) =
-        request_with_legacy_execution_nonce_store("legacy-deferred")?;
-
+    let (kernel, cap, request, calls) =
+        request_with_recording_execution_nonce_store("owned-nonce")?;
     let reservation = kernel.reserve_dispatch_credentials(
         &request,
-        &capability,
+        &cap,
         false,
         current_unix_timestamp(),
         false,
     )?;
-    assert_eq!(reserve_calls.load(Ordering::SeqCst), 0);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
     reservation.rollback_before_dispatch()?;
-    assert_eq!(reserve_calls.load(Ordering::SeqCst), 0);
-
     let mut reservation = kernel.reserve_dispatch_credentials(
         &request,
-        &capability,
+        &cap,
         false,
         current_unix_timestamp(),
         false,
     )?;
-    reservation.reserve_legacy_execution_nonce_at_effect_boundary()?;
-    assert_eq!(reserve_calls.load(Ordering::SeqCst), 1);
-    let disposition = reservation.commit()?;
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
     assert_eq!(
-        disposition,
+        reservation.commit()?,
         PaymentCredentialDisposition::RetainedAfterAuthorization
     );
-    assert_eq!(reserve_calls.load(Ordering::SeqCst), 1);
-
-    let mut replay = kernel.reserve_dispatch_credentials(
-        &request,
-        &capability,
-        false,
-        current_unix_timestamp(),
-        false,
-    )?;
-    let error = match replay.reserve_legacy_execution_nonce_at_effect_boundary() {
-        Ok(()) => {
-            return Err(
-                std::io::Error::other("replayed legacy execution nonce was accepted").into(),
-            )
-        }
-        Err(error) => error,
-    };
-    assert!(error
-        .to_string()
-        .contains("execution nonce has already been consumed"));
-    assert_eq!(reserve_calls.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        reservation.rollback_before_dispatch_with_disposition()?,
+        PaymentCredentialDisposition::RetainedAfterAuthorization
+    );
+    assert!(kernel
+        .execution_nonce_store
+        .as_ref()
+        .ok_or("nonce store")?
+        .is_consumed(request.execution_nonce.as_ref().ok_or("nonce")?.nonce_id())?);
+    assert!(matches!(
+        kernel.reserve_dispatch_credentials(&request, &cap, false, current_unix_timestamp(), false),
+        Err(KernelError::ExecutionNonce(ExecutionNonceError::Replayed))
+    ));
     Ok(())
 }
 
 #[test]
-fn legacy_execution_nonce_store_allows_dispatch_and_denies_replay(
+fn execution_nonce_store_allows_dispatch_and_denies_replay(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (kernel, _capability, request, reserve_calls) =
-        request_with_legacy_execution_nonce_store("legacy-dispatch-first")?;
+        request_with_recording_execution_nonce_store("owned-dispatch-first")?;
 
     let response = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(response.verdict, Verdict::Allow);
     assert_eq!(reserve_calls.load(Ordering::SeqCst), 1);
 
     let mut replay = request;
-    replay.request_id = "legacy-dispatch-replay".to_string();
+    replay.request_id = "owned-dispatch-replay".to_string();
     let response = kernel.evaluate_tool_call_blocking(&replay)?;
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(response.reason.is_some());
@@ -918,8 +916,8 @@ fn default_governed_approval_replay_store_accepts_once_and_denies_replay(
 }
 
 #[test]
-fn hosted_url_elicitation_commits_credentials_fail_closed(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn hosted_url_elicitation_commits_credentials_fail_closed() -> Result<(), Box<dyn std::error::Error>>
+{
     let mut fixture = request_with_panicking_execution_nonce_store(
         "hosted-url-credential-rollback",
         false,
@@ -956,8 +954,8 @@ fn hosted_url_elicitation_commits_credentials_fail_closed(
 }
 
 #[test]
-fn nested_url_elicitation_commits_credentials_fail_closed(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn nested_url_elicitation_commits_credentials_fail_closed() -> Result<(), Box<dyn std::error::Error>>
+{
     let mut fixture = request_with_panicking_execution_nonce_store(
         "nested-url-credential-rollback",
         false,
@@ -1151,10 +1149,7 @@ fn allow_receipt_append_linearizes_with_concurrent_revocation(
     let capability = make_capability(
         &kernel,
         &agent,
-        make_scope(vec![make_grant(
-            "revocation-linearization-server",
-            "write",
-        )]),
+        make_scope(vec![make_grant("revocation-linearization-server", "write")]),
         300,
     );
     let request = make_request(

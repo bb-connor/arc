@@ -7,6 +7,11 @@
 use core::fmt;
 use core::time::Duration;
 
+/// Maximum unexplained skew for replay retention observations. This tolerates
+/// queued writer samples; it never extends a signed authority window or permits
+/// the trusted clock itself to regress.
+pub const MAX_REPLAY_WALL_SKEW_SECS: u32 = 300;
+
 /// Milliseconds since the Unix epoch, for signed or persisted timestamps.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct UnixMillis(u64);

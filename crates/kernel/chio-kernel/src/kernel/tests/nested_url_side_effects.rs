@@ -40,16 +40,8 @@ struct NestedMutationExecutionNonceStore {
 }
 
 impl ExecutionNonceStore for NestedMutationExecutionNonceStore {
-    fn reserve(&self, nonce_id: &str) -> Result<bool, KernelError> {
-        self.inner.reserve(nonce_id)
-    }
-
     fn reserve_until(&self, nonce_id: &str, nonce_expires_at: i64) -> Result<bool, KernelError> {
         self.inner.reserve_until(nonce_id, nonce_expires_at)
-    }
-
-    fn supports_dispatch_reservations(&self) -> bool {
-        true
     }
 
     fn reserve_for_dispatch(
@@ -70,6 +62,9 @@ impl ExecutionNonceStore for NestedMutationExecutionNonceStore {
     ) -> Result<bool, KernelError> {
         self.inner
             .rollback_dispatch_reservation(nonce_id, reservation_id)
+    }
+    fn is_consumed(&self, id: &str) -> Result<bool, KernelError> {
+        self.inner.is_consumed(id)
     }
 }
 
@@ -229,12 +224,10 @@ fn nested_child_before_url_elicitation_is_terminal_and_consumes_nonce(
 
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        RevalidationReadyRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(RevalidationReadyRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+    }));
 
     let nonce_config = ExecutionNonceConfig {
         nonce_ttl_secs: 30,
@@ -337,7 +330,10 @@ fn nested_child_before_url_elicitation_is_terminal_and_consumes_nonce(
     ));
     let child_receipts = kernel.child_receipt_log();
     assert_eq!(child_receipts.len(), 1);
-    assert_eq!(child_receipts.receipts()[0].parent_request_id, context.request_id);
+    assert_eq!(
+        child_receipts.receipts()[0].parent_request_id,
+        context.request_id
+    );
     Ok(())
 }
 
@@ -535,8 +531,8 @@ fn cancellation_poll_before_url_elicitation_records_ambiguous_dispatch(
 }
 
 #[test]
-fn nested_flow_revalidates_after_credential_reservation(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn nested_flow_revalidates_after_credential_reservation() -> Result<(), Box<dyn std::error::Error>>
+{
     let mut kernel = make_kernel(make_config());
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(SideEffectServer::new(

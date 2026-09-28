@@ -250,11 +250,13 @@ impl SqliteBudgetStore {
         connection: Arc<StoreConnection>,
         serving_owner: Arc<crate::serving_owner::SqliteServingOwner>,
     ) -> Self {
+        let clock = serving_owner.clock.clone();
+        let clock_fence = serving_owner.clock_fence.clone();
         Self {
             connection,
             serving_owner: Some(serving_owner),
-            clock: Arc::new(SystemClock),
-            clock_fence: Arc::new(Mutex::new(ClockFence::default())),
+            clock,
+            clock_fence,
         }
     }
 

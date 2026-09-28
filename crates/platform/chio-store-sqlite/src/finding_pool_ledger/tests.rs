@@ -147,21 +147,46 @@ fn qualified_ledger_binds_validation_to_the_borrowed_database_file() {
 }
 
 #[test]
-fn outbox_lease_clock_does_not_regress_with_wall_time() {
-    let clock = OutboxLeaseClock::new(1);
+fn outbox_lease_clock_is_injected_checked_and_preserves_its_high_water() {
+    use chio_security_types::clock::ClockError;
+    let source = crate::replay_clock::tests::ManualClock::new(10_000);
+    let clock = OutboxLeaseClock::new(1, source.clone());
     assert_eq!(
         clock
             .nondecreasing_now(10_000)
-            .test_expect("initialize lease clock"),
+            .test_expect("initialize clock"),
         10_000
     );
-    std::thread::sleep(Duration::from_millis(3));
-    assert!(
-        clock
-            .nondecreasing_now(1)
-            .test_expect("advance lease clock across rollback")
-            > 10_000
+    source.set(10_001, 1);
+    assert_eq!(
+        clock.nondecreasing_now(1).test_expect("elapsed clock"),
+        11_000
     );
+    source.fail(ClockError::Unavailable);
+    assert!(matches!(
+        clock.nondecreasing_now(1),
+        Err(FindingPoolLedgerError::Clock(ClockError::Unavailable))
+    ));
+    source.set(9_999, 2);
+    assert!(matches!(
+        clock.nondecreasing_now(1),
+        Err(FindingPoolLedgerError::Clock(
+            ClockError::WallClockRegression
+        ))
+    ));
+    let source = crate::replay_clock::tests::ManualClock::new(10_000);
+    let overflow = OutboxLeaseClock::new(1, source.clone());
+    assert_eq!(
+        overflow
+            .nondecreasing_now(u64::MAX)
+            .test_expect("initial boundary"),
+        u64::MAX
+    );
+    source.set(10_001, 1);
+    assert!(matches!(
+        overflow.nondecreasing_now(1),
+        Err(FindingPoolLedgerError::Clock(ClockError::Overflow))
+    ));
 }
 
 #[test]

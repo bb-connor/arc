@@ -198,6 +198,13 @@ impl ChioKernel {
     }
 
     pub fn new(config: KernelConfig) -> Self {
+        Self::new_with_clock(config, Arc::new(chio_security_types::clock::SystemClock))
+    }
+
+    pub fn new_with_clock(
+        config: KernelConfig,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Self {
         info!("initializing Chio kernel");
         let authority_keypair = config.keypair.clone();
         let checkpoint_batch_size = config.checkpoint_batch_size;
@@ -253,6 +260,8 @@ impl ChioKernel {
         let federation_dual_receipts_gauge;
         let federation_dsse_envelopes_gauge;
         let mut kernel = Self {
+            clock: clock.clone(),
+            clock_fence: Mutex::new(chio_security_types::clock::ClockFence::default()),
             config,
             durable_admission_mode: crate::admission_operation::DurableAdmissionMode::default(),
             durable_admission_runtime: None,
@@ -267,7 +276,7 @@ impl ChioKernel {
             unsafe_ephemeral_financial_dispatch: false,
             guards: std::sync::Arc::new(Vec::new()),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
-            budget_store: Arc::new(InMemoryBudgetStore::new()),
+            budget_store: Arc::new(InMemoryBudgetStore::with_clock(clock)),
             budget_store_lock: Mutex::new(()),
             admission_operation_store: None,
             approval_store: None,
