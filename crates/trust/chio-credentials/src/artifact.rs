@@ -1,5 +1,8 @@
 #[derive(Debug, thiserror::Error)]
 pub enum CredentialError {
+    #[error(transparent)]
+    SignedJson(#[from] chio_core::canonical::UntrustedJsonError),
+
     #[error("did error: {0}")]
     Did(#[from] DidError),
 

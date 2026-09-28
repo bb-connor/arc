@@ -23,6 +23,41 @@ sys.modules[_spec.name] = _lexer
 _spec.loader.exec_module(_lexer)
 LITERALS = re.compile(r'r(?P<hashes>#{0,16})"(?P<raw>.*?)"(?P=hashes)|"(?P<quoted>(?:\\.|[^"\\])*)"', re.S)
 CREATE = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s*\(", re.I)
+DECODERS = "from_str|from_slice|from_reader|from_value"
+
+
+def json_decoders(code):
+    """Locate direct and imported serde JSON entry points, retaining multiplicity.
+
+    This is a lexical tripwire, not name resolution. Custom Deserialize owners
+    are recorded too, so adding a value visitor cannot bypass file classification.
+    """
+    patterns = [(rf"\bserde_json::({DECODERS})\b", None)]
+    for alias in re.findall(r"\buse\s+serde_json\s+as\s+(\w+)\s*;", code):
+        patterns.append((rf"\b{alias}::({DECODERS})\b", None))
+    for alias in re.findall(r"\buse\s+serde_json::(?:de::)?Deserializer\s+as\s+(\w+)\s*;", code):
+        patterns.append((rf"\b{alias}::(from_str|from_slice|from_reader)\b", None))
+    if re.search(r"\buse\s+serde_json::\*\s*;", code):
+        patterns.append((rf"\b({DECODERS})\s*(?=\(|::<)", None))
+    for imported in re.finditer(r"\buse\s+serde_json::(\{[^;]+\}|\w+(?:\s+as\s+\w+)?)\s*;", code):
+        for alias in re.findall(r"\bself\s+as\s+(\w+)", imported.group(1)):
+            patterns.append((rf"\b{alias}::({DECODERS})\b", None))
+        for alias in re.findall(r"\bDeserializer\s+as\s+(\w+)", imported.group(1)):
+            patterns.append((rf"\b{alias}::(from_str|from_slice|from_reader)\b", None))
+        for item in re.finditer(rf"\b({DECODERS})(?:\s+as\s+(\w+))?\b", imported.group(1)):
+            name = item.group(2) or item.group(1)
+            patterns.append((rf"\b{name}\s*(?=\(|::<)", item.group(1)))
+    seen = set()
+    for pattern, decoder in patterns:
+        for match in re.finditer(pattern, code):
+            site = (match.start(), decoder or match.group(1))
+            if site not in seen:
+                seen.add(site)
+                yield site
+    for match in re.finditer(r"\b(?:serde_json::)?Deserializer::(from_str|from_slice|from_reader)\b", code):
+        yield match.start(), "Deserializer::" + match.group(1)
+    for match in re.finditer(r"\bfn\s+deserialize\s*<", code):
+        yield match.start(), "custom_deserialize"
 
 
 def production(path):
@@ -91,16 +126,21 @@ def sql_statements(path, text):
 
 
 def scan(root, catalog):
-    found = {"constructors": [], "raw_decoders": [], "schemas": {}, "unscoped_sql": []}
+    found = {"constructors": [], "raw_decoders": [], "schemas": {}, "unscoped_sql": [], "decoder_census": {}}
     files = dict(sources(root))
     decoder_owners = set(catalog["signed_input_files"])
     for path, text in files.items():
         code = _lexer.blank_rust_noise(text)
+        decoders = list(json_decoders(code))
+        if decoders:
+            found["decoder_census"][path] = sorted(
+                f"{owner_at(code, offset)}::{decoder}" for offset, decoder in decoders
+            )
         for match in re.finditer(r"UntrustedJsonText::(new|from_wire)\s*\(", code):
             found["constructors"].append(f"{path}::{owner_at(code, match.start())}::{match.group(1)}")
         if path in decoder_owners:
-            for match in re.finditer(r"serde_json::(from_str|from_slice|from_value)\b", code):
-                found["raw_decoders"].append(f"{path}::{owner_at(code, match.start())}::{match.group(1)}")
+            for offset, decoder in decoders:
+                found["raw_decoders"].append(f"{path}::{owner_at(code, offset)}::{decoder}")
         if path.startswith(STORE):
             for table, _ in schema_tables(text):
                 found["schemas"].setdefault(table, []).append(path)
@@ -129,6 +169,13 @@ def scan(root, catalog):
 def check(root, catalog):
     found, files = scan(root, catalog)
     errors = []
+    if found["decoder_census"] != catalog.get("decoder_census"):
+        errors.append("workspace decoder census changed; classify new files and entry points")
+    contracts = catalog.get("decoder_file_contracts", {})
+    if set(contracts) != set(found["decoder_census"]) or any(
+        not contract.get("kind") or not contract.get("contract") for contract in contracts.values()
+    ):
+        errors.append("workspace decoder file contracts are incomplete")
     for name in ("constructors", "raw_decoders", "schemas"):
         if found[name] != catalog[name]:
             errors.append(f"{name} changed; review and update {CATALOG}")
@@ -142,6 +189,22 @@ def check(root, catalog):
             errors.append(f"missing principal/contract: {row['path']}::{row['owner']}")
     if set(catalog["tables"]) != set(found["schemas"]):
         errors.append("tenant table classification is incomplete")
+    families = catalog.get("tenant_runtime_families", {})
+    for table, row in catalog["tables"].items():
+        family = families.get(row.get("runtime_family"))
+        if not family or not family.get("entry_points") or not family.get("evidence_kind"):
+            errors.append(f"tenant runtime matrix is incomplete: {table}")
+            continue
+        if family["evidence_kind"] == "runtime-gap":
+            if not family.get("remaining"):
+                errors.append(f"tenant runtime gap lacks an explicit disposition: {table}")
+        elif not family.get("tests"):
+            errors.append(f"tenant runtime evidence is missing: {table}")
+    for family in families.values():
+        for case in family.get("tests", []):
+            path = root / case["path"]
+            if not path.is_file() or not re.search(r"\bfn\s+" + re.escape(case["test"]) + r"\b", path.read_text()):
+                errors.append(f"tenant runtime case is missing: {case['path']}::{case['test']}")
     for table, paths in found["schemas"].items():
         for path in paths:
             if f"tenant-read-contract: {table}" not in files[path]:

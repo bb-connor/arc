@@ -157,8 +157,10 @@ pub(in crate::admission_operation_store::security_participant_state) fn load(
         return Ok(None);
     };
     let bytes = bytes.ok_or_else(|| invalid("native nonce preflight record exceeds bounds"))?;
-    let record: Record = serde_json::from_slice(&bytes)
-        .map_err(|_| invalid("native nonce preflight is not bounded typed history"))?;
+    let record: Record =
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| invalid("native nonce preflight is not bounded typed history"))?;
     if record.authority.as_str() != authority
         || record.sequence != sequence
         || record.bytes()? != bytes

@@ -8,7 +8,7 @@ fn changed_arguments_payload_context_and_selected_authority_deny_before_writes(
     let other = hydrate(&fixture, &imported(&fixture, "other")?)?;
     let pending = pending(&fixture, "egress-binding", None)?;
     let before = counts(&fixture)?;
-    for variant in 0..7 {
+    for variant in 0..8 {
         let mut request = pending.request.clone();
         let mut plan = pending.plan.clone();
         let mut context = pending.context.clone();
@@ -28,6 +28,7 @@ fn changed_arguments_payload_context_and_selected_authority_deny_before_writes(
             4 => initialized = &other,
             5 => plan.request_id = RequestId::new("other-request")?,
             6 => plan.expires_at_unix_ms = now_ms() - 1,
+            7 => plan.key.tenant_id = chio_security_types::ports::TenantId::new("foreign-tenant")?,
             _ => unreachable!(),
         }
         assert!(

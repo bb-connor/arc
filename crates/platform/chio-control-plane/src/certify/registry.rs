@@ -34,17 +34,19 @@ impl Default for CertificationRegistry {
 
 impl CertificationRegistry {
     pub(crate) fn load(path: &Path) -> Result<Self, CliError> {
-        match fs::read(path) {
+        match crate::signed_input::read_bounded(path) {
             Ok(bytes) => {
-                let mut registry: Self = serde_json::from_slice(&bytes)?;
+                let registry: Self = crate::signed_input::decode(&bytes)?;
                 if !is_supported_certification_registry_version(&registry.version) {
                     return Err(CliError::attest_error(format!(
                         "unsupported certification registry version: {}",
                         registry.version
                     )));
                 }
-                registry.version = CERTIFICATION_REGISTRY_VERSION.to_string();
-                for entry in registry.artifacts.values() {
+                for (key, entry) in &registry.artifacts {
+                    if key != &entry.artifact_id {
+                        return Err(CliError::RecordBinding("artifact_id"));
+                    }
                     verify_certification_registry_entry(entry)?;
                 }
                 Ok(registry)

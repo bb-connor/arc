@@ -132,7 +132,7 @@ mod tests {
         ProducerId::new("receipt-authority").unwrap_or_else(|error| panic!("producer id: {error}"))
     }
 
-    fn signed_event(keypair: &Keypair) -> UnverifiedSecurityEvent {
+    pub(super) fn signed_event(keypair: &Keypair) -> UnverifiedSecurityEvent {
         signed_event_kind(
             "event-signed",
             SecurityEventKind::TripwireObservation,
@@ -204,7 +204,7 @@ mod tests {
         }
     }
 
-    fn verifier(keypair: &Keypair) -> NativeSecurityEventVerifier {
+    pub(super) fn verifier(keypair: &Keypair) -> NativeSecurityEventVerifier {
         NativeSecurityEventVerifier::new(
             Arc::new(FixedClock(10_000)),
             vec![TrustedSecurityEventProducer {
@@ -715,7 +715,7 @@ mod tests {
             .unwrap_or_else(|error| panic!("authoritative finding: {error}"))
     }
 
-    fn authoritative_finding() -> AuthoritativeCorrelatedFindingEvidence {
+    pub(super) fn authoritative_finding() -> AuthoritativeCorrelatedFindingEvidence {
         authoritative_finding_with_identity("finding-first", "rule-one", 32)
     }
 

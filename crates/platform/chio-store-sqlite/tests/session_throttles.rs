@@ -495,3 +495,6 @@ fn command_recovery_survives_restart_and_rejects_rebinding_and_stale_fence() {
         PortErrorKind::IntegrityFailure
     );
 }
+
+#[path = "session_throttles/tenant_isolation.rs"]
+mod tenant_isolation;

@@ -115,13 +115,13 @@ impl chio_security_types::clock::Clock for FlowTestClock {
         chio_security_types::clock::ClockReading,
         chio_security_types::clock::ClockError,
     > {
-        let value: PortResult<u64> = (|| match self.mode.load(Ordering::SeqCst) {
+        let value: PortResult<u64> = match self.mode.load(Ordering::SeqCst) {
             0 => now_ms(),
             1 => Ok(0),
             2 => Ok((1_u64 << 53) - 1),
             3 => panic!("native policy clock panic"),
             _ => Err(PortError::unavailable()),
-        })();
+        };
         let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
         chio_security_types::clock::Clock::read(
             &chio_security_types::clock::FixedClock::from_millis(value),

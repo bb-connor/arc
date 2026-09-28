@@ -53,7 +53,7 @@ pub(crate) fn ensure_parent_dir(path: &Path) -> Result<(), CliError> {
 pub(crate) fn load_signed_certification_check(
     path: &Path,
 ) -> Result<SignedCertificationCheck, CliError> {
-    let artifact: SignedCertificationCheck = serde_json::from_slice(&fs::read(path)?)?;
+    let artifact: SignedCertificationCheck = crate::signed_input::read(path)?;
     verify_signed_certification_check(&artifact)?;
     Ok(artifact)
 }

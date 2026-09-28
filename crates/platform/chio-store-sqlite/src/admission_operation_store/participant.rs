@@ -890,11 +890,13 @@ fn verify_payment_terminal_record(
         authoritative_outcome,
     } = verification;
     let evidence: UntrustedPaymentTerminalEvidenceV1 =
-        serde_json::from_slice(bytes).map_err(|error| {
-            AdmissionOperationStoreError::Invariant(format!(
-                "terminal payment evidence is invalid JSON: {error}"
-            ))
-        })?;
+        chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| {
+                AdmissionOperationStoreError::Invariant(format!(
+                    "terminal payment evidence is invalid JSON: {error}"
+                ))
+            })?;
     evidence
         .source
         .binding
@@ -904,11 +906,14 @@ fn verify_payment_terminal_record(
             "terminal payment evidence has no consumer receipt".to_owned(),
         )
     })?;
-    let receipt: ChioReceipt = serde_json::from_slice(receipt_bytes).map_err(|error| {
-        AdmissionOperationStoreError::Invariant(format!(
-            "terminal payment consumer receipt is invalid JSON: {error}"
-        ))
-    })?;
+    let receipt: ChioReceipt =
+        chio_core::canonical::UntrustedJsonText::from_wire(receipt_bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| {
+                AdmissionOperationStoreError::Invariant(format!(
+                    "terminal payment consumer receipt is invalid JSON: {error}"
+                ))
+            })?;
     let expected_source_record_id = format!("payment:{}", journal.operation_id);
     let journal_digest = sha256_hex(
         &canonical_json_bytes(&journal)
@@ -956,11 +961,13 @@ fn verify_denied_participant_outcome_bindings(
     projection_json: &[u8],
 ) -> Result<AuthoritativeToolOutcomeBindingV1, AdmissionOperationStoreError> {
     let projection: UntrustedTerminalParticipantProjectionV1 =
-        serde_json::from_slice(projection_json).map_err(|error| {
-            invariant(format!(
-                "delivery-denied participant projection is invalid JSON: {error}"
-            ))
-        })?;
+        chio_core::canonical::UntrustedJsonText::from_wire(projection_json, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| {
+                invariant(format!(
+                    "delivery-denied participant projection is invalid JSON: {error}"
+                ))
+            })?;
     if projection.terminal != "denied_after_delivery" {
         return Err(AdmissionOperationError::TerminalProjectionBindingMismatch.into());
     }
@@ -982,11 +989,14 @@ fn verify_denied_participant_outcome_bindings(
     {
         return Err(AdmissionOperationError::TerminalProjectionBindingMismatch.into());
     }
-    let receipt: ChioReceipt = serde_json::from_slice(receipt_bytes).map_err(|error| {
-        invariant(format!(
-            "delivery-denied participant receipt is invalid JSON: {error}"
-        ))
-    })?;
+    let receipt: ChioReceipt =
+        chio_core::canonical::UntrustedJsonText::from_wire(receipt_bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| {
+                invariant(format!(
+                    "delivery-denied participant receipt is invalid JSON: {error}"
+                ))
+            })?;
     let receipt_digest =
         sha256_hex(&canonical_json_bytes(&receipt).map_err(|error| invariant(error.to_string()))?);
     let authoritative = load_authoritative_tool_outcome_binding(transaction, operation)?;
@@ -1076,7 +1086,8 @@ fn load_authoritative_tool_outcome_binding(
         ));
     };
     let persisted: chio_kernel::tool_outcome::PersistedToolOutcomeRecordV1 =
-        serde_json::from_slice(&encoded)
+        chio_core::canonical::UntrustedJsonText::from_wire(&encoded, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
             .map_err(|error| invariant(format!("tool outcome decode failed: {error}")))?;
     let record = chio_kernel::tool_outcome::ToolOutcomeRecordV1::from_persisted(persisted)
         .map_err(|error| invariant(error.to_string()))?;

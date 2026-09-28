@@ -37,7 +37,9 @@ pub(in crate::admission_operation_store) fn verify(
         return Ok(None);
     };
     let ownership: PreflightOwnership =
-        serde_json::from_slice(&bytes).map_err(|error| invariant(error.to_string()))?;
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| invariant(error.to_string()))?;
     let at = stored_u64(at, "preflight_recorded_at")?;
     validate_trusted_time(at, "preflight_recorded_at")?;
     let identity =
@@ -61,7 +63,8 @@ pub(in crate::admission_operation_store) fn verify(
         ));
     }
     let prepared = AdmissionOperationV1::from_persisted(
-        serde_json::from_slice::<PersistedAdmissionOperationV1>(&snapshot)
+        chio_core::canonical::UntrustedJsonText::from_wire(&snapshot, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed::<PersistedAdmissionOperationV1>())
             .map_err(|error| invariant(error.to_string()))?,
     )?;
     if prepared.binding() != operation.binding()

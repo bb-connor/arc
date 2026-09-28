@@ -580,11 +580,13 @@ pub(super) fn load_durable_obligation_at_head(
 fn decode_projection(
     bytes: &[u8],
 ) -> Result<PersistedObligationProjectionV1, AdmissionOperationStoreError> {
-    serde_json::from_slice(bytes).map_err(|error| {
-        invariant(format!(
-            "terminal obligation projection is invalid: {error}"
-        ))
-    })
+    chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| {
+            invariant(format!(
+                "terminal obligation projection is invalid: {error}"
+            ))
+        })
 }
 
 fn validate_projection(
@@ -651,8 +653,12 @@ fn validate_channel_projection(
     channel_id: &str,
     reservation_id: &str,
 ) -> Result<(), AdmissionOperationStoreError> {
-    let channel: PersistedChannelTerminalV1 = serde_json::from_slice(channel_json)
-        .map_err(|error| invariant(format!("channel terminal projection is invalid: {error}")))?;
+    let channel: PersistedChannelTerminalV1 =
+        chio_core::canonical::UntrustedJsonText::from_wire(channel_json, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| {
+                invariant(format!("channel terminal projection is invalid: {error}"))
+            })?;
     channel
         .signed_reservation
         .body
@@ -1273,7 +1279,8 @@ fn decode_canonical<T: for<'de> Deserialize<'de> + Serialize>(
     bytes: &[u8],
     label: &str,
 ) -> Result<T, AdmissionOperationStoreError> {
-    let value: T = serde_json::from_slice(bytes)
+    let value: T = chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
         .map_err(|error| invariant(format!("{label} is invalid: {error}")))?;
     let canonical = canonical_json_bytes(&value)
         .map_err(|error| invariant(format!("{label} encoding failed: {error}")))?;

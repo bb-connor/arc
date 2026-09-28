@@ -118,7 +118,9 @@ impl Oid4vpRequestObject {
                 "Chio OID4VP only supports response_type `{OID4VP_RESPONSE_TYPE_VP_TOKEN}`"
             )));
         }
-        if self.nonce.trim().is_empty() || self.state.trim().is_empty() || self.jti.trim().is_empty()
+        if self.nonce.trim().is_empty()
+            || self.state.trim().is_empty()
+            || self.jti.trim().is_empty()
         {
             return Err(CredentialError::InvalidOid4vpRequest(
                 "OID4VP request object requires non-empty nonce, state, and jti".to_string(),
@@ -134,12 +136,10 @@ impl Oid4vpRequestObject {
                 "OID4VP request object has expired".to_string(),
             ));
         }
-        validate_endpoint_prefix(&client_id, "response_uri", &self.response_uri).map_err(
-            |error| CredentialError::InvalidOid4vpRequest(error.to_string()),
-        )?;
-        validate_endpoint_prefix(&client_id, "request_uri", &self.request_uri).map_err(|error| {
-            CredentialError::InvalidOid4vpRequest(error.to_string())
-        })?;
+        validate_endpoint_prefix(&client_id, "response_uri", &self.response_uri)
+            .map_err(|error| CredentialError::InvalidOid4vpRequest(error.to_string()))?;
+        validate_endpoint_prefix(&client_id, "request_uri", &self.request_uri)
+            .map_err(|error| CredentialError::InvalidOid4vpRequest(error.to_string()))?;
         if let Some(assertion) = self.identity_assertion.as_ref() {
             assertion
                 .validate_at(now)
@@ -153,8 +153,7 @@ impl Oid4vpRequestObject {
                 Some(bound_request_id) if bound_request_id == self.jti => {}
                 Some(_) => {
                     return Err(CredentialError::InvalidOid4vpRequest(
-                        "OID4VP identity assertion bound_request_id did not match jti"
-                            .to_string(),
+                        "OID4VP identity assertion bound_request_id did not match jti".to_string(),
                     ))
                 }
                 None => {
@@ -660,7 +659,10 @@ pub fn build_oid4vp_request_transport(
     signing_key: &Keypair,
 ) -> Result<Oid4vpRequestTransport, CredentialError> {
     let request_jwt = sign_oid4vp_request_object(request, signing_key)?;
-    let launch_url = format!("{OID4VP_OPENID4VP_SCHEME}?request_uri={}", request.request_uri);
+    let launch_url = format!(
+        "{OID4VP_OPENID4VP_SCHEME}?request_uri={}",
+        request.request_uri
+    );
     Ok(Oid4vpRequestTransport {
         request_id: request.jti.clone(),
         request_uri: request.request_uri.clone(),
@@ -832,8 +834,8 @@ pub fn respond_to_oid4vp_request(
             "holder key does not match the portable credential subject".to_string(),
         ));
     }
-    let holder_thumbprint = PortableEd25519Jwk::from_public_key(&holder_keypair.public_key())
-        .thumbprint()?;
+    let holder_thumbprint =
+        PortableEd25519Jwk::from_public_key(&holder_keypair.public_key()).thumbprint()?;
     if holder_thumbprint != inspected.subject_thumbprint {
         return Err(CredentialError::InvalidOid4vpResponse(
             "holder key does not match the portable credential cnf.jwk thumbprint".to_string(),
@@ -899,8 +901,8 @@ pub fn verify_oid4vp_direct_post_response(
             "OID4VP response JWT typ must be `{OID4VP_RESPONSE_OBJECT_TYP}`"
         )));
     }
-    let response: Oid4vpDirectPostResponseClaims =
-        serde_json::from_value(payload.clone()).map_err(|error| {
+    let response: Oid4vpDirectPostResponseClaims = serde_json::from_value(payload.clone())
+        .map_err(|error| {
             CredentialError::InvalidOid4vpResponse(format!(
                 "OID4VP response payload is not valid JSON: {error}"
             ))
@@ -1069,12 +1071,10 @@ fn sign_jwt_value(
         "alg": "EdDSA",
         "typ": typ,
     });
-    let header_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(
-        serde_json::to_vec(&header).map_err(|error| CredentialError::Core(error.into()))?,
-    );
-    let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(
-        serde_json::to_vec(payload).map_err(|error| CredentialError::Core(error.into()))?,
-    );
+    let header_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .encode(serde_json::to_vec(&header).map_err(|error| CredentialError::Core(error.into()))?);
+    let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .encode(serde_json::to_vec(payload).map_err(|error| CredentialError::Core(error.into()))?);
     let signing_input = format!("{header_b64}.{payload_b64}");
     let signature = signing_key.sign(signing_input.as_bytes());
     Ok(format!(
@@ -1087,49 +1087,5 @@ fn decode_compact_jwt(
     compact: &str,
     label: &str,
 ) -> Result<(Value, Value, String, Signature), CredentialError> {
-    decode_compact_jwt_without_signature(
-        compact,
-        label,
-        CredentialError::InvalidOid4vpResponse,
-    )
-}
-
-fn decode_compact_jwt_without_signature<F>(
-    compact: &str,
-    label: &str,
-    error_mapper: F,
-) -> Result<(Value, Value, String, Signature), CredentialError>
-where
-    F: Fn(String) -> CredentialError,
-{
-    let parts = compact.split('.').collect::<Vec<_>>();
-    if parts.len() != 3 {
-        return Err(error_mapper(format!(
-            "{label} JWT must contain exactly three compact segments"
-        )));
-    }
-    let signing_input = format!("{}.{}", parts[0], parts[1]);
-    let header_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .decode(parts[0].as_bytes())
-        .map_err(|error| error_mapper(format!("{label} JWT header is not valid base64url: {error}")))?;
-    let payload_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .decode(parts[1].as_bytes())
-        .map_err(|error| error_mapper(format!("{label} JWT payload is not valid base64url: {error}")))?;
-    let signature_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .decode(parts[2].as_bytes())
-        .map_err(|error| error_mapper(format!("{label} JWT signature is not valid base64url: {error}")))?;
-    if signature_bytes.len() != 64 {
-        return Err(error_mapper(format!(
-            "{label} JWT signature must decode to 64 bytes, got {}",
-            signature_bytes.len()
-        )));
-    }
-    let mut signature_array = [0u8; 64];
-    signature_array.copy_from_slice(&signature_bytes);
-    let header = serde_json::from_slice(&header_bytes)
-        .map_err(|error| error_mapper(format!("{label} JWT header is not valid JSON: {error}")))?;
-    let payload = serde_json::from_slice(&payload_bytes).map_err(|error| {
-        error_mapper(format!("{label} JWT payload is not valid JSON: {error}"))
-    })?;
-    Ok((header, payload, signing_input, Signature::from_bytes(&signature_array)))
+    decode_compact_jwt_without_signature(compact, label, CredentialError::InvalidOid4vpResponse)
 }

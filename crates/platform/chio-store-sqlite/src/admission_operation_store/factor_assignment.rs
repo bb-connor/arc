@@ -1775,14 +1775,9 @@ fn decode_factor_json<T>(bytes: &[u8], label: &str) -> Result<T, AdmissionOperat
 where
     T: for<'de> Deserialize<'de> + Serialize,
 {
-    let value: T = serde_json::from_slice(bytes)
-        .map_err(|error| invariant(format!("factor {label} is invalid: {error}")))?;
-    let canonical = canonical_json_bytes(&value)
-        .map_err(|error| invariant(format!("factor {label} encoding failed: {error}")))?;
-    if canonical != bytes {
-        return Err(invariant(format!("factor {label} is not canonical")));
-    }
-    Ok(value)
+    chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+        .and_then(|input| input.decode_canonical())
+        .map_err(|error| invariant(format!("factor {label} is invalid: {error}")))
 }
 
 fn factor_sqlite_error(error: rusqlite::Error) -> AdmissionOperationStoreError {

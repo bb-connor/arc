@@ -22,6 +22,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::CliError;
 
+#[cfg(test)]
+#[path = "passport_verifier/tests/signed_readback.rs"]
+mod signed_readback_tests;
+
 const VERIFIER_POLICY_REGISTRY_VERSION: &str = "chio.passport-verifier-policies.v1";
 const PASSPORT_STATUS_REGISTRY_VERSION: &str = "chio.passport-status-registry.v1";
 const PASSPORT_ISSUANCE_REGISTRY_VERSION: &str = "chio.passport-issuance-offers.v1";
@@ -67,17 +71,19 @@ impl Default for VerifierPolicyRegistry {
 
 impl VerifierPolicyRegistry {
     pub fn load(path: &Path) -> Result<Self, CliError> {
-        match fs::read(path) {
+        match crate::signed_input::read_bounded(path) {
             Ok(bytes) => {
-                let mut registry: Self = serde_json::from_slice(&bytes)?;
+                let registry: Self = crate::signed_input::decode(&bytes)?;
                 if registry.version != VERIFIER_POLICY_REGISTRY_VERSION {
                     return Err(CliError::policy_error(format!(
                         "unsupported verifier policy registry version: {}",
                         registry.version
                     )));
                 }
-                registry.version = VERIFIER_POLICY_REGISTRY_VERSION.to_string();
-                for document in registry.policies.values() {
+                for (key, document) in &registry.policies {
+                    if key != &document.body.policy_id {
+                        return Err(CliError::RecordBinding("policy_id"));
+                    }
                     verify_signed_passport_verifier_policy(document)
                         .map_err(|error| CliError::policy_error(error.to_string()))?;
                 }
@@ -219,22 +225,24 @@ impl Default for PassportIssuanceOfferRegistry {
 
 impl PassportStatusRegistry {
     pub fn load(path: &Path) -> Result<Self, CliError> {
-        match fs::read(path) {
+        match crate::signed_input::read_bounded(path) {
             Ok(bytes) => {
-                let mut registry: Self = serde_json::from_slice(&bytes)?;
+                let registry: Self = crate::signed_input::decode(&bytes)?;
                 if registry.version != PASSPORT_STATUS_REGISTRY_VERSION {
                     return Err(CliError::policy_error(format!(
                         "unsupported passport status registry version: {}",
                         registry.version
                     )));
                 }
-                registry.version = PASSPORT_STATUS_REGISTRY_VERSION.to_string();
-                for record in registry.passports.values_mut() {
-                    if record.updated_at == 0 {
-                        record.updated_at = record.revoked_at.unwrap_or(record.published_at);
+                for (key, record) in &registry.passports {
+                    if key != &record.passport_id {
+                        return Err(CliError::RecordBinding("passport_id"));
                     }
-                }
-                for record in registry.passports.values() {
+                    if record.updated_at == 0 {
+                        return Err(CliError::policy_error(
+                            "passport updated_at must be present and nonzero",
+                        ));
+                    }
                     verify_passport_lifecycle_record(record)?;
                 }
                 Ok(registry)
@@ -424,17 +432,19 @@ impl PassportStatusRegistry {
 
 impl PassportIssuanceOfferRegistry {
     pub fn load(path: &Path) -> Result<Self, CliError> {
-        match fs::read(path) {
+        match crate::signed_input::read_bounded(path) {
             Ok(bytes) => {
-                let mut registry: Self = serde_json::from_slice(&bytes)?;
+                let registry: Self = crate::signed_input::decode(&bytes)?;
                 if registry.version != PASSPORT_ISSUANCE_REGISTRY_VERSION {
                     return Err(CliError::policy_error(format!(
                         "unsupported passport issuance registry version: {}",
                         registry.version
                     )));
                 }
-                registry.version = PASSPORT_ISSUANCE_REGISTRY_VERSION.to_string();
-                for record in registry.offers.values() {
+                for (key, record) in &registry.offers {
+                    if key != &record.offer_id {
+                        return Err(CliError::RecordBinding("offer_id"));
+                    }
                     verify_passport_issuance_offer_record(record)?;
                 }
                 Ok(registry)
@@ -863,7 +873,13 @@ impl PassportVerifierChallengeStore {
                 "challenge `{challenge_id}` expired before it could be fetched"
             )));
         }
-        let challenge: PassportPresentationChallenge = serde_json::from_str(&challenge_json)?;
+        let challenge: PassportPresentationChallenge =
+            crate::signed_input::decode(challenge_json.as_bytes())?;
+        if challenge_identifier(&challenge) != challenge_id
+            || unix_from_rfc3339(&challenge.expires_at)? != expires_at
+        {
+            return Err(CliError::RecordBinding("challenge_id/expires_at"));
+        }
         verify_passport_presentation_challenge(&challenge, now)
             .map_err(|error| CliError::policy_error(error.to_string()))?;
         transaction.commit()?;
@@ -1098,7 +1114,10 @@ impl Oid4vpVerifierTransactionStore {
                 "OID4VP request `{request_id}` expired before it could be fetched"
             )));
         }
-        let request: Oid4vpRequestObject = serde_json::from_str(&request_json)?;
+        let request: Oid4vpRequestObject = crate::signed_input::decode(request_json.as_bytes())?;
+        if request.jti != request_id || request.exp != expires_at {
+            return Err(CliError::RecordBinding("request_id/expires_at"));
+        }
         transaction.commit()?;
         Ok((request, request_jwt))
     }
@@ -1155,11 +1174,9 @@ impl Oid4vpVerifierTransactionStore {
             )?;
             status = WalletExchangeTransactionStatus::Expired;
         }
-        let request: Oid4vpRequestObject = serde_json::from_str(&request_json)?;
-        if request.jti != request_id {
-            return Err(CliError::cli_other_error(format!(
-                "stored OID4VP request payload did not match request_id `{request_id}`"
-            )));
+        let request: Oid4vpRequestObject = crate::signed_input::decode(request_json.as_bytes())?;
+        if request.jti != request_id || request.iat != issued_at || request.exp != expires_at {
+            return Err(CliError::RecordBinding("request_id/issued_at/expires_at"));
         }
         let transaction_state = build_wallet_exchange_transaction_state(
             &request.jti,

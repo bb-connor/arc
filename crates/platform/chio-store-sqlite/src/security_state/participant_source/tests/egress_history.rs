@@ -80,9 +80,7 @@ fn expired_stale_and_committed_fences_remain_exact_migratable_history() -> TestR
             chio_security_types::clock::ClockReading,
             chio_security_types::clock::ClockError,
         > {
-            let value: chio_security_types::ports::PortResult<u64> =
-                (|| Ok(self.0.load(Ordering::Acquire)))();
-            let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+            let value = self.0.load(Ordering::Acquire);
             chio_security_types::clock::Clock::read(
                 &chio_security_types::clock::FixedClock::from_millis(value),
             )

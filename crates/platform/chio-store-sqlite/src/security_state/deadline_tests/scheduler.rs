@@ -9,7 +9,9 @@ fn lineage_renewal_cutoff_overflow_preserves_scheduler_rows() -> TestResult {
     fixture.clock.0.store(now, Ordering::Release);
     request.now_unix_ms = now;
     request.lease_expires_at_unix_ms = now + 1;
-    let error = fixture.store.claim_due(&request).unwrap_err();
+    let Err(error) = fixture.store.claim_due(&request) else {
+        panic!("overflow must reject the scheduler claim");
+    };
     assert_eq!(error.kind(), PortErrorKind::Unavailable);
     assert_eq!(
         error.code().as_str(),

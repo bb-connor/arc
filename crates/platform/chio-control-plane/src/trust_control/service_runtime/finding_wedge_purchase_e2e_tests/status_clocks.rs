@@ -18,14 +18,11 @@ pub(super) struct FinalBoundaryStatusAdmissionClock {
 
 impl trusted_time::Clock for FinalBoundaryStatusAdmissionClock {
     fn read(&self) -> core::result::Result<trusted_time::ClockReading, trusted_time::ClockError> {
-        let value: Result<u64, String> = (|| {
-            if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
-                Ok(self.fresh_now)
-            } else {
-                Ok(self.final_now)
-            }
-        })();
-        let value = value.map_err(|_| trusted_time::ClockError::Unavailable)?;
+        let value = if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+            self.fresh_now
+        } else {
+            self.final_now
+        };
         trusted_time::Clock::read(&trusted_time::FixedClock::new(value))
     }
 }
@@ -38,15 +35,11 @@ pub(super) struct FinalBoundaryRetractionClock {
 
 impl trusted_time::Clock for FinalBoundaryRetractionClock {
     fn read(&self) -> core::result::Result<trusted_time::ClockReading, trusted_time::ClockError> {
-        let value: Result<u64, chio_guards::finding_retraction::FindingRetractionResolveError> =
-            (|| {
-                if self.calls.fetch_add(1, Ordering::SeqCst) < 2 {
-                    Ok(self.fresh_now)
-                } else {
-                    Ok(self.final_now)
-                }
-            })();
-        let value = value.map_err(|_| trusted_time::ClockError::Unavailable)?;
+        let value = if self.calls.fetch_add(1, Ordering::SeqCst) < 2 {
+            self.fresh_now
+        } else {
+            self.final_now
+        };
         trusted_time::Clock::read(&trusted_time::FixedClock::new(value))
     }
 }

@@ -1217,8 +1217,12 @@ fn decode_row(raw: RawOperationRow) -> Result<StoredOperation, AdmissionOperatio
     if raw.operation_json.is_empty() || raw.operation_json.len() > MAX_PERSISTED_OPERATION_BYTES {
         return Err(invariant("persisted admission operation size is invalid"));
     }
-    let persisted: PersistedAdmissionOperationV1 = serde_json::from_slice(&raw.operation_json)
-        .map_err(|error| invariant(format!("persisted admission operation is invalid: {error}")))?;
+    let persisted: PersistedAdmissionOperationV1 =
+        chio_core::canonical::UntrustedJsonText::from_wire(&raw.operation_json, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| {
+                invariant(format!("persisted admission operation is invalid: {error}"))
+            })?;
     let operation = AdmissionOperationV1::from_persisted(persisted)?;
     let canonical = encode_operation(&operation)?;
     if canonical != raw.operation_json {
@@ -1542,7 +1546,9 @@ pub(crate) fn receipt_projection_error(error: AdmissionOperationStoreError) -> R
 }
 
 fn decode_projection_receipt(bytes: Vec<u8>) -> Result<ChioReceipt, ReceiptStoreError> {
-    let receipt: ChioReceipt = serde_json::from_slice(&bytes)?;
+    let receipt: ChioReceipt =
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())?;
     if canonical_json_bytes(&receipt)
         .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         != bytes

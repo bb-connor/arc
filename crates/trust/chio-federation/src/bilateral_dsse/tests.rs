@@ -637,6 +637,24 @@ fn payload_decode_failures_report_the_protocol_stage() {
 }
 
 #[test]
+fn payload_size_limit_applies_before_base64_decode_and_pae_allocation() {
+    let envelope = DsseEnvelope {
+        payload_type: PAYLOAD_TYPE_IN_TOTO.into(),
+        payload: "%".repeat((4_usize * 1024 * 1024).div_ceil(3) * 4 + 1),
+        signatures: Vec::new(),
+    };
+    for error in [
+        envelope.decode_statement().unwrap_err(),
+        envelope.pae_bytes().unwrap_err(),
+    ] {
+        assert_eq!(error.code(), "dsse.malformed");
+        assert!(
+            matches!(error, BilateralCoSigningError::CanonicalJson(message) if message == "dsse.malformed: payload exceeds size limit")
+        );
+    }
+}
+
+#[test]
 fn keyid_is_sha256_of_raw_ed25519_public_key_bytes() {
     // Key-identifier invariant: the spec's keyid contract is
     // SHA-256 of RAW key material (Ed25519 = 32 verifying-key

@@ -891,6 +891,11 @@ pub(crate) async fn handle_submit_finding_status_intent(
     intent_response(record, outcome == FindingStatusWriteOutcome::ExactReplay)
 }
 
+fn status_clock_now() -> Result<u64, chio_security_types::clock::ClockError> {
+    chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
+        .map(|now| now.as_secs())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1515,9 +1520,7 @@ mod tests {
                 chio_security_types::clock::ClockReading,
                 chio_security_types::clock::ClockError,
             > {
-                let value: Result<u64, String> = (|| Ok(self.0))();
-                let value =
-                    value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+                let value = self.0;
                 chio_security_types::clock::Clock::read(
                     &chio_security_types::clock::FixedClock::new(value),
                 )
@@ -1971,9 +1974,4 @@ mod tests {
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         Ok(())
     }
-}
-
-fn status_clock_now() -> Result<u64, chio_security_types::clock::ClockError> {
-    chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
-        .map(|now| now.as_secs())
 }

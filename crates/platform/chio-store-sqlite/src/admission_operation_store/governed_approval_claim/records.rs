@@ -461,7 +461,9 @@ fn canonical(value: &impl Serialize) -> Result<Vec<u8>, AdmissionOperationStoreE
 fn decode<T: serde::de::DeserializeOwned + Serialize>(
     bytes: &[u8],
 ) -> Result<T, AdmissionOperationStoreError> {
-    let value: T = serde_json::from_slice(bytes).map_err(|error| invariant(error.to_string()))?;
+    let value: T = chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| invariant(error.to_string()))?;
     if canonical(&value)? != bytes {
         return Err(invariant("approval participant record is not canonical"));
     }

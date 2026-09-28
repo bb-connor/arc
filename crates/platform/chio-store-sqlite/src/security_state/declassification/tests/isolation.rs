@@ -1,5 +1,125 @@
 use super::*;
 
+fn assert_exact_tenant_reads(
+    reader: ScopedReader<'_>,
+    consumed: &DeclassificationConsumptionEvidenceCommit,
+) -> TestResult {
+    let mut query = DeclassificationUseQuery {
+        tenant_id: consumed.consumption.tenant_id.clone(),
+        grant_id: consumed.consumption.grant_id.clone(),
+    };
+    assert!(records::load_use(reader, &query)?.is_some());
+    query.tenant_id = TenantId::new("foreign-tenant")?;
+    assert_eq!(records::load_use(reader, &query)?, None);
+    let mut evidence = evidence_query(consumed, DeclassificationEvidencePhase::Consumption);
+    let owned = records::load_evidence(reader, &evidence)?.ok_or("missing owned evidence")?;
+    records::verify_identity(reader, &owned)?;
+    evidence.tenant_id = query.tenant_id.clone();
+    assert_eq!(records::load_evidence(reader, &evidence)?, None);
+    let mut forged = owned;
+    forged.tenant_id = query.tenant_id.clone();
+    assert_eq!(
+        records::verify_identity(reader, &forged),
+        Err(PortError::integrity_failure())
+    );
+    assert!(records::pending(
+        reader,
+        Some(&query.tenant_id),
+        Some(&query.grant_id),
+        u64::MAX,
+        10
+    )?
+    .is_empty());
+    Ok(())
+}
+
+#[test]
+fn exact_declassification_identifiers_are_tenant_bound_in_both_scopes() -> TestResult {
+    with_flow_sql_fixture(false, |connection| {
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        seed_lifecycle(&tx, A)?;
+        let state = ScopedMutation::native_for_test(&tx, A);
+        state.seal_declassification_live_dispatch()?;
+        let consumed = consumption("tenant-a", "exact-grant")?;
+        state.commit_declassification_consumption_evidence(&consumed, || Ok(1_000))?;
+        assert_exact_tenant_reads(state.reader(), &consumed)?;
+        let outcome = release(&consumed)?;
+        state.commit_declassification_outcome_evidence(&outcome)?;
+        for (phase, receipt) in [
+            (
+                DeclassificationEvidencePhase::Consumption,
+                &consumed.receipt,
+            ),
+            (DeclassificationEvidencePhase::Outcome, &outcome.receipt),
+        ] {
+            state.acknowledge_declassification_evidence(&ack(
+                &consumed.consumption.grant_id,
+                receipt,
+                phase,
+            ))?;
+        }
+        state.compact_declassification_evidence(&compaction_request(&consumed, &outcome)?)?;
+        assert_eq!(
+            state.commit_declassification_consumption_evidence(&consumed, || Ok(1_000)),
+            Err(PortError::conflict())
+        );
+        let foreign = consumption("foreign-tenant", "exact-grant")?;
+        assert_eq!(
+            state.commit_declassification_consumption_evidence(&foreign, || Ok(1_000))?,
+            DeclassificationConsume::Consumed
+        );
+
+        tx.rollback()?;
+        Ok(())
+    })?;
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("exact-declassification.sqlite");
+    let consumed = consumption("tenant-a", "exact-grant")?;
+    {
+        let store = SqliteSecurityStateStore::open_with_trusted_clock(
+            &path,
+            Arc::new(chio_security_types::clock::FixedClock::from_millis(1_000)),
+        )?;
+        store.seal_declassification_live_dispatch()?;
+        store.commit_declassification_consumption_evidence(&consumed)?;
+        let connection = store.connection()?;
+        assert_exact_tenant_reads(ScopedReader::legacy(&connection), &consumed)?;
+    }
+    let reopened = SqliteSecurityStateStore::open_with_trusted_clock(
+        &path,
+        Arc::new(chio_security_types::clock::FixedClock::from_millis(1_000)),
+    )?;
+    let connection = reopened.connection()?;
+    assert_exact_tenant_reads(ScopedReader::legacy(&connection), &consumed)?;
+    drop(connection);
+    let outcome = release(&consumed)?;
+    reopened.commit_declassification_outcome_evidence(&outcome)?;
+    for (phase, receipt) in [
+        (
+            DeclassificationEvidencePhase::Consumption,
+            &consumed.receipt,
+        ),
+        (DeclassificationEvidencePhase::Outcome, &outcome.receipt),
+    ] {
+        reopened.acknowledge_declassification_evidence(&ack(
+            &consumed.consumption.grant_id,
+            receipt,
+            phase,
+        ))?;
+    }
+    reopened.compact_declassification_evidence(&compaction_request(&consumed, &outcome)?)?;
+    assert_eq!(
+        reopened.commit_declassification_consumption_evidence(&consumed),
+        Err(PortError::conflict())
+    );
+    let foreign = consumption("foreign-tenant", "exact-grant")?;
+    assert_eq!(
+        reopened.commit_declassification_consumption_evidence(&foreign)?,
+        DeclassificationConsume::Consumed
+    );
+    Ok(())
+}
+
 #[test]
 fn fresh_native_consumption_and_retry_bounds_fail_without_partial_writes() -> TestResult {
     with_flow_sql_fixture(false, |connection| {

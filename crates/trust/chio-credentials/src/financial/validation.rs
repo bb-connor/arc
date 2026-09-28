@@ -352,11 +352,13 @@ fn validate_financial_source_disclosure(
                 {
                     return invalid_financial("financial source bundle size is invalid");
                 }
-                let value: serde_json::Value = serde_json::from_slice(bytes)
-                    .map_err(|error| invalid_financial_error(error.to_string()))?;
-                if canonical_json_bytes(&value)? != bytes
-                    || domain_digest_bytes(FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN, bytes)
-                        != artifact.artifact_digest
+                let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+                    bytes,
+                    MAX_FINANCIAL_SOURCE_ARTIFACT_BYTES,
+                )?
+                .decode_canonical()?;
+                if domain_digest_bytes(FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN, bytes)
+                    != artifact.artifact_digest
                     || value
                         .get("body")
                         .and_then(|body| body.get("schema"))
@@ -389,8 +391,11 @@ fn validate_bundled_source_signers(
         return Ok(());
     };
     for artifact in artifacts {
-        let value: serde_json::Value = serde_json::from_str(&artifact.canonical_artifact)
-            .map_err(|error| invalid_financial_error(error.to_string()))?;
+        let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+            artifact.canonical_artifact.as_bytes(),
+            MAX_FINANCIAL_SOURCE_ARTIFACT_BYTES,
+        )?
+        .decode_canonical()?;
         let signer = value
             .get("signerKey")
             .ok_or_else(|| invalid_financial_error("bundled source signer is missing"))?;

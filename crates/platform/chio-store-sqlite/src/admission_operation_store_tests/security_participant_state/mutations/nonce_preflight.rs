@@ -210,6 +210,24 @@ fn preflight_rejects_wrong_phase_lease_identity_and_observation_before_writing()
         input.key().clone(),
         InformationLabel::bottom(),
     )?;
+    let mut foreign_key = input.key().clone();
+    foreign_key.tenant_id = TenantId::new("foreign-tenant")?;
+    let foreign = NativeSecurityNoncePreflightJoinRequestV1::new(
+        input.operation_id().clone(),
+        foreign_key,
+        input.input_label().clone(),
+    )?;
+    assert!(fixture
+        .store
+        .join_native_security_nonce_preflight(
+            &operation,
+            &lease,
+            &binding,
+            &context,
+            &foreign,
+            now_ms(),
+        )
+        .is_err());
     assert!(fixture
         .store
         .join_native_security_nonce_preflight(

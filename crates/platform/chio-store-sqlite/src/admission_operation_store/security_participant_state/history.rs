@@ -249,8 +249,10 @@ pub(super) fn load(
         return Ok(None);
     };
     let bytes = bytes.ok_or_else(|| invalid("native mutation record exceeds bounds"))?;
-    let record: Record = serde_json::from_slice(&bytes)
-        .map_err(|_| invalid("native mutation record is not bounded typed data"))?;
+    let record: Record =
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| invalid("native mutation record is not bounded typed data"))?;
     let operation = AdmissionOperationV1::from_persisted(record.operation.clone())?;
     if record.authority.as_str() != authority
         || record.sequence != sequence

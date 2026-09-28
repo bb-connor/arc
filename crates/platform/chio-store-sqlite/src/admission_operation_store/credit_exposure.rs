@@ -1263,14 +1263,13 @@ fn decode_credit_exposure_record(
             "persisted credit exposure record has invalid size",
         ));
     }
-    let record: CreditExposureReservationRecordV1 = serde_json::from_slice(bytes)
-        .map_err(|error| invariant(format!("credit exposure record decoding failed: {error}")))?;
+    let record: CreditExposureReservationRecordV1 =
+        chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_CREDIT_EXPOSURE_RECORD_BYTES)
+            .and_then(|input| input.decode_canonical())
+            .map_err(|error| {
+                invariant(format!("credit exposure record decoding failed: {error}"))
+            })?;
     record.validate().map_err(credit_error)?;
-    if encode_credit_exposure_record(&record)? != bytes {
-        return Err(invariant(
-            "persisted credit exposure record is not canonical",
-        ));
-    }
     Ok(record)
 }
 

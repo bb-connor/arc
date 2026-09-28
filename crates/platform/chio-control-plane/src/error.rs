@@ -15,6 +15,12 @@ use crate::policy;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CliError {
+    #[error("record storage binding does not match {0}")]
+    RecordBinding(&'static str),
+
+    #[error(transparent)]
+    SignedJson(#[from] chio_core::canonical::UntrustedJsonError),
+
     #[error("{0}")]
     Core(#[from] chio_core::error::Error),
 
@@ -178,6 +184,14 @@ impl CliError {
 
     pub fn report(&self) -> StructuredErrorReport {
         match self {
+            Self::SignedJson(error) => self.report_with_context(
+                error.code(), serde_json::json!({}),
+                "Use an unambiguous JSON document matching the signed input contract.",
+            ),
+            Self::RecordBinding(field) => self.report_with_context(
+                POLICY_CONSTRAINT_INVALID.urn, serde_json::json!({ "field": field }),
+                "Restore the storage key and projection matching the recorded document.",
+            ),
             Self::Core(error) => self.report_with_context(
                 "CHIO-CLI-CORE",
                 serde_json::json!({ "source": error.to_string() }),

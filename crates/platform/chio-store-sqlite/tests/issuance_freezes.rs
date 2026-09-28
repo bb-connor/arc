@@ -1311,3 +1311,6 @@ fn installed_freeze_is_maintained_while_applying_and_rolling_back_but_not_after_
         vec!["maintenance", "active", "maintenance", "active"]
     );
 }
+
+#[path = "issuance_freezes/tenant_isolation.rs"]
+mod tenant_isolation;

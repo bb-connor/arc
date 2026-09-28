@@ -9,8 +9,7 @@ pub const CHIO_PASSPORT_SD_JWT_VC_CREDENTIAL_CONFIGURATION_ID: &str =
 pub const CHIO_PASSPORT_SD_JWT_VC_FORMAT: &str = "application/dc+sd-jwt";
 pub const CHIO_PASSPORT_SD_JWT_VC_TYPE: &str =
     "https://chio.world/credentials/types/chio-passport-sd-jwt-vc/v1";
-pub const CHIO_PASSPORT_SD_JWT_VC_TYPE_METADATA_PATH: &str =
-    "/.well-known/chio-passport-sd-jwt-vc";
+pub const CHIO_PASSPORT_SD_JWT_VC_TYPE_METADATA_PATH: &str = "/.well-known/chio-passport-sd-jwt-vc";
 pub const OID4VCI_JWKS_PATH: &str = "/.well-known/jwks.json";
 const SD_JWT_VC_TYP: &str = "dc+sd-jwt";
 const SD_JWT_VC_HASH_ALG: &str = "sha-256";
@@ -42,6 +41,11 @@ impl PortableEd25519Jwk {
         if self.crv != "Ed25519" {
             return Err(CredentialError::InvalidOid4vciCredentialResponse(
                 "portable JWK crv must be `Ed25519`".to_string(),
+            ));
+        }
+        if self.x.len() != 43 {
+            return Err(CredentialError::InvalidOid4vciCredentialResponse(
+                "portable JWK x must contain 43 base64url characters".to_string(),
             ));
         }
         let bytes = URL_SAFE_NO_PAD.decode(self.x.as_bytes()).map_err(|error| {
@@ -236,7 +240,9 @@ pub fn build_chio_passport_sd_jwt_type_metadata(
         issuer_identity: portable_identity_binding.issuer_identity.clone(),
         portable_claim_catalog: portable_claim_catalog.clone(),
         portable_identity_binding: portable_identity_binding.clone(),
-        type_metadata_url: format!("{credential_issuer}{CHIO_PASSPORT_SD_JWT_VC_TYPE_METADATA_PATH}"),
+        type_metadata_url: format!(
+            "{credential_issuer}{CHIO_PASSPORT_SD_JWT_VC_TYPE_METADATA_PATH}"
+        ),
         jwks_url: format!("{credential_issuer}{OID4VCI_JWKS_PATH}"),
         always_disclosed_claims: portable_claim_catalog.always_disclosed_claims,
         selectively_disclosable_claims: portable_claim_catalog.selectively_disclosable_claims,
@@ -291,7 +297,10 @@ pub fn issue_chio_passport_sd_jwt_vc(
         "vct".to_string(),
         Value::String(CHIO_PASSPORT_SD_JWT_VC_TYPE.to_string()),
     );
-    payload.insert("_sd_alg".to_string(), Value::String(SD_JWT_VC_HASH_ALG.to_string()));
+    payload.insert(
+        "_sd_alg".to_string(),
+        Value::String(SD_JWT_VC_HASH_ALG.to_string()),
+    );
     payload.insert(
         "cnf".to_string(),
         json!({
@@ -308,7 +317,11 @@ pub fn issue_chio_passport_sd_jwt_vc(
     );
     payload.insert(
         "chio_credential_count".to_string(),
-        Value::Number(u64::try_from(projection.credential_count).unwrap_or(u64::MAX).into()),
+        Value::Number(
+            u64::try_from(projection.credential_count)
+                .unwrap_or(u64::MAX)
+                .into(),
+        ),
     );
     if let Some(status) = passport_status {
         payload.insert(
@@ -335,7 +348,9 @@ pub fn issue_chio_passport_sd_jwt_vc(
                     )));
                 }
             }
-            .map_err(|error| CredentialError::InvalidOid4vciCredentialResponse(error.to_string()))?;
+            .map_err(|error| {
+                CredentialError::InvalidOid4vciCredentialResponse(error.to_string())
+            })?;
             Ok(disclosure_entry(&claim, value))
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -349,14 +364,18 @@ pub fn issue_chio_passport_sd_jwt_vc(
         ),
     );
 
-    let header_b64 = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&header).map_err(|error| {
-        CredentialError::InvalidOid4vciCredentialResponse(error.to_string())
-    })?);
-    let payload_b64 = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&Value::Object(payload)).map_err(
-        |error| CredentialError::InvalidOid4vciCredentialResponse(error.to_string()),
-    )?);
+    let header_b64 =
+        URL_SAFE_NO_PAD.encode(serde_json::to_vec(&header).map_err(|error| {
+            CredentialError::InvalidOid4vciCredentialResponse(error.to_string())
+        })?);
+    let payload_b64 = URL_SAFE_NO_PAD.encode(
+        serde_json::to_vec(&Value::Object(payload)).map_err(|error| {
+            CredentialError::InvalidOid4vciCredentialResponse(error.to_string())
+        })?,
+    );
     let signing_input = format!("{header_b64}.{payload_b64}");
-    let signature_b64 = URL_SAFE_NO_PAD.encode(issuer_keypair.sign(signing_input.as_bytes()).to_bytes());
+    let signature_b64 =
+        URL_SAFE_NO_PAD.encode(issuer_keypair.sign(signing_input.as_bytes()).to_bytes());
     let compact_jwt = format!("{signing_input}.{signature_b64}");
     let compact = format!(
         "{}~{}~{}~{}~",
@@ -377,60 +396,35 @@ pub fn verify_chio_passport_sd_jwt_vc(
     issuer_public_key: &PublicKey,
     now: u64,
 ) -> Result<ChioPassportSdJwtVcVerification, CredentialError> {
-    let segments = compact.split('~').collect::<Vec<_>>();
-    if segments.len() < 2 {
+    if compact.len() > 16 * 1024 * 1024 {
         return Err(CredentialError::InvalidOid4vciCredentialResponse(
+            "portable credential exceeds size limit".to_string(),
+        ));
+    }
+    let (compact_jwt, disclosure_text) = compact.split_once('~').ok_or_else(|| {
+        CredentialError::InvalidOid4vciCredentialResponse(
             "portable credential must include a compact JWT plus disclosures".to_string(),
-        ));
-    }
-    let compact_jwt = segments[0];
-    let disclosures = segments
-        .iter()
-        .skip(1)
-        .filter(|value| !value.is_empty())
-        .copied()
-        .collect::<Vec<_>>();
-    let jwt_parts = compact_jwt.split('.').collect::<Vec<_>>();
-    if jwt_parts.len() != 3 {
+        )
+    })?;
+    let disclosures = disclosure_text.split('~').filter(|value| !value.is_empty());
+    let (header, payload, signing_input, signature) = decode_compact_jwt_without_signature(
+        compact_jwt,
+        "portable credential",
+        CredentialError::InvalidOid4vciCredentialResponse,
+    )?;
+    if header.get("alg").and_then(Value::as_str) != Some("EdDSA")
+        || header.get("typ").and_then(Value::as_str) != Some(SD_JWT_VC_TYP)
+    {
         return Err(CredentialError::InvalidOid4vciCredentialResponse(
-            "portable credential JWT must contain exactly three compact segments".to_string(),
+            "portable credential JWT header must declare EdDSA and dc+sd-jwt".to_string(),
         ));
     }
-    let signing_input = format!("{}.{}", jwt_parts[0], jwt_parts[1]);
-    let signature_bytes = URL_SAFE_NO_PAD
-        .decode(jwt_parts[2].as_bytes())
-        .map_err(|error| {
-            CredentialError::InvalidOid4vciCredentialResponse(format!(
-                "portable credential signature is not valid base64url: {error}"
-            ))
-        })?;
-    if signature_bytes.len() != 64 {
-        return Err(CredentialError::InvalidOid4vciCredentialResponse(format!(
-            "portable credential signature must decode to 64 bytes, got {}",
-            signature_bytes.len()
-        )));
-    }
-    let mut signature_array = [0u8; 64];
-    signature_array.copy_from_slice(&signature_bytes);
-    let signature = Signature::from_bytes(&signature_array);
     if !issuer_public_key.verify(signing_input.as_bytes(), &signature) {
         return Err(CredentialError::InvalidOid4vciCredentialResponse(
             "portable credential signature verification failed".to_string(),
         ));
     }
 
-    let payload_bytes = URL_SAFE_NO_PAD
-        .decode(jwt_parts[1].as_bytes())
-        .map_err(|error| {
-            CredentialError::InvalidOid4vciCredentialResponse(format!(
-                "portable credential payload is not valid base64url: {error}"
-            ))
-        })?;
-    let payload: Value = serde_json::from_slice(&payload_bytes).map_err(|error| {
-        CredentialError::InvalidOid4vciCredentialResponse(format!(
-            "portable credential payload is not valid JSON: {error}"
-        ))
-    })?;
     let payload_object = payload.as_object().ok_or_else(|| {
         CredentialError::InvalidOid4vciCredentialResponse(
             "portable credential payload must be a JSON object".to_string(),
@@ -552,8 +546,8 @@ pub fn verify_chio_passport_sd_jwt_vc(
         })
         .collect::<Result<BTreeSet<_>, _>>()?;
     let actual_digests = disclosures
-        .iter()
-        .map(|disclosure| sd_jwt_disclosure_digest(disclosure))
+        .clone()
+        .map(sd_jwt_disclosure_digest)
         .collect::<BTreeSet<_>>();
     if !actual_digests.is_subset(&expected_digests) {
         return Err(CredentialError::InvalidOid4vciCredentialResponse(
@@ -605,11 +599,7 @@ fn disclosure_entry(key: &str, value: Value) -> SdJwtDisclosureEntry {
     let encoded = {
         let mut salt = [0u8; 16];
         OsRng.fill_bytes(&mut salt);
-        let payload = json!([
-            URL_SAFE_NO_PAD.encode(salt),
-            key,
-            value,
-        ]);
+        let payload = json!([URL_SAFE_NO_PAD.encode(salt), key, value,]);
         let bytes = match serde_json::to_vec(&payload) {
             Ok(bytes) => bytes,
             Err(_) => unreachable!("sd-jwt disclosure payload is always serializable"),
@@ -625,16 +615,26 @@ fn sd_jwt_disclosure_digest(disclosure: &str) -> String {
 }
 
 fn parse_sd_jwt_disclosure(disclosure: &str) -> Result<(String, String, Value), CredentialError> {
-    let bytes = URL_SAFE_NO_PAD.decode(disclosure.as_bytes()).map_err(|error| {
-        CredentialError::InvalidOid4vciCredentialResponse(format!(
-            "portable credential disclosure is not valid base64url: {error}"
-        ))
-    })?;
-    let array: Vec<Value> = serde_json::from_slice(&bytes).map_err(|error| {
-        CredentialError::InvalidOid4vciCredentialResponse(format!(
-            "portable credential disclosure is not valid JSON: {error}"
-        ))
-    })?;
+    if disclosure.len() > jwt_decode::MAX_ENCODED_JSON_BYTES {
+        return Err(CredentialError::InvalidOid4vciCredentialResponse(
+            "portable credential disclosure exceeds size limit".to_string(),
+        ));
+    }
+    let bytes = URL_SAFE_NO_PAD
+        .decode(disclosure.as_bytes())
+        .map_err(|error| {
+            CredentialError::InvalidOid4vciCredentialResponse(format!(
+                "portable credential disclosure is not valid base64url: {error}"
+            ))
+        })?;
+    let array: Vec<Value> =
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, jwt_decode::MAX_JSON_BYTES)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| {
+                CredentialError::InvalidOid4vciCredentialResponse(format!(
+                    "portable credential disclosure is not valid JSON: {error}"
+                ))
+            })?;
     if array.len() != 3 {
         return Err(CredentialError::InvalidOid4vciCredentialResponse(
             "portable credential disclosures must be [salt, key, value] arrays".to_string(),

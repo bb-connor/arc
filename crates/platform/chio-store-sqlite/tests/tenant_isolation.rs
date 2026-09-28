@@ -52,6 +52,17 @@ fn point_reads_bind_ids_to_authenticated_tenants() -> Result<(), Box<dyn std::er
             .load_chio_receipt_with_context(&receipt.id, &ReceiptReadContext::admin_service())?
             .is_some());
     }
+    drop(store);
+    let store = SqliteReceiptStore::open(&path)?;
+    let context = ReceiptReadContext::authenticated_tenant("tenant-A");
+    assert!(store
+        .load_chio_receipt_with_context(&receipts[0].id, &context)?
+        .is_some());
+    for id in [&receipts[1].id, &receipts[2].id] {
+        assert!(store
+            .load_chio_receipt_with_context(id, &context)?
+            .is_none());
+    }
     for tenant in ["", " tenant-A", "tenant-A "] {
         assert!(matches!(
             store.load_chio_receipt_with_context(

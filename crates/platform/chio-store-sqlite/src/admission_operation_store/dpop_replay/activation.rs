@@ -141,7 +141,9 @@ pub(super) fn load_authority(
         return Ok(None);
     };
     let authority: DpopReplayAuthorityV1 =
-        serde_json::from_slice(&bytes).map_err(|_| "DPoP activation decode failed")?;
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| "DPoP activation decode failed")?;
     if canonical_json_bytes(&authority).map_err(|error| error.to_string())? != bytes {
         return Err("DPoP activation is not canonical".into());
     }

@@ -29,6 +29,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 #[path = "response_dispatch/scheduler_lease.rs"]
 mod scheduler_lease;
 
+#[path = "response_dispatch/tenant_isolation.rs"]
+mod tenant_isolation;
+
 fn now_unix_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -57,9 +60,7 @@ impl chio_security_types::clock::Clock for MutableSecurityStateClock {
         chio_security_types::clock::ClockReading,
         chio_security_types::clock::ClockError,
     > {
-        let value: chio_security_types::ports::PortResult<u64> =
-            (|| Ok(self.0.load(Ordering::Acquire)))();
-        let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+        let value = self.0.load(Ordering::Acquire);
         chio_security_types::clock::Clock::read(
             &chio_security_types::clock::FixedClock::from_millis(value),
         )

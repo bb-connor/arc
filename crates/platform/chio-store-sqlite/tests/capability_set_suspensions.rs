@@ -442,3 +442,6 @@ fn member_and_command_integrity_corruption_fail_closed() {
         PortErrorKind::IntegrityFailure
     );
 }
+
+#[path = "capability_set_suspensions/tenant_isolation.rs"]
+mod tenant_isolation;

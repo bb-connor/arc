@@ -76,11 +76,14 @@ pub(super) fn require_original(
                 .as_ref()
                 .ok_or_else(|| invalid("native output lacks its admitted security identity"))?,
         )?;
-        let request = serde_json::from_str(
-            raw.request_canonical_json
+        let request = chio_core::canonical::UntrustedJsonText::from_wire(
+            (raw.request_canonical_json
                 .as_deref()
-                .ok_or_else(|| invalid("native output lacks its frozen request"))?,
+                .ok_or_else(|| invalid("native output lacks its frozen request"))?)
+            .as_bytes(),
+            64 * 1024 * 1024,
         )
+        .and_then(|input| input.decode_signed())
         .map_err(invalid)?;
         original.validate_request_material(&request)?;
     }

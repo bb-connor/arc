@@ -191,9 +191,9 @@ fn frost_rotation_ceremony_commits_each_round_before_replay_after_restart() {
             .open(&recipient.config, &test_sealing_key(&recipient.config))
             .unwrap_or_else(|e| panic!("open outbound: {e}"));
         let secret = opened.secret_bytes();
-        assert_database_files_exclude(&fixture.database, &secret);
-        assert_database_files_exclude(&fixture.database, hex::encode(&secret).as_bytes());
-        let encoded = serde_json::to_vec(&*secret)
+        assert_database_files_exclude(&fixture.database, secret);
+        assert_database_files_exclude(&fixture.database, hex::encode(secret).as_bytes());
+        let encoded = serde_json::to_vec(secret)
             .unwrap_or_else(|error| panic!("encode test needle: {error}"));
         assert_database_files_exclude(&fixture.database, &encoded);
     }

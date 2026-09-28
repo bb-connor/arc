@@ -56,11 +56,12 @@ pub(in crate::admission_operation_store) fn verify_nonce_capture_approval(
         let bytes: Option<Vec<u8>> = row.get(0).map_err(sqlite_error)?;
         let bytes = bytes
             .ok_or_else(|| invariant("nonce capture approval token exceeds its storage bound"))?;
-        let token: GovernedApprovalToken =
-            serde_json::from_slice(&bytes).map_err(|error| invariant(error.to_string()))?;
-        if canonical_json_bytes(&token).map_err(|error| invariant(error.to_string()))? != bytes {
-            return Err(invariant("nonce capture approval token is not canonical"));
-        }
+        let token: GovernedApprovalToken = chio_core::canonical::UntrustedJsonText::from_wire(
+            &bytes,
+            MAX_PERSISTED_OPERATION_BYTES,
+        )
+        .and_then(|input| input.decode_canonical())
+        .map_err(|error| invariant(error.to_string()))?;
         tokens.push(token);
     }
     let token_digests = tokens
@@ -127,13 +128,12 @@ fn load_retained_proposal(
     };
     let proposal_bytes = proposal_bytes
         .ok_or_else(|| invariant("retained threshold proposal exceeds its storage bound"))?;
-    let proposal: ThresholdApprovalProposal =
-        serde_json::from_slice(&proposal_bytes).map_err(|error| invariant(error.to_string()))?;
-    if canonical_json_bytes(&proposal).map_err(|error| invariant(error.to_string()))?
-        != proposal_bytes
-    {
-        return Err(invariant("nonce capture proposal is not canonical"));
-    }
+    let proposal: ThresholdApprovalProposal = chio_core::canonical::UntrustedJsonText::from_wire(
+        &proposal_bytes,
+        MAX_PERSISTED_OPERATION_BYTES,
+    )
+    .and_then(|input| input.decode_canonical())
+    .map_err(|error| invariant(error.to_string()))?;
     Ok(Some(proposal))
 }
 

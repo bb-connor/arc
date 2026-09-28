@@ -143,7 +143,8 @@ pub(super) fn verify(
             ));
         }
         let snapshot = AdmissionOperationV1::from_persisted(
-            serde_json::from_slice::<PersistedAdmissionOperationV1>(&bytes)
+            chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed::<PersistedAdmissionOperationV1>())
                 .map_err(|error| invariant(error.to_string()))?,
         )?;
         if snapshot.state() != phase.state()

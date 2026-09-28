@@ -230,7 +230,8 @@ pub(super) fn verify_reservation(
         ));
     }
     let ready = AdmissionOperationV1::from_persisted(
-        serde_json::from_slice::<PersistedAdmissionOperationV1>(&ready_json)
+        chio_core::canonical::UntrustedJsonText::from_wire(&ready_json, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed::<PersistedAdmissionOperationV1>())
             .map_err(|error| invariant(error.to_string()))?,
     )?;
     if ready.binding() != operation.binding()

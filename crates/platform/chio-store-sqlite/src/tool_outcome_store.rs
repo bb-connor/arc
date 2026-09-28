@@ -888,7 +888,8 @@ fn verify_outcome_projection(
             |row| row.get(0),
         )
         .map_err(sqlite_error)?;
-    let persisted = serde_json::from_slice(&operation_json)
+    let persisted = chio_core::canonical::UntrustedJsonText::from_wire(&operation_json, 256 * 1024)
+        .and_then(|input| input.decode_canonical())
         .map_err(|error| invariant(format!("admission operation decode failed: {error}")))?;
     let operation = AdmissionOperationV1::from_persisted(persisted)
         .map_err(|error| invariant(error.to_string()))?;
@@ -1326,8 +1327,10 @@ fn load_outcome_connection(
     else {
         return Ok(None);
     };
-    let persisted: PersistedToolOutcomeRecordV1 = serde_json::from_slice(&encoded)
-        .map_err(|error| invariant(format!("tool outcome decode failed: {error}")))?;
+    let persisted: PersistedToolOutcomeRecordV1 =
+        chio_core::canonical::UntrustedJsonText::from_wire(&encoded, MAX_OUTCOME_RECORD_BYTES)
+            .and_then(|input| input.decode_canonical())
+            .map_err(|error| invariant(format!("tool outcome decode failed: {error}")))?;
     let record = ToolOutcomeRecordV1::from_persisted(persisted)
         .map_err(|error| invariant(error.to_string()))?;
     if record.operation_id().as_str() != operation_id
@@ -1380,8 +1383,10 @@ fn load_evaluation_connection(
     let Some((evaluation_id, outcome_id, version, lifecycle, encoded)) = row else {
         return Ok(None);
     };
-    let persisted: PersistedPostReturnEvaluationRecordV1 = serde_json::from_slice(&encoded)
-        .map_err(|error| invariant(format!("post-return evaluation decode failed: {error}")))?;
+    let persisted: PersistedPostReturnEvaluationRecordV1 =
+        chio_core::canonical::UntrustedJsonText::from_wire(&encoded, MAX_EVALUATION_RECORD_BYTES)
+            .and_then(|input| input.decode_canonical())
+            .map_err(|error| invariant(format!("post-return evaluation decode failed: {error}")))?;
     let record = PostReturnEvaluationRecordV1::from_persisted(persisted)
         .map_err(|error| invariant(error.to_string()))?;
     let canonical = record.to_persisted();

@@ -371,6 +371,40 @@ mod tests {
     }
 
     #[test]
+    fn exact_finding_id_is_tenant_bound_before_and_after_restart() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("tenant-finding.sqlite");
+        let digest = finding_payload_sha256("text/plain", b"private").unwrap();
+        let store = SqliteFindingPayloadStore::open(&path).unwrap();
+        store
+            .put(
+                &tenant(),
+                &key(7),
+                "exact-finding",
+                "text/plain",
+                &digest,
+                b"private",
+            )
+            .unwrap();
+        let check = |store: &SqliteFindingPayloadStore| {
+            assert_eq!(
+                store
+                    .get(&tenant(), &key(7), "exact-finding")
+                    .unwrap()
+                    .payload,
+                b"private"
+            );
+            assert!(matches!(
+                store.get(&TenantId::new("foreign"), &key(7), "exact-finding"),
+                Err(FindingPayloadStoreError::NotFound)
+            ));
+        };
+        check(&store);
+        drop(store);
+        check(&SqliteFindingPayloadStore::open(&path).unwrap());
+    }
+
+    #[test]
     fn sealed_payload_survives_restart_and_exact_replay() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("operator.db");

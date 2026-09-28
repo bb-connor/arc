@@ -1243,7 +1243,8 @@ fn response_receipt_cursor_is_plan_bound_and_exactly_cas_idempotent() {
         created_at_unix_ms,
         created_at_unix_ms + 10_000,
     );
-    let store = SqliteSecurityStateStore::open(directory.path().join("receipt-cursor.db"))
+    let path = directory.path().join("receipt-cursor.db");
+    let store = SqliteSecurityStateStore::open(&path)
         .unwrap_or_else(|error| panic!("security store open failed: {error}"));
     store
         .commit_dispatch(&request)
@@ -1318,8 +1319,20 @@ fn response_receipt_cursor_is_plan_bound_and_exactly_cas_idempotent() {
         store
             .load_receipt_cursor(&key)
             .unwrap_or_else(|error| panic!("receipt cursor load failed: {error}")),
-        Some(next)
+        Some(next.clone())
     );
+    let mut foreign_key = key.clone();
+    foreign_key.tenant_id = TenantId::new("foreign-tenant")
+        .unwrap_or_else(|error| panic!("foreign tenant: {error}"));
+    assert_eq!(store.load_receipt_cursor(&foreign_key)
+        .unwrap_or_else(|error| panic!("foreign cursor: {error}")), None);
+    drop(store);
+    let reopened = SqliteSecurityStateStore::open(&path)
+        .unwrap_or_else(|error| panic!("reopen cursor: {error}"));
+    assert_eq!(reopened.load_receipt_cursor(&key)
+        .unwrap_or_else(|error| panic!("owned cursor after restart: {error}")), Some(next));
+    assert_eq!(reopened.load_receipt_cursor(&foreign_key)
+        .unwrap_or_else(|error| panic!("foreign cursor after restart: {error}")), None);
 }
 
 #[test]

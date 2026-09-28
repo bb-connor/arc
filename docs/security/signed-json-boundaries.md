@@ -62,9 +62,9 @@ closed checkpoint bodies retain their typed integer-only decoder. These are
 explicit contracts, not permissive fallbacks. The constructor census and the
 remaining raw decoders in migrated files are pinned in
 [trust-boundary-inventory.json](trust-boundary-inventory.json), checked by
-`scripts/check-trust-boundaries.py`. This source gate requires review for changes
-in its named files; it does not infer the trust classification of arbitrary new
-APIs elsewhere in the workspace.
+`scripts/check-trust-boundaries.py`. The September 28 expansion below also pins decoder-bearing files across
+`crates/`. The gate requires review when a new file or decoder spelling appears;
+it does not infer the trust classification of arbitrary APIs.
 
 `UntrustedJsonError` supplies registered rule codes, redacted Display/Debug and
 inspectable sources. Receipt-store waiter snapshots share the original parser
@@ -95,6 +95,38 @@ in the intermediate value tree. String escaping writes directly into the output.
 No compatibility parser accepts older pretty-printed custody.
 The FROST store likewise uses constrained readers for all persisted record forms.
 
-The current source gate inventories 44 constrained constructors and ten sealed
+At that checkpoint the source gate inventoried 44 constrained constructors and ten sealed
 result types; it ignores decoder spellings inside comments and literals. This
 expands the reviewed owners, not the claim to every decoder in the workspace.
+
+## Signed-reader batch (2026-09-28)
+
+The source gate now pins 114 constrained-reader constructor occurrences in 88
+registered signed-reader files. Its wider lexical census contains 556 files and
+1,881 decoder spellings, including imported serde aliases, `from_reader`,
+`Deserializer` and custom `Deserialize` implementations. Multiplicity is retained.
+New decoder files fail until their disposition is recorded. The source filter
+excludes named test modules and masks `cfg(test)` items; it is not Rust name
+resolution and can include test fragments with unconventional names.
+
+The file dispositions deliberately separate 447 `raw-input-baseline` files,
+86 typed-value conversion files, 14 example/fuzz files and nine reviewed signed
+owners that still contain individually classified raw conversions. A baseline
+entry does not establish that input is unsigned, authenticated or safe. Those 447
+files remain semantic review work; packet 10.2 is open.
+
+| Migrated owner | Enforced boundary |
+| --- | --- |
+| Credentials and financial passports | Bounded original bytes before `Value`; native integers retained; bundled source artifacts require exact canonical bytes, artifact digests and existing source-signer checks. |
+| JWT and SD-JWT | Shared strict header/payload reader; segment bounds before base64 allocation; Ed25519 signature over the original compact preimage. SD-JWT also requires its supported signed header, bounds disclosures and preserves holder/disclosure-digest checks. |
+| Passport, issuance and certification registries | Bounded file reads, strict JSON, existing artifact validation plus exact map-key identity. Lifecycle timestamps must be present and nonzero. Stored challenge/request identity and expiry must agree with their row projections. |
+| Reputation policy files | Explicit YAML extension remains local operator configuration. JSON determines signed shape before typed decoding; malformed signed documents cannot fall through to a plain-policy/YAML interpretation. |
+| Finding purchase, recovery, status and finding artifacts | Shared exact typed-canonical reader with existing explicit I-JSON preflight. Duplicate canonical serialization was removed. |
+| DSSE and FROST | Bounded DSSE payload before base64 allocation and PAE construction; exact statement and embedded-receipt canonical bytes; exact completed FROST authorization bytes. Existing signature, roster, epoch and binding checks remain separate. |
+| Federation transport | Catchup, fanout, revocation and bilateral messages apply bounded strict decoding before their existing authenticated lane checks. |
+| Durable SQLite evidence | Tool outcomes, admission participants and projections, nonce/output/egress evidence, attested Finding batches and outbox use bounded original-byte decoding while retaining canonical/digest/row checks. These records are not all independently signed. |
+| IOU settlement | Insert/read verify the envelope signature; readback requires canonical bytes and matches receipt ID, tenant, IOU ID, amount, currency, timestamp and issuer to their stored projections. Embedded issuer integrity is not independent issuer authorization. |
+
+The [execution record](../reviews/2026-09-28-signed-reader-tenant-execution.md)
+records focused tests and calibrated production-reader bypasses. No hosted or
+workspace-wide qualification follows from this reader migration.

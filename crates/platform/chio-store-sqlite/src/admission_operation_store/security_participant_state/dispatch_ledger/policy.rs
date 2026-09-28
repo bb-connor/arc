@@ -57,11 +57,17 @@ pub(super) fn decode(
     }
     // Retain every policy field, including those owned by the policy evaluator.
     // The typed view below validates only the storage-boundary contract.
-    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(invalid)?;
+    let value: serde_json::Value =
+        chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(invalid)?;
     if canonical_json_bytes(&value).map_err(invalid)? != bytes {
         return Err(invalid("native dispatch policy is not canonical JSON"));
     }
-    let policy: Policy = serde_json::from_slice(bytes).map_err(invalid)?;
+    let policy: Policy =
+        chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(invalid)?;
     let declassified = policy.inputs.declassification.is_some();
     if policy.schema
         != if declassified {
@@ -258,8 +264,12 @@ impl Policy {
             (None, None) => Ok(()),
             (Some(expected), Some((actual, consumption))) if expected == actual => {
                 let receipt: chio_core::receipt::security::ActiveDefenseReceiptBody =
-                    serde_json::from_slice(consumption.receipt.canonical_body.as_bytes())
-                        .map_err(invalid)?;
+                    chio_core::canonical::UntrustedJsonText::from_wire(
+                        consumption.receipt.canonical_body.as_bytes(),
+                        64 * 1024 * 1024,
+                    )
+                    .and_then(|input| input.decode_signed())
+                    .map_err(invalid)?;
                 let chio_core::receipt::security::ActiveDefenseReceiptBody::DeclassificationConsumption(body) = receipt else {
                     return Err(invalid("native use is not consumption evidence"));
                 };

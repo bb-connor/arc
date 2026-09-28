@@ -10,8 +10,11 @@ pub(super) fn current_operation(
         [historical.binding().operation_id().as_str()], |row| row.get(0),
     ).map_err(sqlite_error)?;
     let bytes = bytes.ok_or_else(|| invalid("native dispatch ledger owner exceeds its bound"))?;
-    let operation =
-        AdmissionOperationV1::from_persisted(serde_json::from_slice(&bytes).map_err(invalid)?)?;
+    let operation = AdmissionOperationV1::from_persisted(
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(invalid)?,
+    )?;
     if encode_operation(&operation)? != bytes
         || operation.binding() != historical.binding()
         || operation.version() < historical.version()
@@ -43,7 +46,10 @@ pub(super) fn load(
     };
     let bytes =
         bytes.ok_or_else(|| invalid("native dispatch ledger record exceeds its physical bound"))?;
-    let record: Record = serde_json::from_slice(&bytes).map_err(invalid)?;
+    let record: Record =
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(invalid)?;
     let decoded = AdmissionOperationV1::from_persisted(record.operation.clone())?;
     if record.bytes()? != bytes
         || digest.as_deref() != Some(record.digest()?.as_str())

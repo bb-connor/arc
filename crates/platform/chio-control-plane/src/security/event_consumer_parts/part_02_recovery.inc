@@ -1080,7 +1080,7 @@
         }
     }
 
-    fn publish_recovery_batch(
+    pub(super) fn publish_recovery_batch(
         store: &SqliteSecurityStateStore,
         findings: &[AuthoritativeCorrelatedFindingEvidence],
     ) -> AttestedFindingBatchPublication {

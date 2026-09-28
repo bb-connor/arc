@@ -1,6 +1,8 @@
 pub const FINANCIAL_AGENT_PASSPORT_SCHEMA_V1: &str = "chio.financial-agent-passport.v1";
-pub const FINANCIAL_AGENT_PASSPORT_SOURCE_MANIFEST_SCHEMA_V1: &str = "chio.financial-agent-passport.source-manifest.v1";
-pub const PRESENTED_FINANCIAL_AGENT_PASSPORT_SCHEMA_V1: &str = "chio.financial-agent-passport.presentation.v1";
+pub const FINANCIAL_AGENT_PASSPORT_SOURCE_MANIFEST_SCHEMA_V1: &str =
+    "chio.financial-agent-passport.source-manifest.v1";
+pub const PRESENTED_FINANCIAL_AGENT_PASSPORT_SCHEMA_V1: &str =
+    "chio.financial-agent-passport.presentation.v1";
 pub const FINANCIAL_PASSPORT_PRESENTATION_CHALLENGE_SCHEMA_V1: &str =
     "chio.financial-agent-passport-presentation-challenge.v1";
 pub const FINANCIAL_PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V1: &str =
@@ -8,8 +10,10 @@ pub const FINANCIAL_PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V1: &str =
 
 const FINANCIAL_CREDENTIAL_ID_DOMAIN: &[u8] = b"chio.fincred.credential-id.v1\0";
 const PASSPORT_CREDENTIAL_REF_DOMAIN: &[u8] = b"chio.financial-agent-passport.credential-ref.v1\0";
-const PASSPORT_SOURCE_MANIFEST_ID_DOMAIN: &[u8] = b"chio.financial-agent-passport.source-manifest-id.v1\0";
-const PASSPORT_PRESENTATION_DIGEST_DOMAIN: &[u8] = b"chio.financial-agent-passport.presentation-digest.v1\0";
+const PASSPORT_SOURCE_MANIFEST_ID_DOMAIN: &[u8] =
+    b"chio.financial-agent-passport.source-manifest-id.v1\0";
+const PASSPORT_PRESENTATION_DIGEST_DOMAIN: &[u8] =
+    b"chio.financial-agent-passport.presentation-digest.v1\0";
 const PASSPORT_PRESENTATION_CHALLENGE_DIGEST_DOMAIN: &[u8] =
     b"chio.financial-agent-passport.presentation-challenge-digest.v1\0";
 const FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN: &[u8] = b"chio.fincred.source-artifact.v1\0";
@@ -20,6 +24,7 @@ const MAX_FINANCIAL_POSITIONS: usize = 64;
 const MAX_FINANCIAL_IDENTIFIER_BYTES: usize = 512;
 const MAX_FINANCIAL_SOURCE_ARTIFACT_BYTES: usize = 512 * 1024;
 const MAX_FINANCIAL_SOURCE_BUNDLE_BYTES: usize = 2 * 1024 * 1024;
+const MAX_FINANCIAL_PRESENTATION_BYTES: usize = 16 * 1024 * 1024;
 const I_JSON_MAX_SAFE_INTEGER: u64 = MAX_I_JSON_SAFE_INTEGER;
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -365,11 +370,14 @@ pub fn inspect_financial_credential_signature(
 pub fn decode_financial_credential(
     bytes: &[u8],
 ) -> Result<FinancialCredentialEnvelope, CredentialError> {
-    let value: serde_json::Value = serde_json::from_slice(bytes)
-        .map_err(|error| invalid_financial_error(error.to_string()))?;
+    let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        bytes,
+        MAX_FINANCIAL_PRESENTATION_BYTES,
+    )?
+    .decode_signed()?;
     preflight_financial_credential_value(&value)?;
-    let credential: FinancialCredentialEnvelope =
-        serde_json::from_value(value).map_err(|error| invalid_financial_error(error.to_string()))?;
+    let credential: FinancialCredentialEnvelope = serde_json::from_value(value)
+        .map_err(|error| invalid_financial_error(error.to_string()))?;
     credential.validate_contract()?;
     Ok(credential)
 }
@@ -622,8 +630,11 @@ impl<'de> Deserialize<'de> for VersionedAgentPassport {
 pub fn decode_versioned_agent_passport(
     bytes: &[u8],
 ) -> Result<VersionedAgentPassport, CredentialError> {
-    let value = serde_json::from_slice(bytes)
-        .map_err(|error| CredentialError::InvalidVersionedPassport(error.to_string()))?;
+    let value = chio_core::canonical::UntrustedJsonText::from_wire(
+        bytes,
+        MAX_FINANCIAL_PRESENTATION_BYTES,
+    )?
+    .decode_signed()?;
     decode_versioned_agent_passport_value(value)
 }
 

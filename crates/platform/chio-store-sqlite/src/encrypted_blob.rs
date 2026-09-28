@@ -1083,6 +1083,11 @@ fn now_secs() -> i64 {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
+#[path = "encrypted_blob/tests/tenant_isolation.rs"]
+mod tenant_isolation;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

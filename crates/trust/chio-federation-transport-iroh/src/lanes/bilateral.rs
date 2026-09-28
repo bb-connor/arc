@@ -323,6 +323,8 @@ enum BilateralAcceptError {
     /// A request could not be decoded / a reply could not be encoded.
     #[error("bilateral codec error: {0}")]
     Codec(#[from] serde_json::Error),
+    #[error(transparent)]
+    SignedInput(#[from] chio_core_types::canonical::UntrustedJsonError),
     /// A QUIC accept/finish transport failure.
     #[error("bilateral transport error: {0}")]
     Transport(String),
@@ -338,6 +340,7 @@ impl BilateralAcceptError {
         match self {
             BilateralAcceptError::Wire(_) => "wire",
             BilateralAcceptError::Codec(_) => "codec",
+            BilateralAcceptError::SignedInput(error) => error.code(),
             BilateralAcceptError::Transport(_) => "transport",
             BilateralAcceptError::AcceptLimit(error) => error.code(),
         }
@@ -519,8 +522,10 @@ impl IrohBilateralCoSigner {
             client_bounded(&self.limits, AcceptPhase::ReadFrame, read_frame(&mut recv))
                 .await?
                 .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
-        let reply: WireReply = serde_json::from_slice(&reply_bytes)
-            .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
+        let reply: WireReply =
+            chio_core_types::canonical::UntrustedJsonText::from_wire(&reply_bytes, MAX_WIRE_BYTES)
+                .and_then(|input| input.decode_signed())
+                .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
         reply.into_result()
     }
 }
@@ -793,7 +798,12 @@ impl BilateralCoSignHandler {
             .limiter
             .bounded(AcceptPhase::ReadFrame, read_frame(&mut recv))
             .await??;
-        let wire_request: WireDsseCoSigningRequest = serde_json::from_slice(&request_bytes)?;
+        let wire_request: WireDsseCoSigningRequest =
+            chio_core_types::canonical::UntrustedJsonText::from_wire(
+                &request_bytes,
+                MAX_WIRE_BYTES,
+            )?
+            .decode_signed()?;
         let request = wire_request.into_request();
 
         // Step 4/5: verify + co-sign (or a typed error mirroring the contract).

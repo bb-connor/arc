@@ -1059,8 +1059,12 @@ pub(super) fn verify_stored_terminal_projection(
         ));
     }
     for (record, commitment) in records.iter().zip(manifest.records()) {
-        let value: serde_json::Value = serde_json::from_slice(&record.record_json)
-            .map_err(|error| invariant(format!("terminal record is invalid: {error}")))?;
+        let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+            &record.record_json,
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| invariant(format!("terminal record is invalid: {error}")))?;
         let canonical = canonical_json_bytes(&value)
             .map_err(|error| invariant(format!("terminal record encoding failed: {error}")))?;
         if record.record_json.is_empty()
@@ -1084,8 +1088,12 @@ pub(super) fn verify_stored_terminal_projection(
         projection_record(&records, AdmissionProjectionRecordKind::ChannelTerminal)?
             .map(|record| record.record_json.as_slice());
     let projection_body: StoredTerminalProjectionBody =
-        serde_json::from_slice(&projection.projection_json)
-            .map_err(|error| invariant(format!("terminal projection body is invalid: {error}")))?;
+        chio_core::canonical::UntrustedJsonText::from_wire(
+            &projection.projection_json,
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| invariant(format!("terminal projection body is invalid: {error}")))?;
     projection_body.context.validate()?;
     if projection_body.context.operation_id != *operation.binding().operation_id() {
         return Err(invariant(
@@ -1201,8 +1209,12 @@ fn verify_stored_denied_record_shape(
     projection_json: &[u8],
     records: &[StoredProjectionRecord],
 ) -> Result<(), AdmissionOperationStoreError> {
-    let body: serde_json::Value = serde_json::from_slice(projection_json)
-        .map_err(|error| invariant(format!("delivery-denied projection is invalid: {error}")))?;
+    let body: serde_json::Value =
+        chio_core::canonical::UntrustedJsonText::from_wire(projection_json, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| {
+                invariant(format!("delivery-denied projection is invalid: {error}"))
+            })?;
     let body = body
         .as_object()
         .ok_or_else(|| invariant("delivery-denied projection is not an object"))?;
@@ -1257,8 +1269,10 @@ fn verify_stored_denied_record_shape(
     }
     let receipt = projection_record(records, AdmissionProjectionRecordKind::Receipt)?
         .ok_or_else(|| invariant("delivery-denied projection has no receipt record"))?;
-    let receipt_value: ChioReceipt = serde_json::from_slice(&receipt.record_json)
-        .map_err(|error| invariant(format!("delivery-denied receipt is invalid: {error}")))?;
+    let receipt_value: ChioReceipt =
+        chio_core::canonical::UntrustedJsonText::from_wire(&receipt.record_json, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| invariant(format!("delivery-denied receipt is invalid: {error}")))?;
     let payment = projection_record(records, AdmissionProjectionRecordKind::PaymentTerminal)?;
     let observer = projection_record(
         records,
@@ -1335,7 +1349,12 @@ fn verify_stored_authorization_projection(
         (None, None) => Ok(()),
         (Some(record), Some(stored)) => {
             let consumption: AuthorizationReceiptConsumption =
-                serde_json::from_slice(&record.record_json).map_err(|error| {
+                chio_core::canonical::UntrustedJsonText::from_wire(
+                    &record.record_json,
+                    64 * 1024 * 1024,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(|error| {
                     invariant(format!("authorization consumption is invalid: {error}"))
                 })?;
             if stored.0 != consumption.authorization_receipt_id
@@ -1405,7 +1424,12 @@ fn verify_stored_observer_projection(
     match (record, stored) {
         (None, None) => Ok(()),
         (Some(record), Some(stored)) => {
-            let pending: PendingSettlementObservation = serde_json::from_slice(&record.record_json)
+            let pending: PendingSettlementObservation =
+                chio_core::canonical::UntrustedJsonText::from_wire(
+                    &record.record_json,
+                    64 * 1024 * 1024,
+                )
+                .and_then(|input| input.decode_signed())
                 .map_err(|error| invariant(format!("observer attempt zero is invalid: {error}")))?;
             let lease_exists: i64 = connection
                 .query_row(

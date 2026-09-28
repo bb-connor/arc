@@ -859,16 +859,24 @@ fn validate_correlation_source_evidence(
 ) -> PortResult<()> {
     let (canonical_source, domain) = match trust_class {
         ProducerTrustClass::InternalDetector => {
-            let signed: SignedSecurityEvent = serde_json::from_slice(source_evidence.as_bytes())
-                .map_err(|_| PortError::invalid_data())?;
+            let signed: SignedSecurityEvent = chio_core::canonical::UntrustedJsonText::from_wire(
+                source_evidence.as_bytes(),
+                64 * 1024 * 1024,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| PortError::invalid_data())?;
             (
                 canonical_json_bytes(&signed).map_err(|_| PortError::invalid_data())?,
                 EVENT_EVIDENCE_HASH_DOMAIN,
             )
         }
         ProducerTrustClass::VerifiedReceipt => {
-            let receipt: ChioReceipt = serde_json::from_slice(source_evidence.as_bytes())
-                .map_err(|_| PortError::invalid_data())?;
+            let receipt: ChioReceipt = chio_core::canonical::UntrustedJsonText::from_wire(
+                source_evidence.as_bytes(),
+                64 * 1024 * 1024,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| PortError::invalid_data())?;
             (
                 canonical_json_bytes(&receipt).map_err(|_| PortError::invalid_data())?,
                 RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN,
@@ -931,8 +939,12 @@ fn validate_stored_correlation_ingress(
         .map_err(|_| PortError::integrity_failure())?;
     let stored_source =
         CanonicalBody::new(stored.5.clone()).map_err(|_| PortError::integrity_failure())?;
-    let source_value: serde_json::Value = serde_json::from_slice(stored_source.as_bytes())
-        .map_err(|_| PortError::integrity_failure())?;
+    let source_value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        stored_source.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|_| PortError::integrity_failure())?;
     let canonical_source =
         canonical_json_bytes(&source_value).map_err(|_| PortError::integrity_failure())?;
     if canonical_source.as_slice() != stored_source.as_bytes()
@@ -1492,8 +1504,12 @@ fn load_attested_finding_batch_record(
     };
     let body_hash = decode_digest(body_hash)?;
     let canonical_body = CanonicalBody::new(body).map_err(|_| PortError::integrity_failure())?;
-    let body: AttestedFindingBatchBody = serde_json::from_slice(canonical_body.as_bytes())
-        .map_err(|_| PortError::integrity_failure())?;
+    let body: AttestedFindingBatchBody = chio_core::canonical::UntrustedJsonText::from_wire(
+        canonical_body.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|_| PortError::integrity_failure())?;
     let publication = AttestedFindingBatchPublication {
         body,
         canonical_body,

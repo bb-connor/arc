@@ -361,6 +361,10 @@ fn native_output_journal_rejects_stale_lease_generation_and_substituted_artifact
         let changed = serde_json::from_value(changed)?;
         assert!(finalizing.join(&fixture, &changed).is_err(), "{field}");
     }
+    let mut foreign = serde_json::to_value(&intent)?;
+    foreign["key"]["tenant_id"] = "foreign-tenant".into();
+    let foreign = serde_json::from_value(foreign)?;
+    assert!(finalizing.join(&fixture, &foreign).is_err());
     let mut snapshot = finalizing
         .observation
         .snapshot()

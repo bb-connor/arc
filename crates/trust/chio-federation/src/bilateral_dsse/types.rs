@@ -321,21 +321,49 @@ impl DsseEnvelope {
     /// byte-for-byte against the `CoSigningBody` preimage used by
     /// `DualSignedReceipt`).
     pub fn pae_bytes(&self) -> Result<Vec<u8>, BilateralCoSigningError> {
-        let payload_bytes = BASE64_STANDARD
-            .decode(self.payload.as_bytes())
-            .map_err(|e| BilateralCoSigningError::CanonicalJson(format!("payload base64: {e}")))?;
+        let payload_bytes = self.decode_payload()?;
         Ok(pae(&self.payload_type, &payload_bytes))
+    }
+
+    fn decode_payload(&self) -> Result<Vec<u8>, BilateralCoSigningError> {
+        const MAX_PAYLOAD_BYTES: usize = 4 * 1024 * 1024;
+        const MAX_ENCODED_BYTES: usize = MAX_PAYLOAD_BYTES.div_ceil(3) * 4;
+        if self.payload.len() > MAX_ENCODED_BYTES {
+            return Err(BilateralCoSigningError::CanonicalJson(
+                "dsse.malformed: payload exceeds size limit".into(),
+            ));
+        }
+        let bytes = BASE64_STANDARD
+            .decode(self.payload.as_bytes())
+            .map_err(|error| {
+                BilateralCoSigningError::CanonicalJson(format!("payload base64: {error}"))
+            })?;
+        if bytes.len() > MAX_PAYLOAD_BYTES {
+            return Err(BilateralCoSigningError::CanonicalJson(
+                "dsse.malformed: payload exceeds size limit".into(),
+            ));
+        }
+        Ok(bytes)
     }
 
     /// Decode the wrapped Statement back from its base64 payload. Returns
     /// the canonical-JSON bytes alongside the parsed Statement so callers
     /// can re-hash without re-canonicalising.
     pub fn decode_statement(&self) -> Result<(DsseStatement, Vec<u8>), BilateralCoSigningError> {
-        let bytes = BASE64_STANDARD
-            .decode(self.payload.as_bytes())
-            .map_err(|e| BilateralCoSigningError::CanonicalJson(format!("payload base64: {e}")))?;
-        let statement: DsseStatement = serde_json::from_slice(&bytes)
-            .map_err(|e| BilateralCoSigningError::CanonicalJson(format!("payload json: {e}")))?;
+        let bytes = self.decode_payload()?;
+        let statement: DsseStatement =
+            chio_core_types::canonical::UntrustedJsonText::from_wire(&bytes, 4 * 1024 * 1024)
+                .and_then(|input| input.decode_canonical())
+                .map_err(|error| match error {
+                    chio_core_types::canonical::UntrustedJsonError::NonCanonical => {
+                        BilateralCoSigningError::CanonicalJson(
+                            "statement.malformed: payload is not canonical JSON".into(),
+                        )
+                    }
+                    other => {
+                        BilateralCoSigningError::CanonicalJson(format!("payload json: {other}"))
+                    }
+                })?;
         Ok((statement, bytes))
     }
 }

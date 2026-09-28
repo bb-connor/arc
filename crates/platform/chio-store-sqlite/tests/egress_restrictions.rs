@@ -458,3 +458,6 @@ fn corrupt_generation(path: &Path) {
         })
         .unwrap_or_else(|error| panic!("corrupt egress generation: {error}"));
 }
+
+#[path = "egress_restrictions/tenant_isolation.rs"]
+mod tenant_isolation;

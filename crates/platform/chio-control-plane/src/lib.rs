@@ -14,6 +14,7 @@ pub mod attestation;
 pub mod certify;
 mod durable_admission;
 mod error;
+mod signed_input;
 pub use chio_enterprise_export as enterprise_export;
 #[cfg(test)]
 use durable_admission::create_private_directory;

@@ -359,8 +359,12 @@ fn decode_attested_finding_response_outbox_row(
             let canonical_body =
                 CanonicalBody::new(body).map_err(|_| PortError::integrity_failure())?;
             let body: AttestedFindingResponsePlanBody =
-                serde_json::from_slice(canonical_body.as_bytes())
-                    .map_err(|_| PortError::integrity_failure())?;
+                chio_core::canonical::UntrustedJsonText::from_wire(
+                    canonical_body.as_bytes(),
+                    64 * 1024 * 1024,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(|_| PortError::integrity_failure())?;
             let publication = AttestedFindingResponsePlanPublication {
                 body,
                 canonical_body,
@@ -385,9 +389,11 @@ fn decode_attested_finding_response_outbox_row(
             validate_canonical_json_body(&canonical_body, &decode_digest(body_hash)?)
                 .map_err(|_| PortError::integrity_failure())?;
             Some(
-                serde_json::from_slice::<PreparedActiveResponseDispatchBinding>(
+                chio_core::canonical::UntrustedJsonText::from_wire(
                     canonical_body.as_bytes(),
+                    64 * 1024 * 1024,
                 )
+                .and_then(|input| input.decode_signed::<PreparedActiveResponseDispatchBinding>())
                 .map_err(|_| PortError::integrity_failure())?,
             )
         }

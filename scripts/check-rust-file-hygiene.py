@@ -312,16 +312,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "existing oversized budget store test suite; capped to current size until split",
         max_lines=2_479,
     ),
-    "crates/trust/chio-federation-transport-iroh/src/lanes/revocation.rs": allow(
-        "2026-11-30",
-        "iroh revocation lane; capped to current size until split",
-        max_lines=2_511,
-    ),
-    "crates/trust/chio-federation-transport-iroh/src/lanes/fanout.rs": allow(
-        "2026-11-30",
-        "iroh fanout lane; capped to current size until split",
-        max_lines=2_443,
-    ),
     "crates/economy/chio-web3/src/settlement_proof.rs": allow(
         "2026-10-31",
         "web3 settlement proof surface; capped to current size until split",

@@ -1,6 +1,9 @@
 #[path = "event_consumer/admission_request.rs"]
 mod admission_request;
 #[cfg(test)]
+#[path = "event_consumer/tenant_isolation_tests.rs"]
+mod tenant_isolation_tests;
+#[cfg(test)]
 #[path = "event_consumer/test_clocks.rs"]
 mod test_clocks;
 include!(concat!(

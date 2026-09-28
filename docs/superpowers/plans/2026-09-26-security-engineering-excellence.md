@@ -834,9 +834,14 @@ against an isolated blind-recovery mutant. See the
 - [x] Migrate correction 1F's receipt, signed export, lineage, manifest, keyring,
       broker and response-authority readers. The closed checkpoint decoder and
       dedicated zeroizing broker credential decoder retain explicit contracts.
-- [x] Gate the 44 constructor sites and remaining raw decoders in migrated files;
-      calibrate injected decoder bypasses. The gate does not classify arbitrary
-      new reader APIs outside those files.
+- [x] Gate the 114 current constructor sites and remaining raw decoders in 88
+      migrated/registered reader files. Pin the wider 556-file decoder census,
+      including imported spellings and custom deserializers; new decoder files
+      require disposition. Calibrate both source-gate and actual parser bypasses.
+- [x] Migrate the named credential, passport, certification, Finding, federation
+      and durable evidence readers in the September 28 signed-reader batch.
+      Preserve exact canonical versus native integer contracts and signature/
+      role/row binding; remove malformed-input and lifecycle readback fallbacks.
 - [ ] Complete the broader wire/file/database reader census and migration.
 
 Implementation and focused evidence: [trust-boundary execution](../../reviews/2026-09-27-trust-boundary-execution.md).
@@ -844,7 +849,10 @@ The subsequent [sealed ceremony batch](../../reviews/2026-09-27-frost-sealed-cer
 adds constrained canonical readers for every FROST store record. The
 [September 28 continuation](../../reviews/2026-09-28-reader-accounting-recovery-execution.md)
 adds 22 more constructor sites, private canonical custody and proof-result sealing.
-Broader census closure remains open.
+The [signed-reader batch](../../reviews/2026-09-28-signed-reader-tenant-execution.md)
+adds the workspace source inventory and named owner migrations. Semantic review
+of its 447 raw-input-baseline files remains open; a lexical baseline is not
+completion of signed-reader migration.
 
 #### 10.3 Classify tenant scoping by the enforcing principal (S3, corrected by the external review's R4)
 
@@ -861,8 +869,13 @@ Broader census closure remains open.
       No identifier is classified as a bearer capability.
 - [ ] Every isolation test gives tenant B the exact valid identifier belonging to
       tenant A and requires denial, for every table in every class. Receipt point
-      and list tests now cover exact IDs, unattributed rows, invalid contexts and
-      forged tenant projections. The full per-table runtime matrix remains open.
+      and list tests cover exact IDs, unattributed rows, invalid contexts and
+      forged tenant projections. The matrix maps 84 tables to runtime families
+      and explicitly leaves `admission_operation_authorization_consumptions`
+      without a production SQLite fixture. The full runtime item remains open.
+- [x] Give all 85 tables a machine-checked runtime-family or explicit-gap mapping,
+      with enforcing entry points and source test references. Extend exact-ID,
+      restart, replay and native-principal negatives across the mapped families.
 - [x] Receipt IDs are lookup keys, not read authority. User-facing point loads
       require a sealed adapter-issued context, SQL tenant binding and signed-body
       binding. HTTP point loads retain their admin-only contract. Internal kernel

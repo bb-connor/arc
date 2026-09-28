@@ -1558,6 +1558,20 @@ fn scheduler_retry_health_outbox_survives_restart_and_ack_is_idempotent() {
         .acknowledge_health_event(&ack)
         .unwrap_or_else(|error| panic!("ack health event: {error}"));
     assert!(delivered.health_event_delivered);
+    assert_eq!(
+        store
+            .load_retry(&ack.key)
+            .unwrap_or_else(|error| panic!("owned retry: {error}")),
+        Some(delivered.clone())
+    );
+    let mut foreign_key = ack.key.clone();
+    foreign_key.tenant_id = tenant("tenant-b");
+    assert_eq!(
+        store
+            .load_retry(&foreign_key)
+            .unwrap_or_else(|error| panic!("foreign retry: {error}")),
+        None
+    );
     drop(store);
 
     let reopened = SqliteSecurityStateStore::open(path)
@@ -1567,6 +1581,12 @@ fn scheduler_retry_health_outbox_survives_restart_and_ack_is_idempotent() {
         .unwrap_or_else(|error| panic!("load retry after restart: {error}"))
         .unwrap_or_else(|| panic!("retry missing after restart"));
     assert_eq!(loaded, delivered);
+    assert_eq!(
+        reopened
+            .load_retry(&foreign_key)
+            .unwrap_or_else(|error| panic!("foreign retry after restart: {error}")),
+        None
+    );
     assert_eq!(
         reopened
             .acknowledge_health_event(&ack)

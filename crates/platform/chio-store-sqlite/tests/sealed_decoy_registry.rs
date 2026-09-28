@@ -14,6 +14,9 @@ use chio_security_types::{
 };
 use chio_store_sqlite::SqliteSealedDecoyRegistryStore;
 use chio_test_support::prelude::*;
+
+#[path = "sealed_decoy_registry/tenant_isolation.rs"]
+mod tenant_isolation;
 use rusqlite::{params, Connection};
 use tempfile::TempDir;
 
@@ -864,7 +867,8 @@ fn watermark_sequence_reservation_is_durable_monotonic_and_exactly_idempotent() 
 #[test]
 fn watermark_sequence_operation_ids_are_tenant_wide() {
     let temp = tempfile::tempdir().test_expect("temporary directory");
-    let store = open(&database(&temp, "watermark-sequence-operation-scope"));
+    let path = database(&temp, "watermark-sequence-operation-scope");
+    let store = open(&path);
     let tenant_a = tenant("tenant-a");
     let tenant_b = tenant("tenant-b");
     let first = sequence_reservation(&tenant_a, "a", 90, 1, "shared-operation");
@@ -882,18 +886,19 @@ fn watermark_sequence_operation_ids_are_tenant_wide() {
         )),
         PortErrorKind::Conflict,
     );
+    let foreign = sequence_reservation(&tenant_b, "a", 90, 1, "shared-operation");
     assert_eq!(
-        store
-            .reserve(&sequence_reservation(
-                &tenant_b,
-                "different-key",
-                91,
-                1,
-                "shared-operation",
-            ))
-            .test_unwrap(),
+        store.reserve(&foreign).test_unwrap(),
         WatermarkSequenceReservationResult::Reserved
     );
+    drop(store);
+    let reopened = open(&path);
+    for request in [&first, &foreign] {
+        assert_eq!(
+            reopened.reserve(request).test_unwrap(),
+            WatermarkSequenceReservationResult::ExactRetry
+        );
+    }
 }
 
 #[test]

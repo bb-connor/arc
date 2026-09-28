@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -219,7 +218,7 @@ pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(
         authority_seed_file,
     } = command;
 
-    let passport: AgentPassport = serde_json::from_slice(&fs::read(passport_path)?)?;
+    let passport: AgentPassport = crate::signed_input::read(passport_path)?;
     let verifier_policy = verifier_policy_path
         .map(load_passport_verifier_policy)
         .transpose()?;
@@ -309,19 +308,33 @@ fn require_receipt_db_path(receipt_db_path: Option<&Path>) -> Result<&Path, CliE
 }
 
 fn load_passport_verifier_policy(path: &Path) -> Result<PassportVerifierPolicy, CliError> {
-    let contents = fs::read_to_string(path)?;
+    let bytes = crate::signed_input::read_bounded(path)?;
+    let input = chio_core::canonical::UntrustedJsonText::from_wire(
+        &bytes,
+        crate::signed_input::MAX_SIGNED_FILE_BYTES,
+    )?;
     let policy = if path
         .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| matches!(extension, "yaml" | "yml"))
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| matches!(ext, "yaml" | "yml"))
     {
-        serde_yml::from_str(&contents)?
-    } else if let Ok(document) = serde_json::from_str::<SignedPassportVerifierPolicy>(&contents) {
-        verify_signed_passport_verifier_policy(&document)
-            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-        document.body.policy
+        // Explicit operator configuration format, never a signed-document fallback.
+        serde_yml::from_slice(&bytes)?
     } else {
-        serde_json::from_str(&contents).or_else(|_| serde_yml::from_str(&contents))?
+        let value: serde_json::Value = input.decode_signed()?;
+        let signed = value.as_object().is_some_and(|object| {
+            object.contains_key("body")
+                || object.contains_key("signature")
+                || object.contains_key("signerKey")
+        });
+        if signed {
+            let document: SignedPassportVerifierPolicy = serde_json::from_value(value)?;
+            verify_signed_passport_verifier_policy(&document)
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+            document.body.policy
+        } else {
+            serde_json::from_value(value)?
+        }
     };
     Ok(policy)
 }
