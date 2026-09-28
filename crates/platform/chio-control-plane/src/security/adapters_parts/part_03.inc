@@ -1,11 +1,19 @@
 #[cfg(test)]
 mod tests {
+    use super::test_clocks::{AdvancingClock, FixedClock};
+
     mod native_flow {
-        include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/security/adapters/native_flow_tests.rs"));
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/security/adapters/native_flow_tests.rs"
+        ));
     }
 
     mod prepared_dispatch {
-        include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/security/adapters/flow_dispatch_tests.rs"));
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/security/adapters/flow_dispatch_tests.rs"
+        ));
     }
 
     use super::{FlowResolverConfig, PersistentFlowResolver, StructuredClassificationAdapter};
@@ -33,22 +41,21 @@ mod tests {
         TOOL_MANIFEST_SCHEMA,
     };
     use chio_security_kernel::{
-        FlowPostInvocationInput, FlowPostInvocationResolver, FlowPreDispatchInput,
+        Clock, FlowPostInvocationInput, FlowPostInvocationResolver, FlowPreDispatchInput,
         FlowPreDispatchPort, FlowPreInvocationInput, FlowPreInvocationPort,
-        FlowPreInvocationResolver, SecurityClock,
+        FlowPreInvocationResolver,
     };
     use chio_security_types::flow::DeclassificationPurpose;
     use chio_security_types::ports::{
         derive_declassification_transition_id, CanonicalBody, ClassificationPort,
         ClassificationRequest, ClassificationResult, ClassifierId, ClassifierVersion,
-        CommittedEgressFence, DeclassificationEvidenceCommitStore,
-        DeclassificationEvidencePhase, DeclassificationEvidenceQuery,
-        DeclassificationTransitionBinding, DeclassificationUseQuery, DeclassificationUseState,
-        DestinationId, Digest32, EgressFence, EgressFenceCommit, EgressFenceRequest,
-        ExactReceiptRecord, ExactSecurityReceiptSink, FlowJoinRequest, FlowStateKey,
-        FlowStateSnapshot, FlowStateStore, GrantId, IsolationEpochTransition, LineageId,
-        OpaqueReceiptRef, PortError, PortErrorKind, PortResult, ReceiptAppendRequest, RecordId,
-        RequestId, SecurityReceiptSink, SessionId, TenantId,
+        CommittedEgressFence, DeclassificationEvidenceCommitStore, DeclassificationEvidencePhase,
+        DeclassificationEvidenceQuery, DeclassificationTransitionBinding, DeclassificationUseQuery,
+        DeclassificationUseState, DestinationId, Digest32, EgressFence, EgressFenceCommit,
+        EgressFenceRequest, ExactReceiptRecord, ExactSecurityReceiptSink, FlowJoinRequest,
+        FlowStateKey, FlowStateSnapshot, FlowStateStore, GrantId, IsolationEpochTransition,
+        LineageId, OpaqueReceiptRef, PortError, PortErrorKind, PortResult, ReceiptAppendRequest,
+        RecordId, RequestId, SecurityReceiptSink, SessionId, TenantId,
     };
     use chio_security_types::{
         Compartment, DeclassificationGrantBody, DeclassificationGrantClaims, InformationLabel,
@@ -189,48 +196,10 @@ mod tests {
         assert_ne!(outcome_a, outcome_b);
     }
 
-    struct FixedClock(u64);
-
-    impl SecurityClock for FixedClock {
-        fn now_unix_ms(&self) -> PortResult<u64> {
-            Ok(self.0)
-        }
-    }
-
-    impl chio_store_sqlite::security_state::SecurityStateClock for FixedClock {
-        fn now_unix_ms(&self) -> PortResult<u64> {
-            Ok(self.0)
-        }
-    }
-
     fn open_declassification_test_store(
         path: impl AsRef<std::path::Path>,
     ) -> PortResult<SqliteSecurityStateStore> {
         SqliteSecurityStateStore::open_with_trusted_clock(path, Arc::new(FixedClock(150_000)))
-    }
-
-    struct AdvancingClock {
-        calls: AtomicUsize,
-        first_unix_ms: u64,
-    }
-
-    impl AdvancingClock {
-        fn new(first_unix_ms: u64) -> Self {
-            Self {
-                calls: AtomicUsize::new(0),
-                first_unix_ms,
-            }
-        }
-    }
-
-    impl SecurityClock for AdvancingClock {
-        fn now_unix_ms(&self) -> PortResult<u64> {
-            let elapsed = u64::try_from(self.calls.fetch_add(1, Ordering::SeqCst))
-                .map_err(|_| PortError::unavailable())?;
-            self.first_unix_ms
-                .checked_add(elapsed)
-                .ok_or_else(PortError::unavailable)
-        }
     }
 
     struct CountingEmptyClassifier {
@@ -856,7 +825,9 @@ mod tests {
         assert_eq!(body.header.tenant_id.as_str(), "tenant-a");
         assert_eq!(body.request_hash.as_bytes().len(), 32);
         assert_eq!(body.denial_code.as_str(), "flow.policy_flow_violation");
-        let retained = state.load(&flow_key()).unwrap_or_else(|error| panic!("taint: {error}"))
+        let retained = state
+            .load(&flow_key())
+            .unwrap_or_else(|error| panic!("taint: {error}"))
             .unwrap_or_else(|| panic!("missing taint"));
         assert_eq!(retained.principal_label, restricted_label());
         assert_eq!(retained.session_label, restricted_label());
@@ -1058,8 +1029,7 @@ mod tests {
             .load_declassification_use(&DeclassificationUseQuery {
                 tenant_id: TenantId::new("tenant-a")
                     .unwrap_or_else(|error| panic!("tenant: {error}")),
-                grant_id: GrantId::new("grant-a")
-                    .unwrap_or_else(|error| panic!("grant: {error}")),
+                grant_id: GrantId::new("grant-a").unwrap_or_else(|error| panic!("grant: {error}")),
             })
             .unwrap_or_else(|error| panic!("load unknown use: {error:?}"))
             .unwrap_or_else(|| panic!("unknown use missing"));

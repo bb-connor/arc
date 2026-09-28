@@ -2,9 +2,17 @@ use super::*;
 
 struct Clock;
 
-impl SecurityStateClock for Clock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        Ok(1_000)
+impl chio_security_types::clock::Clock for Clock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = 1_000;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 

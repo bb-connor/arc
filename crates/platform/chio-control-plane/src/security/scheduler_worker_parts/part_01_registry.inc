@@ -40,7 +40,7 @@ pub struct SqliteResponseWorkerPort {
     alerts: Arc<dyn SecurityAlertPort>,
     health_port: Arc<dyn SchedulerHealthPort>,
     scheduler: Arc<DynResponseScheduler>,
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
     config: ProductionResponseSchedulerConfig,
     claim_incarnation_id: RecordId,
     operation_lock: Mutex<()>,
@@ -54,7 +54,7 @@ impl SqliteResponseWorkerPort {
         receipts: Arc<dyn SecurityReceiptSink>,
         alerts: Arc<dyn SecurityAlertPort>,
         health_port: Arc<dyn SchedulerHealthPort>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
         config: ProductionResponseSchedulerConfig,
     ) -> Result<Self, ResponseWorkerTickError> {
         Self::new_internal(
@@ -77,7 +77,7 @@ impl SqliteResponseWorkerPort {
         receipts: Arc<dyn SecurityReceiptSink>,
         alerts: Arc<dyn SecurityAlertPort>,
         health_port: Arc<dyn SchedulerHealthPort>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
         config: ProductionResponseSchedulerConfig,
     ) -> Result<Self, ResponseWorkerTickError> {
         Self::new_internal(
@@ -100,7 +100,7 @@ impl SqliteResponseWorkerPort {
         receipts: Arc<dyn SecurityReceiptSink>,
         alerts: Arc<dyn SecurityAlertPort>,
         health_port: Arc<dyn SchedulerHealthPort>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
         config: ProductionResponseSchedulerConfig,
         claim_incarnation_id: RecordId,
     ) -> Result<Self, ResponseWorkerTickError> {
@@ -124,7 +124,7 @@ impl SqliteResponseWorkerPort {
         receipts: Arc<dyn SecurityReceiptSink>,
         alerts: Arc<dyn SecurityAlertPort>,
         health_port: Arc<dyn SchedulerHealthPort>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
         config: ProductionResponseSchedulerConfig,
         claim_incarnation_id: Option<RecordId>,
     ) -> Result<Self, ResponseWorkerTickError> {
@@ -168,7 +168,11 @@ impl SqliteResponseWorkerPort {
         if self.cleanup_expired_terminal_leases()? {
             return Err(ResponseWorkerTickError::TerminalSchedulerCleanupPending);
         }
-        let now_unix_ms = self.clock.now_unix_ms()?;
+        let now_unix_ms = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
+                    .map_err(PortError::from)?;
         let claim_id = worker_claim_id(
             &self.config.tenant_id,
             &self.config.lease_owner_id,
@@ -217,7 +221,11 @@ impl SqliteResponseWorkerPort {
     }
 
     fn prepare_work(&self, work: &ScheduledWork) -> Result<ScheduledWork, ResponseWorkerTickError> {
-        let now_unix_ms = self.clock.now_unix_ms()?;
+        let now_unix_ms = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
+                    .map_err(PortError::from)?;
         let mut current = work.clone();
         if current.lease_expires_at_unix_ms.saturating_sub(now_unix_ms)
             <= self.config.renewal_margin_ms
@@ -332,7 +340,11 @@ impl ResponseWorkerPort for SqliteResponseWorkerPort {
         for work in claimed {
             let processed = (|| -> Result<SchedulerWorkOutcome, ResponseWorkerTickError> {
                 let current = self.prepare_work(&work)?;
-                let now_unix_ms = self.clock.now_unix_ms()?;
+                let now_unix_ms = self
+                    .clock
+                    .unix_millis()
+                    .map(chio_security_types::clock::UnixMillis::get)
+                    .map_err(PortError::from)?;
                 Ok(self.scheduler.process(&current, now_unix_ms)?)
             })();
             match processed {

@@ -18,23 +18,35 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
-/// Clock abstraction used by the cache and other resilience primitives.
-///
-/// The default implementation reads from [`tokio::time::Instant::now`], which
-/// honors [`tokio::time::pause`]/`advance` in tests. Callers with a custom
-/// time source may provide their own implementation.
-pub trait Clock: Send + Sync + 'static {
-    /// Return the current monotonic instant.
-    fn now(&self) -> Instant;
+pub use chio_security_types::clock::Clock;
+use chio_security_types::clock::{
+    ClockError, ClockFence, ClockReading, MonotonicInstant, SystemClock,
+};
+
+/// Clock backed by Tokio's pausable monotonic timer and native epoch time.
+#[derive(Debug)]
+pub struct TokioClock {
+    state: Mutex<(Instant, ClockFence)>,
 }
-
-/// Default [`Clock`] implementation backed by Tokio's pausable timer.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct TokioClock;
-
+impl Default for TokioClock {
+    fn default() -> Self {
+        Self {
+            state: Mutex::new((Instant::now(), ClockFence::default())),
+        }
+    }
+}
 impl Clock for TokioClock {
-    fn now(&self) -> Instant {
-        Instant::now()
+    fn read(&self) -> Result<ClockReading, ClockError> {
+        let mut state = self.state.lock().map_err(|_| ClockError::Unavailable)?;
+        let elapsed = Instant::now()
+            .checked_duration_since(state.0)
+            .ok_or(ClockError::MonotonicRegression)?;
+        let nanos = u64::try_from(elapsed.as_nanos()).map_err(|_| ClockError::Overflow)?;
+        let reading = ClockReading::new(
+            SystemClock.unix_millis()?,
+            MonotonicInstant::from_nanos(nanos),
+        );
+        state.1.observe(reading)
     }
 }
 
@@ -42,7 +54,7 @@ impl Clock for TokioClock {
 #[derive(Debug, Clone)]
 struct Entry<V> {
     value: V,
-    expires_at: Instant,
+    expires_at: MonotonicInstant,
     /// Monotonically increasing recency counter. Higher = more recent.
     recency: u64,
 }
@@ -75,7 +87,7 @@ where
     /// Capacity is a non-zero usize because a zero-capacity cache is
     /// degenerate (every insert would immediately evict itself).
     pub fn new(capacity: NonZeroUsize) -> Self {
-        Self::with_clock(capacity, Arc::new(TokioClock))
+        Self::with_clock(capacity, Arc::new(TokioClock::default()))
     }
 
     /// Create a cache backed by a custom [`Clock`] implementation.
@@ -113,7 +125,7 @@ where
     /// entry's recency); `None` on miss or expired entry. Expired entries
     /// are removed on observation.
     pub fn get(&self, key: &K) -> Option<V> {
-        let now = self.clock.now();
+        let now = self.clock.monotonic().ok()?;
         let Ok(mut inner) = self.inner.lock() else {
             return None;
         };
@@ -136,8 +148,12 @@ where
     /// Insert `value` under `key` with the given `ttl`. If the cache is at
     /// capacity, evicts the least recently used live entry first.
     pub fn insert(&self, key: K, value: V, ttl: Duration) {
-        let now = self.clock.now();
-        let expires_at = now.checked_add(ttl).unwrap_or(now);
+        let Ok(now) = self.clock.monotonic() else {
+            return;
+        };
+        let Ok(expires_at) = now.checked_add(ttl) else {
+            return;
+        };
         let Ok(mut inner) = self.inner.lock() else {
             return;
         };
@@ -174,7 +190,9 @@ where
     /// Remove every entry whose TTL has expired relative to the clock's
     /// current "now". Returns the number of entries removed.
     pub fn prune(&self) -> usize {
-        let now = self.clock.now();
+        let Ok(now) = self.clock.monotonic() else {
+            return 0;
+        };
         let Ok(mut inner) = self.inner.lock() else {
             return 0;
         };
@@ -189,7 +207,7 @@ where
     }
 }
 
-fn evict_expired<K, V>(entries: &mut HashMap<K, Entry<V>>, now: Instant) -> usize
+fn evict_expired<K, V>(entries: &mut HashMap<K, Entry<V>>, now: MonotonicInstant) -> usize
 where
     K: Eq + Hash + Clone,
 {

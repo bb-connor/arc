@@ -1364,3 +1364,1216 @@ codes:
     stability: unstable
     consumed_by:
       - chio-weights
+
+  - urn: "urn:chio:error:kernel:response-canonical-body"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response canonical body."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-CANONICAL-BODY"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-canonical-encoding"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response canonical encoding."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-CANONICAL-ENCODING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-canonical-identifier"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response canonical identifier."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-CANONICAL-IDENTIFIER"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-canonical-receipt"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response canonical receipt."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-CANONICAL-RECEIPT"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-canonical-value"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response canonical value."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-CANONICAL-VALUE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-dispatch-approval-requirement-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response dispatch approval requirement mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-APPROVAL-REQUIREMENT-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-dispatch-authorization-outside-window"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response dispatch authorization outside window."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-AUTHORIZATION-OUTSIDE-WINDOW"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-dispatch-capability-digest-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response dispatch capability digest mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-CAPABILITY-DIGEST-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-dispatch-execution-binding"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response dispatch execution binding."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-EXECUTION-BINDING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-dispatch-execution-mode"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response dispatch execution mode."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-EXECUTION-MODE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-dispatch-lease-outside-window"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response dispatch lease outside window."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-LEASE-OUTSIDE-WINDOW"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-dispatch-resume-requires-governed-approval"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response dispatch resume requires governed approval."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-RESUME-REQUIRES-GOVERNED-APPROVAL"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-dispatch-snapshot-already-authorized"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response dispatch snapshot already authorized."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-SNAPSHOT-ALREADY-AUTHORIZED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-dispatch-snapshot-without-execution-dispatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response dispatch snapshot without execution dispatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-SNAPSHOT-WITHOUT-EXECUTION-DISPATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-dispatch-zero-admission-operation-version"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response dispatch zero admission operation version."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-ZERO-ADMISSION-OPERATION-VERSION"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-dispatch-zero-executor-generation"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response dispatch zero executor generation."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-DISPATCH-ZERO-EXECUTOR-GENERATION"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-active-evidence-binding"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor active evidence binding."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-ACTIVE-EVIDENCE-BINDING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-active-evidence-encoding"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor active evidence encoding."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-ACTIVE-EVIDENCE-ENCODING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-active-evidence-mutation-bound"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor active evidence mutation bound."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-ACTIVE-EVIDENCE-MUTATION-BOUND"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-approval-required"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor approval required."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-APPROVAL-REQUIRED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-attempt-overflow"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor attempt overflow."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-ATTEMPT-OVERFLOW"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-effect-journal-decode"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor effect journal decode."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-EFFECT-JOURNAL-DECODE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-effect-journal-encoding"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor effect journal encoding."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-EFFECT-JOURNAL-ENCODING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-effect-outcome-unknown"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor effect outcome unknown."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-EFFECT-OUTCOME-UNKNOWN"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-generation-overflow"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor generation overflow."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-GENERATION-OVERFLOW"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-generation-width"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor generation width."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-GENERATION-WIDTH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-invalid-active-evidence"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor invalid active evidence."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-INVALID-ACTIVE-EVIDENCE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-invalid-effect-journal"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor invalid effect journal."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-INVALID-EFFECT-JOURNAL"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-invalid-effect-result"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor invalid effect result."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-INVALID-EFFECT-RESULT"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-receipt-lineage-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor receipt lineage mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-RECEIPT-LINEAGE-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-stale-lease"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor stale lease."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-STALE-LEASE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-executor-work-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor work mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-WORK-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-affected-ids"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan affected ids."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-AFFECTED-IDS"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-affected-set-hash"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan affected set hash."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-AFFECTED-SET-HASH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-affected-set-hash-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan affected set hash mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-AFFECTED-SET-HASH-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-contribution-hash-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan contribution hash mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-CONTRIBUTION-HASH-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-contribution-not-canonical"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan contribution not canonical."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-CONTRIBUTION-NOT-CANONICAL"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-contribution-not-json"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan contribution not json."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-CONTRIBUTION-NOT-JSON"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-effect-bound"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan effect bound."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-EFFECT-BOUND"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-effect-id-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan effect id mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-EFFECT-ID-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-effect-ordinal-overflow"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan effect ordinal overflow."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-EFFECT-ORDINAL-OVERFLOW"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-expiry-overflow"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan expiry overflow."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-EXPIRY-OVERFLOW"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-freeze-acquisition-not-exact"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan freeze acquisition not exact."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-FREEZE-ACQUISITION-NOT-EXACT"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-freeze-binding-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan freeze binding mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-FREEZE-BINDING-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-freeze-contribution"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan freeze contribution."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-FREEZE-CONTRIBUTION"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-freeze-target-not-lineage"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan freeze target not lineage."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-FREEZE-TARGET-NOT-LINEAGE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-no-effects"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan no effects."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-NO-EFFECTS"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-plan-body-hash"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan plan body hash."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-PLAN-BODY-HASH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-plan-body-hash-encoding"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan plan body hash encoding."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-PLAN-BODY-HASH-ENCODING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-plan-hash-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan plan hash mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-PLAN-HASH-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-too-many-effects"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan too many effects."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-TOO-MANY-EFFECTS"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-plan-zero-ttl"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response plan zero ttl."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-PLAN-ZERO-TTL"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-record-action-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response record action mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-ACTION-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-record-body-hash-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response record body hash mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-BODY-HASH-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-record-decode"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response record decode."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-DECODE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-record-due-at-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response record due at mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-DUE-AT-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-record-empty-mutation-log"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response record empty mutation log."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-EMPTY-MUTATION-LOG"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-record-generation-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response record generation mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-GENERATION-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-record-lifecycle"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response record lifecycle."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-LIFECYCLE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-record-missing-applying-lease"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response record missing applying lease."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-MISSING-APPLYING-LEASE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-record-not-canonical"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response record not canonical."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-NOT-CANONICAL"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-record-state-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response record state mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-STATE-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-record-tenant-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response record tenant mismatch."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-TENANT-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-record-zero-mutation-generation"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response record zero mutation generation."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-RECORD-ZERO-MUTATION-GENERATION"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-state-generation-overflow"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response state generation overflow."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-GENERATION-OVERFLOW"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-state-incomplete-application"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response state incomplete application."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-INCOMPLETE-APPLICATION"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-state-invalid-effect-lifecycle"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response state invalid effect lifecycle."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-INVALID-EFFECT-LIFECYCLE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-state-invalid-failure-record"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response state invalid failure record."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-INVALID-FAILURE-RECORD"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-state-invalid-timing"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response state invalid timing."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-INVALID-TIMING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-state-invalid-transition"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response state invalid transition."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-INVALID-TRANSITION"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-state-mutation-limit"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response state mutation limit."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-MUTATION-LIMIT"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-state-not-due"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response state not due."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-NOT-DUE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-state-shape"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response state shape."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-SHAPE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-state-stale-generation"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response state stale generation."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-STALE-GENERATION"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-state-unknown-effect"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response state unknown effect."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-UNKNOWN-EFFECT"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:response-state-unrestored-effects"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response state unrestored effects."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-STATE-UNRESTORED-EFFECTS"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:clock-unavailable"
+    domain: kernel
+    severity: error
+    summary: "Trusted time refused: clock-unavailable."
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline."
+    string_code: "CHIO-KERNEL-CLOCK-UNAVAILABLE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-kernel-core
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:clock-before-epoch"
+    domain: kernel
+    severity: error
+    summary: "Trusted time refused: clock-before-epoch."
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline."
+    string_code: "CHIO-KERNEL-CLOCK-BEFORE-EPOCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-kernel-core
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:clock-overflow"
+    domain: kernel
+    severity: error
+    summary: "Trusted time refused: clock-overflow."
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline."
+    string_code: "CHIO-KERNEL-CLOCK-OVERFLOW"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-kernel-core
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:clock-wall-clock-regression"
+    domain: kernel
+    severity: error
+    summary: "Trusted time refused: clock-wall-clock-regression."
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline."
+    string_code: "CHIO-KERNEL-CLOCK-WALL-CLOCK-REGRESSION"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-kernel-core
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:clock-monotonic-regression"
+    domain: kernel
+    severity: error
+    summary: "Trusted time refused: clock-monotonic-regression."
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline."
+    string_code: "CHIO-KERNEL-CLOCK-MONOTONIC-REGRESSION"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-kernel-core
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:clock-expired"
+    domain: kernel
+    severity: error
+    summary: "Trusted time refused: clock-expired."
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline."
+    string_code: "CHIO-KERNEL-CLOCK-EXPIRED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-kernel-core
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:clock-not-yet-valid"
+    domain: kernel
+    severity: error
+    summary: "Trusted time refused: clock-not-yet-valid."
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline."
+    string_code: "CHIO-KERNEL-CLOCK-NOT-YET-VALID"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-kernel-core
+      - chio-control-plane
+
+  - urn: "urn:chio:error:kernel:clock-invalid-window"
+    domain: kernel
+    severity: error
+    summary: "Trusted time refused: clock-invalid-window."
+    help: "Restore a trusted nonregressing clock; retain the original authority deadline."
+    string_code: "CHIO-KERNEL-CLOCK-INVALID-WINDOW"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-kernel-core
+      - chio-control-plane
+
+  - urn: "urn:chio:error:transport:response-authority-frame-bound"
+    domain: transport
+    severity: error
+    summary: "The authority envelope exceeds its byte limit."
+    help: "Reject this request; verify the pinned authority context and original signed envelope."
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-FRAME-BOUND"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-control-plane
+
+  - urn: "urn:chio:error:transport:response-authority-decode"
+    domain: transport
+    severity: error
+    summary: "The authority envelope cannot be decoded."
+    help: "Reject this request; verify the pinned authority context and original signed envelope."
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-DECODE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-control-plane
+
+  - urn: "urn:chio:error:transport:response-authority-canonical"
+    domain: transport
+    severity: error
+    summary: "The authority envelope is not canonical JSON."
+    help: "Reject this request; verify the pinned authority context and original signed envelope."
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-CANONICAL"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-control-plane
+
+  - urn: "urn:chio:error:transport:response-authority-schema"
+    domain: transport
+    severity: error
+    summary: "The authority envelope schema is unsupported."
+    help: "Reject this request; verify the pinned authority context and original signed envelope."
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-SCHEMA"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-control-plane
+
+  - urn: "urn:chio:error:transport:response-authority-deployment"
+    domain: transport
+    severity: error
+    summary: "The authority envelope is bound to a different deployment."
+    help: "Reject this request; verify the pinned authority context and original signed envelope."
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-DEPLOYMENT"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-control-plane
+
+  - urn: "urn:chio:error:transport:response-authority-store"
+    domain: transport
+    severity: error
+    summary: "The authority envelope is bound to a different store."
+    help: "Reject this request; verify the pinned authority context and original signed envelope."
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-STORE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-control-plane
+
+  - urn: "urn:chio:error:transport:response-authority-time-overflow"
+    domain: transport
+    severity: error
+    summary: "The authority freshness window overflows."
+    help: "Reject this request; verify the pinned authority context and original signed envelope."
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-TIME-OVERFLOW"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-control-plane
+
+  - urn: "urn:chio:error:transport:response-authority-freshness"
+    domain: transport
+    severity: error
+    summary: "The authority envelope is outside its freshness window."
+    help: "Reject this request; verify the pinned authority context and original signed envelope."
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-FRESHNESS"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-control-plane
+
+  - urn: "urn:chio:error:transport:response-authority-client"
+    domain: transport
+    severity: error
+    summary: "The authority envelope names a different client."
+    help: "Reject this request; verify the pinned authority context and original signed envelope."
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-CLIENT"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-control-plane
+
+  - urn: "urn:chio:error:transport:response-authority-algorithm"
+    domain: transport
+    severity: error
+    summary: "The authority envelope signature algorithm differs from its key."
+    help: "Reject this request; verify the pinned authority context and original signed envelope."
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-ALGORITHM"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-control-plane
+
+  - urn: "urn:chio:error:transport:response-authority-signature"
+    domain: transport
+    severity: error
+    summary: "The authority envelope signature is invalid."
+    help: "Reject this request; verify the pinned authority context and original signed envelope."
+    string_code: "CHIO-TRANSPORT-RESPONSE-AUTHORITY-SIGNATURE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-control-plane

@@ -29,7 +29,7 @@
                 artifacts_unavailable: false,
             }),
             coordinator,
-            Arc::clone(&clock) as Arc<dyn SecurityClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
         )
         .unwrap_or_else(|error| panic!("cancel-before-expiry planner: {error}"));
 
@@ -107,7 +107,7 @@
                 artifacts_unavailable: false,
             }),
             coordinator,
-            Arc::clone(&clock) as Arc<dyn SecurityClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
         )
         .unwrap_or_else(|error| panic!("prepared-ack-loss planner: {error}"));
 
@@ -158,7 +158,7 @@
                 false,
                 Arc::clone(&effects),
             )),
-            Arc::clone(&clock) as Arc<dyn SecurityClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
         );
         planner
             .resume_incomplete_pass(1)
@@ -213,7 +213,7 @@
                     false,
                     Arc::clone(&effects),
                 )),
-                Arc::clone(&clock) as Arc<dyn SecurityClock>,
+                Arc::clone(&clock) as Arc<dyn Clock>,
             );
             planner
                 .resume_incomplete_pass(1)
@@ -557,7 +557,7 @@
                 Arc::clone(&effects),
                 Arc::clone(&termination_calls),
             )),
-            Arc::clone(&clock) as Arc<dyn SecurityClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
         );
         planner
             .resume_incomplete_pass(1)
@@ -737,7 +737,7 @@
                 false,
                 Arc::clone(&effects),
             )),
-            Arc::clone(&clock) as Arc<dyn SecurityClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
         );
         let short = AttestedFindingResponseRecoveryLimits::new(1, 10, 1)
             .unwrap_or_else(|error| panic!("short limits: {error}"));
@@ -822,7 +822,7 @@
                 false,
                 Arc::clone(&effects),
             )),
-            Arc::clone(&clock) as Arc<dyn SecurityClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
         ));
         planner
             .resume_incomplete_pass(1)

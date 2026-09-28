@@ -1135,3 +1135,63 @@ target    = "peers_lock_decode"
 path      = "fuzz/corpus/peers_lock_decode/empty.toml"
 sha256    = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 source    = "hand_curated_coverage"
+
+[[seed]]
+target = "response_authority_protocol"
+path = "fuzz/corpus/response_authority_protocol/0"
+sha256 = "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "response_authority_protocol"
+path = "fuzz/corpus/response_authority_protocol/1"
+sha256 = "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "response_authority_protocol"
+path = "fuzz/corpus/response_authority_protocol/2"
+sha256 = "dbc1b4c900ffe48d575b5da5c638040125f65db0fe3e24494b76ea986457d986"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "response_authority_protocol"
+path = "fuzz/corpus/response_authority_protocol/3"
+sha256 = "084fed08b978af4d7d196a7446a86b58009e636b611db16211b65a9aadff29c5"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "response_authority_protocol"
+path = "fuzz/corpus/response_authority_protocol/4"
+sha256 = "e52d9c508c502347344d8c07ad91cbd6068afc75ff6292f062a09ca381c89e71"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "response_lifecycle"
+path = "fuzz/corpus/response_lifecycle/0"
+sha256 = "18ff07a0c8afcc4d93df77abc62742bc67a1a295be53dce98c00cfc23f0bcd51"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "response_lifecycle"
+path = "fuzz/corpus/response_lifecycle/1"
+sha256 = "3df5edda3641a1e8f35f0470bf7981450d539d4596c316a3ef93efd50a5cab68"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "response_lifecycle"
+path = "fuzz/corpus/response_lifecycle/2"
+sha256 = "84ea664b1a91cc42aee5938aad3cd35fa68f8d6f5314c48b6cbaf11d1ee07288"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "response_authority_protocol"
+path = "fuzz/corpus/response_authority_protocol/timestamp-overflow"
+sha256 = "12a3ae445661ce5dee78d0650d33362dec29c4f82af05e7e57fb595bbbacf0ca"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "response_lifecycle"
+path = "fuzz/corpus/response_lifecycle/unresolved-owner-loss"
+sha256 = "724b65c3dd83889ba04458fd08d3a4b772196ecf5e7d0e299d56840e1b4d2139"
+source = "hand_curated_coverage"

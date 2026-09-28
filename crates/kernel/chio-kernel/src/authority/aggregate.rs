@@ -15,10 +15,7 @@ pub fn validate_issued_aggregate_family_root_response(
     current_issuer: &PublicKey,
     max_invocations: u32,
 ) -> Result<(), KernelError> {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?
-        .as_secs();
+    let now = capability_authority_now_unix_secs(&SystemClock)?;
     validate_issued_response_at(
         capability,
         requested_subject,
@@ -149,8 +146,7 @@ mod tests {
         let subject = Keypair::generate().public_key();
         let backend: Arc<dyn SigningBackend> =
             Arc::new(chio_core::crypto::Ed25519Backend::new(key.clone()));
-        let authority =
-            GovernedCapabilityAuthority::new(backend, Arc::new(SystemCapabilityAuthorityClock));
+        let authority = GovernedCapabilityAuthority::new(backend, Arc::new(SystemClock));
         let scope = scope();
         let root = authority.issue_aggregate_family_root(&subject, scope.clone(), 300, 2)?;
         validate_issued_aggregate_family_root_response(
@@ -170,8 +166,7 @@ mod tests {
         let key = Keypair::generate();
         let subject = Keypair::generate().public_key();
         let backend = Arc::new(chio_core::crypto::Ed25519Backend::new(key.clone()));
-        let authority =
-            GovernedCapabilityAuthority::new(backend, Arc::new(SystemCapabilityAuthorityClock));
+        let authority = GovernedCapabilityAuthority::new(backend, Arc::new(SystemClock));
         let mut requested_scope = scope();
         assert!(authority
             .issue_capability_with_aggregate_budget(&subject, requested_scope.clone(), 300, 2)

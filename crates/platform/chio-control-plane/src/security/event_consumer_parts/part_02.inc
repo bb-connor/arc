@@ -1,23 +1,20 @@
 #[cfg(test)]
 mod tests {
     use super::{
-        build_attested_finding_batch_publication, AttestedFindingAdmissionArtifactPayload,
-        AttestedFindingBatchPlanner, AttestedFindingAdmissionArtifacts,
-        AttestedFindingResponseCompletionProof,
-        AttestedFindingDispatchCommittedResume, AttestedFindingPreDispatchReconstruction,
+        build_attested_finding_batch_publication, governed_approval_request_from_native,
+        AttestedFindingAdmissionArtifactPayload, AttestedFindingAdmissionArtifacts,
+        AttestedFindingBatchPlanner, AttestedFindingDispatchCommittedResume,
+        AttestedFindingPreDispatchReconstruction, AttestedFindingResponseCompletionProof,
         AttestedFindingResponseCoordinator, AttestedFindingResponsePolicyPlanner,
         AttestedFindingResponsePolicySelection, AttestedFindingResponseRecoveryLimits,
         CorrelationAttestor, CorrelationPort, DurableAttestedFindingBatchPlanner,
-        DurableCorrelationIngress, KernelAttestedFindingResponseCoordinator,
-        KernelActiveResponseApprovalVerifier,
-        NativeSecurityEventVerifier, PreparedAttestedFindingResponse,
-        ProductionCorrelationConsumer,
-        ReservedAttestedFindingResponsePlan,
-        RuleCorrelationOutcome, SecurityEventReceiptProjection, SqliteTemporalCorrelationPort,
+        DurableCorrelationIngress, KernelActiveResponseApprovalVerifier,
+        KernelAttestedFindingResponseCoordinator, NativeSecurityEventVerifier,
+        PreparedAttestedFindingResponse, ProductionCorrelationConsumer,
+        ReservedAttestedFindingResponsePlan, RuleCorrelationOutcome,
+        SecurityEventReceiptProjection, SqliteTemporalCorrelationPort,
         TrustedSecurityEventProducer, TrustedSecurityEventReceiptProducer,
-        VerifiedSecurityEventIngress,
-        governed_approval_request_from_native,
-        SECURITY_EVENT_RECEIPT_PROJECTION_VERSION,
+        VerifiedSecurityEventIngress, SECURITY_EVENT_RECEIPT_PROJECTION_VERSION,
     };
     use crate::security::{DurableActiveResponseExecutor, NativeSecurityReceiptSink};
     use chio_core::capability::governance::{
@@ -38,53 +35,50 @@ mod tests {
         ActiveDefenseReceiptBody, CorrelatedFindingReceiptBody,
     };
     use chio_core_types::SignedSecurityEvent;
+    use chio_kernel::approval::ApprovalStore;
     use chio_kernel::security_admission_operation::{
         AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStore,
         ReplayReservationState,
     };
-    use chio_kernel::approval::ApprovalStore;
     use chio_kernel::threshold_approval::{
-        authorization_capability_hash, ThresholdApprovalProposal,
-        ThresholdApprovalProposalBody, ThresholdApprovalRequirement,
+        authorization_capability_hash, ThresholdApprovalProposal, ThresholdApprovalProposalBody,
+        ThresholdApprovalRequirement,
     };
     use chio_kernel::{
         ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
-        ActiveResponseCommittedDispatch,
+        ActiveResponseAuthorizationRequest, ActiveResponseCommittedDispatch,
         ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
         ActiveResponseExecutionRequest, ActiveResponseExecutorAuthority,
         ActiveResponseExecutorAuthorityIdentity, ActiveResponseExecutorError,
         ActiveResponseFindingAuthority, ActiveResponseFindingAuthorityError,
         ActiveResponsePolicyResolutionError, ActiveResponseRequirement,
-        ActiveResponseAuthorizationRequest,
         ActiveResponseSubmissionProof, ActiveResponseSubmissionProofBody,
         AuthoritativeCorrelatedFindingEvidence, AutomaticActiveResponseDispatchFenceOutcome,
         ChioKernel, GovernedSecurityRuntimePublication, KernelConfig, KernelError,
         MemoryBudgetConfig, PreparedActiveResponseAdmission, SecurityDispatchOutcomeHandle,
-        SecurityPreDispatchContext, SecurityPreDispatchHook,
-        DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
-        DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        SecurityPreDispatchContext, SecurityPreDispatchHook, DEFAULT_CHECKPOINT_BATCH_SIZE,
+        DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
     };
     use chio_quarantine::{
         CorrelationOutcome, CorrelationPolicy, CorrelationStatus, RuleLimits, TemporalRule,
     };
-    use chio_security_kernel::{SecurityClock, SecurityEventIngress};
+    use chio_security_kernel::{Clock, SecurityEventIngress};
     use chio_security_types::ports::{
-        AdmissionArtifactRef, ApprovalVerifierPort, AttestedFindingBatchBinding,
-        AttestedFindingBatchBindings,
-        AttestedFindingBatchKey, AttestedFindingBatchPublication, AttestedFindingBatchStore,
+        AdmissionArtifactRef, AlertDeliveryQuery, AlertDeliveryStatus, ApprovalVerifierPort,
+        AttestedFindingBatchBinding, AttestedFindingBatchBindings, AttestedFindingBatchKey,
+        AttestedFindingBatchPublication, AttestedFindingBatchStore,
         AttestedFindingResponseAdmissionState, AttestedFindingResponseCompletionOutcome,
-        AttestedFindingResponseCompletionState, AttestedFindingResponseOutboxKey,
-        AttestedFindingResponseOutboxHealth, AttestedFindingResponseOutboxRecord,
+        AttestedFindingResponseCompletionState, AttestedFindingResponseOutboxHealth,
+        AttestedFindingResponseOutboxKey, AttestedFindingResponseOutboxRecord,
         AttestedFindingResponseOutboxStore, AttestedFindingResponseOutboxTransition,
         AttestedFindingResponsePlanPublication, AttestedFindingResponsePlanningState,
-        AlertDeliveryQuery, AlertDeliveryStatus, CanonicalBody, CorrelationIngressStore,
-        CreateOutcome, Digest32, EffectExecutionStatus, EffectOperation, EffectPort,
-        EffectRequest, EffectResult, EffectResultQuery, ErrorCode, EventAppend, EventId,
-        GovernedApprovalRequest, GovernedApprovalReservationMutation,
+        CanonicalBody, CorrelationIngressStore, CreateOutcome, Digest32, EffectExecutionStatus,
+        EffectOperation, EffectPort, EffectRequest, EffectResult, EffectResultQuery, ErrorCode,
+        EventAppend, EventId, GovernedApprovalRequest, GovernedApprovalReservationMutation,
         IssuanceFreezeAdmissionQuery, LeaseOwnerId, OpaqueReceiptRef, PortError, PortErrorKind,
-        PortResult, PreparedActiveResponseDispatchBinding, ProducerId, ProducerTrustClass, RecordId,
-        RuleId, SecurityAlert, SecurityAlertPort, SecurityEventVerifierPort, SessionId, TenantId,
-        UnverifiedEventBatch, UnverifiedSecurityEvent, VerifiedSecurityEvent,
+        PortResult, PreparedActiveResponseDispatchBinding, ProducerId, ProducerTrustClass,
+        RecordId, RuleId, SecurityAlert, SecurityAlertPort, SecurityEventVerifierPort, SessionId,
+        TenantId, UnverifiedEventBatch, UnverifiedSecurityEvent, VerifiedSecurityEvent,
     };
     use chio_security_types::{
         OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind,
@@ -93,14 +87,14 @@ mod tests {
     };
     use chio_store_sqlite::security_state::SqliteSecurityStateStore;
     use chio_store_sqlite::{
-        SqliteSecurityAdmissionOperationStore, SqliteApprovalStore, SqliteBudgetStore,
-        SqliteReceiptStore,
+        SqliteApprovalStore, SqliteBudgetStore, SqliteReceiptStore,
+        SqliteSecurityAdmissionOperationStore,
     };
     use rusqlite::Connection;
     use serde_json::json;
     use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
-    use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier, Mutex};
     use std::thread;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -112,46 +106,7 @@ mod tests {
         }
     }
 
-    struct FixedClock(u64);
-
-    impl SecurityClock for FixedClock {
-        fn now_unix_ms(&self) -> PortResult<u64> {
-            Ok(self.0)
-        }
-    }
-
-    struct MutableClock(AtomicU64);
-
-    impl MutableClock {
-        fn new(now_unix_ms: u64) -> Self {
-            Self(AtomicU64::new(now_unix_ms))
-        }
-
-        fn set(&self, now_unix_ms: u64) {
-            self.0.store(now_unix_ms, Ordering::Release);
-        }
-    }
-
-    impl SecurityClock for MutableClock {
-        fn now_unix_ms(&self) -> PortResult<u64> {
-            Ok(self.0.load(Ordering::Acquire))
-        }
-    }
-
-    struct ToggleClock {
-        ready: AtomicBool,
-        now_unix_ms: u64,
-    }
-
-    impl SecurityClock for ToggleClock {
-        fn now_unix_ms(&self) -> PortResult<u64> {
-            if self.ready.load(Ordering::Acquire) {
-                Ok(self.now_unix_ms)
-            } else {
-                Err(PortError::unavailable())
-            }
-        }
-    }
+    use super::test_clocks::{FixedClock, MutableClock, ToggleClock};
 
     fn tenant() -> TenantId {
         TenantId::new("tenant-events").unwrap_or_else(|error| panic!("tenant id: {error}"))
@@ -178,7 +133,11 @@ mod tests {
     }
 
     fn signed_event(keypair: &Keypair) -> UnverifiedSecurityEvent {
-        signed_event_kind("event-signed", SecurityEventKind::TripwireObservation, keypair)
+        signed_event_kind(
+            "event-signed",
+            SecurityEventKind::TripwireObservation,
+            keypair,
+        )
     }
 
     fn signed_event_kind(
@@ -197,8 +156,7 @@ mod tests {
         keypair: &Keypair,
     ) -> UnverifiedSecurityEvent {
         let body = SecurityEventBody::new(SecurityEventBodyInput {
-            event_id: EventId::new(event_id)
-                .unwrap_or_else(|error| panic!("event id: {error}")),
+            event_id: EventId::new(event_id).unwrap_or_else(|error| panic!("event id: {error}")),
             event_time_unix_ms,
             ingest_time_unix_ms,
             tenant_id: tenant(),
@@ -355,7 +313,7 @@ mod tests {
     fn verifier_with_receipts(
         internal_keypair: &Keypair,
         receipt_keypair: &Keypair,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
     ) -> NativeSecurityEventVerifier {
         NativeSecurityEventVerifier::new(
             clock,
@@ -685,7 +643,7 @@ mod tests {
         });
         let verifier = Arc::new(
             NativeSecurityEventVerifier::new(
-                Arc::clone(&clock) as Arc<dyn SecurityClock>,
+                Arc::clone(&clock) as Arc<dyn Clock>,
                 vec![TrustedSecurityEventProducer {
                     tenant_id: tenant(),
                     producer_id: producer(),
@@ -808,7 +766,9 @@ mod tests {
         let contribution_hash =
             Digest32::new(*chio_core::sha256(canonical_contribution.as_bytes()).as_bytes());
         AttestedFindingResponsePolicySelection {
-            execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
+            execution: chio_security_types::ResponseExecutionBinding::new(
+                chio_security_types::ResponseExecutionMode::Live,
+            ),
             affected_ids: vec![record("affected-policy")],
             effects: vec![ResponseEffectSpec {
                 kind: ResponseEffectKind::ThrottleSession,
@@ -863,11 +823,10 @@ mod tests {
             if artifact_ref.as_str() != "policy-artifacts" {
                 return Err(PortError::integrity_failure());
             }
-            Ok(AttestedFindingAdmissionArtifacts::synthetic(Digest32::new([
-                74_u8; 32
-            ])))
+            Ok(AttestedFindingAdmissionArtifacts::synthetic(Digest32::new(
+                [74_u8; 32],
+            )))
         }
-
     }
 
     #[derive(Default)]
@@ -906,9 +865,9 @@ mod tests {
             if prepared.durable_dispatch_binding(plan.response_plan())? != *binding {
                 return Err(PortError::integrity_failure());
             }
-            Ok(AttestedFindingPreDispatchReconstruction::Prepared(Box::new(
-                prepared,
-            )))
+            Ok(AttestedFindingPreDispatchReconstruction::Prepared(
+                Box::new(prepared),
+            ))
         }
 
         fn terminate_never_committed(
@@ -1000,9 +959,9 @@ mod tests {
             if prepared.durable_dispatch_binding(plan.response_plan())? != *binding {
                 return Err(PortError::integrity_failure());
             }
-            Ok(AttestedFindingPreDispatchReconstruction::Prepared(Box::new(
-                prepared,
-            )))
+            Ok(AttestedFindingPreDispatchReconstruction::Prepared(
+                Box::new(prepared),
+            ))
         }
 
         fn terminate_never_committed(
@@ -1104,9 +1063,9 @@ mod tests {
                     error_code.clone(),
                 ));
             }
-            Ok(AttestedFindingAdmissionArtifacts::synthetic(Digest32::new([
-                74_u8; 32
-            ])))
+            Ok(AttestedFindingAdmissionArtifacts::synthetic(Digest32::new(
+                [74_u8; 32],
+            )))
         }
     }
 
@@ -1311,7 +1270,7 @@ mod tests {
         let clock = Arc::new(MutableClock::new(10_000));
         let event_verifier = Arc::new(
             NativeSecurityEventVerifier::new(
-                Arc::clone(&clock) as Arc<dyn SecurityClock>,
+                Arc::clone(&clock) as Arc<dyn Clock>,
                 vec![TrustedSecurityEventProducer {
                     tenant_id: tenant(),
                     producer_id: producer(),
@@ -1325,11 +1284,9 @@ mod tests {
             )
             .unwrap_or_else(|error| panic!("verifier: {error}")),
         );
-        let ingress = VerifiedSecurityEventIngress::new(
-            Arc::clone(&event_verifier),
-            Arc::clone(&store),
-        )
-        .unwrap_or_else(|error| panic!("ingress: {error}"));
+        let ingress =
+            VerifiedSecurityEventIngress::new(Arc::clone(&event_verifier), Arc::clone(&store))
+                .unwrap_or_else(|error| panic!("ingress: {error}"));
         ingress
             .verify_and_append(&event)
             .unwrap_or_else(|error| panic!("enqueue tail event: {error}"));
@@ -1372,9 +1329,11 @@ mod tests {
         let connection = Connection::open(&path)
             .unwrap_or_else(|error| panic!("inspect deferred tail: {error}"));
         let deferred_outcomes: i64 = connection
-            .query_row("SELECT COUNT(*) FROM security_correlation_outcomes", [], |row| {
-                row.get(0)
-            })
+            .query_row(
+                "SELECT COUNT(*) FROM security_correlation_outcomes",
+                [],
+                |row| row.get(0),
+            )
             .unwrap_or_else(|error| panic!("count deferred outcomes: {error}"));
         assert_eq!(deferred_outcomes, 0);
 
@@ -1397,9 +1356,14 @@ mod tests {
             "security_attested_finding_response_outbox",
         ] {
             let count: i64 = connection
-                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0))
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                    row.get(0)
+                })
                 .unwrap_or_else(|error| panic!("count {table}: {error}"));
-            assert_eq!(count, 1, "idle flush did not commit exactly one {table} row");
+            assert_eq!(
+                count, 1,
+                "idle flush did not commit exactly one {table} row"
+            );
         }
     }
 
@@ -1429,7 +1393,7 @@ mod tests {
         let clock = Arc::new(MutableClock::new(100_000));
         let event_verifier = Arc::new(
             NativeSecurityEventVerifier::new(
-                Arc::clone(&clock) as Arc<dyn SecurityClock>,
+                Arc::clone(&clock) as Arc<dyn Clock>,
                 vec![TrustedSecurityEventProducer {
                     tenant_id: tenant(),
                     producer_id: producer(),
@@ -1443,11 +1407,9 @@ mod tests {
             )
             .unwrap_or_else(|error| panic!("verifier: {error}")),
         );
-        let ingress = VerifiedSecurityEventIngress::new(
-            Arc::clone(&event_verifier),
-            Arc::clone(&store),
-        )
-        .unwrap_or_else(|error| panic!("ingress: {error}"));
+        let ingress =
+            VerifiedSecurityEventIngress::new(Arc::clone(&event_verifier), Arc::clone(&store))
+                .unwrap_or_else(|error| panic!("ingress: {error}"));
         ingress
             .verify_and_append(&future)
             .unwrap_or_else(|error| panic!("enqueue future prefix: {error}"));
@@ -1525,11 +1487,9 @@ mod tests {
                     .unwrap_or_else(|error| panic!("open ingress store: {error}")),
             );
             let event_verifier = Arc::new(verifier(&keypair));
-            let ingress = VerifiedSecurityEventIngress::new(
-                Arc::clone(&event_verifier),
-                Arc::clone(&store),
-            )
-            .unwrap_or_else(|error| panic!("ingress: {error}"));
+            let ingress =
+                VerifiedSecurityEventIngress::new(Arc::clone(&event_verifier), Arc::clone(&store))
+                    .unwrap_or_else(|error| panic!("ingress: {error}"));
             ingress
                 .verify_and_append(&event)
                 .unwrap_or_else(|error| panic!("enqueue native event: {error}"));
@@ -1596,7 +1556,9 @@ mod tests {
             ("security_attested_finding_response_outbox", 1_i64),
         ] {
             let count: i64 = connection
-                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0))
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                    row.get(0)
+                })
                 .unwrap_or_else(|error| panic!("count {table}: {error}"));
             assert_eq!(count, expected, "unexpected durable row count for {table}");
         }
@@ -1620,7 +1582,10 @@ mod tests {
         let keypair = Keypair::from_seed(&[93_u8; 32]);
         for (event_id, event_kind) in [
             ("native-canary-ingress", SecurityEventKind::CanaryInvocation),
-            ("native-honey-ingress", SecurityEventKind::TripwireObservation),
+            (
+                "native-honey-ingress",
+                SecurityEventKind::TripwireObservation,
+            ),
             (
                 "native-watermark-ingress",
                 SecurityEventKind::WatermarkObservation,
@@ -1707,11 +1672,9 @@ mod tests {
             assert_eq!(finding_batches, 1);
             assert_eq!(response_work, 1);
 
-            let replay_ingress = VerifiedSecurityEventIngress::new(
-                Arc::new(verifier(&keypair)),
-                Arc::clone(&store),
-            )
-            .unwrap_or_else(|error| panic!("replay ingress: {error}"));
+            let replay_ingress =
+                VerifiedSecurityEventIngress::new(Arc::new(verifier(&keypair)), Arc::clone(&store))
+                    .unwrap_or_else(|error| panic!("replay ingress: {error}"));
             assert_eq!(
                 replay_ingress
                     .verify_and_append(&event)

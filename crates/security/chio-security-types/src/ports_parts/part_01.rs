@@ -145,6 +145,15 @@ impl PortError {
     }
 }
 
+impl From<crate::clock::ClockError> for PortError {
+    fn from(error: crate::clock::ClockError) -> Self {
+        Self::new(
+            PortErrorKind::Unavailable,
+            ErrorCode(error.code().to_string()),
+        )
+    }
+}
+
 impl fmt::Display for PortError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{:?}: {}", self.kind, self.code)
@@ -1035,8 +1044,7 @@ impl DeclassificationTransitionBinding {
             | Self::RecoveryUndeliveredConsumption { .. } => {
                 Some(DeclassificationUseState::DispatchFailed)
             }
-            Self::OutcomeUnknownAfterDispatch { .. }
-            | Self::RecoveryOutcomeUnknown { .. } => {
+            Self::OutcomeUnknownAfterDispatch { .. } | Self::RecoveryOutcomeUnknown { .. } => {
                 Some(DeclassificationUseState::OutcomeUnknown)
             }
         }

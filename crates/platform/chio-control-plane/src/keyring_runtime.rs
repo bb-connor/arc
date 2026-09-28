@@ -14,6 +14,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use chio_core::crypto::{Keypair, SigningBackend};
+use chio_security_types::clock::{Clock, SystemClock};
 use chio_security_types::ports::{Digest32, RecordId};
 use chio_security_types::{
     EnterpriseMigrationControl, EnterpriseMigrationKey, EnterpriseMigrationMinimumHead,
@@ -398,17 +399,10 @@ impl KeyringRuntimeComposition {
                     )
                 })?;
             let policy = self.store.policy_clone();
-            let issued_at = u64::try_from(
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map_err(|_| {
-                        CliError::cli_other_error("system time precedes the Unix epoch".to_string())
-                    })?
-                    .as_millis(),
-            )
-            .map_err(|_| {
-                CliError::cli_other_error("system time exceeds key-log range".to_string())
-            })?;
+            let issued_at = SystemClock
+                .unix_millis()
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?
+                .get();
             let sequence = previous.body.sequence.checked_add(1).ok_or_else(|| {
                 CliError::cli_other_error("key-log sequence overflow".to_string())
             })?;

@@ -3,9 +3,17 @@ use chio_core::crypto::{Signature, SigningAlgorithm};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 struct Clock;
-impl CapabilityAuthorityClock for Clock {
-    fn now_unix_millis(&self) -> Result<u64, CapabilityAuthorityClockError> {
-        Ok(1_700_000_000_000)
+impl chio_security_types::clock::Clock for Clock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = 1_700_000_000_000;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 

@@ -98,7 +98,8 @@ impl PreparedFlowDispatch<'_> {
         let now_unix_ms = self
             .resolver
             .clock
-            .now_unix_ms()
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
             .map_err(|_| FlowDenial::StateChanged)?;
         if now_unix_ms < self.prepared_at_unix_ms {
             return Err(FlowDenial::StateChanged);
@@ -321,7 +322,8 @@ impl PersistentFlowResolver {
         }
         let consumption_acknowledged_at_unix_ms = self
             .clock
-            .now_unix_ms()
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
             .map_err(|_| FlowDenial::StateChanged)?;
         if let Err(error) = append_and_ack_exact_evidence(
             evidence.store.as_ref(),
@@ -334,7 +336,8 @@ impl PersistentFlowResolver {
         ) {
             let failed_at_unix_ms = self
                 .clock
-                .now_unix_ms()
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)
                 .map_err(|_| FlowDenial::StateChanged)?;
             let receipt_failure = prepare_declassification_outcome_evidence(
                 &evidence,
@@ -348,7 +351,8 @@ impl PersistentFlowResolver {
         }
         let committed_at_unix_ms = self
             .clock
-            .now_unix_ms()
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
             .map_err(|_| FlowDenial::StateChanged)?;
         if let Err(error) = self.commit_admission_at(
             &admission,
@@ -357,7 +361,8 @@ impl PersistentFlowResolver {
         ) {
             let failed_at_unix_ms = self
                 .clock
-                .now_unix_ms()
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)
                 .map_err(|_| FlowDenial::StateChanged)?;
             let dispatch_failed = prepare_declassification_outcome_evidence(
                 &evidence,

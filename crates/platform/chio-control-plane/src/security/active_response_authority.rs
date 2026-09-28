@@ -22,6 +22,8 @@ use chio_security_types::{
 };
 use serde::{Deserialize, Serialize};
 
+mod validation;
+use validation::{decode_authority_request, VerifiedAuthorityRequest};
 mod client;
 mod protocol;
 #[cfg(test)]
@@ -360,3 +362,6 @@ fn canonical_hex_digest(value: &str) -> PortResult<Digest32> {
     }
     Ok(Digest32::new(*parsed.as_bytes()))
 }
+
+#[cfg(any(test, feature = "fuzz"))]
+pub mod fuzz;

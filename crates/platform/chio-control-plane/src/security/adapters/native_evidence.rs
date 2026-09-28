@@ -1225,6 +1225,7 @@ fn backend_alert(alert: &SecurityAlert) -> PortResult<Alert> {
 #[cfg(test)]
 mod tests {
     use super::scheduler_health_body;
+    use super::*;
     use chio_quarantine::build_response_plan;
     use chio_security_types::ports::{
         ActionId, CanonicalBody, Digest32, ErrorCode, OpaqueReceiptRef, RecordId,
@@ -1314,8 +1315,10 @@ mod tests {
             first_failure_at_unix_ms: 1_700_000_010_000,
             attempts: 4,
             scheduler_fencing_token: 19,
-            error_code: ErrorCode::new("response.store_unavailable")
-                .unwrap_or_else(|error| panic!("error code: {error}")),
+            error_code: ErrorCode::new(
+                chio_security_types::DispatchRejection::CapabilityDigestMismatch.code(),
+            )
+            .unwrap_or_else(|error| panic!("error code: {error}")),
             alert: SecurityAlert {
                 tenant_id,
                 event_id,
@@ -1335,6 +1338,36 @@ mod tests {
                 .unwrap_or_else(|error| panic!("prior receipt: {error}")),
         )
         .unwrap_or_else(|error| panic!("scheduler health body: {error}"));
+        let directory =
+            tempfile::tempdir().unwrap_or_else(|error| panic!("receipt directory: {error}"));
+        let store = Arc::new(
+            chio_store_sqlite::SqliteReceiptStore::open(directory.path().join("receipts.db"))
+                .unwrap_or_else(|error| panic!("receipt store: {error}")),
+        );
+        let signer = Arc::new(chio_core::Ed25519Backend::new(
+            chio_core::Keypair::from_seed(&[31; 32]),
+        ));
+        let sink = NativeSecurityReceiptSink::new(store.clone(), signer.clone());
+        let append = active_defense_append_request(&body)
+            .unwrap_or_else(|error| panic!("append request: {error}"));
+        let evidence_id = sink
+            .sign_and_append(&append)
+            .unwrap_or_else(|error| panic!("signed receipt: {error}"));
+        let signed = store
+            .load_indexed_security_evidence(&evidence_id)
+            .unwrap_or_else(|error| panic!("load receipt: {error}"))
+            .unwrap_or_else(|| panic!("signed evidence missing"));
+        verify_native_security_receipt(&evidence_id, &body, &signed, &[signer.public_key()])
+            .unwrap_or_else(|error| panic!("verify signed reason: {error}"));
+        let mut changed = body.clone();
+        if let ActiveDefenseReceiptBody::SchedulerHealth(ref mut health) = changed {
+            health.error_code = ErrorCode::new("substituted.reason")
+                .unwrap_or_else(|error| panic!("reason: {error}"));
+        }
+        assert!(matches!(
+            verify_native_security_receipt(&evidence_id, &changed, &signed, &[signer.public_key()]),
+            Err(ActiveResponseFindingAuthorityError::Integrity(_))
+        ));
         let chio_core::receipt::security::ActiveDefenseReceiptBody::SchedulerHealth(body) = body
         else {
             panic!("scheduler health page must emit a scheduler-health body");
@@ -1342,7 +1375,10 @@ mod tests {
         assert_eq!(body.response.plan_hash, plan.plan_hash);
         assert_eq!(body.attempts, 4);
         assert_eq!(body.scheduler_fencing_token, 19);
-        assert_eq!(body.error_code.as_str(), "response.store_unavailable");
+        assert_eq!(
+            body.error_code.as_str(),
+            chio_security_types::DispatchRejection::CapabilityDigestMismatch.code()
+        );
         assert_eq!(body.evidence_hash, digest(9));
         assert_eq!(
             body.header.prior_receipt_ids.as_slice()[0].as_str(),

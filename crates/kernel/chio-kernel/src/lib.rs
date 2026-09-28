@@ -237,9 +237,8 @@ pub use authority::{
     validate_issued_capability_response_with_binding,
     validate_issued_capability_response_with_binding_at, AuthoritySnapshot, AuthorityStatus,
     AuthorityStoreError, AuthorityTrustedKeySnapshot, CapabilityAuthority,
-    CapabilityAuthorityClock, CapabilityAuthorityClockError, CapabilityAuthorityWorkloadBinding,
-    CapabilityIssuanceContext, GovernedCapabilityAuthority, LocalCapabilityAuthority,
-    SystemCapabilityAuthorityClock,
+    CapabilityAuthorityWorkloadBinding, CapabilityIssuanceContext, Clock, ClockError,
+    GovernedCapabilityAuthority, LocalCapabilityAuthority, SystemClock,
 };
 #[cfg(not(loom))]
 pub use budget_store::{BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore};

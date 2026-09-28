@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(unix)]
 use std::os::unix::net::UnixStream;
@@ -706,10 +705,9 @@ fn decode_canonical_response<T: for<'de> Deserialize<'de>>(bytes: &[u8], label: 
 }
 
 fn now_unix_seconds() -> Result<u64> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .map_err(|error| BrokerError::AuthorityUnavailable(format!("system clock failed: {error}")))
+    chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
+        .map(chio_security_types::clock::UnixMillis::as_secs)
+        .map_err(BrokerError::from)
 }
 
 #[cfg(test)]

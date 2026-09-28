@@ -331,7 +331,7 @@ fn install_broker(
             credential_placement:
                 chio_secret_broker::daemon_runtime::ProviderPlacementConfig::BearerAuthorization,
         },
-        Arc::new(chio_secret_broker::daemon::SystemDaemonClock),
+        Arc::new(chio_secret_broker::daemon::SystemClock),
     )?;
     let selected = verifier.binding().clone();
     // No broker transport is invoked by this custody-read test. Its production

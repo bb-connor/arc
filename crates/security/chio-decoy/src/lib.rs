@@ -30,10 +30,10 @@ pub use registry::{
     SecretMaterial,
 };
 pub use watermark::{
-    InactiveWatermark, SignedWatermarkEnvelope, TrustedWatermarkKey, VerifiedWatermark,
-    WatermarkCandidateError, WatermarkClock, WatermarkEncoding, WatermarkIssueError,
-    WatermarkIssueRequest, WatermarkIssuer, WatermarkIssuerConfig, WatermarkIssuerDependencies,
-    WatermarkIssuerPolicy, WatermarkKeyResolver, WatermarkKeyStatus, WatermarkObservationContext,
+    Clock, InactiveWatermark, SignedWatermarkEnvelope, TrustedWatermarkKey, VerifiedWatermark,
+    WatermarkCandidateError, WatermarkEncoding, WatermarkIssueError, WatermarkIssueRequest,
+    WatermarkIssuer, WatermarkIssuerConfig, WatermarkIssuerDependencies, WatermarkIssuerPolicy,
+    WatermarkKeyResolver, WatermarkKeyStatus, WatermarkObservationContext,
     WatermarkObservationPersistence, WatermarkPayload, WatermarkRegistryState, WatermarkScanError,
     WatermarkScanReport, WatermarkScanVerdict, WatermarkSourceContext,
     WatermarkSourceContextResolver, WatermarkVerifier, WatermarkVerifierDependencies,

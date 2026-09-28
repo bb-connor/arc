@@ -36,13 +36,24 @@ impl Drop for ResetBusyRelease {
 
 struct Clock(AtomicU64);
 
-impl SecurityStateClock for Clock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        let now = self.0.load(Ordering::Acquire);
-        if now == u64::MAX {
-            return Err(PortError::unavailable());
-        }
-        Ok(now)
+impl chio_security_types::clock::Clock for Clock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value: PortResult<u64> = (|| {
+            let now = self.0.load(Ordering::Acquire);
+            if now == u64::MAX {
+                return Err(PortError::unavailable());
+            }
+            Ok(now)
+        })();
+        let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 

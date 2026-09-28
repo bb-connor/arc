@@ -13,7 +13,7 @@ use chio_security_types::ports::{
     SessionId, TenantId,
 };
 use chio_security_types::{ResponseEffectKind, ResponseTarget};
-use chio_store_sqlite::{security_state::SecurityStateClock, SqliteSecurityStateStore};
+use chio_store_sqlite::{security_state::Clock, SqliteSecurityStateStore};
 use tempfile::tempdir;
 
 fn now_unix_ms() -> u64 {
@@ -35,9 +35,17 @@ impl MutableSecurityStateClock {
     }
 }
 
-impl SecurityStateClock for MutableSecurityStateClock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        Ok(self.0.load(Ordering::Acquire))
+impl chio_security_types::clock::Clock for MutableSecurityStateClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = self.0.load(Ordering::Acquire);
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 
@@ -344,7 +352,7 @@ fn action_rebinding_and_stale_scheduler_fences_fail_closed() {
     let clock = Arc::new(MutableSecurityStateClock::new(now));
     let store = SqliteSecurityStateStore::open_with_trusted_clock(
         &path,
-        Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+        Arc::clone(&clock) as Arc<dyn Clock>,
     )
     .unwrap_or_else(|error| panic!("open store: {error}"));
     let work = scheduled_action(&store, "action-a", "claim-a", now);

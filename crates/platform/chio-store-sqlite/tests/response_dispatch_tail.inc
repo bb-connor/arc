@@ -73,7 +73,7 @@ fn delayed_scheduler_renewal_and_retry_replays_remain_idempotent() {
     let store = Arc::new(
         SqliteSecurityStateStore::open_with_trusted_clock(
             &path,
-            Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
         )
         .unwrap_or_else(|error| panic!("security store open failed: {error}")),
     );
@@ -157,7 +157,7 @@ fn exact_claim_replay_returns_the_current_renewed_lease() {
     let store = Arc::new(
         SqliteSecurityStateStore::open_with_trusted_clock(
             directory.path().join("claim-renewal-replay.db"),
-            Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
         )
         .unwrap_or_else(|error| panic!("security store open failed: {error}")),
     );
@@ -205,7 +205,7 @@ fn earlier_renewal_replay_returns_the_current_successor_lease() {
     let store = Arc::new(
         SqliteSecurityStateStore::open_with_trusted_clock(
             directory.path().join("renewal-successor-replay.db"),
-            Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
         )
         .unwrap_or_else(|error| panic!("security store open failed: {error}")),
     );
@@ -255,7 +255,7 @@ fn superseded_retry_replay_returns_a_stale_conflict() {
     let store = Arc::new(
         SqliteSecurityStateStore::open_with_trusted_clock(
             directory.path().join("retry-successor-replay.db"),
-            Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
         )
         .unwrap_or_else(|error| panic!("security store open failed: {error}")),
     );
@@ -412,10 +412,7 @@ fn simultaneous_two_handle_commit_and_fence_preserve_durable_exclusivity() {
             assert_eq!(observed, Box::new(committed));
             true
         }
-        (
-            Err(commit_error),
-            Ok(AutomaticResponseDispatchFenceOutcome::Fenced(fenced)),
-        ) => {
+        (Err(commit_error), Ok(AutomaticResponseDispatchFenceOutcome::Fenced(fenced))) => {
             assert_eq!(commit_error.kind(), PortErrorKind::Conflict);
             assert_eq!(
                 fenced.prepared_dispatch_binding,
@@ -752,7 +749,8 @@ fn historical_governed_commit_is_unclaimable_until_zero_effect_terminalization()
         },
     );
     let mut request = prepare_response_dispatch(ResponseDispatchPreparationRequest {
-        plan: chio_security_types::FreshLiveAdmission::new(plan.clone()).unwrap_or_else(|error| panic!("live fixture plan: {error}")),
+        plan: chio_security_types::FreshLiveAdmission::new(plan.clone())
+            .unwrap_or_else(|error| panic!("live fixture plan: {error}")),
         dispatch_id: record_id("historical-governed-dispatch"),
         authorization_capability_hash: digest(30),
         governed_intent_hash: digest(32),
@@ -908,7 +906,7 @@ fn scheduler_lease_body_hash_covers_dispatch_and_takeover_origins() {
     let initial_path = directory.path().join("dispatch-lease-body-hash.db");
     let initial_store = SqliteSecurityStateStore::open_with_trusted_clock(
         &initial_path,
-        Arc::clone(&initial_clock) as Arc<dyn SecurityStateClock>,
+        Arc::clone(&initial_clock) as Arc<dyn Clock>,
     )
     .unwrap_or_else(|error| panic!("security store open failed: {error}"));
     let initial_request = dispatch_request(
@@ -972,7 +970,7 @@ fn scheduler_lease_body_hash_covers_dispatch_and_takeover_origins() {
     let takeover_path = directory.path().join("takeover-lease-body-hash.db");
     let takeover_store = SqliteSecurityStateStore::open_with_trusted_clock(
         &takeover_path,
-        Arc::clone(&takeover_clock) as Arc<dyn SecurityStateClock>,
+        Arc::clone(&takeover_clock) as Arc<dyn Clock>,
     )
     .unwrap_or_else(|error| panic!("takeover store open failed: {error}"));
     let takeover_dispatch = dispatch_request(

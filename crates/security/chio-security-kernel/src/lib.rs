@@ -27,8 +27,8 @@ pub use pre_invocation::{
 };
 pub use session_throttle::SessionThrottleGuard;
 pub use tripwire::{
-    DecoyTripwireDetectorPort, SecurityClock, SecurityEventIngress, SystemSecurityClock,
-    TripwireEventPublisher, TripwireGuard,
+    Clock, DecoyTripwireDetectorPort, SecurityEventIngress, SystemClock, TripwireEventPublisher,
+    TripwireGuard,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

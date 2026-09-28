@@ -7,8 +7,8 @@ use rusqlite::{params, Connection, OpenFlags, OptionalExtension, TransactionBeha
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    verify_retained_history, verify_sync_update, KeyLogPolicy, KeyLogSyncResponse, KeyringError,
-    Result, SignedKeyActivationCommit, SignedKeyLogCheckpoint, SignedKeyLogEvent, TrustedClock,
+    verify_retained_history, verify_sync_update, Clock, KeyLogPolicy, KeyLogSyncResponse,
+    KeyringError, Result, SignedKeyActivationCommit, SignedKeyLogCheckpoint, SignedKeyLogEvent,
     WitnessId, WitnessSignature,
 };
 
@@ -101,7 +101,7 @@ pub struct SqliteKeyLogWitness {
     policy: KeyLogPolicy,
     witness_id: WitnessId,
     backend: Box<dyn SigningBackend>,
-    clock: Arc<dyn TrustedClock>,
+    clock: Arc<dyn Clock>,
     storage_file: crate::DurableSqliteFile,
 }
 
@@ -121,7 +121,7 @@ impl SqliteKeyLogWitness {
         policy: KeyLogPolicy,
         witness_id: WitnessId,
         backend: Box<dyn SigningBackend>,
-        clock: Arc<dyn TrustedClock>,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self> {
         let path = path.as_ref();
         crate::provision_durable_sqlite_path(path)?;
@@ -139,7 +139,7 @@ impl SqliteKeyLogWitness {
         policy: KeyLogPolicy,
         witness_id: WitnessId,
         backend: Box<dyn SigningBackend>,
-        clock: Arc<dyn TrustedClock>,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self> {
         let configured = policy
             .witness_keys
@@ -187,7 +187,10 @@ impl SqliteKeyLogWitness {
         response: &KeyLogSyncResponse,
     ) -> Result<WitnessSignature> {
         candidate.verify_operator(&self.policy.operator_key)?;
-        let now = self.clock.now()?;
+        let now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         self.policy
             .validate_checkpoint_time(candidate.body.issued_at, now)?;
         let mut connection = self.connection()?;
@@ -339,7 +342,10 @@ impl SqliteKeyLogWitness {
         gossip
             .witness_signature
             .verify(&gossip.checkpoint, witness_key)?;
-        let now = self.clock.now()?;
+        let now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         self.policy
             .validate_checkpoint_time(gossip.checkpoint.body.issued_at, now)?;
         let mut connection = self.connection()?;
@@ -467,7 +473,13 @@ impl SqliteKeyLogWitness {
         let checkpoints = load_checkpoints(&connection)?;
         let commits = load_commits(&connection)?;
         let pin = load_pin(&connection)?;
-        validate_retained_gossip(&connection, &self.policy, self.clock.now()?)?;
+        validate_retained_gossip(
+            &connection,
+            &self.policy,
+            self.clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)?,
+        )?;
         if events.is_empty() {
             if !checkpoints.is_empty()
                 || !commits.is_empty()
@@ -485,7 +497,9 @@ impl SqliteKeyLogWitness {
             &checkpoints,
             &commits,
             &self.policy,
-            self.clock.now()?,
+            self.clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)?,
             false,
         )?;
         if pin.as_ref() != Some(&verified.pin) {

@@ -1,6 +1,5 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{header, HeaderMap, StatusCode};
@@ -209,9 +208,7 @@ impl FrostCoordinatorCredentialRegistry {
     }
 }
 
-pub trait FrostCoordinatorClock: Send + Sync {
-    fn now_unix_ms(&self) -> Result<u64, FrostCoordinatorControlError>;
-}
+pub use chio_security_types::clock::{Clock, SystemClock};
 
 pub trait FrostSignerBurnFanout: Send + Sync {
     fn burn_signer_sessions(
@@ -232,19 +229,6 @@ pub struct FrostSignerBurnRequest<'a> {
 #[error("FROST signer burn fanout failed: {0}")]
 pub struct FrostSignerBurnFanoutError(pub String);
 
-#[derive(Debug, Default)]
-pub struct SystemFrostCoordinatorClock;
-
-impl FrostCoordinatorClock for SystemFrostCoordinatorClock {
-    fn now_unix_ms(&self) -> Result<u64, FrostCoordinatorControlError> {
-        let millis = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|_| FrostCoordinatorControlError::Clock)?
-            .as_millis();
-        u64::try_from(millis).map_err(|_| FrostCoordinatorControlError::Clock)
-    }
-}
-
 pub struct FrostCoordinatorControl {
     authority: Arc<SqliteAuthorityStore>,
     store: SqliteFrostStore,
@@ -252,7 +236,7 @@ pub struct FrostCoordinatorControl {
     epoch_anchor: Arc<dyn FrostEpochAnchor>,
     slot_anchor: Arc<dyn FrostAuthorizationSlotAnchorWriter>,
     artifact_trust: FrostArtifactTrustStore,
-    clock: Arc<dyn FrostCoordinatorClock>,
+    clock: Arc<dyn Clock>,
     signer_burn_fanout: Arc<dyn FrostSignerBurnFanout>,
 }
 
@@ -271,7 +255,7 @@ impl FrostCoordinatorControl {
         epoch_anchor: Arc<dyn FrostEpochAnchor>,
         slot_anchor: Arc<dyn FrostAuthorizationSlotAnchorWriter>,
         artifact_trust: FrostArtifactTrustStore,
-        clock: Arc<dyn FrostCoordinatorClock>,
+        clock: Arc<dyn Clock>,
         signer_burn_fanout: Arc<dyn FrostSignerBurnFanout>,
     ) -> Self {
         let store = authority.frost_store();
@@ -288,7 +272,10 @@ impl FrostCoordinatorControl {
     }
 
     fn now(&self) -> Result<u64, FrostCoordinatorControlError> {
-        self.clock.now_unix_ms()
+        self.clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
+            .map_err(|_| FrostCoordinatorControlError::Clock)
     }
 
     fn active_roster(

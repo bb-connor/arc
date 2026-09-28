@@ -10,7 +10,7 @@ use chio_security_types::ports::{
 };
 use serde::Serialize;
 
-use crate::tripwire::{SecurityClock, SystemSecurityClock};
+use crate::tripwire::{Clock, SystemClock};
 use crate::MissingContextPolicy;
 
 const GUARD_NAME: &str = "chio-session-throttle";
@@ -32,7 +32,7 @@ struct InvocationCommitment<'a> {
 /// Fail-closed session throttle guard for the synchronous kernel guard path.
 pub struct SessionThrottleGuard {
     throttles: Arc<dyn SessionThrottleStore>,
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
     missing_context: MissingContextPolicy,
 }
 
@@ -40,7 +40,7 @@ impl SessionThrottleGuard {
     #[must_use]
     pub fn new(
         throttles: Arc<dyn SessionThrottleStore>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
         missing_context: MissingContextPolicy,
     ) -> Self {
         Self {
@@ -55,7 +55,7 @@ impl SessionThrottleGuard {
         throttles: Arc<dyn SessionThrottleStore>,
         missing_context: MissingContextPolicy,
     ) -> Self {
-        Self::new(throttles, Arc::new(SystemSecurityClock), missing_context)
+        Self::new(throttles, Arc::new(SystemClock), missing_context)
     }
 
     fn deny(reason: &str) -> GuardDecision {
@@ -185,7 +185,11 @@ impl Guard for SessionThrottleGuard {
             tenant_id: context.tenant_id().clone(),
             session_id: context.session_id().clone(),
         };
-        let observed_at_unix_ms = match self.clock.now_unix_ms() {
+        let observed_at_unix_ms = match self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
+        {
             Ok(value) if value != 0 => value,
             Ok(_) | Err(_) => return Ok(Self::deny("session throttle clock failed")),
         };

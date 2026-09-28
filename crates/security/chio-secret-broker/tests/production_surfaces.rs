@@ -14,8 +14,8 @@ use chio_secret_broker::protocol::{
 };
 use chio_secret_broker::provision::{
     admin_mutation_receipt_digest, governed_admin_intent_digest, sign_admin_control_receipt,
-    sign_admin_mutation_receipt, AdminAuthorization, AdminAuthorizer, AdminClock,
-    AdminControlReceiptBody, AdminMutationOutcome, AdminMutationReceiptBody, AdminOperation,
+    sign_admin_mutation_receipt, AdminAuthorization, AdminAuthorizer, AdminControlReceiptBody,
+    AdminMutationOutcome, AdminMutationReceiptBody, AdminOperation,
     GovernedAdminAuthorizationEnvelope, GovernedAdminAuthorizer, GovernedAdminPolicy,
     ADMIN_CONTROL_RECEIPT_SCHEMA, ADMIN_MUTATION_RECEIPT_SCHEMA,
 };
@@ -40,9 +40,15 @@ fn private_tempdir() -> tempfile::TempDir {
     directory
 }
 
-impl AdminClock for FixedClock {
-    fn now_unix_seconds(&self) -> chio_secret_broker::Result<u64> {
-        Ok(self.0)
+impl chio_security_types::clock::Clock for FixedClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = self.0;
+        chio_security_types::clock::Clock::read(&chio_security_types::clock::FixedClock::new(value))
     }
 }
 

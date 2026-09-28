@@ -6,7 +6,7 @@ impl BrokerService {
     ) -> Result<Self> {
         let mut service =
             Self::from_authorities(config, attempts.into_attempt_store()?, authorities)?;
-        service.authority_clock = Some(Arc::new(crate::daemon::SystemDaemonClock));
+        service.authority_clock = Some(Arc::new(crate::daemon::SystemClock));
         Ok(service)
     }
 
@@ -62,7 +62,9 @@ impl BrokerService {
 
     fn authority_observation_time(&self, previous: u64) -> Result<u64> {
         let observed = match &self.authority_clock {
-            Some(clock) => clock.now_unix_seconds()?,
+            Some(clock) => clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::as_secs)?,
             None => previous,
         };
         if observed < previous {

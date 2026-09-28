@@ -1,6 +1,5 @@
 // Adapted from Clawdstrike concepts; see docs/security/clawdstrike-active-defense-provenance.md.
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::receipt::metadata::GuardEvidence;
 use chio_core::receipt::security::{
@@ -35,21 +34,7 @@ use crate::MissingContextPolicy;
 const PRE_INVOCATION_GUARD_NAME: &str = "chio-tripwire-pre-invocation";
 const POST_INVOCATION_HOOK_NAME: &str = "chio-watermark-tripwire";
 
-pub trait SecurityClock: Send + Sync {
-    fn now_unix_ms(&self) -> PortResult<u64>;
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-pub struct SystemSecurityClock;
-
-impl SecurityClock for SystemSecurityClock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        let duration = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|_| PortError::unavailable())?;
-        u64::try_from(duration.as_millis()).map_err(|_| PortError::invalid_data())
-    }
-}
+pub use chio_security_types::clock::{Clock, SystemClock};
 
 /// Verification boundary for detector-signed events.
 ///
@@ -61,7 +46,7 @@ pub trait SecurityEventIngress: Send + Sync {
 
 pub struct TripwireEventPublisher {
     ingress: Arc<dyn SecurityEventIngress>,
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
     signer: Arc<dyn SigningBackend>,
     producer_id: ProducerId,
     producer_key_id: RecordId,
@@ -77,7 +62,7 @@ struct TripwireReceiptEvidence {
 impl TripwireEventPublisher {
     pub fn new(
         ingress: Arc<dyn SecurityEventIngress>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
         signer: Arc<dyn SigningBackend>,
         producer_id: ProducerId,
         producer_key_id: RecordId,
@@ -114,7 +99,7 @@ impl TripwireEventPublisher {
 pub struct DecoyTripwireDetectorPort {
     decoy: Option<Arc<DecoyDetector>>,
     watermark: Option<Arc<WatermarkVerifier>>,
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
 }
 
 impl DecoyTripwireDetectorPort {
@@ -122,7 +107,7 @@ impl DecoyTripwireDetectorPort {
     pub fn new(
         decoy: Arc<DecoyDetector>,
         watermark: Arc<WatermarkVerifier>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
     ) -> Self {
         Self {
             decoy: Some(decoy),
@@ -132,7 +117,7 @@ impl DecoyTripwireDetectorPort {
     }
 
     #[must_use]
-    pub fn decoy_only(decoy: Arc<DecoyDetector>, clock: Arc<dyn SecurityClock>) -> Self {
+    pub fn decoy_only(decoy: Arc<DecoyDetector>, clock: Arc<dyn Clock>) -> Self {
         Self {
             decoy: Some(decoy),
             watermark: None,
@@ -141,10 +126,7 @@ impl DecoyTripwireDetectorPort {
     }
 
     #[must_use]
-    pub fn watermark_only(
-        watermark: Arc<WatermarkVerifier>,
-        clock: Arc<dyn SecurityClock>,
-    ) -> Self {
+    pub fn watermark_only(watermark: Arc<WatermarkVerifier>, clock: Arc<dyn Clock>) -> Self {
         Self {
             decoy: None,
             watermark: Some(watermark),
@@ -168,7 +150,10 @@ impl DecoyTripwireDetectorPort {
             surface,
             presented: input.content.as_bytes(),
             class: ObservationClass::DirectPresentation,
-            observed_at_unix_ms: self.clock.now_unix_ms()?,
+            observed_at_unix_ms: self
+                .clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)?,
         };
         match detector
             .detect(&observation)
@@ -188,7 +173,10 @@ impl DecoyTripwireDetectorPort {
         let verifier = self.watermark.as_ref().ok_or_else(PortError::unavailable)?;
         let text =
             std::str::from_utf8(input.content.as_bytes()).map_err(|_| PortError::invalid_data())?;
-        let observed_at_unix_ms = self.clock.now_unix_ms()?;
+        let observed_at_unix_ms = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         let observation_digest = domain_digest(
             b"chio.security.watermark-observation.v1\0",
             input.request_id.as_str().as_bytes(),
@@ -589,7 +577,10 @@ fn prepare_detection(
     else {
         return Err(PortError::invalid_data());
     };
-    let now_unix_ms = publisher.clock.now_unix_ms()?;
+    let now_unix_ms = publisher
+        .clock
+        .unix_millis()
+        .map(chio_security_types::clock::UnixMillis::get)?;
     let binding_bytes = canonical_json_bytes(&DetectionEvidenceBinding {
         schema: "chio.security.tripwire-evidence-binding.v1",
         phase,

@@ -177,7 +177,10 @@ pub fn verify_parsed_passport(
         return Err(VerifyError::InvalidSignature);
     }
 
-    let now = clock.now_unix_secs();
+    let now = clock
+        .unix_millis()
+        .map_err(|error| VerifyError::Internal(error.to_string()))?
+        .as_secs();
     if now < envelope.body.issued_at {
         return Err(VerifyError::NotYetValid);
     }

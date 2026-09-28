@@ -3,7 +3,7 @@ use chio_quarantine::{
     ResponseExecutor, ResponseScheduler, ScheduledResponseExecutor, SchedulerError,
     SchedulerPolicy, SchedulerTickRequest, SchedulerWorkOutcome,
 };
-use chio_security_kernel::SecurityClock;
+use chio_security_kernel::Clock;
 use chio_security_types::ports::{
     ActionId, DeclassificationEvidenceCommitStore, EffectPort, ErrorCode, GrantId, LeaseOwnerId,
     PortError, PortErrorKind, RecordId, ResponseDispatchStore, ResponseSchedulerStore,

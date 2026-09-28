@@ -17,6 +17,7 @@ name = "chio_control_plane"
 
 [features]
 default = []
+fuzz = []
 pq = ["chio-core/pq", "chio-kernel/pq", "chio-store-sqlite/pq"]
 
 [dependencies]

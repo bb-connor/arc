@@ -56,14 +56,16 @@ impl fmt::Display for DispatchRejection {
                 ResponseExecutionMode::Live.as_str()
             ),
             Self::ExecutionBinding(error) => {
-                write!(formatter, "response plan execution binding is invalid: {error}")
+                write!(
+                    formatter,
+                    "response plan execution binding is invalid: {error}"
+                )
             }
             Self::CapabilityDigestMismatch => formatter.write_str(
                 "authorization capability digest does not match the plan operator capability",
             ),
-            Self::ZeroExecutorGeneration => {
-                formatter.write_str("executor authority generation zero cannot authorize a dispatch")
-            }
+            Self::ZeroExecutorGeneration => formatter
+                .write_str("executor authority generation zero cannot authorize a dispatch"),
             Self::AuthorizationOutsideWindow {
                 authorized_at_unix_ms,
                 created_at_unix_ms,
@@ -80,9 +82,8 @@ impl fmt::Display for DispatchRejection {
                 formatter,
                 "initial lease ends at {lease_expires_at_unix_ms}, outside ({authorized_at_unix_ms}, {plan_expires_at_unix_ms}]"
             ),
-            Self::ApprovalRequirementMismatch => formatter.write_str(
-                "dispatch approval kind does not match the plan approval requirement",
-            ),
+            Self::ApprovalRequirementMismatch => formatter
+                .write_str("dispatch approval kind does not match the plan approval requirement"),
             Self::ZeroAdmissionOperationVersion => {
                 formatter.write_str("governed approval names admission operation version zero")
             }
@@ -120,5 +121,44 @@ impl core::error::Error for DispatchRejection {
 impl From<ResponseExecutionBindingError> for DispatchRejection {
     fn from(error: ResponseExecutionBindingError) -> Self {
         Self::ExecutionBinding(error)
+    }
+}
+
+impl DispatchRejection {
+    /// Registered, input-independent reason retained in evidence and diagnostics.
+    pub fn code(&self) -> &str {
+        match self {
+            Self::ExecutionMode { .. } => "urn:chio:error:kernel:response-dispatch-execution-mode",
+            Self::ExecutionBinding(..) => {
+                "urn:chio:error:kernel:response-dispatch-execution-binding"
+            }
+            Self::CapabilityDigestMismatch => {
+                "urn:chio:error:kernel:response-dispatch-capability-digest-mismatch"
+            }
+            Self::ZeroExecutorGeneration => {
+                "urn:chio:error:kernel:response-dispatch-zero-executor-generation"
+            }
+            Self::AuthorizationOutsideWindow { .. } => {
+                "urn:chio:error:kernel:response-dispatch-authorization-outside-window"
+            }
+            Self::LeaseOutsideWindow { .. } => {
+                "urn:chio:error:kernel:response-dispatch-lease-outside-window"
+            }
+            Self::ApprovalRequirementMismatch => {
+                "urn:chio:error:kernel:response-dispatch-approval-requirement-mismatch"
+            }
+            Self::ZeroAdmissionOperationVersion => {
+                "urn:chio:error:kernel:response-dispatch-zero-admission-operation-version"
+            }
+            Self::ResumeRequiresGovernedApproval { .. } => {
+                "urn:chio:error:kernel:response-dispatch-resume-requires-governed-approval"
+            }
+            Self::SnapshotWithoutExecutionDispatch => {
+                "urn:chio:error:kernel:response-dispatch-snapshot-without-execution-dispatch"
+            }
+            Self::SnapshotAlreadyAuthorized => {
+                "urn:chio:error:kernel:response-dispatch-snapshot-already-authorized"
+            }
+        }
     }
 }

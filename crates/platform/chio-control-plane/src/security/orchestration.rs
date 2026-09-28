@@ -7,7 +7,7 @@ use std::time::Duration;
 use chio_core::SigningBackend;
 use chio_kernel::{ActiveResponseFindingAuthority, IndexedSecurityEvidenceStore};
 use chio_quarantine::{CorrelationPolicy, TemporalRule};
-use chio_security_kernel::SecurityClock;
+use chio_security_kernel::Clock;
 use chio_security_types::ports::{
     AttestedFindingBatchStore, AttestedFindingResponseOutboxStore, BlastRadiusPort,
     CorrelationIngressStore, DeclassificationEvidenceCommitStore, Digest32, EffectPort,
@@ -79,7 +79,7 @@ pub struct ProductionActiveDefenseHostConfig {
     pub(crate) scheduler_health: Arc<dyn SchedulerHealthPort>,
     pub(crate) response_policy_planner: Arc<dyn AttestedFindingResponsePolicyPlanner>,
     pub(crate) response_coordinator: Arc<dyn AttestedFindingResponseCoordinator>,
-    pub(crate) clock: Arc<dyn SecurityClock>,
+    pub(crate) clock: Arc<dyn Clock>,
     pub(crate) active_defense: ProductionActiveDefenseConfig,
     pub(crate) worker_loop: ProductionResponseWorkerLoopConfig,
 }
@@ -96,7 +96,7 @@ impl ProductionActiveDefenseHostConfig {
         scheduler_health: Arc<dyn SchedulerHealthPort>,
         response_policy_planner: Arc<dyn AttestedFindingResponsePolicyPlanner>,
         response_coordinator: Arc<KernelAttestedFindingResponseCoordinator>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
         active_defense: ProductionActiveDefenseConfig,
         worker_loop: ProductionResponseWorkerLoopConfig,
     ) -> Self {
@@ -165,7 +165,7 @@ impl ProductionSecurityStateAuthority {
     #[cfg(test)]
     pub(crate) fn open_with_trusted_clock(
         path: impl AsRef<std::path::Path>,
-        clock: Arc<dyn chio_store_sqlite::security_state::SecurityStateClock>,
+        clock: Arc<dyn chio_store_sqlite::security_state::Clock>,
     ) -> Result<Self, ResponseWorkerTickError> {
         struct TestLifecycleOwner;
 
@@ -389,7 +389,7 @@ pub(super) struct ProductionDeclassificationReceiptLifecycle {
     security_store: Arc<SqliteSecurityStateStore>,
     indexed_evidence_store: Arc<dyn IndexedSecurityEvidenceStore>,
     signer: Arc<dyn SigningBackend>,
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
     receipt_sink: Arc<NativeSecurityReceiptSink>,
     outbox: ProductionDeclassificationReceiptOutbox,
     runtime_leases: Arc<ProductionRuntimeLeaseState>,
@@ -400,7 +400,7 @@ impl ProductionDeclassificationReceiptLifecycle {
         security_state_authority: ProductionSecurityStateAuthority,
         indexed_evidence_store: Arc<dyn IndexedSecurityEvidenceStore>,
         signer: Arc<dyn SigningBackend>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self, ResponseWorkerTickError> {
         security_state_authority.ensure_owned()?;
         let authority_claim = security_state_authority.claim_lifecycle()?;
@@ -435,7 +435,7 @@ impl ProductionDeclassificationReceiptLifecycle {
         security_state_authority: &ProductionSecurityStateAuthority,
         indexed_evidence_store: &Arc<dyn IndexedSecurityEvidenceStore>,
         signer: &Arc<dyn SigningBackend>,
-        clock: &Arc<dyn SecurityClock>,
+        clock: &Arc<dyn Clock>,
     ) -> Result<(), ResponseWorkerTickError> {
         self.security_state_authority.ensure_owned()?;
         if !self
@@ -737,7 +737,7 @@ pub(super) struct ProductionActiveDefenseOrchestratorContext {
     scheduler_health: Arc<dyn SchedulerHealthPort>,
     response_policy_planner: Arc<dyn AttestedFindingResponsePolicyPlanner>,
     response_coordinator: Arc<dyn AttestedFindingResponseCoordinator>,
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
     config: ProductionActiveDefenseConfig,
     lifecycle: ProductionDeclassificationReceiptLifecycle,
 }

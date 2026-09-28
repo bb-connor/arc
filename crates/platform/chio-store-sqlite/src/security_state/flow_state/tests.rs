@@ -45,7 +45,7 @@ fn join_and_fence_wait_for_the_outer_commit() -> TestResult {
             expected_context_generation: snapshot.context_generation,
             expires_at_unix_ms: i64::MAX as u64,
         },
-        &SystemSecurityStateClock,
+        &SystemClock,
     )?;
     assert!(load_flow_snapshot(&observer, &join.key)?.is_none());
     assert!(!transition_status(
@@ -59,9 +59,11 @@ fn join_and_fence_wait_for_the_outer_commit() -> TestResult {
         &EgressFenceCommit {
             fence: fence.clone(),
             dispatch_commitment_id: RecordId::new("dispatch")?,
-            committed_at_unix_ms: SystemSecurityStateClock.now_unix_ms()?,
+            committed_at_unix_ms: SystemClock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)?,
         },
-        &SystemSecurityStateClock,
+        &SystemClock,
     )?;
     assert!(load_flow_snapshot(&observer, &join.key)?.is_none());
     owner.into_transaction().commit()?;

@@ -8,6 +8,8 @@ pub use response_simulation::{
 };
 #[cfg(unix)]
 mod active_response_authority;
+#[cfg(all(unix, feature = "fuzz"))]
+pub use active_response_authority::fuzz::response_authority_protocol;
 mod active_response_validation;
 pub mod adapters;
 mod correlation;
@@ -98,10 +100,10 @@ use chio_kernel::{
     SecurityPreDispatchPolicy,
 };
 use chio_security_kernel::{
-    CapabilitySetSuspensionGuard, ContainmentGuard, EgressRestrictionGuard, FlowPostInvocationHook,
-    FlowPostInvocationPort, FlowPreDispatchHook, FlowPreDispatchPort, FlowPreInvocationGuard,
-    FlowPreInvocationPort, IssuanceFreezeAdmission, MissingContextPolicy, RawOutputTripwireHook,
-    SecurityClock, SessionThrottleGuard, SystemSecurityClock, TripwireEventPublisher,
+    CapabilitySetSuspensionGuard, Clock, ContainmentGuard, EgressRestrictionGuard,
+    FlowPostInvocationHook, FlowPostInvocationPort, FlowPreDispatchHook, FlowPreDispatchPort,
+    FlowPreInvocationGuard, FlowPreInvocationPort, IssuanceFreezeAdmission, MissingContextPolicy,
+    RawOutputTripwireHook, SessionThrottleGuard, SystemClock, TripwireEventPublisher,
     TripwireGuard,
 };
 use chio_security_types::ports::TripwireDetectorPort;
@@ -142,7 +144,7 @@ pub struct ActiveDefenseRuntime {
     flow_pre_dispatch: Arc<dyn FlowPreDispatchPort>,
     flow_post_invocation: Arc<dyn FlowPostInvocationPort>,
     security_context_authority: Arc<dyn SecurityInvocationContextAuthority>,
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
 }
 
 impl ActiveDefenseRuntime {
@@ -166,13 +168,13 @@ impl ActiveDefenseRuntime {
             flow_pre_dispatch,
             flow_post_invocation,
             security_context_authority,
-            clock: Arc::new(SystemSecurityClock),
+            clock: Arc::new(SystemClock),
         }
     }
 
     /// Replace the system clock with an authenticated runtime clock.
     #[must_use]
-    pub fn with_clock(mut self, clock: Arc<dyn SecurityClock>) -> Self {
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = clock;
         self
     }
@@ -361,7 +363,7 @@ mod tests {
         let publisher = Arc::new(
             TripwireEventPublisher::new(
                 Arc::new(AcceptingIngress),
-                Arc::new(SystemSecurityClock),
+                Arc::new(SystemClock),
                 Arc::new(Ed25519Backend::new(Keypair::from_seed(&[37; 32]))),
                 ProducerId::new("control-plane-active-defense").expect("producer id"),
                 RecordId::new("control-plane-active-defense-key-v1").expect("key id"),

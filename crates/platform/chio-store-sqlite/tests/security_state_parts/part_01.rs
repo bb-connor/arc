@@ -1,5 +1,4 @@
 use std::collections::BTreeSet;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -42,8 +41,8 @@ use chio_security_types::{
     SecuritySubject,
 };
 use chio_store_sqlite::{
-    security_state::SecurityStateClock, SqliteEncryptedBlobStore, SqliteReceiptStore,
-    SqliteSecurityStateStore, TenantId as BlobTenantId, TenantKey,
+    security_state::Clock, SqliteEncryptedBlobStore, SqliteReceiptStore, SqliteSecurityStateStore,
+    TenantId as BlobTenantId, TenantKey,
 };
 use tempfile::tempdir;
 
@@ -208,28 +207,6 @@ fn current_unix_ms() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_else(|error| panic!("clock: {error}"));
     u64::try_from(duration.as_millis()).unwrap_or_else(|error| panic!("clock range: {error}"))
-}
-
-struct FixedSecurityStateClock {
-    now_unix_ms: AtomicU64,
-}
-
-impl FixedSecurityStateClock {
-    fn new(now_unix_ms: u64) -> Self {
-        Self {
-            now_unix_ms: AtomicU64::new(now_unix_ms),
-        }
-    }
-
-    fn set(&self, now_unix_ms: u64) {
-        self.now_unix_ms.store(now_unix_ms, Ordering::Release);
-    }
-}
-
-impl SecurityStateClock for FixedSecurityStateClock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        Ok(self.now_unix_ms.load(Ordering::Acquire))
-    }
 }
 
 fn overlay_apply_request(
@@ -1443,18 +1420,16 @@ fn isolation_epoch_must_be_verified_and_preserves_lineage_taint() {
         .open_isolation_epoch(&transition)
         .unwrap_or_else(|error| panic!("open verified epoch: {error}"));
     assert!(isolated.principal_label.is_bottom());
-    assert!(isolated
-        .lineage_label
-        .compartments()
-        .is_some_and(|values| values
+    assert!(isolated.lineage_label.compartments().is_some_and(|values| {
+        values
             .iter()
-            .any(|value| value.as_str() == "lineage-secret")));
-    assert!(isolated
-        .session_label
-        .compartments()
-        .is_some_and(|values| values
+            .any(|value| value.as_str() == "lineage-secret")
+    }));
+    assert!(isolated.session_label.compartments().is_some_and(|values| {
+        values
             .iter()
-            .any(|value| value.as_str() == "lineage-secret")));
+            .any(|value| value.as_str() == "lineage-secret")
+    }));
 }
 
 #[test]
@@ -1606,7 +1581,7 @@ fn scheduler_takeover_fences_stale_overlay_mutations() {
     let path = directory.path().join("state.db");
     let now = current_unix_ms();
     let clock = Arc::new(FixedSecurityStateClock::new(now));
-    let store_clock: Arc<dyn SecurityStateClock> = clock.clone();
+    let store_clock: Arc<dyn Clock> = clock.clone();
     let store = SqliteSecurityStateStore::open_with_trusted_clock(&path, store_clock)
         .unwrap_or_else(|error| panic!("open store: {error}"));
     let plan = ResponsePlanRecord {
@@ -1744,7 +1719,7 @@ fn scheduler_takeover_fences_stale_overlay_mutations() {
 fn injected_clock_controls_scheduler_lease_and_overlay_mutations() {
     let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let clock = Arc::new(FixedSecurityStateClock::new(50_000));
-    let store_clock: Arc<dyn SecurityStateClock> = clock.clone();
+    let store_clock: Arc<dyn Clock> = clock.clone();
     let store = SqliteSecurityStateStore::open_with_trusted_clock(
         directory.path().join("trusted-clock-state.db"),
         store_clock,

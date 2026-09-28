@@ -7,7 +7,7 @@ use chio_kernel::{
     Guard, GuardContext, SecurityInvocationContext, SecurityInvocationContextV1, ToolCallRequest,
     Verdict,
 };
-use chio_security_kernel::{MissingContextPolicy, SecurityClock, SessionThrottleGuard};
+use chio_security_kernel::{Clock, MissingContextPolicy, SessionThrottleGuard};
 use chio_security_types::ports::{
     empty_session_throttle_snapshot, predict_session_throttle_apply, session_throttle_version_hash,
     Digest32, EffectExecutionStatus, EffectResultQuery, IsolationEpochId, LineageId, PortError,
@@ -28,9 +28,17 @@ enum Behavior {
 
 struct FixedClock(u64);
 
-impl SecurityClock for FixedClock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        Ok(self.0)
+impl chio_security_types::clock::Clock for FixedClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = self.0;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 
@@ -329,17 +337,26 @@ fn missing_authoritative_session_cannot_bypass_enforcement() {
 #[test]
 fn zero_or_failed_clock_denies_before_consumption() {
     struct FailingClock;
-    impl SecurityClock for FailingClock {
-        fn now_unix_ms(&self) -> PortResult<u64> {
-            Err(PortError::unavailable())
+    impl chio_security_types::clock::Clock for FailingClock {
+        fn read(
+            &self,
+        ) -> core::result::Result<
+            chio_security_types::clock::ClockReading,
+            chio_security_types::clock::ClockError,
+        > {
+            let value: PortResult<u64> = Err(PortError::unavailable());
+            let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+            chio_security_types::clock::Clock::read(
+                &chio_security_types::clock::FixedClock::from_millis(value),
+            )
         }
     }
 
     let request = request();
     let security = security_context();
     for clock in [
-        Arc::new(FixedClock(0)) as Arc<dyn SecurityClock>,
-        Arc::new(FailingClock) as Arc<dyn SecurityClock>,
+        Arc::new(FixedClock(0)) as Arc<dyn Clock>,
+        Arc::new(FailingClock) as Arc<dyn Clock>,
     ] {
         let store = Arc::new(FakeThrottles::new(Behavior::Allow));
         let throttle_store: Arc<dyn SessionThrottleStore> = store.clone();

@@ -278,7 +278,7 @@ fn verify_restart(root: &Path, witness: &Witness, cut: Cut) -> TestResult {
             witness.binding.clone(),
             super::super::super::registry(true, InformationLabel::bottom())?,
             Arc::new(super::super::super::RestrictedClassifier),
-            Arc::new(Clock::default()),
+            Arc::new(FlowTestClock::default()),
             config,
         )?
         .with_captured_lifecycle()

@@ -11,6 +11,7 @@ use crate::service::{
     IpcResponse,
 };
 use crate::store::{AttemptRegistration, AttemptStore};
+use chio_security_types::clock::Clock as _;
 use std::os::unix::{fs::PermissionsExt, net::UnixListener};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
@@ -55,7 +56,9 @@ impl RegistrationPeer {
                         serde_json::from_slice(wire.payload.as_slice())?;
                     let authorization: SignedRegisterAttemptAuthorization =
                         serde_json::from_slice(wire.authorization.as_slice())?;
-                    let now = crate::daemon::SystemDaemonClock.now_unix_seconds()?;
+                    let now = crate::daemon::SystemClock
+                        .unix_millis()
+                        .map(chio_security_types::clock::UnixMillis::as_secs)?;
                     verify_register_attempt_authorization(
                         &authorization,
                         &attempt.registration,

@@ -51,8 +51,8 @@ use chio_quarantine::{
     TemporalRule,
 };
 use chio_security_kernel::{
-    ContainmentGuard, DecoyTripwireDetectorPort, MissingContextPolicy, SecurityClock,
-    SecurityEventIngress, TripwireEventPublisher, TripwireGuard,
+    ContainmentGuard, DecoyTripwireDetectorPort, MissingContextPolicy, SecurityEventIngress,
+    TripwireEventPublisher, TripwireGuard,
 };
 use chio_security_types::flow::{DeclassificationPurpose, ToolFlowDeclaration};
 use chio_security_types::ports::{
@@ -310,15 +310,17 @@ fn slow_cumulative_exfiltration() {
 
 struct FixedClock(u64);
 
-impl SecurityClock for FixedClock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        Ok(self.0)
-    }
-}
-
-impl chio_store_sqlite::security_state::SecurityStateClock for FixedClock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        Ok(self.0)
+impl chio_security_types::clock::Clock for FixedClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = self.0;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 

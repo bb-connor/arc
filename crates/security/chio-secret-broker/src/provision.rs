@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core_types::capability::governance::{GovernedApprovalDecision, GovernedApprovalToken};
 use chio_core_types::{
@@ -333,23 +332,7 @@ pub trait AdminAuthorizer: Send + Sync {
     ) -> Result<String>;
 }
 
-pub trait AdminClock: Send + Sync {
-    fn now_unix_seconds(&self) -> Result<u64>;
-}
-
-#[derive(Debug, Default)]
-pub struct SystemAdminClock;
-
-impl AdminClock for SystemAdminClock {
-    fn now_unix_seconds(&self) -> Result<u64> {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|error| {
-                BrokerError::AuthorityUnavailable(format!("admin clock failed: {error}"))
-            })
-            .map(|duration| duration.as_secs())
-    }
-}
+pub use chio_security_types::clock::{Clock, SystemClock};
 
 #[derive(Debug, Clone)]
 pub struct GovernedAdminPolicy {
@@ -477,7 +460,7 @@ pub struct GovernedAdminAuthorizer {
     policy: GovernedAdminPolicy,
     trusted_approvers: BTreeSet<String>,
     trusted_mutation_receipt_signer: PublicKey,
-    clock: Arc<dyn AdminClock>,
+    clock: Arc<dyn Clock>,
 }
 
 impl GovernedAdminAuthorizer {
@@ -485,7 +468,7 @@ impl GovernedAdminAuthorizer {
         path: impl AsRef<Path>,
         policy: GovernedAdminPolicy,
         trusted_mutation_receipt_signer: PublicKey,
-        clock: Arc<dyn AdminClock>,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self> {
         let trusted_approvers = policy.validate()?;
         let path = path.as_ref();
@@ -688,7 +671,10 @@ impl GovernedAdminAuthorizer {
         authorization: &AdminAuthorization,
         intent_digest: &str,
     ) -> Result<String> {
-        let now = self.clock.now_unix_seconds()?;
+        let now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::as_secs)?;
         let verified = self.verify_envelope(authorization, intent_digest, now)?;
         self.consume(&verified, now)?;
         Ok(verified.authorization_digest)
@@ -721,7 +707,10 @@ impl GovernedAdminAuthorizer {
             return Ok(existing);
         }
 
-        let now = self.clock.now_unix_seconds()?;
+        let now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::as_secs)?;
         let verified = self.verify_envelope(authorization, intent_digest, now)?;
         if verified.authorization_digest != authorization_digest {
             return Err(BrokerError::Invariant(

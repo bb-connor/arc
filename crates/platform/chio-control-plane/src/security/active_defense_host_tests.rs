@@ -28,7 +28,7 @@ use chio_quarantine::{
     build_response_plan, decode_response_record, CorrelationPolicy, RuleLimits, SchedulerPolicy,
     TemporalRule,
 };
-use chio_security_kernel::SecurityClock;
+use chio_security_kernel::Clock;
 use chio_security_types::ports::{
     containment_session_target, ActionId, BlastRadiusFenceAcquisition, BlastRadiusPort,
     BlastRadiusRequest, BlastRadiusResult, CanonicalBody, Digest32, EventId, LeaseOwnerId,
@@ -126,20 +126,18 @@ impl FixedClock {
     }
 }
 
-impl SecurityClock for FixedClock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        // Crash the worker outside the shared SQLite transaction. A storage
-        // clock panic poisons the store and is a different failure boundary.
-        if self.panic_once.swap(false, Ordering::AcqRel) {
-            panic!("controlled active-defense worker crash");
-        }
-        self.read_now_unix_ms()
-    }
-}
-
-impl chio_store_sqlite::security_state::SecurityStateClock for FixedClock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        self.read_now_unix_ms()
+impl chio_security_types::clock::Clock for FixedClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value: PortResult<u64> = self.read_now_unix_ms();
+        let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 
@@ -289,8 +287,7 @@ impl HostFixture {
         let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
         let security_path = directory.path().join("security-state.sqlite");
         let clock = Arc::new(FixedClock::new(50_000));
-        let store_clock: Arc<dyn chio_store_sqlite::security_state::SecurityStateClock> =
-            clock.clone();
+        let store_clock: Arc<dyn chio_store_sqlite::security_state::Clock> = clock.clone();
         let security_state_authority = ProductionSecurityStateAuthority::open_with_trusted_clock(
             &security_path,
             Arc::clone(&store_clock),
@@ -339,7 +336,7 @@ impl HostFixture {
             &RuleLimits::default(),
         )
         .unwrap_or_else(|error| panic!("temporal rule: {error}"));
-        let security_clock: Arc<dyn SecurityClock> = clock.clone();
+        let security_clock: Arc<dyn Clock> = clock.clone();
         let response_coordinator = Arc::new(FailClosedResponseCoordinator::new());
         let config = ProductionActiveDefenseHostConfig {
             durability: SecurityDurability::persistent(),

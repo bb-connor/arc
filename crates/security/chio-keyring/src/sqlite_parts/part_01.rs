@@ -8,14 +8,13 @@ use chio_core_types::{
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension, TransactionBehavior};
 
 use crate::{
-    AnchorId, ArtifactTimeAnchorBody, ArtifactTimeAnchorKind, CheckpointStage, EventId,
+    AnchorId, ArtifactTimeAnchorBody, ArtifactTimeAnchorKind, CheckpointStage, Clock, EventId,
     KeyActivationCommitBody, KeyEnterpriseReceiptStage, KeyId, KeyLogCheckpointBody, KeyLogHead,
     KeyLogPin, KeyLogPolicy, KeyLogState, KeyLogSyncResponse, KeyringArtifactSignature,
     KeyringError, Result, SignedArtifactTimeAnchor, SignedKeyActivationCommit,
     SignedKeyEnterpriseReceipt, SignedKeyLogCheckpoint, SignedKeyLogEvent, SigningTopology,
-    StoredCheckpoint, SystemTrustedClock, TrustedClock, WitnessId, WitnessSignature,
-    WitnessedActivationSet, ARTIFACT_TIME_ANCHOR_SCHEMA, KEY_ACTIVATION_COMMIT_SCHEMA,
-    KEY_LOG_CHECKPOINT_SCHEMA,
+    StoredCheckpoint, SystemClock, WitnessId, WitnessSignature, WitnessedActivationSet,
+    ARTIFACT_TIME_ANCHOR_SCHEMA, KEY_ACTIVATION_COMMIT_SCHEMA, KEY_LOG_CHECKPOINT_SCHEMA,
 };
 
 const SCHEMA: &str = r#"
@@ -203,7 +202,7 @@ fn validate_open_selector_lock(lock_path: &Path, file: &File) -> Result<()> {
 pub struct SqliteKeyLogStore {
     connection: Mutex<Connection>,
     policy: KeyLogPolicy,
-    clock: Arc<dyn TrustedClock>,
+    clock: Arc<dyn Clock>,
     storage_file: crate::DurableSqliteFile,
     _selector_lock: Option<File>,
 }
@@ -231,7 +230,7 @@ impl SqliteKeyLogStore {
             path,
             policy,
             SigningTopology::LocalSingleWriter,
-            Arc::new(SystemTrustedClock),
+            Arc::new(SystemClock),
         )
     }
 
@@ -260,7 +259,7 @@ impl SqliteKeyLogStore {
         let store = Self {
             connection: Mutex::new(connection),
             policy,
-            clock: Arc::new(SystemTrustedClock),
+            clock: Arc::new(SystemClock),
             storage_file,
             _selector_lock: None,
         };
@@ -273,14 +272,14 @@ impl SqliteKeyLogStore {
         policy: KeyLogPolicy,
         topology: SigningTopology,
     ) -> Result<Self> {
-        Self::open_with_clock(path, policy, topology, Arc::new(SystemTrustedClock))
+        Self::open_with_clock(path, policy, topology, Arc::new(SystemClock))
     }
 
     pub fn open_with_clock(
         path: impl AsRef<Path>,
         policy: KeyLogPolicy,
         topology: SigningTopology,
-        clock: Arc<dyn TrustedClock>,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self> {
         let path = path.as_ref();
         if topology != SigningTopology::LocalSingleWriter {
@@ -385,7 +384,10 @@ impl SqliteKeyLogStore {
         let last_checkpoint_time = previous_checkpoints
             .last()
             .map(|stored| stored.checkpoint.body.issued_at);
-        let checkpoint_issued_at = self.clock.now()?;
+        let checkpoint_issued_at = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         self.policy
             .validate_checkpoint_time(checkpoint_issued_at, checkpoint_issued_at)?;
         if checkpoint_issued_at < event.body.issued_at
@@ -533,7 +535,10 @@ impl SqliteKeyLogStore {
             .iter()
             .map(|stored| stored.checkpoint.clone())
             .collect::<Vec<_>>();
-        let now = self.clock.now()?;
+        let now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         for checkpoint in &checkpoint_envelopes {
             self.policy
                 .validate_checkpoint_time(checkpoint.body.issued_at, now)?;
@@ -607,7 +612,10 @@ impl SqliteKeyLogStore {
         {
             return Err(KeyringError::InvalidWitnessActivation);
         }
-        let mut committed_at = self.clock.now()?;
+        let mut committed_at = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         if let Some(latest_anchor) = latest_verified_artifact_anchor_time_for_epoch(
             &transaction,
             u64::try_from(activation_commits.len()).map_err(|_| KeyringError::NumericRange)?,
@@ -881,7 +889,10 @@ impl SqliteKeyLogStore {
         stored
             .checkpoint
             .verify_witnesses(&self.policy.witness_keys)?;
-        let anchored_at = self.clock.now()?;
+        let anchored_at = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         if anchored_at < stored.checkpoint.body.issued_at {
             return Err(KeyringError::InvalidTimeOrdering);
         }
@@ -1229,7 +1240,10 @@ impl SqliteKeyLogStore {
             .iter()
             .map(|stored| stored.checkpoint.clone())
             .collect::<Vec<_>>();
-        let now = self.clock.now()?;
+        let now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         for checkpoint in &checkpoint_envelopes {
             self.policy
                 .validate_checkpoint_time(checkpoint.body.issued_at, now)?;

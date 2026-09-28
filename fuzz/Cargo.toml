@@ -37,7 +37,13 @@ sigstore-merkle = { path = "../third_party/sigstore-merkle-chio" }
 sigstore-crypto = { path = "../third_party/sigstore-crypto-chio" }
 sigstore-trust-root = { path = "../third_party/sigstore-trust-root-chio" }
 
+[features]
+response_authority_protocol = ["dep:chio-control-plane"]
+response_lifecycle = ["dep:chio-quarantine"]
+
 [dependencies]
+chio-control-plane = { path = "../crates/platform/chio-control-plane", features = ["fuzz"], optional = true }
+chio-quarantine = { path = "../crates/security/chio-quarantine", features = ["fuzz"], optional = true }
 chio-a2a-adapter = { path = "../crates/protocol/chio-a2a-adapter", features = ["fuzz"] }
 chio-acp-edge = { path = "../crates/protocol/chio-acp-edge", features = ["fuzz"] }
 chio-anchor = { path = "../crates/economy/chio-anchor", features = ["fuzz"] }
@@ -294,6 +300,22 @@ bench = false
 [[bin]]
 name = "fuzz_tool_action"
 path = "fuzz_targets/tool_action.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "response_authority_protocol"
+required-features = ["response_authority_protocol"]
+path = "fuzz_targets/response_authority_protocol.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "response_lifecycle"
+required-features = ["response_lifecycle"]
+path = "fuzz_targets/response_lifecycle.rs"
 test = false
 doc = false
 bench = false

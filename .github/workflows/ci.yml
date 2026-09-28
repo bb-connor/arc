@@ -176,6 +176,8 @@ jobs:
           bash scripts/tests/check-accounting-arithmetic.test.sh
           python3 scripts/check-domain-separation.py
           bash scripts/tests/check-domain-separation.test.sh
+          python3 scripts/check-security-clocks.py
+          python3 scripts/tests/check-security-clocks.test.py
           python3 scripts/check-negative-assertions.py
           bash scripts/tests/check-negative-assertions.test.sh
           python3 scripts/check-lint-parity.py

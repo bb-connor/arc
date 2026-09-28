@@ -21,7 +21,10 @@ fn migration_refuses_malformed_egress_history_without_retiring_the_source() -> T
         let connection = Connection::open(&path)?;
         connection.execute_batch(mutation)?;
         assert!(source.preview(&binding()?).is_err(), "{mutation}");
-        assert!(SqliteSecurityParticipantSource::open(&path).is_err(), "{mutation}");
+        assert!(
+            SqliteSecurityParticipantSource::open(&path).is_err(),
+            "{mutation}"
+        );
         assert!(source.seal_exact(&expected).is_err(), "{mutation}");
         assert!(!schema::has_evidence(&connection)?);
     }
@@ -70,9 +73,19 @@ fn expired_stale_and_committed_fences_remain_exact_migratable_history() -> TestR
     };
 
     struct Clock(AtomicU64);
-    impl crate::security_state::SecurityStateClock for Clock {
-        fn now_unix_ms(&self) -> chio_security_types::ports::PortResult<u64> {
-            Ok(self.0.load(Ordering::Acquire))
+    impl chio_security_types::clock::Clock for Clock {
+        fn read(
+            &self,
+        ) -> core::result::Result<
+            chio_security_types::clock::ClockReading,
+            chio_security_types::clock::ClockError,
+        > {
+            let value: chio_security_types::ports::PortResult<u64> =
+                (|| Ok(self.0.load(Ordering::Acquire)))();
+            let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+            chio_security_types::clock::Clock::read(
+                &chio_security_types::clock::FixedClock::from_millis(value),
+            )
         }
     }
     let directory = tempfile::tempdir()?;

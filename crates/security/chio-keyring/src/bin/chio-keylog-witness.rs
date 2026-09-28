@@ -9,12 +9,11 @@ use std::time::Duration;
 use chio_keyring::bind_private_unix_listener;
 use chio_keyring::{
     load_key_log_policy, load_witness_seed_backend, load_witness_service_config,
-    read_single_canonical_frame, write_canonical_frame, KeyringError, SqliteKeyLogWitness,
-    SystemTrustedClock, TrustedClock, WitnessId, WitnessServiceOperation,
-    WitnessServiceReadinessBody, WitnessServiceReadinessProof, WitnessServiceRequest,
-    WitnessServiceResponse, WitnessServiceResult, WitnessServiceState,
-    KEY_LOG_WITNESS_IPC_REQUEST_SCHEMA, KEY_LOG_WITNESS_IPC_RESPONSE_SCHEMA,
-    KEY_LOG_WITNESS_READINESS_SCHEMA,
+    read_single_canonical_frame, write_canonical_frame, Clock, KeyringError, SqliteKeyLogWitness,
+    SystemClock, WitnessId, WitnessServiceOperation, WitnessServiceReadinessBody,
+    WitnessServiceReadinessProof, WitnessServiceRequest, WitnessServiceResponse,
+    WitnessServiceResult, WitnessServiceState, KEY_LOG_WITNESS_IPC_REQUEST_SCHEMA,
+    KEY_LOG_WITNESS_IPC_RESPONSE_SCHEMA, KEY_LOG_WITNESS_READINESS_SCHEMA,
 };
 
 fn main() -> ExitCode {
@@ -36,8 +35,10 @@ fn run() -> chio_keyring::Result<()> {
     let witness_id = WitnessId::new(config.witness_id)?;
     let backend = load_witness_seed_backend(&config.seed_file_path)?;
     let readiness_backend = backend.clone();
-    let clock = Arc::new(SystemTrustedClock);
-    let started_at = clock.now()?;
+    let clock = Arc::new(SystemClock);
+    let started_at = clock
+        .unix_millis()
+        .map(chio_security_types::clock::UnixMillis::get)?;
     // Provisioning is first-start permission. A supervisor restart must reopen
     // the original store and validate its policy instead of recreating it.
     let witness = if config.provision && !config.database_path.try_exists()? {

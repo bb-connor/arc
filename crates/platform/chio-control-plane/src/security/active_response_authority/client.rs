@@ -1,17 +1,15 @@
-use std::os::unix::net::UnixStream;
-use std::sync::Arc;
 #[cfg(target_os = "linux")]
-use std::time::{Duration, Instant};
-
 use chio_core::{canonical_json_bytes, sha256_hex, Keypair, PublicKey, SigningBackend};
 use chio_kernel::AuthoritativeCorrelatedFindingEvidence;
 use chio_secure_ipc::{read_bounded_frame, write_bounded_frame};
+use chio_security_types::clock::{Clock, MonotonicInstant, SystemClock};
 use chio_security_types::ports::{
     AdmissionArtifactRef, AttestedFindingBatchBinding, PortError, PortResult, RequestId,
 };
+use std::os::unix::net::UnixStream;
+use std::sync::Arc;
 
 use super::protocol::validate_operation_result;
-use super::transport::now_unix_seconds;
 #[cfg(target_os = "linux")]
 use super::transport::{
     connect_unix_stream_before, validate_connected_peer, validate_socket_metadata,
@@ -31,6 +29,7 @@ use crate::security::event_consumer::{
 };
 
 pub struct ProductionActiveResponseAuthorityClient {
+    clock: Arc<dyn Clock>,
     config: ProductionActiveResponseAuthorityFileConfig,
     client_signer: Arc<dyn SigningBackend>,
     client_identity: PublicKey,
@@ -39,6 +38,12 @@ pub struct ProductionActiveResponseAuthorityClient {
 }
 
 impl ProductionActiveResponseAuthorityClient {
+    /// Install the runtime-owned trusted clock before issuing requests.
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
     pub fn new(
         config: ProductionActiveResponseAuthorityFileConfig,
         client_signer: Arc<dyn SigningBackend>,
@@ -53,6 +58,7 @@ impl ProductionActiveResponseAuthorityClient {
             );
         }
         Ok(Self {
+            clock: Arc::new(SystemClock),
             config,
             client_signer,
             client_identity: signer_key,
@@ -70,6 +76,7 @@ impl ProductionActiveResponseAuthorityClient {
         config.validate()?;
         let signer_key = Self::validate_signer_and_role_separation(&config, &client_signer)?;
         Ok(Self {
+            clock: Arc::new(SystemClock),
             config,
             client_signer,
             client_identity: signer_key,
@@ -102,19 +109,21 @@ impl ProductionActiveResponseAuthorityClient {
         operation: ActiveResponseAuthorityOperation,
     ) -> PortResult<ActiveResponseAuthorityResult> {
         #[cfg(target_os = "linux")]
-        let deadline = Instant::now()
-            .checked_add(Duration::from_millis(self.config.timeout_ms))
-            .ok_or_else(PortError::invalid_data)?;
+        let deadline = chio_security_types::clock::AuthorityDeadline::for_timeout_ms(
+            self.clock.read()?,
+            self.config.timeout_ms,
+        )?;
         let expected_operation = operation.clone();
-        let issued_at_unix_seconds = now_unix_seconds()?;
+        let issued_at_unix_seconds = self.clock.unix_millis()?.as_secs();
         let request = self.sign_request(operation, issued_at_unix_seconds)?;
         let request_bytes =
             canonical_json_bytes(&request).map_err(|_| PortError::invalid_data())?;
         let request_digest = sha256_hex(&request_bytes);
         #[cfg(target_os = "linux")]
         let mut stream = AbsoluteDeadlineUnixStream::with_deadline(
-            self.connect_authenticated(deadline)?,
+            self.connect_authenticated(deadline.monotonic_deadline())?,
             deadline,
+            Arc::clone(&self.clock),
         )?;
         #[cfg(not(target_os = "linux"))]
         let mut stream = self.connect_authenticated()?;
@@ -138,7 +147,7 @@ impl ProductionActiveResponseAuthorityClient {
             &response,
             request.body.request_id.as_str(),
             &request_digest,
-            now_unix_seconds()?,
+            self.clock.unix_millis()?.as_secs(),
         )?;
         validate_operation_result(&expected_operation, &response.body.result)?;
         match response.body.result {
@@ -234,7 +243,7 @@ impl ProductionActiveResponseAuthorityClient {
     }
 
     #[cfg(target_os = "linux")]
-    fn connect_authenticated(&self, deadline: Instant) -> PortResult<UnixStream> {
+    fn connect_authenticated(&self, deadline: MonotonicInstant) -> PortResult<UnixStream> {
         if self.config.expected_peer.process_id == std::process::id() {
             #[cfg(test)]
             if self.allow_same_process_peer_for_test {
@@ -248,11 +257,12 @@ impl ProductionActiveResponseAuthorityClient {
     #[cfg(target_os = "linux")]
     fn connect_authenticated_after_process_check(
         &self,
-        deadline: Instant,
+        deadline: MonotonicInstant,
     ) -> PortResult<UnixStream> {
         let socket_identity =
             validate_socket_metadata(&self.config.socket_path, self.config.expected_peer.user_id)?;
-        let stream = connect_unix_stream_before(&self.config.socket_path, deadline)?;
+        let stream =
+            connect_unix_stream_before(&self.config.socket_path, deadline, self.clock.as_ref())?;
         validate_connected_peer(&stream, &self.config.expected_peer)?;
         if validate_socket_metadata(&self.config.socket_path, self.config.expected_peer.user_id)?
             != socket_identity

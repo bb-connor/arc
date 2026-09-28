@@ -175,9 +175,7 @@ pub trait WatermarkSourceContextResolver: Send + Sync {
     fn resolve(&self, source_receipt_id: &RecordId) -> PortResult<Option<WatermarkSourceContext>>;
 }
 
-pub trait WatermarkClock: Send + Sync {
-    fn now_unix_ms(&self) -> u64;
-}
+pub use chio_security_types::clock::Clock;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct WatermarkIssuerPolicy {
@@ -219,7 +217,7 @@ pub struct WatermarkIssuerDependencies {
     pub registry: PrivateDecoyRegistry,
     pub contexts: Arc<dyn WatermarkSourceContextResolver>,
     pub sequences: Arc<dyn WatermarkSequenceStore>,
-    pub clock: Arc<dyn WatermarkClock>,
+    pub clock: Arc<dyn Clock>,
 }
 
 pub struct WatermarkIssuer {
@@ -250,7 +248,12 @@ impl WatermarkIssuer {
         if context.source_receipt_id != request.source_receipt_id {
             return Err(WatermarkIssueError::InvalidContext);
         }
-        let now = self.dependencies.clock.now_unix_ms();
+        let now = self
+            .dependencies
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
+            .map_err(WatermarkIssueError::Clock)?;
         validate_issuance_time(now, &context, self.config.policy)?;
         let trusted = self
             .dependencies
@@ -656,6 +659,8 @@ impl fmt::Debug for WatermarkVerifier {
 
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum WatermarkIssueError {
+    #[error("trusted watermark clock failed: {0}")]
+    Clock(#[source] chio_security_types::clock::ClockError),
     #[error("watermark issuance policy is invalid")]
     InvalidPolicy,
     #[error("watermark sequence is invalid")]

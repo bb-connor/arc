@@ -8,9 +8,9 @@ use chio_core_types::{
     Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
 };
 use chio_decoy::{
-    DecoyCreateRequest, PrivateDecoyRegistry, SecretMaterial, SignedWatermarkEnvelope,
-    TrustedWatermarkKey, WatermarkClock, WatermarkIssueError, WatermarkIssueRequest,
-    WatermarkIssuer, WatermarkIssuerConfig, WatermarkIssuerDependencies, WatermarkIssuerPolicy,
+    Clock, DecoyCreateRequest, PrivateDecoyRegistry, SecretMaterial, SignedWatermarkEnvelope,
+    TrustedWatermarkKey, WatermarkIssueError, WatermarkIssueRequest, WatermarkIssuer,
+    WatermarkIssuerConfig, WatermarkIssuerDependencies, WatermarkIssuerPolicy,
     WatermarkKeyResolver, WatermarkKeyStatus, WatermarkObservationContext,
     WatermarkObservationPersistence, WatermarkScanError, WatermarkScanVerdict,
     WatermarkSequenceStore, WatermarkSourceContext, WatermarkSourceContextResolver,
@@ -161,11 +161,19 @@ impl WatermarkKeyResolver for Keys {
     }
 }
 
-struct Clock(AtomicU64);
+struct TestClock(AtomicU64);
 
-impl WatermarkClock for Clock {
-    fn now_unix_ms(&self) -> u64 {
-        self.0.load(Ordering::SeqCst)
+impl chio_security_types::clock::Clock for TestClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = self.0.load(Ordering::SeqCst);
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 
@@ -263,7 +271,7 @@ impl Fixture {
             },
         );
         let observations = Arc::new(Observations::default());
-        let clock = Arc::new(Clock(AtomicU64::new(OBSERVED_AT)));
+        let clock = Arc::new(TestClock(AtomicU64::new(OBSERVED_AT)));
         let issuer = WatermarkIssuer::new(
             WatermarkIssuerConfig {
                 key_id: key_id.clone(),
@@ -275,7 +283,7 @@ impl Fixture {
                 registry: registry.clone(),
                 contexts: Arc::clone(&contexts) as Arc<dyn WatermarkSourceContextResolver>,
                 sequences: Arc::new(Sequences::default()),
-                clock: Arc::clone(&clock) as Arc<dyn WatermarkClock>,
+                clock: Arc::clone(&clock) as Arc<dyn Clock>,
             },
         );
         Self {

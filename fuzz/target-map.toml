@@ -410,3 +410,17 @@ triggers = [
 ]
 seeds    = "fuzz/corpus/fuzz_tool_action"
 notes    = "Tool action classification and guard verdicts for egress, shell, SQL, memory, MCP, and HTTP authority projection."
+
+[targets.response_authority_protocol]
+crate = "chio-control-plane"
+path = "fuzz/fuzz_targets/response_authority_protocol.rs"
+triggers = ["crates/platform/chio-control-plane/src/security/active_response_authority*", "crates/platform/chio-control-plane/src/security/active_response_authority/**", "crates/security/chio-security-types/src/clock*", "fuzz/fuzz_targets/response_authority_protocol.rs", "fuzz/corpus/response_authority_protocol/**"]
+seeds = "fuzz/corpus/response_authority_protocol"
+notes = "Production canonical authenticated request verification, with signed valid seeds, identity and freshness substitutions."
+
+[targets.response_lifecycle]
+crate = "chio-quarantine"
+path = "fuzz/fuzz_targets/response_lifecycle.rs"
+triggers = ["crates/security/chio-quarantine/**", "crates/security/chio-security-types/src/response*", "crates/security/chio-security-types/src/clock*", "fuzz/fuzz_targets/response_lifecycle.rs", "fuzz/corpus/response_lifecycle/**"]
+seeds = "fuzz/corpus/response_lifecycle"
+notes = "Production response state machine and overlap simulator, with apply, retry, reconstruction, expiry and rollback seeds."

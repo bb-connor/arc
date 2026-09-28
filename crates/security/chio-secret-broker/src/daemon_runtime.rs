@@ -28,7 +28,7 @@ use crate::authority_ipc::{
     AuthorityRpcClient, AuthorityRpcClientConfig, BrokerAdmissionAuthority,
 };
 use crate::budget::BrokerExecutionBudget;
-use crate::daemon::{BrokerDaemonHandler, DaemonClock, SystemDaemonClock};
+use crate::daemon::{BrokerDaemonHandler, Clock, SystemClock};
 use crate::generic_https::GenericHttpsExecutor;
 use crate::migration::{BrokerMigrationEnforcer, ProductionBrokerMigrationEnforcer};
 #[cfg(unix)]
@@ -41,7 +41,7 @@ use crate::protocol::BrokerExecuteRequest;
 use crate::provider::{CredentialPlacement, GenericCredentialProvider};
 #[cfg(unix)]
 use crate::provision::AdminAuthorization;
-use crate::provision::{GovernedAdminAuthorizer, GovernedAdminPolicy, SystemAdminClock};
+use crate::provision::{GovernedAdminAuthorizer, GovernedAdminPolicy};
 use crate::receipt::SqliteBrokerReceiptSink;
 use crate::reconcile::{
     reconcile_durable_completions, reconcile_durable_failures, reconcile_pending,
@@ -415,7 +415,7 @@ pub struct BrokerDaemonRuntime {
 struct BrokerDaemonAuditContext {
     audit_service: Arc<BrokerService>,
     audit_admin: Arc<GovernedAdminAuthorizer>,
-    audit_clock: Arc<dyn DaemonClock>,
+    audit_clock: Arc<dyn Clock>,
     audit_deployment_id: String,
     audit_broker_instance_id: String,
     audit_tenant_scope: String,
@@ -596,7 +596,7 @@ impl BrokerDaemonRuntime {
                 maximum_token_lifetime_seconds: config.admin.maximum_token_lifetime_seconds,
             },
             signing_key.public_key(),
-            Arc::new(SystemAdminClock),
+            Arc::new(SystemClock),
         )?);
         for &(path, label) in &database_files {
             validate_private_service_file(path, config.trusted_service_uid, label)?;
@@ -606,20 +606,24 @@ impl BrokerDaemonRuntime {
             retained.validate()?;
         }
         validate_distinct_database_files(&all_database_files)?;
-        let daemon_clock: Arc<dyn DaemonClock> = Arc::new(SystemDaemonClock);
+        let daemon_clock: Arc<dyn Clock> = Arc::new(SystemClock);
         reconcile_durable_failures(
             attempts.as_ref(),
             receipt_sink.as_ref(),
             &signing_key.public_key(),
             256,
-            daemon_clock.now_unix_seconds()?,
+            daemon_clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::as_secs)?,
         )?;
         reconcile_durable_completions(
             attempts.as_ref(),
             receipt_sink.as_ref(),
             &signing_key.public_key(),
             256,
-            daemon_clock.now_unix_seconds()?,
+            daemon_clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::as_secs)?,
         )?;
         let authority = Arc::new(AuthorityRpcClient::connect(
             AuthorityRpcClientConfig {
@@ -634,7 +638,9 @@ impl BrokerDaemonRuntime {
             attempts.as_ref(),
             authority.as_ref(),
             256,
-            daemon_clock.now_unix_seconds()?,
+            daemon_clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::as_secs)?,
         )?;
         let provider = Arc::new(GenericCredentialProvider::new(
             config.provider_adapter_id.clone(),
@@ -881,7 +887,10 @@ impl BrokerDaemonAuditContext {
         runner_authorization: &SignedBrokerAuditRunnerAuthorization,
         admin_authorization: &AdminAuthorization,
     ) -> Result<CompletedBrokerAuditComparison> {
-        let now_unix_seconds = self.audit_clock.now_unix_seconds()?;
+        let now_unix_seconds = self
+            .audit_clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::as_secs)?;
         let verified_runner = verify_broker_audit_runner_authorization(
             runner_authorization,
             request,
@@ -909,7 +918,10 @@ impl BrokerDaemonAuditContext {
 #[cfg(unix)]
 impl BrokerPrivilegedAuditHandler for BrokerDaemonAuditContext {
     fn now_unix_seconds(&self) -> Result<u64> {
-        self.audit_clock.now_unix_seconds()
+        self.audit_clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::as_secs)
+            .map_err(BrokerError::from)
     }
 
     fn compare(
@@ -1098,7 +1110,7 @@ fn prepare_private_service_database(
         Err(error) => {
             return Err(BrokerError::Storage(format!(
                 "{label} metadata failed: {error}"
-            )))
+            )));
         }
     }
     validate_private_service_file(path, trusted_service_uid, label)
@@ -1272,7 +1284,7 @@ fn validate_sqlite_sidecars(path: &Path, trusted_service_uid: u32, label: &str) 
             Err(error) => {
                 return Err(BrokerError::Storage(format!(
                     "{label} sidecar metadata failed: {error}"
-                )))
+                )));
             }
         }
     }

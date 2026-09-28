@@ -1,3 +1,4 @@
+use chio_security_types::clock::{AuthorityDeadline, Clock, MonotonicInstant};
 #[cfg(target_os = "linux")]
 use std::fs;
 #[cfg(target_os = "linux")]
@@ -8,16 +9,23 @@ use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
 #[cfg(target_os = "linux")]
 use std::path::Path;
+use std::sync::Arc;
 #[cfg(target_os = "linux")]
-use std::time::{Duration, Instant};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 #[cfg(target_os = "linux")]
 use chio_secure_ipc::PeerIdentity;
 use chio_security_types::ports::{PortError, PortResult};
 
+#[cfg(all(test, target_os = "linux"))]
+mod clock_tests;
+
 #[cfg(target_os = "linux")]
-pub(super) fn connect_unix_stream_before(path: &Path, deadline: Instant) -> PortResult<UnixStream> {
+pub(super) fn connect_unix_stream_before(
+    path: &Path,
+    deadline: MonotonicInstant,
+    clock: &dyn Clock,
+) -> PortResult<UnixStream> {
     use rustix::event::{poll, PollFd, PollFlags, Timespec};
     use rustix::io::Errno;
     use rustix::net::{
@@ -38,14 +46,16 @@ pub(super) fn connect_unix_stream_before(path: &Path, deadline: Instant) -> Port
             Err(error) if error == Errno::ISCONN => break,
             Err(error) if error == Errno::AGAIN || error == Errno::WOULDBLOCK => {
                 let remaining = deadline
-                    .checked_duration_since(Instant::now())
+                    .duration_since(clock.monotonic()?)
+                    .ok()
                     .filter(|remaining| !remaining.is_zero())
                     .ok_or_else(PortError::unavailable)?;
                 std::thread::sleep(remaining.min(Duration::from_millis(1)));
             }
             Err(error) if error == Errno::INPROGRESS || error == Errno::ALREADY => loop {
                 let remaining = deadline
-                    .checked_duration_since(Instant::now())
+                    .duration_since(clock.monotonic()?)
+                    .ok()
                     .filter(|remaining| !remaining.is_zero())
                     .ok_or_else(PortError::unavailable)?;
                 let timeout =
@@ -107,36 +117,48 @@ pub(super) fn validate_connected_peer(
 #[cfg(target_os = "linux")]
 pub(super) struct AbsoluteDeadlineUnixStream {
     stream: UnixStream,
-    deadline: Instant,
+    deadline: AuthorityDeadline,
+    clock: Arc<dyn Clock>,
 }
 
 #[cfg(target_os = "linux")]
 impl AbsoluteDeadlineUnixStream {
-    pub(super) fn new(stream: UnixStream, timeout: Duration) -> PortResult<Self> {
-        let deadline = Instant::now()
-            .checked_add(timeout)
-            .ok_or_else(PortError::invalid_data)?;
-        Self::with_deadline(stream, deadline)
+    pub(super) fn new(
+        stream: UnixStream,
+        timeout: Duration,
+        clock: Arc<dyn Clock>,
+    ) -> PortResult<Self> {
+        let timeout_ms =
+            u64::try_from(timeout.as_millis()).map_err(|_| PortError::invalid_data())?;
+        let deadline = AuthorityDeadline::for_timeout_ms(clock.read()?, timeout_ms)?;
+        Self::with_deadline(stream, deadline, clock)
     }
-
-    pub(super) fn with_deadline(stream: UnixStream, deadline: Instant) -> PortResult<Self> {
-        Self::remaining(deadline).map_err(|_| PortError::unavailable())?;
-        Ok(Self { stream, deadline })
+    pub(super) fn with_deadline(
+        stream: UnixStream,
+        deadline: AuthorityDeadline,
+        clock: Arc<dyn Clock>,
+    ) -> PortResult<Self> {
+        let mut value = Self {
+            stream,
+            deadline,
+            clock,
+        };
+        value.remaining().map_err(|_| PortError::unavailable())?;
+        Ok(value)
     }
-
-    fn remaining(deadline: Instant) -> io::Result<Duration> {
-        deadline
-            .checked_duration_since(Instant::now())
-            .filter(|remaining| !remaining.is_zero())
-            .ok_or_else(|| io::Error::new(io::ErrorKind::TimedOut, "IPC deadline elapsed"))
+    fn remaining(&mut self) -> io::Result<Duration> {
+        self.clock
+            .read()
+            .and_then(|now| self.deadline.remaining(now))
+            .map_err(|error| io::Error::new(io::ErrorKind::TimedOut, error))
     }
 }
 
 #[cfg(target_os = "linux")]
 impl Read for AbsoluteDeadlineUnixStream {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
-        self.stream
-            .set_read_timeout(Some(Self::remaining(self.deadline)?))?;
+        let remaining = self.remaining()?;
+        self.stream.set_read_timeout(Some(remaining))?;
         self.stream.read(buffer)
     }
 }
@@ -144,14 +166,14 @@ impl Read for AbsoluteDeadlineUnixStream {
 #[cfg(target_os = "linux")]
 impl Write for AbsoluteDeadlineUnixStream {
     fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
-        self.stream
-            .set_write_timeout(Some(Self::remaining(self.deadline)?))?;
+        let remaining = self.remaining()?;
+        self.stream.set_write_timeout(Some(remaining))?;
         self.stream.write(buffer)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.stream
-            .set_write_timeout(Some(Self::remaining(self.deadline)?))?;
+        let remaining = self.remaining()?;
+        self.stream.set_write_timeout(Some(remaining))?;
         self.stream.flush()
     }
 }
@@ -190,29 +212,9 @@ pub(super) fn validate_socket_metadata(
     })
 }
 
+#[cfg(test)]
 pub(super) fn now_unix_seconds() -> PortResult<u64> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .map_err(|_| PortError::unavailable())
-        .and_then(|now| {
-            if now == 0 {
-                Err(PortError::unavailable())
-            } else {
-                Ok(now)
-            }
-        })
-}
-
-#[cfg(target_os = "linux")]
-pub(super) fn now_unix_millis() -> PortResult<u64> {
-    let elapsed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| PortError::unavailable())?;
-    let now = u64::try_from(elapsed.as_millis()).map_err(|_| PortError::unavailable())?;
-    if now == 0 {
-        Err(PortError::unavailable())
-    } else {
-        Ok(now)
-    }
+    Ok(chio_security_types::clock::SystemClock
+        .unix_millis()?
+        .as_secs())
 }

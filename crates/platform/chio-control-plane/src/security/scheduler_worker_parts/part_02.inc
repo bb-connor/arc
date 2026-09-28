@@ -16,7 +16,7 @@ mod tests {
         build_response_plan, ResponseStateMachine, ResponseTransitionRequest, SchedulerPolicy,
         SchedulerWorkOutcome,
     };
-    use chio_security_kernel::SecurityClock;
+    use chio_security_kernel::Clock;
     use chio_security_types::ports::{
         ActionId, AlertDeliveryQuery, AlertDeliveryStatus, CanonicalBody, EffectExecutionStatus,
         EffectPort, EffectRequest, EffectResult, EffectResultQuery, ErrorCode, GrantId,
@@ -30,7 +30,7 @@ mod tests {
         OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind,
         ResponseEffectSpec, ResponsePlanInput, ResponseState, ResponseTarget,
     };
-    use chio_store_sqlite::security_state::{SecurityStateClock, SqliteSecurityStateStore};
+    use chio_store_sqlite::security_state::SqliteSecurityStateStore;
     use std::collections::VecDeque;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
@@ -610,15 +610,17 @@ mod tests {
         }
     }
 
-    impl SecurityClock for SqliteTestClock {
-        fn now_unix_ms(&self) -> PortResult<u64> {
-            Ok(self.0.load(Ordering::Acquire))
-        }
-    }
-
-    impl SecurityStateClock for SqliteTestClock {
-        fn now_unix_ms(&self) -> PortResult<u64> {
-            Ok(self.0.load(Ordering::Acquire))
+    impl chio_security_types::clock::Clock for SqliteTestClock {
+        fn read(
+            &self,
+        ) -> core::result::Result<
+            chio_security_types::clock::ClockReading,
+            chio_security_types::clock::ClockError,
+        > {
+            let value = self.0.load(Ordering::Acquire);
+            chio_security_types::clock::Clock::read(
+                &chio_security_types::clock::FixedClock::from_millis(value),
+            )
         }
     }
 
@@ -627,13 +629,24 @@ mod tests {
         events: Arc<Mutex<Vec<&'static str>>>,
     }
 
-    impl SecurityClock for OrderingClock {
-        fn now_unix_ms(&self) -> PortResult<u64> {
-            self.events
-                .lock()
-                .map_err(|_| PortError::unavailable())?
-                .push("claim");
-            Ok(self.now_unix_ms)
+    impl chio_security_types::clock::Clock for OrderingClock {
+        fn read(
+            &self,
+        ) -> core::result::Result<
+            chio_security_types::clock::ClockReading,
+            chio_security_types::clock::ClockError,
+        > {
+            let value: PortResult<u64> = (|| {
+                self.events
+                    .lock()
+                    .map_err(|_| PortError::unavailable())?
+                    .push("claim");
+                Ok(self.now_unix_ms)
+            })();
+            let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+            chio_security_types::clock::Clock::read(
+                &chio_security_types::clock::FixedClock::from_millis(value),
+            )
         }
     }
 
@@ -733,7 +746,9 @@ mod tests {
             *chio_core::sha256(canonical_contribution.as_bytes()).as_bytes(),
         );
         let plan = build_response_plan(ResponsePlanInput {
-            execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
+            execution: chio_security_types::ResponseExecutionBinding::new(
+                chio_security_types::ResponseExecutionMode::Live,
+            ),
             action_id: ActionId::new(action_id)
                 .unwrap_or_else(|error| panic!("action id: {error}")),
             trigger_finding_id: RecordId::new("finding-scheduler-worker")
@@ -774,7 +789,10 @@ mod tests {
         })
         .unwrap_or_else(|error| panic!("response plan: {error}"));
         ResponseStateMachine::new(Arc::clone(store))
-            .create(chio_security_types::FreshLiveAdmission::new(plan).unwrap_or_else(|error| panic!("live fixture plan: {error}")))
+            .create(
+                chio_security_types::FreshLiveAdmission::new(plan)
+                    .unwrap_or_else(|error| panic!("live fixture plan: {error}")),
+            )
             .unwrap_or_else(|error| panic!("create plan: {error}"))
     }
 
@@ -855,7 +873,7 @@ mod tests {
         let store = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(
                 directory.path().join("operation-gate-poison.sqlite"),
-                Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+                Arc::clone(&clock) as Arc<dyn Clock>,
             )
             .unwrap_or_else(|error| panic!("security store: {error}")),
         );
@@ -893,7 +911,7 @@ mod tests {
         let store = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(
                 &path,
-                Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+                Arc::clone(&clock) as Arc<dyn Clock>,
             )
             .unwrap_or_else(|error| panic!("security store: {error}")),
         );
@@ -969,7 +987,7 @@ mod tests {
         let outbox_port: Arc<dyn DeclassificationReceiptOutboxPort> = scripted.clone();
         let outbox = ProductionDeclassificationReceiptOutbox::new_for_test(outbox_port);
         let ports = Arc::new(SqliteTestPorts);
-        let clock: Arc<dyn SecurityClock> = Arc::new(OrderingClock {
+        let clock: Arc<dyn Clock> = Arc::new(OrderingClock {
             now_unix_ms: current_unix_ms(),
             events: Arc::clone(&events),
         });
@@ -1039,7 +1057,7 @@ mod tests {
         let first_store = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(
                 &path,
-                Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+                Arc::clone(&clock) as Arc<dyn Clock>,
             )
             .unwrap_or_else(|error| panic!("security store: {error}")),
         );
@@ -1065,7 +1083,7 @@ mod tests {
         let reopened_store = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(
                 &path,
-                Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+                Arc::clone(&clock) as Arc<dyn Clock>,
             )
             .unwrap_or_else(|error| panic!("reopen security store: {error}")),
         );
@@ -1143,7 +1161,7 @@ mod tests {
         let terminal_store = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(
                 &terminal_path,
-                Arc::clone(&terminal_clock) as Arc<dyn SecurityStateClock>,
+                Arc::clone(&terminal_clock) as Arc<dyn Clock>,
             )
             .unwrap_or_else(|error| panic!("terminal security store: {error}")),
         );
@@ -1193,7 +1211,7 @@ mod tests {
         let terminal_reopened = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(
                 &terminal_path,
-                Arc::clone(&terminal_clock) as Arc<dyn SecurityStateClock>,
+                Arc::clone(&terminal_clock) as Arc<dyn Clock>,
             )
             .unwrap_or_else(|error| panic!("terminal store reopen: {error}")),
         );
@@ -1262,7 +1280,7 @@ mod tests {
         let batch_store = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(
                 &batch_path,
-                Arc::clone(&batch_clock) as Arc<dyn SecurityStateClock>,
+                Arc::clone(&batch_clock) as Arc<dyn Clock>,
             )
             .unwrap_or_else(|error| panic!("terminal batch store: {error}")),
         );
@@ -1339,7 +1357,7 @@ mod tests {
         let batch_reopened = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(
                 &batch_path,
-                Arc::clone(&batch_clock) as Arc<dyn SecurityStateClock>,
+                Arc::clone(&batch_clock) as Arc<dyn Clock>,
             )
             .unwrap_or_else(|error| panic!("terminal batch reopen: {error}")),
         );

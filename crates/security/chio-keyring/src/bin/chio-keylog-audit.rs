@@ -17,9 +17,9 @@ use chio_keyring::{
     load_audit_service_config, load_key_log_policy, load_witness_seed_backend,
     read_single_canonical_frame, write_canonical_frame, AuditServiceOperation,
     AuditServiceReadinessBody, AuditServiceReadinessProof, AuditServiceRequest,
-    AuditServiceResponse, AuditServiceResult, CheckpointStage, KeyLogAuditMonitor, KeyLogPin,
-    KeyLogPolicy, KeyringError, SqliteKeyLogStore, SqlitePinnedKeyLogVerifier, SystemTrustedClock,
-    TrustedClock, UnixKeyLogWitnessClient, WitnessId, WitnessServiceView,
+    AuditServiceResponse, AuditServiceResult, CheckpointStage, Clock, KeyLogAuditMonitor,
+    KeyLogPin, KeyLogPolicy, KeyringError, SqliteKeyLogStore, SqlitePinnedKeyLogVerifier,
+    SystemClock, UnixKeyLogWitnessClient, WitnessId, WitnessServiceView,
     KEY_LOG_AUDIT_IPC_REQUEST_SCHEMA, KEY_LOG_AUDIT_IPC_RESPONSE_SCHEMA,
     KEY_LOG_AUDIT_READINESS_SCHEMA,
 };
@@ -46,7 +46,7 @@ struct PollLoopConfig {
     health: Arc<Mutex<AuditHealth>>,
     force_poll: Arc<AtomicBool>,
     poll_interval_millis: u64,
-    clock: Arc<SystemTrustedClock>,
+    clock: Arc<SystemClock>,
 }
 
 #[cfg(unix)]
@@ -103,7 +103,7 @@ fn run() -> chio_keyring::Result<()> {
         &config.operator_database_path,
         policy.clone(),
     )?);
-    let clock = Arc::new(SystemTrustedClock);
+    let clock = Arc::new(SystemClock);
     // Keep the original verifier and pin across supervisor restarts. Creation
     // remains exclusive when an explicitly provisioned store does not exist.
     let verifier = if config.provision && !config.database_path.try_exists()? {
@@ -118,7 +118,9 @@ fn run() -> chio_keyring::Result<()> {
         ));
     }
     let monitor = Arc::new(KeyLogAuditMonitor::new(verifier));
-    let started_at = clock.now()?;
+    let started_at = clock
+        .unix_millis()
+        .map(chio_security_types::clock::UnixMillis::get)?;
     let witnesses = config
         .witness_sockets
         .iter()
@@ -261,7 +263,7 @@ fn poll_once(
     policy: &KeyLogPolicy,
     witnesses: &[UnixKeyLogWitnessClient],
     previous_health: AuditHealth,
-    clock: &dyn TrustedClock,
+    clock: &dyn Clock,
 ) -> chio_keyring::Result<AuditHealth> {
     let retained_health = previous_health.clone();
     let mut current_operator_pin = None;
@@ -315,7 +317,9 @@ fn poll_once(
         "audit synchronization did not observe the operator head",
     ))?;
 
-    let now = clock.now()?;
+    let now = clock
+        .unix_millis()
+        .map(chio_security_types::clock::UnixMillis::get)?;
     let mut witness_views = previous_health.witness_views;
     let mut witness_proofs = previous_health.witness_proofs;
     let mut available = Vec::new();

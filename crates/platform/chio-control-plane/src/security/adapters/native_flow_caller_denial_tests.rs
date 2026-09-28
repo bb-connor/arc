@@ -135,7 +135,7 @@ fn native_caller_changed_input_cannot_replace_original_reserved_join() -> TestRe
             fixture.binding.clone(),
             super::super::super::registry(false, super::super::super::restricted_label())?,
             Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(Clock::default()),
+            Arc::new(FlowTestClock::default()),
             config,
         )?
         .with_captured_lifecycle(),

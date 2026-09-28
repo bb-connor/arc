@@ -32,8 +32,8 @@ use chio_security_kernel::{
     FlowDispatchOutcomeRecorder, FlowPostInvocationHook, FlowPostInvocationInput,
     FlowPostInvocationPort, FlowPostInvocationResolver, FlowPreDispatchHook, FlowPreDispatchInput,
     FlowPreDispatchPort, FlowPreInvocationGuard, FlowPreInvocationInput, FlowPreInvocationPort,
-    FlowPreInvocationResolver, MissingContextPolicy, RawOutputTripwireHook, SecurityClock,
-    SecurityEventIngress, TripwireEventPublisher, TripwireGuard,
+    FlowPreInvocationResolver, MissingContextPolicy, RawOutputTripwireHook, SecurityEventIngress,
+    TripwireEventPublisher, TripwireGuard,
 };
 use chio_security_types::flow::{DeclassificationPurpose, ToolFlowDeclaration};
 use chio_security_types::ports::{
@@ -109,9 +109,17 @@ impl TripwireDetectorPort for FakeDetector {
 
 struct FixedClock(u64);
 
-impl SecurityClock for FixedClock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        Ok(self.0)
+impl chio_security_types::clock::Clock for FixedClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = self.0;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 

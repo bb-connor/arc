@@ -1,3 +1,4 @@
+use chio_security_types::clock::{Clock, SystemClock};
 use std::os::unix::net::UnixStream;
 use std::sync::Arc;
 #[cfg(target_os = "linux")]
@@ -21,15 +22,12 @@ use chio_security_types::ResponsePlan;
 use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "linux")]
-use super::transport::{
-    now_unix_millis, now_unix_seconds, validate_connected_peer, AbsoluteDeadlineUnixStream,
-};
+use super::transport::{validate_connected_peer, AbsoluteDeadlineUnixStream};
 #[cfg(target_os = "linux")]
 use super::{
-    active_response_authority_request_signing_bytes,
     active_response_authority_response_signing_bytes, validate_active_response_artifacts_draft,
     ActiveResponseAdmissionArtifactsWire, ActiveResponseAuthorityResponseBody,
-    SignedActiveResponseAuthorityRequest, SignedActiveResponseAuthorityResponse,
+    SignedActiveResponseAuthorityResponse,
 };
 use super::{
     validate_active_response_policy_selection, ActiveResponseAdmissionArtifactsDraftWire,
@@ -128,6 +126,7 @@ enum ServeFailure {
 /// then enforces canonical framing, signatures, freshness, replay protection,
 /// and one absolute I/O deadline.
 pub struct ActiveResponseAuthorityProtocolServer {
+    clock: Arc<dyn Clock>,
     #[cfg(target_os = "linux")]
     config: ActiveResponseAuthorityProtocolServerConfig,
     #[cfg(target_os = "linux")]
@@ -143,6 +142,12 @@ pub struct ActiveResponseAuthorityProtocolServer {
 }
 
 impl ActiveResponseAuthorityProtocolServer {
+    /// Install the runtime-owned trusted clock before serving any requests.
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
     pub fn new(
         config: ActiveResponseAuthorityProtocolServerConfig,
         authority_signer: Arc<dyn SigningBackend>,
@@ -161,6 +166,7 @@ impl ActiveResponseAuthorityProtocolServer {
         #[cfg(not(target_os = "linux"))]
         let _ = (authority_identity, handler);
         Ok(Self {
+            clock: Arc::new(SystemClock),
             #[cfg(target_os = "linux")]
             config,
             #[cfg(target_os = "linux")]
@@ -187,6 +193,7 @@ impl ActiveResponseAuthorityProtocolServer {
         let authority_identity =
             Self::validate_signer_and_role_separation(&config, &authority_signer)?;
         Ok(Self {
+            clock: Arc::new(SystemClock),
             config,
             authority_signer,
             authority_identity,
@@ -242,23 +249,26 @@ impl ActiveResponseAuthorityProtocolServer {
         }
         validate_connected_peer(&stream, &self.config.expected_client_peer)
             .map_err(ServeFailure::Client)?;
-        let mut stream =
-            AbsoluteDeadlineUnixStream::new(stream, Duration::from_millis(self.config.timeout_ms))
-                .map_err(ServeFailure::Internal)?;
+        let mut stream = AbsoluteDeadlineUnixStream::new(
+            stream,
+            Duration::from_millis(self.config.timeout_ms),
+            Arc::clone(&self.clock),
+        )
+        .map_err(ServeFailure::Internal)?;
         let request_bytes =
             read_bounded_frame(&mut stream, super::MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES)
                 .map_err(|_| ServeFailure::Client(PortError::invalid_data()))?;
-        let request: SignedActiveResponseAuthorityRequest = serde_json::from_slice(&request_bytes)
-            .map_err(|_| ServeFailure::Client(PortError::integrity_failure()))?;
-        let canonical = canonical_json_bytes(&request)
-            .map_err(|_| ServeFailure::Client(PortError::integrity_failure()))?;
-        if canonical != request_bytes {
-            return Err(ServeFailure::Client(PortError::integrity_failure()));
-        }
-        self.verify_and_reserve_request(
-            &request,
-            now_unix_seconds().map_err(ServeFailure::Internal)?,
-        )?;
+        let request = super::decode_authority_request(
+            &request_bytes,
+            &self.config,
+            self.clock
+                .unix_millis()
+                .map_err(|error| ServeFailure::Internal(error.into()))?
+                .as_secs(),
+        )
+        .map_err(ServeFailure::Client)?;
+        self.reserve_request(&request)?;
+        let request = request.into_request();
         let result = self.dispatch(&request.body.operation)?;
         validate_operation_result(&request.body.operation, &result)
             .map_err(ServeFailure::Internal)?;
@@ -273,7 +283,11 @@ impl ActiveResponseAuthorityProtocolServer {
             store_digest: self.config.store_digest,
             request_id: request.body.request_id.clone(),
             request_digest: sha256_hex(&request_bytes),
-            issued_at_unix_seconds: now_unix_seconds().map_err(ServeFailure::Internal)?,
+            issued_at_unix_seconds: self
+                .clock
+                .unix_millis()
+                .map_err(|error| ServeFailure::Internal(error.into()))?
+                .as_secs(),
             authority: self.authority_identity.clone(),
             result,
         };
@@ -351,7 +365,7 @@ impl ActiveResponseAuthorityProtocolServer {
                         .map(|artifacts| {
                             ActiveResponseAuthorityResult::Artifacts(Box::new(artifacts))
                         })
-                        .map_err(ServeFailure::Internal)
+                        .map_err(ServeFailure::Internal);
                 }
                 Err(error) => Err(error),
             },
@@ -398,7 +412,7 @@ impl ActiveResponseAuthorityProtocolServer {
             expected_ref,
             response_plan,
             &self.authority_identity,
-            now_unix_millis()?,
+            self.clock.unix_millis()?.get(),
         )?;
         Ok(ActiveResponseAdmissionArtifactsWire {
             action_id: draft.action_id,
@@ -414,41 +428,29 @@ impl ActiveResponseAuthorityProtocolServer {
     }
 
     #[cfg(target_os = "linux")]
-    fn verify_and_reserve_request(
+    fn reserve_request(
         &self,
-        request: &SignedActiveResponseAuthorityRequest,
-        now_unix_seconds: u64,
+        request: &super::VerifiedAuthorityRequest,
     ) -> Result<(), ServeFailure> {
-        let body = &request.body;
-        let earliest = now_unix_seconds.saturating_sub(self.config.maximum_clock_skew_seconds);
-        let latest = now_unix_seconds
-            .checked_add(self.config.maximum_clock_skew_seconds)
-            .ok_or_else(PortError::invalid_data)
-            .map_err(ServeFailure::Client)?;
-        if body.schema != ACTIVE_RESPONSE_AUTHORITY_SCHEMA
-            || body.deployment_digest != self.config.deployment_digest
-            || body.store_digest != self.config.store_digest
-            || body.issued_at_unix_seconds < earliest
-            || body.issued_at_unix_seconds > latest
-            || body.client != self.config.trusted_client
-            || request.algorithm != self.config.trusted_client.algorithm()
-            || request.signature.algorithm() != request.algorithm
-        {
-            return Err(ServeFailure::Client(PortError::integrity_failure()));
-        }
-        let canonical =
-            active_response_authority_request_signing_bytes(body).map_err(ServeFailure::Client)?;
-        if !self
-            .config
-            .trusted_client
-            .verify(&canonical, &request.signature)
-        {
-            return Err(ServeFailure::Client(PortError::integrity_failure()));
-        }
+        let body = &request.request().body;
         let mut replay_cache = self
             .replay_cache
             .lock()
             .map_err(|_| ServeFailure::Internal(PortError::unavailable()))?;
+        // Sample after acquiring the reservation lock. Neither signature work
+        // nor lock contention may preserve an earlier freshness decision.
+        let now_unix_seconds = self
+            .clock
+            .unix_millis()
+            .map_err(|error| ServeFailure::Internal(error.into()))?
+            .as_secs();
+        super::validation::validate_request_freshness(
+            body.issued_at_unix_seconds,
+            self.config.maximum_clock_skew_seconds,
+            now_unix_seconds,
+        )
+        .map_err(ServeFailure::Client)?;
+        let earliest = now_unix_seconds.saturating_sub(self.config.maximum_clock_skew_seconds);
         replay_cache.retain(|_, issued_at| *issued_at >= earliest);
         if replay_cache.contains_key(&body.request_id) {
             return Err(ServeFailure::Client(PortError::conflict()));

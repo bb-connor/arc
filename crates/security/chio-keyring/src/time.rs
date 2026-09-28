@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core_types::{
     canonical_json_bytes, Hash, PublicKey, Signature, SigningAlgorithm, SigningBackend,
@@ -12,21 +11,7 @@ use crate::{derive_key_id, AnchorId, KeyId, KeyringError, Result};
 pub const ARTIFACT_TIME_ANCHOR_SCHEMA: &str = "chio.key-log.artifact-time-anchor.v1";
 const ARTIFACT_TIME_SIGNATURE_DOMAIN: &[u8] = b"chio.key-log.artifact-time-anchor.v1\0";
 
-pub trait TrustedClock: Send + Sync {
-    fn now(&self) -> Result<u64>;
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-pub struct SystemTrustedClock;
-
-impl TrustedClock for SystemTrustedClock {
-    fn now(&self) -> Result<u64> {
-        let duration = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|_| KeyringError::InvalidTimeOrdering)?;
-        u64::try_from(duration.as_millis()).map_err(|_| KeyringError::NumericRange)
-    }
-}
+pub use chio_security_types::clock::{Clock, SystemClock};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
@@ -89,7 +74,7 @@ impl SignedArtifactTimeAnchor {
 pub struct ArtifactTimeVerifier {
     trust_roots: BTreeMap<AnchorId, PublicKey>,
     policy_binding: Hash,
-    clock: Arc<dyn TrustedClock>,
+    clock: Arc<dyn Clock>,
     max_future_skew: u64,
 }
 
@@ -97,7 +82,7 @@ impl ArtifactTimeVerifier {
     pub(crate) fn new(
         trust_roots: BTreeMap<AnchorId, PublicKey>,
         policy_binding: Hash,
-        clock: Arc<dyn TrustedClock>,
+        clock: Arc<dyn Clock>,
         max_future_skew: u64,
     ) -> Result<Self> {
         if trust_roots.is_empty() {
@@ -135,14 +120,11 @@ impl ArtifactTimeVerifier {
         {
             return Err(KeyringError::InvalidArtifactTimeEvidence);
         }
-        let latest = self
-            .clock
-            .now()?
-            .checked_add(self.max_future_skew)
-            .ok_or(KeyringError::NumericRange)?;
-        if signed.body.anchored_at > latest {
-            return Err(KeyringError::InvalidArtifactTimeEvidence);
-        }
+        chio_security_types::clock::validate_future_skew(
+            chio_security_types::clock::UnixMillis::new(signed.body.anchored_at),
+            self.clock.unix_millis()?,
+            self.max_future_skew,
+        )?;
         Ok(ArtifactTimeEvidence {
             artifact_hash: signed.body.artifact_hash,
             anchored_at: signed.body.anchored_at,

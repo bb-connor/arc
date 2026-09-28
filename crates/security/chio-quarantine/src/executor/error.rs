@@ -13,15 +13,15 @@ pub enum ExecutorError {
     #[error("response execution retry attempt overflowed")]
     AttemptOverflow,
     #[error("response execution alert failed: {0}")]
-    Alert(PortError),
+    Alert(#[source] PortError),
     #[error("response execution canonicalization failed: {0}")]
     Canonical(#[from] CanonicalFailure),
     #[error("response effect outcome is unknown")]
     EffectOutcomeUnknown,
     #[error("response effect mutation returned without an authoritative result: {0}")]
-    EffectMutation(PortError),
+    EffectMutation(#[source] PortError),
     #[error("response effect result query failed: {0}")]
-    EffectQuery(PortError),
+    EffectQuery(#[source] PortError),
     #[error("response effect result is invalid")]
     InvalidEffectResult,
     #[error("response effect generation overflowed")]
@@ -43,13 +43,13 @@ pub enum ExecutorError {
     #[error("active response evidence dispatch binding is invalid")]
     ActiveEvidenceBinding(#[source] ResponseExecutionDispatchBindingError),
     #[error("response execution receipt failed: {0}")]
-    Receipt(PortError),
+    Receipt(#[source] PortError),
     #[error("response execution receipt lineage does not match durable state")]
     ReceiptLineageMismatch,
     #[error("response execution lease is stale")]
     StaleLease,
     #[error("response execution store failed: {0}")]
-    Store(PortError),
+    Store(#[source] PortError),
     #[error("response state machine failed: {0}")]
     StateMachine(#[from] StateMachineError),
     #[error("scheduled work does not match the response plan")]

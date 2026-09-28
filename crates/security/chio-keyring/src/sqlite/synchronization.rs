@@ -22,7 +22,10 @@ impl SqliteKeyLogStore {
             let transaction =
                 connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
             let events = load_events_from(&transaction)?;
-            let now = self.clock.now()?;
+            let now = self
+                .clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)?;
             let checkpoints = load_checkpoints_from(&transaction)?;
             let activation_commits = load_activation_commits_from(&transaction)?;
             transaction.commit()?;

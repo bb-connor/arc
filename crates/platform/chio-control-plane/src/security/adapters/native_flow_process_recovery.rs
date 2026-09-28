@@ -283,7 +283,7 @@ fn resolver(
         binding,
         registry,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         config,
     )?
     .with_captured_lifecycle())

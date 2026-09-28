@@ -10,7 +10,7 @@ fn native_nonce_expiry_at_final_commit_rolls_back_capture_without_reversing_tain
         fixture.binding.clone(),
         super::super::super::super::registry(false, InformationLabel::bottom())?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     fixture

@@ -1,5 +1,5 @@
-use super::*;
 use super::trust::verify_legacy_credential_authority;
+use super::*;
 use crate::financial_passport_v2::validate_presented_agent_passport_v2_authority_contract;
 
 const FINANCIAL_CREDENTIAL_BODY_DIGEST_DOMAIN: &[u8] = b"chio.fincred.verified-body-digest.v1\0";
@@ -70,7 +70,7 @@ pub fn evaluate_financial_credentials(
     lifecycle_generation: &dyn CrossIssuerLifecycleGenerationAnchor,
     lifecycle_high_water: &dyn CrossIssuerLifecycleHighWaterStore,
     sources: &dyn FinancialEvidenceSourceResolver,
-    clock: &dyn TrustedClock,
+    clock: &dyn Clock,
 ) -> Result<VerifiedFinancialCredentialSet, CredentialError> {
     evaluate_financial_credentials_inner(
         presentation,
@@ -95,7 +95,7 @@ pub fn evaluate_financial_credentials_with_legacy(
     lifecycle_high_water: &dyn CrossIssuerLifecycleHighWaterStore,
     sources: &dyn FinancialEvidenceSourceResolver,
     legacy_anchors: &dyn LegacyCredentialIssuanceAnchorResolver,
-    clock: &dyn TrustedClock,
+    clock: &dyn Clock,
 ) -> Result<VerifiedFinancialCredentialSet, CredentialError> {
     evaluate_financial_credentials_inner(
         presentation,
@@ -120,11 +120,12 @@ fn evaluate_financial_credentials_inner(
     lifecycle_high_water: &dyn CrossIssuerLifecycleHighWaterStore,
     sources: &dyn FinancialEvidenceSourceResolver,
     legacy_anchors: Option<&dyn LegacyCredentialIssuanceAnchorResolver>,
-    clock: &dyn TrustedClock,
+    clock: &dyn Clock,
 ) -> Result<VerifiedFinancialCredentialSet, CredentialError> {
     let now = clock
-        .now()
-        .map_err(|error| evaluation_availability_error("trusted clock", error))?;
+        .unix_millis()
+        .map(chio_security_types::clock::UnixMillis::as_secs)
+        .map_err(|error| authority_error(format!("trusted clock: {}", error.code())))?;
     validate_time("financialEvaluation.now", now)?;
     let policy_body = policy.policy();
     if now < policy_body.not_before || now >= policy_body.expires_at {
@@ -524,16 +525,4 @@ fn normalize_proof_digests(values: &mut [String]) -> Result<(), CredentialError>
         ));
     }
     Ok(())
-}
-
-fn evaluation_availability_error(
-    component: &str,
-    error: FinancialAuthorityAvailabilityError,
-) -> CredentialError {
-    let reason = match error {
-        FinancialAuthorityAvailabilityError::Unavailable => "is unavailable",
-        FinancialAuthorityAvailabilityError::Stale => "is stale",
-        FinancialAuthorityAvailabilityError::Conflict => "is conflicting",
-    };
-    authority_error(format!("{component} {reason}"))
 }

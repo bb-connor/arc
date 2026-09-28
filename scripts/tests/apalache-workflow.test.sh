@@ -33,7 +33,7 @@ scheduled = job(
     "apalache_verdict",
 )
 verdict = job(safety, "apalache_verdict", "apalache-negative")
-legacy_job = job(
+propagation_job = job(
     temporal,
     "revocation_eventually_seen",
     "distributed_revocation_temporal",
@@ -79,16 +79,15 @@ assert "uses: ./.github/workflows/apalache-safety.yml" in ci_call
 assert "\n    if:" not in ci_call
 
 assert "timeout-minutes: 120" in distributed_job
-legacy_outer_timeout = int(re.search(r"timeout-minutes: ([0-9]+)", legacy_job).group(1))
-legacy_inner_timeout = int(re.search(r"--timeout-seconds ([0-9]+)", legacy_job).group(1))
-assert legacy_inner_timeout == 3600
-assert legacy_outer_timeout * 60 == legacy_inner_timeout + 900
-assert legacy_job.count("./scripts/check-apalache-positive.sh") == 1
+assert "timeout-minutes: 10" in propagation_job
+assert propagation_job.count("scripts/check-revocation-propagation.py") == 1
+assert "--timeout-seconds 3600" not in propagation_job
+assert "if-no-files-found: error" in propagation_job
 assert "if: ${{ always() }}" in temporal_verdict
 for dependency in ("revocation_eventually_seen", "distributed_revocation_temporal"):
     assert f"      - {dependency}" in temporal_verdict
 assert (
-    '[[ "${LEGACY_RESULT}" != "success" || "${DISTRIBUTED_RESULT}" != "success" ]]'
+    '[[ "${PROPAGATION_RESULT}" != "success" || "${DISTRIBUTED_RESULT}" != "success" ]]'
     in temporal_verdict
 )
 assert distributed.count("./scripts/check-apalache-positive.sh") == 3

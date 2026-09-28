@@ -206,11 +206,10 @@ pub use content_review::{
     ContentReviewConfig, ContentReviewError, ContentReviewGuard, ContentReviewRules,
 };
 pub use finding_retraction::{
-    AuthenticatedFindingStatus, FindingDeliveryLineageResolver, FindingRetractionClock,
-    FindingRetractionQuery, FindingRetractionResolution, FindingRetractionResolveError,
-    FindingRetractionResolver, FindingStatusCache, FindingStatusValue,
-    VerifiedFindingDeliveryLineage, VerifiedFindingRetractionResolver,
-    FINDING_RETRACTION_RESOLVER_PROFILE,
+    AuthenticatedFindingStatus, Clock, FindingDeliveryLineageResolver, FindingRetractionQuery,
+    FindingRetractionResolution, FindingRetractionResolveError, FindingRetractionResolver,
+    FindingStatusCache, FindingStatusValue, VerifiedFindingDeliveryLineage,
+    VerifiedFindingRetractionResolver, FINDING_RETRACTION_RESOLVER_PROFILE,
 };
 pub use memory_governance::{
     FindingRetractionGuardConfig, MemoryGovernanceConfig, MemoryGovernanceError,

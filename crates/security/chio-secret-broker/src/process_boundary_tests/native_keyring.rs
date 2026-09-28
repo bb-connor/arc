@@ -4,7 +4,7 @@ use chio_core_types::capability::token::CapabilityToken;
 use chio_keyring::{
     BootstrapAuthorization, KeyLogAuthorizations, KeyLogEventBody, KeyLogOperation,
     KeyLogWitnessClient, KeyringSigningResult, SignedKeyLogEvent, SqliteKeyLogStore,
-    SqlitePinnedKeyLogVerifier, SystemTrustedClock,
+    SqlitePinnedKeyLogVerifier, SystemClock,
 };
 use chio_store_sqlite::SqliteReceiptStore;
 
@@ -119,7 +119,7 @@ impl KeyringDelivery {
             match chio_control_plane::load_keyring_runtime_composition(&active, &config_path) {
                 Ok(runtime) => break runtime,
                 Err(error) if started.elapsed() >= Duration::from_secs(10) => {
-                    return Err(error.into())
+                    return Err(error.into());
                 }
                 Err(_) => thread::sleep(Duration::from_millis(20)),
             }
@@ -162,7 +162,7 @@ impl KeyringDelivery {
         let verifier = SqlitePinnedKeyLogVerifier::provision(
             &verifier_path,
             policy.clone(),
-            Arc::new(SystemTrustedClock),
+            Arc::new(SystemClock),
         )?;
         let bytes = canonical_json_bytes(&parent.signing_body())?;
         let anchor = evidence
@@ -313,7 +313,7 @@ impl KeyringDelivery {
         let verifier = SqlitePinnedKeyLogVerifier::open(
             &self.verifier_path,
             self.policy.clone(),
-            Arc::new(SystemTrustedClock),
+            Arc::new(SystemClock),
         )?;
         let key = verifier.verify_artifact_signing_evidence(
             &canonical_json_bytes(&original.signing_body())?,
@@ -360,7 +360,7 @@ impl KeyringDelivery {
         let verifier = SqlitePinnedKeyLogVerifier::open(
             &self.verifier_path,
             self.policy.clone(),
-            Arc::new(SystemTrustedClock),
+            Arc::new(SystemClock),
         )?;
         let base = verifier.pin()?.ok_or("independent receiver pin")?;
         verifier.apply_sync(&runtime.key_log_synchronization_response(Some(&base))?)?;

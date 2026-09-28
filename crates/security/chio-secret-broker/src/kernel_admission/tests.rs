@@ -16,9 +16,15 @@ mod registration_peer;
 mod registration;
 
 struct Clock(u64);
-impl DaemonClock for Clock {
-    fn now_unix_seconds(&self) -> Result<u64> {
-        Ok(self.0)
+impl chio_security_types::clock::Clock for Clock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = self.0;
+        chio_security_types::clock::Clock::read(&chio_security_types::clock::FixedClock::new(value))
     }
 }
 
@@ -258,15 +264,36 @@ fn broker_admission_uses_installed_trust_and_live_clock() -> TestResult {
         assert!(changed.verify(&bytes, &moved).is_err());
     }
     struct FailedClock;
-    impl DaemonClock for FailedClock {
-        fn now_unix_seconds(&self) -> Result<u64> {
-            Err(crate::BrokerError::AuthorityUnavailable(
-                "test clock unavailable".into(),
+    impl chio_security_types::clock::Clock for FailedClock {
+        fn read(
+            &self,
+        ) -> core::result::Result<
+            chio_security_types::clock::ClockReading,
+            chio_security_types::clock::ClockError,
+        > {
+            let value: Result<u64> = (|| {
+                Err(crate::BrokerError::AuthorityUnavailable(
+                    "test clock unavailable".into(),
+                ))
+            })();
+            let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+            chio_security_types::clock::Clock::read(&chio_security_types::clock::FixedClock::new(
+                value,
             ))
         }
     }
     let failed = BrokerQuotaVerifier::new(verifier.config, Arc::new(FailedClock))?;
-    assert!(failed.verify(&bytes, &context).is_err());
+    assert_eq!(
+        failed
+            .verify(&bytes, &context)
+            .err()
+            .map(|error| error.to_string()),
+        Some(
+            chio_security_types::clock::ClockError::Unavailable
+                .code()
+                .to_owned()
+        )
+    );
     Ok(())
 }
 

@@ -8,7 +8,7 @@ use std::path::Path;
 #[cfg(unix)]
 use std::path::PathBuf;
 use std::sync::{Arc, MutexGuard};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use crate::{encrypted_blob::SqliteEncryptedBlobStore, store_connection::StoreConnection};
 use chio_core::canonical::canonical_json_bytes;
@@ -662,26 +662,12 @@ END
 /// boundary must never be implemented from request-controlled timestamps.
 /// Implementations must be bounded and must not reenter the store: reads occur
 /// while the connection and its security-state transaction are held.
-pub trait SecurityStateClock: Send + Sync {
-    fn now_unix_ms(&self) -> PortResult<u64>;
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct SystemSecurityStateClock;
-
-impl SecurityStateClock for SystemSecurityStateClock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        let duration = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|_| PortError::unavailable())?;
-        u64::try_from(duration.as_millis()).map_err(|_| PortError::unavailable())
-    }
-}
+pub use chio_security_types::clock::{Clock, SystemClock};
 
 pub struct SqliteSecurityStateStore {
     connection: StoreConnection,
     isolation_epoch_verifier: Arc<dyn IsolationEpochEvidenceVerifierPort>,
-    clock: Arc<dyn SecurityStateClock>,
+    clock: Arc<dyn Clock>,
     #[cfg(unix)]
     database_path: PathBuf,
     #[cfg(unix)]
@@ -743,7 +729,7 @@ impl SqliteSecurityStateStore {
         Self::open_with_dependencies(
             path,
             Arc::new(DenyIsolationEpochEvidence),
-            Arc::new(SystemSecurityStateClock),
+            Arc::new(SystemClock),
         )
     }
 
@@ -751,16 +737,12 @@ impl SqliteSecurityStateStore {
         path: impl AsRef<Path>,
         isolation_epoch_verifier: Arc<dyn IsolationEpochEvidenceVerifierPort>,
     ) -> PortResult<Self> {
-        Self::open_with_dependencies(
-            path,
-            isolation_epoch_verifier,
-            Arc::new(SystemSecurityStateClock),
-        )
+        Self::open_with_dependencies(path, isolation_epoch_verifier, Arc::new(SystemClock))
     }
 
     pub fn open_with_trusted_clock(
         path: impl AsRef<Path>,
-        clock: Arc<dyn SecurityStateClock>,
+        clock: Arc<dyn Clock>,
     ) -> PortResult<Self> {
         Self::open_with_dependencies(path, Arc::new(DenyIsolationEpochEvidence), clock)
     }
@@ -768,7 +750,7 @@ impl SqliteSecurityStateStore {
     fn open_with_dependencies(
         path: impl AsRef<Path>,
         isolation_epoch_verifier: Arc<dyn IsolationEpochEvidenceVerifierPort>,
-        clock: Arc<dyn SecurityStateClock>,
+        clock: Arc<dyn Clock>,
     ) -> PortResult<Self> {
         let path = path.as_ref();
         let path_text = path.as_os_str().to_string_lossy();

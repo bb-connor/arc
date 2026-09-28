@@ -11,7 +11,7 @@ use chio_keyring::{
     KeyLogPolicyConfig, KeyLogState, KeyStatus, LogId, NewKeyProofOfPossession,
     OldKeyAuthorization, RecoveryAuthorization, RecoveryAuthorizerId, RecoveryPolicyId,
     SignedArtifactTimeAnchor, SignedKeyActivationCommit, SignedKeyLogCheckpoint, SignedKeyLogEvent,
-    TrustedClock, WitnessId, WitnessRosterId, WitnessSignature, WitnessedActivationSet,
+    WitnessId, WitnessRosterId, WitnessSignature, WitnessedActivationSet,
     ARTIFACT_TIME_ANCHOR_SCHEMA, KEY_ACTIVATION_COMMIT_SCHEMA, KEY_LOG_CHECKPOINT_SCHEMA,
     KEY_LOG_EVENT_SCHEMA, MAX_RECOVERY_AUTHORIZATIONS,
 };
@@ -22,9 +22,17 @@ fn backend(seed: u8) -> Ed25519Backend {
 
 struct FixedClock(u64);
 
-impl TrustedClock for FixedClock {
-    fn now(&self) -> chio_keyring::Result<u64> {
-        Ok(self.0)
+impl chio_security_types::clock::Clock for FixedClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = self.0;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 

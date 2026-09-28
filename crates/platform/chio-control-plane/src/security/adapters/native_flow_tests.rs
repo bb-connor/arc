@@ -35,10 +35,7 @@ fn public_fixture() -> TestResult<Fixture> {
     Fixture::new(std::array::from_fn(|_| InformationLabel::bottom()))
 }
 
-fn resolver(
-    fixture: &Fixture,
-    clock: Arc<dyn SecurityClock>,
-) -> TestResult<Arc<NativeFlowResolver>> {
+fn resolver(fixture: &Fixture, clock: Arc<dyn Clock>) -> TestResult<Arc<NativeFlowResolver>> {
     Ok(Arc::new(NativeFlowResolver::new(
         fixture.binding.clone(),
         flow_registry(),
@@ -113,7 +110,7 @@ fn native_policy_commits_real_egress_custody_without_activating_dispatch() -> Te
         fixture.binding.clone(),
         flow_registry(),
         classifier.clone(),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     let custody = fixture.run(resolver, || {})??;
@@ -132,7 +129,7 @@ fn native_local_policy_does_not_manufacture_an_egress_fence() -> TestResult {
         fixture.binding.clone(),
         registry(false, InformationLabel::bottom())?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     let custody = fixture.run(resolver, || {})??;
@@ -150,7 +147,7 @@ fn native_policy_rejects_unrecorded_operator_floor_without_rejoining() -> TestRe
         fixture.binding.clone(),
         registry(true, restricted_label())?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         config,
     )?);
     assert!(matches!(
@@ -173,7 +170,7 @@ fn native_policy_requires_taint_propagation_in_each_recorded_label() -> TestResu
         fixture.binding.clone(),
         registry(true, restricted_label())?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     assert!(matches!(
@@ -190,7 +187,7 @@ fn native_policy_accepts_recorded_restricted_labels_with_matching_clearance() ->
         fixture.binding.clone(),
         registry(true, restricted_label())?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     let custody = fixture.run(resolver, || {})??;
@@ -209,7 +206,7 @@ fn native_policy_accepts_recorded_restricted_labels_with_matching_clearance() ->
 #[test]
 fn native_policy_rejects_public_destination_for_recorded_restricted_input() -> TestResult {
     let mut fixture = Fixture::new(std::array::from_fn(|_| restricted_label()))?;
-    let resolver = resolver(&fixture, Arc::new(Clock::default()))?;
+    let resolver = resolver(&fixture, Arc::new(FlowTestClock::default()))?;
     assert!(matches!(
         fixture.run(resolver, || {})?,
         Err(NativeFlowError::Policy(FlowDenial::PolicyFlowViolation))
@@ -225,7 +222,7 @@ fn native_policy_requires_admitted_manifest_before_classification() -> TestResul
         fixture.binding.clone(),
         Arc::new(VerifiedManifestRegistry::default()),
         classifier.clone(),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     assert!(matches!(
@@ -241,7 +238,7 @@ fn native_policy_rejects_other_initialized_authority_before_classification() -> 
     let mut fixture = public_fixture()?;
     let other = public_fixture()?;
     assert_ne!(fixture.binding, other.binding);
-    let resolver = resolver(&other, Arc::new(Clock::default()))?;
+    let resolver = resolver(&other, Arc::new(FlowTestClock::default()))?;
     assert!(matches!(
         fixture.run(resolver, || {})?,
         Err(NativeFlowError::AuthorityMismatch)
@@ -259,7 +256,7 @@ fn native_policy_rejects_legacy_evidence_configuration() -> TestResult {
             fixture.binding,
             flow_registry(),
             Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(Clock::default()),
+            Arc::new(FlowTestClock::default()),
             config
         ),
         Err(NativeFlowError::LegacyEvidenceConfigured)
@@ -270,7 +267,7 @@ fn native_policy_rejects_legacy_evidence_configuration() -> TestResult {
 #[test]
 fn native_policy_rejects_regressing_clock_before_egress_acquisition() -> TestResult {
     let mut fixture = public_fixture()?;
-    let clock = Arc::new(Clock::default());
+    let clock = Arc::new(FlowTestClock::default());
     let resolver = resolver(&fixture, clock.clone())?;
     assert!(matches!(
         fixture.run(resolver, move || {
@@ -284,7 +281,7 @@ fn native_policy_rejects_regressing_clock_before_egress_acquisition() -> TestRes
 #[test]
 fn native_policy_rejects_future_clock_before_preparation() -> TestResult {
     let mut fixture = public_fixture()?;
-    let clock = Arc::new(Clock::default());
+    let clock = Arc::new(FlowTestClock::default());
     clock.mode.store(2, Ordering::SeqCst);
     let resolver = resolver(&fixture, clock)?;
     assert!(matches!(
@@ -297,7 +294,7 @@ fn native_policy_rejects_future_clock_before_preparation() -> TestResult {
 #[test]
 fn native_policy_contains_clock_panic_before_egress_acquisition() -> TestResult {
     let mut fixture = public_fixture()?;
-    let clock = Arc::new(Clock::default());
+    let clock = Arc::new(FlowTestClock::default());
     let resolver = resolver(&fixture, clock.clone())?;
     assert!(matches!(
         fixture.run(resolver, move || {
@@ -327,7 +324,7 @@ fn native_policy_rejects_classifier_payload_substitution() -> TestResult {
         fixture.binding.clone(),
         flow_registry(),
         Arc::new(InvalidClassifier(false)),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     assert!(matches!(
@@ -344,7 +341,7 @@ fn native_policy_contains_classifier_panic_without_egress_writes() -> TestResult
         fixture.binding.clone(),
         flow_registry(),
         Arc::new(InvalidClassifier(true)),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     assert!(matches!(
@@ -368,7 +365,7 @@ fn native_policy_rejects_untrusted_declassification_before_classification() -> T
         fixture.binding.clone(),
         flow_registry(),
         classifier.clone(),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     assert!(matches!(
@@ -411,7 +408,7 @@ fn native_policy_rejects_classifier_taint_not_in_original_join() -> TestResult {
         fixture.binding.clone(),
         registry(true, restricted_label())?,
         Arc::new(RestrictedClassifier),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         config,
     )?);
     assert!(matches!(
@@ -424,7 +421,7 @@ fn native_policy_rejects_classifier_taint_not_in_original_join() -> TestResult {
 #[test]
 fn native_local_policy_revalidates_clock_without_fence_writes() -> TestResult {
     let mut fixture = public_fixture()?;
-    let clock = Arc::new(Clock::default());
+    let clock = Arc::new(FlowTestClock::default());
     let resolver = Arc::new(NativeFlowResolver::new(
         fixture.binding.clone(),
         registry(false, InformationLabel::bottom())?,
@@ -444,7 +441,7 @@ fn native_local_policy_revalidates_clock_without_fence_writes() -> TestResult {
 #[test]
 fn native_policy_rejects_clock_failure_before_egress_acquisition() -> TestResult {
     let mut fixture = public_fixture()?;
-    let clock = Arc::new(Clock::default());
+    let clock = Arc::new(FlowTestClock::default());
     let resolver = resolver(&fixture, clock.clone())?;
     assert!(matches!(
         fixture.run(resolver, move || {

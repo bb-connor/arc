@@ -6148,3 +6148,7 @@ async fn wedge_purchase_refuses_to_persist_an_unvalidatable_artifact() -> TestRe
     );
     Ok(())
 }
+
+#[path = "finding_wedge_purchase_e2e_tests/status_clocks.rs"]
+mod status_clocks;
+use status_clocks::*;

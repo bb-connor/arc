@@ -110,7 +110,7 @@ fn ledger_write_failures_preserve_committed_egress_through_compensation_and_reop
             fixture.binding.clone(),
             registry(true, InformationLabel::bottom())?,
             classifier.clone(),
-            Arc::new(Clock::default()),
+            Arc::new(FlowTestClock::default()),
             flow_config(),
         )?);
         let result = fixture.run_ledger_write_fault(resolver, fault)?;

@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core_types::{canonical_json_bytes, SigningBackend};
 use serde::de::DeserializeOwned;
@@ -40,23 +39,7 @@ const DAEMON_ADMIN_INTENT_DOMAIN: &[u8] = b"chio.broker-daemon-admin-intent.v1\0
 const MAX_DAEMON_COMBINED_RESPONSE_BYTES: u64 = 16_384;
 const I_JSON_MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
 
-pub trait DaemonClock: Send + Sync {
-    fn now_unix_seconds(&self) -> Result<u64>;
-}
-
-#[derive(Debug, Default)]
-pub struct SystemDaemonClock;
-
-impl DaemonClock for SystemDaemonClock {
-    fn now_unix_seconds(&self) -> Result<u64> {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_secs())
-            .map_err(|error| {
-                BrokerError::AuthorityUnavailable(format!("daemon clock failed: {error}"))
-            })
-    }
-}
+pub use chio_security_types::clock::{Clock, SystemClock};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -243,7 +226,7 @@ pub fn encode_credential_mutation_payload(
         _ => {
             return Err(BrokerError::InvalidRequest(
                 "credential mutation operation is invalid".to_string(),
-            ))
+            ));
         }
     };
     let command = CredentialMutationCommand {
@@ -274,7 +257,7 @@ fn decode_canonical_credential_mutation_payload(bytes: &[u8]) -> Result<Credenti
         _ => {
             return Err(BrokerError::InvalidRequest(
                 "sensitive JSON payload is invalid".to_string(),
-            ))
+            ));
         }
     };
     parser.expect_literal(b",\"schema\":")?;
@@ -348,7 +331,7 @@ pub struct BrokerDaemonHandler {
     admin: Arc<GovernedAdminAuthorizer>,
     admin_receipt_signer: Arc<dyn SigningBackend>,
     backend: Arc<EncryptedBlobSecretBackend>,
-    clock: Arc<dyn DaemonClock>,
+    clock: Arc<dyn Clock>,
 }
 
 impl BrokerDaemonHandler {
@@ -364,7 +347,7 @@ impl BrokerDaemonHandler {
         admin: Arc<GovernedAdminAuthorizer>,
         admin_receipt_signer: Arc<dyn SigningBackend>,
         backend: Arc<EncryptedBlobSecretBackend>,
-        clock: Arc<dyn DaemonClock>,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self> {
         validate_identifier(&tenant_scope, "daemon tenant scope", 512)?;
         validate_identifier(&audience, "daemon broker audience", 512)?;
@@ -471,7 +454,10 @@ impl BrokerDaemonHandler {
                 operation: operation_name.to_string(),
                 tenant_scope: self.tenant_scope.clone(),
                 response_digest: hex::encode(Sha256::digest(&response)),
-                completed_at_unix_seconds: self.clock.now_unix_seconds()?,
+                completed_at_unix_seconds: self
+                    .clock
+                    .unix_millis()
+                    .map(chio_security_types::clock::UnixMillis::as_secs)?,
                 outcome: AdminMutationOutcome::Applied,
             },
             self.admin_receipt_signer.as_ref(),
@@ -548,7 +534,10 @@ impl BrokerDaemonHandler {
                 operation: admin_operation,
                 tenant_scope: self.tenant_scope.clone(),
                 credential: command.credential.clone(),
-                completed_at_unix_seconds: self.clock.now_unix_seconds()?,
+                completed_at_unix_seconds: self
+                    .clock
+                    .unix_millis()
+                    .map(chio_security_types::clock::UnixMillis::as_secs)?,
                 outcome: AdminMutationOutcome::Applied,
             },
             self.admin_receipt_signer.as_ref(),
@@ -594,7 +583,10 @@ impl BrokerIpcHandler for BrokerDaemonHandler {
         let registration = &authenticated.registration;
         let authorization: SignedRegisterAttemptAuthorization =
             decode_canonical_payload(&request.authorization)?;
-        let now = self.clock.now_unix_seconds()?;
+        let now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::as_secs)?;
         verify_register_attempt_authorization(
             &authorization,
             registration,
@@ -618,7 +610,10 @@ impl BrokerIpcHandler for BrokerDaemonHandler {
         let registration = &authenticated.registration;
         let authorization: SignedRegisterAttemptAuthorization =
             decode_canonical_payload(&request.authorization)?;
-        let now = self.clock.now_unix_seconds()?;
+        let now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::as_secs)?;
         verify_register_attempt_authorization(
             &authorization,
             registration,
@@ -652,7 +647,10 @@ impl BrokerIpcHandler for BrokerDaemonHandler {
         let registration = &authenticated.registration;
         let authorization: SignedRegisterAttemptAuthorization =
             decode_canonical_payload(&request.authorization)?;
-        let now = self.clock.now_unix_seconds()?;
+        let now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::as_secs)?;
         verify_register_attempt_authorization(
             &authorization,
             registration,
@@ -684,7 +682,9 @@ impl BrokerIpcHandler for BrokerDaemonHandler {
                 &capability,
                 &self.trusted_issuer,
                 &self.audience,
-                self.clock.now_unix_seconds()?,
+                self.clock
+                    .unix_millis()
+                    .map(chio_security_types::clock::UnixMillis::as_secs)?,
                 true,
             )
         })?;
@@ -722,7 +722,10 @@ impl BrokerIpcHandler for BrokerDaemonHandler {
     fn execute(&self, request: AuthenticatedIpcRequest) -> Result<IpcResponse> {
         self.validate_envelope(&request, IpcOperation::Execute)?;
         let execute: BrokerExecuteRequest = decode_canonical_payload(&request.payload)?;
-        let now_unix_seconds = self.clock.now_unix_seconds()?;
+        let now_unix_seconds = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::as_secs)?;
         canonical_json_bytes(&execute.proof)
             .map_err(|error| {
                 BrokerError::InvalidRequest(format!("request proof encoding failed: {error}"))
@@ -767,7 +770,12 @@ impl BrokerIpcHandler for BrokerDaemonHandler {
             &execute,
             &trusted,
             now_unix_seconds,
-            &|| self.clock.now_unix_seconds(),
+            &|| {
+                self.clock
+                    .unix_millis()
+                    .map(chio_security_types::clock::UnixMillis::as_secs)
+                    .map_err(BrokerError::from)
+            },
         )? {
             BrokerExecuteOutcome::Success(response) => {
                 accepted_response(IpcOperation::Execute, response.as_ref())
@@ -907,7 +915,7 @@ mod tests {
         BROKER_CAPABILITY_SCHEMA, BROKER_EXECUTE_SCHEMA,
     };
     use crate::provider::{CredentialPlacement, GenericCredentialProvider};
-    use crate::provision::{AdminClock, GovernedAdminAuthorizationEnvelope, GovernedAdminPolicy};
+    use crate::provision::{GovernedAdminAuthorizationEnvelope, GovernedAdminPolicy};
     use crate::receipt::{BrokerReceiptSink, SignedBrokerFailureReceipt, SignedBrokerReceipt};
     use crate::registration::{
         broker_execute_request_registration_digest, prepared_dispatch_id,
@@ -923,15 +931,17 @@ mod tests {
 
     struct FixedClock(u64);
 
-    impl DaemonClock for FixedClock {
-        fn now_unix_seconds(&self) -> Result<u64> {
-            Ok(self.0)
-        }
-    }
-
-    impl AdminClock for FixedClock {
-        fn now_unix_seconds(&self) -> Result<u64> {
-            Ok(self.0)
+    impl chio_security_types::clock::Clock for FixedClock {
+        fn read(
+            &self,
+        ) -> core::result::Result<
+            chio_security_types::clock::ClockReading,
+            chio_security_types::clock::ClockError,
+        > {
+            let value = self.0;
+            chio_security_types::clock::Clock::read(&chio_security_types::clock::FixedClock::new(
+                value,
+            ))
         }
     }
 

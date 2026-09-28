@@ -1,16 +1,16 @@
+use chio_security_types::clock as trusted_time;
 // RPC completion can cross a clock tick after the caller sampled request time.
 struct AuthorityTestClock {
     now: AtomicU64,
     unavailable: AtomicBool,
 }
-impl crate::daemon::DaemonClock for AuthorityTestClock {
-    fn now_unix_seconds(&self) -> Result<u64> {
+impl trusted_time::Clock for AuthorityTestClock {
+    fn read(&self) -> core::result::Result<trusted_time::ClockReading, trusted_time::ClockError> {
         if self.unavailable.load(Ordering::SeqCst) {
-            return Err(BrokerError::AuthorityUnavailable(
-                "clock unavailable".into(),
-            ));
+            return Err(trusted_time::ClockError::Unavailable);
         }
-        Ok(self.now.load(Ordering::SeqCst))
+        let value = self.now.load(Ordering::SeqCst);
+        trusted_time::Clock::read(&trusted_time::FixedClock::new(value))
     }
 }
 

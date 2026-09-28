@@ -2,6 +2,7 @@
 
 extern crate alloc;
 
+pub mod clock;
 pub mod deception;
 pub mod declassification;
 pub mod event;
@@ -13,6 +14,7 @@ pub mod response_dispatch;
 mod response_domains;
 pub mod response_execution;
 pub mod response_simulation;
+pub mod response_state;
 
 pub use response_dispatch::DispatchRejection;
 pub use response_execution::{
@@ -75,3 +77,6 @@ pub use response::{
     ResponseTransitionRecord, MAX_RESPONSE_EFFECTS, MAX_RESPONSE_MUTATIONS,
     RESPONSE_STATE_SCHEMA_VERSION,
 };
+
+#[cfg(kani)]
+pub mod kani_public_harnesses;

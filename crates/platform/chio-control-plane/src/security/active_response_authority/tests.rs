@@ -814,6 +814,57 @@ mod linux_uds {
     }
 
     #[test]
+    fn protocol_server_rechecks_freshness_before_reserving_verified_request() {
+        struct JumpAtReservation(std::sync::atomic::AtomicUsize);
+        impl chio_security_types::clock::Clock for JumpAtReservation {
+            fn read(
+                &self,
+            ) -> Result<
+                chio_security_types::clock::ClockReading,
+                chio_security_types::clock::ClockError,
+            > {
+                let call = self.0.fetch_add(1, Ordering::SeqCst);
+                chio_security_types::clock::Clock::read(
+                    &chio_security_types::clock::FixedClock::new(if call >= 5 {
+                        1006
+                    } else {
+                        1000
+                    }),
+                )
+            }
+        }
+        let authority = Keypair::from_seed(&[52_u8; 32]);
+        let server = protocol_server(authority.clone(), None).with_clock(Arc::new(
+            JumpAtReservation(std::sync::atomic::AtomicUsize::new(0)),
+        ));
+        let client = test_client(client_config(
+            PathBuf::from("/run/chio/unused.sock"),
+            authority.public_key(),
+        ));
+        let request = client
+            .sign_request(ActiveResponseAuthorityOperation::Health, 1000)
+            .test_expect("signed request before the forward step");
+        let bytes = canonical_json_bytes(&request).test_expect("canonical request");
+        let (mut peer, stream) = UnixStream::pair().test_expect("protocol stream");
+        write_bounded_frame(
+            &mut peer,
+            &bytes,
+            super::MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES,
+        )
+        .test_expect("complete inbound frame");
+        assert_eq!(
+            server
+                .serve_one(stream)
+                .test_expect("classified stale request"),
+            ActiveResponseAuthorityServeOutcome::ClientFault {
+                kind: PortErrorKind::IntegrityFailure,
+                code: ErrorCode::new("urn:chio:error:transport:response-authority-freshness")
+                    .test_expect("registered reason"),
+            }
+        );
+    }
+
+    #[test]
     fn protocol_server_surfaces_internal_handler_failure_to_supervision() {
         let authority = Keypair::from_seed(&[54_u8; 32]);
         let signer: Arc<dyn SigningBackend> = Arc::new(Ed25519Backend::new(authority.clone()));
@@ -926,7 +977,13 @@ mod linux_uds {
         for _ in 0..32 {
             match connect_unix_stream_before(
                 &socket_path,
-                Instant::now() + Duration::from_millis(20),
+                chio_security_types::clock::Clock::monotonic(
+                    &chio_security_types::clock::SystemClock,
+                )
+                .unwrap_or_else(|e| panic!("clock: {e}"))
+                .checked_add(Duration::from_millis(20))
+                .unwrap_or_else(|e| panic!("deadline: {e}")),
+                &chio_security_types::clock::SystemClock,
             ) {
                 Ok(stream) => queued.push(stream),
                 Err(_) => break,
@@ -935,11 +992,21 @@ mod linux_uds {
         assert!(!queued.is_empty());
         assert!(queued.len() < 32);
         let started = Instant::now();
-        assert!(connect_unix_stream_before(
-            &socket_path,
-            Instant::now() + Duration::from_millis(60),
-        )
-        .is_err());
+        assert_eq!(
+            connect_unix_stream_before(
+                &socket_path,
+                chio_security_types::clock::Clock::monotonic(
+                    &chio_security_types::clock::SystemClock
+                )
+                .unwrap_or_else(|e| panic!("clock: {e}"))
+                .checked_add(Duration::from_millis(60))
+                .unwrap_or_else(|e| panic!("deadline: {e}")),
+                &chio_security_types::clock::SystemClock,
+            )
+            .err()
+            .map(|error| error.kind()),
+            Some(chio_security_types::ports::PortErrorKind::Unavailable)
+        );
         assert!(started.elapsed() < Duration::from_millis(500));
     }
 }

@@ -184,7 +184,7 @@ fn run_capture_through_with_clearance(
         fixture.binding.clone(),
         super::super::registry(egress, clearance)?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     fixture
@@ -263,7 +263,7 @@ fn native_atomic_capture_faults_roll_back_budget_and_operation_together() -> Tes
                 fixture.binding.clone(),
                 super::super::registry(egress, InformationLabel::bottom())?,
                 Arc::new(CountingEmptyClassifier::new()),
-                Arc::new(Clock::default()),
+                Arc::new(FlowTestClock::default()),
                 flow_config(),
             )?);
             fixture

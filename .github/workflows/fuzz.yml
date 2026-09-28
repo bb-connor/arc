@@ -140,6 +140,8 @@ jobs:
           - fuzz_merkle_checkpoint
           - federation_trust_establishment
           - finding_worker_protocol
+          - response_authority_protocol
+          - response_lifecycle
           - underwriting_policy_input
           - revocation_oracle_merkle
           - rollback_anchor_slots
@@ -203,7 +205,11 @@ jobs:
           set -euo pipefail
           cargo metadata --locked --manifest-path fuzz/Cargo.toml --format-version 1 --no-deps >/dev/null
           cd fuzz
-          cargo +nightly fuzz build --sanitizer address ${{ matrix.target }}
+          features=""
+          case "${{ matrix.target }}" in
+            response_authority_protocol|response_lifecycle) features="${{ matrix.target }}" ;;
+          esac
+          cargo +nightly fuzz build --sanitizer address --features "$features" ${{ matrix.target }}
 
       - name: Run fuzz target (ASan, max_total_time = ${{ env.CHIO_FUZZ_MAX_TOTAL_TIME }}s)
         if: steps.select.outputs.selected == 'true' && steps.confirm.outputs.exists == 'true'
@@ -216,7 +222,11 @@ jobs:
           #   -rss_limit_mb=2048 : per-target RSS ceiling
           # The corpus dir under fuzz/corpus/<target>/ seeds the run; if
           # the dir is empty libFuzzer starts from scratch.
-          cargo +nightly fuzz run \
+          features=""
+          case "${{ matrix.target }}" in
+            response_authority_protocol|response_lifecycle) features="${{ matrix.target }}" ;;
+          esac
+          cargo +nightly fuzz run --features "$features" \
             --sanitizer address \
             ${{ matrix.target }} \
             -- \

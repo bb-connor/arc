@@ -108,19 +108,28 @@ pub(super) fn now_ms() -> PortResult<u64> {
 }
 
 #[derive(Default)]
-pub(super) struct Clock {
+pub(super) struct FlowTestClock {
     pub mode: AtomicUsize,
 }
 
-impl SecurityClock for Clock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        match self.mode.load(Ordering::SeqCst) {
+impl chio_security_types::clock::Clock for FlowTestClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value: PortResult<u64> = (|| match self.mode.load(Ordering::SeqCst) {
             0 => now_ms(),
             1 => Ok(0),
             2 => Ok((1_u64 << 53) - 1),
             3 => panic!("native policy clock panic"),
             _ => Err(PortError::unavailable()),
-        }
+        })();
+        let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 

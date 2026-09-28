@@ -1097,7 +1097,7 @@
         findings: &[AuthoritativeCorrelatedFindingEvidence],
         policy: Arc<dyn AttestedFindingResponsePolicyPlanner>,
         coordinator: Arc<dyn AttestedFindingResponseCoordinator>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
     ) -> DurableAttestedFindingBatchPlanner {
         DurableAttestedFindingBatchPlanner::new(
             Arc::clone(&store) as Arc<dyn AttestedFindingBatchStore>,
@@ -1484,7 +1484,7 @@
                 false,
                 Arc::clone(&effects),
             )),
-            Arc::clone(&clock) as Arc<dyn SecurityClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
         );
         let report = plan_only
             .resume_incomplete_pass(1)
@@ -1508,7 +1508,7 @@
                 false,
                 Arc::clone(&effects),
             )),
-            Arc::clone(&clock) as Arc<dyn SecurityClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
         );
         assert!(fail_prepare.resume_incomplete_pass(1).is_err());
         let artifact_bound = store
@@ -1530,7 +1530,7 @@
                 true,
                 Arc::clone(&effects),
             )),
-            Arc::clone(&clock) as Arc<dyn SecurityClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
         );
         assert!(fail_execute.resume_incomplete_pass(1).is_err());
         let prepared = store
@@ -1555,7 +1555,7 @@
                 false,
                 Arc::clone(&effects),
             )),
-            Arc::clone(&clock) as Arc<dyn SecurityClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
         );
         recovered
             .resume_incomplete_pass(1)

@@ -96,9 +96,17 @@ fn seed(path: &std::path::Path) -> TestResult<SqliteSecurityStateStore> {
 
 struct HistoryClock;
 
-impl crate::security_state::SecurityStateClock for HistoryClock {
-    fn now_unix_ms(&self) -> chio_security_types::ports::PortResult<u64> {
-        Ok(1_000)
+impl chio_security_types::clock::Clock for HistoryClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = 1_000;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 

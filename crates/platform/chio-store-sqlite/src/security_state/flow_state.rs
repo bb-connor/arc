@@ -199,7 +199,7 @@ impl SecurityStateWriteTransaction<'_> {
     pub(in super::super) fn acquire_egress_fence(
         self,
         request: &EgressFenceRequest,
-        clock: &dyn SecurityStateClock,
+        clock: &dyn Clock,
     ) -> PortResult<(Self, EgressFence)> {
         let fence = FlowMutation::legacy(self.transaction())
             .acquire_egress_fence(request, || {
@@ -211,7 +211,7 @@ impl SecurityStateWriteTransaction<'_> {
     pub(in super::super) fn commit_egress_fence(
         self,
         commitment: &EgressFenceCommit,
-        clock: &dyn SecurityStateClock,
+        clock: &dyn Clock,
     ) -> PortResult<(Self, CommittedEgressFence)> {
         let committed = FlowMutation::legacy(self.transaction())
             .commit_egress_fence(commitment, || {

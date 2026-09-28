@@ -499,3 +499,36 @@ timeout_secs = 1800
 lane = "pr"
 features = ["kani"]
 notes = "Production M5 arithmetic core: full-width overflow and signed-cap failures reject; successful awards are live-bond capped and exact-sum over three ordered buyer harms in a fixed 1:2:3 ratio plus the community fund."
+
+[[harness]]
+crate = "chio-security-types"
+harness = "clock_fence_preserves_last_success_on_regression"
+lane = "pr"
+default_unwind = 4
+timeout_secs = 60
+unwinding_checks = true
+
+[[harness]]
+crate = "chio-security-types"
+harness = "authority_deadline_never_extends_on_retry"
+lane = "pr"
+default_unwind = 4
+timeout_secs = 60
+unwinding_checks = true
+
+[[harness]]
+crate = "chio-security-types"
+harness = "future_skew_uses_checked_full_width_arithmetic"
+lane = "pr"
+default_unwind = 4
+timeout_secs = 60
+unwinding_checks = true
+
+[[harness]]
+crate = "chio-security-types"
+harness = "response_terminal_states_and_clean_rollback_are_closed"
+lane = "pr"
+default_unwind = 4
+timeout_secs = 60
+unwinding_checks = true
+primary_rust_symbol = "chio_security_types::response_state::is_legal_response_transition"

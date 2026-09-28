@@ -198,7 +198,10 @@ fn verify_capability_base(
     }
 
     // Time-bound check.
-    let now = clock.now_unix_secs();
+    let now = clock
+        .unix_millis()
+        .map_err(|error| CapabilityError::Internal(error.to_string()))?
+        .as_secs();
     match classify_time_window(now, token.issued_at, token.expires_at) {
         TimeWindowStatus::Valid => {}
         TimeWindowStatus::NotYetValid => return Err(CapabilityError::NotYetValid),

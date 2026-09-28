@@ -5,7 +5,7 @@ use super::*;
 pub(super) struct FlowPolicyView<'a> {
     pub manifests: &'a VerifiedManifestRegistry,
     pub classifier: &'a dyn ClassificationPort,
-    pub clock: &'a dyn SecurityClock,
+    pub clock: &'a dyn Clock,
     pub config: &'a FlowResolverConfig,
 }
 
@@ -61,7 +61,8 @@ impl<'a> FlowPolicyView<'a> {
             .map_err(|_| FlowDenial::StateOverflow)?;
         let now_unix_ms = self
             .clock
-            .now_unix_ms()
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
             .map_err(|_| FlowDenial::StateChanged)?;
         let capability_id = RecordId::new(input.request.capability.id.clone())
             .map_err(|_| FlowDenial::InvalidManifest)?;

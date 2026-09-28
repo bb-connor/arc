@@ -4,9 +4,9 @@ use chio_core_types::{Hash, PublicKey, SigningAlgorithm};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    derive_key_id, AnchorId, ArtifactTimeEvidence, ArtifactTimeVerifier, AuthorityId, EventId,
-    KeyId, KeyLogOperation, KeyringError, LogId, RecoveryAuthorizerId, RecoveryPolicyId, Result,
-    SignedKeyActivationCommit, SignedKeyLogCheckpoint, SignedKeyLogEvent, TrustedClock, WitnessId,
+    derive_key_id, AnchorId, ArtifactTimeEvidence, ArtifactTimeVerifier, AuthorityId, Clock,
+    EventId, KeyId, KeyLogOperation, KeyringError, LogId, RecoveryAuthorizerId, RecoveryPolicyId,
+    Result, SignedKeyActivationCommit, SignedKeyLogCheckpoint, SignedKeyLogEvent, WitnessId,
     WitnessRosterId, MAX_RECOVERY_AUTHORIZATIONS, MAX_WITNESS_SIGNATURES,
 };
 
@@ -264,7 +264,7 @@ impl KeyLogPolicy {
 
     pub fn artifact_time_verifier(
         &self,
-        clock: std::sync::Arc<dyn TrustedClock>,
+        clock: std::sync::Arc<dyn Clock>,
         max_future_skew: u64,
     ) -> Result<ArtifactTimeVerifier> {
         ArtifactTimeVerifier::new(

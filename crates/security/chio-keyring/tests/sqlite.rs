@@ -35,9 +35,17 @@ struct Fixture {
 
 struct FixedClock(u64);
 
-impl chio_keyring::TrustedClock for FixedClock {
-    fn now(&self) -> chio_keyring::Result<u64> {
-        Ok(self.0)
+impl chio_security_types::clock::Clock for FixedClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = self.0;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 
@@ -49,9 +57,17 @@ impl MutableClock {
     }
 }
 
-impl chio_keyring::TrustedClock for MutableClock {
-    fn now(&self) -> chio_keyring::Result<u64> {
-        Ok(self.0.load(Ordering::SeqCst))
+impl chio_security_types::clock::Clock for MutableClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = self.0.load(Ordering::SeqCst);
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 

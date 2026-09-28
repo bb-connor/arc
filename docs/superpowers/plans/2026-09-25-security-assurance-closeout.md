@@ -12,7 +12,7 @@
 
 **Extended by:** the [engineering excellence addendum](2026-09-26-security-engineering-excellence.md), which adds Packet 0 (build, gate and measurement integrity) before Packet 1, corrections 1A to 1E inside Packet 1, corrections 2A, 2B, 3A, 4A and 4B with their parent packets, and Packets 7 (structural remediation), 8 (accounting type safety), 9 (measurement and hot-path cost) and 10 (state recovery and isolation boundaries) after Packet 6. Its findings are in code quality review [pass 1](../../reviews/2026-09-26-security-code-quality-review.md) (Q series), [pass 2](../../reviews/2026-09-26-security-code-quality-review-pass-2.md) (R series), [performance pass 3](../../reviews/2026-09-26-security-performance-review-pass-3.md) (P series) [pass 4](../../reviews/2026-09-26-security-review-pass-4.md) (S series), the [unrepresentable-defects design](../specs/2026-09-26-unrepresentable-defects-design.md) (pass 5) and the [pass 6](../../reviews/2026-09-26-review-validation-pass-6.md) and [pass 7](../../reviews/2026-09-26-review-validation-pass-7.md) validations; its standing rules are the [security engineering standard](../../security/engineering-standard.md). Read the revised execution order there before starting a packet.
 
-**Read correction 1D first.** Packet 1's exit requires negative tests that distinguish missing approval, expired approval, stale scope, overlap, both expiry orders, rollback conflict and cross-mode replay. All of those currently reject with the single value `StateMachineError::InvalidDispatch`, so that corpus cannot demonstrate what it claims until rejection provenance is restored. Writing it first means rewriting it.
+**Read correction 1D first.** Packet 1's exit requires negative tests that distinguish missing approval, expired approval, stale scope, overlap, both expiry orders, rollback conflict and cross-mode replay. The original snapshot collapsed those failures into `StateMachineError::InvalidDispatch`. The current dispatch discriminants and registered evidence codes are recorded in the [shared clock and response batch](../../reviews/2026-09-27-shared-clock-response-assurance.md); broader rejection-source and mutation coverage remains open.
 
 ## Global constraints
 
@@ -103,12 +103,22 @@ Foundation integration retains the original steps 1-4 acceptance boundary. Once 
 
 **Owners:** `fuzz/Cargo.toml`, `fuzz/fuzz_targets/`, production fuzz entry points, `formal/proof-manifest.toml`, `formal/rust-verification/`, `formal/apalache/`, and the existing trace-validation surface.
 
-- [ ] Add two focused harnesses: `response_authority_protocol` for bounded authenticated-envelope decoding/validation, and `response_lifecycle` for generated plan/apply/expire/rollback/restart sequences. Use actual production validation and transition functions. Seed with valid signed fixtures and valid plans so campaigns reach meaningful states; mutate binding fields and ordering as well as raw bytes.
-- [ ] Assert semantic oracles: a malformed/rebound envelope grants no authority; dry-run never enters live execution; partial rollback cannot report a clean lift; removing one contribution preserves overlapping restrictions. Minimize every finding into a Rust regression and retained corpus seed.
-- [ ] Run time-bounded sanitizer campaigns with the existing pinned toolchains and resource budgets. Record target, source, duration, corpus and crash artifacts. Include new targets in existing inventory/CI selection; a successful build is not a campaign.
-- [ ] Extend bounded Kani checks for production pure authorization/transition helpers introduced or changed by these packets. Keep overflow and unwinding assertions enabled; record domain bounds. Preserve existing Lean algebra and canonicalization obligations when their code changes.
+- [x] Add two focused harnesses: `response_authority_protocol` for bounded authenticated-envelope decoding/validation, and `response_lifecycle` for generated plan/apply/expire/rollback/restart sequences. Use actual production validation and transition functions. Seed with valid signed fixtures and valid plans so campaigns reach meaningful states; mutate binding fields and ordering as well as raw bytes.
+- [x] Assert semantic oracles: a malformed/rebound envelope grants no authority; dry-run never enters live execution; partial rollback cannot report a clean lift; removing one contribution preserves overlapping restrictions. Minimize every finding into a Rust regression and retained corpus seed.
+- [x] Run time-bounded sanitizer campaigns with the existing pinned toolchains and resource budgets. Record target, source, duration, corpus and crash artifacts. Include new targets in existing inventory/CI selection; a successful build is not a campaign.
+- [x] Extend bounded Kani checks for production pure authorization/transition helpers introduced or changed by these packets. Keep overflow and unwinding assertions enabled; record domain bounds. Preserve existing Lean algebra and canonicalization obligations when their code changes.
 - [ ] Add a response lifecycle model covering overlapping actions, owner loss, partial acknowledgement, expiry and rollback. Validate corresponding production traces at the actual commit/effect/receipt boundaries. Require positive exploration plus caught negative mutations for dry-run isolation, no false clean rollback and truthful receipt state.
 - [ ] Resolve the existing temporal timeout in its owning lane with an explained model/state-space or implementation repair. Preserve the original failure and invariant. Distinguish bounded safety from liveness assumptions and do not equate model proofs or mirror hashes with full Rust verification.
+
+**Checkpoint (September 27):** The [shared clock and response batch](../../reviews/2026-09-27-shared-clock-response-assurance.md)
+delivers both production-entry targets and valid seeds, deterministic lifecycle
+properties, four production-source Kani checks, the finite lifecycle model and
+its eight counterexamples, and bounded propagation checks. Committed mutation
+traces are checked locally; full external-effect/receipt refinement remains
+outside that claim. The original larger temporal timeout is still unverified.
+Final local evidence includes 607 distinct owning tests, a browser wasm target
+check, four actual-crate Kani proofs, nine lifecycle model outcomes and two
+bounded sanitizer campaigns. This does not close the unchecked broader claims.
 
 **Exit:** New campaigns explore the changed trust boundaries and model claims identify production linkage, bounds and remaining assumptions. All existing final acceptance inventories remain required.
 

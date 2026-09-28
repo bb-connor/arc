@@ -9,7 +9,7 @@ use chio_keyring::{
     AnchorId, AuthorityId, KeyLogPin, KeyLogPolicy, KeyLogPolicyConfig, KeyLogState,
     KeyLogSyncResponse, KeyringError, LogId, RecoveryPolicyId, SignedKeyActivationCommit,
     SignedKeyEnterpriseReceipt, SignedKeyLogCheckpoint, SignedKeyLogEvent,
-    SqlitePinnedKeyLogVerifier, TrustedClock, WitnessId, WitnessRosterId, WitnessSignature,
+    SqlitePinnedKeyLogVerifier, WitnessId, WitnessRosterId, WitnessSignature,
     WitnessedActivationSet,
 };
 use serde::Deserialize;
@@ -70,9 +70,17 @@ struct MutationExpectation {
 
 struct FixedClock(u64);
 
-impl TrustedClock for FixedClock {
-    fn now(&self) -> chio_keyring::Result<u64> {
-        Ok(self.0)
+impl chio_security_types::clock::Clock for FixedClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = self.0;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 

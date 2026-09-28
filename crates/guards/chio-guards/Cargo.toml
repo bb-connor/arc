@@ -16,6 +16,7 @@ public_entrypoint = true
 name = "chio_guards"
 
 [dependencies]
+chio-security-types = { workspace = true, features = ["std"] }
 chio-kernel = { workspace = true }
 chio-core = { workspace = true }
 chio-http-session = { workspace = true }

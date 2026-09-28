@@ -1215,9 +1215,7 @@ impl IndependentKeyLogServices {
 
 fn readiness_nonce_prefix() -> Result<String> {
     let counter = READINESS_NONCE_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let elapsed = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|_| KeyringError::InvalidTimeOrdering)?;
+    let now = crate::Clock::unix_millis(&crate::SystemClock)?;
     #[cfg(unix)]
     let entropy = {
         let mut random = [0_u8; 32];
@@ -1232,7 +1230,7 @@ fn readiness_nonce_prefix() -> Result<String> {
     Ok(format!(
         "readiness.{}.{}.{}.{}",
         std::process::id(),
-        elapsed.as_nanos(),
+        now.get(),
         counter,
         entropy
     ))

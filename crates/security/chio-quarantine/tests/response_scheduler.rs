@@ -795,7 +795,7 @@ fn scheduler_ttl_unknown_effect_outcome_retries_and_pages_without_false_completi
         assert!(matches!(
             outcomes.as_slice(),
             [SchedulerWorkOutcome::RetryScheduled { error_code, .. }]
-                if error_code.as_str() == "response.effect_outcome_unknown"
+                if error_code.as_str() == "urn:chio:error:kernel:response-executor-effect-outcome-unknown"
         ));
     }
     assert_eq!(health.pages(), 1);
@@ -1184,4 +1184,43 @@ fn scheduler_fencing_substituted_terminal_record_never_releases_claimed_action()
     ));
     assert!(store.work().is_some());
     assert!(store.retry().is_none());
+}
+
+#[test]
+fn dispatch_rejection_survives_retry_and_operator_evidence(
+) -> Result<(), Box<dyn std::error::Error>> {
+    struct RejectedExecutor;
+    impl ScheduledResponseExecutor for RejectedExecutor {
+        fn execute_scheduled(
+            &self,
+            _: &ResponsePlanRecord,
+            _: &ScheduledWork,
+            _: u64,
+        ) -> Result<ResponsePlanRecord, ExecutorError> {
+            Err(chio_quarantine::StateMachineError::InvalidDispatch(
+                chio_security_types::DispatchRejection::CapabilityDigestMismatch,
+            )
+            .into())
+        }
+    }
+    let store = Arc::new(SchedulerStore::default());
+    let _planned = plan(Arc::clone(&store));
+    let health = Arc::new(TestHealthSink::default());
+    let scheduler = ResponseScheduler::new(
+        Arc::clone(&store),
+        Arc::new(RejectedExecutor),
+        Arc::clone(&health),
+        policy(),
+    )?;
+    scheduler.tick(&tick(1000, "named-refusal"))?;
+    scheduler.tick(&tick(1060, "named-refusal-page"))?;
+    let expected = "urn:chio:error:kernel:response-dispatch-capability-digest-mismatch";
+    let retry = store.retry().ok_or("missing retry")?;
+    assert_eq!(retry.last_error.as_str(), expected);
+    let pages = health.state.lock().map_err(|_| "health lock")?;
+    let page = pages.pages.values().next().ok_or("missing operator page")?;
+    let body = serde_json::to_value(page)?;
+    assert!(body.to_string().contains(expected));
+    assert_eq!(pages.pages.len(), 1);
+    Ok(())
 }

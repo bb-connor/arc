@@ -563,14 +563,6 @@
         receipt_signer: Arc<dyn SigningBackend>,
     }
 
-    struct AuditClock;
-
-    impl crate::provision::AdminClock for AuditClock {
-        fn now_unix_seconds(&self) -> Result<u64> {
-            Ok(20)
-        }
-    }
-
     fn fixture(maximum_executions: u32, fail_transport: bool, deny_capture: bool) -> Fixture {
         let attempts = Arc::new(SqliteAttemptStore::open_in_memory().test_expect("attempt store"));
         let receipts = Arc::new(Mutex::new(Vec::new()));
@@ -651,7 +643,7 @@
                     maximum_token_lifetime_seconds: 300,
                 },
                 receipt_signer.public_key(),
-                Arc::new(AuditClock),
+                Arc::new(trusted_time::FixedClock::new(20)),
             )
             .test_expect("audit admin authorizer"),
         );

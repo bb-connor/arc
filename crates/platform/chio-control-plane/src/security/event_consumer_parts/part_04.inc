@@ -4,7 +4,7 @@ pub struct DurableAttestedFindingBatchPlanner {
     finding_authority: Arc<dyn ActiveResponseFindingAuthority>,
     policy: Arc<dyn AttestedFindingResponsePolicyPlanner>,
     coordinator: Arc<dyn AttestedFindingResponseCoordinator>,
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
 }
 
 const MAX_ATTESTED_FINDING_STARTUP_RECOVERY_RECORDS: u64 = 1_000_000;
@@ -83,7 +83,7 @@ impl DurableAttestedFindingBatchPlanner {
         finding_authority: Arc<dyn ActiveResponseFindingAuthority>,
         policy: Arc<dyn AttestedFindingResponsePolicyPlanner>,
         coordinator: Arc<dyn AttestedFindingResponseCoordinator>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
     ) -> PortResult<Self> {
         batch_store.ensure_attested_finding_batches_ready()?;
         outbox_store.ensure_attested_finding_response_outbox_ready()?;
@@ -106,7 +106,9 @@ impl DurableAttestedFindingBatchPlanner {
         self.batch_store.ensure_attested_finding_batches_ready()?;
         self.outbox_store
             .ensure_attested_finding_response_outbox_ready()?;
-        self.clock.now_unix_ms()?;
+        self.clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         self.coordinator.ensure_configured()
     }
 
@@ -123,7 +125,10 @@ impl DurableAttestedFindingBatchPlanner {
         publication: &AttestedFindingBatchPublication,
     ) -> PortResult<()> {
         self.ensure_recovery_ready()?;
-        let now_unix_ms = self.clock.now_unix_ms()?;
+        let now_unix_ms = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         let mut report = AttestedFindingResponseRecoveryReport::default();
         let mut first_error = None;
         for (ordinal, binding) in publication.body.bindings.as_slice().iter().enumerate() {
@@ -230,7 +235,10 @@ impl DurableAttestedFindingBatchPlanner {
             return Err(PortError::invalid_data());
         }
         self.ensure_recovery_ready()?;
-        let now_unix_ms = self.clock.now_unix_ms()?;
+        let now_unix_ms = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         let mut report = AttestedFindingResponseRecoveryReport::default();
         let mut first_error = None;
         for pending in self
@@ -507,7 +515,7 @@ impl DurableAttestedFindingBatchPlanner {
                 .recover_simulation(&publication.body.response_plan)
             {
                 Ok(Some(simulation)) => {
-                    return self.persist_simulation(&claimed, &simulation, report)
+                    return self.persist_simulation(&claimed, &simulation, report);
                 }
                 Ok(None) => {}
                 Err(error) => return self.close_admission_failure(&claimed, error, report),
@@ -1066,7 +1074,9 @@ impl AttestedFindingBatchPlanner for DurableAttestedFindingBatchPlanner {
         self.finding_authority
             .ensure_ready()
             .map_err(map_finding_authority_error)?;
-        self.clock.now_unix_ms()?;
+        self.clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         self.policy.ensure_ready()?;
         self.coordinator.ensure_configured()
     }
@@ -1078,7 +1088,9 @@ impl AttestedFindingBatchPlanner for DurableAttestedFindingBatchPlanner {
         self.finding_authority
             .ensure_ready()
             .map_err(map_finding_authority_error)?;
-        self.clock.now_unix_ms()?;
+        self.clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         self.policy.ensure_ready()?;
         self.coordinator.ensure_ready()
     }

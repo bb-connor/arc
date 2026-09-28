@@ -136,7 +136,7 @@ impl Config {
         self.classification()?;
         BrokerQuotaVerifier::new(
             self.quota.clone(),
-            Arc::new(chio_secret_broker::daemon::SystemDaemonClock),
+            Arc::new(chio_secret_broker::daemon::SystemClock),
         )
         .map_err(error)?;
         Ok(())
@@ -412,7 +412,7 @@ fn components(host: &HostConfig) -> Result<Components, CliError> {
     }
     let verifier = BrokerQuotaVerifier::new(
         config.quota.clone(),
-        Arc::new(chio_secret_broker::daemon::SystemDaemonClock),
+        Arc::new(chio_secret_broker::daemon::SystemClock),
     )
     .map_err(error)?;
     let participant = Arc::new(
@@ -505,7 +505,7 @@ pub(super) fn connect(
         native.clone(),
         selected.registry.clone(),
         Arc::new(classifier),
-        Arc::new(chio_security_kernel::SystemSecurityClock),
+        Arc::new(chio_security_kernel::SystemClock),
         flow_config,
     )
     .map_err(error)?
@@ -597,7 +597,7 @@ impl AuthorityService {
                 _ => {
                     return Err(error(
                         "broker authority socket is live or cannot be safely recovered",
-                    ))
+                    ));
                 }
             }
         }

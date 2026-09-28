@@ -1,7 +1,5 @@
 use super::AttestedCorrelationWriter;
-use chio_core::capability::governance::{
-    GovernedApprovalToken, GovernedTransactionIntent,
-};
+use chio_core::capability::governance::{GovernedApprovalToken, GovernedTransactionIntent};
 use chio_core::capability::token::CapabilityToken;
 use chio_core::{canonical_json_bytes, sha256, Hash, PublicKey};
 use chio_core_types::receipt::body::ChioReceipt;
@@ -10,51 +8,42 @@ use chio_core_types::receipt::kinds::{
     BoundaryClass, ObservationOutcome, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
 };
 use chio_core_types::SignedSecurityEvent;
-use chio_kernel::threshold_approval::{
-    authorization_capability_hash, ThresholdApprovalProposal,
-};
+use chio_kernel::threshold_approval::{authorization_capability_hash, ThresholdApprovalProposal};
 use chio_kernel::{
     active_response_admission_artifact_payload_digest, active_response_submission_proof_digest,
-    ActiveResponseAdmissionRequest, ActiveResponseAuthorizationRequest,
-    ActiveResponseArtifactAuthorityAttestation,
-    ActiveResponseExecutionEvidence,
-    ActiveResponseExecutionOutcome,
-    ActiveResponseExecutorAuthorityIdentity,
+    ActiveResponseAdmissionRequest, ActiveResponseArtifactAuthorityAttestation,
+    ActiveResponseAuthorizationRequest, ActiveResponseExecutionEvidence,
+    ActiveResponseExecutionOutcome, ActiveResponseExecutorAuthorityIdentity,
     ActiveResponseFindingAuthority, ActiveResponseFindingAuthorityError,
-    ActiveResponseSubmissionProof,
-    AuthoritativeCorrelatedFindingEvidence, ChioKernel, KernelError,
-    DispatchCommittedActiveResponseResume, PreDispatchActiveResponseReconstruction,
+    ActiveResponseSubmissionProof, AuthoritativeCorrelatedFindingEvidence, ChioKernel,
+    DispatchCommittedActiveResponseResume, KernelError, PreDispatchActiveResponseReconstruction,
     PreparedActiveResponseAdmission,
 };
 use chio_quarantine::{
-    build_response_plan, opaque_admission_artifact, ApprovalCoordinatorError,
-    CorrelationOutcome, CorrelationPolicy, CorrelationStatus, ResponseApprovalCoordinator,
-    TemporalCorrelator, TemporalRule,
+    build_response_plan, opaque_admission_artifact, ApprovalCoordinatorError, CorrelationOutcome,
+    CorrelationPolicy, CorrelationStatus, ResponseApprovalCoordinator, TemporalCorrelator,
+    TemporalRule,
 };
-use chio_security_kernel::{SecurityClock, SecurityEventIngress};
+use chio_security_kernel::{Clock, SecurityEventIngress};
 use chio_security_types::ports::{
     derive_attested_finding_action_id, derive_attested_finding_batch_id,
     derive_attested_finding_reservation_id, validate_attested_finding_batch_body,
     AdmissionArtifactRef, ApprovalVerifierPort, AttestedFindingBatchBinding,
-    AttestedFindingBatchBindings,
-    AttestedFindingBatchBody,
-    AttestedFindingBatchKey, AttestedFindingBatchPublication, AttestedFindingBatchStore,
+    AttestedFindingBatchBindings, AttestedFindingBatchBody, AttestedFindingBatchKey,
+    AttestedFindingBatchPublication, AttestedFindingBatchStore,
     AttestedFindingResponseAdmissionState, AttestedFindingResponseCompletionOutcome,
     AttestedFindingResponseCompletionState, AttestedFindingResponseOutboxHealth,
     AttestedFindingResponseOutboxKey, AttestedFindingResponseOutboxRecord,
     AttestedFindingResponseOutboxStore, AttestedFindingResponseOutboxTransition,
     AttestedFindingResponsePlanBody, AttestedFindingResponsePlanPublication,
-    AttestedFindingResponsePlanningState,
-    CanonicalBody, CorrelationIngressStore, Digest32, ErrorCode, EventPartitionScan,
-    GovernedApprovalRequest, GovernedApprovalReservation,
+    AttestedFindingResponsePlanningState, CanonicalBody, CorrelationIngressStore, Digest32,
+    ErrorCode, EventPartitionScan, GovernedApprovalRequest, GovernedApprovalReservation,
     GovernedApprovalReservationMutation, OpaqueReceiptRef, PortError, PortErrorKind, PortResult,
-    ProducerId,
-    PreparedActiveResponseDispatchBinding,
-    ProducerTrustClass, RecordId, RuleId, SecurityEventStore, SecurityEventVerifierPort, TenantId,
-    UnverifiedSecurityEvent, VerifiedSecurityEvent,
-    ATTESTED_FINDING_BATCH_SCHEMA_VERSION, ATTESTED_FINDING_RESPONSE_INITIAL_RETRY_MS,
-    ATTESTED_FINDING_RESPONSE_MAX_RETRY_MS, ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION,
-    MAX_ATTESTED_FINDING_RESPONSE_OUTBOX_SCAN,
+    PreparedActiveResponseDispatchBinding, ProducerId, ProducerTrustClass, RecordId, RuleId,
+    SecurityEventStore, SecurityEventVerifierPort, TenantId, UnverifiedSecurityEvent,
+    VerifiedSecurityEvent, ATTESTED_FINDING_BATCH_SCHEMA_VERSION,
+    ATTESTED_FINDING_RESPONSE_INITIAL_RETRY_MS, ATTESTED_FINDING_RESPONSE_MAX_RETRY_MS,
+    ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION, MAX_ATTESTED_FINDING_RESPONSE_OUTBOX_SCAN,
 };
 #[cfg(test)]
 use chio_security_types::ports::{
@@ -116,7 +105,7 @@ pub enum SecurityEventVerifierConfigError {
 }
 
 pub struct NativeSecurityEventVerifier {
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
     trusted: BTreeMap<(TenantId, ProducerId), TrustedSecurityEventProducer>,
     trusted_receipts: BTreeMap<(TenantId, ProducerId), TrustedSecurityEventReceiptProducer>,
     max_event_age_ms: u64,
@@ -125,7 +114,7 @@ pub struct NativeSecurityEventVerifier {
 
 impl NativeSecurityEventVerifier {
     pub fn new(
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
         producers: Vec<TrustedSecurityEventProducer>,
         receipt_producers: Vec<TrustedSecurityEventReceiptProducer>,
         max_event_age_ms: u64,
@@ -164,7 +153,11 @@ impl NativeSecurityEventVerifier {
         if self.trusted.is_empty() && self.trusted_receipts.is_empty() {
             return Err(PortError::integrity_failure());
         }
-        self.clock.now_unix_ms().map(|_| ())
+        self.clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
+            .map(|_| ())
+            .map_err(PortError::from)
     }
 
     fn verify_time_bounds(
@@ -172,7 +165,10 @@ impl NativeSecurityEventVerifier {
         event_time_unix_ms: u64,
         received_at_unix_ms: u64,
     ) -> PortResult<()> {
-        let now_unix_ms = self.clock.now_unix_ms()?;
+        let now_unix_ms = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         let latest = now_unix_ms
             .checked_add(self.max_future_skew_ms)
             .ok_or_else(PortError::invalid_data)?;
@@ -340,12 +336,8 @@ impl NativeSecurityEventVerifier {
         self.ensure_ready()?;
         let body = self.parse_bound_body(event)?;
         match body.trust_class {
-            ProducerTrustClass::InternalDetector => {
-                self.verify_internal_event(event, &body, false)
-            }
-            ProducerTrustClass::VerifiedReceipt => {
-                self.verify_receipt_event(event, &body, false)
-            }
+            ProducerTrustClass::InternalDetector => self.verify_internal_event(event, &body, false),
+            ProducerTrustClass::VerifiedReceipt => self.verify_receipt_event(event, &body, false),
         }
     }
 }
@@ -678,7 +670,10 @@ impl CorrelationEventVerifier for NativeSecurityEventVerifier {
     }
 
     fn now_unix_ms(&self) -> PortResult<u64> {
-        self.clock.now_unix_ms()
+        self.clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
+            .map_err(PortError::from)
     }
 
     fn verify(&self, event: &UnverifiedSecurityEvent) -> PortResult<VerifiedSecurityEvent> {
@@ -727,18 +722,21 @@ struct RuleCorrelationOutcome {
 }
 
 fn correlation_delivery_error(outcome: &CorrelationOutcome) -> Option<PortError> {
-    outcome.detector_health.iter().find_map(|health| match health.kind {
-        chio_security_types::DetectorHealthKind::StoreUnavailable
-        | chio_security_types::DetectorHealthKind::TruncatedScan => {
-            Some(PortError::unavailable())
-        }
-        chio_security_types::DetectorHealthKind::StoreConflict => Some(PortError::conflict()),
-        chio_security_types::DetectorHealthKind::CorruptEvent
-        | chio_security_types::DetectorHealthKind::CorruptState => {
-            Some(PortError::integrity_failure())
-        }
-        chio_security_types::DetectorHealthKind::StateOverflow => None,
-    })
+    outcome
+        .detector_health
+        .iter()
+        .find_map(|health| match health.kind {
+            chio_security_types::DetectorHealthKind::StoreUnavailable
+            | chio_security_types::DetectorHealthKind::TruncatedScan => {
+                Some(PortError::unavailable())
+            }
+            chio_security_types::DetectorHealthKind::StoreConflict => Some(PortError::conflict()),
+            chio_security_types::DetectorHealthKind::CorruptEvent
+            | chio_security_types::DetectorHealthKind::CorruptState => {
+                Some(PortError::integrity_failure())
+            }
+            chio_security_types::DetectorHealthKind::StateOverflow => None,
+        })
 }
 
 struct SqliteTemporalCorrelationPort {
@@ -778,14 +776,14 @@ impl CorrelationPort for SqliteTemporalCorrelationPort {
         let tenant_id = TenantId::new("active-defense-readiness").map_err(PortError::from)?;
         let rule_id = RuleId::new("active-defense-readiness").map_err(PortError::from)?;
         self.store.scan_partition(&EventPartitionScan {
-                tenant_id: tenant_id.clone(),
-                rule_id: rule_id.clone(),
-                partition_hash: Digest32::new([0_u8; 32]),
-                after_event_time_unix_ms: None,
-                after_event_id: None,
-                through_event_time_unix_ms: 0,
-                max_results: 1,
-            })?;
+            tenant_id: tenant_id.clone(),
+            rule_id: rule_id.clone(),
+            partition_hash: Digest32::new([0_u8; 32]),
+            after_event_time_unix_ms: None,
+            after_event_id: None,
+            through_event_time_unix_ms: 0,
+            max_results: 1,
+        })?;
         self.store
             .load_correlation_outcome(&chio_security_types::ports::CorrelationOutcomeKey {
                 tenant_id,
@@ -935,29 +933,20 @@ impl ProductionCorrelationConsumer {
     }
 
     #[cfg(test)]
-    fn consume(
-        &self,
-        event: &UnverifiedSecurityEvent,
-    ) -> PortResult<CorrelationConsumerReport> {
+    fn consume(&self, event: &UnverifiedSecurityEvent) -> PortResult<CorrelationConsumerReport> {
         self.ensure_ready()?;
         let verified = self.verifier.verify(event)?;
         self.consume_verified_after_ready(&verified)
             .map(|consumed| consumed.report)
     }
 
-    fn verify_live(
-        &self,
-        event: &UnverifiedSecurityEvent,
-    ) -> PortResult<VerifiedSecurityEvent> {
+    fn verify_live(&self, event: &UnverifiedSecurityEvent) -> PortResult<VerifiedSecurityEvent> {
         let verified = self.verifier.verify(event)?;
         self.ensure_supported_policy(&verified)?;
         Ok(verified)
     }
 
-    fn verify_durable(
-        &self,
-        event: &UnverifiedSecurityEvent,
-    ) -> PortResult<VerifiedSecurityEvent> {
+    fn verify_durable(&self, event: &UnverifiedSecurityEvent) -> PortResult<VerifiedSecurityEvent> {
         self.ensure_ready()?;
         let verified = self.verifier.verify_durable(event)?;
         self.ensure_supported_policy(&verified)?;
@@ -987,9 +976,7 @@ impl ProductionCorrelationConsumer {
         verified: &VerifiedSecurityEvent,
     ) -> PortResult<CorrelationConsumption> {
         let observed_at_unix_ms = self.verifier.now_unix_ms()?;
-        let outcomes = self
-            .correlation
-            .correlate(verified, observed_at_unix_ms)?;
+        let outcomes = self.correlation.correlate(verified, observed_at_unix_ms)?;
         let mut reports = Vec::with_capacity(outcomes.len());
         let mut authoritative = Vec::new();
         let mut evidence_ids = BTreeSet::new();

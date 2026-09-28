@@ -1,0 +1,77 @@
+schema = "chio.response-lifecycle-linkage.v1"
+model = "formal/apalache/ResponseLifecycle.tla"
+config = "formal/apalache/MCResponseLifecycle.cfg"
+runtime_trace = "chio.response-runtime-trace.v1"
+claim = "Finite lifecycle abstraction, actual Rust guards and exercised runtime traces; no claim of full implementation refinement."
+
+[[hook]]
+path = "crates/security/chio-security-types/src/response_execution.rs"
+symbol = "new"
+boundary = "FreshLiveAdmission mode refusal"
+
+[[hook]]
+path = "crates/security/chio-security-types/src/response_state.rs"
+symbol = "is_legal_response_transition"
+boundary = "legal lifecycle edges"
+
+[[hook]]
+path = "crates/security/chio-security-types/src/response_state.rs"
+symbol = "rollback_effect_is_restored"
+boundary = "clean rollback prerequisite"
+
+[[hook]]
+path = "crates/security/chio-security-types/src/response.rs"
+symbol = "all_applied_reversible_effects_restored"
+boundary = "snapshot rollback guard"
+
+[[hook]]
+path = "crates/security/chio-quarantine/src/simulation.rs"
+symbol = "evaluate_response_simulation"
+boundary = "independent overlapping contributions"
+
+[[hook]]
+path = "crates/security/chio-quarantine/src/executor_proof.rs"
+symbol = "validate_dispatch_authorization"
+boundary = "bound dispatch admission"
+
+[[hook]]
+path = "crates/security/chio-quarantine/src/fuzz.rs"
+symbol = "lifecycle_seed_corpus_reaches_apply_rollback_expiry_and_restart"
+boundary = "production runtime trace emitter"
+
+[[hook]]
+path = "crates/security/chio-security-types/src/clock.rs"
+symbol = "remaining_nanos"
+boundary = "fixed retry authority window"
+
+[[negative]]
+config = "formal/apalache/_negative_tests/MCResponseLifecycleAcknowledgeUnexecutedBroken.cfg"
+falsifies = "ReceiptStateTruthful"
+
+[[negative]]
+config = "formal/apalache/_negative_tests/MCResponseLifecycleActivateUnacknowledgedBroken.cfg"
+falsifies = "ReceiptStateTruthful"
+
+[[negative]]
+config = "formal/apalache/_negative_tests/MCResponseLifecycleClearOnRemoveBroken.cfg"
+falsifies = "OverlapPreserved"
+
+[[negative]]
+config = "formal/apalache/_negative_tests/MCResponseLifecycleDryRunDispatchBroken.cfg"
+falsifies = "DryRunIsolation"
+
+[[negative]]
+config = "formal/apalache/_negative_tests/MCResponseLifecycleGuessNotExecutedBroken.cfg"
+falsifies = "ReceiptStateTruthful"
+
+[[negative]]
+config = "formal/apalache/_negative_tests/MCResponseLifecycleLiftUnrestoredBroken.cfg"
+falsifies = "NoFalseCleanLift"
+
+[[negative]]
+config = "formal/apalache/_negative_tests/MCResponseLifecycleOverlapLiftWitness.cfg"
+falsifies = "LiftedPlanClearsItsTargets"
+
+[[negative]]
+config = "formal/apalache/_negative_tests/MCResponseLifecycleTimeoutUnresolvedBroken.cfg"
+falsifies = "ReceiptStateTruthful"

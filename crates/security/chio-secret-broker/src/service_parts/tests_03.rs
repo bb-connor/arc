@@ -1545,7 +1545,7 @@ fn audit_comparison_requires_exact_runner_and_durable_one_shot_governance() {
             maximum_token_lifetime_seconds: 300,
         },
         fixture.service.receipt_signer.public_key(),
-        Arc::new(AuditClock),
+        Arc::new(trusted_time::FixedClock::new(20)),
     )
     .test_expect("reopen audit replay store");
     assert!(matches!(

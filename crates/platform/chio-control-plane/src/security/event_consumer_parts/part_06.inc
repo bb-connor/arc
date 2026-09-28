@@ -470,7 +470,7 @@
             Arc::clone(&effects),
             receipts,
             alerts,
-            Arc::clone(&clock) as Arc<dyn SecurityClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
             30_000,
         )
         .unwrap_or_else(|error| panic!("construct real adapter executor: {error}"));
@@ -576,7 +576,7 @@
         let kernel = Arc::new(kernel);
         let coordinator = Arc::new(KernelAttestedFindingResponseCoordinator::new_unbound(
             executor_identity,
-            Arc::clone(&clock) as Arc<dyn SecurityClock>,
+            Arc::clone(&clock) as Arc<dyn Clock>,
             super::super::ActiveResponseExecutionProfile::Live,
         ));
         coordinator
@@ -1067,7 +1067,7 @@
 
         let recreated = Arc::new(KernelAttestedFindingResponseCoordinator::new_unbound(
             fixture.runtime.executor.identity(),
-            Arc::clone(&fixture.clock) as Arc<dyn SecurityClock>,
+            Arc::clone(&fixture.clock) as Arc<dyn Clock>,
             super::super::ActiveResponseExecutionProfile::Live,
         ));
         recreated

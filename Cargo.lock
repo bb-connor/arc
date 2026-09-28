@@ -3371,6 +3371,7 @@ dependencies = [
  "chio-fincred",
  "chio-reputation",
  "chio-revocation-oracle",
+ "chio-security-types",
  "chio-spec-validate",
  "chio-test-support",
  "chrono",
@@ -4052,6 +4053,7 @@ dependencies = [
  "chio-core",
  "chio-http-session",
  "chio-kernel",
+ "chio-security-types",
  "chio-store-sqlite",
  "glob",
  "lru 0.18.2",
@@ -4213,6 +4215,7 @@ dependencies = [
  "arc-swap",
  "chio-adversarial-suite",
  "chio-core-types",
+ "chio-security-types",
  "dudect-bencher",
  "proptest",
  "serde",
@@ -4240,6 +4243,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "chio-secure-ipc",
+ "chio-security-types",
  "chio-test-support",
  "rusqlite",
  "rustix",
@@ -4788,6 +4792,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]

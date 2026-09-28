@@ -15,17 +15,16 @@ use chio_core::receipt::security::{
 };
 use chio_data_guards::{FindingLocation, StructuredClassifier};
 use chio_flow::{
-    canonical_request_hash,
-    information_label_hash, prepare_egress_fence, prepare_pre_invocation, verify_declassification,
-    CategoryLabelMap, DeclassificationDispatchOutcome, DeclassificationError,
-    DeclassificationVerificationRequest, FlowAdmission, FlowDenial, InformationFlowLattice,
-    PostInvocationFlow, ResolvedFlowRequest,
+    canonical_request_hash, information_label_hash, prepare_egress_fence, prepare_pre_invocation,
+    verify_declassification, CategoryLabelMap, DeclassificationDispatchOutcome,
+    DeclassificationError, DeclassificationVerificationRequest, FlowAdmission, FlowDenial,
+    InformationFlowLattice, PostInvocationFlow, ResolvedFlowRequest,
 };
 use chio_manifest::{AdmittedToolSecurity, BridgeSecurityMetadata, VerifiedManifestRegistry};
 use chio_security_kernel::{
-    FlowDispatchOutcomeRecorder, FlowPostInvocationInput, FlowPostInvocationResolver,
+    Clock, FlowDispatchOutcomeRecorder, FlowPostInvocationInput, FlowPostInvocationResolver,
     FlowPreDispatchInput, FlowPreDispatchPort, FlowPreInvocationInput, FlowPreInvocationPort,
-    FlowPreInvocationResolver, SecurityClock, SystemSecurityClock,
+    FlowPreInvocationResolver, SystemClock,
 };
 use chio_security_types::flow::DeclassificationPurpose;
 use chio_security_types::ports::{
@@ -193,7 +192,7 @@ pub struct PersistentFlowResolver {
     manifests: Arc<VerifiedManifestRegistry>,
     state: Arc<dyn FlowStateStore>,
     classifier: Arc<dyn ClassificationPort>,
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
     config: FlowResolverConfig,
 }
 
@@ -222,7 +221,7 @@ pub struct DeclassificationCompactionReport {
 pub struct DeclassificationReceiptOutboxDrainer {
     store: Arc<dyn DeclassificationEvidenceCommitStore>,
     sink: Arc<dyn ExactSecurityReceiptSink>,
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
 }
 
 impl DeclassificationReceiptOutboxDrainer {
@@ -230,13 +229,13 @@ impl DeclassificationReceiptOutboxDrainer {
         store: Arc<dyn DeclassificationEvidenceCommitStore>,
         sink: Arc<dyn ExactSecurityReceiptSink>,
     ) -> PortResult<Self> {
-        Self::new_with_clock(store, sink, Arc::new(SystemSecurityClock))
+        Self::new_with_clock(store, sink, Arc::new(SystemClock))
     }
 
     pub fn new_with_clock(
         store: Arc<dyn DeclassificationEvidenceCommitStore>,
         sink: Arc<dyn ExactSecurityReceiptSink>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
     ) -> PortResult<Self> {
         let drainer = Self { store, sink, clock };
         drainer.ensure_ready()?;
@@ -317,7 +316,10 @@ impl DeclassificationReceiptOutboxDrainer {
                     },
                 )
             };
-            let recovery_time_unix_ms = self.clock.now_unix_ms()?;
+            let recovery_time_unix_ms = self
+                .clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)?;
             if recovery_time_unix_ms < consumption.receipt.occurred_at_unix_ms {
                 return Err(PortError::integrity_failure());
             }
@@ -370,7 +372,10 @@ impl DeclassificationReceiptOutboxDrainer {
         if max_receipts == 0 || max_receipts > MAX_DECLASSIFICATION_EVIDENCE_BATCH {
             return Err(PortError::invalid_data());
         }
-        let now_unix_ms = self.clock.now_unix_ms()?;
+        let now_unix_ms = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         let pending = self
             .store
             .load_pending_declassification_evidence_batch(now_unix_ms, max_receipts)?;
@@ -471,7 +476,10 @@ impl DeclassificationReceiptOutboxDrainer {
         max_records: u32,
     ) -> PortResult<DeclassificationCompactionReport> {
         let readiness_cursor = self.store.declassification_evidence_readiness_cursor()?;
-        let compacted_at_unix_ms = self.clock.now_unix_ms()?;
+        let compacted_at_unix_ms = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         let candidates = self.store.load_declassification_compaction_candidates(
             &DeclassificationCompactionQuery {
                 readiness_cursor: readiness_cursor.clone(),
@@ -575,7 +583,7 @@ struct PersistentDeclassificationOutcomeRecorder {
     released: DeclassificationTransitionBinding,
     dispatch_failed: DeclassificationTransitionBinding,
     outcome_unknown_after_dispatch: DeclassificationTransitionBinding,
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
     pending_outcome: Option<PendingDeclassificationOutcome>,
     completed_outcome: Option<DeclassificationDispatchOutcome>,
 }
@@ -598,7 +606,8 @@ impl FlowDispatchOutcomeRecorder for PersistentDeclassificationOutcomeRecorder {
         if self.pending_outcome.is_none() {
             let occurred_at_unix_ms = self
                 .clock
-                .now_unix_ms()
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)
                 .map_err(|_| FlowDenial::StateChanged)?;
             let transition_binding = match outcome {
                 DeclassificationDispatchOutcome::Released => self.released.clone(),
@@ -738,7 +747,7 @@ impl PersistentFlowResolver {
         manifests: Arc<VerifiedManifestRegistry>,
         state: Arc<dyn FlowStateStore>,
         classifier: Arc<dyn ClassificationPort>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
         config: FlowResolverConfig,
     ) -> Self {
         Self {

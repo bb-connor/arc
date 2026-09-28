@@ -867,7 +867,7 @@ impl ApprovalVerifierPort for KernelActiveResponseApprovalVerifier<'_> {
 pub struct KernelAttestedFindingResponseCoordinator {
     kernel: Mutex<Option<Arc<ChioKernel>>>,
     executor_authority: ActiveResponseExecutorAuthorityIdentity,
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
     profile: super::response_simulation::ActiveResponseExecutionProfile,
 }
 
@@ -875,7 +875,7 @@ impl KernelAttestedFindingResponseCoordinator {
     #[must_use]
     pub fn new_unbound(
         executor_authority: ActiveResponseExecutorAuthorityIdentity,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
         profile: super::response_simulation::ActiveResponseExecutionProfile,
     ) -> Self {
         Self {
@@ -979,12 +979,16 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
         if self.executor_authority.generation() == 0 {
             return Err(PortError::invalid_data());
         }
-        self.clock.now_unix_ms()?;
+        self.clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         Ok(())
     }
 
     fn ensure_ready(&self) -> PortResult<()> {
-        self.clock.now_unix_ms()?;
+        self.clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         if let super::response_simulation::ActiveResponseExecutionProfile::DryRun(service) =
             &self.profile
         {
@@ -1092,7 +1096,9 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
                         plan.response_plan(),
                         &governed_request,
                         &retained,
-                        self.clock.now_unix_ms()?,
+                        self.clock
+                            .unix_millis()
+                            .map(chio_security_types::clock::UnixMillis::get)?,
                     )
                     .map_err(map_approval_coordinator_error)?;
                 let Some(reconstructed) = reconstructed else {
@@ -1180,7 +1186,9 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
                     .prepare(
                         plan.response_plan(),
                         &governed_request,
-                        self.clock.now_unix_ms()?,
+                        self.clock
+                            .unix_millis()
+                            .map(chio_security_types::clock::UnixMillis::get)?,
                     )
                     .map_err(map_approval_coordinator_error)?;
                 let prepared = coordinator.verifier().retained_prepared()?;
@@ -1287,7 +1295,9 @@ impl AttestedFindingResponseCoordinator for KernelAttestedFindingResponseCoordin
                     .commit(
                         plan.response_plan(),
                         &reservation,
-                        self.clock.now_unix_ms()?,
+                        self.clock
+                            .unix_millis()
+                            .map(chio_security_types::clock::UnixMillis::get)?,
                     )
                     .map_err(map_approval_coordinator_error)?;
                 if committed_binding != native_binding {

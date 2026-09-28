@@ -62,7 +62,6 @@ fn validate_enterprise_receipts(
     Ok(())
 }
 
-
 fn load_events_from(connection: &Connection) -> Result<Vec<SignedKeyLogEvent>> {
     let mut statement = connection.prepare(
         "SELECT sequence, event_id, CASE WHEN length(canonical_envelope) <= 1048576 THEN canonical_envelope END, envelope_hash, leaf_hash, operation FROM key_events ORDER BY sequence",
@@ -199,7 +198,7 @@ fn latest_verified_artifact_anchor_time_for_epoch(
     connection: &Connection,
     signing_epoch: u64,
     policy: &KeyLogPolicy,
-    clock: &Arc<dyn TrustedClock>,
+    clock: &Arc<dyn Clock>,
 ) -> Result<Option<u64>> {
     let mut statement = connection.prepare(
         "SELECT a.artifact_hash, CASE WHEN length(a.canonical_anchor) <= 1048576 THEN a.canonical_anchor END \
@@ -266,7 +265,7 @@ fn verify_artifact_anchor_context(
 fn verify_artifact_time_anchors(
     connection: &Connection,
     policy: &KeyLogPolicy,
-    clock: Arc<dyn TrustedClock>,
+    clock: Arc<dyn Clock>,
 ) -> Result<()> {
     let mut statement = connection
         .prepare("SELECT artifact_hash FROM key_artifact_time_anchors ORDER BY artifact_hash")?;

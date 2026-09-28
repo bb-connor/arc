@@ -1,7 +1,6 @@
 use super::*;
 use crate::security::adapters::{canonical_body, PreparedFlowDispatch};
 use chio_flow::FlowDenial;
-use chio_store_sqlite::security_state::SecurityStateClock;
 use std::sync::atomic::AtomicU64;
 
 mod evidence_callbacks {
@@ -13,15 +12,17 @@ mod evidence_callbacks {
 
 struct ControlledClock(AtomicU64);
 
-impl SecurityClock for ControlledClock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        Ok(self.0.load(Ordering::SeqCst))
-    }
-}
-
-impl SecurityStateClock for ControlledClock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
-        SecurityClock::now_unix_ms(self)
+impl chio_security_types::clock::Clock for ControlledClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = self.0.load(Ordering::SeqCst);
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 

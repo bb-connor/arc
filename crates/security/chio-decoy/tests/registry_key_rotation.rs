@@ -12,9 +12,9 @@ use chio_decoy::{
     DecoyCreateRequest, DecoyDetection, DecoyDetector, ObservationClass, PrivateDecoyRegistry,
     PrivilegedExportCredential, RegistryError, RegistryExportAuthorizer, RegistryExportGrant,
     RegistryKey, RegistryKeyProvider, SecretMaterial, TripwireObservation, TrustedWatermarkKey,
-    WatermarkClock, WatermarkIssueRequest, WatermarkIssuer, WatermarkIssuerConfig,
-    WatermarkIssuerDependencies, WatermarkIssuerPolicy, WatermarkKeyResolver, WatermarkKeyStatus,
-    WatermarkSequenceStore, WatermarkSourceContext, WatermarkSourceContextResolver,
+    WatermarkIssueRequest, WatermarkIssuer, WatermarkIssuerConfig, WatermarkIssuerDependencies,
+    WatermarkIssuerPolicy, WatermarkKeyResolver, WatermarkKeyStatus, WatermarkSequenceStore,
+    WatermarkSourceContext, WatermarkSourceContextResolver,
 };
 use chio_security_types::ports::{
     ArtifactId, BoundedVec, Digest32, PortError, PortResult, RecordId, SealedDecoyRegistryStore,
@@ -396,11 +396,18 @@ impl WatermarkKeyResolver for WatermarkKeys {
     }
 }
 
-struct Clock;
+struct TestClock;
 
-impl WatermarkClock for Clock {
-    fn now_unix_ms(&self) -> u64 {
-        150
+impl chio_security_types::clock::Clock for TestClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(150),
+        )
     }
 }
 
@@ -448,7 +455,7 @@ fn issue_watermark(registry: PrivateDecoyRegistry, marker_ref: RecordId, tenant_
                 not_after_unix_ms: 1_000,
             })),
             sequences: Arc::new(Sequences),
-            clock: Arc::new(Clock),
+            clock: Arc::new(TestClock),
         },
     );
     issuer

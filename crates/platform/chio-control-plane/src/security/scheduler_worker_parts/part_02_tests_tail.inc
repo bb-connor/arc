@@ -7,7 +7,7 @@
         let store = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(
                 &path,
-                Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+                Arc::clone(&clock) as Arc<dyn Clock>,
             )
             .unwrap_or_else(|error| panic!("rollback security store: {error}")),
         );
@@ -76,7 +76,7 @@
         let reopened = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(
                 &path,
-                Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+                Arc::clone(&clock) as Arc<dyn Clock>,
             )
             .unwrap_or_else(|error| panic!("rollback store reopen: {error}")),
         );
@@ -137,7 +137,7 @@
         let store = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(
                 directory.path().join("response-order.sqlite"),
-                Arc::clone(&clock) as Arc<dyn SecurityStateClock>,
+                Arc::clone(&clock) as Arc<dyn Clock>,
             )
             .unwrap_or_else(|error| panic!("security store: {error}")),
         );
@@ -222,7 +222,7 @@
         let failure_store = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(
                 &failure_path,
-                Arc::clone(&failure_clock) as Arc<dyn SecurityStateClock>,
+                Arc::clone(&failure_clock) as Arc<dyn Clock>,
             )
             .unwrap_or_else(|error| panic!("failure security store: {error}")),
         );

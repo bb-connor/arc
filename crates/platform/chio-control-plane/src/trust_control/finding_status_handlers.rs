@@ -690,7 +690,7 @@ pub(crate) async fn handle_get_finding_status_proof(
             return plain_http_error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 "current portable finding status proof is unavailable",
-            )
+            );
         }
         Err(error) => return status_read_error(error),
     };
@@ -876,7 +876,7 @@ pub(crate) async fn handle_submit_finding_status_intent(
             return plain_http_error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 "persisted status intent cannot be recovered",
-            )
+            );
         }
         Err(error) => return status_read_error(error),
     };
@@ -1500,9 +1500,19 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         struct FixedAdmissionClock(u64);
 
-        impl super::super::finding_status_verifier::FindingStatusAdmissionClock for FixedAdmissionClock {
-            fn now_unix_secs(&self) -> Result<u64, String> {
-                Ok(self.0)
+        impl chio_security_types::clock::Clock for FixedAdmissionClock {
+            fn read(
+                &self,
+            ) -> core::result::Result<
+                chio_security_types::clock::ClockReading,
+                chio_security_types::clock::ClockError,
+            > {
+                let value: Result<u64, String> = (|| Ok(self.0))();
+                let value =
+                    value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+                chio_security_types::clock::Clock::read(
+                    &chio_security_types::clock::FixedClock::new(value),
+                )
             }
         }
 

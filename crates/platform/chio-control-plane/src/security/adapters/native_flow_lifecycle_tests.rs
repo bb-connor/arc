@@ -10,7 +10,7 @@ fn native_captured_lifecycle_invokes_once_and_replays_the_released_receipt() -> 
             fixture.binding.clone(),
             super::super::registry(egress, InformationLabel::bottom())?,
             Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(Clock::default()),
+            Arc::new(FlowTestClock::default()),
             flow_config(),
         )?
         .with_captured_lifecycle();
@@ -206,7 +206,7 @@ fn fault_case(fault: Fault) -> TestResult {
             fixture.binding.clone(),
             super::super::registry(false, InformationLabel::bottom())?,
             Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(Clock::default()),
+            Arc::new(FlowTestClock::default()),
             flow_config(),
         )?
         .with_captured_lifecycle(),

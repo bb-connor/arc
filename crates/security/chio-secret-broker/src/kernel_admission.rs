@@ -17,7 +17,7 @@ use chio_kernel::supplemental_quota::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::daemon::DaemonClock;
+use crate::daemon::Clock;
 use crate::daemon_runtime::ProviderPlacementConfig;
 use crate::protocol::BrokerExecuteRequest;
 use crate::provider::{CredentialPlacement, GenericCredentialProvider};
@@ -53,14 +53,14 @@ pub struct BrokerQuotaVerifierConfig {
 
 pub struct BrokerQuotaVerifier {
     config: BrokerQuotaVerifierConfig,
-    clock: Arc<dyn DaemonClock>,
+    clock: Arc<dyn Clock>,
     binding: SupplementalQuotaVerifierBinding,
     normalized_destination: String,
     provider: GenericCredentialProvider,
 }
 
 impl BrokerQuotaVerifier {
-    pub fn new(config: BrokerQuotaVerifierConfig, clock: Arc<dyn DaemonClock>) -> Result<Self> {
+    pub fn new(config: BrokerQuotaVerifierConfig, clock: Arc<dyn Clock>) -> Result<Self> {
         for field in [
             &config.audience,
             &config.server_id,
@@ -139,7 +139,10 @@ impl BrokerQuotaVerifier {
         {
             return Err(rejected());
         }
-        let now = self.clock.now_unix_seconds()?;
+        let now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::as_secs)?;
         crate::capability::verify_capability(
             &execute.capability,
             &self.config.issuer,

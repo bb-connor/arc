@@ -19,13 +19,12 @@
 //!
 //! # no_std posture
 //!
-//! The crate is `no_std + alloc` by source. `wasm-bindgen`, `js-sys`,
-//! `web-sys`, and `serde-wasm-bindgen` are all host crates that would
-//! pull `std` if enabled; we gate them on `cfg(target_arch = "wasm32")`
-//! so native `cargo test -p chio-kernel-browser` does not need them and
-//! the native target compiles the pure-logic helpers alone. The wasm
-//! entry points are themselves gated behind `#[cfg(target_arch =
-//! "wasm32")]` for the same reason.
+//! The pure surface uses `no_std + alloc`. The browser clock uses `std`
+//! for its thread-local regression fence; the JavaScript binding dependencies
+//! also link `std` on wasm. Those dependencies and entry points are gated on
+//! `cfg(target_arch = "wasm32")`, so native tests compile the pure helpers
+//! without JavaScript bindings. The underlying portable kernel and shared
+//! clock types remain `no_std + alloc`.
 //!
 //! # Fail-closed design
 //!
@@ -41,7 +40,6 @@
 
 extern crate alloc;
 
-#[cfg(not(target_arch = "wasm32"))]
 extern crate std;
 
 pub mod clock;

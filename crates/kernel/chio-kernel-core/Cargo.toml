@@ -20,6 +20,7 @@ name = "chio_kernel_core"
 # the host and for `wasm32-unknown-unknown` with `--no-default-features`.
 # See docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md.
 [dependencies]
+chio-security-types = { workspace = true }
 # Depend on `chio-core-types` with `default-features = false` and forward the
 # `std` feature through our own feature flag so downstream consumers can
 # select between the hosted `std` build and the portable `no_std + alloc`
@@ -49,7 +50,7 @@ dudect-bencher = { version = "0.7", optional = true }
 
 [features]
 default = ["std", "revocation-view"]
-std = ["chio-core-types/std", "serde/std", "serde_json/std"]
+std = ["chio-security-types/std", "chio-core-types/std", "serde/std", "serde_json/std"]
 # Enables the `revocation_view` module: an arc-swap-backed read-only
 # snapshot of the revocation oracle's most recent signed epoch root that
 # dispatch consults on every call. Implies `std` because `arc-swap`

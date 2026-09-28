@@ -8,7 +8,7 @@ use chio_core_types::canonical_json_bytes;
 use chio_core_types::capability::token::CapabilityToken;
 use chio_keyring::{
     KeyLogPolicyDocument, KeyringArtifactSignature, SignedArtifactTimeAnchor,
-    SqlitePinnedKeyLogVerifier, SystemTrustedClock,
+    SqlitePinnedKeyLogVerifier, SystemClock,
 };
 use serde::{Deserialize, Serialize};
 
@@ -46,7 +46,7 @@ impl Config {
                 .clone()
                 .into_policy()
                 .map_err(error)?,
-            Arc::new(SystemTrustedClock),
+            Arc::new(SystemClock),
         )
         .map_err(|cause| error(format!("cannot open pinned key-log verifier: {cause}")))
     }
@@ -92,7 +92,7 @@ impl HostKeyring {
                     .clone()
                     .into_policy()
                     .map_err(error)?,
-                Arc::new(SystemTrustedClock),
+                Arc::new(SystemClock),
             )
             .map_err(error)?
         } else {

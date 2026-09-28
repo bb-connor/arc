@@ -84,9 +84,7 @@ pub trait FindingStatusCache: Send + Sync {
 }
 
 /// Trusted clock used to enforce the signed epoch freshness window.
-pub trait FindingRetractionClock: Send + Sync {
-    fn now_unix_secs(&self) -> Result<u64, FindingRetractionResolveError>;
-}
+pub use chio_security_types::clock::Clock;
 
 /// Successful resolution returned to the guard.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -147,7 +145,7 @@ pub struct VerifiedFindingRetractionResolver {
     provenance: Arc<dyn MemoryProvenanceStore>,
     lineage: Arc<dyn FindingDeliveryLineageResolver>,
     status: Arc<dyn FindingStatusCache>,
-    clock: Arc<dyn FindingRetractionClock>,
+    clock: Arc<dyn Clock>,
 }
 
 impl VerifiedFindingRetractionResolver {
@@ -157,7 +155,7 @@ impl VerifiedFindingRetractionResolver {
         provenance: Arc<dyn MemoryProvenanceStore>,
         lineage: Arc<dyn FindingDeliveryLineageResolver>,
         status: Arc<dyn FindingStatusCache>,
-        clock: Arc<dyn FindingRetractionClock>,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self, FindingRetractionResolveError> {
         let resolver_id = resolver_id.into();
         let feed_id = feed_id.into();
@@ -284,7 +282,8 @@ impl FindingRetractionResolver for VerifiedFindingRetractionResolver {
         }
         let now = self
             .clock
-            .now_unix_secs()
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::as_secs)
             .map_err(|error| FindingRetractionResolveError::ClockUnavailable(error.to_string()))?;
         if status.checked_at > now || now >= status.valid_until {
             return Err(FindingRetractionResolveError::StaleStatus);
@@ -340,9 +339,17 @@ mod tests {
 
     struct StaticClock(u64);
 
-    impl FindingRetractionClock for StaticClock {
-        fn now_unix_secs(&self) -> Result<u64, FindingRetractionResolveError> {
-            Ok(self.0)
+    impl chio_security_types::clock::Clock for StaticClock {
+        fn read(
+            &self,
+        ) -> core::result::Result<
+            chio_security_types::clock::ClockReading,
+            chio_security_types::clock::ClockError,
+        > {
+            let value = self.0;
+            chio_security_types::clock::Clock::read(&chio_security_types::clock::FixedClock::new(
+                value,
+            ))
         }
     }
 

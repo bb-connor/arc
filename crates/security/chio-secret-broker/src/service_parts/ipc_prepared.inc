@@ -230,9 +230,11 @@ fn prepared_connection_binding(
         .body
         .expires_at_unix_seconds
         .min(authenticated.registration.nonce_expires_at_unix_seconds);
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|_| prepared_internal_fault("prepared connection clock unavailable"))?;
+    let now = Duration::from_millis(
+        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
+            .map_err(|_| prepared_internal_fault("prepared connection clock unavailable"))?
+            .get(),
+    );
     let remaining = Duration::from_secs(expires)
         .checked_sub(now)
         .filter(|remaining| !remaining.is_zero())

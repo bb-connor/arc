@@ -25,10 +25,9 @@ pub use connection::{BrokerMcpConnection, BrokerMcpToolConnection};
 pub use delivery::{NativeBrokerCompletionEvidence, NativeBrokerQuotaObservation};
 
 pub(super) fn trusted_now_ms() -> Result<u64> {
-    let elapsed = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|_| rejected())?;
-    u64::try_from(elapsed.as_millis()).map_err(|_| rejected())
+    chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
+        .map(chio_security_types::clock::UnixMillis::get)
+        .map_err(BrokerError::from)
 }
 
 /// Independently selected native and broker participants, pinned to a serving

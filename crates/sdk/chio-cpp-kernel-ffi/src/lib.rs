@@ -10,7 +10,6 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core_types::capability::{
     attenuation::ScopeHash, crypto_floor::CapabilityCryptoFloor, features::CapabilityNegotiation,
@@ -134,17 +133,7 @@ impl KernelFfiError {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-struct SystemClock;
-
-impl Clock for SystemClock {
-    fn now_unix_secs(&self) -> u64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_secs())
-            .unwrap_or(0)
-    }
-}
+use chio_kernel_core::clock::SystemClock;
 
 #[derive(Debug, Deserialize)]
 struct EvaluateRequestEnvelope {
@@ -499,11 +488,12 @@ fn map_signing_error(error: ReceiptSigningError) -> KernelFfiError {
         // over the caller-supplied canonical content preimage inside the trust
         // boundary and produces this variant on a render-A / sign-B mismatch.
         // Surfaced as a distinct, fail-closed signing failure.
-        ReceiptSigningError::ContentHashMismatch { recomputed, claimed } => {
-            KernelFfiError::SigningFailed(format!(
-                "receipt content_hash mismatch: body claimed {claimed} but signer recomputed {recomputed} over the canonical content (WYSIWYS refused)"
-            ))
-        }
+        ReceiptSigningError::ContentHashMismatch {
+            recomputed,
+            claimed,
+        } => KernelFfiError::SigningFailed(format!(
+            "receipt content_hash mismatch: body claimed {claimed} but signer recomputed {recomputed} over the canonical content (WYSIWYS refused)"
+        )),
         ReceiptSigningError::SigningFailed(message) => KernelFfiError::SigningFailed(message),
     }
 }

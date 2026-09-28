@@ -295,6 +295,11 @@ impl<
             }
             Err(error) => {
                 let code = executor_error_code(&error)?;
+                tracing::warn!(
+                    reason_code = code.as_str(),
+                    action_id = work.action_id.as_str(),
+                    "response execution refused"
+                );
                 self.schedule_retry(work, now_unix_ms, code)
             }
         }
@@ -716,33 +721,7 @@ fn error_code(value: &str) -> Result<ErrorCode, SchedulerError> {
 }
 
 fn executor_error_code(error: &ExecutorError) -> Result<ErrorCode, SchedulerError> {
-    match error {
-        ExecutorError::Alert(error)
-        | ExecutorError::EffectMutation(error)
-        | ExecutorError::EffectQuery(error)
-        | ExecutorError::Receipt(error)
-        | ExecutorError::Store(error) => Ok(error.code().clone()),
-        ExecutorError::ApprovalRequired => error_code("response.approval_required"),
-        ExecutorError::AttemptOverflow => error_code("response.attempt_overflow"),
-        ExecutorError::Canonical(_) => error_code("response.executor_canonical"),
-        ExecutorError::EffectOutcomeUnknown => error_code("response.effect_outcome_unknown"),
-        ExecutorError::GenerationOverflow => error_code("response.generation_overflow"),
-        ExecutorError::GenerationWidth(_) => error_code("response.generation_width"),
-        ExecutorError::InvalidEffectResult => error_code("response.effect_result_invalid"),
-        ExecutorError::InvalidEffectJournal => error_code("response.effect_journal_invalid"),
-        ExecutorError::EffectJournalDecode(_) => error_code("response.effect_journal_decode"),
-        ExecutorError::EffectJournalEncoding(_) => error_code("response.effect_journal_encoding"),
-        ExecutorError::InvalidActiveEvidence => error_code("response.active_evidence_invalid"),
-        ExecutorError::ActiveEvidenceMutationBound(_) => {
-            error_code("response.active_evidence_mutation_bound")
-        }
-        ExecutorError::ActiveEvidenceEncoding(_) => error_code("response.active_evidence_encoding"),
-        ExecutorError::ActiveEvidenceBinding(_) => error_code("response.active_evidence_binding"),
-        ExecutorError::ReceiptLineageMismatch => error_code("response.receipt_lineage_mismatch"),
-        ExecutorError::StaleLease => error_code("response.scheduler_lease_stale"),
-        ExecutorError::StateMachine(_) => error_code("response.state_machine_error"),
-        ExecutorError::WorkMismatch => error_code("response.scheduler_work_mismatch"),
-    }
+    error_code(error.code())
 }
 
 fn hex_bytes(bytes: &[u8]) -> String {

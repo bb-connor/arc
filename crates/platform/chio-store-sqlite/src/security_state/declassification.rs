@@ -38,7 +38,7 @@ impl SecurityStateWriteTransaction<'_> {
     pub(super) fn commit_declassification_consumption_evidence(
         self,
         request: &DeclassificationConsumptionEvidenceCommit,
-        clock: &dyn SecurityStateClock,
+        clock: &dyn Clock,
     ) -> PortResult<(Self, DeclassificationConsume)> {
         let consumed = ScopedMutation::legacy(self.transaction())
             .commit_declassification_consumption_evidence(request, || {

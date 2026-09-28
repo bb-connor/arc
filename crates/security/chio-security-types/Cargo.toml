@@ -24,5 +24,9 @@ std = ["serde/std", "dep:serde_json", "dep:sha2"]
 jsonschema = { workspace = true }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 
-[lints]
-workspace = true
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }

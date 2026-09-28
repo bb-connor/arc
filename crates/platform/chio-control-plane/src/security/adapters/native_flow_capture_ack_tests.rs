@@ -165,7 +165,7 @@ fn run_fault(mut fixture: Fixture, egress: bool, fault: Fault) -> TestResult {
         fixture.binding.clone(),
         super::super::super::registry(egress, InformationLabel::bottom())?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     fixture

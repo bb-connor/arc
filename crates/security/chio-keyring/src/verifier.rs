@@ -7,10 +7,10 @@ use rusqlite::{params, Connection, OpenFlags, OptionalExtension, TransactionBeha
 
 use crate::{
     verify_retained_history, verify_sync_update, ArtifactTimeAnchorKind, ArtifactTimeEvidence,
-    CheckpointConflictKind, CheckpointEquivocationEvidence, CheckpointGossip, KeyId, KeyLogPin,
-    KeyLogPolicy, KeyLogState, KeyLogSyncResponse, KeyRecord, KeyringArtifactSignature,
+    CheckpointConflictKind, CheckpointEquivocationEvidence, CheckpointGossip, Clock, KeyId,
+    KeyLogPin, KeyLogPolicy, KeyLogState, KeyLogSyncResponse, KeyRecord, KeyringArtifactSignature,
     KeyringError, Result, SignedArtifactTimeAnchor, SignedKeyActivationCommit,
-    SignedKeyLogCheckpoint, SignedKeyLogEvent, TrustedClock, CHECKPOINT_EQUIVOCATION_SCHEMA,
+    SignedKeyLogCheckpoint, SignedKeyLogEvent, CHECKPOINT_EQUIVOCATION_SCHEMA,
 };
 
 const VERIFIER_SCHEMA: &str = r#"
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS verifier_gossip (
 pub struct SqlitePinnedKeyLogVerifier {
     connection: Mutex<Connection>,
     policy: KeyLogPolicy,
-    clock: Arc<dyn TrustedClock>,
+    clock: Arc<dyn Clock>,
     storage_file: crate::DurableSqliteFile,
 }
 
@@ -75,7 +75,7 @@ impl SqlitePinnedKeyLogVerifier {
     pub fn provision(
         path: impl AsRef<Path>,
         policy: KeyLogPolicy,
-        clock: Arc<dyn TrustedClock>,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self> {
         let path = path.as_ref();
         crate::provision_durable_sqlite_path(path)?;
@@ -91,7 +91,7 @@ impl SqlitePinnedKeyLogVerifier {
     pub fn open(
         path: impl AsRef<Path>,
         policy: KeyLogPolicy,
-        clock: Arc<dyn TrustedClock>,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self> {
         let path = path.as_ref();
         crate::require_existing_durable_sqlite_path(path)?;
@@ -125,7 +125,10 @@ impl SqlitePinnedKeyLogVerifier {
     }
 
     pub fn apply_sync(&self, response: &KeyLogSyncResponse) -> Result<KeyLogPin> {
-        let now = self.clock.now()?;
+        let now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         let mut connection = self.connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         response.validate_bounds()?;
@@ -166,7 +169,10 @@ impl SqlitePinnedKeyLogVerifier {
             .get(&gossip.witness_signature.witness_id)
             .ok_or(KeyringError::InvalidSignature)?;
         gossip.witness_signature.verify(&gossip.checkpoint, key)?;
-        let now = self.clock.now()?;
+        let now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         self.policy
             .validate_checkpoint_time(gossip.checkpoint.body.issued_at, now)?;
         let mut connection = self.connection()?;
@@ -192,7 +198,13 @@ impl SqlitePinnedKeyLogVerifier {
         time_evidence: &ArtifactTimeEvidence,
     ) -> Result<KeyRecord> {
         let connection = self.connection()?;
-        let state = rebuild_state(&connection, &self.policy, self.clock.now()?)?;
+        let state = rebuild_state(
+            &connection,
+            &self.policy,
+            self.clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)?,
+        )?;
         Ok(state
             .verification_key_for_artifact(key_id, artifact_hash, time_evidence)?
             .clone())
@@ -208,7 +220,10 @@ impl SqlitePinnedKeyLogVerifier {
         signature_evidence: &KeyringArtifactSignature,
         signed_time_anchor: &SignedArtifactTimeAnchor,
     ) -> Result<KeyRecord> {
-        let now = self.clock.now()?;
+        let now = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         let connection = self.connection()?;
         let events = load_events(&connection)?;
         let checkpoints = load_checkpoints(&connection)?;
@@ -265,7 +280,14 @@ impl SqlitePinnedKeyLogVerifier {
         if load_events(&connection)?.is_empty() {
             return Ok(None);
         }
-        rebuild_state(&connection, &self.policy, self.clock.now()?).map(Some)
+        rebuild_state(
+            &connection,
+            &self.policy,
+            self.clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)?,
+        )
+        .map(Some)
     }
 
     pub fn conflicts(&self) -> Result<Vec<CheckpointEquivocationEvidence>> {
@@ -278,7 +300,13 @@ impl SqlitePinnedKeyLogVerifier {
         let checkpoints = load_checkpoints(&connection)?;
         let commits = load_commits(&connection)?;
         let pin = load_pin(&connection)?;
-        validate_retained_gossip(&connection, &self.policy, self.clock.now()?)?;
+        validate_retained_gossip(
+            &connection,
+            &self.policy,
+            self.clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)?,
+        )?;
         if events.is_empty() {
             if !checkpoints.is_empty() || !commits.is_empty() || pin.is_some() {
                 return Err(KeyringError::StateInvariant(
@@ -292,7 +320,9 @@ impl SqlitePinnedKeyLogVerifier {
             &checkpoints,
             &commits,
             &self.policy,
-            self.clock.now()?,
+            self.clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)?,
             true,
         )?;
         if pin.as_ref() != Some(&verified.pin) {

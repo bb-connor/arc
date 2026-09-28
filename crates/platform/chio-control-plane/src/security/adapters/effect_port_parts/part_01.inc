@@ -1,6 +1,6 @@
+use chio_security_types::clock::{Clock, SystemClock};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_quarantine::decode_response_record;
 use chio_security_types::ports::{
@@ -374,12 +374,17 @@ impl<'a> EscalateAlertCommitment<'a> {
 /// Durable exact backend for observational `EscalateAlert` effects.
 pub struct EscalateAlertBackend {
     alerts: Arc<dyn EscalateAlertStore>,
+    clock: Arc<dyn Clock>,
 }
 
 impl EscalateAlertBackend {
     #[must_use]
     pub fn new(alerts: Arc<dyn EscalateAlertStore>) -> Self {
-        Self { alerts }
+        Self::with_clock(alerts, Arc::new(SystemClock))
+    }
+
+    pub fn with_clock(alerts: Arc<dyn EscalateAlertStore>, clock: Arc<dyn Clock>) -> Self {
+        Self { alerts, clock }
     }
 
     fn load_persisted(
@@ -416,7 +421,7 @@ impl EscalateAlertBackend {
         if let Some((_, _, result)) = self.load_persisted(commitment)? {
             return Ok(result);
         }
-        let alert = build_escalate_alert(commitment, current_unix_ms()?)?;
+        let alert = build_escalate_alert(commitment, self.clock.unix_millis()?.get())?;
         let observed = match self.alerts.page(&alert) {
             Ok(status) => status,
             Err(page_error) => {
@@ -608,17 +613,6 @@ fn escalate_alert_record_id(
 ) -> PortResult<RecordId> {
     let digest = domain_hash(domain, commitment)?;
     RecordId::new(format!("{prefix}:{}", hex::encode(digest.as_bytes()))).map_err(PortError::from)
-}
-
-fn current_unix_ms() -> PortResult<u64> {
-    let elapsed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| PortError::unavailable())?;
-    let millis = u64::try_from(elapsed.as_millis()).map_err(|_| PortError::unavailable())?;
-    if millis == 0 {
-        return Err(PortError::unavailable());
-    }
-    Ok(millis)
 }
 
 /// Exact `ThrottleSession` backend backed by independent durable windows.
@@ -1249,4 +1243,5 @@ pub struct IssuanceFreezeBackend {
     freezes: Arc<dyn IssuanceFreezeStore>,
     blast_radius: Arc<dyn BlastRadiusPort>,
     scheduler: Option<Arc<dyn ResponseSchedulerStore>>,
+    clock: Arc<dyn Clock>,
 }

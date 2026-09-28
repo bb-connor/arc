@@ -24,7 +24,7 @@ pub struct DurableActiveResponseExecutor<
     effects: Arc<E>,
     receipts: Arc<R>,
     alerts: Arc<A>,
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
     lease_duration_ms: u64,
     response_executor: ResponseExecutor<S, E, R, A>,
 }
@@ -43,7 +43,7 @@ impl<
         effects: Arc<E>,
         receipts: Arc<R>,
         alerts: Arc<A>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
         lease_duration_ms: u64,
     ) -> Result<Self, DurableActiveResponseExecutorConfigError> {
         validate_lease_duration(lease_duration_ms)?;
@@ -86,8 +86,12 @@ impl<
         policy_decision_hash: Digest32,
         authorized_at_unix_ms: u64,
     ) -> Result<ActiveResponseExecutionEvidence, ActiveResponseExecutorError> {
-        let authorization_capability_hash =
-            hex::encode(response_plan.operator_capability.capability_digest.as_bytes());
+        let authorization_capability_hash = hex::encode(
+            response_plan
+                .operator_capability
+                .capability_digest
+                .as_bytes(),
+        );
         let governed_intent_hash = hex::encode(governed_intent_hash.as_bytes());
         let policy_decision_hash = hex::encode(policy_decision_hash.as_bytes());
         let approval = ActiveResponseExecutionApproval::Automatic;
@@ -239,7 +243,7 @@ impl<
             _ => {
                 return Err(reject(
                     "active-response approval mode does not match the plan",
-                ))
+                ));
             }
         };
         if raw.origin == ActiveResponseExecutionOrigin::CommittedAdmission
@@ -283,7 +287,8 @@ impl<
         let resumed_after_expiry = now_unix_ms >= request.raw.response_plan.expires_at_unix_ms;
         if now_unix_ms < request.raw.response_plan.created_at_unix_ms
             || request.raw.authorized_at_unix_ms > now_unix_ms
-            || (resumed_after_expiry && request.raw.origin != ActiveResponseExecutionOrigin::CommittedAdmission)
+            || (resumed_after_expiry
+                && request.raw.origin != ActiveResponseExecutionOrigin::CommittedAdmission)
         {
             return Err(ActiveResponseExecutorError::RejectedBeforeCommit(
                 "active-response plan is not live".to_string(),
@@ -304,10 +309,13 @@ impl<
                     "active-response execution lease is invalid".to_string(),
                 )
             })?;
-        let prepared = source.prepare_dispatch(ResponseDispatchLease {
-            lease_owner_id: self.lease_owner_id.clone(),
-            lease_expires_at_unix_ms,
-        }, now_unix_ms)?;
+        let prepared = source.prepare_dispatch(
+            ResponseDispatchLease {
+                lease_owner_id: self.lease_owner_id.clone(),
+                lease_expires_at_unix_ms,
+            },
+            now_unix_ms,
+        )?;
 
         match self.store.commit_dispatch(&prepared) {
             Ok(ResponseDispatchCommitOutcome::Committed(record)) => {
@@ -333,11 +341,7 @@ impl<
         match self.store.load_dispatch(&key) {
             Ok(ResponseDispatchLoadOutcome::Found(record)) => {
                 self.validate_existing_dispatch(request, &record)?;
-                self.drive_committed_dispatch(
-                    request,
-                    &record,
-                    true,
-                )
+                self.drive_committed_dispatch(request, &record, true)
             }
             Ok(ResponseDispatchLoadOutcome::Missing) => {
                 use chio_security_types::ports::PortErrorKind;
@@ -517,13 +521,14 @@ impl<
         current: &ResponsePlanRecord,
         now_unix_ms: u64,
     ) -> Result<ScheduledWork, ActiveResponseExecutorError> {
-        let lease_expires_at_unix_ms = now_unix_ms
-            .checked_add(self.lease_duration_ms)
-            .ok_or_else(|| {
-                ActiveResponseExecutorError::OutcomeUnknown(
-                    "expired active-response recovery lease overflowed".to_string(),
-                )
-            })?;
+        let lease_expires_at_unix_ms =
+            now_unix_ms
+                .checked_add(self.lease_duration_ms)
+                .ok_or_else(|| {
+                    ActiveResponseExecutorError::OutcomeUnknown(
+                        "expired active-response recovery lease overflowed".to_string(),
+                    )
+                })?;
         self.recover_work_with_expiry(
             request,
             dispatch,
@@ -559,7 +564,9 @@ impl<
                     "active-response recovery fence lookup failed: {error}"
                 ))
             })?
-            .map_or(dispatch.initial_work.fencing_token, |work| work.fencing_token);
+            .map_or(dispatch.initial_work.fencing_token, |work| {
+                work.fencing_token
+            });
         let outcome = self
             .store
             .recover_dispatch_work(&ResponseDispatchRecoveryRequest {
@@ -701,11 +708,14 @@ impl<
     }
 
     fn execution_time_before_commit(&self) -> Result<u64, ActiveResponseExecutorError> {
-        self.clock.now_unix_ms().map_err(|error| {
-            ActiveResponseExecutorError::RejectedBeforeCommit(format!(
-                "active-response clock is unavailable: {error}"
-            ))
-        })
+        self.clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
+            .map_err(|error| {
+                ActiveResponseExecutorError::RejectedBeforeCommit(format!(
+                    "active-response clock is unavailable: {error}"
+                ))
+            })
     }
 
     fn validate_automatic_dispatch_fence_request(
@@ -793,11 +803,14 @@ impl<
     }
 
     fn execution_time_after_commit(&self) -> Result<u64, ActiveResponseExecutorError> {
-        self.clock.now_unix_ms().map_err(|error| {
-            ActiveResponseExecutorError::OutcomeUnknown(format!(
-                "active-response clock is unavailable after dispatch commitment: {error}"
-            ))
-        })
+        self.clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)
+            .map_err(|error| {
+                ActiveResponseExecutorError::OutcomeUnknown(format!(
+                    "active-response clock is unavailable after dispatch commitment: {error}"
+                ))
+            })
     }
 
     fn lease_expiry(&self, now_unix_ms: u64, plan_expiry_unix_ms: u64) -> Option<u64> {

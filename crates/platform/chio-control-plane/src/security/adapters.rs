@@ -22,3 +22,6 @@ include!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/src/security/adapters_parts/part_03.inc"
 ));
+#[cfg(test)]
+#[path = "adapters/test_clocks.rs"]
+mod test_clocks;

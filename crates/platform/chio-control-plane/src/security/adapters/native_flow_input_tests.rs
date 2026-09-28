@@ -28,7 +28,7 @@ fn restricted_resolver(fixture: &Fixture) -> TestResult<Arc<NativeFlowResolver>>
         fixture.binding.clone(),
         registry(true, restricted_label())?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?))
 }
@@ -121,7 +121,7 @@ fn native_input_classifies_before_budget_and_rechecks_after_the_single_join() ->
         fixture.binding.clone(),
         registry(true, restricted_label())?,
         classifier.clone(),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         restricted_config()?,
     )?);
     require_complete_source(&fixture.run_native(resolver)??, &restricted_label())?;
@@ -138,7 +138,7 @@ fn native_input_operator_floor_is_in_the_original_join() -> TestResult {
         fixture.binding.clone(),
         registry(true, restricted_label())?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         config,
     )?);
     require_complete_source(&fixture.run_native(resolver)??, &restricted_label())
@@ -152,7 +152,7 @@ fn native_input_local_policy_does_not_acquire_egress_custody() -> TestResult {
         fixture.binding.clone(),
         registry(false, InformationLabel::bottom())?,
         classifier.clone(),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     let custody = fixture.run_native(resolver)??;
@@ -180,7 +180,7 @@ fn native_input_stronger_post_join_classification_denies_without_rejoining() -> 
         fixture.binding.clone(),
         registry(true, restricted_label())?,
         classifier.clone(),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         restricted_config()?,
     )?);
     assert!(matches!(
@@ -199,7 +199,7 @@ fn native_input_missing_manifest_denies_before_classification_or_join() -> TestR
         fixture.binding.clone(),
         Arc::new(VerifiedManifestRegistry::default()),
         classifier.clone(),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     fixture.deny_native(resolver, &FlowDenial::InvalidManifest.to_string())?;
@@ -214,7 +214,7 @@ fn native_input_classifier_substitution_denies_without_taint_or_budget() -> Test
         fixture.binding.clone(),
         flow_registry(),
         Arc::new(InvalidClassifier(false)),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     fixture.deny_native(resolver, "classifier")
@@ -227,7 +227,7 @@ fn native_input_classifier_panic_denies_without_taint_or_budget() -> TestResult 
         fixture.binding.clone(),
         flow_registry(),
         Arc::new(InvalidClassifier(true)),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     fixture.deny_native(resolver, "panicked")
@@ -246,7 +246,7 @@ fn native_input_untrusted_declassification_denies_before_classification_or_join(
         fixture.binding.clone(),
         flow_registry(),
         classifier.clone(),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     fixture.deny_native(

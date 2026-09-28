@@ -17,6 +17,7 @@ use chio_kernel::{
     BudgetStore, ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolServerConnection,
     Verdict,
 };
+use chio_security_types::clock::Clock as _;
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteReceiptStore};
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -191,7 +192,7 @@ fn registered_composite_execution(
     let (fixture_verifier, mut execute, _) = fixture()?;
     let verifier = BrokerQuotaVerifier::new(
         fixture_verifier.config,
-        Arc::new(crate::daemon::SystemDaemonClock),
+        Arc::new(crate::daemon::SystemClock),
     )?;
     let binding = verifier.binding().clone();
     #[cfg(target_os = "linux")]
@@ -238,7 +239,9 @@ fn registered_composite_execution(
     kernel.reconcile_durable_admission_startup()?;
     let caller = Keypair::from_seed(&[32; 32]);
     let parent = kernel.issue_aggregate_family_root(&caller.public_key(), scope, 300, 3)?;
-    let now = crate::daemon::SystemDaemonClock.now_unix_seconds()?;
+    let now = crate::daemon::SystemClock
+        .unix_millis()
+        .map(chio_security_types::clock::UnixMillis::as_secs)?;
     let mut body = execute.capability.body;
     body.parent_capability_id = parent.id.clone();
     body.issued_at_unix_seconds = now;

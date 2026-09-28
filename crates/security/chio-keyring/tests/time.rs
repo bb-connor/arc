@@ -7,8 +7,7 @@ use chio_core_types::{sha256, Ed25519Backend, Keypair, SigningBackend};
 use chio_keyring::{
     AnchorId, ArtifactTimeAnchorBody, ArtifactTimeAnchorKind, ArtifactTimeVerifier, AuthorityId,
     KeyLogPolicy, KeyLogPolicyConfig, KeyringError, LogId, RecoveryPolicyId,
-    SignedArtifactTimeAnchor, TrustedClock, WitnessId, WitnessRosterId,
-    ARTIFACT_TIME_ANCHOR_SCHEMA,
+    SignedArtifactTimeAnchor, WitnessId, WitnessRosterId, ARTIFACT_TIME_ANCHOR_SCHEMA,
 };
 
 fn backend(seed: u8) -> Ed25519Backend {
@@ -17,9 +16,17 @@ fn backend(seed: u8) -> Ed25519Backend {
 
 struct FixedClock(u64);
 
-impl TrustedClock for FixedClock {
-    fn now(&self) -> chio_keyring::Result<u64> {
-        Ok(self.0)
+impl chio_security_types::clock::Clock for FixedClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = self.0;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 
@@ -82,11 +89,17 @@ fn untrusted_tampered_and_future_anchor_statements_fail_closed() {
     let trusted = backend(70);
     let verifier = verifier(&trusted);
 
-    assert!(verifier.verify(&statement(&backend(71))).is_err());
+    assert!(matches!(
+        verifier.verify(&statement(&backend(71))),
+        Err(KeyringError::InvalidArtifactTimeEvidence)
+    ));
 
     let mut tampered = statement(&trusted);
     tampered.body.artifact_hash = sha256(b"other-artifact");
-    assert!(verifier.verify(&tampered).is_err());
+    assert!(matches!(
+        verifier.verify(&tampered),
+        Err(KeyringError::InvalidArtifactTimeEvidence)
+    ));
 
     let future = SignedArtifactTimeAnchor::sign(
         ArtifactTimeAnchorBody {
@@ -98,7 +111,9 @@ fn untrusted_tampered_and_future_anchor_statements_fail_closed() {
     .test_unwrap();
     assert!(matches!(
         verifier.verify(&future),
-        Err(KeyringError::InvalidArtifactTimeEvidence)
+        Err(KeyringError::Clock(
+            chio_security_types::clock::ClockError::NotYetValid
+        ))
     ));
 }
 

@@ -10,7 +10,7 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use tokio::time::Instant;
+use chio_security_types::clock::MonotonicInstant;
 
 use super::cache::{Clock, TokioClock};
 
@@ -29,7 +29,7 @@ pub struct TokenBucket {
 #[derive(Debug)]
 struct BucketInner {
     tokens: f64,
-    last_refill: Instant,
+    last_refill: Option<MonotonicInstant>,
 }
 
 impl TokenBucket {
@@ -38,14 +38,14 @@ impl TokenBucket {
     /// zero rate means the bucket never refills (only the initial burst
     /// is available).
     pub fn new(rate_per_second: f64, burst: u32) -> Self {
-        Self::with_clock(rate_per_second, burst, Arc::new(TokioClock))
+        Self::with_clock(rate_per_second, burst, Arc::new(TokioClock::default()))
     }
 
     /// Create a bucket with a custom clock.
     pub fn with_clock(rate_per_second: f64, burst: u32, clock: Arc<dyn Clock>) -> Self {
         let rate = rate_per_second.max(0.0);
         let burst_f = f64::from(burst.max(1));
-        let now = clock.now();
+        let now = clock.monotonic().ok();
         Self {
             inner: Mutex::new(BucketInner {
                 tokens: burst_f,
@@ -78,11 +78,15 @@ impl TokenBucket {
         if n <= 0.0 {
             return true;
         }
-        let now = self.clock.now();
+        let Ok(now) = self.clock.monotonic() else {
+            return false;
+        };
         let Ok(mut inner) = self.inner.lock() else {
             return false;
         };
-        self.refill(&mut inner, now);
+        if !self.refill(&mut inner, now) {
+            return false;
+        }
         if inner.tokens + f64::EPSILON >= n {
             inner.tokens -= n;
             if inner.tokens < 0.0 {
@@ -96,28 +100,32 @@ impl TokenBucket {
 
     /// Current token count. Mainly useful for tests and diagnostics.
     pub fn available(&self) -> f64 {
-        let now = self.clock.now();
+        let Ok(now) = self.clock.monotonic() else {
+            return 0.0;
+        };
         let Ok(mut inner) = self.inner.lock() else {
             return 0.0;
         };
-        self.refill(&mut inner, now);
+        if !self.refill(&mut inner, now) {
+            return 0.0;
+        }
         inner.tokens
     }
 
-    fn refill(&self, inner: &mut BucketInner, now: Instant) {
-        if self.rate_per_second == 0.0 {
-            inner.last_refill = now;
-            return;
-        }
-        let elapsed = now
-            .saturating_duration_since(inner.last_refill)
-            .as_secs_f64();
-        if elapsed <= 0.0 {
-            return;
-        }
-        let added = elapsed * self.rate_per_second;
+    fn refill(&self, inner: &mut BucketInner, now: MonotonicInstant) -> bool {
+        let Some(previous) = inner.last_refill else {
+            // A failed initial sample cannot mint a burst on recovery.
+            inner.tokens = 0.0;
+            inner.last_refill = Some(now);
+            return false;
+        };
+        let Ok(elapsed) = now.duration_since(previous) else {
+            return false;
+        };
+        let added = elapsed.as_secs_f64() * self.rate_per_second;
         inner.tokens = (inner.tokens + added).min(self.burst);
-        inner.last_refill = now;
+        inner.last_refill = Some(now);
+        true
     }
 }
 

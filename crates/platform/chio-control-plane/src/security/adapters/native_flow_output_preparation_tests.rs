@@ -151,7 +151,7 @@ fn install_classifier(
         fixture.binding.clone(),
         super::super::super::super::registry(false, InformationLabel::bottom())?,
         classifier.clone(),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         config,
     )?;
     fixture

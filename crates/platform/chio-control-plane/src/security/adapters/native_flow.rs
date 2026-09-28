@@ -44,7 +44,7 @@ pub struct NativeFlowResolver {
     binding: NativeSecurityAuthorityBindingV1,
     manifests: Arc<VerifiedManifestRegistry>,
     classifier: Arc<dyn ClassificationPort>,
-    clock: Arc<dyn SecurityClock>,
+    clock: Arc<dyn Clock>,
     config: FlowResolverConfig,
     captured_lifecycle: bool,
 }
@@ -114,7 +114,7 @@ impl NativeFlowResolver {
         binding: NativeSecurityAuthorityBindingV1,
         manifests: Arc<VerifiedManifestRegistry>,
         classifier: Arc<dyn ClassificationPort>,
-        clock: Arc<dyn SecurityClock>,
+        clock: Arc<dyn Clock>,
         config: FlowResolverConfig,
     ) -> Result<Self, NativeFlowError> {
         if config.declassification_evidence.is_some() || config.receipt_evidence.is_some() {
@@ -329,8 +329,13 @@ impl PreparedNativeFlowDispatch<'_> {
         self,
         authority: &mut chio_kernel::NativeSecurityDispatchCaptureAuthority<'_, '_>,
     ) -> Result<(NativeFlowCustody, chio_kernel::AdmissionBudgetCapture), NativeFlowError> {
-        let sampled = policy_call(|| self.resolver.clock.now_unix_ms())?
-            .map_err(|_| NativeFlowError::ClockChanged)?;
+        let sampled = policy_call(|| {
+            self.resolver
+                .clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)
+        })?
+        .map_err(|_| NativeFlowError::ClockChanged)?;
         let validated = self.custody.validate_current()?;
         require_time(self.prepared_at, sampled, validated, self.valid_until)?;
         let operation_id = self.custody.operation_id().clone();
@@ -415,8 +420,13 @@ impl PreparedNativeFlowDispatch<'_> {
         self,
         grant_index: Option<usize>,
     ) -> Result<NativeFlowCustody, NativeFlowError> {
-        let now = policy_call(|| self.resolver.clock.now_unix_ms())?
-            .map_err(|_| NativeFlowError::ClockChanged)?;
+        let now = policy_call(|| {
+            self.resolver
+                .clock
+                .unix_millis()
+                .map(chio_security_types::clock::UnixMillis::get)
+        })?
+        .map_err(|_| NativeFlowError::ClockChanged)?;
         let validated_at = self.custody.validate_current()?;
         require_time(self.prepared_at, now, validated_at, self.valid_until)?;
         // Declassifying preparation may be inspected, but only the capture

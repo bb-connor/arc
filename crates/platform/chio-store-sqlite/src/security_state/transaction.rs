@@ -1,6 +1,6 @@
 //! Owned security mutations for composition in one outer SQLite transaction.
 
-use super::{participant_source, sqlite_error, PortError, PortResult, SecurityStateClock};
+use super::{participant_source, sqlite_error, Clock, PortError, PortResult};
 use rusqlite::{DropBehavior, Transaction, TransactionState};
 
 /// No method commits independently. A mutation consumes this owner and returns
@@ -40,8 +40,11 @@ impl<'connection> SecurityStateWriteTransaction<'connection> {
 /// clock sampling; write callers must already hold the SQLite write transaction.
 pub(super) fn trusted_time_in_transaction(
     transaction: &Transaction<'_>,
-    clock: &dyn SecurityStateClock,
+    clock: &dyn Clock,
 ) -> PortResult<u64> {
     participant_source::ensure_legacy_writable(transaction)?;
-    clock.now_unix_ms()
+    clock
+        .unix_millis()
+        .map(chio_security_types::clock::UnixMillis::get)
+        .map_err(PortError::from)
 }

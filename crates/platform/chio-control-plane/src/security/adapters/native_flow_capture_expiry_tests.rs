@@ -9,7 +9,7 @@ fn runtime_expiry_after_native_verification_rolls_back_physical_capture() -> Tes
         fixture.binding.clone(),
         super::super::super::super::registry(false, InformationLabel::bottom())?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(Clock::default()),
+        Arc::new(FlowTestClock::default()),
         flow_config(),
     )?);
     fixture

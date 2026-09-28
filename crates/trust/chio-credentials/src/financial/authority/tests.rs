@@ -178,9 +178,15 @@ fn manifest_authority_resolves_independently_to_one_active_local_key() -> TestRe
 #[derive(Clone)]
 struct FixedClock(u64);
 
-impl TrustedClock for FixedClock {
-    fn now(&self) -> Result<u64, FinancialAuthorityAvailabilityError> {
-        Ok(self.0)
+impl chio_security_types::clock::Clock for FixedClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = self.0;
+        chio_security_types::clock::Clock::read(&chio_security_types::clock::FixedClock::new(value))
     }
 }
 

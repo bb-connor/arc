@@ -14,9 +14,17 @@ mod support;
 
 struct FixedClock;
 
-impl TrustedClock for FixedClock {
-    fn now(&self) -> Result<u64> {
-        Ok(5_000)
+impl chio_security_types::clock::Clock for FixedClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value = 5_000;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 
@@ -27,12 +35,23 @@ struct AppendDuringRead {
     pending: AtomicBool,
 }
 
-impl TrustedClock for AppendDuringRead {
-    fn now(&self) -> Result<u64> {
-        if self.pending.swap(false, Ordering::SeqCst) {
-            self.writer.append_event(&self.rotation, &self.operator)?;
-        }
-        Ok(5_000)
+impl chio_security_types::clock::Clock for AppendDuringRead {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value: Result<u64> = (|| {
+            if self.pending.swap(false, Ordering::SeqCst) {
+                self.writer.append_event(&self.rotation, &self.operator)?;
+            }
+            Ok(5_000)
+        })();
+        let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 

@@ -742,3 +742,19 @@ If a TLA+ invariant or Kani harness named in this file produces a
 counterexample, file a tracking issue using
 `formal/issue-templates/property-counterexample.md` and follow the
 property-failure triage runbook in the formal/ documentation.
+
+## Response lifecycle and shared clock guards
+
+The [response linkage registry](response-lifecycle.toml) binds the finite
+`ResponseLifecycle` model and eight named negative variants to the production
+state-machine, dispatch, simulation and clock hooks. The [evidence contract](response-lifecycle.md)
+records bounds, runtime trace generation and the temporal timeout disposition.
+Four registered `chio-security-types` Kani harnesses verify the actual pure
+clock/deadline/skew and terminal/rollback helpers. The Rust mutation history is
+exercised separately; no full Rust/TLA refinement is claimed.
+
+`RevocationPropagationEpochQuotient` retains the original propagation actions,
+checks the pair projection and `PendingCoversLag`, and exhausts the declared
+3-authority/1-capability domain under weak fairness. The earlier
+4-authority/8-capability SMT timeout remains unverified. The finite reduction,
+fairness transfer and native transport behavior are distinct claims.

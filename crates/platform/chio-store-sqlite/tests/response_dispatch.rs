@@ -20,7 +20,7 @@ use chio_security_types::{
     ResponseEffectProgress, ResponseEffectSpec, ResponseMutationLog, ResponseMutationRecord,
     ResponsePlanInput, ResponseState, ResponseTarget,
 };
-use chio_store_sqlite::{security_state::SecurityStateClock, SqliteSecurityStateStore};
+use chio_store_sqlite::{security_state::Clock, SqliteSecurityStateStore};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Barrier};
 use std::thread;
@@ -50,9 +50,19 @@ impl MutableSecurityStateClock {
     }
 }
 
-impl SecurityStateClock for MutableSecurityStateClock {
-    fn now_unix_ms(&self) -> chio_security_types::ports::PortResult<u64> {
-        Ok(self.0.load(Ordering::Acquire))
+impl chio_security_types::clock::Clock for MutableSecurityStateClock {
+    fn read(
+        &self,
+    ) -> core::result::Result<
+        chio_security_types::clock::ClockReading,
+        chio_security_types::clock::ClockError,
+    > {
+        let value: chio_security_types::ports::PortResult<u64> =
+            (|| Ok(self.0.load(Ordering::Acquire)))();
+        let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(value),
+        )
     }
 }
 

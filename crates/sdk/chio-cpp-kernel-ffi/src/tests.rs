@@ -166,7 +166,14 @@ fn passport_envelope_at(issuer: &Keypair, issued_at: u64, expires_at: u64) -> St
 
 #[test]
 fn fixed_clock_helpers_preserve_epoch_zero_and_negative_sentinel() {
-    assert_eq!(fixed_clock_from_secs(0).unwrap().now_unix_secs(), 0);
+    assert_eq!(
+        fixed_clock_from_secs(0)
+            .unwrap()
+            .unix_millis()
+            .unwrap()
+            .as_secs(),
+        0
+    );
     assert!(fixed_clock_from_secs(-1).is_none());
 }
 
@@ -284,16 +291,27 @@ fn evaluate_honors_epoch_zero_clock() {
 }
 
 #[test]
-fn evaluate_accepts_u64_now_secs_above_i64_max() {
+fn evaluate_checks_seconds_to_milliseconds_at_the_clock_boundary() {
+    let maximum_seconds = u64::MAX / 1_000;
     let output = evaluate_json_str(&evaluate_envelope_at(
         "echo",
         0,
         u64::MAX,
-        Some(i64::MAX as u64 + 1),
+        Some(maximum_seconds),
     ))
     .unwrap();
     let value: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert_eq!(value["verdict"], "allow");
+    for now in [maximum_seconds + 1, i64::MAX as u64 + 1, u64::MAX] {
+        let output =
+            evaluate_json_str(&evaluate_envelope_at("echo", 0, u64::MAX, Some(now))).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(value["verdict"], "deny");
+        assert!(value["reason"]
+            .as_str()
+            .unwrap()
+            .contains("trusted time exceeds representable range"));
+    }
 }
 
 #[test]

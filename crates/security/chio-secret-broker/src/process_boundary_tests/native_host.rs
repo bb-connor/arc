@@ -21,7 +21,7 @@ use chio_manifest::{
     sign_manifest, AuthoritativeToolPolicy, RuntimeToolTopology, ToolAnnotations, ToolDefinition,
     ToolFlowDeclaration, ToolManifest, VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
 };
-use chio_security_kernel::SystemSecurityClock;
+use chio_security_kernel::SystemClock;
 use chio_security_types::ports::{
     BoundedVec, ClassificationPort, ClassificationRequest, ClassificationResult, ClassifierId,
     ClassifierVersion, IsolationEpochId, LineageId, PortError, PortResult, SessionId, TenantId,
@@ -189,7 +189,7 @@ impl NativeHost {
             native.clone(),
             manifest_registry,
             Arc::new(EmptyClassifier),
-            Arc::new(SystemSecurityClock),
+            Arc::new(SystemClock),
             FlowResolverConfig::new(
                 InformationLabel::bottom(),
                 CategoryLabelMap::new(
@@ -214,7 +214,7 @@ impl NativeHost {
                 provider_adapter_version: 1,
                 credential_placement: config.provider_placement,
             },
-            Arc::new(crate::daemon::SystemDaemonClock),
+            Arc::new(crate::daemon::SystemClock),
         )?;
         let participant = Arc::new(BrokerAdmissionParticipant::new(
             BrokerIpcClientConfig {

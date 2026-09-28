@@ -50,6 +50,8 @@
 
 pub mod cache;
 pub mod circuit_breaker;
+#[cfg(test)]
+mod clock_tests;
 pub mod retry;
 pub mod token_bucket;
 
@@ -219,7 +221,7 @@ impl<E: ExternalGuard + ?Sized> AsyncGuardAdapterBuilder<E> {
         Self {
             inner,
             config: AsyncGuardAdapterConfig::default(),
-            clock: Arc::new(TokioClock),
+            clock: Arc::new(TokioClock::default()),
         }
     }
 

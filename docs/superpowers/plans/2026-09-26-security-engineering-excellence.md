@@ -34,9 +34,11 @@ retention stall, and stable-candidate scale evidence are still open.
 
 The current accounting batch and its remaining boundaries are recorded in
 [checked budget accounting](../../reviews/2026-09-27-checked-budget-accounting.md).
-The next implementation batch is the shared clock port and response lifecycle
-verification. Broad module/pool migrations and operational pilot observation
-remain separate work. The user's no-compatibility instruction supersedes the
+The shared clock and response lifecycle batch is recorded in
+[shared clock and response assurance](../../reviews/2026-09-27-shared-clock-response-assurance.md).
+Correction 4A remains partial: its common contract and migrated owners are in
+place, while the remaining ambient-time inventory stays open. Broad module/pool
+migrations and operational pilot observation remain separate work. The user's no-compatibility instruction supersedes the
 original 1C migration proposal; inline execution supersedes the lane dispatch.
 
 ## Revised execution order
@@ -223,6 +225,12 @@ review pass that gates another packet's ability to demonstrate its exit criteria
       not solved the operator half of the problem.
 - [ ] Then write Packet 1's test corpus against specific variants, and mutation-
       check each one per standard rule 10.2.
+
+**Checkpoint (September 27):** Dispatch discriminants now retain registered
+codes through executor errors, scheduler retries, operator logs and signed
+receipt construction. The [execution record](../../reviews/2026-09-27-shared-clock-response-assurance.md)
+records precise rejection tests and receipt tamper refusal. The broader source
+chain and per-rule mutation inventory remains open, so Correction 1D is partial.
 
 **Exit:** Every security rejection in the response path is distinguishable by a
 caller, a receipt, a log and a test. Packet 1's and Packet 4's acceptance criteria
@@ -488,10 +496,10 @@ composition roots.
 Addresses Q5. Belongs with parent Packet 4, whose Kani and property obligations
 depend on a deterministically drivable time source.
 
-- [ ] Define one clock port with `UnixMillis` and `MonotonicInstant` as distinct
+- [x] Define one clock port with `UnixMillis` and `MonotonicInstant` as distinct
       types that cannot be compared or subtracted across the boundary, and an
       explicit fail-closed contract on a non-monotonic or unavailable reading.
-- [ ] Migrate the three existing traits onto it. Do not add a fourth.
+- [x] Migrate the three existing traits onto it. Do not add a fourth.
 - [ ] Replace direct `SystemTime::now()` calls in production security paths with
       the injected port. Inventory first: 60 production files and 80 call sites, including
       `chio-control-plane/src/security/active_response.rs` and `keyring_runtime.rs`.
@@ -499,9 +507,16 @@ depend on a deterministically drivable time source.
 - [ ] Classify every deadline as monotonic-compared or epoch-signed, and state the
       skew policy once for the TCB rather than only in the broker's deployment
       config.
-- [ ] Add property and Kani coverage now that time is injectable: wall-clock
+- [x] Add property and Kani coverage now that time is injectable: wall-clock
       regression, skew at the policy boundary, `u64` overflow at the limits, and a
       retry that must not widen the original window.
+
+**Checkpoint (September 27):** The shared contract, three original trait
+migrations, response deadlines, regression gate and bounded proofs are delivered.
+The gate pins 208 remaining sites including fixtures and the independent Finding
+commit clock. The [execution record](../../reviews/2026-09-27-shared-clock-response-assurance.md)
+records the migrated consumers and deadline classification. Repository-wide
+ambient-time replacement and classification remain open; this does not close Q5.
 
 **Exit:** One clock port, units in the type, skew policy stated once, no direct
 `SystemTime::now()` in the TCB, deadline logic driven deterministically.

@@ -176,7 +176,7 @@ fn native_broker_connection_prepares_original_and_refuses_misbound_acknowledgeme
                 fixture.binding.clone(),
                 super::super::super::super::registry(true, InformationLabel::bottom())?,
                 Arc::new(CountingEmptyClassifier::new()),
-                Arc::new(Clock::default()),
+                Arc::new(FlowTestClock::default()),
                 flow_config(),
             )?
             .with_captured_lifecycle();

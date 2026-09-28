@@ -22,7 +22,7 @@ pub(in crate::security::adapters::tests::native_flow::support) fn configure(
             fixture.binding.clone(),
             super::super::super::registry(egress, InformationLabel::bottom())?,
             Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(Clock::default()),
+            Arc::new(FlowTestClock::default()),
             config,
         )?
         .with_captured_lifecycle(),

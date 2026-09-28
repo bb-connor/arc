@@ -1,15 +1,8 @@
 name: apalache-temporal
 
-# Scheduled/manual workflow: runs both revocation liveness properties plus the
-# distributed model's bounded refinement and non-vacuity witness.
-#
-# This workflow is scheduled/manual only and is not a required PR gate. Safety
-# invariants for RevocationPropagation run in apalache-safety.yml at the PR
-# length bound. This length-24 temporal config keeps deep liveness coverage
-# separate.
-#
-# Do not promote this workflow to a required check until the underlying
-# property is fixed and the run is reliably green.
+# Scheduled/manual liveness checks. Propagation uses an explicit finite
+# epoch-order quotient; the original 4-authority/8-capability SMT timeout
+# remains unverified. Full-model safety stays in apalache-safety.yml.
 
 on:
   workflow_dispatch:
@@ -27,7 +20,7 @@ jobs:
   revocation_eventually_seen:
     name: revocation-eventually-seen
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
@@ -51,16 +44,21 @@ jobs:
           command -v apalache-mc
           apalache-mc version || true
 
-      - name: RevocationEventuallySeen temporal check
+      - name: RevocationEventuallySeen finite reduction and witnesses
         shell: bash
         run: |
           set -euo pipefail
-          ./scripts/check-apalache-positive.sh \
-            --temporal RevocationEventuallySeen \
-            --length 24 \
-            --timeout-seconds 3600 \
-            --config formal/tla/MCRevocationPropagationTemporal.cfg \
-            formal/tla/RevocationPropagation.tla
+          python3 scripts/check-revocation-propagation.py \
+            --jar "${HOME}/.local/share/apalache/apalache-0.50.1/lib/apalache.jar" \
+            --output output/revocation-propagation
+
+      - name: Upload propagation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: revocation-propagation
+          path: output/revocation-propagation
+          if-no-files-found: error
 
   distributed_revocation_temporal:
     name: distributed-revocation-temporal
@@ -106,12 +104,12 @@ jobs:
 
       - name: Validate temporal results
         env:
-          LEGACY_RESULT: ${{ needs.revocation_eventually_seen.result }}
+          PROPAGATION_RESULT: ${{ needs.revocation_eventually_seen.result }}
           DISTRIBUTED_RESULT: ${{ needs.distributed_revocation_temporal.result }}
         run: |
           set -euo pipefail
-          if [[ "${LEGACY_RESULT}" != "success" || "${DISTRIBUTED_RESULT}" != "success" ]]; then
-            echo "one or more temporal Apalache jobs did not succeed" >&2
+          if [[ "${PROPAGATION_RESULT}" != "success" || "${DISTRIBUTED_RESULT}" != "success" ]]; then
+            echo "one or more temporal verification jobs did not succeed" >&2
             exit 1
           fi
 

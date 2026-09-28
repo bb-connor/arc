@@ -29,7 +29,7 @@ impl SqliteSecurityStateStore {
                 (ResponseEffectKind::EscalateAlert, ResponseTarget::Tenant { tenant_id })
                     if tenant_id == &plan.tenant_id =>
                 {
-                    continue
+                    continue;
                 }
                 (ResponseEffectKind::SuspendSession, ResponseTarget::Session { session_id }) => {
                     let target = chio_security_types::ports::containment_session_target(
@@ -88,7 +88,10 @@ impl SqliteSecurityStateStore {
             state.version_hash()?;
             states.push(state);
         }
-        let captured_at_unix_ms = self.clock.now_unix_ms()?;
+        let captured_at_unix_ms = self
+            .clock
+            .unix_millis()
+            .map(chio_security_types::clock::UnixMillis::get)?;
         transaction.commit().map_err(sqlite_error)?;
         Ok(ResponseSimulationSnapshot {
             tenant_id: plan.tenant_id.clone(),

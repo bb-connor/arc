@@ -1,3 +1,4 @@
+extern crate self as chio_quarantine;
 pub mod approval;
 pub mod blast;
 pub mod correlation;
@@ -32,3 +33,8 @@ pub use state_machine::{
 };
 
 pub mod simulation;
+
+mod rejection_codes;
+
+#[cfg(any(test, feature = "fuzz"))]
+pub mod fuzz;

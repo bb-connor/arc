@@ -190,7 +190,7 @@ impl BrokerServiceAuthorityBundle {
 }
 
 pub struct BrokerService {
-    authority_clock: Option<Arc<dyn crate::daemon::DaemonClock>>,
+    authority_clock: Option<Arc<dyn crate::daemon::Clock>>,
     config: BrokerServiceConfig,
     trusted_issuer: PublicKey,
     backend: Arc<EncryptedBlobSecretBackend>,

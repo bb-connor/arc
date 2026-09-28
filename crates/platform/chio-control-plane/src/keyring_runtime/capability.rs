@@ -1,7 +1,7 @@
 //! Capability issuance and its original witnessed signing evidence.
 use super::{CliError, KeyringRuntimeComposition};
 use chio_core::capability::token::CapabilityToken;
-use chio_kernel::{GovernedCapabilityAuthority, SystemCapabilityAuthorityClock};
+use chio_kernel::{GovernedCapabilityAuthority, SystemClock};
 use std::sync::Arc;
 
 impl KeyringRuntimeComposition {
@@ -12,7 +12,7 @@ impl KeyringRuntimeComposition {
         self.ensure_bound_signing_topology()?;
         Ok(GovernedCapabilityAuthority::new(
             self.authority_backend.clone(),
-            Arc::new(SystemCapabilityAuthorityClock),
+            Arc::new(SystemClock),
         ))
     }
 

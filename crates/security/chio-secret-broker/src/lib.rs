@@ -38,6 +38,8 @@ pub use encrypted_blob_backend::{EncryptedBlobSecretBackend, SealedKeyFd, Sealed
 
 #[derive(Debug, thiserror::Error)]
 pub enum BrokerError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("broker request is invalid: {0}")]
     InvalidRequest(String),
     #[error("broker authorization denied: {0}")]
@@ -62,6 +64,7 @@ impl BrokerError {
     #[must_use]
     pub const fn diagnostic_code(&self) -> &'static str {
         match self {
+            Self::Clock(error) => error.code(),
             Self::InvalidRequest(_) => "invalid_request",
             Self::AuthorizationDenied(_) => "authorization_denied",
             Self::AuthorityUnavailable(_) => "authority_unavailable",
@@ -77,6 +80,7 @@ impl BrokerError {
     pub(crate) fn redacted(self) -> Self {
         let code = self.diagnostic_code().to_string();
         match self {
+            Self::Clock(error) => Self::Clock(error),
             Self::InvalidRequest(_) => Self::InvalidRequest(code),
             Self::AuthorizationDenied(_) => Self::AuthorizationDenied(code),
             Self::AuthorityUnavailable(_) => Self::AuthorityUnavailable(code),

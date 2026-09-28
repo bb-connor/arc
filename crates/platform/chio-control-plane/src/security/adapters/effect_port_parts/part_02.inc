@@ -12,6 +12,7 @@ impl IssuanceFreezeBackend {
             freezes,
             blast_radius,
             scheduler: None,
+            clock: Arc::new(SystemClock),
         }
     }
 
@@ -27,7 +28,13 @@ impl IssuanceFreezeBackend {
             freezes,
             blast_radius,
             scheduler: Some(scheduler),
+            clock: Arc::new(SystemClock),
         }
+    }
+
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
     }
 
     fn key(&self, tenant_id: &TenantId, target: &ResponseTarget) -> PortResult<IssuanceFreezeKey> {
@@ -151,7 +158,7 @@ impl IssuanceFreezeBackend {
         request: &EffectRequest,
         spec: &IssuanceFreezeSpec,
     ) -> PortResult<LineageFence> {
-        let now_unix_ms = current_unix_ms()?;
+        let now_unix_ms = self.clock.unix_millis()?.get();
         let lease_expires_at_unix_ms = spec.acquisition.expires_at_unix_ms;
         if lease_expires_at_unix_ms <= now_unix_ms
             || lease_expires_at_unix_ms.saturating_sub(now_unix_ms) > LINEAGE_FENCE_MAX_LEASE_MS

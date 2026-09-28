@@ -40,7 +40,7 @@ fn native_captured_lifecycle_executes_with_original_runtime_approval_and_dpop() 
                 fixture.binding.clone(),
                 super::super::super::registry(egress, InformationLabel::bottom())?,
                 Arc::new(CountingEmptyClassifier::new()),
-                Arc::new(Clock::default()),
+                Arc::new(FlowTestClock::default()),
                 flow_config(),
             )?
             .with_captured_lifecycle(),
@@ -290,7 +290,7 @@ fn native_combined_credentials_deny_missing_proof_or_changed_approved_intent_bef
             fixture.binding.clone(),
             super::super::super::registry(false, InformationLabel::bottom())?,
             Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(Clock::default()),
+            Arc::new(FlowTestClock::default()),
             flow_config(),
         )?);
         fixture.kernel.set_security_pre_dispatch_hook(resolver);

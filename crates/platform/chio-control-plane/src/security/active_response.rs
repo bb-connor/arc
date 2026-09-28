@@ -22,7 +22,7 @@ use chio_kernel::{
     ActiveResponseReceiptProofSource, AutomaticActiveResponseDispatchFenceOutcome,
 };
 use chio_quarantine::{decode_response_record, DurableActiveResponseOutcome, ResponseExecutor};
-use chio_security_kernel::SecurityClock;
+use chio_security_kernel::Clock;
 use chio_security_types::ports::{
     AutomaticResponseDispatchFenceOutcome, AutomaticResponseDispatchFenceRequest, Digest32,
     EffectPort, LeaseOwnerId, PortErrorKind, PreparedActiveResponseDispatchBinding, RecordId,
@@ -52,7 +52,6 @@ mod tests {
         build_response_plan, EffectMutation, EffectMutationRequest, EffectReceiptContext,
         ResponseStateMachine, ResponseTransitionRequest,
     };
-    use chio_security_kernel::SecurityClock;
     use chio_security_types::ports::{
         ActionId, AlertDeliveryQuery, AlertDeliveryStatus, CanonicalBody, Digest32,
         EffectExecutionStatus, EffectOperation, EffectPort, EffectRequest, EffectResult,
@@ -110,14 +109,25 @@ mod tests {
         }
     }
 
-    impl SecurityClock for FixedClock {
-        fn now_unix_ms(&self) -> PortResult<u64> {
-            let call = self.calls.fetch_add(1, Ordering::SeqCst).saturating_add(1);
-            if self.fail_on_call.load(Ordering::SeqCst) == call {
-                self.fail_on_call.store(0, Ordering::SeqCst);
-                return Err(PortError::unavailable());
-            }
-            Ok(self.now_unix_ms.load(Ordering::SeqCst))
+    impl chio_security_types::clock::Clock for FixedClock {
+        fn read(
+            &self,
+        ) -> core::result::Result<
+            chio_security_types::clock::ClockReading,
+            chio_security_types::clock::ClockError,
+        > {
+            let value: PortResult<u64> = (|| {
+                let call = self.calls.fetch_add(1, Ordering::SeqCst).saturating_add(1);
+                if self.fail_on_call.load(Ordering::SeqCst) == call {
+                    self.fail_on_call.store(0, Ordering::SeqCst);
+                    return Err(PortError::unavailable());
+                }
+                Ok(self.now_unix_ms.load(Ordering::SeqCst))
+            })();
+            let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+            chio_security_types::clock::Clock::read(
+                &chio_security_types::clock::FixedClock::from_millis(value),
+            )
         }
     }
 
@@ -125,9 +135,17 @@ mod tests {
         clock: Arc<FixedClock>,
     }
 
-    impl chio_store_sqlite::security_state::SecurityStateClock for TestStoreClock {
-        fn now_unix_ms(&self) -> PortResult<u64> {
-            Ok(self.clock.now_unix_ms.load(Ordering::SeqCst))
+    impl chio_security_types::clock::Clock for TestStoreClock {
+        fn read(
+            &self,
+        ) -> core::result::Result<
+            chio_security_types::clock::ClockReading,
+            chio_security_types::clock::ClockError,
+        > {
+            let value = self.clock.now_unix_ms.load(Ordering::SeqCst);
+            chio_security_types::clock::Clock::read(
+                &chio_security_types::clock::FixedClock::from_millis(value),
+            )
         }
     }
 
@@ -481,7 +499,7 @@ mod tests {
                 .unwrap_or_else(|error| panic!("create executor test directory: {error}"));
             let database_path = tempdir.path().join("active-response.sqlite3");
             let clock = Arc::new(FixedClock::new(now_unix_ms));
-            let store_clock: Arc<dyn chio_store_sqlite::security_state::SecurityStateClock> =
+            let store_clock: Arc<dyn chio_store_sqlite::security_state::Clock> =
                 Arc::new(TestStoreClock {
                     clock: Arc::clone(&clock),
                 });

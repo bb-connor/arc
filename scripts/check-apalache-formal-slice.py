@@ -468,26 +468,34 @@ def check_temporal_workflow() -> None:
     refinement = read("formal/tla/DistributedRevocationTemporalRefinement.tla")
     refinement_cfg = read("formal/tla/MCDistributedRevocationTemporalRefinement.cfg")
     witness = read("formal/tla/DistributedRevocationTemporalWitness.tla")
-    legacy_job = workflow_job(
+    propagation_job = workflow_job(
         text,
         "revocation_eventually_seen",
         "distributed_revocation_temporal",
     )
     verdict_job = workflow_job(text, "temporal_verdict", None)
 
-    outer_timeout = re.search(r"(?m)^    timeout-minutes: ([0-9]+)$", legacy_job)
-    inner_timeout = re.search(r"--timeout-seconds ([0-9]+)", legacy_job)
+    propagation_gate = read("scripts/check-revocation-propagation.py")
+    quotient = read("formal/tla/RevocationPropagationEpochQuotient.tla")
+    quotient_cfg = read("formal/tla/MCRevocationPropagationEpochQuotient.cfg")
     require(
-        outer_timeout is not None and inner_timeout is not None,
-        "legacy temporal job must declare both outer and inner timeouts",
+        "timeout-minutes: 10" in propagation_job
+        and "TIMEOUT_SECONDS = 60" in propagation_gate,
+        "finite propagation checks must keep bounded inner and outer deadlines",
     )
     require(
-        int(inner_timeout.group(1)) == 3600,
-        "legacy temporal evidence must retain its 3600-second model-check budget",
+        "scripts/check-revocation-propagation.py" in propagation_job
+        and "RevocationPropagationEpochQuotient" in propagation_gate
+        and "RevocationPropagationUnfairWitness" in propagation_gate,
+        "propagation gate must check the quotient and calibrate the fairness requirement",
     )
     require(
-        int(outer_timeout.group(1)) * 60 == int(inner_timeout.group(1)) + 900,
-        "legacy temporal job must reserve exactly 900 seconds for setup and teardown",
+        "EXTENDS RevocationPropagationPairRefinement" in quotient
+        and "Revoke(a, c)" in quotient and "WF_vars(PropagateAny)" in quotient
+        and "TemporalProjectionRefines" in quotient_cfg
+        and "RevocationEventuallySeen" in quotient_cfg
+        and "PendingCoversLag" in quotient_cfg,
+        "finite quotient must use original actions with checked projection and propagation",
     )
     require(
         "if: ${{ always() }}" in verdict_job,
@@ -499,7 +507,7 @@ def check_temporal_workflow() -> None:
             f"temporal verdict must depend on {dependency}",
         )
     require(
-        '[[ "${LEGACY_RESULT}" != "success" || "${DISTRIBUTED_RESULT}" != "success" ]]'
+        '[[ "${PROPAGATION_RESULT}" != "success" || "${DISTRIBUTED_RESULT}" != "success" ]]'
         in verdict_job,
         "temporal verdict must fail unless both temporal jobs succeed",
     )
@@ -513,7 +521,7 @@ def check_temporal_workflow() -> None:
         "apalache-temporal must not describe the liveness lane as advisory",
     )
     require(
-        "RevocationEventuallySeen" in text and "--temporal RevocationEventuallySeen" in text,
+        "RevocationEventuallySeen" in text and "scripts/check-revocation-propagation.py" in text,
         "apalache-temporal must run the named RevocationEventuallySeen liveness property",
     )
     require(
@@ -571,7 +579,7 @@ def check_temporal_workflow() -> None:
     )
     require(
         re.search(r"(?m)^INVARIANT\s*\n\s*SafetyInv\b", cfg) is not None,
-        "MCRevocationPropagationTemporal.cfg must check SafetyInv at the nightly length bound",
+        "MCRevocationPropagationTemporal.cfg must check SafetyInv for reproducing the preserved historical length bound",
     )
 
 
