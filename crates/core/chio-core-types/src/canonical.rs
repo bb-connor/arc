@@ -26,8 +26,10 @@ use serde_json::{Map, Value};
 
 use crate::error::{Error, Result};
 
+mod secret;
 #[path = "canonical/signed_json.rs"]
 mod signed_json;
+pub use secret::canonical_json_bytes_zeroizing;
 #[path = "canonical/untrusted.rs"]
 mod untrusted;
 pub use untrusted::{UntrustedJsonError, UntrustedJsonText};
@@ -199,7 +201,7 @@ fn write_canonical_value(value: &Value, out: &mut String) -> Result<()> {
         Value::Array(arr) => write_canonical_array(arr, out),
         Value::String(s) => {
             out.push('"');
-            out.push_str(&escape_json_string(s));
+            write_escaped_json_string(s, out);
             out.push('"');
             Ok(())
         }
@@ -233,7 +235,7 @@ fn write_canonical_object(map: &Map<String, Value>, out: &mut String) -> Result<
             out.push(',');
         }
         out.push('"');
-        out.push_str(&escape_json_string(key));
+        write_escaped_json_string(key, out);
         out.push_str("\":");
         write_canonical_value(value, out)?;
     }
@@ -513,8 +515,7 @@ fn trim_decimal(mut s: String) -> String {
 /// Quotes and reverse solidus use their mandatory JSON escapes. Control
 /// characters in the C0 range use the standard short forms when available and
 /// lowercase `\uXXXX` otherwise. DEL and C1 controls pass through as UTF-8.
-fn escape_json_string(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
+fn write_escaped_json_string(s: &str, result: &mut String) {
     for c in s.chars() {
         match c {
             '"' => result.push_str("\\\""),
@@ -526,12 +527,14 @@ fn escape_json_string(s: &str) -> String {
             '\t' => result.push_str("\\t"),
             c if c <= '\u{001f}' => {
                 // C0 controls without a short form use \uXXXX.
-                result.push_str(&format!("\\u{:04x}", c as u32));
+                let digits = b"0123456789abcdef";
+                result.push_str("\\u00");
+                result.push(char::from(digits[(c as usize) >> 4]));
+                result.push(char::from(digits[(c as usize) & 15]));
             }
             c => result.push(c),
         }
     }
-    result
 }
 
 /// A strictly-validated JSON value tree used by the text-parsing entry points.
@@ -645,7 +648,7 @@ impl StrictJson {
             StrictJson::Float(f) => out.push_str(&canonicalize_f64(*f)?),
             StrictJson::Str(s) => {
                 out.push('"');
-                out.push_str(&escape_json_string(s));
+                write_escaped_json_string(s, out);
                 out.push('"');
             }
             StrictJson::Array(items) => {
@@ -668,7 +671,7 @@ impl StrictJson {
                         out.push(',');
                     }
                     out.push('"');
-                    out.push_str(&escape_json_string(key));
+                    write_escaped_json_string(key, out);
                     out.push_str("\":");
                     value.write_canonical(out)?;
                 }

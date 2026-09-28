@@ -854,15 +854,26 @@ pub(crate) fn build_checkpoint_after_frontier_cache_miss_with_hook(
         after_audit(tx)?;
         if staged_head
             .claim_log_max_seq
-            .saturating_sub(staged_head.checkpointed_entry_seq())
+            .checked_sub(staged_head.checkpointed_entry_seq())
+            .ok_or_else(|| {
+                ReceiptStoreError::Conflict("checkpoint extends beyond claim log head".into())
+            })?
             < signer.max_batch
         {
             staged_head.chain_frontier = Some(frontier.clone());
             return Ok((frontier, advanced));
         }
 
-        let start_seq = staged_head.checkpointed_entry_seq().saturating_add(1);
-        let end_seq = start_seq.saturating_add(signer.max_batch - 1);
+        let start_seq = staged_head
+            .checkpointed_entry_seq()
+            .checked_add(1)
+            .ok_or_else(|| ReceiptStoreError::Conflict("claim log sequence overflow".into()))?;
+        let end_seq = staged_head
+            .checkpointed_entry_seq()
+            .checked_add(signer.max_batch)
+            .ok_or_else(|| {
+                ReceiptStoreError::Conflict("checkpoint batch sequence overflow".into())
+            })?;
         ensure_claim_log_range_contiguous(tx, start_seq, end_seq, "checkpoint range")?;
         let receipt_bytes = load_claim_tree_canonical_bytes_range(tx, start_seq, end_seq)?
             .into_iter()

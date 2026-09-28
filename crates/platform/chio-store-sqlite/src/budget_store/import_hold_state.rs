@@ -109,6 +109,7 @@ impl SqliteBudgetStore {
                         false,
                         HoldDisposition::Open,
                         record.authority.as_ref(),
+                        record.recorded_at,
                     )
                 } else {
                     Self::delete_hold_if_exists(transaction, hold_id)
@@ -155,6 +156,7 @@ impl SqliteBudgetStore {
                     hold.invocation_captured,
                     disposition,
                     record.authority.as_ref().or(hold.authority.as_ref()),
+                    record.recorded_at,
                 )
             }
             BudgetMutationKind::CancelCapturedBeforeDispatch => {
@@ -192,6 +194,7 @@ impl SqliteBudgetStore {
                     false,
                     HoldDisposition::Reversed,
                     record.authority.as_ref().or(hold.authority.as_ref()),
+                    record.recorded_at,
                 )
             }
             BudgetMutationKind::CaptureInvocation => {
@@ -232,6 +235,7 @@ impl SqliteBudgetStore {
                     true,
                     hold.disposition,
                     record.authority.as_ref().or(hold.authority.as_ref()),
+                    record.recorded_at,
                 )
             }
             BudgetMutationKind::ReverseExposure => {
@@ -260,6 +264,7 @@ impl SqliteBudgetStore {
                     false,
                     HoldDisposition::Reversed,
                     record.authority.as_ref(),
+                    record.recorded_at,
                 )
             }
             BudgetMutationKind::ReconcileSpend => {
@@ -290,6 +295,7 @@ impl SqliteBudgetStore {
                     true,
                     HoldDisposition::Reconciled,
                     record.authority.as_ref(),
+                    record.recorded_at,
                 )
             }
             BudgetMutationKind::ReserveInvocation

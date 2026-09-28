@@ -118,7 +118,12 @@ impl BrokerQuotaVerifier {
             return Err(rejected());
         }
         let execute: BrokerExecuteRequest =
-            serde_json::from_slice(bytes).map_err(|_| rejected())?;
+            chio_core_types::canonical::UntrustedJsonText::from_wire(
+                bytes,
+                MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES,
+            )
+            .and_then(|text| text.decode_canonical())
+            .map_err(|_| rejected())?;
         // Exact typed canonical bytes reject duplicate fields, unknown options
         // and alternate encodings. Every behavior-affecting request byte is
         // also bound by the kernel's independently computed argument digest.

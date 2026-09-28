@@ -38,6 +38,11 @@ class BoundaryGateCalibration(unittest.TestCase):
         errors = self.errors(path, lambda text: text + '\nfn bypass(s: &str) { serde_json::from_str(s) }')
         self.assertTrue(any("raw_decoders" in error for error in errors), errors)
 
+    def test_documented_decoders_are_not_production_calls(self):
+        path = self.catalog["signed_input_files"][0]
+        errors = self.errors(path, lambda text: text + '\n/// fn example() { serde_json::from_slice(bytes); }\nfn text_only() { let s = "serde_json::from_str(bytes)"; }')
+        self.assertEqual(errors, [])
+
     def test_new_table_requires_a_principal(self):
         errors = self.errors(gate.STORE + "/new_schema.sql", lambda _: "CREATE TABLE leaked (tenant_id TEXT, id TEXT);")
         self.assertTrue(any("classification is incomplete" in error for error in errors), errors)
@@ -46,6 +51,11 @@ class BoundaryGateCalibration(unittest.TestCase):
         proof = self.catalog["proofs"][0]
         errors = self.errors(proof["path"], lambda text: text.replace("    id: String,", "    pub id: String,", 1))
         self.assertTrue(any("proof fields are not sealed" in error for error in errors), errors)
+
+    def test_derived_proof_deserializer_is_rejected(self):
+        proof = self.catalog["proofs"][0]
+        errors = self.errors(proof["path"], lambda text: text.replace("pub struct " + proof["type"], "#[derive(serde::Deserialize)]\npub struct " + proof["type"], 1))
+        self.assertTrue(any("proof implements Deserialize" in error for error in errors), errors)
 
     def test_secret_extraction_outside_custody_is_rejected(self):
         errors = self.errors(gate.STORE + "/leaked.rs", lambda _: "fn send(package: FrostRound2Package) { package.secret_bytes(); }")

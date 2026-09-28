@@ -224,3 +224,14 @@ fn envelope_roundtrips_through_serde() {
     // presence on the parsed envelope.
     let _: &Signature = &decoded.signature;
 }
+
+#[test]
+fn passport_reader_rejects_duplicate_members_before_signature_verification() {
+    let issuer = Keypair::generate();
+    let envelope = build_envelope(&issuer, "did:chio:agent-1", ISSUED_AT, EXPIRES_AT);
+    let wire = String::from_utf8(serialize_envelope(&envelope)).expect("JSON");
+    let wire = wire.replacen("\"subject\":", "\"subject\":\"shadow\",\"subject\":", 1);
+    assert!(
+        matches!(verify_passport(wire.as_bytes(), &[issuer.public_key()], &FixedClock::new(ISSUED_AT + 1)), Err(VerifyError::InvalidEnvelope(code)) if code == "urn:chio:error:attest:signed-json-invalid-input")
+    );
+}

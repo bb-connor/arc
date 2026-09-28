@@ -886,7 +886,7 @@ mod preconnected_execution_tests {
             },
         ];
 
-        for envelope in envelopes {
+        for (case, envelope) in envelopes.into_iter().enumerate() {
             let response_frame =
                 canonical_json_bytes(&envelope).test_expect("denial response envelope");
             let (client, mut server) = deadline_bounded_pair();
@@ -904,8 +904,15 @@ mod preconnected_execution_tests {
             .test_expect_err("tampered denial must fail closed");
             server.join().test_expect("IPC server");
             assert!(matches!(
-                error,
-                BrokerError::AuthorizationDenied(_) | BrokerError::AuthorityUnavailable(_)
+                (case, error),
+                (0..=2, BrokerError::AuthorizationDenied(_))
+                    | (3, BrokerError::AuthorityUnavailable(_))
+                    | (
+                        4,
+                        BrokerError::UntrustedInput(
+                            chio_core_types::canonical::UntrustedJsonError::NonCanonical
+                        )
+                    )
             ));
         }
     }
@@ -981,7 +988,12 @@ mod preconnected_execution_tests {
             if expected_authority_unavailable {
                 assert!(matches!(error, BrokerError::AuthorityUnavailable(_)));
             } else {
-                assert!(matches!(error, BrokerError::AuthorizationDenied(_)));
+                assert!(matches!(
+                    error,
+                    BrokerError::UntrustedInput(
+                        chio_core_types::canonical::UntrustedJsonError::NonCanonical
+                    )
+                ));
             }
         }
     }

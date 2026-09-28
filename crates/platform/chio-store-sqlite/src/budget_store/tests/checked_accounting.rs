@@ -418,15 +418,16 @@ fn sql_hold_predicate_refuses_underflow_and_wrong_remainder_without_rust_prechec
             .begin_write(&mut connection)
             .test_expect("transaction");
         // Call the SQL writer directly, bypassing the release API's amount checks.
-        let error = SqliteBudgetStore::update_hold(
-            &transaction,
-            "hold",
-            consumed,
-            remaining,
-            HoldDisposition::Released,
-            None,
-        )
-        .test_expect_err("SQL predicate refuses write");
+        let error = store
+            .update_hold(
+                &transaction,
+                "hold",
+                consumed,
+                remaining,
+                HoldDisposition::Released,
+                None,
+            )
+            .test_expect_err("SQL predicate refuses write");
         assert!(
             matches!(&error, BudgetStoreError::Invariant(reason)
             if reason == "budget hold compare-and-set failed"),

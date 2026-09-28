@@ -683,17 +683,13 @@ impl SqliteBrokerReceiptSink {
     }
 
     fn decode_stored_receipt(&self, canonical: &[u8]) -> Result<SignedBrokerReceipt> {
-        let receipt: SignedBrokerReceipt = serde_json::from_slice(canonical).map_err(|error| {
-            BrokerError::Storage(format!("persisted broker receipt decoding failed: {error}"))
-        })?;
-        let reencoded = canonical_json_bytes(&receipt).map_err(|error| {
-            BrokerError::Storage(format!("persisted broker receipt encoding failed: {error}"))
-        })?;
-        if reencoded != canonical {
-            return Err(BrokerError::Storage(
-                "persisted broker receipt is not canonical JSON".to_string(),
-            ));
-        }
+        let receipt: SignedBrokerReceipt =
+            chio_core_types::canonical::UntrustedJsonText::from_wire(
+                canonical,
+                MAX_DURABLE_COMPLETED_RESPONSE_BYTES,
+            )
+            .and_then(|text| text.decode_canonical())
+            .map_err(BrokerError::UntrustedInput)?;
         verify_execution_receipt(&receipt, &self.trusted_signer)?;
         Ok(receipt)
     }
@@ -719,21 +715,12 @@ impl SqliteBrokerReceiptSink {
         canonical: &[u8],
     ) -> Result<SignedBrokerFailureReceipt> {
         let receipt: SignedBrokerFailureReceipt =
-            serde_json::from_slice(canonical).map_err(|error| {
-                BrokerError::Storage(format!(
-                    "persisted broker failure receipt decoding failed: {error}"
-                ))
-            })?;
-        let reencoded = canonical_json_bytes(&receipt).map_err(|error| {
-            BrokerError::Storage(format!(
-                "persisted broker failure receipt encoding failed: {error}"
-            ))
-        })?;
-        if reencoded != canonical {
-            return Err(BrokerError::Storage(
-                "persisted broker failure receipt is not canonical JSON".to_string(),
-            ));
-        }
+            chio_core_types::canonical::UntrustedJsonText::from_wire(
+                canonical,
+                MAX_DURABLE_COMPLETED_RESPONSE_BYTES,
+            )
+            .and_then(|text| text.decode_canonical())
+            .map_err(BrokerError::UntrustedInput)?;
         verify_failure_receipt(&receipt, &self.trusted_signer)?;
         Ok(receipt)
     }
@@ -962,23 +949,18 @@ impl BrokerReceiptSink for SqliteBrokerReceiptSink {
         }
         let receipt = self.decode_stored_receipt(&canonical_receipt)?;
         let response: BrokerExecuteResponse =
-            serde_json::from_slice(&canonical_response).map_err(|error| {
-                BrokerError::Storage(format!(
-                    "durable completed broker response decoding failed: {error}"
-                ))
-            })?;
-        let recanonical = canonical_json_bytes(&response).map_err(|error| {
-            BrokerError::Storage(format!(
-                "durable completed broker response encoding failed: {error}"
-            ))
-        })?;
-        if recanonical != canonical_response
-            || response.receipt != receipt
+            chio_core_types::canonical::UntrustedJsonText::from_wire(
+                &canonical_response,
+                MAX_DURABLE_COMPLETED_RESPONSE_BYTES,
+            )
+            .and_then(|text| text.decode_canonical())
+            .map_err(BrokerError::UntrustedInput)?;
+        if response.receipt != receipt
             || response.receipt.body.receipt_id != stored_receipt_id
             || response.evidence.attempt_id != attempt_id
         {
             return Err(BrokerError::Storage(
-                "durable completed broker response is noncanonical or misbound".to_string(),
+                "durable completed broker response is misbound".to_string(),
             ));
         }
         validate_durable_completed_response(&response, &self.trusted_signer)?;

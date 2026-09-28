@@ -577,8 +577,10 @@ pub fn decode_execute_request(bytes: &[u8]) -> Result<BrokerExecuteRequest> {
             "broker execute frame is empty or oversized".to_string(),
         ));
     }
-    let request: BrokerExecuteRequest = serde_json::from_slice(bytes)
-        .map_err(|error| BrokerError::InvalidRequest(format!("invalid execute frame: {error}")))?;
+    let request: BrokerExecuteRequest =
+        chio_core_types::canonical::UntrustedJsonText::from_wire(bytes, MAX_WIRE_BYTES)
+            .and_then(|text| text.decode_signed())
+            .map_err(BrokerError::UntrustedInput)?;
     request.validate_bounds()?;
     Ok(request)
 }

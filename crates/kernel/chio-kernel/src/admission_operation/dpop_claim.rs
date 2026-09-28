@@ -84,7 +84,9 @@ impl DpopReplayCredentialV1 {
         let seconds = authority_time_unix_ms / 1000;
         if seconds > self.valid_through_unix_secs()?
             || self.issued_at_unix_secs
-                > seconds.saturating_add(self.authority.max_clock_skew_secs())
+                > seconds
+                    .checked_add(self.authority.max_clock_skew_secs())
+                    .ok_or_else(|| invalid("proof skew horizon exceeds clock bounds"))?
         {
             return Err(invalid("proof is not fresh at the authority clock"));
         }

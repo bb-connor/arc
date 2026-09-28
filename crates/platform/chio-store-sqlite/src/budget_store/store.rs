@@ -18,6 +18,13 @@ const BUDGET_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["capability_grant_budgets"]
 
 impl SqliteBudgetStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, BudgetStoreError> {
+        Self::open_with_clock(path, Arc::new(SystemClock))
+    }
+
+    pub fn open_with_clock(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, BudgetStoreError> {
         let path = path.as_ref();
         // Resolve any `file:` URI to its on-disk parent before creating it, so a
         // URI-configured store creates the real backing directory rather than a
@@ -33,6 +40,8 @@ impl SqliteBudgetStore {
         Ok(Self {
             connection: Arc::new(StoreConnection::transaction_only("budget", connection)),
             serving_owner: None,
+            clock,
+            clock_fence: Arc::new(Mutex::new(ClockFence::default())),
         })
     }
 
@@ -244,7 +253,18 @@ impl SqliteBudgetStore {
         Self {
             connection,
             serving_owner: Some(serving_owner),
+            clock: Arc::new(SystemClock),
+            clock_fence: Arc::new(Mutex::new(ClockFence::default())),
         }
+    }
+
+    pub(super) fn unix_now(&self) -> Result<i64, BudgetStoreError> {
+        let mut fence = self
+            .clock_fence
+            .lock()
+            .map_err(|_| ClockError::Unavailable)?;
+        let reading = fence.observe(self.clock.read()?)?;
+        i64::try_from(reading.unix_millis().as_secs()).map_err(|_| ClockError::Overflow.into())
     }
 
     pub(super) fn connection(&self) -> Result<MutexGuard<'_, Connection>, BudgetStoreError> {
@@ -257,6 +277,8 @@ impl SqliteBudgetStore {
         &self,
         connection: &'a mut Connection,
     ) -> Result<rusqlite::Transaction<'a>, BudgetStoreError> {
+        // Clock failure also denies an idempotent mutation replay before any write.
+        self.unix_now()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         crate::serving_owner::verify_budget_fence(&transaction, self.serving_owner.as_deref())?;
         if let Some(owner) = self.serving_owner.as_ref() {
@@ -1108,6 +1130,7 @@ impl SqliteBudgetStore {
     }
 
     fn generated_event_id(
+        &self,
         transaction: &rusqlite::Transaction<'_>,
     ) -> Result<String, BudgetStoreError> {
         let count =
@@ -1116,8 +1139,10 @@ impl SqliteBudgetStore {
             })?;
         Ok(format!(
             "sqlite-budget-event-{}-{}",
-            unix_now(),
-            count.max(0) + 1
+            self.unix_now()?,
+            count.checked_add(1).filter(|_| count >= 0).ok_or_else(|| {
+                BudgetStoreError::Overflow("budget event number exceeds SQLite range".into())
+            })?
         ))
     }
 
@@ -1271,6 +1296,7 @@ impl SqliteBudgetStore {
     }
 
     pub(super) fn create_hold(
+        &self,
         transaction: &rusqlite::Transaction<'_>,
         hold_id: &str,
         capability_id: &str,
@@ -1278,7 +1304,7 @@ impl SqliteBudgetStore {
         authorized_exposure_units: u64,
         authority: Option<&BudgetEventAuthority>,
     ) -> Result<(), BudgetStoreError> {
-        let now = unix_now();
+        let now = self.unix_now()?;
         transaction.execute(
             r#"
             INSERT INTO budget_authorization_holds (
@@ -1316,6 +1342,7 @@ impl SqliteBudgetStore {
     }
 
     pub(super) fn update_hold(
+        &self,
         transaction: &rusqlite::Transaction<'_>,
         hold_id: &str,
         consumed_exposure_units: u64,
@@ -1346,7 +1373,7 @@ impl SqliteBudgetStore {
                 authority
                     .map(|value| budget_u64_to_sqlite(value.lease_epoch, "lease_epoch"))
                     .transpose()?,
-                unix_now(),
+                self.unix_now()?,
                 budget_u64_to_sqlite(consumed_exposure_units, "consumed_exposure_units")?,
             ],
         )?;
@@ -1369,8 +1396,9 @@ impl SqliteBudgetStore {
         invocation_captured: bool,
         disposition: HoldDisposition,
         authority: Option<&BudgetEventAuthority>,
+        recorded_at: i64,
     ) -> Result<(), BudgetStoreError> {
-        let now = unix_now();
+        let now = recorded_at;
         transaction.execute(
             r#"
             INSERT INTO budget_authorization_holds (
@@ -1653,6 +1681,7 @@ impl SqliteBudgetStore {
 
     #[allow(clippy::too_many_arguments)]
     pub(super) fn append_mutation_event(
+        &self,
         transaction: &rusqlite::Transaction<'_>,
         event_id: Option<&str>,
         hold_id: Option<&str>,
@@ -1675,9 +1704,9 @@ impl SqliteBudgetStore {
         validate_budget_grant_index(grant_index)?;
         let event_id = match event_id {
             Some(event_id) => event_id.to_string(),
-            None => Self::generated_event_id(transaction)?,
+            None => self.generated_event_id(transaction)?,
         };
-        let recorded_at = unix_now();
+        let recorded_at = self.unix_now()?;
         let (
             authorization_outcome,
             invocation_state_before,
@@ -1853,12 +1882,12 @@ impl SqliteBudgetStore {
             )
             .optional()?;
         let (current, total_cost_exposed, total_cost_realized_spend) = current.unwrap_or((0, 0, 0));
-        let updated_at = unix_now();
+        let updated_at = self.unix_now()?;
 
         let allowed = budget_increment_admits(current, max_invocations);
         if !allowed {
             let event_seq = allocate_budget_replication_seq(&transaction)?;
-            SqliteBudgetStore::append_mutation_event(
+            self.append_mutation_event(
                 &transaction,
                 event_id,
                 None,
@@ -1910,7 +1939,7 @@ impl SqliteBudgetStore {
                 budget_u64_to_sqlite(seq, "seq")?,
             ],
         )?;
-        SqliteBudgetStore::append_mutation_event(
+        self.append_mutation_event(
             &transaction,
             event_id,
             None,

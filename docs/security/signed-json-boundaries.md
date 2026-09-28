@@ -78,3 +78,23 @@ execute-failure receipts. Their local typed sources retain the registered URNs.
 Putting a full URN after the broker prefix would create an invalid diagnostic;
 the signed-envelope regression rejects that former mapping and verifies the
 correctly bound failure receipt.
+
+## September 28 continuation
+
+The bounded reader now also owns federation authority profiles, issuance and
+revocation requests, peer pins, portable passport envelopes, classifier field
+paths, declassification request hashes, and broker audit/provision/receipt readers.
+Public signed input keeps the lossless native integer contract. Stored and IPC
+canonical records enforce exact bytes before their existing signatures and bindings.
+Broker and authority input errors retain the structured parser source.
+
+Authority private-key custody now uses exact canonical JSON and zeroizing seed
+fields. Its Debug output is redacted, and its serialized writer returns a
+zeroizing string. Canonical private decoding also wipes string values and keys
+in the intermediate value tree. String escaping writes directly into the output.
+No compatibility parser accepts older pretty-printed custody.
+The FROST store likewise uses constrained readers for all persisted record forms.
+
+The current source gate inventories 44 constrained constructors and ten sealed
+result types; it ignores decoder spellings inside comments and literals. This
+expands the reviewed owners, not the claim to every decoder in the workspace.

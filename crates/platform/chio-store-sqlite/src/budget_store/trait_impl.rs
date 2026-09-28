@@ -216,7 +216,7 @@ impl BudgetStore for SqliteBudgetStore {
               AND invocation_count_debited = 1
               AND invocation_captured = 0
             "#,
-            params![&request.hold_id, unix_now()],
+            params![&request.hold_id, self.unix_now()?],
         )?;
         if changed != 1 {
             transaction.rollback()?;
@@ -226,7 +226,7 @@ impl BudgetStore for SqliteBudgetStore {
             )));
         }
 
-        SqliteBudgetStore::append_mutation_event(
+        self.append_mutation_event(
             &transaction,
             Some(&request.event_id),
             Some(&request.hold_id),
@@ -426,7 +426,7 @@ impl BudgetStore for SqliteBudgetStore {
                 InvocationCount::new(current.0)
                     .try_sub(InvocationCount::new(1))?
                     .get(),
-                unix_now(),
+                self.unix_now()?,
                 budget_u64_to_sqlite(event_seq, "seq")?,
                 budget_u64_to_sqlite(total_cost_exposed_after, "total_cost_exposed")?,
                 i64::from(current.0),
@@ -439,7 +439,7 @@ impl BudgetStore for SqliteBudgetStore {
                 "budget usage compare-and-set failed".into(),
             ));
         }
-        SqliteBudgetStore::update_hold(
+        self.update_hold(
             &transaction,
             &request.hold_id,
             hold.authorized_exposure_units,
@@ -451,7 +451,7 @@ impl BudgetStore for SqliteBudgetStore {
             "UPDATE budget_authorization_holds SET invocation_captured = 0 WHERE hold_id = ?1",
             params![&request.hold_id],
         )?;
-        SqliteBudgetStore::append_mutation_event(
+        self.append_mutation_event(
             &transaction,
             Some(&request.event_id),
             Some(&request.hold_id),
@@ -860,7 +860,7 @@ impl BudgetStore for SqliteBudgetStore {
                 InvocationCount::new(invocation_count)
                     .try_sub(InvocationCount::new(1))?
                     .get(),
-                unix_now(),
+                self.unix_now()?,
                 budget_u64_to_sqlite(seq, "seq")?,
                 budget_u64_to_sqlite(new_total_cost_exposed, "total_cost_exposed")?,
                 i64::from(invocation_count),
@@ -886,7 +886,7 @@ impl BudgetStore for SqliteBudgetStore {
                 .as_ref(),
                 authority,
             )?;
-            SqliteBudgetStore::update_hold(
+            self.update_hold(
                 &transaction,
                 hold_id,
                 cost_units,
@@ -895,7 +895,7 @@ impl BudgetStore for SqliteBudgetStore {
                 next_authority.as_ref(),
             )?;
         }
-        SqliteBudgetStore::append_mutation_event(
+        self.append_mutation_event(
             &transaction,
             event_id,
             hold_id,
@@ -1071,7 +1071,7 @@ impl BudgetStore for SqliteBudgetStore {
             params![
                 capability_id,
                 grant_index as i64,
-                unix_now(),
+                self.unix_now()?,
                 budget_u64_to_sqlite(seq, "seq")?,
                 budget_u64_to_sqlite(new_total_cost_exposed, "total_cost_exposed")?,
                 i64::from(invocation_count),
@@ -1104,7 +1104,7 @@ impl BudgetStore for SqliteBudgetStore {
             } else {
                 HoldDisposition::Open
             };
-            SqliteBudgetStore::update_hold(
+            self.update_hold(
                 &transaction,
                 hold_id,
                 cost_units,
@@ -1113,7 +1113,7 @@ impl BudgetStore for SqliteBudgetStore {
                 next_authority.as_ref(),
             )?;
         }
-        SqliteBudgetStore::append_mutation_event(
+        self.append_mutation_event(
             &transaction,
             event_id,
             hold_id,
@@ -1321,7 +1321,7 @@ impl BudgetStore for SqliteBudgetStore {
             params![
                 capability_id,
                 grant_index as i64,
-                unix_now(),
+                self.unix_now()?,
                 budget_u64_to_sqlite(seq, "seq")?,
                 budget_u64_to_sqlite(new_total_cost_exposed, "total_cost_exposed")?,
                 budget_u64_to_sqlite(new_total_cost_realized_spend, "total_cost_realized_spend",)?,
@@ -1348,7 +1348,7 @@ impl BudgetStore for SqliteBudgetStore {
                 .as_ref(),
                 authority,
             )?;
-            SqliteBudgetStore::update_hold(
+            self.update_hold(
                 &transaction,
                 hold_id,
                 exposed_cost_units,
@@ -1357,7 +1357,7 @@ impl BudgetStore for SqliteBudgetStore {
                 next_authority.as_ref(),
             )?;
         }
-        SqliteBudgetStore::append_mutation_event(
+        self.append_mutation_event(
             &transaction,
             event_id,
             hold_id,

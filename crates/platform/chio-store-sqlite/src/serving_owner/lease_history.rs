@@ -199,7 +199,9 @@ pub(super) fn verify_serving_lease_history(
         })?;
     }
 
-    let lease_count = expected_epoch - 1;
+    let lease_count = expected_epoch.checked_sub(1).ok_or_else(|| {
+        SqliteServingOwnerError::Invalid("serving lease history has no initial epoch".into())
+    })?;
     if owner_epoch == 0 {
         if lease_count != 0 || active_lease_id.is_some() || active_opened_at_ms.is_some() {
             return Err(SqliteServingOwnerError::Invalid(

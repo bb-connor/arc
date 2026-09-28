@@ -356,8 +356,17 @@ pub fn mint_execution_nonce_with_reservation(
     config: &ExecutionNonceConfig,
     now: i64,
 ) -> Result<SignedExecutionNonce, KernelError> {
-    let ttl = i64::try_from(config.nonce_ttl_secs).unwrap_or(i64::MAX);
-    let expires_at = now.saturating_add(ttl);
+    let ttl = i64::try_from(config.nonce_ttl_secs)
+        .ok()
+        .filter(|ttl| *ttl > 0)
+        .ok_or_else(|| {
+            KernelError::InvalidConstraint(
+                "execution nonce TTL is outside the positive clock domain".into(),
+            )
+        })?;
+    let expires_at = now.checked_add(ttl).filter(|_| now >= 0).ok_or_else(|| {
+        KernelError::InvalidConstraint("execution nonce expiry exceeds the clock domain".into())
+    })?;
     let nonce = ExecutionNonce {
         schema: EXECUTION_NONCE_SCHEMA.to_string(),
         nonce_id: Uuid::now_v7().as_hyphenated().to_string(),
@@ -644,6 +653,28 @@ mod tests {
         assert_eq!(signed.nonce.expires_at, now + cfg.nonce_ttl_secs as i64);
 
         verify_execution_nonce(&signed, &kp.public_key(), &binding, now + 1, &store).unwrap();
+    }
+
+    #[test]
+    fn nonce_mint_refuses_empty_negative_and_overflowing_lifetimes() {
+        let key = Keypair::from_seed(&[33; 32]);
+        for (now, ttl) in [(1, 0), (-1, 1), (1, u64::MAX), (i64::MAX, 1)] {
+            let config = ExecutionNonceConfig {
+                nonce_ttl_secs: ttl,
+                ..ExecutionNonceConfig::default()
+            };
+            assert!(
+                matches!(mint_execution_nonce(&key, sample_binding(), &config, now),
+                Err(KernelError::InvalidConstraint(reason)) if reason.starts_with("execution nonce"))
+            );
+        }
+        let config = ExecutionNonceConfig {
+            nonce_ttl_secs: 1,
+            ..ExecutionNonceConfig::default()
+        };
+        let signed = mint_execution_nonce(&key, sample_binding(), &config, i64::MAX - 1)
+            .expect("exact endpoint");
+        assert_eq!(signed.nonce.expires_at, i64::MAX);
     }
 
     #[test]

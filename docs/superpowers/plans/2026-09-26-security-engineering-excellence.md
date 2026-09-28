@@ -23,7 +23,7 @@ and [pass 7](../../reviews/2026-09-26-review-validation-pass-7.md) validations,
 against `3cd73631a1` plus the uncommitted Packet 1 tree. Standing rules live in the
 [security engineering standard](../../security/engineering-standard.md).
 
-## Current execution status (September 27)
+## Current execution status (September 28)
 
 The original sequencing and checkboxes below have been reconciled with the local
 implementation records. Gate/configuration delivery, response authority types,
@@ -462,8 +462,8 @@ launch regression typechecks there and requires x86_64 to execute.
 - [x] Retain the `saturating_*` and `wrapping_*` inventory in the security crates,
       kernel and stores: 638 source lines at `4c35ce7867`, including fixtures.
 - [ ] Finish classifying each site as correct-by-intent or defect. The retained
-      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 130
-      sites (66 repaired sites); 508 remain explicitly pending.
+      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 146
+      sites (82 repaired sites); 492 remain explicitly pending.
 - [ ] A `wrapping_*` in an accounting, quota, counter or deadline path is a defect:
       fix it and add the regression.
 - [ ] A `saturating_sub` in an accounting path silently clamps to zero, hiding the
@@ -513,7 +513,7 @@ depend on a deterministically drivable time source.
 
 **Checkpoint (September 27):** The shared contract, three original trait
 migrations, response deadlines, regression gate and bounded proofs are delivered.
-The gate pins 208 remaining sites including fixtures and the independent Finding
+The gate pins 206 remaining sites including fixtures and the independent Finding
 commit clock. The [execution record](../../reviews/2026-09-27-shared-clock-response-assurance.md)
 records the migrated consumers and deadline classification. Repository-wide
 ambient-time replacement and classification remain open; this does not close Q5.
@@ -775,7 +775,7 @@ the 64 tenant-scoped tables, `receipt_store/bootstrap/open.rs` triggers.
       an external artifact and what the consistency check is; which have no external
       pairing and all writes through RAII transactions, where recovery after a
       verified rollback is permitted with the reason stated.
-- [ ] Four tests per store with specific outcomes, never "the next operation
+- [x] Four recovery cutpoints per externally anchored store with specific outcomes, never "the next operation
       succeeds": panic before commit (rollback verified, next operation succeeds);
       panic with rollback made to fail through the authorizer (fenced, uncommitted
       row never read); panic after commit before the anchor write (refuse or
@@ -790,7 +790,12 @@ the 64 tenant-scoped tables, `receipt_store/bootstrap/open.rs` triggers.
 - [ ] Do not reach for `parking_lot`: a non-poisoning mutex hides the panic.
 
 Implementation and local tests: [resumed execution](../../reviews/2026-09-26-resumed-execution.md).
-The per-store, four-cutpoint mutation campaign above is a separate acceptance item.
+The September 28 owner run passes all 91 existing connection recovery cases across
+20 per-store modules. Transaction-only stores check verified rollback, denied
+rollback and committed state without an external-anchor phase. The unchanged
+rollback-failure regression passes against the shared production helper and fails
+against an isolated blind-recovery mutant. See the
+[reader, accounting and recovery continuation](../../reviews/2026-09-28-reader-accounting-recovery-execution.md).
 
 #### 10.2 Type the untrusted-serialization boundary (S2)
 
@@ -801,15 +806,17 @@ The per-store, four-cutpoint mutation campaign above is a separate acceptance it
 - [x] Migrate correction 1F's receipt, signed export, lineage, manifest, keyring,
       broker and response-authority readers. The closed checkpoint decoder and
       dedicated zeroizing broker credential decoder retain explicit contracts.
-- [x] Gate the 18 constructor sites and remaining raw decoders in migrated files;
+- [x] Gate the 44 constructor sites and remaining raw decoders in migrated files;
       calibrate injected decoder bypasses. The gate does not classify arbitrary
       new reader APIs outside those files.
 - [ ] Complete the broader wire/file/database reader census and migration.
 
 Implementation and focused evidence: [trust-boundary execution](../../reviews/2026-09-27-trust-boundary-execution.md).
 The subsequent [sealed ceremony batch](../../reviews/2026-09-27-frost-sealed-ceremony-execution.md)
-adds constrained canonical readers for every FROST store record. Broader census
-closure remains open.
+adds constrained canonical readers for every FROST store record. The
+[September 28 continuation](../../reviews/2026-09-28-reader-accounting-recovery-execution.md)
+adds 22 more constructor sites, private canonical custody and proof-result sealing.
+Broader census closure remains open.
 
 #### 10.3 Classify tenant scoping by the enforcing principal (S3, corrected by the external review's R4)
 

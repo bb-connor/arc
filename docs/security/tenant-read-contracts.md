@@ -36,3 +36,10 @@ PostgreSQL tenant tables; those have separate owning surfaces.
 
 Run `python3 scripts/check-trust-boundaries.py` and its calibration test at
 `scripts/tests/check-trust-boundaries.test.py`. CI runs both.
+
+The September 28 continuation adds exact-identifier model/SQLite tests for flow,
+correlation and event scans, response plans and effects, overlay contributions,
+lineage fences and scheduler claims. Every tested read first proves the tenant A
+record exists, then supplies A's unchanged identifiers with tenant B's scope.
+The SQLite read checks repeat after restart. The exhaustive table/principal
+matrix remains open. See the [execution record](../reviews/2026-09-28-reader-accounting-recovery-execution.md).

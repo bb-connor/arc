@@ -238,8 +238,10 @@ fn validate_field_path(payload: &[u8], path: &str) -> Result<(), ClassificationM
     if !path.starts_with('/') {
         return Err(ClassificationMappingError::InvalidFieldPath);
     }
-    let document: serde_json::Value = serde_json::from_slice(payload)
-        .map_err(|_| ClassificationMappingError::InvalidFieldPath)?;
+    let document: serde_json::Value =
+        chio_core_types::canonical::UntrustedJsonText::from_wire(payload, 16 * 1024 * 1024)
+            .and_then(|text| text.decode_signed())
+            .map_err(|_| ClassificationMappingError::InvalidFieldPath)?;
     document
         .pointer(path)
         .map(|_| ())

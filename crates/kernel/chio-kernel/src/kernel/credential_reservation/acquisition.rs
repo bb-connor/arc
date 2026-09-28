@@ -61,7 +61,13 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
                 })?;
                 reservation.dpop_key =
                     Some((proof.body.nonce.clone(), proof.body.capability_id.clone()));
-                let valid_through = proof.body.issued_at.saturating_add(config.proof_ttl_secs);
+                let valid_through = proof
+                    .body
+                    .issued_at
+                    .checked_add(config.proof_ttl_secs)
+                    .ok_or_else(|| {
+                        KernelError::DpopVerificationFailed("DPoP proof horizon overflow".into())
+                    })?;
                 match run_credential_store_operation(
                     &reservation.reservation_id,
                     "DPoP nonce reservation",

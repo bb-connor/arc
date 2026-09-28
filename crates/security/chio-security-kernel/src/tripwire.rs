@@ -210,8 +210,8 @@ impl DecoyTripwireDetectorPort {
             .first()
             .ok_or_else(PortError::integrity_failure)?;
         Ok(TripwireDecision::Match {
-            artifact_id_hash: hit.evidence.artifact_id_hash,
-            artifact_version_hash: hit.evidence.version_hash,
+            artifact_id_hash: hit.evidence().artifact_id_hash,
+            artifact_version_hash: hit.evidence().version_hash,
         })
     }
 }

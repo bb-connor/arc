@@ -461,7 +461,7 @@ fn transition_extends_state(
     transition.body.key == current.key
         && transition.body.from_stage == Some(current.stage)
         && transition.body.to_stage == current.stage.next().unwrap_or(current.stage)
-        && transition.body.generation == current.generation.saturating_add(1)
+        && current.generation.checked_add(1) == Some(transition.body.generation)
         && transition.body.prior_head_digest == Some(current.transition_digest)
         && transition.body.trusted_at_unix_ms >= current.updated_at_unix_ms
 }

@@ -289,11 +289,9 @@ impl InMemoryBudgetStoreInner {
             }
         }
         let primary_key = (request.capability_id.clone(), request.grant_index);
-        let current = self
-            .counts
-            .get(&primary_key)
-            .cloned()
-            .unwrap_or_else(|| Self::default_usage_record(&request.capability_id, grant_index));
+        let current = self.counts.get(&primary_key).cloned().unwrap_or_else(|| {
+            Self::default_usage_record(&request.capability_id, grant_index, self.now)
+        });
         let current_total = checked_committed_cost_units(
             current.total_cost_exposed,
             current.total_cost_realized_spend,
@@ -412,7 +410,7 @@ impl InMemoryBudgetStoreInner {
             BudgetStoreError::Overflow("budget event sequence overflowed u64".to_string())
         })?;
         self.next_seq = event_seq;
-        let recorded_at = unix_now();
+        let recorded_at = self.now;
         let invocation_quota_usages_before = self.invocation_quota_usages(&quotas)?;
 
         if allowed {
@@ -425,10 +423,9 @@ impl InMemoryBudgetStoreInner {
                     },
                 );
             }
-            let entry = self
-                .counts
-                .entry(primary_key.clone())
-                .or_insert_with(|| Self::default_usage_record(&request.capability_id, grant_index));
+            let entry = self.counts.entry(primary_key.clone()).or_insert_with(|| {
+                Self::default_usage_record(&request.capability_id, grant_index, self.now)
+            });
             entry.invocation_count = next_invocation_count;
             entry.total_cost_exposed = next_exposure;
             entry.updated_at = recorded_at;
@@ -825,7 +822,7 @@ impl InMemoryBudgetStoreInner {
             invocation_state_after: hold.invocation_state,
             monetary_state_before: hold.monetary_state,
             monetary_state_after: hold.monetary_state,
-            recorded_at: unix_now(),
+            recorded_at: self.now,
             event_seq,
             usage_seq: None,
             exposure_units: 0,
@@ -960,12 +957,12 @@ impl InMemoryBudgetStoreInner {
         }
     }
 
-    fn default_usage_record(capability_id: &str, grant_index: u32) -> BudgetUsageRecord {
+    fn default_usage_record(capability_id: &str, grant_index: u32, now: i64) -> BudgetUsageRecord {
         BudgetUsageRecord {
             capability_id: capability_id.to_string(),
             grant_index,
             invocation_count: 0,
-            updated_at: unix_now(),
+            updated_at: now,
             seq: 0,
             total_cost_exposed: 0,
             total_cost_realized_spend: 0,

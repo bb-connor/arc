@@ -177,8 +177,10 @@ pub fn verify_passport(
     authority_keys: &[PublicKey],
     clock: &dyn Clock,
 ) -> Result<VerifiedPassport, VerifyError> {
-    let envelope: PortablePassportEnvelope = serde_json::from_slice(envelope_bytes)
-        .map_err(|error| VerifyError::InvalidEnvelope(error.to_string()))?;
+    let envelope: PortablePassportEnvelope =
+        chio_core_types::canonical::UntrustedJsonText::from_wire(envelope_bytes, 16 * 1024 * 1024)
+            .and_then(|text| text.decode_signed())
+            .map_err(|error| VerifyError::InvalidEnvelope(error.to_string()))?;
     verify_parsed_passport(&envelope, authority_keys, clock)
 }
 

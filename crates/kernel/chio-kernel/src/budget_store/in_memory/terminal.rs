@@ -341,7 +341,7 @@ impl InMemoryBudgetStoreInner {
             self.next_seq = next_seq;
             entry.invocation_count = next_count.get();
             entry.total_cost_exposed = next_balance.exposed();
-            entry.updated_at = unix_now();
+            entry.updated_at = self.now;
             entry.seq = next_seq;
             invocation_count_after = entry.invocation_count;
             total_cost_exposed_after = entry.total_cost_exposed;
@@ -458,7 +458,7 @@ impl InMemoryBudgetStoreInner {
                         }
                     },
                 ),
-                recorded_at: unix_now(),
+                recorded_at: self.now,
                 event_seq: seq,
                 usage_seq: Some(seq),
                 exposure_units: cost_units,
@@ -487,7 +487,7 @@ impl InMemoryBudgetStoreInner {
                 capability_id: capability_id.to_string(),
                 grant_index: grant_index_u32,
                 invocation_count: invocation_count_after,
-                updated_at: unix_now(),
+                updated_at: self.now,
                 seq,
                 total_cost_exposed: total_cost_exposed_after,
                 total_cost_realized_spend: total_cost_realized_spend_after,
@@ -671,7 +671,7 @@ impl InMemoryBudgetStoreInner {
                     .release(ExposureUnits::new(cost_units))?;
             self.next_seq = next_seq;
             entry.total_cost_exposed = next_balance.exposed();
-            entry.updated_at = unix_now();
+            entry.updated_at = self.now;
             entry.seq = next_seq;
             invocation_count_after = entry.invocation_count;
             total_cost_exposed_after = entry.total_cost_exposed;
@@ -725,7 +725,7 @@ impl InMemoryBudgetStoreInner {
                         }
                     },
                 ),
-                recorded_at: unix_now(),
+                recorded_at: self.now,
                 event_seq: seq,
                 usage_seq: Some(seq),
                 exposure_units: cost_units,
@@ -960,7 +960,7 @@ impl InMemoryBudgetStoreInner {
             entry.total_cost_realized_spend = next_balance.spent();
             entry.total_cost_exposed = next_balance.exposed();
             self.next_seq = next_seq;
-            entry.updated_at = unix_now();
+            entry.updated_at = self.now;
             entry.seq = next_seq;
             invocation_count_after = entry.invocation_count;
             total_cost_exposed_after = entry.total_cost_exposed;
@@ -1008,7 +1008,7 @@ impl InMemoryBudgetStoreInner {
                     .as_ref()
                     .map_or(BudgetMonetaryState::Exposed, |hold| hold.monetary_state),
                 monetary_state_after: terminal_state,
-                recorded_at: unix_now(),
+                recorded_at: self.now,
                 event_seq: seq,
                 usage_seq: Some(seq),
                 exposure_units: exposed_cost_units,

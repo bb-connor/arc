@@ -6,6 +6,8 @@ the Rust API; owning runtime tests enforce authentication and row isolation.
 """
 import argparse
 import hashlib
+import importlib.util
+import sys
 import json
 import re
 from pathlib import Path
@@ -13,6 +15,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = "docs/security/trust-boundary-inventory.json"
 STORE = "crates/platform/chio-store-sqlite/src"
+# Share the calibrated Rust lexer. Examples inside documentation and strings
+# cannot construct proof values or bypass a production reader.
+_spec = importlib.util.spec_from_file_location("accounting_lexer", ROOT / "scripts/check-accounting-arithmetic.py")
+_lexer = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = _lexer
+_spec.loader.exec_module(_lexer)
 LITERALS = re.compile(r'r(?P<hashes>#{0,16})"(?P<raw>.*?)"(?P=hashes)|"(?P<quoted>(?:\\.|[^"\\])*)"', re.S)
 CREATE = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s*\(", re.I)
 
@@ -87,11 +95,12 @@ def scan(root, catalog):
     files = dict(sources(root))
     decoder_owners = set(catalog["signed_input_files"])
     for path, text in files.items():
-        for match in re.finditer(r"UntrustedJsonText::(new|from_wire)\s*\(", text):
-            found["constructors"].append(f"{path}::{owner_at(text, match.start())}::{match.group(1)}")
+        code = _lexer.blank_rust_noise(text)
+        for match in re.finditer(r"UntrustedJsonText::(new|from_wire)\s*\(", code):
+            found["constructors"].append(f"{path}::{owner_at(code, match.start())}::{match.group(1)}")
         if path in decoder_owners:
-            for match in re.finditer(r"serde_json::(from_str|from_slice|from_value)\b", text):
-                found["raw_decoders"].append(f"{path}::{owner_at(text, match.start())}::{match.group(1)}")
+            for match in re.finditer(r"serde_json::(from_str|from_slice|from_value)\b", code):
+                found["raw_decoders"].append(f"{path}::{owner_at(code, match.start())}::{match.group(1)}")
         if path.startswith(STORE):
             for table, _ in schema_tables(text):
                 found["schemas"].setdefault(table, []).append(path)
@@ -142,7 +151,14 @@ def check(root, catalog):
         match = re.search(r"pub struct " + proof["type"] + r"\s*\{([^}]+)\}", text, re.S)
         if not match or re.search(r"\bpub\b", match.group(1)):
             errors.append(f"proof fields are not sealed: {proof['type']}")
-        if re.search(r"impl[^\n]*Deserialize[^\n]*" + proof["type"], text):
+        code = _lexer.blank_rust_noise(text)
+        declaration = re.search(r"pub struct " + proof["type"] + r"\b", code)
+        prefix = code[:declaration.start()] if declaration else ""
+        item_start = max(prefix.rfind("}"), prefix.rfind(";")) + 1
+        derives = re.findall(r"#\[derive\(([^)]*)\)\]", prefix[item_start:])
+        if any(re.search(r"\bDeserialize\b", derive) for derive in derives) or re.search(
+            r"impl\s*(?:<[^{};]*>\s*)?(?:[\w:]+::)?Deserialize(?:<[^{};]*>)?\s+for\s+" + proof["type"] + r"\b", code
+        ):
             errors.append(f"proof implements Deserialize: {proof['type']}")
     for path, text in files.items():
         if re.search(r"\.secret_bytes\s*\(", text) and path != catalog["frost_secret_owner"]:

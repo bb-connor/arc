@@ -14,6 +14,11 @@ the name of a struct.
 | `SupplementalQuotaVerificationRecord` | Trusted-port record | The installed supplemental verifier returns it directly to the kernel, which rechecks bindings and constructs private `KernelVerifiedSupplementalQuotaClaim`. |
 | `SecurityEventVerificationRecord` | Trusted-port / durable projection | `VerifiedSecurityEventIngress` calls its installed `SecurityEventVerifierPort` before store admission. Native verification checks tenant/producer trust, canonical body, signature and time. Persisted recovery is store-owned. |
 | `IsolationVerificationRecord` | Trusted-port record | Flow-state rotation invokes the installed isolation verifier. Request callers do not supply its result as proof. |
+| `VerifiedClassification` | Sealed classifier result | Category mapping checks payload, request, classifier and finding locations. |
+| `VerifiedDeclassification` / `ConsumedDeclassification` | Sealed verification / consumption result | Grant signature and complete request binding precede construction; durable consumption is separate. |
+| `VerifiedAuthorityExchange` / `VerifiedBrokerAuditRunnerAuthorization` | Sealed verifier result | Authority/runner signature, independently trusted keys, request binding and freshness checks. |
+| `VerifiedWatermark` | Sealed verifier result | Signature, key status, registry and observation checks precede construction; only read-only accessors are public. |
+| `FileOwnershipProof` | Untrusted persisted ownership record | The cleanup owner rechecks the keyed ownership tag and descriptor-owned filesystem identity before removal. Deserialization is not ownership authority. |
 | `ApprovalSetBody` | Serializable signed artifact body | Kernel approval verification checks members, signatures and bindings before constructing private admission/reservation evidence. |
 | `BudgetHoldAuthorizationRecord` | Budget-store decision record | Only the immediate result of the installed store's authorize-hold operation reaches kernel budget admission. |
 | `CapabilityVerificationJson` / mobile `CapabilityVerificationRecord` | Browser / FFI projection | Output serialization of the sealed portable result. There is no conversion back to `VerifiedCapability`. |

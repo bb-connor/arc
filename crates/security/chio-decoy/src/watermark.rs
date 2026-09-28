@@ -423,13 +423,43 @@ pub enum WatermarkObservationPersistence {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Authenticated result from the watermark verifier, not a caller-supplied record.
+/// ```compile_fail
+/// use chio_decoy::VerifiedWatermark;
+/// fn forge(hit: &mut VerifiedWatermark) { hit.cross_tenant = false; }
+/// ```
+/// ```compile_fail
+/// use chio_decoy::VerifiedWatermark;
+/// fn decode(bytes: &[u8]) { let _ = serde_json::from_slice::<VerifiedWatermark>(bytes); }
+/// ```
 pub struct VerifiedWatermark {
-    pub payload: WatermarkPayload,
-    pub key_status: WatermarkKeyStatus,
-    pub evidence: DecoyEvidenceRef,
-    pub registry_state: WatermarkRegistryState,
-    pub cross_tenant: bool,
-    pub observation: WatermarkObservationPersistence,
+    payload: WatermarkPayload,
+    key_status: WatermarkKeyStatus,
+    evidence: DecoyEvidenceRef,
+    registry_state: WatermarkRegistryState,
+    cross_tenant: bool,
+    observation: WatermarkObservationPersistence,
+}
+
+impl VerifiedWatermark {
+    pub const fn payload(&self) -> &WatermarkPayload {
+        &self.payload
+    }
+    pub const fn key_status(&self) -> WatermarkKeyStatus {
+        self.key_status
+    }
+    pub const fn evidence(&self) -> &DecoyEvidenceRef {
+        &self.evidence
+    }
+    pub const fn registry_state(&self) -> WatermarkRegistryState {
+        self.registry_state
+    }
+    pub const fn cross_tenant(&self) -> bool {
+        self.cross_tenant
+    }
+    pub const fn observation(&self) -> &WatermarkObservationPersistence {
+        &self.observation
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

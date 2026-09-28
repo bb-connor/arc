@@ -25,7 +25,7 @@ type OpenHold = (String, String, u32, u64, bool, Option<BudgetEventAuthority>);
 
 impl SqliteBudgetStore {
     fn sqlite_like_prefix_pattern(prefix: &str) -> String {
-        let mut pattern = String::with_capacity(prefix.len() + 1);
+        let mut pattern = String::with_capacity(prefix.len());
         for ch in prefix.chars() {
             match ch {
                 '%' | '_' | '\\' => {
@@ -115,8 +115,18 @@ impl SqliteBudgetStore {
                 }
             })();
             match result {
-                Ok(true) => summary.reconciled += 1,
-                Ok(false) => summary.reversed += 1,
+                Ok(true) => {
+                    summary.reconciled = summary
+                        .reconciled
+                        .checked_add(1)
+                        .ok_or_else(|| BudgetStoreError::Overflow("reap count overflow".into()))?
+                }
+                Ok(false) => {
+                    summary.reversed = summary
+                        .reversed
+                        .checked_add(1)
+                        .ok_or_else(|| BudgetStoreError::Overflow("reap count overflow".into()))?
+                }
                 Err(error) => {
                     tracing::warn!(
                         hold_id,
@@ -172,7 +182,9 @@ impl SqliteBudgetStore {
                     authority,
                 })?;
             }
-            settled += 1;
+            settled = settled
+                .checked_add(1)
+                .ok_or_else(|| BudgetStoreError::Overflow("reap count overflow".into()))?;
         }
         Ok(settled)
     }
@@ -288,7 +300,7 @@ impl SqliteBudgetStore {
                 envelope.budget_total.map(|value| value as i64),
                 envelope.delegation_depth as i64,
                 envelope.root_budget_holder,
-                unix_now(),
+                self.unix_now()?,
             ],
         )?;
         if updated == 0 {

@@ -70,3 +70,6 @@ fn durable_write_contracts_hold_for_sqlite() {
     let store = Faulting::new(sqlite);
     exercise_contracts(&store);
 }
+
+#[path = "tenant_isolation.rs"]
+mod tenant_isolation;

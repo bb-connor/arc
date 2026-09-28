@@ -331,8 +331,7 @@ fn domain_separated_digest<T: Serialize>(
 ) -> Result<String, SupplementalQuotaError> {
     let canonical = canonical_json_bytes(value)
         .map_err(|error| SupplementalQuotaError::Canonicalization(error.to_string()))?;
-    let mut message = Vec::with_capacity(domain.len() + 1 + canonical.len());
-    message.extend_from_slice(domain.as_bytes());
+    let mut message = Vec::from(domain.as_bytes());
     message.push(0);
     message.extend_from_slice(&canonical);
     Ok(sha256_hex(&message))

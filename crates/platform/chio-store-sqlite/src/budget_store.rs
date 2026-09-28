@@ -1,8 +1,7 @@
+use chio_security_types::clock::{Clock, ClockError, ClockFence, SystemClock};
 use std::fs;
 use std::path::Path;
-use std::sync::{Arc, MutexGuard};
-
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use chio_core::capability::scope::MonetaryAmount;
 use chio_kernel::budget_store::{
@@ -92,6 +91,8 @@ use schema::*;
 
 #[derive(Clone)]
 pub struct SqliteBudgetStore {
+    clock: Arc<dyn Clock>,
+    clock_fence: Arc<Mutex<ClockFence>>,
     connection: Arc<StoreConnection>,
     serving_owner: Option<Arc<crate::serving_owner::SqliteServingOwner>>,
 }

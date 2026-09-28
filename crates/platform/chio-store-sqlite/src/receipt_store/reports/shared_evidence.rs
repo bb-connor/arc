@@ -130,7 +130,10 @@ impl SqliteReceiptStore {
                     .local_anchor_capability_id
                     .clone()
                     .or(local_anchor_capability_id);
-                entry.matched_local_receipts = entry.matched_local_receipts.saturating_add(1);
+                entry.matched_local_receipts =
+                    entry.matched_local_receipts.checked_add(1).ok_or_else(|| {
+                        ReceiptStoreError::Conflict("shared evidence count overflow".into())
+                    })?;
                 entry.first_seen = Some(
                     entry
                         .first_seen
@@ -142,10 +145,28 @@ impl SqliteReceiptStore {
                         .map_or(timestamp, |value| value.max(timestamp)),
                 );
                 match decision.as_str() {
-                    "allow" => entry.allow_count = entry.allow_count.saturating_add(1),
-                    "deny" => entry.deny_count = entry.deny_count.saturating_add(1),
-                    "cancelled" => entry.cancelled_count = entry.cancelled_count.saturating_add(1),
-                    _ => entry.incomplete_count = entry.incomplete_count.saturating_add(1),
+                    "allow" => {
+                        entry.allow_count = entry.allow_count.checked_add(1).ok_or_else(|| {
+                            ReceiptStoreError::Conflict("shared evidence count overflow".into())
+                        })?
+                    }
+                    "deny" => {
+                        entry.deny_count = entry.deny_count.checked_add(1).ok_or_else(|| {
+                            ReceiptStoreError::Conflict("shared evidence count overflow".into())
+                        })?
+                    }
+                    "cancelled" => {
+                        entry.cancelled_count =
+                            entry.cancelled_count.checked_add(1).ok_or_else(|| {
+                                ReceiptStoreError::Conflict("shared evidence count overflow".into())
+                            })?
+                    }
+                    _ => {
+                        entry.incomplete_count =
+                            entry.incomplete_count.checked_add(1).ok_or_else(|| {
+                                ReceiptStoreError::Conflict("shared evidence count overflow".into())
+                            })?
+                    }
                 }
                 matched_this_receipt = true;
             }

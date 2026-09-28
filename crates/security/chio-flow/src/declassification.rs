@@ -376,8 +376,10 @@ pub fn verify_declassification(
 }
 
 pub fn canonical_request_hash(body: &CanonicalBody) -> Result<Digest32, DeclassificationError> {
-    let value: serde_json::Value = serde_json::from_slice(body.as_bytes())
-        .map_err(|_| DeclassificationError::InvalidRequestRepresentation)?;
+    let value: serde_json::Value =
+        chio_core_types::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 16 * 1024 * 1024)
+            .and_then(|text| text.decode_canonical())
+            .map_err(|_| DeclassificationError::InvalidRequestRepresentation)?;
     let canonical = canonical_json_bytes(&value)
         .map_err(|_| DeclassificationError::InvalidRequestRepresentation)?;
     if canonical.as_slice() != body.as_bytes() {

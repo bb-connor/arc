@@ -35,11 +35,19 @@ use chio_governance::lease::{
     CAPABILITY_LEASE_SCHEMA_V1,
 };
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroizing;
 
 mod frost_ceremony;
 mod frost_coordinator;
 mod frost_signer;
+mod input;
 mod profile;
+pub use input::{
+    authority_profile_from_json, authority_profile_json, issuance_bundle_json,
+    issuance_request_from_json, issuance_request_json, peer_pins_from_json, peer_pins_json,
+    revocation_publication_request_from_json, revocation_publication_request_json,
+    signed_revocation_checkpoint_json, signing_keys_from_json, signing_keys_json,
+};
 
 pub use frost_ceremony::{
     advance_frost_ceremony, begin_frost_ceremony, complete_frost_ceremony,
@@ -68,8 +76,10 @@ pub const REVOCATION_PUBLICATION_REQUEST_SCHEMA: &str =
 pub const PEER_PINS_SCHEMA: &str = "chio.federation.peer-pins.v1";
 pub const LOCAL_SIGNING_KEYS_SCHEMA: &str = "chio.federation.local-signing-keys.v1";
 
-#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+#[derive(Debug, thiserror::Error)]
 pub enum ChioAuthorityError {
+    #[error("{0}")]
+    UntrustedInput(#[source] chio_core_types::canonical::UntrustedJsonError),
     #[error("authority profile failed: {0}")]
     Profile(String),
     #[error("issuance request failed: {0}")]
@@ -110,20 +120,20 @@ pub struct AuthorityProfileDocument {
     pub revocation_authority: ChioRevocationAuthority,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NamedSeedHex {
     pub id: String,
-    pub seed_hex: String,
+    pub seed_hex: Zeroizing<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LocalAuthoritySigningKeysDocument {
     pub schema: String,
     pub lease_authority_seeds: Vec<NamedSeedHex>,
     pub governance_authority_seeds: Vec<NamedSeedHex>,
-    pub revocation_authority_seed_hex: String,
+    pub revocation_authority_seed_hex: Zeroizing<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -192,6 +202,29 @@ pub struct PeerPinsDocument {
     pub peers: Vec<PeerLadderBinding>,
     pub vendors: Vec<VendorKeyBinding>,
     pub action_classes: Vec<ChioTrustedActionClass>,
+}
+
+impl std::fmt::Debug for NamedSeedHex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NamedSeedHex")
+            .field("id", &self.id)
+            .field("seed_hex", &"<redacted>")
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for LocalAuthoritySigningKeysDocument {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LocalAuthoritySigningKeysDocument")
+            .field("schema", &self.schema)
+            .field("lease_authorities", &self.lease_authority_seeds.len())
+            .field(
+                "governance_authorities",
+                &self.governance_authority_seeds.len(),
+            )
+            .field("seeds", &"<redacted>")
+            .finish()
+    }
 }
 
 impl LocalAuthoritySigningKeysDocument {
@@ -419,89 +452,6 @@ impl PeerPinsDocument {
         ensure_reference_workflow_classes(&self.action_classes)?;
         Ok(())
     }
-}
-
-pub fn authority_profile_from_json(
-    json: &str,
-) -> Result<AuthorityProfileDocument, ChioAuthorityError> {
-    let document: AuthorityProfileDocument =
-        serde_json::from_str(json).map_err(|error| ChioAuthorityError::Json(error.to_string()))?;
-    document.validate()?;
-    Ok(document)
-}
-
-pub fn issuance_request_from_json(json: &str) -> Result<ChioIssuanceRequest, ChioAuthorityError> {
-    let document: ChioIssuanceRequest =
-        serde_json::from_str(json).map_err(|error| ChioAuthorityError::Json(error.to_string()))?;
-    document.validate()?;
-    Ok(document)
-}
-
-pub fn signing_keys_from_json(
-    json: &str,
-) -> Result<LocalAuthoritySigningKeysDocument, ChioAuthorityError> {
-    let document: LocalAuthoritySigningKeysDocument =
-        serde_json::from_str(json).map_err(|error| ChioAuthorityError::Json(error.to_string()))?;
-    document.validate()?;
-    Ok(document)
-}
-
-pub fn revocation_publication_request_from_json(
-    json: &str,
-) -> Result<RevocationPublicationRequest, ChioAuthorityError> {
-    let document: RevocationPublicationRequest =
-        serde_json::from_str(json).map_err(|error| ChioAuthorityError::Json(error.to_string()))?;
-    document.validate()?;
-    Ok(document)
-}
-
-pub fn peer_pins_from_json(json: &str) -> Result<PeerPinsDocument, ChioAuthorityError> {
-    let document: PeerPinsDocument =
-        serde_json::from_str(json).map_err(|error| ChioAuthorityError::Json(error.to_string()))?;
-    document.validate()?;
-    Ok(document)
-}
-
-pub fn authority_profile_json(
-    profile: &AuthorityProfileDocument,
-) -> Result<String, ChioAuthorityError> {
-    serde_json::to_string_pretty(profile)
-        .map_err(|error| ChioAuthorityError::Json(error.to_string()))
-}
-
-pub fn issuance_request_json(request: &ChioIssuanceRequest) -> Result<String, ChioAuthorityError> {
-    serde_json::to_string_pretty(request)
-        .map_err(|error| ChioAuthorityError::Json(error.to_string()))
-}
-
-pub fn signing_keys_json(
-    keys: &LocalAuthoritySigningKeysDocument,
-) -> Result<String, ChioAuthorityError> {
-    serde_json::to_string_pretty(keys).map_err(|error| ChioAuthorityError::Json(error.to_string()))
-}
-
-pub fn issuance_bundle_json(bundle: &ChioIssuanceBundle) -> Result<String, ChioAuthorityError> {
-    serde_json::to_string_pretty(bundle)
-        .map_err(|error| ChioAuthorityError::Json(error.to_string()))
-}
-
-pub fn revocation_publication_request_json(
-    request: &RevocationPublicationRequest,
-) -> Result<String, ChioAuthorityError> {
-    serde_json::to_string_pretty(request)
-        .map_err(|error| ChioAuthorityError::Json(error.to_string()))
-}
-
-pub fn peer_pins_json(document: &PeerPinsDocument) -> Result<String, ChioAuthorityError> {
-    serde_json::to_string_pretty(document)
-        .map_err(|error| ChioAuthorityError::Json(error.to_string()))
-}
-
-pub fn signed_revocation_checkpoint_json(
-    checkpoint: &SignedChioRevocationCheckpoint,
-) -> Result<String, ChioAuthorityError> {
-    serde_json::to_string_pretty(checkpoint)
-        .map_err(|error| ChioAuthorityError::Json(error.to_string()))
 }
 
 pub fn issue_authority_bundle(

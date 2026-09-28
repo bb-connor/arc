@@ -5,8 +5,8 @@ use chio_kernel::InMemoryBudgetStore;
 mod composite_lifecycle;
 
 fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
         .expect("time before epoch")
         .as_nanos();
     std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
@@ -1322,7 +1322,7 @@ fn import_snapshot_records_rolls_back_usage_rows_when_mutation_conflicts_sqlite(
         .expect("existing authorize event");
     conflicting_event.authority = Some(conflicting_authority);
 
-    let imported_usage = usage_record("cap-import-rollback", 0, 2, unix_now(), 88, 40, 5);
+    let imported_usage = usage_record("cap-import-rollback", 0, 2, 1_700_000_000, 88, 40, 5);
 
     let error = store
         .import_snapshot_records(&[imported_usage], &[conflicting_event])

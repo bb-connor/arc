@@ -535,7 +535,7 @@ fn active_and_overlap_keys_verify_only_inside_receipt_anchored_windows() {
         .test_expect("overlap verification");
     assert_eq!(report.verdict, WatermarkScanVerdict::ActiveHit);
     assert_eq!(
-        report.active_hits[0].key_status,
+        report.active_hits[0].key_status(),
         WatermarkKeyStatus::Overlap
     );
 
@@ -661,9 +661,9 @@ fn a_verified_active_hit_survives_observation_store_failure_and_cross_tenant_rep
         .test_expect("verified hit remains visible");
     assert_eq!(report.verdict, WatermarkScanVerdict::ActiveHit);
     assert_eq!(report.detector_failures, 1);
-    assert!(report.active_hits[0].cross_tenant);
+    assert!(report.active_hits[0].cross_tenant());
     assert_eq!(
-        report.active_hits[0].observation,
+        *report.active_hits[0].observation(),
         WatermarkObservationPersistence::Failed
     );
 }
@@ -711,7 +711,7 @@ fn observation_deduplication_binds_token_and_first_complete_attribution() {
         .scan_text(&token, &context)
         .test_expect("first scan");
     assert_eq!(
-        first.active_hits[0].observation,
+        *first.active_hits[0].observation(),
         WatermarkObservationPersistence::Persisted(WatermarkObservationResult::Recorded)
     );
     let duplicate = fixture
@@ -719,7 +719,7 @@ fn observation_deduplication_binds_token_and_first_complete_attribution() {
         .scan_text(&token, &context)
         .test_expect("duplicate scan");
     assert!(matches!(
-        duplicate.active_hits[0].observation,
+        duplicate.active_hits[0].observation(),
         WatermarkObservationPersistence::Persisted(WatermarkObservationResult::Duplicate { .. })
     ));
 
@@ -731,7 +731,7 @@ fn observation_deduplication_binds_token_and_first_complete_attribution() {
     assert_eq!(conflict.verdict, WatermarkScanVerdict::ActiveHit);
     assert_eq!(conflict.detector_failures, 1);
     assert_eq!(
-        conflict.active_hits[0].observation,
+        *conflict.active_hits[0].observation(),
         WatermarkObservationPersistence::Failed
     );
 }

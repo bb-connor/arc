@@ -1,3 +1,5 @@
+use super::*;
+
 impl BudgetStore for InMemoryBudgetStore {
     fn try_increment(
         &self,
@@ -625,8 +627,8 @@ impl BudgetStore for InMemoryBudgetStore {
                 .map(|(hold_id, _)| hold_id.clone())
                 .collect::<Vec<_>>()
         };
-        let mut reconciled = 0;
-        let mut reversed = 0;
+        let mut reconciled = 0usize;
+        let mut reversed = 0usize;
         for hold_id in hold_ids {
             let hold = self.get_budget_hold(&hold_id)?.ok_or_else(|| {
                 BudgetStoreError::Invariant(format!("budget hold `{hold_id}` disappeared"))
@@ -651,7 +653,9 @@ impl BudgetStore for InMemoryBudgetStore {
                         authority: hold.authority,
                     })?;
                 }
-                reconciled += 1;
+                reconciled = reconciled
+                    .checked_add(1)
+                    .ok_or_else(|| BudgetStoreError::Overflow("reap count overflow".into()))?;
             } else {
                 self.reverse_budget_hold(BudgetReverseHoldRequest {
                     capability_id: hold.capability_id,
@@ -662,7 +666,9 @@ impl BudgetStore for InMemoryBudgetStore {
                     authority: hold.authority,
                     expected_cumulative_approval_state: None,
                 })?;
-                reversed += 1;
+                reversed = reversed
+                    .checked_add(1)
+                    .ok_or_else(|| BudgetStoreError::Overflow("reap count overflow".into()))?;
             }
         }
         Ok((reconciled, reversed))
@@ -834,16 +840,5 @@ impl BudgetStore for InMemoryBudgetStore {
             }
         }
         Ok(hold_ids.len())
-    }
-}
-
-fn hold_is_open(hold: &BudgetHoldState) -> bool {
-    match hold.monetary_state {
-        BudgetMonetaryState::Exposed => true,
-        BudgetMonetaryState::None => hold.invocation_state == BudgetInvocationState::Authorized,
-        BudgetMonetaryState::Released
-        | BudgetMonetaryState::Reconciled
-        | BudgetMonetaryState::Captured
-        | BudgetMonetaryState::Reversed => false,
     }
 }

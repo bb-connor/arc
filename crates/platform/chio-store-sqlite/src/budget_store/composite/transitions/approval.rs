@@ -159,7 +159,7 @@ impl SqliteBudgetStore {
                 next_authority
                     .map(|value| budget_u64_to_sqlite(value.lease_epoch, "lease_epoch"))
                     .transpose()?,
-                unix_now(),
+                self.unix_now()?,
             ],
         )?;
         if changed != 1 {
@@ -167,7 +167,7 @@ impl SqliteBudgetStore {
                 "cumulative approval hold compare-and-set failed".to_string(),
             ));
         }
-        let event = SqliteBudgetStore::append_mutation_event(
+        let event = self.append_mutation_event(
             &transaction,
             Some(&request.event_id),
             Some(&request.hold_id),

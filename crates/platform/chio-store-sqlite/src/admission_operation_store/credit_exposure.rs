@@ -299,7 +299,9 @@ pub(crate) fn reserve_credit_exposure_tx(
     }
     verify_credit_exposure_fence_tx(transaction, fence)?;
     validate_trusted_time(trusted_now_unix_ms, "credit_exposure_reserved_at_unix_ms")?;
-    if trusted_now_unix_ms / 1_000 >= reservation.authority_expires_at_unix_seconds() {
+    if chio_security_types::clock::UnixMillis::new(trusted_now_unix_ms).as_secs()
+        >= reservation.authority_expires_at_unix_seconds()
+    {
         return Err(invariant("credit exposure authority set is expired"));
     }
     if let Some(existing) =

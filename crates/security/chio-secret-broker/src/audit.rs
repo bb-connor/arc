@@ -333,22 +333,11 @@ impl SignedBrokerAuditRunnerAuthorization {
                 "broker audit runner authorization is empty or oversized".to_string(),
             ));
         }
-        let authorization: Self = serde_json::from_slice(bytes).map_err(|error| {
-            BrokerError::InvalidRequest(format!(
-                "broker audit runner authorization decoding failed: {error}"
-            ))
-        })?;
+        let authorization: Self =
+            chio_core_types::canonical::UntrustedJsonText::from_wire(bytes, MAX_WIRE_BYTES)
+                .and_then(|text| text.decode_canonical())
+                .map_err(BrokerError::UntrustedInput)?;
         authorization.verify_signature()?;
-        if canonical_json_bytes(&authorization).map_err(|error| {
-            BrokerError::InvalidRequest(format!(
-                "broker audit runner authorization encoding failed: {error}"
-            ))
-        })? != bytes
-        {
-            return Err(BrokerError::InvalidRequest(
-                "broker audit runner authorization is not canonical JSON".to_string(),
-            ));
-        }
         Ok(authorization)
     }
 
@@ -776,20 +765,13 @@ impl SignedBrokerAuditComparison {
                 "broker audit comparison is empty or oversized".to_string(),
             ));
         }
-        let comparison: Self = serde_json::from_slice(bytes).map_err(|error| {
-            BrokerError::InvalidRequest(format!("broker audit comparison decoding failed: {error}"))
-        })?;
+        let comparison: Self = chio_core_types::canonical::UntrustedJsonText::from_wire(
+            bytes,
+            MAX_AUDIT_COMPARISON_BYTES,
+        )
+        .and_then(|text| text.decode_canonical())
+        .map_err(BrokerError::UntrustedInput)?;
         comparison.verify_signature()?;
-        if canonical_json_bytes(&comparison).map_err(|error| {
-            BrokerError::InvalidRequest(format!(
-                "broker audit comparison canonicalization failed: {error}"
-            ))
-        })? != bytes
-        {
-            return Err(BrokerError::InvalidRequest(
-                "broker audit comparison is not canonical JSON".to_string(),
-            ));
-        }
         Ok(comparison)
     }
 

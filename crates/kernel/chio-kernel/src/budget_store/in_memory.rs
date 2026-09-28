@@ -1,7 +1,7 @@
 use super::{ExposureBalance, ExposureUnits, InvocationCount};
+use chio_security_types::clock::{Clock, ClockError, ClockFence, SystemClock};
 use std::collections::HashMap;
-use std::sync::{Mutex, MutexGuard};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::{
     budget_commit_metadata, checked_committed_cost_units, validate_optional_budget_identity,
@@ -129,14 +129,13 @@ struct RecordedBudgetMutation {
 }
 
 pub struct InMemoryBudgetStore {
+    clock: Arc<dyn Clock>,
     inner: Mutex<InMemoryBudgetStoreInner>,
 }
 
 impl Default for InMemoryBudgetStore {
     fn default() -> Self {
-        Self {
-            inner: Mutex::new(InMemoryBudgetStoreInner::default()),
-        }
+        Self::with_clock(Arc::new(SystemClock))
     }
 }
 
@@ -145,10 +144,22 @@ impl InMemoryBudgetStore {
         Self::default()
     }
 
+    /// The shared fallible clock is sampled before any in-memory mutation.
+    pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
+        Self {
+            clock,
+            inner: Mutex::new(InMemoryBudgetStoreInner::default()),
+        }
+    }
+
     fn lock_inner(&self) -> Result<MutexGuard<'_, InMemoryBudgetStoreInner>, BudgetStoreError> {
-        self.inner.lock().map_err(|_| {
+        let mut inner = self.inner.lock().map_err(|_| {
             BudgetStoreError::Invariant("in-memory budget store lock poisoned".to_string())
-        })
+        })?;
+        let reading = inner.clock_fence.observe(self.clock.read()?)?;
+        inner.now =
+            i64::try_from(reading.unix_millis().as_secs()).map_err(|_| ClockError::Overflow)?;
+        Ok(inner)
     }
 
     fn recorded_mutation_decision(
@@ -193,6 +204,8 @@ impl InMemoryBudgetStore {
 
 #[derive(Default)]
 struct InMemoryBudgetStoreInner {
+    clock_fence: ClockFence,
+    now: i64,
     counts: HashMap<(String, usize), BudgetUsageRecord>,
     events: Vec<BudgetMutationRecord>,
     explicit_events: HashMap<String, RecordedBudgetMutation>,
@@ -211,11 +224,15 @@ mod accounting;
 include!("in_memory/composite.rs");
 include!("in_memory/admission.rs");
 include!("in_memory/terminal.rs");
-include!("in_memory/trait_impl.rs");
+mod trait_impl;
 
-fn unix_now() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs() as i64)
-        .unwrap_or(0)
+fn hold_is_open(hold: &BudgetHoldState) -> bool {
+    match hold.monetary_state {
+        BudgetMonetaryState::Exposed => true,
+        BudgetMonetaryState::None => hold.invocation_state == BudgetInvocationState::Authorized,
+        BudgetMonetaryState::Released
+        | BudgetMonetaryState::Reconciled
+        | BudgetMonetaryState::Captured
+        | BudgetMonetaryState::Reversed => false,
+    }
 }

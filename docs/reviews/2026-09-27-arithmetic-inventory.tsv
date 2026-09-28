@@ -14,7 +14,7 @@ crates/kernel/chio-kernel/benches/fixtures/dispatch_request_fixture.rs	226	pendi
 crates/kernel/chio-kernel/benches/fixtures/dispatch_request_fixture.rs	442	pending	Needs semantic review; no correctness claim	timestamp: capability.issued_at.saturating_add(1),
 crates/kernel/chio-kernel/benches/paper_security_components.rs	42	pending	Needs semantic review; no correctness claim	let next = sequence.get().saturating_add(1);
 crates/kernel/chio-kernel/benches/receipt_append.rs	27	pending	Needs semantic review; no correctness claim	let next = sequence.get().saturating_add(1);
-crates/kernel/chio-kernel/src/admission_operation/dpop_claim.rs	87	pending	Needs semantic review; no correctness claim	> seconds.saturating_add(self.authority.max_clock_skew_secs())
+crates/kernel/chio-kernel/src/admission_operation/dpop_claim.rs	87	fixed	Checked authority skew horizon refuses overflow before freshness admission	> seconds.saturating_add(self.authority.max_clock_skew_secs())
 crates/kernel/chio-kernel/src/approval.rs	1375	removed_api	Removed ownerless pattern-based standing approval API and backend; request-bound approval decisions remain	batch.used_calls = batch.used_calls.saturating_add(1);
 crates/kernel/chio-kernel/src/approval.rs	1377	removed_api	Removed ownerless pattern-based standing approval API and backend; request-bound approval decisions remain	batch.used_total_units = batch.used_total_units.saturating_add(amt.units);
 crates/kernel/chio-kernel/src/approval.rs	1426	removed_api	Removed ownerless pattern-based standing approval API and backend; request-bound approval decisions remain	|| batch.used_total_units.saturating_add(amt.units) > total.units
@@ -41,7 +41,7 @@ crates/kernel/chio-kernel/src/dpop.rs	585	fixed	Whole release plan checks bytes 
 crates/kernel/chio-kernel/src/dpop.rs	592	intentional_bound	Utilization threshold subtracts one fifth of capacity; division proves this cannot underflow	let alert_threshold = capacity.saturating_sub(capacity / 5);
 crates/kernel/chio-kernel/src/dpop.rs	682	intentional_bound	Saturated now plus skew is the inclusive upper comparison bound; proof expiry is independently checked	if proof.body.issued_at > now_secs.saturating_add(config.max_clock_skew_secs) {
 crates/kernel/chio-kernel/src/dpop.rs	747	fixed	Checked proof validity horizon rejects overflow before replay reservation	let valid_through = proof.body.issued_at.saturating_add(config.proof_ttl_secs);
-crates/kernel/chio-kernel/src/execution_nonce.rs	360	pending	Needs semantic review; no correctness claim	let expires_at = now.saturating_add(ttl);
+crates/kernel/chio-kernel/src/execution_nonce.rs	360	fixed	Nonce minting rejects zero TTL, negative time and an unrepresentable expiry before signing	let expires_at = now.saturating_add(ttl);
 crates/kernel/chio-kernel/src/execution_nonce.rs	783	pending	Needs semantic review; no correctness claim	.saturating_add(30);
 crates/kernel/chio-kernel/src/finding_pool.rs	907	pending	Needs semantic review; no correctness claim	.saturating_add(FINDING_POOL_CLAIM_WINDOW_MS)
 crates/kernel/chio-kernel/src/finding_pool_tests.rs	397	pending	Needs semantic review; no correctness claim	.saturating_add(pending.len());
@@ -53,7 +53,7 @@ crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_valid
 crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc	797	pending	Needs semantic review; no correctness claim	if bounded.len().saturating_add(character.len_utf8()) > 1_024 {
 crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs	1555	pending	Needs semantic review; no correctness claim	.saturating_sub(payment.reconcile.committed_cost_units_after),
 crates/kernel/chio-kernel/src/kernel/construction.rs	1577	pending	Needs semantic review; no correctness claim	let timestamp_unix_ms = current_unix_timestamp().saturating_mul(1000);
-crates/kernel/chio-kernel/src/kernel/credential_reservation/acquisition.rs	64	pending	Needs semantic review; no correctness claim	let valid_through = proof.body.issued_at.saturating_add(config.proof_ttl_secs);
+crates/kernel/chio-kernel/src/kernel/credential_reservation/acquisition.rs	64	fixed	Checked DPoP horizon refuses overflow before reserving replay state	let valid_through = proof.body.issued_at.saturating_add(config.proof_ttl_secs);
 crates/kernel/chio-kernel/src/kernel/delegation.rs	100	pending	Needs semantic review; no correctness claim	let age_ms = now_unix_ms.saturating_sub(snapshot.issued_at_unix_ms);
 crates/kernel/chio-kernel/src/kernel/delegation.rs	50	pending	Needs semantic review; no correctness claim	let now_unix_ms = current_unix_timestamp().saturating_mul(1000);
 crates/kernel/chio-kernel/src/kernel/dispatch.rs	198	pending	Needs semantic review; no correctness claim	.wait_timeout(schedule, next_deadline.saturating_duration_since(now))
@@ -192,7 +192,7 @@ crates/platform/chio-store-sqlite/src/capability_lineage.rs	358	pending	Needs se
 crates/platform/chio-store-sqlite/src/capability_lineage_tests.rs	560	pending	Needs semantic review; no correctness claim	mismatched.expires_at = mismatched.expires_at.saturating_add(1);
 crates/platform/chio-store-sqlite/src/channel_lifecycle_store_tests/prepared.rs	33	pending	Needs semantic review; no correctness claim	let observed_at_unix_ms = now_ms()?.saturating_sub(1_000);
 crates/platform/chio-store-sqlite/src/channel_lifecycle_store_tests/prepared.rs	540	pending	Needs semantic review; no correctness claim	plan.observed_at_unix_ms.saturating_sub(1)
-crates/platform/chio-store-sqlite/src/enterprise_migration_state.rs	464	pending	Needs semantic review; no correctness claim	&& transition.body.generation == current.generation.saturating_add(1)
+crates/platform/chio-store-sqlite/src/enterprise_migration_state.rs	464	fixed	Checked generation successor cannot accept an exhausted generation as its own successor	&& transition.body.generation == current.generation.saturating_add(1)
 crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1006	pending	Needs semantic review; no correctness claim	assert_eq!(high_water, base.saturating_add(1));
 crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1014	pending	Needs semantic review; no correctness claim	".reserve_for_dispatch(""dispatch-owned"", now.saturating_add(100), ""owner-a"")"
 crates/platform/chio-store-sqlite/src/execution_nonce_store.rs	1031	pending	Needs semantic review; no correctness claim	".try_reserve("" nonce"", now, now.saturating_add(100))"
@@ -331,18 +331,18 @@ crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs	202	boun
 crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs	228	bounded_count	Counts outcomes or subsets once per persisted receipt	metering_actionable_receipts = metering_actionable_receipts.saturating_add(1);
 crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs	232	bounded_count	Counts outcomes or subsets once per persisted receipt	metering_evidence_missing_receipts.saturating_add(1);
 crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs	236	bounded_count	Counts outcomes or subsets once per persisted receipt	metering_financial_mismatch_receipts.saturating_add(1);
-crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	133	pending	Needs semantic review; no correctness claim	entry.matched_local_receipts = entry.matched_local_receipts.saturating_add(1);
-crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	145	pending	Needs semantic review; no correctness claim	"""allow"" => entry.allow_count = entry.allow_count.saturating_add(1),"
-crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	146	pending	Needs semantic review; no correctness claim	"""deny"" => entry.deny_count = entry.deny_count.saturating_add(1),"
-crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	147	pending	Needs semantic review; no correctness claim	"""cancelled"" => entry.cancelled_count = entry.cancelled_count.saturating_add(1),"
-crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	148	pending	Needs semantic review; no correctness claim	_ => entry.incomplete_count = entry.incomplete_count.saturating_add(1),
-crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs	605	pending	Needs semantic review; no correctness claim	let mut expected_seq = effective_floor.saturating_add(1);
-crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs	612	pending	Needs semantic review; no correctness claim	expected_seq = expected_seq.saturating_add(1);
-crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs	614	pending	Needs semantic review; no correctness claim	if expected_seq != max_entry_seq.saturating_add(1) {
-crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs	617	pending	Needs semantic review; no correctness claim	expected_seq.saturating_sub(1)
-crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs	833	pending	Needs semantic review; no correctness claim	.saturating_sub(staged_head.checkpointed_entry_seq())
-crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs	840	pending	Needs semantic review; no correctness claim	let start_seq = staged_head.checkpointed_entry_seq().saturating_add(1);
-crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs	841	pending	Needs semantic review; no correctness claim	let end_seq = start_seq.saturating_add(signer.max_batch - 1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	133	fixed	Exact report counters refuse overflow instead of publishing a clamped audit total	entry.matched_local_receipts = entry.matched_local_receipts.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	145	fixed	Exact report counters refuse overflow instead of publishing a clamped audit total	"""allow"" => entry.allow_count = entry.allow_count.saturating_add(1),"
+crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	146	fixed	Exact report counters refuse overflow instead of publishing a clamped audit total	"""deny"" => entry.deny_count = entry.deny_count.saturating_add(1),"
+crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	147	fixed	Exact report counters refuse overflow instead of publishing a clamped audit total	"""cancelled"" => entry.cancelled_count = entry.cancelled_count.saturating_add(1),"
+crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs	148	fixed	Exact report counters refuse overflow instead of publishing a clamped audit total	_ => entry.incomplete_count = entry.incomplete_count.saturating_add(1),
+crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs	605	fixed	Checked claim-log successors and predecessor refuse an unrepresentable continuity boundary	let mut expected_seq = effective_floor.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs	612	fixed	Checked claim-log successors and predecessor refuse an unrepresentable continuity boundary	expected_seq = expected_seq.saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs	614	fixed	Checked claim-log successors and predecessor refuse an unrepresentable continuity boundary	if expected_seq != max_entry_seq.saturating_add(1) {
+crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs	617	fixed	Checked claim-log successors and predecessor refuse an unrepresentable continuity boundary	expected_seq.saturating_sub(1)
+crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs	833	fixed	Checked pending range and batch end refuse backwards or overflowing checkpoint boundaries	.saturating_sub(staged_head.checkpointed_entry_seq())
+crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs	840	fixed	Checked pending range and batch end refuse backwards or overflowing checkpoint boundaries	let start_seq = staged_head.checkpointed_entry_seq().saturating_add(1);
+crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs	841	fixed	Checked pending range and batch end refuse backwards or overflowing checkpoint boundaries	let end_seq = start_seq.saturating_add(signer.max_batch - 1);
 crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/authorization.rs	581	pending	Needs semantic review; no correctness claim	if leaf.delegation_depth as usize != chain.len().saturating_sub(1) {
 crates/platform/chio-store-sqlite/src/receipt_store/tests/background_checkpoint_races.rs	764	pending	Needs semantic review; no correctness claim	winner.body.issued_at = loser.body.issued_at.saturating_add(1_000);
 crates/platform/chio-store-sqlite/src/receipt_store/tests/background_checkpoints.rs	388	pending	Needs semantic review; no correctness claim	external.body.issued_at = external.body.issued_at.saturating_add(1_000);

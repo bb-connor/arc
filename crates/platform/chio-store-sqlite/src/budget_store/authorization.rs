@@ -175,7 +175,7 @@ impl SqliteBudgetStore {
                         &request.capability_id,
                         request.grant_index as i64,
                         i64::from(invocation_count_after),
-                        unix_now(),
+                        self.unix_now()?,
                         budget_u64_to_sqlite(event_seq, "seq")?,
                         budget_u64_to_sqlite(exposed_after, "total_cost_exposed")?,
                         budget_u64_to_sqlite(current.3, "total_cost_realized_spend")?,
@@ -190,7 +190,7 @@ impl SqliteBudgetStore {
                     ));
                 }
                 if let Some(hold_id) = request.hold_id.as_deref() {
-                    Self::create_hold(
+                    self.create_hold(
                         &transaction,
                         hold_id,
                         &request.capability_id,
@@ -208,7 +208,7 @@ impl SqliteBudgetStore {
             } else {
                 (None, current.1, current.2, current.3)
             };
-        let event = Self::append_mutation_event(
+        let event = self.append_mutation_event(
             &transaction,
             request.event_id.as_deref(),
             request.hold_id.as_deref(),

@@ -223,7 +223,7 @@ pub(super) fn load_usage_or_default(
             capability_id: capability_id.to_string(),
             grant_index,
             invocation_count: 0,
-            updated_at: unix_now(),
+            updated_at: 0, // No mutation exists for an absent usage row.
             seq: 0,
             total_cost_exposed: 0,
             total_cost_realized_spend: 0,

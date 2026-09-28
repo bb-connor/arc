@@ -406,7 +406,7 @@ impl SqliteBudgetStore {
             .transpose()?;
 
         let event_seq = allocate_budget_replication_seq(&transaction)?;
-        let recorded_at = unix_now();
+        let recorded_at = self.unix_now()?;
         let mut usage_after = current.clone();
         let mut quota_after = quota_before.clone();
         let mut cumulative_after = cumulative_before.clone();
@@ -427,7 +427,7 @@ impl SqliteBudgetStore {
             usage_after.seq = event_seq;
             write_usage(&transaction, &current, &usage_after)?;
 
-            Self::create_hold(
+            self.create_hold(
                 &transaction,
                 hold_id,
                 &request.capability_id,
@@ -502,7 +502,7 @@ impl SqliteBudgetStore {
         } else {
             BudgetMutationKind::ReserveInvocation
         };
-        let event = Self::append_mutation_event(
+        let event = self.append_mutation_event(
             &transaction,
             Some(event_id),
             Some(hold_id),
@@ -729,7 +729,10 @@ impl SqliteBudgetStore {
                 }
                 credit_exposure
                     .authorities
-                    .ensure_current_at(binding.trusted_now_unix_ms / 1_000)
+                    .ensure_current_at(
+                        chio_security_types::clock::UnixMillis::new(binding.trusted_now_unix_ms)
+                            .as_secs(),
+                    )
                     .map_err(|error| {
                         BudgetStoreError::Invariant(format!(
                             "credit exposure authority is not current: {error}"

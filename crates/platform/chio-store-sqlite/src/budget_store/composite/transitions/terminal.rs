@@ -75,7 +75,7 @@ impl SqliteBudgetStore {
             .try_sub(ExposureUnits::new(request.released_exposure_units))?
             .get();
         usage.seq = event_seq;
-        usage.updated_at = unix_now();
+        usage.updated_at = self.unix_now()?;
         write_usage(&transaction, &usage_before, &usage)?;
         let remaining = ExposureUnits::new(hold.remaining_exposure)
             .try_sub(ExposureUnits::new(request.released_exposure_units))?
@@ -106,7 +106,7 @@ impl SqliteBudgetStore {
                 authority
                     .map(|value| budget_u64_to_sqlite(value.lease_epoch, "lease_epoch"))
                     .transpose()?,
-                unix_now(),
+                self.unix_now()?,
                 budget_u64_to_sqlite(request.released_exposure_units, "released_exposure_units",)?,
             ],
         )?;
@@ -115,7 +115,7 @@ impl SqliteBudgetStore {
                 "budget release compare-and-set failed".to_string(),
             ));
         }
-        let event = SqliteBudgetStore::append_mutation_event(
+        let event = self.append_mutation_event(
             &transaction,
             Some(event_id),
             Some(hold_id),
@@ -311,7 +311,7 @@ impl SqliteBudgetStore {
             .try_sub(ExposureUnits::new(request.reversed_exposure_units))?
             .get();
         usage.seq = event_seq;
-        usage.updated_at = unix_now();
+        usage.updated_at = self.unix_now()?;
         write_usage(&transaction, &usage_before, &usage)?;
         for state in &quota_after {
             write_quota_state(&transaction, state)?;
@@ -362,7 +362,7 @@ impl SqliteBudgetStore {
                 authority
                     .map(|value| budget_u64_to_sqlite(value.lease_epoch, "lease_epoch"))
                     .transpose()?,
-                unix_now(),
+                self.unix_now()?,
                 budget_u64_to_sqlite(hold.remaining_exposure, "previous_hold_exposure")?,
             ],
         )?;
@@ -371,7 +371,7 @@ impl SqliteBudgetStore {
                 "budget reversal compare-and-set failed".to_string(),
             ));
         }
-        let event = SqliteBudgetStore::append_mutation_event(
+        let event = self.append_mutation_event(
             &transaction,
             Some(event_id),
             Some(hold_id),
@@ -548,7 +548,7 @@ impl SqliteBudgetStore {
             .try_sub(ExposureUnits::new(hold.remaining_exposure))?
             .get();
         usage.seq = event_seq;
-        usage.updated_at = unix_now();
+        usage.updated_at = self.unix_now()?;
         write_usage(&transaction, &usage_before, &usage)?;
         for state in &quota_after {
             write_quota_state(&transaction, state)?;
@@ -595,7 +595,7 @@ impl SqliteBudgetStore {
                 authority
                     .map(|value| budget_u64_to_sqlite(value.lease_epoch, "lease_epoch"))
                     .transpose()?,
-                unix_now(),
+                self.unix_now()?,
                 budget_u64_to_sqlite(hold.remaining_exposure, "previous_hold_exposure")?,
             ],
         )?;
@@ -604,7 +604,7 @@ impl SqliteBudgetStore {
                 "captured cancellation compare-and-set failed".to_string(),
             ));
         }
-        let event = SqliteBudgetStore::append_mutation_event(
+        let event = self.append_mutation_event(
             &transaction,
             Some(&request.event_id),
             Some(&request.hold_id),
@@ -777,7 +777,7 @@ impl SqliteBudgetStore {
         usage.total_cost_exposed = balance.exposed();
         usage.total_cost_realized_spend = balance.spent();
         usage.seq = event_seq;
-        usage.updated_at = unix_now();
+        usage.updated_at = self.unix_now()?;
         write_usage(transaction, &usage_before, &usage)?;
         let next_authority = authority.or(hold.authority.as_ref());
         let changed = transaction.execute(
@@ -798,7 +798,7 @@ impl SqliteBudgetStore {
                 next_authority
                     .map(|value| budget_u64_to_sqlite(value.lease_epoch, "lease_epoch"))
                     .transpose()?,
-                unix_now(),
+                self.unix_now()?,
                 budget_u64_to_sqlite(hold.remaining_exposure, "previous_hold_exposure")?,
             ],
         )?;
@@ -807,7 +807,7 @@ impl SqliteBudgetStore {
                 "budget settlement compare-and-set failed".to_string(),
             ));
         }
-        let event = SqliteBudgetStore::append_mutation_event(
+        let event = self.append_mutation_event(
             transaction,
             Some(event_id),
             Some(hold_id),

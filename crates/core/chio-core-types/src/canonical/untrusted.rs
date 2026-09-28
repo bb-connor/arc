@@ -57,9 +57,8 @@ impl<'a> UntrustedJsonText<'a> {
         &self,
     ) -> Result<T, UntrustedJsonError> {
         let value: T = serde_json::from_str(self.text).map_err(UntrustedJsonError::Decode)?;
-        let canonical = zeroize::Zeroizing::new(
-            super::canonical_json_bytes(&value).map_err(UntrustedJsonError::Canonicalization)?,
-        );
+        let canonical = super::canonical_json_bytes_zeroizing(&value)
+            .map_err(UntrustedJsonError::Canonicalization)?;
         if canonical.as_slice() != self.text.as_bytes() {
             return Err(UntrustedJsonError::NonCanonical);
         }

@@ -84,43 +84,7 @@ def allow(expires: str, rationale: str, *, max_sites: int) -> BaselineEntry:
 # the least unchecked arithmetic are the cheapest to finish, so they come due
 # first. One shared date would leave the only available response being to move
 # the date again.
-BASELINE: dict[str, BaselineEntry] = {
-    "crates/platform/chio-store-sqlite/src/budget_store/reaper.rs": allow(
-        "2026-12-31",
-        "budget lease reaper reconciliation counters; capped until checked arithmetic or a quantity newtype replaces the operators",
-        max_sites=4,
-    ),
-    "crates/kernel/chio-kernel/src/budget_store/in_memory/trait_impl.rs": allow(
-        "2026-11-30",
-        "in-memory budget reconciliation counters; capped until checked arithmetic or a quantity newtype replaces the operators",
-        max_sites=2,
-    ),
-    "crates/kernel/chio-kernel/src/supplemental_quota.rs": allow(
-        "2026-11-30",
-        "supplemental quota domain-separated message length; capped until checked arithmetic or a quantity newtype replaces the operators",
-        max_sites=2,
-    ),
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/credit_exposure.rs": allow(
-        "2026-10-31",
-        "credit exposure authority expiry converted from milliseconds to seconds; capped until checked arithmetic or a quantity newtype replaces the operators",
-        max_sites=1,
-    ),
-    "crates/platform/chio-store-sqlite/src/budget_store/composite.rs": allow(
-        "2026-10-31",
-        "composite budget epoch converted from milliseconds to seconds; capped until checked arithmetic or a quantity newtype replaces the operators",
-        max_sites=1,
-    ),
-    "crates/platform/chio-store-sqlite/src/budget_store/store.rs": allow(
-        "2026-10-31",
-        "SQLite budget store lease generation successor; capped until checked arithmetic or a quantity newtype replaces the operators",
-        max_sites=1,
-    ),
-    "crates/platform/chio-store-sqlite/src/serving_owner/lease_history.rs": allow(
-        "2026-11-30",
-        "serving-owner lease history epoch predecessor; capped until checked arithmetic or a quantity newtype replaces the operators",
-        max_sites=1,
-    ),
-}
+BASELINE: dict[str, BaselineEntry] = {}
 
 
 PATH_WORDS = re.compile(r"[^a-z0-9]+")

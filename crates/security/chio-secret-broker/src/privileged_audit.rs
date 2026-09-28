@@ -264,22 +264,13 @@ impl SignedBrokerPrivilegedAuditChallenge {
                 "privileged audit challenge is empty or oversized".to_string(),
             ));
         }
-        let challenge: Self = serde_json::from_slice(bytes).map_err(|error| {
-            BrokerError::InvalidRequest(format!(
-                "privileged audit challenge decoding failed: {error}"
-            ))
-        })?;
+        let challenge: Self = chio_core_types::canonical::UntrustedJsonText::from_wire(
+            bytes,
+            MAX_AUDIT_CONTROL_FRAME_BYTES,
+        )
+        .and_then(|text| text.decode_canonical())
+        .map_err(BrokerError::UntrustedInput)?;
         verify_broker_privileged_audit_challenge(&challenge, trusted_broker)?;
-        if canonical_json_bytes(&challenge).map_err(|error| {
-            BrokerError::InvalidRequest(format!(
-                "privileged audit challenge encoding failed: {error}"
-            ))
-        })? != bytes
-        {
-            return Err(BrokerError::InvalidRequest(
-                "privileged audit challenge is not canonical JSON".to_string(),
-            ));
-        }
         Ok(challenge)
     }
 }
@@ -549,24 +540,15 @@ impl BrokerPrivilegedAuditEvidenceBundle {
                 "privileged audit evidence is empty or oversized".to_string(),
             ));
         }
-        let bundle: Self = serde_json::from_slice(bytes).map_err(|error| {
-            BrokerError::InvalidRequest(format!(
-                "privileged audit evidence decoding failed: {error}"
-            ))
-        })?;
+        let bundle: Self = chio_core_types::canonical::UntrustedJsonText::from_wire(
+            bytes,
+            MAX_AUDIT_EVIDENCE_FRAME_BYTES,
+        )
+        .and_then(|text| text.decode_canonical())
+        .map_err(BrokerError::UntrustedInput)?;
         bundle.validate()?;
         verify_broker_privileged_audit_challenge(&bundle.challenge, trusted_broker)?;
         verify_broker_audit_comparison(&bundle.comparison, trusted_broker)?;
-        let canonical = Zeroizing::new(canonical_json_bytes(&bundle).map_err(|error| {
-            BrokerError::InvalidRequest(format!(
-                "privileged audit evidence encoding failed: {error}"
-            ))
-        })?);
-        if canonical.as_slice() != bytes {
-            return Err(BrokerError::InvalidRequest(
-                "privileged audit evidence is not canonical JSON".to_string(),
-            ));
-        }
         Ok(bundle)
     }
 
@@ -791,7 +773,7 @@ impl BrokerPrivilegedAuditEndpoint {
             self.config.authorized_runner_gid,
         )?;
         let mut open: BrokerPrivilegedAuditOpenRequest =
-            read_canonical_frame(&mut stream, MAX_AUDIT_OPEN_FRAME_BYTES, "open")?;
+            read_canonical_frame(&mut stream, MAX_AUDIT_OPEN_FRAME_BYTES)?;
         let reference = open.take_reference()?;
         let issued_at_unix_seconds = self.handler.now_unix_seconds()?;
         let expires_at_unix_seconds = issued_at_unix_seconds
@@ -837,7 +819,7 @@ impl BrokerPrivilegedAuditEndpoint {
             "challenge",
         )?;
         let mut commit: BrokerPrivilegedAuditCommitRequest =
-            read_canonical_frame(&mut stream, MAX_AUDIT_CONTROL_FRAME_BYTES, "commit")?;
+            read_canonical_frame(&mut stream, MAX_AUDIT_CONTROL_FRAME_BYTES)?;
         commit.validate_for(&challenge)?;
         if self.handler.now_unix_seconds()? >= challenge.body.expires_at_unix_seconds {
             return Err(BrokerError::AuthorizationDenied(
@@ -994,7 +976,6 @@ impl Write for AuditDeadlineIo {
 fn read_canonical_frame<T: DeserializeOwned + Serialize>(
     reader: &mut AuditDeadlineIo,
     maximum: usize,
-    phase: &str,
 ) -> Result<T> {
     let bytes = Zeroizing::new(read_frame(reader, maximum).map_err(|error| {
         if reader.read_deadline_setup_failed {
@@ -1005,17 +986,10 @@ fn read_canonical_frame<T: DeserializeOwned + Serialize>(
             error
         }
     })?);
-    let decoded: T = serde_json::from_slice(bytes.as_slice()).map_err(|error| {
-        BrokerError::InvalidRequest(format!("privileged audit {phase} decoding failed: {error}"))
-    })?;
-    let canonical = Zeroizing::new(canonical_json_bytes(&decoded).map_err(|error| {
-        BrokerError::InvalidRequest(format!("privileged audit {phase} encoding failed: {error}"))
-    })?);
-    if canonical.as_slice() != bytes.as_slice() {
-        return Err(BrokerError::InvalidRequest(format!(
-            "privileged audit {phase} is not canonical JSON"
-        )));
-    }
+    let decoded: T = chio_core_types::canonical::UntrustedJsonText::from_wire(&bytes, maximum)
+        .and_then(|text| text.decode_canonical())
+        .map_err(BrokerError::UntrustedInput)?;
+
     Ok(decoded)
 }
 

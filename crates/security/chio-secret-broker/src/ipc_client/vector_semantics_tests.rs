@@ -40,6 +40,7 @@ enum ErrorKind {
     InvalidRequest,
     AuthorizationDenied,
     ResponseRejected,
+    NonCanonical,
 }
 
 const SEMANTIC_CASES: [(&str, &str, ErrorKind, &str); 19] = [
@@ -52,8 +53,8 @@ const SEMANTIC_CASES: [(&str, &str, ErrorKind, &str); 19] = [
     (
         "capability_noncanonical_trailing_newline",
         "noncanonical_capability_bytes",
-        ErrorKind::AuthorizationDenied,
-        "is not canonical JSON",
+        ErrorKind::NonCanonical,
+        "urn:chio:error:attest:signed-json-noncanonical",
     ),
     (
         "capability_parent_self_binding",
@@ -474,6 +475,9 @@ fn completion_receipt_authority() -> PublicKey {
 
 fn assert_error(id: &str, error: &BrokerError, kind: ErrorKind, message: &str) {
     let actual_kind = match error {
+        BrokerError::UntrustedInput(
+            chio_core_types::canonical::UntrustedJsonError::NonCanonical,
+        ) => ErrorKind::NonCanonical,
         BrokerError::InvalidRequest(_) => ErrorKind::InvalidRequest,
         BrokerError::AuthorizationDenied(_) => ErrorKind::AuthorizationDenied,
         BrokerError::ResponseRejected(_) => ErrorKind::ResponseRejected,

@@ -602,19 +602,27 @@ pub(crate) fn validate_adopted_claim_log_delta(
     // gap so the whole adopted delta is rejected, mirroring the contiguity rule
     // enforced for the checkpoint build range. `entries` is ordered ASC by the
     // query above.
-    let mut expected_seq = effective_floor.saturating_add(1);
+    let mut expected_seq = effective_floor
+        .checked_add(1)
+        .ok_or_else(|| ReceiptStoreError::Conflict("claim log sequence overflow".into()))?;
     for (entry_seq, _, _) in &entries {
         if *entry_seq != expected_seq {
             return Err(ReceiptStoreError::Conflict(format!(
                 "adopted claim receipt log delta ({effective_floor}, {max_entry_seq}] is not contiguous: expected entry_seq {expected_seq}, found {entry_seq}; run `chio receipt audit`"
             )));
         }
-        expected_seq = expected_seq.saturating_add(1);
+        expected_seq = expected_seq
+            .checked_add(1)
+            .ok_or_else(|| ReceiptStoreError::Conflict("claim log sequence overflow".into()))?;
     }
-    if expected_seq != max_entry_seq.saturating_add(1) {
+    if expected_seq
+        != max_entry_seq
+            .checked_add(1)
+            .ok_or_else(|| ReceiptStoreError::Conflict("claim log sequence overflow".into()))?
+    {
         return Err(ReceiptStoreError::Conflict(format!(
             "adopted claim receipt log delta ({effective_floor}, {max_entry_seq}] is missing trailing entries after entry_seq {}; run `chio receipt audit`",
-            expected_seq.saturating_sub(1)
+            expected_seq.checked_sub(1).ok_or_else(|| ReceiptStoreError::Conflict("claim log sequence underflow".into()))?
         )));
     }
     for (entry_seq, receipt_id, receipt_kind) in entries {

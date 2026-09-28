@@ -94,13 +94,13 @@ fn signing_keys() -> LocalAuthoritySigningKeysDocument {
         schema: LOCAL_SIGNING_KEYS_SCHEMA.to_string(),
         lease_authority_seeds: vec![crate::NamedSeedHex {
             id: "did:chio:buyer-kernel".to_string(),
-            seed_hex: hex::encode([11u8; 32]),
+            seed_hex: hex::encode([11u8; 32]).into(),
         }],
         governance_authority_seeds: vec![crate::NamedSeedHex {
             id: "did:chio:buyer-governance".to_string(),
-            seed_hex: hex::encode([12u8; 32]),
+            seed_hex: hex::encode([12u8; 32]).into(),
         }],
-        revocation_authority_seed_hex: hex::encode([13u8; 32]),
+        revocation_authority_seed_hex: hex::encode([13u8; 32]).into(),
     }
 }
 
@@ -536,4 +536,37 @@ fn trust_bundle_assembly_requires_reference_workflow_classes() {
     assert!(error
         .to_string()
         .contains(WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID));
+}
+
+#[test]
+fn authority_readers_reject_duplicate_fields_before_validation() {
+    let json = crate::authority_profile_json(&profile()).expect("profile");
+    let duplicate = json.replacen("{", "{\"schema\":\"duplicate\",", 1);
+    assert!(matches!(
+        crate::authority_profile_from_json(&duplicate),
+        Err(crate::ChioAuthorityError::UntrustedInput(
+            chio_core_types::canonical::UntrustedJsonError::SignedInput(_)
+        ))
+    ));
+}
+
+#[test]
+fn signing_key_custody_is_canonical_zeroizing_and_redacted() {
+    let keys = signing_keys();
+    let encoded = crate::signing_keys_json(&keys).expect("canonical custody");
+    assert_eq!(
+        crate::signing_keys_from_json(&encoded).expect("decode"),
+        keys
+    );
+    let debug = format!("{keys:?} {:?}", keys.lease_authority_seeds);
+    for seed in [11, 12, 13] {
+        assert!(!debug.contains(&hex::encode([seed; 32])));
+    }
+    let altered = format!(" {}", &*encoded);
+    assert!(matches!(
+        crate::signing_keys_from_json(&altered),
+        Err(crate::ChioAuthorityError::UntrustedInput(
+            chio_core_types::canonical::UntrustedJsonError::NonCanonical
+        ))
+    ));
 }

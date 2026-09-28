@@ -7,6 +7,9 @@ use crate::supplemental_quota::CanonicalRevocationSet;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BudgetStoreError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
+
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
 

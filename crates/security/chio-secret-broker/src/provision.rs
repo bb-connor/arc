@@ -1046,18 +1046,13 @@ fn verify_governed_admin_authorization_inner(
 ) -> Result<VerifiedGovernedAdminAuthorization> {
     validate_digest(intent_digest, "governed admin intent digest")?;
     let envelope: GovernedAdminAuthorizationEnvelope =
-        serde_json::from_slice(authorization.as_bytes()).map_err(|error| {
-            BrokerError::AuthorizationDenied(format!(
-                "governed admin authorization decoding failed: {error}"
-            ))
-        })?;
+        chio_core_types::canonical::UntrustedJsonText::from_wire(
+            authorization.as_bytes(),
+            crate::protocol::MAX_WIRE_BYTES,
+        )
+        .and_then(|text| text.decode_canonical())
+        .map_err(BrokerError::UntrustedInput)?;
     envelope.validate_shape()?;
-    let canonical = envelope.canonical_bytes()?;
-    if canonical != authorization.as_bytes() {
-        return Err(BrokerError::AuthorizationDenied(
-            "governed admin authorization is not canonical JSON".to_string(),
-        ));
-    }
     if envelope.approvals.len() != policy.threshold {
         return Err(BrokerError::AuthorizationDenied(
             "governed admin authorization does not satisfy the exact threshold".to_string(),
@@ -1130,7 +1125,7 @@ fn verify_governed_admin_authorization_inner(
     }
     let mut hasher = Sha256::new();
     hasher.update(GOVERNED_ADMIN_AUTHORIZATION_DOMAIN);
-    hasher.update(&canonical);
+    hasher.update(authorization.as_bytes());
     let authorization_digest = hex::encode(hasher.finalize());
     Ok(VerifiedGovernedAdminAuthorization {
         request_id: request_id
@@ -1193,21 +1188,16 @@ impl AuthorizedAdminOperation {
 
 fn authorization_digest_for_lookup(authorization: &AdminAuthorization) -> Result<String> {
     let envelope: GovernedAdminAuthorizationEnvelope =
-        serde_json::from_slice(authorization.as_bytes()).map_err(|error| {
-            BrokerError::AuthorizationDenied(format!(
-                "governed admin authorization decoding failed: {error}"
-            ))
-        })?;
+        chio_core_types::canonical::UntrustedJsonText::from_wire(
+            authorization.as_bytes(),
+            crate::protocol::MAX_WIRE_BYTES,
+        )
+        .and_then(|text| text.decode_canonical())
+        .map_err(BrokerError::UntrustedInput)?;
     envelope.validate_shape()?;
-    let canonical = envelope.canonical_bytes()?;
-    if canonical != authorization.as_bytes() {
-        return Err(BrokerError::AuthorizationDenied(
-            "governed admin authorization is not canonical JSON".to_string(),
-        ));
-    }
     let mut hasher = Sha256::new();
     hasher.update(GOVERNED_ADMIN_AUTHORIZATION_DOMAIN);
-    hasher.update(canonical);
+    hasher.update(authorization.as_bytes());
     Ok(hex::encode(hasher.finalize()))
 }
 
@@ -1306,21 +1296,12 @@ fn decode_admin_mutation_receipt(
     trusted_mutation_receipt_signer: &PublicKey,
 ) -> Result<SignedAdminMutationReceipt> {
     let receipt: SignedAdminMutationReceipt =
-        serde_json::from_slice(&canonical).map_err(|error| {
-            BrokerError::Storage(format!(
-                "persisted admin mutation receipt decoding failed: {error}"
-            ))
-        })?;
-    let reencoded = canonical_json_bytes(&receipt).map_err(|error| {
-        BrokerError::Storage(format!(
-            "persisted admin mutation receipt encoding failed: {error}"
-        ))
-    })?;
-    if reencoded != canonical {
-        return Err(BrokerError::Storage(
-            "persisted admin mutation receipt is not canonical JSON".to_string(),
-        ));
-    }
+        chio_core_types::canonical::UntrustedJsonText::from_wire(
+            &canonical,
+            crate::protocol::MAX_WIRE_BYTES,
+        )
+        .and_then(|text| text.decode_canonical())
+        .map_err(BrokerError::UntrustedInput)?;
     verify_trusted_admin_mutation_receipt(&receipt, trusted_mutation_receipt_signer)?;
     Ok(receipt)
 }
@@ -1381,21 +1362,12 @@ fn load_admin_control_completion(
         ));
     }
     let receipt: SignedAdminControlReceipt =
-        serde_json::from_slice(&canonical).map_err(|error| {
-            BrokerError::Storage(format!(
-                "persisted admin control receipt decoding failed: {error}"
-            ))
-        })?;
-    let reencoded = canonical_json_bytes(&receipt).map_err(|error| {
-        BrokerError::Storage(format!(
-            "persisted admin control receipt encoding failed: {error}"
-        ))
-    })?;
-    if reencoded != canonical {
-        return Err(BrokerError::Storage(
-            "persisted admin control receipt is not canonical JSON".to_string(),
-        ));
-    }
+        chio_core_types::canonical::UntrustedJsonText::from_wire(
+            &canonical,
+            crate::protocol::MAX_WIRE_BYTES,
+        )
+        .and_then(|text| text.decode_canonical())
+        .map_err(BrokerError::UntrustedInput)?;
     verify_admin_control_receipt(&receipt)?;
     if receipt.body.operation_id != operation_id
         || receipt.body.response_digest != hex::encode(Sha256::digest(&response))
